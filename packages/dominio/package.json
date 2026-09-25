@@ -1,0 +1,19 @@
+{
+  "name": "@celda/dominio",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./area": "./src/area.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
