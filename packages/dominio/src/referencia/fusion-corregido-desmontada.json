@@ -1,0 +1,61 @@
+[
+  {
+    "clave": "movistar-0802314",
+    "posicion": {
+      "longitud": 2.122967,
+      "latitud": 41.386032
+    },
+    "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "corregido",
+    "confianza": "baja",
+    "conflictos": [
+      {
+        "tipo": "desmontada",
+        "compania": "movistar",
+        "procedencia": {
+          "fuente": "antenasmoviles",
+          "clave": "MOVISTAR - 0802314"
+        },
+        "fecha": 1790467200000
+      }
+    ],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0802314"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "MOVISTAR - 0802314"
+          },
+          {
+            "fuente": "antenasmoviles",
+            "clave": "MOVISTAR - 0802314"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR0377Z"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE - CATR0377Z"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "antenasmoviles",
+      "registro-oficial"
+    ],
+    "datosDel": 1790467200000
+  }
+]

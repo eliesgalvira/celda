@@ -45,3 +45,18 @@ export const contiene = (rectangulo: Rectangulo, punto: Coordenada): boolean =>
   punto.longitud <= rectangulo.noreste.longitud &&
   punto.latitud >= rectangulo.suroeste.latitud &&
   punto.latitud <= rectangulo.noreste.latitud;
+
+/** Radio medio de la Tierra en metros (IUGG). */
+const RADIO_TIERRA_METROS = 6_371_008.8;
+
+/**
+ * Distancia en metros entre dos puntos cercanos, con la aproximación equirectangular. A las
+ * distancias que usa la fusión (decenas de metros) el error es de milímetros.
+ */
+export const distanciaMetros = (a: Coordenada, b: Coordenada): number => {
+  const radianes = Math.PI / 180;
+  const latitudMedia = ((a.latitud + b.latitud) / 2) * radianes;
+  const x = (b.longitud - a.longitud) * radianes * Math.cos(latitudMedia);
+  const y = (b.latitud - a.latitud) * radianes;
+  return Math.hypot(x, y) * RADIO_TIERRA_METROS;
+};

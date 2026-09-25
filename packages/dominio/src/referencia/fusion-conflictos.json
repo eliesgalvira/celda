@@ -1,0 +1,105 @@
+[
+  {
+    "clave": "movistar-0800977",
+    "posicion": {
+      "longitud": 2.122967,
+      "latitud": 41.386032
+    },
+    "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "baja",
+    "conflictos": [
+      {
+        "tipo": "codigos-distintos",
+        "compania": "movistar",
+        "codigos": [
+          "800977",
+          "MV-BCN-5"
+        ]
+      },
+      {
+        "tipo": "posicion-distinta",
+        "compania": "orange",
+        "codigo": "CATR6046A",
+        "metros": 500
+      }
+    ],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0800977",
+          "MV-BCN-5"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "antenasmoviles",
+            "clave": "MOVISTAR - MV-BCN-5"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "MOVISTAR - 0800977"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR6046A"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE - CATR6046A"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "antenasmoviles",
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "orange-CATR6046A",
+    "posicion": {
+      "longitud": 2.12896,
+      "latitud": 41.386032
+    },
+    "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "baja",
+    "conflictos": [
+      {
+        "tipo": "posicion-distinta",
+        "compania": "orange",
+        "codigo": "CATR6046A",
+        "metros": 500
+      }
+    ],
+    "estaciones": [
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR6046A"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE - CATR6046A"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  }
+]

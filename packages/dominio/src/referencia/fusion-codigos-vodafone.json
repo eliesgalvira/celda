@@ -1,0 +1,65 @@
+[
+  {
+    "clave": "vodafone-000647",
+    "posicion": {
+      "longitud": 2.122967,
+      "latitud": 41.386032
+    },
+    "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "000647",
+          "00647",
+          "647"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -1900000",
+            "compania": "vodafone",
+            "rangos": [],
+            "mhz": 900,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -1900010",
+            "compania": "vodafone",
+            "rangos": [],
+            "mhz": 900,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -1900020",
+            "compania": "vodafone",
+            "rangos": [],
+            "mhz": 900,
+            "anio": 2024
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE - 000647"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE - 00647"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE - 647"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  }
+]

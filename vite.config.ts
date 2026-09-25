@@ -11,11 +11,22 @@ export default defineConfig({
       "flake.lock",
       "**/*.md",
       "*.html",
+      // Respuestas grabadas byte a byte y resultados de referencia de las pruebas.
+      "docs/investigacion/muestras/**",
+      "**/referencia/**",
+      // Código que generan Confect y Convex.
+      "convex/convex/**",
+      "convex/confect/_generated/**",
     ],
     sortPackageJson: {},
   },
   lint: {
-    ignorePatterns: [...IGNORADOS, "tools/oxlint-plugin-celda/anti-slop/**"],
+    ignorePatterns: [
+      ...IGNORADOS,
+      "tools/oxlint-plugin-celda/anti-slop/**",
+      "convex/convex/**",
+      "convex/confect/_generated/**",
+    ],
     plugins: ["eslint", "oxc", "unicorn", "typescript", "jsx-a11y"],
     jsPlugins: [
       "./tools/oxlint-plugin-celda/index.ts",

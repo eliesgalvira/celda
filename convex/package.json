@@ -1,0 +1,28 @@
+{
+  "name": "@celda/convex",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "codegen": "confect codegen",
+    "backend": "./scripts/backend.sh",
+    "typecheck": "confect codegen && tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@celda/dominio": "workspace:*",
+    "@celda/ingesta": "workspace:*",
+    "@confect/core": "catalog:",
+    "@confect/server": "catalog:",
+    "convex": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@confect/cli": "catalog:",
+    "@confect/test": "catalog:",
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "convex-test": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
