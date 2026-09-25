@@ -1,0 +1,19 @@
+{
+  "name": "@celda/oxlint-plugin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@oxlint/plugins": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "oxlint": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
