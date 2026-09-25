@@ -1,0 +1,1204 @@
+{
+ "fuente": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do",
+ "consultado": "2026-09-26",
+ "nota": "Fichas del área de Campus Nord, Les Corts y Pedralbes convertidas de HTML a JSON con herramientas/det.py. Los valores son texto tal como los publica el registro.",
+ "fichas": [
+  {
+   "codigo": "ORANGE ESPAGNE, S.A.U. - CATR0228A",
+   "direccion": "PZ EUSEBI GÜELL, 1. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2403167",
+     "banda_mhz": "2120.00 - 2140.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2403159",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2403161",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2403163",
+     "banda_mhz": "832.00 - 842.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2403165",
+     "banda_mhz": "1855.10 - 1879.90"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2403166",
+     "banda_mhz": "758.00 - 768.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "80.0",
+     "acimut_grados": "175.0",
+     "valor_uw_cm2": "0.98806"
+    },
+    {
+     "distancia_m": "75.0",
+     "acimut_grados": "146.0",
+     "valor_uw_cm2": "0.59683"
+    },
+    {
+     "distancia_m": "32.0",
+     "acimut_grados": "36.0",
+     "valor_uw_cm2": "0.19618"
+    },
+    {
+     "distancia_m": "89.0",
+     "acimut_grados": "125.0",
+     "valor_uw_cm2": "0.58890"
+    },
+    {
+     "distancia_m": "77.0",
+     "acimut_grados": "138.0",
+     "valor_uw_cm2": "0.58890"
+    },
+    {
+     "distancia_m": "51.0",
+     "acimut_grados": "146.0",
+     "valor_uw_cm2": "0.42784"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR0228A&codEmplazamiento=ORANGE+ESPAGNE%2C+S.A.U.+-+CATR0228A"
+  },
+  {
+   "codigo": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802532",
+   "direccion": "PZ Eusebi Güell, 1. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1900103",
+     "banda_mhz": "1805.10 - 1825.10"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2102124",
+     "banda_mhz": "2620.00 - 2640.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2300446",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2102125",
+     "banda_mhz": "2155.00 - 2170.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2300445",
+     "banda_mhz": "778.00 - 788.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2300444",
+     "banda_mhz": "3460.00 - 3600.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1900102",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1902346",
+     "banda_mhz": "852.00 - 862.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "85.0",
+     "acimut_grados": "60.0",
+     "valor_uw_cm2": "0.18717"
+    },
+    {
+     "distancia_m": "39.0",
+     "acimut_grados": "114.0",
+     "valor_uw_cm2": "0.38836"
+    },
+    {
+     "distancia_m": "78.0",
+     "acimut_grados": "182.0",
+     "valor_uw_cm2": "0.80310"
+    },
+    {
+     "distancia_m": "79.0",
+     "acimut_grados": "245.0",
+     "valor_uw_cm2": "1.45245"
+    },
+    {
+     "distancia_m": "76.0",
+     "acimut_grados": "351.0",
+     "valor_uw_cm2": "0.11207"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0802532&codEmplazamiento=TELEFONICA+MOVILES+ESPA%C3%91A%2C+S.A.U.+-+0802532"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A.U. - 086040",
+   "direccion": "CL JORDI GIRONA, 1. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -1900926",
+     "banda_mhz": "949.90 - 959.90"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2200007",
+     "banda_mhz": "768.00 - 778.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "70.0",
+     "acimut_grados": "220.0",
+     "valor_uw_cm2": "0.19165"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=086040&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.U.+-+086040"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A.U. - 86040",
+   "direccion": "PZ EUSEBI GÜEL, 1. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2301676",
+     "banda_mhz": "1825.10 - 1845.10"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2301675",
+     "banda_mhz": "842.00 - 852.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "70.0",
+     "acimut_grados": "220.0",
+     "valor_uw_cm2": "0.19165"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=86040&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.U.+-+86040"
+  },
+  {
+   "codigo": "DS MOBILE NETWORKS, S.L. - 0800143",
+   "direccion": "VP Esplugues, 28. HOSPITALET DE LLOBREGAT (L'), BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "DS MOBILE NETWORKS, S.L.",
+     "referencia": "B B -2601294",
+     "banda_mhz": "1845.10 - 1855.10"
+    },
+    {
+     "operador": "DS MOBILE NETWORKS, S.L.",
+     "referencia": "B B -2601605",
+     "banda_mhz": "2110.00 - 2120.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "47.0",
+     "acimut_grados": "1.0",
+     "valor_uw_cm2": "0.46922"
+    },
+    {
+     "distancia_m": "49.0",
+     "acimut_grados": "301.0",
+     "valor_uw_cm2": "0.23438"
+    },
+    {
+     "distancia_m": "97.0",
+     "acimut_grados": "187.0",
+     "valor_uw_cm2": "0.19165"
+    },
+    {
+     "distancia_m": "15.0",
+     "acimut_grados": "214.0",
+     "valor_uw_cm2": "1.00864"
+    },
+    {
+     "distancia_m": "58.0",
+     "acimut_grados": "273.0",
+     "valor_uw_cm2": "0.18274"
+    },
+    {
+     "distancia_m": "98.0",
+     "acimut_grados": "297.0",
+     "valor_uw_cm2": "0.19165"
+    },
+    {
+     "distancia_m": "82.0",
+     "acimut_grados": "55.0",
+     "valor_uw_cm2": "0.29804"
+    },
+    {
+     "distancia_m": "48.0",
+     "acimut_grados": "89.0",
+     "valor_uw_cm2": "0.37563"
+    },
+    {
+     "distancia_m": "38.0",
+     "acimut_grados": "182.0",
+     "valor_uw_cm2": "0.20542"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0800143&codEmplazamiento=DS+MOBILE+NETWORKS%2C+S.L.+-+0800143"
+  },
+  {
+   "codigo": "ORANGE ESPAGNE, S.A.U. - CATR0508Z",
+   "direccion": "AV DIAGONAL, 647. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -0430892",
+     "banda_mhz": "2125.00 - 2140.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1300472",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1300473",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1400050",
+     "banda_mhz": "2640.00 - 2660.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1900732",
+     "banda_mhz": "2680.00 - 2690.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1802810",
+     "banda_mhz": "832.00 - 842.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1502907",
+     "banda_mhz": "1855.10 - 1879.90"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1902467",
+     "banda_mhz": "3600.00 - 3700.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2201664",
+     "banda_mhz": "758.00 - 768.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1901731",
+     "banda_mhz": "2120.00 - 2140.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "60.0",
+     "acimut_grados": "25.0",
+     "valor_uw_cm2": "0.18274"
+    },
+    {
+     "distancia_m": "30.0",
+     "acimut_grados": "75.0",
+     "valor_uw_cm2": "0.12629"
+    },
+    {
+     "distancia_m": "55.0",
+     "acimut_grados": "170.0",
+     "valor_uw_cm2": "0.07173"
+    },
+    {
+     "distancia_m": "99.0",
+     "acimut_grados": "265.0",
+     "valor_uw_cm2": "0.29245"
+    },
+    {
+     "distancia_m": "95.0",
+     "acimut_grados": "315.0",
+     "valor_uw_cm2": "0.38197"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR0508Z&codEmplazamiento=ORANGE+ESPAGNE%2C+S.A.U.+-+CATR0508Z"
+  },
+  {
+   "codigo": "ORANGE ESPAGNE, S.A.U. - CATR0514A",
+   "direccion": "AV DIAGIONAL. N2-716, 712. HOSPITALET DE LLOBREGAT (L'), BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2000438",
+     "banda_mhz": "1855.10 - 1879.90"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2100634",
+     "banda_mhz": "2120.00 - 2140.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2001233",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2001232",
+     "banda_mhz": "925.10 - 935.10"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "90.0",
+     "acimut_grados": "40.0",
+     "valor_uw_cm2": "0.31515"
+    },
+    {
+     "distancia_m": "93.0",
+     "acimut_grados": "217.0",
+     "valor_uw_cm2": "0.37563"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR0514A&codEmplazamiento=ORANGE+ESPAGNE%2C+S.A.U.+-+CATR0514A"
+  },
+  {
+   "codigo": "ORANGE ESPAGNE, S.A.U. - CATR2756A",
+   "direccion": "AV DIAGONAL, 687. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2302081",
+     "banda_mhz": "2120.00 - 2140.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1801725",
+     "banda_mhz": "832.00 - 842.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1302019",
+     "banda_mhz": "1855.10 - 1879.90"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2401653",
+     "banda_mhz": "3600.00 - 3700.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2401654",
+     "banda_mhz": "758.00 - 768.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2401648",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1202130",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2302075",
+     "banda_mhz": "2640.00 - 2660.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "10.0",
+     "acimut_grados": "40.0",
+     "valor_uw_cm2": "0.08024"
+    },
+    {
+     "distancia_m": "85.0",
+     "acimut_grados": "130.0",
+     "valor_uw_cm2": "0.09870"
+    },
+    {
+     "distancia_m": "40.0",
+     "acimut_grados": "140.0",
+     "valor_uw_cm2": "0.25475"
+    },
+    {
+     "distancia_m": "70.0",
+     "acimut_grados": "150.0",
+     "valor_uw_cm2": "0.32682"
+    },
+    {
+     "distancia_m": "99.0",
+     "acimut_grados": "170.0",
+     "valor_uw_cm2": "0.25998"
+    },
+    {
+     "distancia_m": "95.0",
+     "acimut_grados": "310.0",
+     "valor_uw_cm2": "0.11207"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR2756A&codEmplazamiento=ORANGE+ESPAGNE%2C+S.A.U.+-+CATR2756A"
+  },
+  {
+   "codigo": "ORANGE ESPAGNE, S.A.U. - CATR3023B",
+   "direccion": "AV ESPLUGUES, 92. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -0600159",
+     "banda_mhz": "2125.00 - 2140.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1201674",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1201683",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1400180",
+     "banda_mhz": "2640.00 - 2660.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2302710",
+     "banda_mhz": "832.00 - 842.00"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2302713",
+     "banda_mhz": "1855.10 - 1879.90"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -2302721",
+     "banda_mhz": "2120.00 - 2140.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "82.0",
+     "acimut_grados": "32.0",
+     "valor_uw_cm2": "0.68758"
+    },
+    {
+     "distancia_m": "30.0",
+     "acimut_grados": "325.0",
+     "valor_uw_cm2": "0.41447"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR3023B&codEmplazamiento=ORANGE+ESPAGNE%2C+S.A.U.+-+CATR3023B"
+  },
+  {
+   "codigo": "ORANGE ESPAGNE, S.A.U. - CATR6190A",
+   "direccion": "AV DIAGONAL, 661. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1701716",
+     "banda_mhz": "925.10 - 935.10"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1900796",
+     "banda_mhz": "1859.90 - 1879.90"
+    },
+    {
+     "operador": "ORANGE ESPAGNE, S.A.U.",
+     "referencia": "B B -1701717",
+     "banda_mhz": "925.10 - 935.10"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "20.0",
+     "acimut_grados": "40.0",
+     "valor_uw_cm2": "0.63728"
+    },
+    {
+     "distancia_m": "20.0",
+     "acimut_grados": "190.0",
+     "valor_uw_cm2": "0.33871"
+    },
+    {
+     "distancia_m": "20.0",
+     "acimut_grados": "200.0",
+     "valor_uw_cm2": "0.01061"
+    },
+    {
+     "distancia_m": "20.0",
+     "acimut_grados": "270.0",
+     "valor_uw_cm2": "0.02889"
+    },
+    {
+     "distancia_m": "10.0",
+     "acimut_grados": "280.0",
+     "valor_uw_cm2": "0.01528"
+    },
+    {
+     "distancia_m": "20.0",
+     "acimut_grados": "280.0",
+     "valor_uw_cm2": ""
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR6190A&codEmplazamiento=ORANGE+ESPAGNE%2C+S.A.U.+-+CATR6190A"
+  },
+  {
+   "codigo": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800268",
+   "direccion": "AV PEDRALBES, 1. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2401286",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -0432119",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1200100",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1900059",
+     "banda_mhz": "852.00 - 862.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1301718",
+     "banda_mhz": "1805.10 - 1825.10"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2000681",
+     "banda_mhz": "2155.00 - 2170.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2401288",
+     "banda_mhz": "778.00 - 788.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1903447",
+     "banda_mhz": "2620.00 - 2640.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2401287",
+     "banda_mhz": "3460.00 - 3600.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "41.0",
+     "acimut_grados": "89.0",
+     "valor_uw_cm2": "0.18274"
+    },
+    {
+     "distancia_m": "60.0",
+     "acimut_grados": "260.0",
+     "valor_uw_cm2": "0.26526"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0800268&codEmplazamiento=TELEFONICA+MOVILES+ESPA%C3%91A%2C+S.A.U.+-+0800268"
+  },
+  {
+   "codigo": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800351",
+   "direccion": "AV Doctor Marañon, 17-31. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -0432249",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1200923",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1803104",
+     "banda_mhz": "852.00 - 862.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1301750",
+     "banda_mhz": "1805.10 - 1825.10"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2300925",
+     "banda_mhz": "2620.00 - 2640.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2201449",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2001391",
+     "banda_mhz": "2155.00 - 2170.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2201448",
+     "banda_mhz": "778.00 - 788.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2201447",
+     "banda_mhz": "3460.00 - 3600.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "69.0",
+     "acimut_grados": "3.0",
+     "valor_uw_cm2": "0.04459"
+    },
+    {
+     "distancia_m": "12.0",
+     "acimut_grados": "30.0",
+     "valor_uw_cm2": "0.19618"
+    },
+    {
+     "distancia_m": "52.0",
+     "acimut_grados": "80.0",
+     "valor_uw_cm2": "0.71344"
+    },
+    {
+     "distancia_m": "53.0",
+     "acimut_grados": "122.0",
+     "valor_uw_cm2": "0.29245"
+    },
+    {
+     "distancia_m": "97.0",
+     "acimut_grados": "331.0",
+     "valor_uw_cm2": "0.06369"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0800351&codEmplazamiento=TELEFONICA+MOVILES+ESPA%C3%91A%2C+S.A.U.+-+0800351"
+  },
+  {
+   "codigo": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800942",
+   "direccion": "VP Eusebi G³ell, 6. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -0900936",
+     "banda_mhz": "1910.00 - 1915.00; 2155.00 - 2170.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2201854",
+     "banda_mhz": "1805.10 - 1825.10"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "91.0",
+     "acimut_grados": "133.0",
+     "valor_uw_cm2": "0.10528"
+    },
+    {
+     "distancia_m": "64.0",
+     "acimut_grados": "193.0",
+     "valor_uw_cm2": "0.18274"
+    },
+    {
+     "distancia_m": "63.0",
+     "acimut_grados": "234.0",
+     "valor_uw_cm2": "0.12998"
+    },
+    {
+     "distancia_m": "29.0",
+     "acimut_grados": "277.0",
+     "valor_uw_cm2": "0.08923"
+    },
+    {
+     "distancia_m": "39.0",
+     "acimut_grados": "93.0",
+     "valor_uw_cm2": "0.08618"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0800942&codEmplazamiento=TELEFONICA+MOVILES+ESPA%C3%91A%2C+S.A.U.+-+0800942"
+  },
+  {
+   "codigo": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0801690",
+   "direccion": "AV DIAGONAL, 661-671. HOSPITALET DE LLOBREGAT (L'), BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -0434908",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1100492",
+     "banda_mhz": "2155.00 - 2170.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "40.0",
+     "acimut_grados": "40.0",
+     "valor_uw_cm2": "0.05860"
+    },
+    {
+     "distancia_m": "30.0",
+     "acimut_grados": "100.0",
+     "valor_uw_cm2": "0.06369"
+    },
+    {
+     "distancia_m": "30.0",
+     "acimut_grados": "140.0",
+     "valor_uw_cm2": "0.07173"
+    },
+    {
+     "distancia_m": "40.0",
+     "acimut_grados": "180.0",
+     "valor_uw_cm2": "0.07451"
+    },
+    {
+     "distancia_m": "40.0",
+     "acimut_grados": "230.0",
+     "valor_uw_cm2": "0.07451"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0801690&codEmplazamiento=TELEFONICA+MOVILES+ESPA%C3%91A%2C+S.A.U.+-+0801690"
+  },
+  {
+   "codigo": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802015",
+   "direccion": "AV Diagonal, 645. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -0700083",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1200049",
+     "banda_mhz": "935.10 - 949.90"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1502435",
+     "banda_mhz": "852.00 - 862.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2000152",
+     "banda_mhz": "2155.00 - 2170.00"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1301958",
+     "banda_mhz": "1805.10 - 1825.10"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -1900551",
+     "banda_mhz": "2620.00 - 2640.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "43.0",
+     "acimut_grados": "37.0",
+     "valor_uw_cm2": "0.86901"
+    },
+    {
+     "distancia_m": "96.0",
+     "acimut_grados": "128.0",
+     "valor_uw_cm2": "0.79389"
+    },
+    {
+     "distancia_m": "83.0",
+     "acimut_grados": "230.0",
+     "valor_uw_cm2": "0.68758"
+    },
+    {
+     "distancia_m": "31.0",
+     "acimut_grados": "310.0",
+     "valor_uw_cm2": "0.68758"
+    },
+    {
+     "distancia_m": "55.0",
+     "acimut_grados": "75.0",
+     "valor_uw_cm2": "0.70476"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0802015&codEmplazamiento=TELEFONICA+MOVILES+ESPA%C3%91A%2C+S.A.U.+-+0802015"
+  },
+  {
+   "codigo": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0807565",
+   "direccion": "AV Joan XXIII, 27. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2201839",
+     "banda_mhz": "1805.10 - 1825.10"
+    },
+    {
+     "operador": "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+     "referencia": "B B -2200203",
+     "banda_mhz": "1805.10 - 1825.10"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "79.0",
+     "acimut_grados": "58.0",
+     "valor_uw_cm2": "0.22451"
+    },
+    {
+     "distancia_m": "65.0",
+     "acimut_grados": "85.0",
+     "valor_uw_cm2": "0.05371"
+    },
+    {
+     "distancia_m": "99.0",
+     "acimut_grados": "112.0",
+     "valor_uw_cm2": "0.09870"
+    },
+    {
+     "distancia_m": "90.0",
+     "acimut_grados": "147.0",
+     "valor_uw_cm2": "0.04035"
+    },
+    {
+     "distancia_m": "47.0",
+     "acimut_grados": "319.0",
+     "valor_uw_cm2": "0.03249"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0807565&codEmplazamiento=TELEFONICA+MOVILES+ESPA%C3%91A%2C+S.A.U.+-+0807565"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A. - 028723",
+   "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.",
+     "referencia": "B B -1802229",
+     "banda_mhz": "1905.00 - 1910.00; 2140.00 - 2155.00"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.",
+     "referencia": "B B -1600031",
+     "banda_mhz": "1825.10 - 1845.10"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "50.0",
+     "acimut_grados": "90.0",
+     "valor_uw_cm2": "0.09549"
+    },
+    {
+     "distancia_m": "90.0",
+     "acimut_grados": "210.0",
+     "valor_uw_cm2": "0.12629"
+    },
+    {
+     "distancia_m": "50.0",
+     "acimut_grados": "290.0",
+     "valor_uw_cm2": "0.12998"
+    },
+    {
+     "distancia_m": "75.0",
+     "acimut_grados": "115.0",
+     "valor_uw_cm2": "0.06112"
+    },
+    {
+     "distancia_m": "78.0",
+     "acimut_grados": "172.0",
+     "valor_uw_cm2": "0.04244"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=028723&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.+-+028723"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A.U. - 000715",
+   "direccion": "AV DIAGONAL, 645. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -1903489",
+     "banda_mhz": "2140.00 - 2155.00"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2500216",
+     "banda_mhz": "768.00 - 778.00"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -1902304",
+     "banda_mhz": "3710.00 - 3800.00"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2400433",
+     "banda_mhz": "842.00 - 852.00"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2400434",
+     "banda_mhz": "1825.10 - 1845.10"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2400439",
+     "banda_mhz": "2660.00 - 2680.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "65.0",
+     "acimut_grados": "24.0",
+     "valor_uw_cm2": "0.63728"
+    },
+    {
+     "distancia_m": "61.0",
+     "acimut_grados": "58.0",
+     "valor_uw_cm2": "0.69614"
+    },
+    {
+     "distancia_m": "57.0",
+     "acimut_grados": "99.0",
+     "valor_uw_cm2": "0.30369"
+    },
+    {
+     "distancia_m": "70.0",
+     "acimut_grados": "168.0",
+     "valor_uw_cm2": "0.21966"
+    },
+    {
+     "distancia_m": "58.0",
+     "acimut_grados": "315.0",
+     "valor_uw_cm2": "0.44142"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=000715&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.U.+-+000715"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A.U. - 00715",
+   "direccion": "AV DIAGONAL, 647. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -0433448",
+     "banda_mhz": "1825.10 - 1845.10"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -0433608",
+     "banda_mhz": "949.90 - 959.90"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -0433772",
+     "banda_mhz": "949.90 - 959.90"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "65.0",
+     "acimut_grados": "24.0",
+     "valor_uw_cm2": "0.63728"
+    },
+    {
+     "distancia_m": "61.0",
+     "acimut_grados": "58.0",
+     "valor_uw_cm2": "0.69614"
+    },
+    {
+     "distancia_m": "57.0",
+     "acimut_grados": "99.0",
+     "valor_uw_cm2": "0.30369"
+    },
+    {
+     "distancia_m": "70.0",
+     "acimut_grados": "168.0",
+     "valor_uw_cm2": "0.21966"
+    },
+    {
+     "distancia_m": "58.0",
+     "acimut_grados": "315.0",
+     "valor_uw_cm2": "0.44142"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=00715&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.U.+-+00715"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A.U. - 018172",
+   "direccion": "AV DIAGONAL, 687. HOSPITALET DE LLOBREGAT (L'), BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -1300856",
+     "banda_mhz": "1825.10 - 1845.10"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "89.0",
+     "acimut_grados": "0.0",
+     "valor_uw_cm2": "0.73095"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=018172&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.U.+-+018172"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A.U. - 079808",
+   "direccion": "AV JOAN XXIII, 3. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -0800843",
+     "banda_mhz": "2140.00 - 2155.00"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -1300787",
+     "banda_mhz": "1825.10 - 1845.10"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "65.0",
+     "acimut_grados": "34.0",
+     "valor_uw_cm2": "1.51518"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=079808&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.U.+-+079808"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A.U. - 11481",
+   "direccion": "AV ESPLUGUES, 92. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -1900522",
+     "banda_mhz": "949.90 - 959.90"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2402825",
+     "banda_mhz": "949.90 - 959.90"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "87.0",
+     "acimut_grados": "0.0",
+     "valor_uw_cm2": "0.67906"
+    },
+    {
+     "distancia_m": "54.0",
+     "acimut_grados": "324.0",
+     "valor_uw_cm2": "0.76660"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=11481&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.U.+-+11481"
+  },
+  {
+   "codigo": "VODAFONE ESPAÑA, S.A.U. - 54846",
+   "direccion": "VP POLÍGONO DOCTOR FERRAN 51 N2, 53. BARCELONA, BARCELONA",
+   "caracteristicas": [
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2500558",
+     "banda_mhz": "768.00 - 778.00"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2500557",
+     "banda_mhz": "842.00 - 852.00"
+    },
+    {
+     "operador": "VODAFONE ESPAÑA, S.A.U.",
+     "referencia": "B B -2000415",
+     "banda_mhz": "2140.00 - 2155.00"
+    }
+   ],
+   "niveles_medidos": [
+    {
+     "distancia_m": "41.0",
+     "acimut_grados": "13.0",
+     "valor_uw_cm2": "0.80310"
+    },
+    {
+     "distancia_m": "20.0",
+     "acimut_grados": "64.0",
+     "valor_uw_cm2": "0.52736"
+    },
+    {
+     "distancia_m": "66.0",
+     "acimut_grados": "138.0",
+     "valor_uw_cm2": "0.40131"
+    },
+    {
+     "distancia_m": "80.0",
+     "acimut_grados": "164.0",
+     "valor_uw_cm2": "0.36935"
+    },
+    {
+     "distancia_m": "38.0",
+     "acimut_grados": "230.0",
+     "valor_uw_cm2": "0.37563"
+    },
+    {
+     "distancia_m": "63.0",
+     "acimut_grados": "239.0",
+     "valor_uw_cm2": "0.58890"
+    },
+    {
+     "distancia_m": "90.0",
+     "acimut_grados": "280.0",
+     "valor_uw_cm2": "0.36935"
+    },
+    {
+     "distancia_m": "88.0",
+     "acimut_grados": "288.0",
+     "valor_uw_cm2": "1.24907"
+    }
+   ],
+   "_url": "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=54846&codEmplazamiento=VODAFONE+ESPA%C3%91A%2C+S.A.U.+-+54846"
+  }
+ ]
+}
