@@ -2,10 +2,16 @@ packages:
   - apps/*
   - packages/*
   - tools/*
+  - convex
 
 # Versiones exactas: se suben en commits deliberados, leyendo antes el
 # CHEATSHEET.md de solid-js y las notas de Effect (ADR 0001 y 0002).
+# Confect sube en su propio commit, leyendo antes su changelog (ADR 0003).
 catalog:
+  "@confect/cli": 10.0.0-next.24
+  "@confect/core": 10.0.0-next.24
+  "@confect/server": 10.0.0-next.24
+  "@confect/test": 10.0.0-next.24
   "@effect/platform-node": 4.0.0-rc.117
   "@effect/tsgo": 0.46.0
   "@effect/vitest": 4.0.0-rc.117
@@ -17,6 +23,8 @@ catalog:
   "@types/node": 24.19.0
   class-variance-authority: 0.7.1
   clsx: 2.1.1
+  convex: 1.46.0
+  convex-test: 0.0.60
   effect: 4.0.0-rc.117
   happy-dom: 20.14.5
   maplibre-gl: 6.11.2
