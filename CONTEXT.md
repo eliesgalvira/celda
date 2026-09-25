@@ -61,11 +61,11 @@ Observación de la comunidad que contradice al registro oficial.
 _Evitar_: enmienda, parche, edición
 
 **Fusión**:
-Unión de las observaciones de todas las fuentes en emplazamientos. Junta las de una misma compañía que están a menos de 60 m.
+Unión de las observaciones de todas las fuentes en emplazamientos. Junta las que están a 15 m o menos, sean de la compañía que sean, y en cada emplazamiento deja una estación base por compañía (ADR 0012).
 _Evitar_: cruce, deduplicación, merge
 
 **Confianza**:
-Grado de acuerdo entre las observaciones que la fusión ha juntado en un emplazamiento.
+Grado de acuerdo entre las observaciones que la fusión ha juntado en un emplazamiento: alta si lo confirman dos fuentes o más, media si solo lo conoce una y baja si tiene conflictos.
 _Evitar_: fiabilidad, puntuación
 
 **Conflicto**:
@@ -73,7 +73,7 @@ Desacuerdo entre observaciones de un mismo emplazamiento que la fusión no resue
 _Evitar_: discrepancia, error
 
 **Estado**:
-Cuánto fiarse de un emplazamiento. Es verificado si el registro oficial coincide con las demás fuentes, corregido si una corrección lo contradice y nuevo si solo lo conocen otras fuentes.
+Cuánto fiarse de un emplazamiento. Es verificado si el registro oficial lo tiene y ninguna otra fuente lo contradice, corregido si una corrección lo contradice y nuevo si solo lo conocen otras fuentes.
 _Evitar_: calidad, validez
 
 **Ingesta**:
@@ -85,8 +85,16 @@ Parte de la ingesta que lee una sola fuente. Cada uno se puede apagar sin tocar 
 _Evitar_: scraper, crawler, conector
 
 **Ejecución de ingesta**:
-Una pasada de un extractor, con su fecha, los cambios que ha escrito y sus errores.
+Una pasada de un extractor, con su fecha, los cambios que ha escrito y sus errores. Queda completada, fallida, omitida (con el interruptor apagado) o interrumpida (si se cortó y otra la sustituyó).
 _Evitar_: job, run, lote
+
+**Interruptor**:
+Lo que apaga un extractor. Con él apagado, la ejecución queda omitida sin pedir nada a la fuente.
+_Evitar_: flag, kill switch
+
+**Barrido**:
+Lectura completa del listado de una fuente en una ejecución. Una observación que falta en dos barridos seguidos se da por retirada; con uno solo no, por si la fuente falló.
+_Evitar_: scan, rastreo, crawl
 
 ### Mapa publicado
 

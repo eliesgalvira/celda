@@ -15,6 +15,7 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 | [0009](0009-ingesta-y-procedencia.md) | Ingesta automática por fuente, con la procedencia de cada dato |
 | 0010 | Pendiente: alojamiento en Cloudflare, con origen de reserva ante los bloqueos de LaLiga |
 | [0011](0011-castellano-en-interfaz-y-codigo.md) | Castellano en la interfaz y en los nombres del dominio en el código |
+| [0012](0012-fusion-a-15-metros.md) | Fusión: observaciones a 15 m o menos, de cualquier compañía (sustituye la regla del 0009) |
 
 ## Pendientes
 
