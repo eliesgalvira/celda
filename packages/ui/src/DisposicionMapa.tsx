@@ -1,0 +1,54 @@
+import type { JSX } from "@solidjs/web";
+import { Show } from "solid-js";
+
+export interface DisposicionMapaProps {
+  /** Recibe el elemento en el que se dibuja el mapa. */
+  readonly lienzo: (elemento: HTMLDivElement) => void;
+  /** Nombre accesible de la región del mapa. */
+  readonly nombre: string;
+  /** El mapa aún no está listo: la región se anuncia como ocupada. */
+  readonly ocupado: boolean;
+  readonly cabecera: JSX.Element;
+  readonly controles: JSX.Element;
+  readonly atribucion: JSX.Element;
+  /** Lo que se superpone al mapa mientras carga o si falla. */
+  readonly aviso?: JSX.Element;
+}
+
+/**
+ * La pantalla del mapa a pantalla completa, en móvil y en escritorio. Cada
+ * pieza tiene su sitio fijo desde el primer momento, así que nada salta al
+ * cargar: el fondo ya tiene el color del mapa y el aviso se superpone.
+ */
+export function DisposicionMapa(props: DisposicionMapaProps) {
+  return (
+    <div class="fixed inset-0 overflow-hidden bg-mapa-fondo font-texto text-tinta">
+      <main
+        aria-label={props.nombre}
+        aria-busy={props.ocupado ? "true" : "false"}
+        class="absolute inset-0"
+      >
+        <div ref={props.lienzo} class="size-full" />
+      </main>
+
+      <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-3 md:top-[18px]">
+        {props.cabecera}
+      </div>
+
+      {/* Con clave: cada aviso nuevo es un elemento nuevo, no uno que se mueve. */}
+      <Show when={props.aviso} keyed>
+        <div class="pointer-events-none absolute inset-0 z-20 grid place-items-center p-4">
+          <div class="pointer-events-auto">{props.aviso}</div>
+        </div>
+      </Show>
+
+      <div class="absolute right-2 bottom-14 z-10 flex flex-col items-center gap-2 md:right-[18px] md:bottom-16">
+        {props.controles}
+      </div>
+
+      <div class="absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-10 max-w-[calc(100%-1rem)]">
+        {props.atribucion}
+      </div>
+    </div>
+  );
+}
