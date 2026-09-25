@@ -17,7 +17,7 @@ export interface ReglaFusion {
   readonly radioMetros: number;
 }
 
-export const REGLA_FUSION: ReglaFusion = { radioMetros: 20 };
+export const REGLA_FUSION: ReglaFusion = { radioMetros: 15 };
 
 const METROS_POR_GRADO = 111_320;
 
@@ -89,7 +89,7 @@ const unicos = <Texto extends string>(valores: ReadonlyArray<Texto>): ReadonlyAr
   [...new Set(valores)].sort(compararTexto);
 
 const claveDeEstacion = (observacion: Observacion): string =>
-  `${observacion.compania}-${normalizarCodigo(observacion.codigo)}`;
+  `${observacion.compania}-${observacion.codigo.trim()}`;
 
 const esOficial = (observacion: Observacion): boolean => observacion.fuente === "registro-oficial";
 
@@ -137,7 +137,7 @@ const estacionDe = (
   const presentes = observaciones.filter((o) => o.afirma === "presente");
   return {
     compania,
-    codigos: unicos(presentes.map((o) => normalizarCodigo(o.codigo))),
+    codigos: unicos(presentes.map((o) => o.codigo.trim())),
     bandas: unirBandas(presentes),
     observaciones: observaciones.map(procedencia),
   };
@@ -243,6 +243,8 @@ const emplazamientoDe = (
  *   dentro del radio. Si no hay ninguno, no crea nada.
  *
  * Es determinista: el resultado no depende del orden de la entrada y sale ordenado por clave.
+ * La clave es la compañía y el código de la observación de menor clave del registro oficial
+ * (o de cualquier fuente si el registro no lo conoce).
  */
 export const fusionar = (
   observaciones: ReadonlyArray<Observacion>,
@@ -276,9 +278,34 @@ export const fusionar = (
   }
 
   const conflictosPorGrupo = posicionesDistintas([...grupos.values()]);
-  return [...grupos.values()]
-    .map((grupo) => emplazamientoDe(grupo, conflictosPorGrupo.get(grupo) ?? []))
-    .sort((a, b) => compararTexto(a.clave, b.clave));
+  return clavesUnicas(
+    [...grupos.values()].map((grupo) =>
+      emplazamientoDe(grupo, conflictosPorGrupo.get(grupo) ?? []),
+    ),
+  );
+};
+
+/**
+ * Ordena por clave y numera las repetidas (`-2`, `-3`…) de sur a norte y de oeste a este. Solo
+ * se repiten si el mismo código de una compañía aparece en dos sitios alejados.
+ */
+const clavesUnicas = (
+  emplazamientos: ReadonlyArray<Emplazamiento>,
+): ReadonlyArray<Emplazamiento> => {
+  const ordenados = [...emplazamientos].sort(
+    (a, b) =>
+      compararTexto(a.clave, b.clave) ||
+      a.posicion.latitud - b.posicion.latitud ||
+      a.posicion.longitud - b.posicion.longitud,
+  );
+  const vistas = new Map<string, number>();
+  return ordenados.map((emplazamiento) => {
+    const repeticion = (vistas.get(emplazamiento.clave) ?? 0) + 1;
+    vistas.set(emplazamiento.clave, repeticion);
+    return repeticion === 1
+      ? emplazamiento
+      : { ...emplazamiento, clave: `${emplazamiento.clave}-${repeticion}` };
+  });
 };
 
 /**
@@ -322,7 +349,7 @@ const posicionesDistintas = (
     const conflicto: Conflicto = {
       tipo: "posicion-distinta",
       compania: muestra.compania,
-      codigo: normalizarCodigo(muestra.codigo),
+      codigo: muestra.codigo.trim(),
       metros: Math.round(metros),
     };
     for (const grupo of repetidos) {

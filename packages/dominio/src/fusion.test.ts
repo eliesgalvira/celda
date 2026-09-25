@@ -125,7 +125,7 @@ describe("fusionar", () => {
     await expect(json(emplazamientos)).toMatchFileSnapshot(referencia("companias-distintas"));
   });
 
-  it("los códigos de Vodafone con ceros a la izquierda son una sola estación base", async () => {
+  it("los registros de Vodafone en el mismo punto son una sola estación base con todos sus códigos", async () => {
     const emplazamientos = fusionar(
       ["647", "00647", "000647"].map((codigo, indice) =>
         observacion({
@@ -136,7 +136,7 @@ describe("fusionar", () => {
       ),
     );
     assert.strictEqual(emplazamientos.length, 1);
-    assert.deepStrictEqual(emplazamientos[0]?.estaciones[0]?.codigos, ["647"]);
+    assert.deepStrictEqual(emplazamientos[0]?.estaciones[0]?.codigos, ["000647", "00647", "647"]);
     assert.strictEqual(emplazamientos[0]?.estaciones[0]?.bandas.length, 3);
     assert.deepStrictEqual(emplazamientos[0]?.conflictos, []);
     await expect(json(emplazamientos)).toMatchFileSnapshot(referencia("codigos-vodafone"));
@@ -221,6 +221,40 @@ describe("fusionar", () => {
       [["codigos-distintos", "posicion-distinta"], ["posicion-distinta"]],
     );
     await expect(json(emplazamientos)).toMatchFileSnapshot(referencia("conflictos"));
+  });
+
+  it("códigos que solo difieren en ceros pero están lejos son emplazamientos distintos sin conflicto", () => {
+    // En la descarga real, Vodafone `3248` y `003248` están a 4 km.
+    const emplazamientos = fusionar([
+      observacion({ compania: "vodafone", codigo: "3248" }),
+      observacion({ compania: "vodafone", codigo: "003248", posicion: alEste(PIUS_XII, 4000) }),
+    ]);
+    assert.deepStrictEqual(
+      emplazamientos.map((e) => [e.clave, e.conflictos.length]),
+      [
+        ["vodafone-003248", 0],
+        ["vodafone-3248", 0],
+      ],
+    );
+  });
+
+  it("el mismo código en dos sitios da dos claves distintas y un conflicto en cada uno", () => {
+    const emplazamientos = fusionar([
+      observacion({ compania: "orange", codigo: "CATR6046A" }),
+      observacion({
+        fuente: "antenasmoviles",
+        compania: "orange",
+        codigo: "CATR6046A",
+        posicion: alEste(PIUS_XII, 800),
+      }),
+    ]);
+    assert.deepStrictEqual(
+      emplazamientos.map((e) => [e.clave, e.estado, e.conflictos.map((c) => c.tipo)]),
+      [
+        ["orange-CATR6046A", "verificado", ["posicion-distinta"]],
+        ["orange-CATR6046A-2", "nuevo", ["posicion-distinta"]],
+      ],
+    );
   });
 
   it("no depende del orden de la entrada", () => {

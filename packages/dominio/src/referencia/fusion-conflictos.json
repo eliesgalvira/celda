@@ -1,6 +1,6 @@
 [
   {
-    "clave": "movistar-800977",
+    "clave": "movistar-0800977",
     "posicion": {
       "longitud": 2.122967,
       "latitud": 41.386032
@@ -29,7 +29,7 @@
       {
         "compania": "movistar",
         "codigos": [
-          "800977",
+          "0800977",
           "MV-BCN-5"
         ],
         "bandas": [],

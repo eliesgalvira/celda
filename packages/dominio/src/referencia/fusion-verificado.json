@@ -1,6 +1,6 @@
 [
   {
-    "clave": "movistar-802314",
+    "clave": "movistar-0802314",
     "posicion": {
       "longitud": 2.122967,
       "latitud": 41.386032
@@ -14,7 +14,7 @@
       {
         "compania": "movistar",
         "codigos": [
-          "802314"
+          "0802314"
         ],
         "bandas": [],
         "observaciones": [

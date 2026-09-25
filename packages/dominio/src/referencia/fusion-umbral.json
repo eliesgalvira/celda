@@ -1,9 +1,9 @@
 {
   "dentro": [
     {
-      "clave": "movistar-800307",
+      "clave": "movistar-0800307",
       "posicion": {
-        "longitud": 2.123084,
+        "longitud": 2.123054,
         "latitud": 41.386032
       },
       "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
@@ -15,7 +15,7 @@
         {
           "compania": "movistar",
           "codigos": [
-            "800307"
+            "0800307"
           ],
           "bandas": [],
           "observaciones": [
@@ -47,9 +47,9 @@
   ],
   "fuera": [
     {
-      "clave": "movistar-800307",
+      "clave": "movistar-0800307",
       "posicion": {
-        "longitud": 2.123213,
+        "longitud": 2.123153,
         "latitud": 41.386032
       },
       "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
@@ -61,7 +61,7 @@
         {
           "compania": "movistar",
           "codigos": [
-            "800307"
+            "0800307"
           ],
           "bandas": [],
           "observaciones": [

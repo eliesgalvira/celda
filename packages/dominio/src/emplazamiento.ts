@@ -76,3 +76,9 @@ export const Emplazamiento = Schema.Struct({
   datosDel: Schema.Finite,
 });
 export type Emplazamiento = typeof Emplazamiento.Type;
+
+const { estaciones: _estaciones, ...camposSinEstaciones } = Emplazamiento.fields;
+
+/** El emplazamiento sin sus estaciones base, como se guarda aparte de ellas. */
+export const EmplazamientoSinEstaciones = Schema.Struct(camposSinEstaciones);
+export type EmplazamientoSinEstaciones = typeof EmplazamientoSinEstaciones.Type;
