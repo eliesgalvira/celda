@@ -15,7 +15,7 @@ export default defineConfig({
       "docs/investigacion/muestras/**",
       "**/referencia/**",
       // Código que generan Confect y Convex.
-      "convex/convex/_generated/**",
+      "convex/convex/**",
       "convex/confect/_generated/**",
     ],
     sortPackageJson: {},
