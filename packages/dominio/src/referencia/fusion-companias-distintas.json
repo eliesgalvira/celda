@@ -1,0 +1,83 @@
+[
+  {
+    "clave": "movistar-800307",
+    "posicion": {
+      "longitud": 2.122967,
+      "latitud": 41.386032
+    },
+    "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "800307"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -1901854",
+            "compania": "movistar",
+            "rangos": [],
+            "mhz": 1800,
+            "anio": 2024
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "MOVISTAR - 0800307"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR6158A"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2403167",
+            "compania": "orange",
+            "rangos": [],
+            "mhz": 2100,
+            "anio": 2024
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE - CATR6158A"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "28723"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -0900936",
+            "compania": "vodafone",
+            "rangos": [],
+            "mhz": 2100,
+            "anio": 2024
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE - 028723"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  }
+]

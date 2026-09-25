@@ -1,0 +1,33 @@
+[
+  {
+    "clave": "movistar-MV-BCN-82383",
+    "posicion": {
+      "longitud": 2.122967,
+      "latitud": 41.386032
+    },
+    "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "nuevo",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "MV-BCN-82383"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "antenasmoviles",
+            "clave": "MOVISTAR - MV-BCN-82383"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "antenasmoviles"
+    ],
+    "datosDel": 1790380800000
+  }
+]

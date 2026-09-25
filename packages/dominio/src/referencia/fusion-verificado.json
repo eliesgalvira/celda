@@ -1,0 +1,38 @@
+[
+  {
+    "clave": "movistar-802314",
+    "posicion": {
+      "longitud": 2.122967,
+      "latitud": 41.386032
+    },
+    "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "alta",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "802314"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "antenasmoviles",
+            "clave": "MOVISTAR - 0802314"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "MOVISTAR - 0802314"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "antenasmoviles",
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  }
+]

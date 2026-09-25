@@ -1,0 +1,112 @@
+{
+  "dentro": [
+    {
+      "clave": "movistar-800307",
+      "posicion": {
+        "longitud": 2.123084,
+        "latitud": 41.386032
+      },
+      "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+      "municipio": "BARCELONA",
+      "estado": "verificado",
+      "confianza": "media",
+      "conflictos": [],
+      "estaciones": [
+        {
+          "compania": "movistar",
+          "codigos": [
+            "800307"
+          ],
+          "bandas": [],
+          "observaciones": [
+            {
+              "fuente": "registro-oficial",
+              "clave": "MOVISTAR - 0800307"
+            }
+          ]
+        },
+        {
+          "compania": "orange",
+          "codigos": [
+            "CATR6158A"
+          ],
+          "bandas": [],
+          "observaciones": [
+            {
+              "fuente": "registro-oficial",
+              "clave": "ORANGE - CATR6158A"
+            }
+          ]
+        }
+      ],
+      "fuentes": [
+        "registro-oficial"
+      ],
+      "datosDel": 1790380800000
+    }
+  ],
+  "fuera": [
+    {
+      "clave": "movistar-800307",
+      "posicion": {
+        "longitud": 2.123213,
+        "latitud": 41.386032
+      },
+      "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+      "municipio": "BARCELONA",
+      "estado": "verificado",
+      "confianza": "media",
+      "conflictos": [],
+      "estaciones": [
+        {
+          "compania": "movistar",
+          "codigos": [
+            "800307"
+          ],
+          "bandas": [],
+          "observaciones": [
+            {
+              "fuente": "registro-oficial",
+              "clave": "MOVISTAR - 0800307"
+            }
+          ]
+        }
+      ],
+      "fuentes": [
+        "registro-oficial"
+      ],
+      "datosDel": 1790380800000
+    },
+    {
+      "clave": "orange-CATR6158A",
+      "posicion": {
+        "longitud": 2.122967,
+        "latitud": 41.386032
+      },
+      "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+      "municipio": "BARCELONA",
+      "estado": "verificado",
+      "confianza": "media",
+      "conflictos": [],
+      "estaciones": [
+        {
+          "compania": "orange",
+          "codigos": [
+            "CATR6158A"
+          ],
+          "bandas": [],
+          "observaciones": [
+            {
+              "fuente": "registro-oficial",
+              "clave": "ORANGE - CATR6158A"
+            }
+          ]
+        }
+      ],
+      "fuentes": [
+        "registro-oficial"
+      ],
+      "datosDel": 1790380800000
+    }
+  ]
+}
