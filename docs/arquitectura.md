@@ -1,5 +1,7 @@
 # Celda · propuesta de arquitectura
 
+> Las decisiones aceptadas de esta propuesta están en los ADR de [`adr/`](adr/README.md). Si este documento y un ADR no coinciden, vale el ADR.
+
 Estado: **aceptada en lo general el 24/09/2026**; las exploraciones técnicas pueden cambiar las decisiones 3, 8 y 10. Cuando se acepte, cada decisión marcada con ▸ pasa a un ADR en `docs/adr/`.
 
 Fuentes consultadas: un proyecto previo del autor sobre reactividad y el gist `evaluating-solid-2.md` (UI que nunca miente), Moli, un proyecto previo del autor con Effect v4 y Solid 2, y su rama `migration/solid-2` (Effect v4 y Solid 2 en producción), vivero y bendoom, dos proyectos previos del autor con Bend 2, y la documentación de Convex, Confect y Solid 2 a fecha de hoy. El diseño de referencia es el prototipo v8 (rama `prototype/celda-primer-uso`).
