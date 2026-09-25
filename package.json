@@ -1,0 +1,26 @@
+{
+  "name": "@celda/monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "effect-tsgo patch --typescript --no-oxlint",
+    "dev": "vp run --filter @celda/web dev",
+    "build": "vp run --filter @celda/web build",
+    "preview": "vp run --filter @celda/web preview",
+    "typecheck": "vp run -r typecheck",
+    "lint": "vp lint --report-unused-disable-directives",
+    "test": "vp run -r test",
+    "fmt": "vp fmt",
+    "fmt:check": "vp fmt --check"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.11"
+  },
+  "packageManager": "pnpm@10.34.5"
+}

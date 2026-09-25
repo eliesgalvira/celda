@@ -1,0 +1,31 @@
+{
+  "name": "@celda/ui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tema.css": "./src/tema.css",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@solidjs/web": "catalog:",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
+    "maplibre-gl": "catalog:",
+    "solid-js": "catalog:",
+    "tailwind-merge": "catalog:",
+    "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@solidjs/testing-library": "catalog:",
+    "@solidjs/vite-plugin": "catalog:",
+    "effect": "catalog:",
+    "happy-dom": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

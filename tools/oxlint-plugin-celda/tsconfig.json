@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["ESNext", "esnext.disposable"],
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        // Código de herramientas copiado de reglas públicas, que dejan estos avisos apagados.
+        "diagnosticSeverity": {
+          "strictBooleanExpressions": "off",
+          "strictEffectProvide": "off",
+          "lazyEffect": "off"
+        }
+      }
+    ]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

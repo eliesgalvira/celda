@@ -1,0 +1,41 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+# Versiones exactas: se suben en commits deliberados, leyendo antes el
+# CHEATSHEET.md de solid-js y las notas de Effect (ADR 0001 y 0002).
+catalog:
+  "@effect/platform-node": 4.0.0-rc.117
+  "@effect/tsgo": 0.46.0
+  "@effect/vitest": 4.0.0-rc.117
+  "@oxlint/plugins": 1.85.0
+  "@solidjs/testing-library": 1.0.0-beta.3
+  "@solidjs/vite-plugin": 3.0.0-next.44
+  "@solidjs/web": 2.0.0-rc.9
+  "@tailwindcss/vite": 4.3.3
+  "@types/node": 24.19.0
+  class-variance-authority: 0.7.1
+  clsx: 2.1.1
+  effect: 4.0.0-rc.117
+  happy-dom: 20.14.5
+  maplibre-gl: 6.11.2
+  oxlint: 1.85.0
+  solid-js: 2.0.0-rc.9
+  tailwind-merge: 3.7.0
+  tailwindcss: 4.3.3
+  typescript: 7.0.2
+  vite: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.0
+  vite-plus: 1.0.0-rc.0
+
+onlyBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - esbuild
+
+# vite-plus sustituye a vite con su propio núcleo (vite 8 por dentro).
+peerDependencyRules:
+  allowedVersions:
+    vite: "*"
+
+overrides:
+  "@types/node": 24.19.0

@@ -1,0 +1,223 @@
+/*
+ * Tema Hexágono. Único sitio con colores, fuentes y formas de Celda (ADR 0006).
+ *
+ * Los tokens tienen nombres semánticos y valores OKLCH. `:root` es el tema
+ * claro; `[data-tema="oscuro"]` deja preparado el oscuro, que la v1 no activa.
+ * El estilo del mapa (mapa/estilo.ts) lee los tokens `--mapa-*` de aquí.
+ */
+@import "tailwindcss" source("./");
+/* En una capa, para que las utilidades de Tailwind ganen a las reglas de MapLibre. */
+@import "maplibre-gl/dist/maplibre-gl.css" layer(base);
+
+:root {
+  color-scheme: light;
+
+  /* SUPERFICIES */
+  --fondo: oklch(86.7% 0.011 89.7);
+  --superficie: oklch(91% 0.01 87.5);
+  --superficie-alta: oklch(94.1% 0.009 84.6);
+  --superficie-invertida: oklch(29.9% 0.005 121.8);
+
+  /* TEXTO */
+  --tinta: oklch(29.9% 0.005 121.8);
+  --tinta-suave: oklch(46% 0.011 106.8);
+  --tinta-invertida: oklch(94.1% 0.009 84.6);
+  --linea: oklch(29.9% 0.005 121.8 / 0.14);
+  --linea-fuerte: oklch(29.9% 0.005 121.8 / 0.55);
+
+  /* MARCA */
+  --primario: oklch(52% 0.077 203.3);
+  --primario-hover: oklch(49% 0.075 203.3);
+  --primario-activo: oklch(43% 0.07 203.3);
+  --primario-fg: oklch(98.5% 0.004 90);
+  --primario-texto: oklch(45% 0.075 203.3);
+  --foco: oklch(49% 0.075 203.3);
+
+  /* ESTADOS DEL EMPLAZAMIENTO */
+  --verificado: oklch(51% 0.077 203.3);
+  --verificado-fg: oklch(98.5% 0.004 90);
+  --corregido: oklch(54% 0.14 50);
+  --corregido-fg: oklch(98.5% 0.004 90);
+  --nuevo: oklch(53.6% 0.1 291.8);
+  --nuevo-fg: oklch(98.5% 0.004 90);
+
+  /* AVISOS */
+  --aviso: oklch(66% 0.155 53.6);
+  --aviso-fondo: oklch(95.5% 0.02 70);
+  --aviso-tinta: oklch(43.1% 0.102 52.4);
+
+  --sombra: oklch(0% 0 0 / 0.18);
+
+  /* MAPA BASE */
+  --mapa-fondo: oklch(86.7% 0.011 89.7);
+  --mapa-parque: oklch(83.9% 0.021 116);
+  --mapa-agua: oklch(81.1% 0.013 190.9);
+  --mapa-edificio: oklch(83.7% 0.013 86.8);
+  --mapa-edificio-borde: oklch(77.7% 0.016 86.4);
+  --mapa-tren: oklch(63.7% 0.012 89.8);
+  --mapa-camino: oklch(78.6% 0.013 86.8);
+  --mapa-calle-borde: oklch(74.5% 0.015 88.7);
+  --mapa-calle: oklch(92% 0.009 84.6);
+  --mapa-avenida: oklch(95.2% 0.007 88.6);
+  --mapa-rotulo: oklch(46.8% 0.012 87.5);
+  --mapa-halo: oklch(86.7% 0.011 89.7);
+  --mapa-lugar: oklch(38.6% 0.008 97.5);
+
+  /* FUENTES */
+  --fuente-texto: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fuente-titulo: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  --fuente-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* FORMAS */
+  --hexagono: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+
+[data-tema="oscuro"] {
+  color-scheme: dark;
+
+  --fondo: oklch(23% 0.006 100);
+  --superficie: oklch(27% 0.007 100);
+  --superficie-alta: oklch(31% 0.008 100);
+  --superficie-invertida: oklch(91% 0.01 87.5);
+
+  --tinta: oklch(93% 0.008 87.5);
+  --tinta-suave: oklch(76% 0.01 100);
+  --tinta-invertida: oklch(25% 0.006 100);
+  --linea: oklch(93% 0.008 87.5 / 0.16);
+  --linea-fuerte: oklch(93% 0.008 87.5 / 0.55);
+
+  --primario: oklch(72% 0.085 203.3);
+  --primario-hover: oklch(78% 0.08 203.3);
+  --primario-activo: oklch(83% 0.07 203.3);
+  --primario-fg: oklch(22% 0.02 203.3);
+  --primario-texto: oklch(80% 0.08 203.3);
+  --foco: oklch(78% 0.08 203.3);
+
+  --verificado: oklch(72% 0.085 203.3);
+  --verificado-fg: oklch(22% 0.02 203.3);
+  --corregido: oklch(74% 0.14 55);
+  --corregido-fg: oklch(22% 0.03 55);
+  --nuevo: oklch(74% 0.09 291.8);
+  --nuevo-fg: oklch(22% 0.03 291.8);
+
+  --aviso: oklch(74% 0.14 55);
+  --aviso-fondo: oklch(29% 0.04 55);
+  --aviso-tinta: oklch(88% 0.06 70);
+
+  --sombra: oklch(0% 0 0 / 0.5);
+
+  --mapa-fondo: oklch(23% 0.006 100);
+  --mapa-parque: oklch(27% 0.02 130);
+  --mapa-agua: oklch(29% 0.03 220);
+  --mapa-edificio: oklch(29% 0.008 90);
+  --mapa-edificio-borde: oklch(33% 0.008 90);
+  --mapa-tren: oklch(48% 0.01 90);
+  --mapa-camino: oklch(38% 0.01 90);
+  --mapa-calle-borde: oklch(20% 0.005 100);
+  --mapa-calle: oklch(35% 0.008 90);
+  --mapa-avenida: oklch(41% 0.008 90);
+  --mapa-rotulo: oklch(78% 0.01 90);
+  --mapa-halo: oklch(23% 0.006 100);
+  --mapa-lugar: oklch(86% 0.008 90);
+}
+
+/* Sin la paleta de Tailwind: solo existen los colores del tema. */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+
+  /* Lo que suele durar poco (una carga rápida) no llega a verse: aparece tras medio segundo. */
+  --animate-aparecer: aparecer 0.2s ease-out 0.5s both;
+
+  @keyframes aparecer {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+@theme inline {
+  --color-fondo: var(--fondo);
+  --color-superficie: var(--superficie);
+  --color-superficie-alta: var(--superficie-alta);
+  --color-superficie-invertida: var(--superficie-invertida);
+  --color-tinta: var(--tinta);
+  --color-tinta-suave: var(--tinta-suave);
+  --color-tinta-invertida: var(--tinta-invertida);
+  --color-linea: var(--linea);
+  --color-linea-fuerte: var(--linea-fuerte);
+  --color-primario: var(--primario);
+  --color-primario-hover: var(--primario-hover);
+  --color-primario-activo: var(--primario-activo);
+  --color-primario-fg: var(--primario-fg);
+  --color-primario-texto: var(--primario-texto);
+  --color-foco: var(--foco);
+  --color-verificado: var(--verificado);
+  --color-verificado-fg: var(--verificado-fg);
+  --color-corregido: var(--corregido);
+  --color-corregido-fg: var(--corregido-fg);
+  --color-nuevo: var(--nuevo);
+  --color-nuevo-fg: var(--nuevo-fg);
+  --color-aviso: var(--aviso);
+  --color-aviso-fondo: var(--aviso-fondo);
+  --color-aviso-tinta: var(--aviso-tinta);
+  --color-sombra: var(--sombra);
+  --color-mapa-fondo: var(--mapa-fondo);
+
+  --font-texto: var(--fuente-texto);
+  --font-titulo: var(--fuente-titulo);
+  --font-mono: var(--fuente-mono);
+
+  --drop-shadow-panel: 0 10px 30px var(--sombra);
+}
+
+/* Hexágono con vértices arriba y abajo, como las agrupaciones del mapa. */
+@utility hexagono {
+  clip-path: var(--hexagono);
+}
+
+/* Hexágono alargado para cintas de texto: botones, etiquetas y la cabecera. */
+@utility cinta {
+  --pico: 8px;
+  clip-path: polygon(
+    var(--pico) 0,
+    calc(100% - var(--pico)) 0,
+    100% 50%,
+    calc(100% - var(--pico)) 100%,
+    var(--pico) 100%,
+    0 50%
+  );
+}
+
+/* Panel con dos esquinas cortadas. */
+@utility chaflan {
+  --corte: 14px;
+  clip-path: polygon(
+    var(--corte) 0,
+    100% 0,
+    100% calc(100% - var(--corte)),
+    calc(100% - var(--corte)) 100%,
+    0 100%,
+    0 var(--corte)
+  );
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--fondo);
+    color: var(--tinta);
+    font-family: var(--fuente-texto);
+    line-height: 1.45;
+    overflow: hidden;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--foco);
+    outline-offset: 2px;
+  }
+}
