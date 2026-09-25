@@ -22,5 +22,5 @@ for lote in $(seq 0 11); do
     }]
   }')"
 done
-time pnpm exec convex run ingesta:recalcularFusion '{"fecha": 2}'
-time pnpm exec convex run ingesta:recalcularFusion '{"fecha": 3}'
+time pnpm exec convex run ingesta:recalcularFusion
+time pnpm exec convex run ingesta:recalcularFusion

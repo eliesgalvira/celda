@@ -427,15 +427,25 @@ const estado = FunctionImpl.make(databaseSchema, ingesta, "estado", () =>
   ).pipe(Effect.orDie),
 );
 
+/**
+ * El extractor real sobre `fetch`, con las opciones de las variables de entorno de Convex, y el
+ * lector de esas variables para el resto del proceso.
+ */
+const capaDeLaAccion = Layer.merge(
+  Layer.unwrap(Effect.map(RegistroOficial.opcionesDesdeConfig, RegistroOficial.capa)).pipe(
+    Layer.provide(FetchHttpClient.layer),
+  ),
+  ConvexConfigProvider.layer,
+).pipe(Layer.provide(ConvexConfigProvider.layer));
+
 /** La ingesta del registro oficial que lanza el cron, con el extractor real. */
 const registroOficial = FunctionImpl.make(databaseSchema, ingesta, "registroOficial", () =>
-  Effect.gen(function* () {
-    const opciones = yield* RegistroOficial.opcionesDesdeConfig;
-    const proceso = yield* opcionesProcesoDesdeConfig;
-    return yield* ejecutarIngesta(proceso).pipe(
-      Effect.provide(RegistroOficial.capa(opciones).pipe(Layer.provide(FetchHttpClient.layer))),
-    );
-  }).pipe(Effect.provide(ConvexConfigProvider.layer), Effect.orDie),
+  Effect.flatMap(opcionesProcesoDesdeConfig, ejecutarIngesta).pipe(
+    // La acción es el punto de entrada de la ingesta: aquí se montan sus capas, una vez.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    Effect.provide(capaDeLaAccion),
+    Effect.orDie,
+  ),
 );
 
 /** Vuelve a fusionar sin pedir nada a las fuentes, por ejemplo tras cambiar la regla. */

@@ -230,7 +230,7 @@ export const capa = (opciones: Opciones): Layer.Layer<Extractor, never, HttpClie
        * Una zona entera sin elementos no es un dato sino un fallo de la fuente: guardarlo
        * contaría todas las estaciones como ausentes y dos noches así las retirarían.
        */
-      const listado = Effect.fn("RegistroOficial.listado")(function* () {
+      const listado = Effect.gen(function* () {
         const resultado = listadoDeElementos(yield* elementosDeCaja(opciones.zona, 0));
         if (resultado.registros.length === 0) {
           return yield* new RespuestaInesperada({
@@ -239,7 +239,7 @@ export const capa = (opciones: Opciones): Layer.Layer<Extractor, never, HttpClie
           });
         }
         return resultado;
-      });
+      }).pipe(Effect.withSpan("RegistroOficial.listado"));
 
       const ficha = Effect.fn("RegistroOficial.ficha")(function* (registro: Registro) {
         const bandas = bandasDeFicha(yield* obtener(registro.url));

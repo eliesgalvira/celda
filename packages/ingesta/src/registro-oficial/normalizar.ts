@@ -45,8 +45,8 @@ export const urlDeFicha = (codigo: string, clave: string): string =>
   `${ORIGEN}/VCTEL/detalleEstacion.do?emplazamiento=${encodeURIComponent(codigo)}&codEmplazamiento=${encodeURIComponent(clave)}`;
 
 /**
- * Listado de una caja, con los mismos parámetros que manda el visor: `zoom` no cambia la
- * respuesta, pero sin él el geoportal contesta `{}`.
+ * Listado de una caja en grados ETRS89, con los parámetros que manda el visor. El valor de
+ * `zoom` no cambia la respuesta, pero una petición sin él y sin los seis decimales recibió `{}`.
  */
 export const urlDeListado = (caja: Caja): string =>
   `${ORIGEN}/VCTEL/infoantenasGeoJSON.do?idCapa=null&zoom=4&bbox=${caja.map((grados) => grados.toFixed(6)).join(",")}`;

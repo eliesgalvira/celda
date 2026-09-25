@@ -77,8 +77,8 @@ export class Extractor extends Context.Service<
   {
     readonly fuente: Fuente;
     /** Recorre el listado completo. Si falla, la ejecución no sabe qué ha desaparecido. */
-    readonly listado: () => Effect.Effect<Listado, ErrorDeExtractor>;
+    readonly listado: Effect.Effect<Listado, ErrorDeExtractor>;
     /** Lee las bandas de la ficha de un registro. */
     readonly ficha: (registro: Registro) => Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor>;
   }
->()("@celda/ingesta/Extractor") {}
+>()("@celda/ingesta/extractor") {}

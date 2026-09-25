@@ -1,3 +1,5 @@
+// Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
+// @effect-diagnostics strictEffectProvide:off
 import type { Extractor } from "@celda/ingesta/extractor";
 import { MutationRunner, QueryRunner } from "@confect/server";
 import * as Effect from "effect/Effect";

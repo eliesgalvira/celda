@@ -1,3 +1,5 @@
+// Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
+// @effect-diagnostics strictEffectProvide:off
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";

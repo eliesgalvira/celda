@@ -1,3 +1,5 @@
+// Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
+// @effect-diagnostics strictEffectProvide:off
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as Clock from "effect/Clock";
@@ -105,7 +107,7 @@ describe("extractor del registro oficial", () => {
       const { salida, peticiones } = yield* conExtractor(
         (url) =>
           url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 200, cuerpo: muestra },
-        (extractor) => extractor.listado(),
+        (extractor) => extractor.listado,
       );
       assert.strictEqual(salida._tag, "Success");
       assert.deepStrictEqual(
@@ -137,7 +139,7 @@ describe("extractor del registro oficial", () => {
               : elementos(300, sur === CAJA[1] ? "S" : `N${oeste}-`, [oeste, sur, este, norte]),
           };
         },
-        (extractor) => extractor.listado(),
+        (extractor) => extractor.listado,
       );
       assert.strictEqual(peticiones.length, 6);
       assert.strictEqual(salida._tag, "Success");
@@ -155,7 +157,7 @@ describe("extractor del registro oficial", () => {
           url.pathname === "/robots.txt"
             ? NO_HAY_ROBOTS
             : { estado: 200, cuerpo: elementos(1, "A", CAJA) },
-        (extractor) => Effect.andThen(extractor.listado(), extractor.listado()),
+        (extractor) => Effect.andThen(extractor.listado, extractor.listado),
       );
       const huecos = peticiones.slice(1).map((p, i) => p.en - (peticiones[i]?.en ?? 0));
       assert.strictEqual(peticiones.length, 3);
@@ -174,7 +176,7 @@ describe("extractor del registro oficial", () => {
             ? { estado: 503, cuerpo: "" }
             : { estado: 200, cuerpo: elementos(1, "A", CAJA) };
         },
-        (extractor) => extractor.listado(),
+        (extractor) => extractor.listado,
       );
       assert.strictEqual(salida._tag, "Success");
       const listados = peticiones.filter((p) => p.ruta !== "/robots.txt");
@@ -190,7 +192,7 @@ describe("extractor del registro oficial", () => {
     Effect.gen(function* () {
       const { salida, peticiones } = yield* conExtractor(
         (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 502, cuerpo: "" }),
-        (extractor) => extractor.listado(),
+        (extractor) => extractor.listado,
       );
       assert.strictEqual(peticiones.length, 1 + 1 + OPCIONES.reintentos);
       assert.strictEqual(salida._tag, "Failure");
@@ -205,7 +207,7 @@ describe("extractor del registro oficial", () => {
           url.pathname === "/robots.txt"
             ? NO_HAY_ROBOTS
             : { estado: 200, cuerpo: elementos(1000, "R", CAJA) },
-        (extractor) => extractor.listado(),
+        (extractor) => extractor.listado,
         { maxPeticiones: 3 },
       );
       assert.strictEqual(peticiones.length, 3);
@@ -220,7 +222,7 @@ describe("extractor del registro oficial", () => {
           url.pathname === "/robots.txt"
             ? { estado: 200, cuerpo: "User-agent: Celda\nDisallow: /VCTEL/\n" }
             : { estado: 200, cuerpo: elementos(1, "A", CAJA) },
-        (extractor) => extractor.listado(),
+        (extractor) => extractor.listado,
       );
       assert.deepStrictEqual(
         peticiones.map((p) => p.ruta),
@@ -234,7 +236,7 @@ describe("extractor del registro oficial", () => {
     Effect.gen(function* () {
       const { salida } = yield* conExtractor(
         (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 200, cuerpo: "{}" }),
-        (extractor) => Effect.flip(extractor.listado()),
+        (extractor) => Effect.flip(extractor.listado),
       );
       assert.deepStrictEqual(
         salida,

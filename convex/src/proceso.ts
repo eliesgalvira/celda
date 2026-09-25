@@ -140,7 +140,7 @@ export const ejecutarIngesta = Effect.fn("Ingesta.ejecutar")(function* (opciones
     return yield* consulta(refs.internal.ingesta.ejecucion, { id: ejecucion });
   }
 
-  const listado = yield* Effect.result(extractor.listado());
+  const listado = yield* Effect.result(extractor.listado);
   if (Result.isFailure(listado)) {
     yield* mutacion(refs.internal.ingesta.fallar, {
       ejecucion,

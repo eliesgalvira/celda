@@ -1,3 +1,6 @@
+// Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
+// @effect-diagnostics strictEffectProvide:off
+import type { Emplazamiento } from "@celda/dominio/emplazamiento";
 import { fusionar } from "@celda/dominio/fusion";
 import type { Observacion } from "@celda/dominio/observacion";
 import { NodeServices } from "@effect/platform-node";
@@ -7,6 +10,10 @@ import * as Effect from "effect/Effect";
 import { muestraCampusNord } from "../pruebas/grabado.ts";
 
 const FECHA = Date.UTC(2026, 8, 26);
+
+/** El resultado de referencia es JSON legible, para revisarlo en cada cambio de la regla. */
+const json = (emplazamientos: ReadonlyArray<Emplazamiento>) =>
+  `${JSON.stringify(emplazamientos, null, 2)}\n`;
 
 /** Las observaciones que guardaría la ingesta con la muestra de Campus Nord. */
 const observacionesDeLaMuestra = Effect.map(muestraCampusNord, ({ listado, fichas }) =>
@@ -24,9 +31,7 @@ describe("fusión del registro oficial grabado en Campus Nord", () => {
     Effect.gen(function* () {
       const emplazamientos = fusionar(yield* observacionesDeLaMuestra);
       yield* Effect.promise(() =>
-        expect(`${JSON.stringify(emplazamientos, null, 2)}\n`).toMatchFileSnapshot(
-          "./referencia/fusion-campus-nord.json",
-        ),
+        expect(json(emplazamientos)).toMatchFileSnapshot("./referencia/fusion-campus-nord.json"),
       );
     }).pipe(Effect.provide(NodeServices.layer)),
   );

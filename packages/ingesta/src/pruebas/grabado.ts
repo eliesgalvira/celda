@@ -32,7 +32,7 @@ export const capaGrabada = (fuente: Fuente, grabada: FuenteGrabada): Layer.Layer
     Extractor,
     Extractor.of({
       fuente,
-      listado: () => Effect.succeed(grabada.listado),
+      listado: Effect.succeed(grabada.listado),
       ficha: (registro: Registro) => {
         const bandas = grabada.fichas.get(registro.clave);
         return bandas === undefined
@@ -77,8 +77,8 @@ const FICHAS_HTML: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /**
- * El registro oficial grabado en Campus Nord el 26/09/2026: el listado de 40 elementos y las
- * fichas de 23 de ellos. Las fichas en HTML pasan por el mismo analizador que en producción;
+ * El registro oficial grabado en Campus Nord el 26/09/2026: el listado de 40 elementos y 23
+ * fichas. Las fichas en HTML pasan por el mismo analizador que en producción;
  * las demás salen de su conversión a JSON en la investigación.
  */
 export const muestraCampusNord = Effect.gen(function* () {

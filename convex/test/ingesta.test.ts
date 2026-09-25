@@ -1,3 +1,5 @@
+// Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
+// @effect-diagnostics strictEffectProvide:off
 import { Extractor, FuenteNoDisponible, type Registro } from "@celda/ingesta/extractor";
 import { capaGrabada, type FuenteGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
 import { NodeServices } from "@effect/platform-node";
@@ -18,8 +20,9 @@ import * as TestConfect from "./TestConfect";
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
 
+/** Un Convex en memoria nuevo para cada prueba, y el sistema de ficheros para las muestras. */
 const conConvex = <A, E, R>(efecto: Effect.Effect<A, E, R>) =>
-  efecto.pipe(Effect.provide(TestConfect.layer), Effect.provide(NodeServices.layer));
+  efecto.pipe(Effect.provide(Layer.merge(TestConfect.layer, NodeServices.layer)));
 
 const registroOficial = (grabada: FuenteGrabada) => capaGrabada("registro-oficial", grabada);
 
@@ -156,11 +159,10 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
             const real = yield* Extractor;
             return Extractor.of({
               ...real,
-              listado: () =>
-                Effect.andThen(
-                  Ref.update(llamadas, (n) => n + 1),
-                  real.listado(),
-                ),
+              listado: Effect.andThen(
+                Ref.update(llamadas, (n) => n + 1),
+                real.listado,
+              ),
             });
           }),
         ).pipe(Layer.provide(registroOficial(unDiaDespues(grabada))));
@@ -251,13 +253,12 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
             Extractor,
             Extractor.of({
               fuente: "registro-oficial",
-              listado: () =>
-                Effect.fail(
-                  new FuenteNoDisponible({
-                    url: "https://geoportal.minetur.gob.es/robots.txt",
-                    motivo: "HTTP 503",
-                  }),
-                ),
+              listado: Effect.fail(
+                new FuenteNoDisponible({
+                  url: "https://geoportal.minetur.gob.es/robots.txt",
+                  motivo: "HTTP 503",
+                }),
+              ),
               ficha: () => Effect.succeed([]),
             }),
           );
