@@ -37,6 +37,8 @@ Solid 2 es una RC con API nueva. Lee `apps/web/node_modules/solid-js/CHEATSHEET.
 
 Vitest en orden aleatorio, con `@effect/vitest` (`it.effect` para lo que devuelve un `Effect`). Los componentes se prueban con `@solidjs/testing-library` sobre happy-dom. Las dependencias reales se sustituyen por capas o funciones de prueba; la regla `no-module-mocking` rechaza los mocks de módulos.
 
+El backend y la ingesta tienen su propia guía: [docs/patterns/convex.md](docs/patterns/convex.md). Explica cómo arrancar Convex en local, cómo se prueba la API en memoria y qué no hacer contra las fuentes reales.
+
 ## Herramientas
 
 Qué hace cada herramienta y qué hubo que ajustar para las RC: [docs/patterns/herramientas.md](docs/patterns/herramientas.md). Las versiones se fijan exactas en el catálogo de `pnpm-workspace.yaml` y se suben en commits propios.

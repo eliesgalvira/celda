@@ -2,7 +2,7 @@
 
 Celda es una web que enseña en un mapa las antenas de telefonía móvil de Barcelona: de qué compañía son y cómo llega su señal. Estará en celda.elies.site.
 
-Hoy muestra el mapa base de Barcelona con el tema Hexágono. El resto llega por partes; el glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
+Hoy muestra el mapa base de Barcelona con el tema Hexágono, y el backend recoge cada noche el registro oficial de Barcelona y lo fusiona en emplazamientos. El resto llega por partes; el glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
 
 ## Arrancar
 
@@ -26,13 +26,17 @@ pnpm run test
 pnpm run build
 ```
 
+El backend de Convex se arranca aparte; ver [docs/patterns/convex.md](docs/patterns/convex.md).
+
 El entorno trae Node 24, pnpm 10, tippecanoe y pmtiles.
 
 ## Estructura
 
 ```
 apps/web/                 la web, una SPA de Solid 2
-packages/dominio/         tipos y esquemas del dominio, sin E/S
+convex/                   backend de Convex con Confect: tablas, ingesta y API pública
+packages/dominio/         tipos y esquemas del dominio y la fusión, sin E/S
+packages/ingesta/         extractores de las fuentes, como servicios Effect
 packages/ui/              componentes y tema: el único sitio con estilos
 tools/oxlint-plugin-celda reglas de lint propias
 docs/                     arquitectura, ADR y patrones
