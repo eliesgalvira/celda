@@ -215,11 +215,17 @@ export function PantallaMapa() {
   // después, abrir o cerrar la ficha no mueve el mapa (historia 22).
   let enfocadoAlCargar = false;
   createEffect(
-    () => ({ listo: mapaListo(), lista: capa().tipo === "lista", clave: seleccionada() }),
-    ({ listo: actual, lista, clave }) => {
+    () => {
+      const clave = seleccionada();
+      return {
+        listo: mapaListo(),
+        lista: capa().tipo === "lista",
+        posicion: emplazamientos().find((e) => e.clave === clave)?.posicion,
+      };
+    },
+    ({ listo: actual, lista, posicion }) => {
       if (enfocadoAlCargar || actual === undefined || !lista) return;
       enfocadoAlCargar = true;
-      const posicion = emplazamientos().find((e) => e.clave === clave)?.posicion;
       if (posicion === undefined) return;
       actual.mapa.jumpTo({
         center: [posicion.longitud, posicion.latitud],

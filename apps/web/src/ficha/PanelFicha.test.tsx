@@ -188,7 +188,9 @@ describe("panel del emplazamiento", () => {
       [`${REGISTRO}0802532`, `${REGISTRO}086040`],
     );
     assert.lengthOf(
-      getAllByRole("listitem").filter((li) => /desde el 26 sept 2026/u.test(li.textContent ?? "")),
+      getAllByRole("listitem").filter((li) =>
+        /, desde el 26 sept 2026/u.test(li.textContent ?? ""),
+      ),
       2,
     );
   });

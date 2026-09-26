@@ -15,6 +15,18 @@ const FECHA = new Intl.DateTimeFormat("es-ES", {
 /** Una fecha corta en la hora de Barcelona: «26 sept 2026». */
 export const fechaCorta = (fecha: number): string => FECHA.format(fecha).replace(".", "");
 
+const HORA = new Intl.DateTimeFormat("es-ES", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Europe/Madrid",
+});
+
+/** Dos fechas que se distinguen al leerlas: con la hora si caen el mismo día. */
+const fechasDistinguibles = (a: number, b: number): readonly [string, string] =>
+  fechaCorta(a) === fechaCorta(b)
+    ? [`${fechaCorta(a)} a las ${HORA.format(a)}`, `${fechaCorta(b)} a las ${HORA.format(b)}`]
+    : [fechaCorta(a), fechaCorta(b)];
+
 const enumerar = (partes: ReadonlyArray<string>): string =>
   partes.length <= 1
     ? (partes[0] ?? "")
@@ -74,27 +86,43 @@ const ENLACE_FUENTE: Readonly<Record<Fuente, string>> = {
   opencellid: "Ver en OpenCelliD",
 };
 
+/**
+ * El código de la observación, delante de su fecha: «086040, ». El registro oficial pone en su
+ * clave la razón social y el código («VODAFONE ESPAÑA, S.A.U. - 086040»).
+ */
+const codigoDeOrigen = (origen: OrigenDeFicha): string => {
+  const codigo = origen.clave.split(" - ").at(-1)?.trim() ?? "";
+  return codigo === "" || codigo === origen.clave ? "" : `${codigo}, `;
+};
+
 /** Cómo se cuenta una observación en la ficha: quién lo dice, qué y desde cuándo, y su enlace. */
 export const textosOrigen = (origen: OrigenDeFicha) => ({
   fuente: NOMBRE_FUENTE[origen.fuente],
-  detalle:
+  detalle: `${codigoDeOrigen(origen)}${
     origen.afirma === "desmontada"
       ? `la da por desmontada desde el ${fechaCorta(origen.fecha)}`
-      : `desde el ${fechaCorta(origen.fecha)}`,
+      : `desde el ${fechaCorta(origen.fecha)}`
+  }`,
   textoEnlace: ENLACE_FUENTE[origen.fuente],
   tono: origen.afirma === "desmontada" ? ("correccion" as const) : ("presente" as const),
 });
 
+/** Lo que dice la marca de agua de la ficha: un título y, si va por delante del mapa, por qué. */
+export interface TextosMarca {
+  readonly titulo: string;
+  readonly detalle?: string;
+}
+
 /** La marca de agua de la ficha, comparada con la del mapa (historia 57). */
-export const textosMarca = (
-  ficha: Ficha,
-  comparacion: ComparacionConCapa,
-): { readonly titulo: string; readonly detalle?: string } =>
-  comparacion.tipo === "posterior"
-    ? {
-        titulo: "Actualizado después del mapa",
-        detalle:
-          `Esta ficha es del ${fechaCorta(comparacion.ficha)} y el mapa, del ` +
-          `${fechaCorta(comparacion.capa)}. El marcador cambiará cuando se publique el mapa nuevo.`,
-      }
-    : { titulo: `Datos de la ficha: ${fechaCorta(ficha.version)}` };
+export const textosMarca = (ficha: Ficha, comparacion: ComparacionConCapa): TextosMarca => {
+  if (comparacion.tipo !== "posterior") {
+    return { titulo: `Datos de la ficha: ${fechaCorta(ficha.version)}` };
+  }
+  const [deLaFicha, delMapa] = fechasDistinguibles(comparacion.ficha, comparacion.capa);
+  return {
+    titulo: "Actualizado después del mapa",
+    detalle:
+      `Esta ficha es del ${deLaFicha} y el mapa, del ${delMapa}. ` +
+      "El marcador cambiará cuando se publique el mapa nuevo.",
+  };
+};
