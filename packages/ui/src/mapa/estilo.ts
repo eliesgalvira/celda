@@ -17,6 +17,8 @@ export const TOKENS_MAPA = [
   "mapa-rotulo",
   "mapa-halo",
   "mapa-lugar",
+  "mapa-emplazamiento",
+  "mapa-emplazamiento-borde",
 ] as const;
 
 export type TokenMapa = (typeof TOKENS_MAPA)[number];
@@ -28,6 +30,19 @@ const OPENFREEMAP = "https://tiles.openfreemap.org";
 
 /** El nombre de la fuente del callejero dentro del estilo. */
 export const FUENTE_MAPA_BASE = "openmaptiles";
+
+/**
+ * La fuente GeoJSON de los emplazamientos. El estilo la declara vacía y la pantalla le pone los
+ * puntos de la capa con `setData`.
+ */
+export const FUENTE_EMPLAZAMIENTOS = "emplazamientos";
+
+/**
+ * Zoom a partir del cual cada emplazamiento es un marcador con sus logos. Más lejos, con toda el
+ * área a la vista, son más de mil y el mapa los pinta como puntos, sin nodos del DOM, hasta que
+ * llegue la agrupación en hexágonos.
+ */
+export const ZOOM_LOGOS = 14;
 
 const deClase = (clases: ReadonlyArray<string>): FilterSpecification => [
   "in",
@@ -60,6 +75,10 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
   glyphs: `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`,
   sources: {
     [FUENTE_MAPA_BASE]: { type: "vector", url: `${OPENFREEMAP}/planet` },
+    [FUENTE_EMPLAZAMIENTOS]: {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    },
   },
   layers: [
     { id: "fondo", type: "background", paint: { "background-color": color("mapa-fondo") } },
@@ -204,6 +223,18 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
         "text-color": color("mapa-lugar"),
         "text-halo-color": color("mapa-halo"),
         "text-halo-width": 1.5,
+      },
+    },
+    {
+      id: "emplazamientos-lejos",
+      type: "circle",
+      source: FUENTE_EMPLAZAMIENTOS,
+      maxzoom: ZOOM_LOGOS,
+      paint: {
+        "circle-color": color("mapa-emplazamiento"),
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2.5, ZOOM_LOGOS, 5],
+        "circle-stroke-color": color("mapa-emplazamiento-borde"),
+        "circle-stroke-width": 1,
       },
     },
   ],

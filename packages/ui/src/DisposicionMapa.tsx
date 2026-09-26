@@ -9,6 +9,12 @@ export interface DisposicionMapaProps {
   /** El mapa aún no está listo: la región se anuncia como ocupada. */
   readonly ocupado: boolean;
   readonly cabecera: JSX.Element;
+  /** Bajo la cabecera: la fecha de los datos del mapa. */
+  readonly datos?: JSX.Element;
+  /** Los marcadores. `CapaDeMarcadores` los lleva dentro del mapa, debajo de los controles. */
+  readonly marcadores?: JSX.Element;
+  /** Una indicación breve abajo en el centro, como «acércate para ver…». */
+  readonly pista?: JSX.Element;
   readonly controles: JSX.Element;
   readonly atribucion: JSX.Element;
   /** Lo que se superpone al mapa mientras carga o si falla. */
@@ -29,11 +35,19 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         class="absolute inset-0"
       >
         <div ref={props.lienzo} class="size-full" />
+        {props.marcadores}
       </main>
 
-      <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-3 md:top-[18px]">
+      <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-1.5 px-3 md:top-[18px]">
         {props.cabecera}
+        {props.datos}
       </div>
+
+      <Show when={props.pista} keyed>
+        <div class="pointer-events-none absolute inset-x-0 bottom-14 z-10 flex justify-center px-16 md:bottom-16">
+          {props.pista}
+        </div>
+      </Show>
 
       {/* Con clave: cada aviso nuevo es un elemento nuevo, no uno que se mueve. */}
       <Show when={props.aviso} keyed>

@@ -48,6 +48,14 @@
 
   --sombra: oklch(0% 0 0 / 0.18);
 
+  /* COMPAÑÍAS: aproximaciones del color de cada marca, iguales en los dos temas */
+  --compania-movistar: oklch(67.2% 0.167 244.5);
+  --compania-vodafone: oklch(58.1% 0.238 29.2);
+  --compania-orange: oklch(72.2% 0.19 50.2);
+  --compania-digi: oklch(40.3% 0.152 265.2);
+  --compania-yoigo: oklch(53.4% 0.218 356.8);
+  --compania-tinta: oklch(99% 0 0);
+
   /* MAPA BASE */
   --mapa-fondo: oklch(86.7% 0.011 89.7);
   --mapa-parque: oklch(83.9% 0.021 116);
@@ -62,6 +70,8 @@
   --mapa-rotulo: oklch(46.8% 0.012 87.5);
   --mapa-halo: oklch(86.7% 0.011 89.7);
   --mapa-lugar: oklch(38.6% 0.008 97.5);
+  --mapa-emplazamiento: oklch(45% 0.075 203.3);
+  --mapa-emplazamiento-borde: oklch(94.1% 0.009 84.6);
 
   /* FUENTES */
   --fuente-texto: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -119,6 +129,8 @@
   --mapa-rotulo: oklch(78% 0.01 90);
   --mapa-halo: oklch(23% 0.006 100);
   --mapa-lugar: oklch(86% 0.008 90);
+  --mapa-emplazamiento: oklch(80% 0.08 203.3);
+  --mapa-emplazamiento-borde: oklch(23% 0.006 100);
 }
 
 /* Sin la paleta de Tailwind: solo existen los colores del tema. */
@@ -163,12 +175,19 @@
   --color-aviso-tinta: var(--aviso-tinta);
   --color-sombra: var(--sombra);
   --color-mapa-fondo: var(--mapa-fondo);
+  --color-movistar: var(--compania-movistar);
+  --color-vodafone: var(--compania-vodafone);
+  --color-orange: var(--compania-orange);
+  --color-digi: var(--compania-digi);
+  --color-yoigo: var(--compania-yoigo);
+  --color-compania-tinta: var(--compania-tinta);
 
   --font-texto: var(--fuente-texto);
   --font-titulo: var(--fuente-titulo);
   --font-mono: var(--fuente-mono);
 
   --drop-shadow-panel: 0 10px 30px var(--sombra);
+  --drop-shadow-marcador: 0 1px 3px var(--sombra);
 }
 
 /* Hexágono con vértices arriba y abajo, como las agrupaciones del mapa. */
