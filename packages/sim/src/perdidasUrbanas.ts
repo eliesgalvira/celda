@@ -14,6 +14,9 @@ export type ParamsPerdidasUrbanas = typeof ParamsPerdidasUrbanas.Type;
  */
 export const DISTANCIA_MINIMA_M = 35;
 
+/** Lo que se pierde de más cada vez que la distancia se multiplica por diez, en dB. */
+export const PENDIENTE_DB_POR_DECADA = 37.6;
+
 export type ResultadoPerdidasUrbanas = {
   /** Pérdida de propagación desde el origen hasta cada punto, en dB. */
   readonly perdidaDb: Float64Array;
@@ -28,7 +31,7 @@ export type ResultadoPerdidasUrbanas = {
  */
 export const perdidaUrbana = (metros: number, frecuenciaMhz: number): number =>
   128.1 +
-  37.6 * Math.log10(Math.max(metros, DISTANCIA_MINIMA_M) / 1000) +
+  PENDIENTE_DB_POR_DECADA * Math.log10(Math.max(metros, DISTANCIA_MINIMA_M) / 1000) +
   21 * Math.log10(frecuenciaMhz / 2000);
 
 /**
