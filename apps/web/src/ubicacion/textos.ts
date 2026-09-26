@@ -80,7 +80,7 @@ export const COMO_REACTIVAR =
 
 /** Qué ha pasado cuando la ubicación no llega. */
 export const TITULO_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
-  denegado: "Has bloqueado la ubicación",
+  denegado: "La ubicación está bloqueada",
   "sin-senal": "Tu dispositivo no sabe dónde está",
   "tiempo-agotado": "La ubicación no ha llegado a tiempo",
   "no-disponible": "Este navegador no da la ubicación",
