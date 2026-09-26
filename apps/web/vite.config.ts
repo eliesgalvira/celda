@@ -3,7 +3,7 @@ import solid from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), solid()],
   server: { port: 8840, strictPort: true },
   preview: { port: 8841, strictPort: true },
@@ -17,5 +17,7 @@ export default defineConfig({
     // pruebas usan la build de navegador en desarrollo.
     server: { deps: { inline: [/solid-js/, /@solidjs/] } },
   },
-  resolve: { conditions: ["browser", "development"] },
-});
+  // Solo en las pruebas: con la condición "development" la build llevaría el Solid de desarrollo,
+  // con sus comprobaciones en cada lectura.
+  resolve: mode === "test" ? { conditions: ["browser", "development"] } : {},
+}));
