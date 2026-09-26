@@ -8,7 +8,7 @@ import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
-import { capaDePrueba } from "../capa/pruebas.ts";
+import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
 import { textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
@@ -23,8 +23,11 @@ const CAPA: CapaLeida = {
       posicion: { longitud: 2.113412, latitud: 41.389278 },
       estado: "verificado",
       companias: ["movistar", "vodafone", "orange"],
+      barrio: "21",
     },
   ],
+  barrios: [{ codigo: "21", nombre: "Pedralbes", etiqueta: { longitud: 2.11, latitud: 41.39 } }],
+  fuenteDeBarrios: FUENTE_DE_BARRIOS,
 };
 
 const NO_LLEGA = Effect.fail(

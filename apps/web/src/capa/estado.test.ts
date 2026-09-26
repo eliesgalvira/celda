@@ -4,6 +4,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Exit from "effect/Exit";
 
 import { estadoDeCarga, textoDatosDelMapa } from "./estado.ts";
+import { FUENTE_DE_BARRIOS } from "./pruebas.ts";
 import {
   BackendNoResponde,
   CapaNoDescargada,
@@ -11,7 +12,13 @@ import {
   SinCapaPublicada,
 } from "./servicio.ts";
 
-const CAPA: CapaLeida = { version: "sitios@2026-09-25T23:44:53Z", fecha: 0, emplazamientos: [] };
+const CAPA: CapaLeida = {
+  version: "sitios@2026-09-25T23:44:53Z",
+  fecha: 0,
+  emplazamientos: [],
+  barrios: [],
+  fuenteDeBarrios: FUENTE_DE_BARRIOS,
+};
 
 describe("estado de la capa", () => {
   it("cada fallo de la carga tiene su motivo, y un defecto es un error interno", () => {

@@ -1,3 +1,4 @@
+import type { LimitesDeBarrios } from "@celda/dominio/barrio";
 import { type EmplazamientoDeCapa, generarCapa } from "@celda/dominio/capa";
 import { MutationRunner, QueryRunner } from "@confect/server";
 import * as Clock from "effect/Clock";
@@ -68,12 +69,13 @@ const PAGINA = 250;
  * 1. Lee la versión de los datos y todos los emplazamientos por páginas.
  * 2. Vuelve a leer la versión. Si ha cambiado, las páginas no son de la misma instantánea y la
  *    publicación falla sin escribir nada.
- * 3. Genera la capa, la guarda en el almacén (sin pisar nunca un fichero distinto) y la registra
- *    en Convex como vigente.
+ * 3. Genera la capa, con el barrio de cada emplazamiento según `limites`, la guarda en el almacén
+ *    (sin pisar nunca un fichero distinto) y la registra en Convex como vigente.
  *
- * Repetirla sin cambios en los datos no escribe nada: el fichero y la versión ya existen.
+ * Repetirla sin cambios en los datos ni en los límites no escribe nada: el fichero y la versión ya
+ * existen.
  */
-export const publicarCapa = Effect.fn("Capas.publicar")(function* () {
+export const publicarCapa = Effect.fn("Capas.publicar")(function* (limites: LimitesDeBarrios) {
   const consulta = yield* QueryRunner.QueryRunner;
   const mutacion = yield* MutationRunner.MutationRunner;
   const almacen = yield* AlmacenDeCapas;
@@ -97,7 +99,7 @@ export const publicarCapa = Effect.fn("Capas.publicar")(function* () {
     return yield* new InstantaneaMovida({ antes: fecha, despues: despues.version });
   }
 
-  const capa = generarCapa(fecha, emplazamientos);
+  const capa = generarCapa(fecha, emplazamientos, limites);
   const bytes = new TextEncoder().encode(capa.contenido).length;
   const ficheroNuevo = yield* almacen.guardar(capa.fichero, capa.contenido);
   const url = almacen.url(capa.fichero);

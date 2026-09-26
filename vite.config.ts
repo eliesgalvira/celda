@@ -14,6 +14,8 @@ export default defineConfig({
       // Respuestas grabadas byte a byte y resultados de referencia de las pruebas.
       "docs/investigacion/muestras/**",
       "**/referencia/**",
+      // Límites de barrio que escribe `pnpm run barrios`, con un barrio por línea.
+      "tools/capas/datos/**",
       // Código que generan Confect y Convex.
       "convex/convex/**",
       "convex/confect/_generated/**",

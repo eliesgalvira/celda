@@ -9,7 +9,7 @@ import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
-import { capaDePrueba } from "../capa/pruebas.ts";
+import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { estaEnElGlosario, terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { type FichasDePrueba, fichasDePrueba } from "./pruebas.ts";
@@ -110,14 +110,18 @@ const CAPA: CapaLeida = {
       posicion: CAMPUS_NORD.posicion,
       estado: "verificado",
       companias: ["movistar", "vodafone"],
+      barrio: null,
     },
     {
       clave: PEDRALBES.clave,
       posicion: PEDRALBES.posicion,
       estado: "verificado",
       companias: ["orange"],
+      barrio: null,
     },
   ],
+  barrios: [],
+  fuenteDeBarrios: FUENTE_DE_BARRIOS,
 };
 
 /**
