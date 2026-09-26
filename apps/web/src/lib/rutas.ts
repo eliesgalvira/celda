@@ -65,6 +65,50 @@ export const conMedir = (ubicacion: Ubicacion, abierto: boolean): string => {
   return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
 };
 
+/** El parámetro de la URL que abre el ejercicio de emplazamientos, con el código del barrio. */
+const EJERCICIO = "ejercicio";
+
+/** El parámetro de la URL que abre los ajustes. No lleva valor. */
+const AJUSTES = "ajustes";
+
+/**
+ * El ejercicio abierto en una ubicación: `null` si está cerrado y, abierto, el código del barrio
+ * elegido o `""` si aún no hay ninguno.
+ */
+export const ejercicioDe = (ubicacion: Ubicacion): string | null =>
+  ubicacion.search.get(EJERCICIO)?.trim() ?? null;
+
+/**
+ * El mapa con el ejercicio abierto en un barrio (o sin barrio con `""`), o cerrado con `null`.
+ * El ejercicio y la ficha ocupan el mismo panel: abrir uno cierra el otro.
+ */
+export const conEjercicio = (ubicacion: Ubicacion, barrio: string | null): string => {
+  const parametros = new URLSearchParams(ubicacion.search);
+  parametros.delete(EMPLAZAMIENTO);
+  if (barrio === null) {
+    parametros.delete(EJERCICIO);
+  } else {
+    parametros.set(EJERCICIO, barrio);
+  }
+  const busqueda = parametros.toString();
+  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
+};
+
+/** Si la ubicación tiene abiertos los ajustes. */
+export const ajustesAbiertos = (ubicacion: Ubicacion): boolean => ubicacion.search.has(AJUSTES);
+
+/** La misma ubicación con los ajustes abiertos o cerrados; el resto de la URL no cambia. */
+export const conAjustes = (ubicacion: Ubicacion, abiertos: boolean): string => {
+  const parametros = new URLSearchParams(ubicacion.search);
+  if (abiertos) {
+    parametros.set(AJUSTES, "");
+  } else {
+    parametros.delete(AJUSTES);
+  }
+  const busqueda = parametros.toString().replace(/(^|&)ajustes=(?=&|$)/u, "$1ajustes");
+  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
+};
+
 /** La clave del emplazamiento seleccionado en una ubicación, o `null` si no hay ninguno. */
 export const emplazamientoDe = (ubicacion: Ubicacion): string | null => {
   const clave = ubicacion.search.get(EMPLAZAMIENTO)?.trim() ?? "";

@@ -1,4 +1,4 @@
-import { BARCELONA } from "@celda/dominio/area";
+import { BARCELONA, type Rectangulo } from "@celda/dominio/area";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
@@ -7,13 +7,16 @@ import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
 import { IconoOndas } from "@celda/ui/interferencia/PanelInterferencia.tsx";
+import { IconoAjustes, IconoEjercicio } from "@celda/ui/ejercicio/Ejercicio.tsx";
 import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
+import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
+import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
 import * as Effect from "effect/Effect";
-import type { Map as MapaMapLibre } from "maplibre-gl";
+import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import {
@@ -25,7 +28,11 @@ import {
 import { CapaEmplazamientos } from "../capa/servicio.ts";
 import { pistaDeCeldas } from "../celdas/celdas.ts";
 import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
+import { AjustesContexto, crearAjustes } from "../ajustes/ajustes.ts";
+import { DialogoAjustes } from "../ajustes/DialogoAjustes.tsx";
 import { usarDatos } from "../datos.tsx";
+import { PanelEjercicio } from "../ejercicio/PanelEjercicio.tsx";
+import { SIN_ZONA, type ZonaEnMapa } from "../ejercicio/zona.ts";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
@@ -44,7 +51,18 @@ import {
 import { VistaInterferencia } from "../interferencia/VistaInterferencia.tsx";
 import { crearServicio, lienzoDeServicio, ServicioContexto } from "../servicio/enMapa.ts";
 import { celdaDe } from "../servicio/servicio.ts";
-import { conMedir, emplazamientoDe, medirAbierto, navegar, ruta, ubicacion } from "../lib/rutas.ts";
+import {
+  ajustesAbiertos,
+  conAjustes,
+  conEjercicio,
+  conMedir,
+  ejercicioDe,
+  emplazamientoDe,
+  medirAbierto,
+  navegar,
+  ruta,
+  ubicacion,
+} from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
 import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
@@ -74,6 +92,7 @@ const ESCRITORIO = "(min-width: 48rem)";
 export function PantallaMapa() {
   const datos = usarDatos();
   const puntoDeReferencia = crearUbicacion(datos);
+  const ajustes = crearAjustes(datos);
   const eligiendo = createMemo(() => puntoDeReferencia.ubicacion().estado.tipo === "eligiendo");
   const [escritorio, setEscritorio] = createSignal(window.matchMedia(ESCRITORIO).matches);
   const [estado, setEstado] = createSignal<EstadoMapa>({ tipo: "cargando" });
@@ -240,6 +259,53 @@ export function PantallaMapa() {
 
   /** El emplazamiento con la ficha abierta, que dice la URL. */
   const seleccionada = createMemo(() => emplazamientoDe(ubicacion()));
+  /**
+   * El barrio del ejercicio abierto (`""` sin barrio), o `null` si está cerrado. Sin el modo
+   * estudiante el ejercicio no se abre, aunque lo pida la URL.
+   */
+  const ejercicio = createMemo(() =>
+    ajustes.ajustes().modoEstudiante && seleccionada() === null ? ejercicioDe(ubicacion()) : null,
+  );
+  const panelAbierto = createMemo(() => seleccionada() !== null || ejercicio() !== null);
+
+  /** Lo que el mapa dibuja de la zona del ejercicio y dónde encuadrarla. */
+  const [zona, setZona] = createSignal<{
+    readonly zona: ZonaEnMapa;
+    readonly encuadre: Rectangulo | undefined;
+  }>({ zona: SIN_ZONA, encuadre: undefined });
+  createEffect(
+    () => ({ actual: mapaListo(), dibujo: zona() }),
+    ({ actual, dibujo }) => {
+      if (actual === undefined) return;
+      actual.getSource<GeoJSONSource>(FUENTE_ZONA)?.setData(dibujo.zona);
+      const encuadre = dibujo.encuadre;
+      if (encuadre === undefined) return;
+      // Deja libre lo que tapa el panel: la columna en escritorio y la hoja media en el móvil.
+      actual.fitBounds(
+        [
+          [encuadre.suroeste.longitud, encuadre.suroeste.latitud],
+          [encuadre.noreste.longitud, encuadre.noreste.latitud],
+        ],
+        {
+          padding: escritorio()
+            ? {
+                top: 90,
+                bottom: 60,
+                left: Math.min(46 * 16, window.innerWidth - 8 * 16) + 40,
+                right: 110,
+              }
+            : {
+                top: 80,
+                bottom: pixelesDeAltura("media", window.innerHeight) + 20,
+                left: 20,
+                right: 90,
+              },
+          duration: 600,
+          maxZoom: 16,
+        },
+      );
+    },
+  );
   const fechaCapa = createMemo(() => {
     const actual = capa();
     return actual.tipo === "lista" ? actual.capa.fecha : undefined;
@@ -421,109 +487,151 @@ export function PantallaMapa() {
   });
 
   return (
-    <UbicacionContexto value={puntoDeReferencia}>
-      <ServicioContexto value={servicio}>
-        <DisposicionMapa
-          nombre={`Mapa de ${BARCELONA.nombre}`}
-          ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
-          lienzo={(elemento) => {
-            contenedor = elemento;
-          }}
-          cabecera={<Cabecera lugar={BARCELONA.nombre} />}
-          datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
-          ubicacion={
-            <>
-              <AvisosDeUbicacion panelAbierto={seleccionada() !== null} />
-              <Show when={eligiendo()}>
-                <EleccionConBuscador alUsarCentro={usarCentro} alIrA={irA} />
+    <AjustesContexto value={ajustes}>
+      <UbicacionContexto value={puntoDeReferencia}>
+        <ServicioContexto value={servicio}>
+          <DisposicionMapa
+            nombre={`Mapa de ${BARCELONA.nombre}`}
+            ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
+            lienzo={(elemento) => {
+              contenedor = elemento;
+            }}
+            cabecera={<Cabecera lugar={BARCELONA.nombre} />}
+            datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
+            ubicacion={
+              <>
+                <AvisosDeUbicacion panelAbierto={panelAbierto()} />
+                <Show when={eligiendo()}>
+                  <EleccionConBuscador alUsarCentro={usarCentro} alIrA={irA} />
+                </Show>
+              </>
+            }
+            eligiendo={eligiendo()}
+            pinCentral={<PinCentral />}
+            dialogo={<PasoPrevio />}
+            marcadores={
+              <Show when={mapaListo()}>
+                {(actual) => (
+                  <>
+                    <Marcadores
+                      mapa={actual()}
+                      emplazamientos={emplazamientos()}
+                      barrios={barrios()}
+                      seleccionada={seleccionada()}
+                      alSeleccionar={seleccionar}
+                    />
+                    <ReferenciaEnMapa
+                      mapa={actual()}
+                      escritorio={escritorio()}
+                      conEtiqueta={!vistaActiva()}
+                    />
+                  </>
+                )}
               </Show>
-            </>
-          }
-          eligiendo={eligiendo()}
-          pinCentral={<PinCentral />}
-          dialogo={<PasoPrevio />}
-          marcadores={
-            <Show when={mapaListo()}>
-              {(actual) => (
-                <>
-                  <Marcadores
-                    mapa={actual()}
-                    emplazamientos={emplazamientos()}
-                    barrios={barrios()}
-                    seleccionada={seleccionada()}
-                    alSeleccionar={seleccionar}
-                  />
-                  <ReferenciaEnMapa
-                    mapa={actual()}
-                    escritorio={escritorio()}
-                    conEtiqueta={!vistaActiva()}
-                  />
-                </>
-              )}
-            </Show>
-          }
-          pista={pista()}
-          controles={
-            <>
-              <BotonHexagonal
-                etiqueta="Acercar"
-                icono="+"
-                disabled={!listo()}
-                onClick={() => mapa?.zoomIn()}
-              />
-              <BotonHexagonal
-                etiqueta="Alejar"
-                icono="−"
-                disabled={!listo()}
-                onClick={() => mapa?.zoomOut()}
-              />
-              <BotonHexagonal
-                etiqueta="Interferencia"
-                icono={<IconoOndas />}
-                activo={vistaActiva()}
-                disabled={!listo() || emplazamientos().length === 0}
-                onClick={cambiarVista}
-              />
-              <BotonHexagonal
-                etiqueta="Medir mi señal"
-                icono={<IconoSenal />}
-                aria-haspopup="dialog"
-                onClick={() => navegar(conMedir(ubicacion(), true))}
-              />
-              <MenuDeUbicacion
-                puedeCentrar={listo()}
-                alCentrar={() => {
-                  const referencia = puntoDeReferencia.referencia();
-                  if (referencia !== undefined) irA(posicionDe(referencia));
-                }}
-              />
-            </>
-          }
-          atribucion={<Atribucion creditos={creditos()} />}
-          aviso={aviso()}
-          panelAbierto={seleccionada() !== null}
-          vista={vista()}
-          panel={
-            <Show when={seleccionada()}>
-              {(clave) => (
-                <PanelFicha
-                  clave={clave()}
-                  fechaCapa={fechaCapa()}
-                  alCerrar={() => navegar(ruta.mapa)}
+            }
+            pista={pista()}
+            controles={
+              <>
+                <BotonHexagonal
+                  etiqueta="Acercar"
+                  icono="+"
+                  disabled={!listo()}
+                  onClick={() => mapa?.zoomIn()}
                 />
-              )}
-            </Show>
-          }
-        />
-        <Show when={midiendo()}>
-          <DialogoMedir
-            navegador={{ ...leerNavegador(), modelo: modelo() }}
-            direccionMovil={new URL(ruta.medir, window.location.origin).href}
-            alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+                <BotonHexagonal
+                  etiqueta="Alejar"
+                  icono="−"
+                  disabled={!listo()}
+                  onClick={() => mapa?.zoomOut()}
+                />
+                <BotonHexagonal
+                  etiqueta="Interferencia"
+                  icono={<IconoOndas />}
+                  activo={vistaActiva()}
+                  disabled={!listo() || emplazamientos().length === 0}
+                  onClick={cambiarVista}
+                />
+                <BotonHexagonal
+                  etiqueta="Medir mi señal"
+                  icono={<IconoSenal />}
+                  aria-haspopup="dialog"
+                  onClick={() => navegar(conMedir(ubicacion(), true))}
+                />
+                <MenuDeUbicacion
+                  puedeCentrar={listo()}
+                  alCentrar={() => {
+                    const referencia = puntoDeReferencia.referencia();
+                    if (referencia !== undefined) irA(posicionDe(referencia));
+                  }}
+                />
+              </>
+            }
+            controlesSecundarios={
+              <>
+                <Show when={ajustes.ajustes().modoEstudiante}>
+                  <BotonHexagonal
+                    etiqueta="Ejercicio"
+                    icono={<IconoEjercicio />}
+                    activo={ejercicio() !== null}
+                    onClick={() =>
+                      navegar(conEjercicio(ubicacion(), ejercicio() === null ? "" : null))
+                    }
+                  />
+                </Show>
+                <BotonHexagonal
+                  etiqueta="Ajustes"
+                  icono={<IconoAjustes />}
+                  aria-haspopup="dialog"
+                  onClick={() => navegar(conAjustes(ubicacion(), true))}
+                />
+              </>
+            }
+            atribucion={<Atribucion creditos={creditos()} />}
+            aviso={aviso()}
+            panelAbierto={panelAbierto()}
+            panelAncho={seleccionada() === null && ejercicio() !== null}
+            vista={vista()}
+            panel={
+              <Switch>
+                <Match when={seleccionada()}>
+                  {(clave) => (
+                    <PanelFicha
+                      clave={clave()}
+                      fechaCapa={fechaCapa()}
+                      alCerrar={() => navegar(ruta.mapa)}
+                    />
+                  )}
+                </Match>
+                <Match when={ejercicio() !== null}>
+                  <PanelEjercicio
+                    barrio={ejercicio() ?? ""}
+                    emplazamientos={emplazamientos()}
+                    fechaCapa={fechaCapa()}
+                    alElegirBarrio={(codigo) =>
+                      navegar(conEjercicio(ubicacion(), codigo), { reemplazar: true })
+                    }
+                    alDibujar={(dibujo, encuadre) => setZona({ zona: dibujo, encuadre })}
+                    alCerrar={() => navegar(conEjercicio(ubicacion(), null))}
+                  />
+                </Match>
+              </Switch>
+            }
           />
-        </Show>
-      </ServicioContexto>
-    </UbicacionContexto>
+          <Show when={midiendo()}>
+            <DialogoMedir
+              navegador={{ ...leerNavegador(), modelo: modelo() }}
+              direccionMovil={new URL(ruta.medir, window.location.origin).href}
+              alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+            />
+          </Show>
+          <Show when={ajustesAbiertos(ubicacion())}>
+            <DialogoAjustes
+              alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
+            />
+          </Show>
+        </ServicioContexto>
+      </UbicacionContexto>
+    </AjustesContexto>
   );
 }
 
