@@ -193,6 +193,7 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
     ...capasServicioDebajo(color("mapa-celda")),
     ...capasCeldas(color("mapa-celda")),
     ...capasServicioEncima(color("mapa-celda"), color("mapa-referencia")),
+    ...capasZona(color("mapa-referencia")),
     {
       id: "nombres-de-calles",
       type: "symbol",
