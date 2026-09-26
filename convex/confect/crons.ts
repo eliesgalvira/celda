@@ -13,4 +13,14 @@ export const INGESTA_REGISTRO_OFICIAL = CronJob.make(
   refs.internal.ingesta.registroOficial,
 );
 
-export default CronJobs.make().add(INGESTA_REGISTRO_OFICIAL);
+/**
+ * antenasmoviles.es una hora después, cuando la del registro ya ha acabado. Con el interruptor
+ * apagado, que es como empieza, solo apunta una ejecución omitida.
+ */
+export const INGESTA_ANTENASMOVILES = CronJob.make(
+  "ingesta de antenasmoviles.es",
+  Cron.parseUnsafe("15 3 * * *"),
+  refs.internal.ingesta.antenasMoviles,
+);
+
+export default CronJobs.make().add(INGESTA_REGISTRO_OFICIAL).add(INGESTA_ANTENASMOVILES);

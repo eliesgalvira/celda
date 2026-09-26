@@ -15,6 +15,8 @@ export default Table.make(() =>
     ausencias: Schema.Int,
     /** Cuándo se dio por retirada: tras dos barridos completos sin verla. */
     retiradaEn: Schema.NullOr(Schema.Finite),
+    /** En las fuentes que listan puntos, el punto de cuyo detalle salió. */
+    punto: Schema.optionalKey(Schema.String),
   }),
 )
   .index("por_clave", ["fuente", "clave"])

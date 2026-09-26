@@ -17,11 +17,15 @@ const Cuentas = Schema.Struct({
   retirados: Schema.Int,
 });
 
-/** Lo que ha escrito una ejecución. Todo a cero si no ha cambiado nada. */
+/**
+ * Lo que ha escrito una ejecución. Todo a cero si no ha cambiado nada. En las fuentes que listan
+ * puntos, `fichas` cuenta los detalles leídos y `puntos`, los puntos del listado.
+ */
 export const Cambios = Schema.Struct({
   observaciones: Cuentas,
   fichas: Schema.Struct({ leidas: Schema.Int, cambiadas: Schema.Int }),
   emplazamientos: Cuentas,
+  puntos: Schema.optionalKey(Cuentas),
 });
 export type Cambios = typeof Cambios.Type;
 
