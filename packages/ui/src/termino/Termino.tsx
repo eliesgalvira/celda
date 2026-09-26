@@ -58,8 +58,9 @@ export function Termino(props: TerminoProps) {
           "pointer-events-auto relative inline cursor-pointer rounded-sm text-left underline decoration-primario " +
           "decoration-dotted decoration-2 underline-offset-[0.22em] hover:decoration-solid " +
           "aria-expanded:bg-primario/15 aria-expanded:decoration-solid " +
-          // El objetivo táctil crece por fuera de la palabra sin mover el texto.
-          "after:absolute after:-inset-x-1 after:-inset-y-2.5 after:content-['']"
+          // El objetivo táctil crece por fuera de la palabra sin mover el texto, pero poco: en
+          // letra pequeña, más se metería en la línea de al lado y taparía otro término.
+          "after:absolute after:-inset-x-1 after:-inset-y-1 after:content-['']"
         }
       >
         {props.children}
