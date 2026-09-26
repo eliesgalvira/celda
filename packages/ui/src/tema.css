@@ -70,8 +70,6 @@
   --mapa-rotulo: oklch(46.8% 0.012 87.5);
   --mapa-halo: oklch(86.7% 0.011 89.7);
   --mapa-lugar: oklch(38.6% 0.008 97.5);
-  --mapa-emplazamiento: oklch(45% 0.075 203.3);
-  --mapa-emplazamiento-borde: oklch(94.1% 0.009 84.6);
 
   /* FUENTES */
   --fuente-texto: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -129,8 +127,6 @@
   --mapa-rotulo: oklch(78% 0.01 90);
   --mapa-halo: oklch(23% 0.006 100);
   --mapa-lugar: oklch(86% 0.008 90);
-  --mapa-emplazamiento: oklch(80% 0.08 203.3);
-  --mapa-emplazamiento-borde: oklch(23% 0.006 100);
 }
 
 /* Sin la paleta de Tailwind: solo existen los colores del tema. */
@@ -221,6 +217,23 @@
     0 100%,
     0 var(--corte)
   );
+}
+
+/*
+ * Transiciones de los marcadores al agrupar y separar, como en el prototipo v8: el logo se
+ * desliza hacia su agrupación y el hexágono crece con un pequeño rebote. Duran como mucho
+ * DURACION_MOVIMIENTO_MS (marcadores/Deslizable.tsx).
+ */
+@utility deslizar {
+  transition:
+    transform 0.6s cubic-bezier(0.3, 0.7, 0.2, 1),
+    opacity 0.45s ease;
+}
+
+@utility brotar {
+  transition:
+    transform 0.5s cubic-bezier(0.3, 1.25, 0.5, 1),
+    opacity 0.45s ease;
 }
 
 @layer base {

@@ -42,7 +42,16 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - `MarcadorEmplazamiento` es un botón de 44 px con el logo a 34 px. No lleva el dibujo dentro: usa con `<use>` un símbolo que `CapaDeMarcadores` dibuja una vez por combinación de compañías. Con 700 marcadores a la vista son unos 3.000 nodos en lugar de unos 15.000.
 - `CapaDeMarcadores` monta la lámina dentro del contenedor del mapa con un `Portal`. Fuera de él, la rueda y los arrastres que empiezan sobre un marcador no llegan al mapa.
 - Una clase de posición que choca con la diana (`absolute` frente a `relative`) se une con `cn`, no con el `class` de `cva`: sin `tailwind-merge` gana la que llegue antes en el CSS, y los marcadores quedaban en fila.
-- Por debajo de `ZOOM_LOGOS` (14, en `mapa/estilo.ts`) no hay marcadores DOM: el estilo del mapa pinta cada emplazamiento como un punto (`--mapa-emplazamiento`) y una `Pista` pide acercarse. Con los 1318 emplazamientos como botones, el zoom iba a 17 fps con la CPU a ×4. Cuando llegue la agrupación en hexágonos (ticket 13) los puntos se sustituyen por ella.
+- `CapaDeMarcadores` lleva `isolate`: el `z-index` de los marcadores no compite con la cabecera ni con los controles.
+
+## Agrupación en hexágonos
+
+- `MarcadorAgrupacion` es el hexágono oscuro con borde primario y el número de emplazamientos que recoge, como en el prototipo v8. Es un botón de 50 × 56 px. Su nombre accesible empieza por el número que se ve («12 emplazamientos, acercar») y al pulsarlo el mapa se acerca a su zona. Va por encima de los logos (`z-10`) y el emplazamiento seleccionado, por encima de todo (`z-20`).
+- Los dos marcadores aceptan `movimiento` (`marcadores/Deslizable.tsx`). Con `entra`, el marcador sale de su agrupación anterior o crece en su sitio. Con `sale`, se desliza hacia la agrupación que lo recoge o se apaga en su sitio, y queda `inert` hasta que la pantalla lo quita. El logo usa la utilidad `deslizar` y el hexágono `brotar`, las dos en `tema.css`, con la curva del prototipo.
+- El punto de partida de la entrada va en `@starting-style` (la variante `starting:` de Tailwind) con variables CSS por marcador. El navegador lo aplica al insertar el nodo, así que no hace falta esperar un fotograma para lanzar la transición.
+- Con la preferencia de reducir movimiento, `motion-reduce:transition-none` quita las transiciones y la web no deja nada saliendo: el cambio es directo.
+- Qué se agrupa y hacia dónde va cada marcador lo decide la web (`apps/web/src/capa/agrupacion.ts` y `pintados.ts`), con pruebas de funciones puras. La librería solo dibuja el `movimiento` que recibe. Las escenas y las transiciones no dependen de supercluster: las agrupaciones por barrio del ticket 14 serán otro tipo de elemento, con otro nivel por debajo de cierto zoom, y otro `Match` en `CapaAgrupada`.
+- Rendimiento medido en Chromium con GPU (Vulkan) y la CPU a ×4, con los 1318 emplazamientos: 55 fps al cruzar un nivel cada medio segundo y 59 con la rueda en una ventana de 390 px; 34 a 40 fps en una de 1400 px. Lo caro es el estilo de los nodos que aparecen al cambiar de nivel, no el JavaScript. Por eso solo se anima lo que se ve y el radio de agrupación es de 60 px: con 48 había un tercio más de nodos y el móvil bajaba a 51 fps.
 - `DatosDelMapa` es la marca de agua del mapa: la fecha de la capa, o que se está cargando. Tiene ancho fijo en `rem`; con `ch` Chromium medía otra fuente y cortaba la fecha.
 
 ## Panel del emplazamiento
@@ -54,7 +63,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - `panel/Ficha.tsx` tiene las piezas de dentro. `CabeceraFicha` y `EsqueletoFicha` comparten contenedor y alto de línea, así que al llegar la ficha no se mueve nada. El esqueleto dice «Cargando la ficha…» a los 0,5 s y, a los 8 s, que tarda más de lo normal (`animate-aparecer-tarde`).
 - `MarcaDeAguaFicha` tiene dos tonos. `al-dia` enseña la fecha de la ficha y `posterior` avisa de que la ficha ha cambiado después del mapa.
 - Con un panel abierto, `DisposicionMapa` (`panelAbierto`) sube en el móvil los controles y los créditos por encima del resumen, y en escritorio aparta los créditos a la derecha de la columna.
-- `MarcadorEmplazamiento` con `seleccionado` lleva un anillo del color primario y `aria-current`.
+- `MarcadorEmplazamiento` con `seleccionado` lleva un anillo del color primario y `aria-current`. Si al alejar el seleccionado queda dentro de una agrupación, se sigue viendo suelto y la agrupación lo sigue contando.
 
 ## Qué rechaza la regla fuera de `packages/ui`
 
