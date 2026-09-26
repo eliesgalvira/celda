@@ -25,6 +25,7 @@ import * as Stream from "effect/Stream";
 import { createEffect, createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 
 import { enVivo, usarDatos } from "../datos.tsx";
+import { ReferenciaEnFicha } from "../ubicacion/Ubicacion.tsx";
 import { ComoEmite } from "./ComoEmite.tsx";
 import { TITULO_COMO_EMITE } from "./diagrama.ts";
 import { compararConCapa } from "./marcaDeAgua.ts";
@@ -171,6 +172,7 @@ function ContenidoFicha(props: {
       <MarcaDeAguaFicha tono={posterior() ? "posterior" : "al-dia"} titulo={marca().titulo}>
         {marca().detalle}
       </MarcaDeAguaFicha>
+      <ReferenciaEnFicha emplazamiento={props.ficha.posicion} />
       <SeccionFicha titulo={TITULO_COMO_EMITE}>
         <ComoEmite clave={props.clave} />
       </SeccionFicha>

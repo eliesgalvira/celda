@@ -1,14 +1,14 @@
 import type { Aportacion } from "@celda/dominio/aportacion";
 import * as Cause from "effect/Cause";
-import * as Crypto from "effect/Crypto";
+import type * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-import { criptoContador } from "../lib/cripto.ts";
-import { AlmacenLocal, AlmacenNoDisponible, nuevaAportacion } from "./almacen.ts";
+import { criptoDePrueba } from "../lib/cripto.ts";
+import { AlmacenLocal, AlmacenNoDisponible } from "./almacen.ts";
 import type { Direccion } from "./buscador.ts";
 import { BuscadorDeDirecciones, BusquedaFallida } from "./buscador.ts";
 import type { LecturaGps, MotivoFalloGps, Permiso } from "./estado.ts";
@@ -75,22 +75,15 @@ export const almacenDePrueba = (
   const disponible: Effect.Effect<void, AlmacenNoDisponible> = roto
     ? Effect.fail(new AlmacenNoDisponible({ motivo: "almacén de prueba roto" }))
     : Effect.void;
-  const cripto = criptoContador();
   return {
     capa: Layer.succeed(
       AlmacenLocal,
       AlmacenLocal.of({
         leer: (tipo) => Effect.map(disponible, () => guardadas.filter((a) => a.tipo === tipo)),
-        sustituir: (contenido) =>
-          disponible.pipe(
-            Effect.flatMap(() => nuevaAportacion(contenido)),
-            Effect.provideService(Crypto.Crypto, cripto),
-            Effect.tap((nueva) =>
-              Effect.sync(() => {
-                guardadas = [...guardadas.filter((a) => a.tipo !== nueva.tipo), nueva];
-              }),
-            ),
-          ),
+        sustituir: (nueva) =>
+          Effect.map(disponible, () => {
+            guardadas = [...guardadas.filter((a) => a.tipo !== nueva.tipo), nueva];
+          }),
         borrar: (tipo) =>
           Effect.map(disponible, () => {
             guardadas = guardadas.filter((a) => a.tipo !== tipo);
@@ -130,5 +123,37 @@ export const buscadorDePrueba = (
       }),
     ),
     consultas: () => consultas,
+  };
+};
+
+export interface OpcionesDeUbicacion {
+  readonly permiso?: Permiso;
+  readonly guardadas?: ReadonlyArray<Aportacion>;
+  readonly almacenRoto?: boolean;
+  readonly busquedas?: ReadonlyMap<string, ReadonlyArray<Direccion> | BusquedaFallida>;
+}
+
+export interface UbicacionDePrueba {
+  readonly capa: Layer.Layer<
+    Geolocalizacion | AlmacenLocal | BuscadorDeDirecciones | Crypto.Crypto
+  >;
+  readonly gps: GeolocalizacionDePrueba;
+  readonly almacen: AlmacenDePrueba;
+  readonly buscador: BuscadorDePrueba;
+}
+
+/**
+ * Los servicios de la ubicación de prueba para montar la app: por defecto, el navegador aún no ha
+ * preguntado por el permiso, no hay nada guardado y el buscador no encuentra nada.
+ */
+export const ubicacionDePrueba = (opciones: OpcionesDeUbicacion = {}): UbicacionDePrueba => {
+  const gps = geolocalizacionDePrueba(opciones.permiso ?? "preguntar");
+  const almacen = almacenDePrueba(opciones.guardadas, opciones.almacenRoto);
+  const buscador = buscadorDePrueba(opciones.busquedas ?? new Map());
+  return {
+    capa: Layer.mergeAll(gps.capa, almacen.capa, buscador.capa, criptoDePrueba),
+    gps,
+    almacen,
+    buscador,
   };
 };

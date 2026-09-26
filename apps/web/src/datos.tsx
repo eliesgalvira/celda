@@ -1,5 +1,6 @@
 import type { Simulador } from "@celda/sim/simulador";
 import type { JSX } from "@solidjs/web";
+import type * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
@@ -8,12 +9,23 @@ import { createContext, onSettled, untrack, useContext } from "solid-js";
 
 import type { CapaEmplazamientos } from "./capa/servicio.ts";
 import type { FichasEnVivo } from "./ficha/servicio.ts";
+import type { AlmacenLocal } from "./ubicacion/almacen.ts";
+import type { BuscadorDeDirecciones } from "./ubicacion/buscador.ts";
+import type { Geolocalizacion } from "./ubicacion/geolocalizacion.ts";
 
 /**
- * Los servicios de datos de la interfaz, con el simulador. En las pruebas se sustituyen por capas
- * de prueba, y el simulador, por el que calcula en el mismo hilo.
+ * Los servicios de la interfaz: los datos del mapa, el simulador, el GPS, lo guardado en el
+ * dispositivo y el buscador. En las pruebas se sustituyen por capas de prueba, y el simulador, por
+ * el que calcula en el mismo hilo.
  */
-export type ServiciosDeDatos = CapaEmplazamientos | FichasEnVivo | Simulador;
+export type ServiciosDeDatos =
+  | CapaEmplazamientos
+  | FichasEnVivo
+  | Simulador
+  | Geolocalizacion
+  | AlmacenLocal
+  | BuscadorDeDirecciones
+  | Crypto.Crypto;
 
 const Datos = createContext<ManagedRuntime.ManagedRuntime<ServiciosDeDatos, never>>();
 

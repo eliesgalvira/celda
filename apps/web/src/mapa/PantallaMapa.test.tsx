@@ -11,6 +11,7 @@ import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { capaDePrueba } from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
+import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 
 const CAPA: CapaLeida = {
   version: "sitios@2026-09-25T23:44:53Z",
@@ -40,6 +41,7 @@ describe("capa de emplazamientos en el mapa", () => {
           capaDePrueba([Effect.never]),
           fichasDePrueba().capa,
           simuladorEnHilo(),
+          ubicacionDePrueba().capa,
         )}
       />
     ));
@@ -60,6 +62,7 @@ describe("capa de emplazamientos en el mapa", () => {
           capaDePrueba([NO_LLEGA, Effect.succeed(CAPA)]),
           fichasDePrueba().capa,
           simuladorEnHilo(),
+          ubicacionDePrueba().capa,
         )}
       />
     ));

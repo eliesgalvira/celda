@@ -7,6 +7,7 @@ import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
+import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
 import * as Effect from "effect/Effect";
 import type { Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
@@ -19,10 +20,22 @@ import { PanelFicha } from "../ficha/PanelFicha.tsx";
 import { conMedir, emplazamientoDe, medirAbierto, navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
+import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
+import { posicionDe } from "../ubicacion/estado.ts";
+import { ReferenciaEnMapa } from "../ubicacion/ReferenciaEnMapa.tsx";
+import {
+  AvisosDeUbicacion,
+  EleccionConBuscador,
+  MenuDeUbicacion,
+  PasoPrevio,
+} from "../ubicacion/Ubicacion.tsx";
 import { CREDITOS_MAPA_BASE, type EstadoMapa, hayWebgl, type MotivoFallo } from "./estado.ts";
 import { Marcadores } from "./Marcadores.tsx";
 
 type ModuloMapaBase = typeof import("./mapaBase.ts");
+
+/** El ancho a partir del cual el panel va a la izquierda y el punto se elige con un clic. */
+const ESCRITORIO = "(min-width: 48rem)";
 
 /**
  * El mapa de Barcelona a pantalla completa con los emplazamientos de la capa vigente, la fecha
@@ -30,6 +43,9 @@ type ModuloMapaBase = typeof import("./mapaBase.ts");
  */
 export function PantallaMapa() {
   const datos = usarDatos();
+  const puntoDeReferencia = crearUbicacion(datos);
+  const eligiendo = createMemo(() => puntoDeReferencia.ubicacion().estado.tipo === "eligiendo");
+  const [escritorio, setEscritorio] = createSignal(window.matchMedia(ESCRITORIO).matches);
   const [estado, setEstado] = createSignal<EstadoMapa>({ tipo: "cargando" });
   const [capa, setCapa] = createSignal<EstadoCapa>({ tipo: "cargando" });
   /** El mapa, cuando ya enseña el callejero. */
@@ -100,12 +116,61 @@ export function PantallaMapa() {
   onSettled(() => {
     arrancar();
     cargarCapa();
+    const pantalla = window.matchMedia(ESCRITORIO);
+    const medir = () => setEscritorio(pantalla.matches);
+    pantalla.addEventListener("change", medir);
     return () => {
       intento += 1;
       intentoCapa += 1;
+      pantalla.removeEventListener("change", medir);
       mapa?.remove();
     };
   });
+
+  // En escritorio, mientras se elige un punto, un clic en el mapa lo marca (historia 26).
+  createEffect(
+    () => mapaListo(),
+    (actual) => {
+      if (actual === undefined) return;
+      const alClic = (evento: {
+        readonly lngLat: { readonly lng: number; readonly lat: number };
+      }) => {
+        if (!eligiendo() || !escritorio()) return;
+        puntoDeReferencia.elegir(
+          { longitud: evento.lngLat.lng, latitud: evento.lngLat.lat },
+          "mapa",
+        );
+      };
+      actual.on("click", alClic);
+      return () => {
+        actual.off("click", alClic);
+      };
+    },
+  );
+
+  /** Lleva el mapa hasta una posición, sin alejarlo si ya está cerca. */
+  const irA = (posicion: { readonly longitud: number; readonly latitud: number }) => {
+    mapa?.easeTo({
+      center: [posicion.longitud, posicion.latitud],
+      zoom: Math.max(mapa.getZoom(), 16),
+      duration: 600,
+    });
+  };
+
+  /** En el móvil, el punto es el que queda bajo el pin, en el centro del mapa. */
+  const usarCentro = () => {
+    if (mapa === undefined) return;
+    const centro = mapa.getCenter();
+    puntoDeReferencia.elegir({ longitud: centro.lng, latitud: centro.lat }, "mapa");
+  };
+
+  // Con la primera lectura del GPS, el mapa va hasta ella.
+  createEffect(
+    () => puntoDeReferencia.ubicacion().estado,
+    (actual, anterior) => {
+      if (actual.tipo === "gps" && anterior?.tipo === "pidiendo") irA(actual.lectura.posicion);
+    },
+  );
 
   const emplazamientos = createMemo(() => {
     const actual = capa();
@@ -129,7 +194,7 @@ export function PantallaMapa() {
       {
         ancho: window.innerWidth,
         alto: window.innerHeight,
-        escritorio: window.matchMedia("(min-width: 48rem)").matches,
+        escritorio: escritorio(),
       },
     );
     if (desplazamiento !== undefined) mapa.panBy([...desplazamiento], { duration: 300 });
@@ -179,7 +244,7 @@ export function PantallaMapa() {
   });
 
   return (
-    <>
+    <UbicacionContexto value={puntoDeReferencia}>
       <DisposicionMapa
         nombre={`Mapa de ${BARCELONA.nombre}`}
         ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
@@ -188,15 +253,29 @@ export function PantallaMapa() {
         }}
         cabecera={<Cabecera lugar={BARCELONA.nombre} />}
         datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
+        ubicacion={
+          <>
+            <AvisosDeUbicacion panelAbierto={seleccionada() !== null} />
+            <Show when={eligiendo()}>
+              <EleccionConBuscador alUsarCentro={usarCentro} alIrA={irA} />
+            </Show>
+          </>
+        }
+        eligiendo={eligiendo()}
+        pinCentral={<PinCentral />}
+        dialogo={<PasoPrevio />}
         marcadores={
           <Show when={mapaListo()}>
             {(actual) => (
-              <Marcadores
-                mapa={actual()}
-                emplazamientos={emplazamientos()}
-                seleccionada={seleccionada()}
-                alSeleccionar={seleccionar}
-              />
+              <>
+                <Marcadores
+                  mapa={actual()}
+                  emplazamientos={emplazamientos()}
+                  seleccionada={seleccionada()}
+                  alSeleccionar={seleccionar}
+                />
+                <ReferenciaEnMapa mapa={actual()} escritorio={escritorio()} />
+              </>
             )}
           </Show>
         }
@@ -219,6 +298,13 @@ export function PantallaMapa() {
               icono={<IconoSenal />}
               aria-haspopup="dialog"
               onClick={() => navegar(conMedir(ubicacion(), true))}
+            />
+            <MenuDeUbicacion
+              puedeCentrar={listo()}
+              alCentrar={() => {
+                const referencia = puntoDeReferencia.referencia();
+                if (referencia !== undefined) irA(posicionDe(referencia));
+              }}
             />
           </>
         }
@@ -244,7 +330,7 @@ export function PantallaMapa() {
           alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
         />
       </Show>
-    </>
+    </UbicacionContexto>
   );
 }
 

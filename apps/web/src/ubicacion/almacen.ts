@@ -18,9 +18,9 @@ export class AlmacenNoDisponible extends Schema.TaggedError<AlmacenNoDisponible>
 ) {}
 
 /**
- * Las aportaciones guardadas en el dispositivo, sin cuenta (ADR 0007). Cada una lleva el formato
- * definitivo: el almacén le pone el identificador y la fecha al crearla. Borrar es borrar de
- * verdad: no queda copia en ninguna parte.
+ * Las aportaciones guardadas en el dispositivo, sin cuenta (ADR 0007), con su formato definitivo
+ * (`nuevaAportacion` les pone el identificador y la fecha). Borrar es borrar de verdad: no queda
+ * copia en ninguna parte.
  */
 export class AlmacenLocal extends Context.Service<
   AlmacenLocal,
@@ -29,10 +29,8 @@ export class AlmacenLocal extends Context.Service<
     readonly leer: (
       tipo: TipoAportacion,
     ) => Effect.Effect<ReadonlyArray<Aportacion>, AlmacenNoDisponible>;
-    /** Crea una aportación y la guarda en lugar de las que hubiera de su tipo, todo de una vez. */
-    readonly sustituir: (
-      contenido: ContenidoAportacion,
-    ) => Effect.Effect<Aportacion, AlmacenNoDisponible>;
+    /** Guarda una aportación en lugar de las que hubiera de su tipo, todo de una vez. */
+    readonly sustituir: (aportacion: Aportacion) => Effect.Effect<void, AlmacenNoDisponible>;
     /** Borra todas las aportaciones de un tipo. */
     readonly borrar: (tipo: TipoAportacion) => Effect.Effect<void, AlmacenNoDisponible>;
   }
@@ -45,14 +43,15 @@ const POR_TIPO = "tipo";
 
 const leerAportacion = Schema.decodeUnknownOption(Aportacion);
 
-/** Una aportación nueva con su identificador y su fecha de creación. */
+/**
+ * Una aportación nueva con su identificador y su fecha de creación. Sin números aleatorios
+ * seguros no se crea nada: es un defecto del navegador, no algo que se pueda arreglar aquí.
+ */
 export const nuevaAportacion = Effect.fn("AlmacenLocal.nuevaAportacion")(function* (
   contenido: ContenidoAportacion,
 ) {
   const crypto = yield* Crypto.Crypto;
-  const id = yield* crypto.randomUUIDv4.pipe(
-    Effect.mapError((error) => new AlmacenNoDisponible({ motivo: error.message })),
-  );
+  const id = yield* Effect.orDie(crypto.randomUUIDv4);
   const creada = yield* Clock.currentTimeMillis;
   return { ...contenido, id, creada } satisfies Aportacion;
 });
@@ -126,13 +125,10 @@ const reemplazar = (almacen: IDBObjectStore, tipo: TipoAportacion, nueva?: Aport
  * El almacén en IndexedDB, en la base `celda`. Recibe la fábrica para poder probarlo con una en
  * memoria; sin ella (un navegador sin IndexedDB) cada operación lo dice.
  */
-export const almacenEnIndexedDb = (
-  fabrica: IDBFactory | undefined,
-): Layer.Layer<AlmacenLocal, never, Crypto.Crypto> =>
+export const almacenEnIndexedDb = (fabrica: IDBFactory | undefined): Layer.Layer<AlmacenLocal> =>
   Layer.effect(
     AlmacenLocal,
     Effect.gen(function* () {
-      const crypto = yield* Crypto.Crypto;
       const base = yield* Effect.cached(
         fabrica === undefined
           ? Effect.fail(new AlmacenNoDisponible({ motivo: "Este navegador no tiene IndexedDB" }))
@@ -148,18 +144,12 @@ export const almacenEnIndexedDb = (
         return yield* entendidas(filas);
       });
 
-      const sustituir = Effect.fn("AlmacenLocal.sustituir")(function* (
-        contenido: ContenidoAportacion,
-      ) {
-        const nueva = yield* nuevaAportacion(contenido).pipe(
-          Effect.provideService(Crypto.Crypto, crypto),
-        );
+      const sustituir = Effect.fn("AlmacenLocal.sustituir")(function* (nueva: Aportacion) {
         const abierta = yield* base;
         yield* transaccion(abierta, "readwrite", (almacen) => {
           reemplazar(almacen, nueva.tipo, nueva);
           return () => undefined;
         });
-        return nueva;
       });
 
       const borrar = Effect.fn("AlmacenLocal.borrar")(function* (tipo: TipoAportacion) {

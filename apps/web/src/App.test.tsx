@@ -9,6 +9,7 @@ import { App } from "./App.tsx";
 import { fichasDePrueba } from "./ficha/pruebas.ts";
 import { capaDePrueba } from "./capa/pruebas.ts";
 import { navegar, ruta } from "./lib/rutas.ts";
+import { ubicacionDePrueba } from "./ubicacion/pruebas.ts";
 
 const esperarAjuste = () => new Promise<void>((resolver) => queueMicrotask(resolver));
 
@@ -22,6 +23,7 @@ describe("App", () => {
           capaDePrueba([Effect.never]),
           fichasDePrueba().capa,
           simuladorEnHilo(),
+          ubicacionDePrueba().capa,
         )}
       />
     ));
@@ -46,6 +48,7 @@ describe("App", () => {
           capaDePrueba([Effect.never]),
           fichasDePrueba().capa,
           simuladorEnHilo(),
+          ubicacionDePrueba().capa,
         )}
       />
     ));
