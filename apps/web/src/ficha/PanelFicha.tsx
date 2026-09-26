@@ -1,7 +1,9 @@
 import type { Ficha } from "@celda/dominio/ficha";
 import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { BANDAS_NOMINALES } from "@celda/dominio/tecnologia";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
+import { Desplegable } from "@celda/ui/Desplegable.tsx";
 import { Etiqueta } from "@celda/ui/Etiqueta.tsx";
 import {
   AvisoFicha,
@@ -10,8 +12,11 @@ import {
   EstacionFicha,
   MarcaDeAguaFicha,
   OrigenFicha,
+  ResumenFicha,
   SeccionFicha,
 } from "@celda/ui/panel/Ficha.tsx";
+import { DatosTecnicos } from "@celda/ui/panel/DatosTecnicos.tsx";
+import { EjeFrecuencias } from "@celda/ui/panel/EjeFrecuencias.tsx";
 import type { AlturaHoja } from "@celda/ui/panel/hoja.ts";
 import { PanelEmplazamiento } from "@celda/ui/panel/PanelEmplazamiento.tsx";
 import * as Effect from "effect/Effect";
@@ -21,14 +26,19 @@ import { createEffect, createMemo, createSignal, Errored, For, Loading, Show } f
 
 import { enVivo, usarDatos } from "../datos.tsx";
 import { compararConCapa } from "./marcaDeAgua.ts";
+import {
+  datosTecnicosDe,
+  filasDelEje,
+  fraseDeResumen,
+  NOTA_TECNICA,
+  TITULO_EJE,
+} from "./resumen.ts";
 import { FichasEnVivo } from "./servicio.ts";
 import {
   antetituloDe,
   lugarDe,
   NOMBRE_ESTADO,
-  SIN_BANDAS,
   textoCodigos,
-  textosBandas,
   textosMarca,
   textosOrigen,
   tituloDe,
@@ -123,7 +133,10 @@ function FichaInexistente(props: { readonly clave: string; readonly alCerrar: ()
   );
 }
 
-/** La ficha ya leída: cabecera, marca de agua y cada compañía con sus bandas y sus fuentes. */
+/**
+ * La ficha ya leída: cabecera, frase de resumen, marca de agua, eje de frecuencias, de dónde
+ * sale cada dato y, plegados, los datos técnicos.
+ */
 function ContenidoFicha(props: { readonly ficha: Ficha; readonly fechaCapa: number | undefined }) {
   const marca = createMemo(() =>
     textosMarca(props.ficha, compararConCapa(props.fechaCapa, props.ficha.version)),
@@ -142,18 +155,24 @@ function ContenidoFicha(props: { readonly ficha: Ficha; readonly fechaCapa: numb
           <Etiqueta tono={props.ficha.estado}>{NOMBRE_ESTADO[props.ficha.estado]}</Etiqueta>
         }
       />
+      <ResumenFicha>{fraseDeResumen(props.ficha.estaciones)}</ResumenFicha>
       <MarcaDeAguaFicha tono={posterior() ? "posterior" : "al-dia"} titulo={marca().titulo}>
         {marca().detalle}
       </MarcaDeAguaFicha>
-      <SeccionFicha titulo="Compañías y bandas">
+      <SeccionFicha titulo={TITULO_EJE}>
+        <EjeFrecuencias
+          titulo={TITULO_EJE}
+          bandas={BANDAS_NOMINALES}
+          filas={filasDelEje(props.ficha.estaciones)}
+        />
+      </SeccionFicha>
+      <SeccionFicha titulo="De dónde salen los datos">
         <For each={props.ficha.estaciones}>
           {(estacion) => (
             <EstacionFicha
               compania={estacion.compania}
               nombre={NOMBRE_COMPANIA[estacion.compania]}
               codigos={textoCodigos(estacion.codigos)}
-              bandas={textosBandas(estacion.bandas)}
-              sinBandas={SIN_BANDAS}
             >
               <For each={estacion.origenes}>
                 {(origen) => {
@@ -173,6 +192,9 @@ function ContenidoFicha(props: { readonly ficha: Ficha; readonly fechaCapa: numb
           )}
         </For>
       </SeccionFicha>
+      <Desplegable titulo="Datos técnicos">
+        <DatosTecnicos estaciones={datosTecnicosDe(props.ficha.estaciones)} nota={NOTA_TECNICA} />
+      </Desplegable>
     </article>
   );
 }

@@ -27,7 +27,8 @@ const fechasDistinguibles = (a: number, b: number): readonly [string, string] =>
     ? [`${fechaCorta(a)} a las ${HORA.format(a)}`, `${fechaCorta(b)} a las ${HORA.format(b)}`]
     : [fechaCorta(a), fechaCorta(b)];
 
-const enumerar = (partes: ReadonlyArray<string>): string =>
+/** «a», «a y b», «a, b y c». */
+export const enumerar = (partes: ReadonlyArray<string>): string =>
   partes.length <= 1
     ? (partes[0] ?? "")
     : `${partes.slice(0, -1).join(", ")} y ${partes.at(-1) ?? ""}`;
@@ -58,23 +59,20 @@ export const NOMBRE_ESTADO: Readonly<Record<Estado, string>> = {
 export const textoCodigos = (codigos: ReadonlyArray<string>): string =>
   codigos.length === 1 ? `Código ${codigos[0] ?? ""}` : `Códigos ${enumerar(codigos)}`;
 
+const MHZ = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2, useGrouping: false });
+
 /**
- * Las bandas de una estación base, una vez cada una y de la más baja a la más alta: «800 MHz».
- * Una banda que no encaja en ninguna conocida se escribe con su tramo publicado.
+ * El tramo de un expediente tal como lo publica la fuente, con coma decimal: «925,1–935,1 MHz»
+ * o, con dos rangos, «1910–1915 y 2155–2170 MHz».
  */
-export const textosBandas = (bandas: ReadonlyArray<Banda>): ReadonlyArray<string> => [
-  ...new Set(
-    bandas.map((banda) => {
-      if (banda.mhz !== null) return `${banda.mhz} MHz`;
-      const [rango] = banda.rangos;
-      return rango === undefined ? "Banda sin tramo" : `${rango.desdeMhz}–${rango.hastaMhz} MHz`;
-    }),
-  ),
-];
+export const textoTramo = (banda: Banda): string =>
+  banda.rangos.length === 0
+    ? "Sin tramo publicado"
+    : `${enumerar(banda.rangos.map((r) => `${MHZ.format(r.desdeMhz)}–${MHZ.format(r.hastaMhz)}`))} MHz`;
 
 export const SIN_BANDAS = "Celda aún no ha leído sus bandas en el registro oficial.";
 
-const NOMBRE_FUENTE: Readonly<Record<Fuente, string>> = {
+export const NOMBRE_FUENTE: Readonly<Record<Fuente, string>> = {
   "registro-oficial": "Registro oficial",
   antenasmoviles: "antenasmoviles.es",
   opencellid: "OpenCelliD",
