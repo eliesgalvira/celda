@@ -1,3 +1,4 @@
+import { textoPlano } from "@celda/dominio/glosario";
 import { assert, describe, it } from "@effect/vitest";
 
 import { textoConflicto, textosCorrecciones } from "./correcciones.ts";
@@ -19,8 +20,12 @@ describe("correcciones en la ficha", () => {
   it("corregido: el registro la tiene de alta y la comunidad la da por desmontada, cada uno con su fecha", () => {
     const textos = textosCorrecciones(FICHA_CORREGIDA);
     assert.strictEqual(
-      textos?.resumen,
+      textoPlano(textos?.resumen ?? []),
       "La comunidad corrige el registro oficial en este emplazamiento. Aquí están las dos versiones.",
+    );
+    assert.deepStrictEqual(
+      textos?.resumen.flatMap((f) => (f.termino === undefined ? [] : [f.termino])),
+      ["correccion", "registro-oficial", "emplazamiento"],
     );
     assert.deepStrictEqual(textos?.contrastes, [
       {
@@ -54,7 +59,7 @@ describe("correcciones en la ficha", () => {
     assert.deepStrictEqual(contraste?.oficial, { fuente: "Registro oficial", dice: "No la tiene" });
     assert.strictEqual(contraste?.comunidad.dice, "La han añadido sus usuarios");
     assert.strictEqual(
-      textosCorrecciones(FICHA_NUEVA)?.resumen,
+      textoPlano(textosCorrecciones(FICHA_NUEVA)?.resumen ?? []),
       "El registro oficial no tiene este emplazamiento: lo han añadido los usuarios de la comunidad.",
     );
   });

@@ -1,5 +1,6 @@
 import type { Ficha } from "@celda/dominio/ficha";
 import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { primeraVezEn } from "@celda/dominio/glosario";
 import { BANDAS_NOMINALES } from "@celda/dominio/tecnologia";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
@@ -30,7 +31,7 @@ import { enVivo, usarDatos } from "../datos.tsx";
 import { ReferenciaEnFicha } from "../ubicacion/Ubicacion.tsx";
 import { ComoEmite } from "./ComoEmite.tsx";
 import { TITULO_COMO_EMITE } from "./diagrama.ts";
-import { textosCorrecciones } from "./correcciones.ts";
+import { textosCorrecciones, TITULO_CORRECCIONES } from "./correcciones.ts";
 import { compararConCapa } from "./marcaDeAgua.ts";
 import {
   datosTecnicosDe,
@@ -185,8 +186,13 @@ function ContenidoFicha(props: {
       </MarcaDeAguaFicha>
       <Show when={textosCorrecciones(props.ficha)}>
         {(correcciones) => (
-          <SeccionFicha titulo="Registro oficial y comunidad">
-            <NotaFicha>{correcciones().resumen}</NotaFicha>
+          <SeccionFicha titulo={<TextoConTerminos texto={TITULO_CORRECCIONES} />}>
+            <NotaFicha>
+              {/* El título ya subraya «registro oficial»: la frase subraya lo demás. */}
+              <TextoConTerminos
+                texto={primeraVezEn([TITULO_CORRECCIONES, correcciones().resumen])[1] ?? []}
+              />
+            </NotaFicha>
             <For each={correcciones().contrastes}>
               {(contraste) => (
                 <ContrasteFicha

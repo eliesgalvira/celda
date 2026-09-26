@@ -1,6 +1,7 @@
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import type { Conflicto } from "@celda/dominio/emplazamiento";
 import type { EstacionDeFicha, Ficha, OrigenDeFicha } from "@celda/dominio/ficha";
+import { llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
 import { fechaCorta } from "./textos.ts";
 
@@ -24,8 +25,8 @@ export interface TextosContraste {
 
 /** Lo que la ficha cuenta de las correcciones y los conflictos de un emplazamiento. */
 export interface TextosCorrecciones {
-  /** Qué pasa en este emplazamiento, en una frase. */
-  readonly resumen: string;
+  /** Qué pasa en este emplazamiento, en una frase, con sus términos marcados. */
+  readonly resumen: TextoMarcado;
   readonly contrastes: ReadonlyArray<TextosContraste>;
   readonly conflictos: ReadonlyArray<string>;
   /** El crédito de antenasmoviles.es, si algo sale de su web. */
@@ -121,12 +122,19 @@ export const textoConflicto = (conflicto: Conflicto): string | undefined => {
   }
 };
 
-const RESUMEN: Readonly<Record<Ficha["estado"], string>> = {
-  verificado: "Las fuentes no se ponen de acuerdo en algún dato de este emplazamiento.",
-  corregido:
-    "La comunidad corrige el registro oficial en este emplazamiento. Aquí están las dos versiones.",
-  nuevo:
-    "El registro oficial no tiene este emplazamiento: lo han añadido los usuarios de la comunidad.",
+/** El título de la sección de correcciones. */
+export const TITULO_CORRECCIONES: TextoMarcado = marcado`${termino(
+  "registro-oficial",
+  "Registro oficial",
+)} y comunidad`;
+
+const REGISTRO = termino("registro-oficial", "registro oficial");
+const EMPLAZAMIENTO = termino("emplazamiento", "emplazamiento");
+
+const RESUMEN: Readonly<Record<Ficha["estado"], TextoMarcado>> = {
+  verificado: llano("Las fuentes no se ponen de acuerdo en algún dato de este emplazamiento."),
+  corregido: marcado`La comunidad ${termino("correccion", "corrige")} el ${REGISTRO} en este ${EMPLAZAMIENTO}. Aquí están las dos versiones.`,
+  nuevo: marcado`El ${REGISTRO} no tiene este ${EMPLAZAMIENTO}: lo han añadido los usuarios de la comunidad.`,
 };
 
 const CREDITO_ANTENASMOVILES =

@@ -9,8 +9,10 @@ import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
 import { capaDePrueba } from "../capa/pruebas.ts";
+import { terminosSubrayados } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
 import { FICHA_COMPANIA_ANADIDA, FICHA_CORREGIDA, FICHA_NUEVA } from "./fichasCorregidas.ts";
+import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 import { fichasDePrueba } from "./pruebas.ts";
 
 /** La capa de la misma instantánea que las fichas, con sus estados. */
@@ -35,6 +37,7 @@ const abrirCon = async (ficha: Ficha) => {
         capaDePrueba([Effect.succeed(CAPA)]),
         fichas.capa,
         simuladorEnHilo(),
+        ubicacionDePrueba().capa,
       )}
     />
   ));
@@ -54,7 +57,7 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
     const etiqueta = within(panel).getByText("Corregido");
     assert.strictEqual(etiqueta.getAttribute("data-tono"), "corregido");
 
-    assert.isNotNull(getByRole("heading", { name: "Registro oficial y comunidad" }));
+    assert.isNotNull(getByRole("heading", { name: /Registro oficial y comunidad/u }));
     const vodafone = within(panel).getByLabelText("Qué dice cada fuente de Vodafone");
     assert.isNotNull(within(vodafone).getByText("La tiene dada de alta"));
     assert.isNotNull(within(vodafone).getByText("desde el 26 sept 2026"));
@@ -66,6 +69,15 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
         .getAttribute("href"),
       "https://antenasmoviles.es/#19/41.388342/2.113628",
     );
+    // La sección subraya el registro oficial en su título y la corrección en su frase.
+    const seccion = getByRole("heading", { name: /Registro oficial y comunidad/u }).closest(
+      "section",
+    );
+    assert.deepStrictEqual(seccion === null ? [] : terminosSubrayados(seccion).slice(0, 3), [
+      "registro-oficial",
+      "correccion",
+      "emplazamiento",
+    ]);
     // Cita a antenasmoviles.es y explica adónde lleva el enlace (historia 61).
     assert.isNotNull(getByText(/^Correcciones de la comunidad de antenasmoviles\.es/u));
   });
@@ -94,6 +106,6 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
       within(panel).getByText("Verificado").getAttribute("data-tono"),
       "verificado",
     );
-    assert.isNull(queryByRole("heading", { name: "Registro oficial y comunidad" }));
+    assert.isNull(queryByRole("heading", { name: /Registro oficial y comunidad/u }));
   });
 });
