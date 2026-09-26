@@ -4,13 +4,21 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 import { Coordenada } from "./area.ts";
+import { Mhz } from "./banda.ts";
 import { type Barrio, barrioDelPunto, FuenteDeBarrios, type LimitesDeBarrios } from "./barrio.ts";
 import { Compania } from "./compania.ts";
 import { Estado } from "./emplazamiento.ts";
 
+/** Las bandas en que emite la estación base de una compañía, de menor a mayor frecuencia. */
+export const BandasDeCapa = Schema.Struct({
+  compania: Compania,
+  mhz: Schema.Array(Mhz),
+});
+export type BandasDeCapa = typeof BandasDeCapa.Type;
+
 /**
- * Lo que la capa guarda de cada emplazamiento: lo justo para dibujar su marcador. El resto se
- * lee en vivo en la ficha.
+ * Lo que la capa guarda de cada emplazamiento: lo justo para dibujar su marcador y la vista de
+ * interferencia. El resto se lee en vivo en la ficha.
  */
 export const EmplazamientoDeCapa = Schema.Struct({
   clave: Schema.String,
@@ -18,6 +26,12 @@ export const EmplazamientoDeCapa = Schema.Struct({
   estado: Estado,
   /** Compañías con estación base en el emplazamiento, en el orden de `COMPANIAS_DE_CAPA`. */
   companias: Schema.Array(Compania),
+  /**
+   * Las bandas conocidas de sus estaciones base, en el orden de `COMPANIAS_DE_CAPA`. Una compañía
+   * de la que aún no se ha leído ninguna banda no aparece, y sin ninguna falta la clave. Tampoco
+   * está en las capas del formato 2.
+   */
+  bandas: Schema.optionalKey(Schema.Array(BandasDeCapa)),
 });
 export type EmplazamientoDeCapa = typeof EmplazamientoDeCapa.Type;
 
@@ -39,9 +53,10 @@ export type CapaPublicada = typeof CapaPublicada.Type;
 
 /**
  * Formato del fichero. Cambiar las columnas o sus códigos es un formato nuevo. El 2 añade los
- * barrios: su tabla en la cabecera y la columna `barrio`.
+ * barrios: su tabla en la cabecera y la columna `barrio`. El 3 añade al final la columna
+ * `bandas`. La web lee el 2 y el 3; en el 2 no se conoce ninguna banda.
  */
-export const FORMATO_CAPA = 2;
+export const FORMATO_CAPA = 3;
 
 /** Bit de cada compañía en la columna `companias`. */
 const BIT_COMPANIA: Readonly<Record<Compania, number>> = {
@@ -56,6 +71,29 @@ const BIT_COMPANIA: Readonly<Record<Compania, number>> = {
 export const COMPANIAS_DE_CAPA: ReadonlyArray<Compania> = Compania.literals
   .slice()
   .sort((a, b) => BIT_COMPANIA[a] - BIT_COMPANIA[b]);
+
+/**
+ * La columna `bandas` guarda un número por emplazamiento con siete bits por compañía, uno por
+ * banda de `Mhz` en su orden: los de la compañía `k` de `COMPANIAS_DE_CAPA` valen 128^k. Con
+ * cinco compañías llega a 2^35, lejos de los enteros exactos de JSON.
+ */
+const BANDAS_POR_COMPANIA = 2 ** Mhz.literals.length;
+
+const codigoDeBandas = (bandas: ReadonlyArray<BandasDeCapa>): number =>
+  bandas.reduce(
+    (codigo, { compania, mhz }) =>
+      codigo +
+      mhz.reduce((bits, banda) => bits | (1 << Mhz.literals.indexOf(banda)), 0) *
+        BANDAS_POR_COMPANIA ** COMPANIAS_DE_CAPA.indexOf(compania),
+    0,
+  );
+
+const bandasDeCodigo = (codigo: number): Array<BandasDeCapa> =>
+  COMPANIAS_DE_CAPA.flatMap((compania, k) => {
+    const bits = Math.floor(codigo / BANDAS_POR_COMPANIA ** k) % BANDAS_POR_COMPANIA;
+    const mhz = Mhz.literals.filter((_, j) => (bits & (1 << j)) !== 0);
+    return mhz.length === 0 ? [] : [{ compania, mhz }];
+  });
 
 /** Código de cada estado en la columna `estado`. */
 const ESTADOS_DE_CAPA = ["verificado", "corregido", "nuevo"] as const;
@@ -76,7 +114,7 @@ const TablaDeBarrios = Schema.Struct({
 const Columnas = Schema.Struct({
   /** La primera clave: se puede leer con los primeros bytes, antes de analizar el resto. */
   version: Schema.String,
-  formato: Schema.Literal(FORMATO_CAPA),
+  formato: Schema.Literals([2, FORMATO_CAPA]),
   barrios: TablaDeBarrios,
   clave: Schema.Array(Schema.String),
   lon: Schema.Array(Schema.Finite),
@@ -85,6 +123,8 @@ const Columnas = Schema.Struct({
   estado: Schema.Array(Schema.Int),
   /** Posición del barrio en la tabla `barrios`, o `SIN_BARRIO`. */
   barrio: Schema.Array(Schema.Int),
+  /** Las bandas conocidas de cada emplazamiento (`codigoDeBandas`). Desde el formato 3. */
+  bandas: Schema.optionalKey(Schema.Array(Schema.Int)),
 });
 type Columnas = typeof Columnas.Type;
 
@@ -169,6 +209,7 @@ export const generarCapa = (
     barrio: ordenados.map(
       (e) => posicionDe.get(barrioDelPunto(e.posicion, barrios)?.codigo ?? "") ?? SIN_BARRIO,
     ),
+    bandas: ordenados.map((e) => codigoDeBandas(e.bandas ?? [])),
   };
   return {
     version,
@@ -221,7 +262,15 @@ const filas = (
   c: Columnas,
 ): Result.Result<Pick<CapaLeida, "emplazamientos" | "barrios">, CapaIlegible> => {
   const n = c.clave.length;
-  if ([c.lon, c.lat, c.companias, c.estado, c.barrio].some((columna) => columna.length !== n)) {
+  const columnas = [
+    c.lon,
+    c.lat,
+    c.companias,
+    c.estado,
+    c.barrio,
+    ...(c.bandas === undefined ? [] : [c.bandas]),
+  ];
+  if (columnas.some((columna) => columna.length !== n)) {
     return Result.fail(new CapaIlegible({ motivo: "las columnas no tienen la misma longitud" }));
   }
   const barrios = barriosDe(c.barrios);
@@ -237,13 +286,16 @@ const filas = (
     if (posicionBarrio !== SIN_BARRIO && barrio === undefined) {
       return Result.fail(new CapaIlegible({ motivo: `barrio desconocido en la fila ${i}` }));
     }
-    emplazamientos.push({
+    const leido: EmplazamientoLeido = {
       clave: c.clave[i] ?? "",
       posicion: { longitud: c.lon[i] ?? 0, latitud: c.lat[i] ?? 0 },
       estado,
       companias: companiasDe(c.companias[i] ?? 0),
       barrio: barrio?.codigo ?? null,
-    });
+    };
+    // Sin ninguna banda conocida, el emplazamiento no lleva la clave.
+    const bandas = bandasDeCodigo(c.bandas?.[i] ?? 0);
+    emplazamientos.push(bandas.length === 0 ? leido : { ...leido, bandas });
   }
   return Result.succeed({ emplazamientos, barrios: barrios.success });
 };

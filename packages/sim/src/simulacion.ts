@@ -87,3 +87,35 @@ export const mallaEnRumbo = (rumbo: number, distancias: ReadonlyArray<number>): 
     norte: Float64Array.from(distancias, (d) => d * Math.cos(radianes)),
   };
 };
+
+/** Un rectángulo del plano, en metros. */
+export interface Rectangulo {
+  readonly oeste: number;
+  readonly sur: number;
+  readonly este: number;
+  readonly norte: number;
+}
+
+/**
+ * Los centros de una trama de hexágonos con un vértice arriba, de `radio` metros del centro a
+ * cada vértice, que caen dentro del rectángulo. La trama está anclada al origen del plano (hay un
+ * centro en 0, 0): dos rectángulos que se solapan dan los mismos centros en la parte común, así
+ * que al mover el mapa los hexágonos no bailan. Las filas van de sur a norte y, dentro de cada
+ * fila, de oeste a este.
+ */
+export const mallaHexagonal = (rectangulo: Rectangulo, radio: number): Malla => {
+  const paso = Math.sqrt(3) * radio;
+  const alto = 1.5 * radio;
+  const este: Array<number> = [];
+  const norte: Array<number> = [];
+  for (let fila = Math.ceil(rectangulo.sur / alto); fila * alto <= rectangulo.norte; fila++) {
+    // Las filas impares van medio paso a la derecha.
+    const desplazamiento = Math.abs(fila % 2) * (paso / 2);
+    const primera = Math.ceil((rectangulo.oeste - desplazamiento) / paso);
+    for (let columna = primera; columna * paso + desplazamiento <= rectangulo.este; columna++) {
+      este.push(columna * paso + desplazamiento);
+      norte.push(fila * alto);
+    }
+  }
+  return { este: Float64Array.from(este), norte: Float64Array.from(norte) };
+};

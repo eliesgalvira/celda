@@ -5,6 +5,7 @@ import { celdas } from "./celdas.ts";
 import { diagramaSector } from "./diagramaSector.ts";
 import { perdidasUrbanas } from "./perdidasUrbanas.ts";
 import type { Malla, Resultado, Simulacion } from "./simulacion.ts";
+import { sinr } from "./sinr.ts";
 
 /**
  * Una simulación tal como la ve el Worker: sin sus tipos, con los parámetros en su formato de
@@ -41,4 +42,5 @@ export const SIMULACIONES: ReadonlyArray<SimulacionRegistrada> = [
   registrar(diagramaSector),
   registrar(perdidasUrbanas),
   registrar(celdas),
+  registrar(sinr),
 ];

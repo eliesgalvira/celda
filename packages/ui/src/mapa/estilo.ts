@@ -2,6 +2,7 @@ import type { ExpressionSpecification, FilterSpecification, StyleSpecification }
 
 import { capasCeldas, FUENTE_CELDAS } from "./celdas.ts";
 import { comoRgb, leerOklch } from "./color.ts";
+import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
 
 /** Los tokens del tema que pinta el mapa base. Cada uno es una variable `--mapa-*` de tema.css. */
 export const TOKENS_MAPA = [
@@ -19,6 +20,12 @@ export const TOKENS_MAPA = [
   "mapa-halo",
   "mapa-lugar",
   "mapa-celda",
+  "mapa-sinr-1",
+  "mapa-sinr-2",
+  "mapa-sinr-3",
+  "mapa-sinr-4",
+  "mapa-sinr-5",
+  "mapa-sinr-6",
 ] as const;
 
 export type TokenMapa = (typeof TOKENS_MAPA)[number];
@@ -56,8 +63,9 @@ const AVENIDAS = ["motorway", "trunk", "primary"];
 /**
  * El estilo del mapa base de OpenFreeMap (esquema OpenMapTiles) con los
  * colores del tema. No lleva ningún color escrito: todos salen de `color`.
- * Lleva también las capas de las celdas, con su fuente vacía hasta que la
- * web la llena (`FUENTE_CELDAS`).
+ * Lleva también las capas de las celdas y de la vista de interferencia, con
+ * sus fuentes vacías hasta que la web las llena (`FUENTE_CELDAS` y
+ * `FUENTE_INTERFERENCIA`).
  */
 export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
   version: 8,
@@ -65,6 +73,10 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
   sources: {
     [FUENTE_MAPA_BASE]: { type: "vector", url: `${OPENFREEMAP}/planet` },
     [FUENTE_CELDAS]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+    [FUENTE_INTERFERENCIA]: {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    },
   },
   layers: [
     { id: "fondo", type: "background", paint: { "background-color": color("mapa-fondo") } },
@@ -155,6 +167,14 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": color("mapa-avenida"), "line-width": grosor(1.2, 7, 18) },
     },
+    ...capasInterferencia([
+      color("mapa-sinr-1"),
+      color("mapa-sinr-2"),
+      color("mapa-sinr-3"),
+      color("mapa-sinr-4"),
+      color("mapa-sinr-5"),
+      color("mapa-sinr-6"),
+    ]),
     ...capasCeldas(color("mapa-celda")),
     {
       id: "nombres-de-calles",

@@ -69,6 +69,50 @@ export interface SelectorProps<Valor extends string> {
   readonly alCambiar: (valor: Valor) => void;
 }
 
+export interface DeslizadorProps {
+  /** Etiqueta visible, encima a la izquierda. */
+  readonly etiqueta: string;
+  readonly valor: number;
+  readonly minimo: number;
+  readonly maximo: number;
+  readonly paso: number;
+  /** El valor como se lee, encima a la derecha y para el lector de pantalla: «50 %». */
+  readonly texto: string;
+  /** Se llama con cada movimiento, también con las flechas del teclado. */
+  readonly alCambiar: (valor: number) => void;
+}
+
+/**
+ * Un deslizador nativo con su etiqueta y su valor visibles. La pista ocupa 44 px de alto, así
+ * que se coge bien con el dedo, y las flechas, Re Pág y Av Pág lo mueven.
+ */
+export function Deslizador(props: DeslizadorProps) {
+  const id = createUniqueId();
+  return (
+    <div class="flex flex-col">
+      <div class="flex items-baseline justify-between gap-2">
+        <label for={id} class="font-mono text-xs font-semibold tracking-wider text-tinta-suave">
+          {props.etiqueta}
+        </label>
+        <output for={id} class="font-mono text-sm font-semibold text-tinta">
+          {props.texto}
+        </output>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={props.minimo}
+        max={props.maximo}
+        step={props.paso}
+        value={props.valor}
+        aria-valuetext={props.texto}
+        onInput={(evento) => props.alCambiar(Number(evento.currentTarget.value))}
+        class="h-11 w-full cursor-pointer accent-primario"
+      />
+    </div>
+  );
+}
+
 /** Un desplegable nativo con su etiqueta visible encima. */
 export function Selector<Valor extends string>(props: SelectorProps<Valor>) {
   const id = createUniqueId();

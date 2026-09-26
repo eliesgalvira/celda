@@ -196,9 +196,17 @@ _Evitar_: patrón de antena, lóbulo
 Simulación de dónde se estorban las estaciones base de una misma compañía en una misma banda.
 _Evitar_: mapa de SINR, mapa de calor
 
+**Interferencia**:
+Señal de otros sectores de la misma compañía en la misma banda que llega a un punto y estorba a la del sector que le da servicio.
+_Evitar_: ruido, solapamiento
+
 **Ocupación**:
 Parte de la capacidad de la red que se supone en uso en la vista de interferencia. Al subirla empeoran los bordes entre celdas.
 _Evitar_: carga, tráfico
+
+**Señal frente a interferencia**:
+Cuánto destaca, en dB, la señal del sector que da servicio sobre la interferencia y el ruido en un punto de la vista de interferencia. Es una simulación. En los textos, su nombre técnico (SINR) va al final.
+_Evitar_: calidad de la señal (esa es la medida, RSRQ), SNR, SINR a secas
 
 ### Ejercicios
 

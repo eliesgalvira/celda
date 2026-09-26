@@ -91,6 +91,16 @@
   --mapa-lugar: oklch(38.6% 0.008 97.5);
   /* Las líneas de las celdas: el verde azulado del primario */
   --mapa-celda: oklch(52% 0.077 203.3);
+  /*
+   * Vista de interferencia: de la señal limpia (verde azulado) a donde domina la interferencia
+   * (naranja oscuro), en seis tramos de la señal frente a interferencia (mapa/interferencia.ts).
+   */
+  --mapa-sinr-1: oklch(48% 0.14 40);
+  --mapa-sinr-2: oklch(66% 0.16 55);
+  --mapa-sinr-3: oklch(80% 0.09 75);
+  --mapa-sinr-4: oklch(83% 0.03 170);
+  --mapa-sinr-5: oklch(67% 0.06 200);
+  --mapa-sinr-6: oklch(54% 0.08 205);
 
   /* FUENTES */
   --fuente-texto: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -162,6 +172,12 @@
   --mapa-halo: oklch(23% 0.006 100);
   --mapa-lugar: oklch(86% 0.008 90);
   --mapa-celda: oklch(72% 0.085 203.3);
+  --mapa-sinr-1: oklch(52% 0.14 40);
+  --mapa-sinr-2: oklch(66% 0.16 55);
+  --mapa-sinr-3: oklch(78% 0.09 75);
+  --mapa-sinr-4: oklch(80% 0.03 170);
+  --mapa-sinr-5: oklch(67% 0.07 200);
+  --mapa-sinr-6: oklch(58% 0.09 205);
 }
 
 /* Sin la paleta de Tailwind: solo existen los colores del tema. */
@@ -215,6 +231,12 @@
   --color-velo: var(--velo);
   --color-eje-lejos: var(--eje-lejos);
   --color-mapa-fondo: var(--mapa-fondo);
+  --color-sinr-1: var(--mapa-sinr-1);
+  --color-sinr-2: var(--mapa-sinr-2);
+  --color-sinr-3: var(--mapa-sinr-3);
+  --color-sinr-4: var(--mapa-sinr-4);
+  --color-sinr-5: var(--mapa-sinr-5);
+  --color-sinr-6: var(--mapa-sinr-6);
   --color-movistar: var(--compania-movistar);
   --color-vodafone: var(--compania-vodafone);
   --color-orange: var(--compania-orange);

@@ -8,12 +8,20 @@ import { estiloMapa, TOKENS_MAPA } from "./estilo.ts";
 
 const MARCA = "token:";
 
-/** Los valores de todas las propiedades de color (`*-color`) de las capas del estilo. */
+/**
+ * Los valores de todas las propiedades de color (`*-color`) de las capas del estilo. De una
+ * expresión `step`, el color de cada tramo: las posiciones pares desde la segunda.
+ */
 const coloresDelEstilo = (estilo: StyleSpecification) =>
   estilo.layers.flatMap((capa) =>
     Object.entries(capa.paint ?? {})
       .filter(([propiedad]) => propiedad.endsWith("-color"))
-      .map(([propiedad, valor]) => ({ capa: capa.id, propiedad, valor })),
+      .flatMap(([propiedad, valor]) =>
+        (Array.isArray(valor) && valor[0] === "step"
+          ? valor.filter((_, i) => i >= 2 && i % 2 === 0)
+          : [valor]
+        ).map((color) => ({ capa: capa.id, propiedad, valor: color })),
+      ),
   );
 
 describe("estiloMapa", () => {

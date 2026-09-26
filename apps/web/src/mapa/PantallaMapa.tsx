@@ -6,6 +6,7 @@ import { BotonHexagonal } from "@celda/ui/BotonHexagonal.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
+import { IconoOndas } from "@celda/ui/interferencia/PanelInterferencia.tsx";
 import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
@@ -27,6 +28,19 @@ import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { usarDatos } from "../datos.tsx";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
+import {
+  crearInterferencia,
+  lienzoDelMapa as lienzoDeInterferencia,
+} from "../interferencia/enMapa.ts";
+import {
+  bandaInicial,
+  companiasDeLaCapa,
+  type EleccionVista,
+  type Encuadre,
+  OCUPACION,
+  ZOOM_INTERFERENCIA,
+} from "../interferencia/interferencia.ts";
+import { VistaInterferencia } from "../interferencia/VistaInterferencia.tsx";
 import { conMedir, emplazamientoDe, medirAbierto, navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
@@ -43,6 +57,9 @@ import { CREDITOS_MAPA_BASE, type EstadoMapa, hayWebgl, type MotivoFallo } from 
 import { Marcadores } from "./Marcadores.tsx";
 
 type ModuloMapaBase = typeof import("./mapaBase.ts");
+
+/** Solo para los tipos: el panel de la vista no se monta sin elección. */
+const ELECCION_VACIA: EleccionVista = { compania: "movistar", mhz: 1800, ocupacion: 0.5 };
 
 /** El ancho a partir del cual el panel va a la izquierda y el punto se elige con un clic. */
 const ESCRITORIO = "(min-width: 48rem)";
@@ -63,6 +80,11 @@ export function PantallaMapa() {
   const listo = createMemo(() => estado().tipo === "listo");
   /** Si el mapa está al zoom de las celdas o más cerca. */
   const [cerca, setCerca] = createSignal(false);
+  /** Lo que se ve del mapa, puesto cada vez que se para. */
+  const [encuadre, setEncuadre] = createSignal<Encuadre>();
+  /** La vista de interferencia (historia 38) y lo que se ha elegido en ella. */
+  const [vistaActiva, setVistaActiva] = createSignal(false);
+  const [eleccion, setEleccion] = createSignal<EleccionVista>();
   let contenedor: HTMLDivElement | undefined;
   let mapa: MapaMapLibre | undefined;
   // Cada arranque tiene su número; un arranque viejo o una pantalla ya cerrada
@@ -86,6 +108,16 @@ export function PantallaMapa() {
       const mirarZoom = () => setCerca(nuevo.getZoom() >= ZOOM_CELDAS);
       nuevo.on("zoom", mirarZoom);
       mirarZoom();
+      const mirarEncuadre = () => {
+        const limites = nuevo.getBounds();
+        setEncuadre({
+          suroeste: { longitud: limites.getWest(), latitud: limites.getSouth() },
+          noreste: { longitud: limites.getEast(), latitud: limites.getNorth() },
+          zoom: nuevo.getZoom(),
+        });
+      };
+      nuevo.on("moveend", mirarEncuadre);
+      nuevo.once("load", mirarEncuadre);
       mapa = nuevo;
     } catch (causa) {
       // MapLibre lanza un Error que nombra WebGL si no consigue el contexto.
@@ -219,7 +251,77 @@ export function PantallaMapa() {
     cerca,
     seleccionada,
   });
+  const interferencia = crearInterferencia(datos, {
+    lienzo: createMemo(() => {
+      const actual = mapaListo();
+      return actual === undefined ? undefined : lienzoDeInterferencia(actual);
+    }),
+    activa: vistaActiva,
+    emplazamientos,
+    eleccion,
+    encuadre,
+    referencia: createMemo(() => {
+      const referencia = puntoDeReferencia.referencia();
+      return referencia === undefined ? undefined : posicionDe(referencia);
+    }),
+  });
+
+  /**
+   * Abre o cierra la vista. Al abrirla por primera vez elige la compañía del emplazamiento
+   * seleccionado, o la primera de la capa, y la banda con más estaciones confirmadas.
+   */
+  const cambiarVista = () => {
+    if (vistaActiva()) {
+      setVistaActiva(false);
+      return;
+    }
+    if (eleccion() === undefined) {
+      const todos = emplazamientos();
+      const clave = seleccionada();
+      const compania =
+        todos.find((e) => e.clave === clave)?.companias[0] ?? companiasDeLaCapa(todos)[0];
+      if (compania !== undefined) {
+        setEleccion({
+          compania,
+          mhz: bandaInicial(todos, compania),
+          ocupacion: OCUPACION.inicial,
+        });
+      }
+    }
+    setVistaActiva(true);
+  };
+
+  /**
+   * El panel de la vista. Es un memo que solo cambia al abrirla o cerrarla: la elección llega al
+   * panel como prop, y moverla no vuelve a montarlo (el deslizador no pierde el dedo).
+   */
+  const conVista = createMemo(() => vistaActiva() && eleccion() !== undefined);
+  const vista = createMemo(() =>
+    conVista() ? (
+      <VistaInterferencia
+        emplazamientos={emplazamientos()}
+        eleccion={eleccion() ?? ELECCION_VACIA}
+        alCambiar={(nueva) => {
+          const anterior = eleccion();
+          // Otra compañía abre en su banda con más estaciones confirmadas.
+          setEleccion(
+            anterior !== undefined && nueva.compania !== anterior.compania
+              ? { ...nueva, mhz: bandaInicial(emplazamientos(), nueva.compania) }
+              : nueva,
+          );
+        }}
+        calculo={interferencia.calculo()}
+        reintentar={() => interferencia.reintentar()}
+        referencia={puntoDeReferencia.referencia()?.tipo}
+        cerca={(encuadre()?.zoom ?? 0) >= ZOOM_INTERFERENCIA}
+        alCerrar={() => setVistaActiva(false)}
+      />
+    ) : undefined,
+  );
+
   const pista = createMemo(() => {
+    // Con la vista de interferencia, su panel dice qué es cada cosa y las celdas no se ven.
+    if (vistaActiva()) return undefined;
     const actual = pistaDeCeldas(cerca(), celdas.calculo());
     return actual === undefined ? undefined : (
       <Pista
@@ -348,6 +450,13 @@ export function PantallaMapa() {
               onClick={() => mapa?.zoomOut()}
             />
             <BotonHexagonal
+              etiqueta="Interferencia"
+              icono={<IconoOndas />}
+              activo={vistaActiva()}
+              disabled={!listo() || emplazamientos().length === 0}
+              onClick={cambiarVista}
+            />
+            <BotonHexagonal
               etiqueta="Medir mi señal"
               icono={<IconoSenal />}
               aria-haspopup="dialog"
@@ -365,6 +474,7 @@ export function PantallaMapa() {
         atribucion={<Atribucion creditos={creditos()} />}
         aviso={aviso()}
         panelAbierto={seleccionada() !== null}
+        vista={vista()}
         panel={
           <Show when={seleccionada()}>
             {(clave) => (

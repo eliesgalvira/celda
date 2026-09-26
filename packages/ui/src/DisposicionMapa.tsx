@@ -37,6 +37,12 @@ export interface DisposicionMapaProps {
    * controles y los créditos suben por encima del resumen de la hoja.
    */
   readonly panelAbierto?: boolean;
+  /**
+   * El panel de una vista del mapa, como la de interferencia (`PanelInterferencia`). En escritorio
+   * va abajo a la derecha, junto a los controles; en el móvil, sobre los créditos, con los
+   * controles encima. En el móvil cede el sitio a la hoja de la ficha y a la de elegir un punto.
+   */
+  readonly vista?: JSX.Element;
 }
 
 /**
@@ -52,6 +58,12 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
       // vuelven abajo.
       data-hoja={props.panelAbierto === true && props.eligiendo !== true ? "" : undefined}
       data-eligiendo={props.eligiendo === true ? "" : undefined}
+      // En el móvil la vista solo se ve sin hoja: entonces los controles suben por encima de ella.
+      data-vista={
+        props.vista !== undefined && props.panelAbierto !== true && props.eligiendo !== true
+          ? ""
+          : undefined
+      }
       class="group/mapa fixed inset-0 overflow-hidden bg-mapa-fondo font-texto text-tinta"
     >
       <main
@@ -98,7 +110,17 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         11.75rem es el alto del resumen de la hoja (`ALTO_RESUMEN`, 188 px). En el móvil los
         créditos ocupan dos líneas y los controles quedan por encima de ellas.
       */}
-      <div class="absolute right-2 bottom-[4.5rem] z-10 flex flex-col items-center gap-2 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-16">
+      <Show when={props.vista}>
+        {/*
+          En el móvil, 22.5rem de alto sobre los créditos (dos líneas, unos 3rem). En escritorio, a
+          la izquierda de la columna de controles, que con sus etiquetas ocupa unos 7rem.
+        */}
+        <div class="absolute inset-x-2 bottom-[3.25rem] z-10 h-[22.5rem] max-md:group-data-eligiendo/mapa:hidden max-md:group-data-hoja/mapa:hidden md:inset-x-auto md:right-32 md:bottom-16 md:h-auto md:max-h-[calc(100%-6rem)] md:w-[22rem]">
+          {props.vista}
+        </div>
+      </Show>
+
+      <div class="absolute right-2 bottom-[4.5rem] z-10 flex flex-col items-center gap-2 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] max-md:group-data-vista/mapa:bottom-[calc(22.5rem+3.75rem)] max-md:group-data-vista/mapa:gap-0 max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-16">
         {props.controles}
       </div>
 
