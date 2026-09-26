@@ -21,7 +21,10 @@ export const Ficha = Schema.Struct({
 
 /** Versión de los datos: la marca de agua con la que se comparan las vistas. */
 export const Version = Schema.Struct({
-  /** Fecha de la ejecución que cambió los emplazamientos por última vez. Nula sin datos. */
+  /**
+   * Fecha de la ejecución que cambió los emplazamientos por última vez, también si solo retiró
+   * alguno. Nula sin datos. De ella sale la versión de la capa.
+   */
   version: Schema.NullOr(Schema.Finite),
   /** Última ejecución completa de cada fuente: «consultado el». */
   consultas: Schema.Array(Schema.Struct({ fuente: Fuente, consultadoEl: Schema.Finite })),

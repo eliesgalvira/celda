@@ -6,6 +6,7 @@ import emplazamientos from "./tables/emplazamientos";
 import estacionesBase from "./tables/estacionesBase";
 import interruptores from "./tables/interruptores";
 import observaciones from "./tables/observaciones";
+import versionesCapa from "./tables/versionesCapa";
 
 export default $defineSchema({
   ejecuciones: $Table.tableDefinition(ejecuciones),
@@ -13,4 +14,5 @@ export default $defineSchema({
   estacionesBase: $Table.tableDefinition(estacionesBase),
   interruptores: $Table.tableDefinition(interruptores),
   observaciones: $Table.tableDefinition(observaciones),
+  versionesCapa: $Table.tableDefinition(versionesCapa),
 });

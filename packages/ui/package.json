@@ -11,6 +11,7 @@
     "test": "vp test run"
   },
   "dependencies": {
+    "@celda/dominio": "workspace:*",
     "@solidjs/web": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",

@@ -2,8 +2,10 @@ import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Enlace } from "@celda/ui/Boton.tsx";
 import { PantallaCentrada } from "@celda/ui/PantallaCentrada.tsx";
 import type { JSX } from "@solidjs/web";
+import type * as Layer from "effect/Layer";
 import { createEffect, createMemo, Show } from "solid-js";
 
+import { ProveedorDeDatos, type ServiciosDeDatos } from "./datos.tsx";
 import { esClicDeNavegacion, navegar, ruta, ubicacion } from "./lib/rutas.ts";
 import { PantallaMapa } from "./mapa/PantallaMapa.tsx";
 
@@ -44,7 +46,7 @@ function NoEncontrada() {
   );
 }
 
-export function App() {
+export function App(props: { readonly servicios: Layer.Layer<ServiciosDeDatos> }) {
   const actual = createMemo(
     () => RUTAS.find((candidata) => candidata.patron === ubicacion().pathname) ?? null,
   );
@@ -57,8 +59,10 @@ export function App() {
   );
 
   return (
-    <Show when={actual()} keyed fallback={<NoEncontrada />}>
-      {(encontrada) => encontrada.vista()}
-    </Show>
+    <ProveedorDeDatos servicios={props.servicios}>
+      <Show when={actual()} keyed fallback={<NoEncontrada />}>
+        {(encontrada) => encontrada.vista()}
+      </Show>
+    </ProveedorDeDatos>
   );
 }

@@ -25,12 +25,12 @@ OpenCelliD       └────────────────────
                                         │ instantánea versionada
                                         ▼
                          generador de capas estáticas
-                     (PMTiles: emplazamientos, agrupaciones)
+                  (JSON por columnas: emplazamientos, ADR 0004)
                                         │
                                         ▼ CDN
 ┌──────────────────────────── navegador ───────────────────────────────┐
 │ Solid 2 (SPA)  ── lecturas en vivo (ficha) ──►  Convex               │
-│   │  MapLibre + PMTiles (mapa base OpenFreeMap, capa de emplazamientos)│
+│   │  MapLibre (mapa base OpenFreeMap) + capa JSON de emplazamientos    │
 │   │  Worker: simulaciones (radiación, SINR, celdas)                  │
 │   └  IndexedDB: medidas y puntos del usuario (formato definitivo)    │
 └──────────────────────────────────────────────────────────────────────┘
@@ -50,7 +50,7 @@ celda/
   packages/sim/        núcleos de simulación puros (interfaz Simulación)
   packages/ui/         librería de componentes y tema Hexágono
   packages/ingesta/    extractores y fusión de fuentes
-  tools/capas/         generador de PMTiles
+  tools/capas/         generador de capas (JSON; PMTiles si la zona crece)
   docs/                arquitectura.md, adr/, patterns/
   CONTEXT.md           glosario
 ```
@@ -79,7 +79,7 @@ Copiamos de Moli el catálogo pnpm con versiones exactas, vite-plus (`vp`: build
 
 ### ▸ 4. El mapa se lee de capas estáticas versionadas
 
-- Una instantánea de los emplazamientos se convierte en PMTiles: puntos con los operadores y el estado, y agrupaciones por barrio. Se publica en la CDN con una versión, por ejemplo `sitios@2026-09-24T03:00Z`.
+- Una instantánea de los emplazamientos se convierte en una capa estática y se publica en la CDN con una versión, por ejemplo `sitios@2026-09-24T03:00Z`. Tras la exploración 03 la capa de Barcelona es un fichero JSON por columnas y no PMTiles (ADR 0004).
 - Para la **UI que nunca miente**, la capa y la ficha pueden tener versiones distintas. Si el registro en vivo de Convex es más reciente que la capa, la ficha lo dice («actualizado después del mapa») y el marcador no se «corrige» a medias. Es la marca de agua por vista que recomienda Moli.
 - El mapa base es OpenFreeMap con el estilo propio del tema. Al principio se usan sus servidores y más adelante se puede alojar en local.
 

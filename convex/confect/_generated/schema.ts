@@ -5,6 +5,7 @@ import emplazamientos from "./tables/emplazamientos";
 import estacionesBase from "./tables/estacionesBase";
 import interruptores from "./tables/interruptores";
 import observaciones from "./tables/observaciones";
+import versionesCapa from "./tables/versionesCapa";
 
 const databaseSchema: $DatabaseSchema.DatabaseSchema<{
   readonly ejecuciones: typeof ejecuciones;
@@ -12,12 +13,14 @@ const databaseSchema: $DatabaseSchema.DatabaseSchema<{
   readonly estacionesBase: typeof estacionesBase;
   readonly interruptores: typeof interruptores;
   readonly observaciones: typeof observaciones;
+  readonly versionesCapa: typeof versionesCapa;
 }> = $DatabaseSchema.make({
   ejecuciones,
   emplazamientos,
   estacionesBase,
   interruptores,
   observaciones,
+  versionesCapa,
 });
 
 export default databaseSchema;

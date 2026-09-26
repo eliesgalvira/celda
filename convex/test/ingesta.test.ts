@@ -307,6 +307,20 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
           consultas: [{ fuente: "registro-oficial", consultadoEl: NOCHE + DIA }],
         });
 
+        // Al tercer día solo se retira una estación base, y su emplazamiento desaparece: la
+        // versión también avanza, porque de ella sale el nombre de la capa.
+        yield* TestClock.adjust(DIA);
+        const tercera = yield* ejecutar(registroOficial(unDiaDespues(grabada)));
+        assert.deepStrictEqual(tercera.cambios.emplazamientos, {
+          creados: 0,
+          cambiados: 0,
+          retirados: 1,
+        });
+        assert.strictEqual(
+          (yield* convex.query(refs.public.datos.version)).version,
+          NOCHE + 2 * DIA,
+        );
+
         // Campus Nord no ha cambiado: su ficha sigue con la versión y la fecha de la primera noche.
         const campusNord = yield* convex.query(refs.public.datos.ficha, {
           clave: "movistar-0802532",
