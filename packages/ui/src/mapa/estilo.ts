@@ -1,5 +1,6 @@
 import type { ExpressionSpecification, FilterSpecification, StyleSpecification } from "maplibre-gl";
 
+import { capasCeldas, FUENTE_CELDAS } from "./celdas.ts";
 import { comoRgb, leerOklch } from "./color.ts";
 
 /** Los tokens del tema que pinta el mapa base. Cada uno es una variable `--mapa-*` de tema.css. */
@@ -17,6 +18,7 @@ export const TOKENS_MAPA = [
   "mapa-rotulo",
   "mapa-halo",
   "mapa-lugar",
+  "mapa-celda",
 ] as const;
 
 export type TokenMapa = (typeof TOKENS_MAPA)[number];
@@ -54,12 +56,15 @@ const AVENIDAS = ["motorway", "trunk", "primary"];
 /**
  * El estilo del mapa base de OpenFreeMap (esquema OpenMapTiles) con los
  * colores del tema. No lleva ningún color escrito: todos salen de `color`.
+ * Lleva también las capas de las celdas, con su fuente vacía hasta que la
+ * web la llena (`FUENTE_CELDAS`).
  */
 export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
   version: 8,
   glyphs: `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`,
   sources: {
     [FUENTE_MAPA_BASE]: { type: "vector", url: `${OPENFREEMAP}/planet` },
+    [FUENTE_CELDAS]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   },
   layers: [
     { id: "fondo", type: "background", paint: { "background-color": color("mapa-fondo") } },
@@ -150,6 +155,7 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": color("mapa-avenida"), "line-width": grosor(1.2, 7, 18) },
     },
+    ...capasCeldas(color("mapa-celda")),
     {
       id: "nombres-de-calles",
       type: "symbol",

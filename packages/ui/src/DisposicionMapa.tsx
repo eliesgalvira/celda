@@ -77,8 +77,12 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         <div class="pointer-events-none absolute inset-0 z-20 md:hidden">{props.pinCentral}</div>
       </Show>
 
+      {/*
+        En el móvil, a la izquierda, a la altura de los controles y sin llegar a su columna, que
+        ocupa unos 7rem con sus etiquetas. En escritorio, centrada en lo que deja libre el panel.
+      */}
       <Show when={props.pista} keyed>
-        <div class="pointer-events-none absolute inset-x-0 bottom-14 z-10 flex justify-center px-16 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+2.5rem)] md:bottom-16">
+        <div class="pointer-events-none absolute inset-x-0 bottom-[4.5rem] z-10 flex justify-start pr-28 pl-3 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] md:bottom-16 md:justify-center md:px-16 md:group-data-panel/mapa:pl-[calc(27rem+1rem)]">
           {props.pista}
         </div>
       </Show>

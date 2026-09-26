@@ -1,0 +1,107 @@
+import type {
+  DataDrivenPropertyValueSpecification,
+  FilterSpecification,
+  LayerSpecification,
+} from "maplibre-gl";
+
+/**
+ * Cómo se dibujan las celdas en el mapa, como en el prototipo v8: un trazo fino del color primario
+ * para todas y, al seleccionar un emplazamiento, su celda remarcada y las demás casi invisibles,
+ * para que no se amontonen líneas alrededor de la que importa.
+ */
+
+/** La fuente GeoJSON de las celdas. Cada polígono lleva la `clave` de su emplazamiento. */
+export const FUENTE_CELDAS = "celdas";
+
+/**
+ * A partir de este zoom se dibujan las celdas. En Barcelona la mitad de las celdas miden más de
+ * 250 m de lado a lado y solo una de cada diez baja de 140 m. A zoom 15 esa décima parte ocupa
+ * unos 80 px, casi el doble que un marcador, y las líneas no se amontonan; a 14 bajaba a 40 px.
+ */
+export const ZOOM_CELDAS = 15;
+
+/** Medio nivel de zoom en que las líneas pasan de no verse a verse del todo, sin saltos. */
+const FUNDIDO = 0.5;
+
+const CAPA_BORDES = "celdas";
+const CAPA_SELECCIONADA = "celda-seleccionada";
+const CAPA_SELECCIONADA_RELLENO = "celda-seleccionada-relleno";
+
+/** Opacidad de las líneas de todas las celdas, sin selección y con ella. */
+const OPACIDAD_BORDES = { normal: 0.45, apagada: 0.14 } as const;
+
+const conFundido = (opacidad: number): DataDrivenPropertyValueSpecification<number> => [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  ZOOM_CELDAS,
+  0,
+  ZOOM_CELDAS + FUNDIDO,
+  opacidad,
+];
+
+const deLaCelda = (clave: string | null): FilterSpecification => [
+  "==",
+  ["get", "clave"],
+  clave ?? "",
+];
+
+/**
+ * Las capas de las celdas, con el color que les da el tema. Van por debajo de los nombres de las
+ * calles, que se siguen leyendo encima de las líneas.
+ */
+export const capasCeldas = (color: string): ReadonlyArray<LayerSpecification> => [
+  {
+    id: CAPA_SELECCIONADA_RELLENO,
+    type: "fill",
+    source: FUENTE_CELDAS,
+    minzoom: ZOOM_CELDAS,
+    filter: deLaCelda(null),
+    paint: { "fill-color": color, "fill-opacity": conFundido(0.1) },
+  },
+  {
+    id: CAPA_BORDES,
+    type: "line",
+    source: FUENTE_CELDAS,
+    minzoom: ZOOM_CELDAS,
+    layout: { "line-join": "round" },
+    paint: {
+      "line-color": color,
+      "line-width": 1,
+      "line-opacity": conFundido(OPACIDAD_BORDES.normal),
+    },
+  },
+  {
+    id: CAPA_SELECCIONADA,
+    type: "line",
+    source: FUENTE_CELDAS,
+    minzoom: ZOOM_CELDAS,
+    filter: deLaCelda(null),
+    layout: { "line-join": "round" },
+    paint: { "line-color": color, "line-width": 2, "line-opacity": conFundido(1) },
+  },
+];
+
+/** Lo que hace falta del mapa de MapLibre para remarcar una celda. */
+export interface MapaConCeldas {
+  readonly setFilter: (capa: string, filtro: FilterSpecification) => void;
+  readonly setPaintProperty: (
+    capa: string,
+    propiedad: "line-opacity",
+    valor: DataDrivenPropertyValueSpecification<number>,
+  ) => void;
+}
+
+/**
+ * Remarca la celda del emplazamiento `clave` y apaga las demás, o las deja todas igual con
+ * `null`. MapLibre funde el cambio de opacidad.
+ */
+export const remarcarCelda = (mapa: MapaConCeldas, clave: string | null): void => {
+  mapa.setFilter(CAPA_SELECCIONADA, deLaCelda(clave));
+  mapa.setFilter(CAPA_SELECCIONADA_RELLENO, deLaCelda(clave));
+  mapa.setPaintProperty(
+    CAPA_BORDES,
+    "line-opacity",
+    conFundido(clave === null ? OPACIDAD_BORDES.normal : OPACIDAD_BORDES.apagada),
+  );
+};
