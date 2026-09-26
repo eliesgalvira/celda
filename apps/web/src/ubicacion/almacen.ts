@@ -1,3 +1,4 @@
+import { AJUSTES_INICIALES, Ajustes } from "@celda/dominio/ajustes";
 import {
   Aportacion,
   type ContenidoAportacion,
@@ -19,8 +20,8 @@ export class AlmacenNoDisponible extends Schema.TaggedError<AlmacenNoDisponible>
 
 /**
  * Las aportaciones guardadas en el dispositivo, sin cuenta (ADR 0007), con su formato definitivo
- * (`nuevaAportacion` les pone el identificador y la fecha). Borrar es borrar de verdad: no queda
- * copia en ninguna parte.
+ * (`nuevaAportacion` les pone el identificador y la fecha), y los ajustes del dispositivo. Borrar
+ * es borrar de verdad: no queda copia en ninguna parte.
  */
 export class AlmacenLocal extends Context.Service<
   AlmacenLocal,
@@ -33,15 +34,23 @@ export class AlmacenLocal extends Context.Service<
     readonly sustituir: (aportacion: Aportacion) => Effect.Effect<void, AlmacenNoDisponible>;
     /** Borra todas las aportaciones de un tipo. */
     readonly borrar: (tipo: TipoAportacion) => Effect.Effect<void, AlmacenNoDisponible>;
+    /** Los ajustes guardados, o los iniciales si nunca se ha guardado ninguno. */
+    readonly leerAjustes: Effect.Effect<Ajustes, AlmacenNoDisponible>;
+    readonly guardarAjustes: (ajustes: Ajustes) => Effect.Effect<void, AlmacenNoDisponible>;
   }
 >()("@celda/web/ubicacion/almacen/AlmacenLocal") {}
 
 const BASE = "celda";
-const VERSION_BASE = 1;
+/** La 2 añade el almacén de ajustes; las aportaciones de la 1 siguen donde estaban. */
+const VERSION_BASE = 2;
 const APORTACIONES = "aportaciones";
 const POR_TIPO = "tipo";
+const AJUSTES = "ajustes";
+/** Clave de la única fila de ajustes: son del dispositivo, no de una persona. */
+const DEL_DISPOSITIVO = "dispositivo";
 
 const leerAportacion = Schema.decodeUnknownOption(Aportacion);
+const leerAjustesGuardados = Schema.decodeUnknownOption(Ajustes);
 
 /**
  * Una aportación nueva con su identificador y su fecha de creación. Sin números aleatorios
@@ -79,6 +88,7 @@ const abrir = (fabrica: IDBFactory): Effect.Effect<IDBDatabase, AlmacenNoDisponi
       if (!base.objectStoreNames.contains(APORTACIONES)) {
         base.createObjectStore(APORTACIONES, { keyPath: "id" }).createIndex(POR_TIPO, "tipo");
       }
+      if (!base.objectStoreNames.contains(AJUSTES)) base.createObjectStore(AJUSTES);
     });
     peticion.addEventListener("success", () => reanudar(Effect.succeed(peticion.result)));
     peticion.addEventListener("error", () =>
@@ -92,17 +102,18 @@ const abrir = (fabrica: IDBFactory): Effect.Effect<IDBDatabase, AlmacenNoDisponi
   });
 
 /**
- * Una transacción sobre las aportaciones. `hacer` pone las peticiones y devuelve cómo leer su
- * resultado cuando la transacción termina bien.
+ * Una transacción sobre las aportaciones o los ajustes. `hacer` pone las peticiones y devuelve
+ * cómo leer su resultado cuando la transacción termina bien.
  */
 const transaccion = <A>(
   base: IDBDatabase,
   modo: IDBTransactionMode,
   hacer: (almacen: IDBObjectStore) => () => A,
+  almacen: typeof APORTACIONES | typeof AJUSTES = APORTACIONES,
 ): Effect.Effect<A, AlmacenNoDisponible> =>
   Effect.callback<A, AlmacenNoDisponible>((reanudar) => {
-    const tx = base.transaction(APORTACIONES, modo);
-    const resultado = hacer(tx.objectStore(APORTACIONES));
+    const tx = base.transaction(almacen, modo);
+    const resultado = hacer(tx.objectStore(almacen));
     tx.addEventListener("complete", () => reanudar(Effect.sync(resultado)));
     tx.addEventListener("error", () =>
       reanudar(Effect.fail(fallo(tx.error, "IndexedDB ha rechazado la operación"))),
@@ -160,6 +171,34 @@ export const almacenEnIndexedDb = (fabrica: IDBFactory | undefined): Layer.Layer
         });
       });
 
-      return AlmacenLocal.of({ leer, sustituir, borrar });
+      const leerAjustes = Effect.gen(function* () {
+        const abierta = yield* base;
+        const fila = yield* transaccion(
+          abierta,
+          "readonly",
+          (almacen) => {
+            const peticion = almacen.get(DEL_DISPOSITIVO);
+            return () => leerAjustesGuardados(peticion.result);
+          },
+          AJUSTES,
+        );
+        // Unos ajustes de otra versión, o ninguno, valen como los iniciales.
+        return Option.getOrElse(fila, () => AJUSTES_INICIALES);
+      }).pipe(Effect.withSpan("AlmacenLocal.leerAjustes"));
+
+      const guardarAjustes = Effect.fn("AlmacenLocal.guardarAjustes")(function* (ajustes: Ajustes) {
+        const abierta = yield* base;
+        yield* transaccion(
+          abierta,
+          "readwrite",
+          (almacen) => {
+            almacen.put(ajustes, DEL_DISPOSITIVO);
+            return () => undefined;
+          },
+          AJUSTES,
+        );
+      });
+
+      return AlmacenLocal.of({ leer, sustituir, borrar, leerAjustes, guardarAjustes });
     }),
   );

@@ -1,3 +1,4 @@
+import { AJUSTES_INICIALES, type Ajustes } from "@celda/dominio/ajustes";
 import type { Aportacion } from "@celda/dominio/aportacion";
 import * as Cause from "effect/Cause";
 import type * as Crypto from "effect/Crypto";
@@ -64,14 +65,18 @@ export interface AlmacenDePrueba {
   readonly capa: Layer.Layer<AlmacenLocal>;
   /** Lo que hay guardado ahora. */
   readonly guardadas: () => ReadonlyArray<Aportacion>;
+  /** Los ajustes guardados ahora. */
+  readonly ajustes: () => Ajustes;
 }
 
 /** Un almacén en memoria con las aportaciones que se le den. Con `roto`, todo falla. */
 export const almacenDePrueba = (
   iniciales: ReadonlyArray<Aportacion> = [],
   roto = false,
+  ajustesIniciales: Ajustes = AJUSTES_INICIALES,
 ): AlmacenDePrueba => {
   let guardadas = [...iniciales];
+  let ajustes = ajustesIniciales;
   const disponible: Effect.Effect<void, AlmacenNoDisponible> = roto
     ? Effect.fail(new AlmacenNoDisponible({ motivo: "almacén de prueba roto" }))
     : Effect.void;
@@ -88,9 +93,15 @@ export const almacenDePrueba = (
           Effect.map(disponible, () => {
             guardadas = guardadas.filter((a) => a.tipo !== tipo);
           }),
+        leerAjustes: Effect.map(disponible, () => ajustes),
+        guardarAjustes: (nuevos) =>
+          Effect.map(disponible, () => {
+            ajustes = nuevos;
+          }),
       }),
     ),
     guardadas: () => guardadas,
+    ajustes: () => ajustes,
   };
 };
 
@@ -130,6 +141,7 @@ export interface OpcionesDeUbicacion {
   readonly permiso?: Permiso;
   readonly guardadas?: ReadonlyArray<Aportacion>;
   readonly almacenRoto?: boolean;
+  readonly ajustes?: Ajustes;
   readonly busquedas?: ReadonlyMap<string, ReadonlyArray<Direccion> | BusquedaFallida>;
 }
 
@@ -148,7 +160,7 @@ export interface UbicacionDePrueba {
  */
 export const ubicacionDePrueba = (opciones: OpcionesDeUbicacion = {}): UbicacionDePrueba => {
   const gps = geolocalizacionDePrueba(opciones.permiso ?? "preguntar");
-  const almacen = almacenDePrueba(opciones.guardadas, opciones.almacenRoto);
+  const almacen = almacenDePrueba(opciones.guardadas, opciones.almacenRoto, opciones.ajustes);
   const buscador = buscadorDePrueba(opciones.busquedas ?? new Map());
   return {
     capa: Layer.mergeAll(gps.capa, almacen.capa, buscador.capa, criptoDePrueba),
