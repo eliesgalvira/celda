@@ -66,6 +66,11 @@ export type ResultadoSectorServicio = {
   readonly sectores: Float64Array;
   readonly inicioSectores: Uint32Array;
   /**
+   * Los límites entre sectores: van del emplazamiento (el origen) al punto del borde de la celda
+   * que da cada uno, este y norte alternos. Uno por sector con polígono si hay dos o más.
+   */
+  readonly cortes: Float64Array;
+  /**
    * El degradado: discos cada vez más grandes alrededor del emplazamiento, recortados al sector
    * que da servicio al primer punto de la malla, o a la celda entera si no hay punto o está junto
    * al emplazamiento. La banda `k` son los vértices de `inicioBandas[k]` a `inicioBandas[k + 1]`
@@ -197,6 +202,12 @@ export const sectorServicio: Simulacion<ParamsSectorServicio, ResultadoSectorSer
       ? repartirEnSectores(celda, { este: 0, norte: 0 }, p.azimuts)
       : p.azimuts.map(() => new Float64Array(0));
     const sectores = juntar(reparto);
+    const conPoligono = reparto.filter((poligono) => poligono.length >= 6);
+    const cortes = Float64Array.from(
+      conPoligono.length < 2
+        ? []
+        : conPoligono.flatMap((poligono) => [poligono[2] ?? 0, poligono[3] ?? 0]),
+    );
     const servido = n > 0 ? (sector[0] ?? -1) : -1;
     const bandas = juntar(bandasDe(servido >= 0 ? (reparto[servido] ?? celda) : celda));
     const perdidaBandas = Float64Array.from(
@@ -212,6 +223,7 @@ export const sectorServicio: Simulacion<ParamsSectorServicio, ResultadoSectorSer
       enCelda,
       sectores: sectores.vertices,
       inicioSectores: sectores.inicio,
+      cortes,
       bandas: bandas.vertices,
       inicioBandas: bandas.inicio,
       perdidaBandas,

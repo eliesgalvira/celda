@@ -114,6 +114,16 @@ describe("sector que da servicio", () => {
     assert.lengthOf(inicioSectores, 4);
     const suma = [0, 1, 2].reduce((t, k) => t + areaDe(sectores, inicioSectores, k), 0);
     assert.closeTo(suma, area(Float64Array.from(CELDA)), 1e-6);
+    // Tres límites, en las bisectrices de los ejes: 60°, 180° y 300°.
+    const { cortes } = sectorServicio.ejecutar(TRES_SECTORES, SIN_MALLA);
+    const rumbos = Array.from({ length: cortes.length / 2 }, (_, i) =>
+      Math.round(
+        ((Math.atan2(cortes[2 * i] ?? 0, cortes[2 * i + 1] ?? 0) * 180) / Math.PI + 360) % 360,
+      ),
+    ).toSorted((a, b) => a - b);
+    assert.deepStrictEqual(rumbos, [60, 180, 300]);
+    const uno = sectorServicio.ejecutar({ ...TRES_SECTORES, azimuts: [90] }, SIN_MALLA);
+    assert.lengthOf(uno.cortes, 0);
     // Un punto al este cae en el sector de 120°.
     assert.isTrue(contiene(trozo(sectores, inicioSectores, 1), 100, -20));
   });
