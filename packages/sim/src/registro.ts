@@ -1,6 +1,7 @@
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
+import { celdas } from "./celdas.ts";
 import { diagramaSector } from "./diagramaSector.ts";
 import { perdidasUrbanas } from "./perdidasUrbanas.ts";
 import type { Malla, Resultado, Simulacion } from "./simulacion.ts";
@@ -39,4 +40,5 @@ export const registrar = <P, R extends Resultado>(
 export const SIMULACIONES: ReadonlyArray<SimulacionRegistrada> = [
   registrar(diagramaSector),
   registrar(perdidasUrbanas),
+  registrar(celdas),
 ];
