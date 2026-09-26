@@ -141,6 +141,43 @@ export function LobulosSector(props: LobulosSectorProps) {
   );
 }
 
+export interface DireccionReferenciaProps {
+  /** Rumbo del emplazamiento al punto de referencia, en grados desde el norte. */
+  readonly rumbo: number;
+  /** «TÚ» con la ubicación GPS y «PUNTO» con un punto elegido, como en el mapa. */
+  readonly etiqueta: string;
+}
+
+/**
+ * Hacia dónde queda el punto de referencia, dentro de `DiagramaRadiacion`: una línea discontinua
+ * del centro al borde y el hexágono del punto, como en el prototipo v8.
+ */
+export function DireccionReferencia(props: DireccionReferenciaProps) {
+  const borde = () => punto(props.rumbo, RADIO);
+  // La etiqueta va por fuera del hexágono, hacia el centro si queda abajo.
+  const debajo = () => borde()[1] > CENTRO;
+  return (
+    <g data-rumbo={Math.round(props.rumbo)}>
+      <line
+        x1={CENTRO}
+        y1={CENTRO}
+        x2={borde()[0]}
+        y2={borde()[1]}
+        class="stroke-referencia stroke-[1.6] [stroke-dasharray:4_3]"
+      />
+      <polygon points={hexagono(borde()[0], borde()[1], 8)} class="fill-referencia" />
+      <text
+        x={borde()[0]}
+        y={borde()[1] + (debajo() ? -13 : 20)}
+        text-anchor="middle"
+        class={`${TEXTO_CON_HALO} fill-tinta text-[10px] font-bold`}
+      >
+        {props.etiqueta}
+      </text>
+    </g>
+  );
+}
+
 /** Lo que ocupa el sitio de los lóbulos mientras se calculan: nada, y un aviso si tarda. */
 export function CalculandoDiagrama() {
   return (

@@ -53,11 +53,11 @@ export const paramsDiagrama = (orientacion: Orientacion): ParamsDiagramaSector =
 const grados = (azimut: number): string => `${Math.round(azimut)}°`;
 
 /** El rumbo de un sector como se escribe: «120°» si es supuesto, «120° ±15°» si es estimado. */
-const azimutDe = (orientacion: Orientacion, azimut: number): string =>
+export const azimutDe = (orientacion: Orientacion, azimut: number): string =>
   orientacion.tipo === "estimada" ? `${grados(azimut)} ±${orientacion.margen}°` : grados(azimut);
 
 /** «0°, 120° y 240°». */
-const enumerar = (azimuts: ReadonlyArray<number>): string => {
+export const enumerar = (azimuts: ReadonlyArray<number>): string => {
   const partes = azimuts.map(grados);
   return partes.length < 2
     ? (partes[0] ?? "")

@@ -10,6 +10,7 @@ export const TERMINOS = [
   "estacion-base",
   "compania",
   "sector",
+  "sector-que-da-servicio",
   "azimut",
   "celda",
   "cobertura",
@@ -32,6 +33,7 @@ export const TERMINOS = [
   "interferencia",
   "ocupacion",
   "sinr",
+  "decibelio",
 ] as const;
 
 export type Termino = (typeof TERMINOS)[number];
@@ -83,6 +85,15 @@ export const GLOSARIO: Glosario = {
       "sus propias antenas.",
     tecnico: "sector",
     relacionados: ["azimut", "estacion-base", "celda"],
+  },
+  "sector-que-da-servicio": {
+    nombre: "Sector que da servicio",
+    explicacion:
+      "El sector que más señal manda hacia un punto, porque su haz apunta hacia allí. Celda lo " +
+      "calcula con un modelo a partir de la dirección, así que depende de hacia dónde se supone " +
+      "que apunta cada sector.",
+    tecnico: "celda servidora (serving cell)",
+    relacionados: ["sector", "azimut", "decibelio"],
   },
   azimut: {
     nombre: "Azimut",
@@ -269,6 +280,14 @@ export const GLOSARIO: Glosario = {
       "Por encima de 20 dB es limpia; por debajo de 0, la interferencia puede más que ella.",
     tecnico: "SINR (relación señal a interferencia más ruido)",
     relacionados: ["interferencia", "ocupacion", "modelo"],
+  },
+  decibelio: {
+    nombre: "Decibelio",
+    explicacion:
+      "La unidad con que se compara la señal. Perder 3 dB es quedarse con la mitad y perder " +
+      "10 dB, con la décima parte. Por eso unos pocos dB ya se notan.",
+    tecnico: "decibelio (dB)",
+    relacionados: ["sector-que-da-servicio"],
   },
 };
 

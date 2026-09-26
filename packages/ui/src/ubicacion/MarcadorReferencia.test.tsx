@@ -6,8 +6,16 @@ import { PuntoElegido } from "./MarcadorReferencia.tsx";
 const montar = (arrastrable: boolean) => {
   const movimientos: Array<readonly [number, number]> = [];
   let soltado = 0;
+  let alMapa = 0;
   const pantalla = render(() => (
-    <div>
+    <div
+      // Como el contenedor del mapa, que escucha el ratón para moverse.
+      ref={(mapa) => {
+        mapa.addEventListener("mousedown", () => {
+          alMapa += 1;
+        });
+      }}
+    >
       <PuntoElegido
         x={100}
         y={200}
@@ -24,10 +32,20 @@ const montar = (arrastrable: boolean) => {
     punto: pantalla.getByRole("button", { name: "El punto elegido" }),
     movimientos,
     soltado: () => soltado,
+    alMapa: () => alMapa,
   };
 };
 
 describe("PuntoElegido", () => {
+  it("el ratón que lo arrastra no llega al mapa; si no se arrastra, sí", () => {
+    const raton = montar(true);
+    fireEvent.mouseDown(raton.punto, { button: 0 });
+    assert.strictEqual(raton.alMapa(), 0);
+    const dedo = montar(false);
+    fireEvent.mouseDown(dedo.punto, { button: 0 });
+    assert.strictEqual(dedo.alMapa(), 1);
+  });
+
   it("con el teclado, las flechas lo mueven y soltar la tecla lo deja ahí", () => {
     const { punto, movimientos, soltado } = montar(true);
     fireEvent.keyDown(punto, { key: "ArrowRight" });

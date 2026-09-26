@@ -1,5 +1,6 @@
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
-import { celdas } from "@celda/sim/celdas";
+import { celdas, type ResultadoCeldas } from "@celda/sim/celdas";
+import type { Coordenada } from "@celda/dominio/area";
 import { Simulador } from "@celda/sim/simulador";
 import { FUENTE_CELDAS, remarcarCelda } from "@celda/ui/mapa/celdas.ts";
 import * as Effect from "effect/Effect";
@@ -44,8 +45,17 @@ export interface EntradaCeldas {
   readonly seleccionada: () => string | null;
 }
 
+/** Las celdas ya calculadas de una capa, con el origen de su plano. */
+export interface CeldasCalculadas {
+  readonly emplazamientos: ReadonlyArray<EmplazamientoDeCapa>;
+  readonly origen: Coordenada;
+  readonly resultado: ResultadoCeldas;
+}
+
 export interface CeldasDelMapa {
   readonly calculo: () => CalculoCeldas;
+  /** Las celdas de la capa vigente, cuando están listas. */
+  readonly calculadas: () => CeldasCalculadas | undefined;
   /** Vuelve a pedir las celdas tras un fallo. */
   readonly reintentar: () => void;
 }
@@ -67,6 +77,7 @@ export function crearCeldas(
   /** La capa cuyas celdas se han pedido: la vigente, en cuanto el mapa se ha acercado. */
   const [pedidas, setPedidas] = createSignal<ReadonlyArray<EmplazamientoDeCapa>>();
   const [intento, setIntento] = createSignal(0);
+  const [calculadas, setCalculadas] = createSignal<CeldasCalculadas>();
 
   createEffect(
     () => ({ cerca: entrada.cerca(), emplazamientos: entrada.emplazamientos() }),
@@ -87,6 +98,7 @@ export function crearCeldas(
       if (pedidasAhora !== emplazamientos) {
         // Otra capa, todavía sin pedir: las celdas de la anterior ya no valen.
         lienzo.dibujar(SIN_CELDAS);
+        setCalculadas(undefined);
         setCalculo("sin-pedir");
         return;
       }
@@ -99,12 +111,13 @@ export function crearCeldas(
           este: new Float64Array(0),
           norte: new Float64Array(0),
         });
-        return celdasEnMapa(resultado, emplazamientos, origen);
+        return { resultado, enMapa: celdasEnMapa(resultado, emplazamientos, origen) };
       });
       void datos.runPromiseExit(calcular, { signal: cancelar.signal }).then((salida) => {
         if (cancelar.signal.aborted) return;
         if (Exit.isSuccess(salida)) {
-          lienzo.dibujar(salida.value);
+          lienzo.dibujar(salida.value.enMapa);
+          setCalculadas({ emplazamientos, origen, resultado: salida.value.resultado });
           setCalculo("listas");
         } else {
           setCalculo("fallo");
@@ -121,5 +134,5 @@ export function crearCeldas(
     },
   );
 
-  return { calculo, reintentar: () => setIntento((n) => n + 1) };
+  return { calculo, calculadas, reintentar: () => setIntento((n) => n + 1) };
 }

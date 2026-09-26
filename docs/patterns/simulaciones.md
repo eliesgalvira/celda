@@ -5,7 +5,7 @@ Léelo antes de añadir o cambiar una simulación. La decisión de fondo está e
 ## Dónde está cada cosa
 
 - `packages/sim/src/simulacion.ts`: la interfaz `Simulacion<Params, R>`, la `Malla` y sus ayudas (`rumboDe`, `distanciaDe`, `mallaDeRumbos`, `mallaEnRumbo`, `mallaHexagonal`).
-- `packages/sim/src/diagramaSector.ts`, `perdidasUrbanas.ts`, `celdas.ts` y `sinr.ts`: las simulaciones de hoy.
+- `packages/sim/src/diagramaSector.ts`, `perdidasUrbanas.ts`, `celdas.ts`, `sinr.ts` y `sectorServicio.ts`: las simulaciones de hoy.
 - `packages/sim/src/poligono.ts`: polígonos del plano local (área, si contienen un punto, recorte por un semiplano).
 - `packages/sim/src/registro.ts`: `SIMULACIONES`, la lista de lo que sabe calcular el Worker.
 - `packages/sim/src/protocolo.ts`: `atender`, lo que hace el Worker con cada solicitud. La versión en el mismo hilo llama a la misma función.
@@ -68,7 +68,18 @@ La tolerancia se declara al generar el fichero y va dentro de él. Las de TypeSc
 - Si dos emplazamientos están en el mismo punto, la celda es del primero y el otro se queda sin ella.
 - La web la calcula entre todos los emplazamientos, sea cual sea su compañía (`CONTEXT.md`), en un plano centrado en la capa (`aPlano` de `@celda/dominio/plano`) y con una caja 100 m más ancha que los emplazamientos. Fuera de la zona de la ingesta puede haber emplazamientos que Celda no conoce, así que las celdas no se alargan por ahí.
 
-`repartirEnSectores(celda, emplazamiento, azimuts)` divide una celda entre los sectores de su estación base, para el ticket 23. A cada punto le toca el sector cuyo eje queda más cerca de su rumbo, que con sectores iguales es el que da más ganancia en el diagrama de sector. Devuelve un polígono por azimut; un sector de más de 180° no es convexo, pero juntos cubren la celda sin solaparse. No está en el registro porque es geometría sobre el resultado de `celdas` y el Worker no la necesita.
+`repartirEnSectores(celda, emplazamiento, azimuts)` divide una celda entre los sectores de su estación base. A cada punto le toca el sector cuyo eje queda más cerca de su rumbo, que con sectores iguales es el que da más ganancia en el diagrama de sector. Devuelve un polígono por azimut; un sector de más de 180° no es convexo, pero juntos cubren la celda sin solaparse. No está en el registro porque es geometría sobre el resultado de `celdas`; la usa `sector-servicio`.
+
+## Sector que da servicio
+
+`sectorServicio` (`sector-servicio@1`) recibe los azimuts y la forma del haz, como el diagrama, y la celda del emplazamiento, todo en un plano con el emplazamiento en el origen. La malla lleva el punto de referencia, o nada.
+
+- Para cada punto dice qué sector le da servicio (el de más ganancia en el diagrama de sector; en un empate, el primero), la ganancia respecto a su eje, la desviación con signo, la distancia, el rumbo y si cae en la celda. Solo mira la dirección: no compara con otros emplazamientos, así que un punto fuera de la celda también tiene sector, y la web avisa de que hay otro emplazamiento más cerca.
+- A menos de `DISTANCIA_JUNTO_M` (15 m, el umbral de la fusión) no elige sector: el rumbo no dice nada y la posición del emplazamiento tampoco se conoce mejor.
+- Devuelve también la celda repartida con `repartirEnSectores`, los límites entre sectores y el degradado: discos alrededor del emplazamiento recortados al sector que da servicio al primer punto, o a la celda entera si no hay punto o está al pie. Cada disco pierde 2 dB más que el anterior según las pérdidas urbanas (37,6 dB por década de distancia, sin la banda, que solo suma una constante), empezando en los 35 m del modelo.
+- Los ficheros de referencia cubren de frente, entre dos sectores, detrás de un solo sector, sobre el emplazamiento, fuera de la celda y sin punto.
+
+En la web (`apps/web/src/servicio/`), `crearServicio` lo pide al simulador cada vez que cambian el emplazamiento seleccionado, el punto o su celda. Al arrastrar el punto llegan muchos cambios: no interrumpe el cálculo en curso, porque interrumpir termina el Worker y arrancar otro cuesta más que el cálculo (menos de 1 ms). Guarda el último cambio y lo calcula al acabar. Otro emplazamiento, quitar la selección o cerrar el mapa sí cancelan. Sin punto y sin celdas calculadas no pide nada.
 
 ## Señal frente a interferencia (`sinr@1`)
 

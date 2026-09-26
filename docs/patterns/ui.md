@@ -98,7 +98,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - `panel/DiagramaRadiacion.tsx` es el diagrama polar del prototipo v6: el borde es 0 dB, el centro la atenuación máxima (30 dB), anillos a 0, −10 y −20 dB, marcas cada 30° y N, E, S, O. Siempre lleva `Etiqueta tono="modelo"` con el `id` y la `version` de la simulación, una leyenda por sector y las notas que dicen de dónde salen la forma y la orientación.
 - Es un `<svg role="img">` con `<title>` y `<desc>`: quien no lo ve oye qué sectores hay, hacia dónde y que es un modelo. La leyenda de debajo repite los rumbos en texto.
 - El marco y los lóbulos van por separado. `DiagramaRadiacion` dibuja los ejes y recibe como hijos `LobulosSector` o, mientras el Worker calcula, `CalculandoDiagrama`, que no ocupa nada y avisa a los 0,5 s. Así el sitio del diagrama está reservado desde el principio.
-- `LobulosSector` pinta con trazo discontinuo una orientación supuesta y con trazo continuo una estimada, y con margen dibuja dos radios a ±15° de cada eje. `destacado` rellena un sector con el primario, para el sector que da servicio (ticket 23).
+- `LobulosSector` pinta con trazo discontinuo una orientación supuesta y con trazo continuo una estimada, y con margen dibuja dos radios a ±15° de cada eje. `destacado` rellena un sector con el primario: el sector que da servicio. `DireccionReferencia` dibuja una línea discontinua del centro al borde en el rumbo del punto de referencia, con su hexágono y «TÚ» o «PUNTO».
 - Los dB de los anillos se escriben en `rumboLibre`, el centro del hueco más ancho entre sectores, para que no pisen el rumbo de ninguno. Los textos llevan un halo del color del panel.
 - En el mapa no se dibujan lóbulos: se solapaban entre emplazamientos. El diagrama vive en el panel.
 
@@ -130,7 +130,7 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 ## Celdas en el mapa
 
 - Las capas de las celdas van en el estilo del mapa (`mapa/celdas.ts`), con una fuente GeoJSON vacía que la web llena. Salen desde `ZOOM_CELDAS` (15) y se funden en medio nivel. En Barcelona una de cada diez celdas mide menos de 140 m de lado a lado; a zoom 15 eso son unos 80 px, casi el doble que un marcador. A zoom 14 bajaba a 40 px y las líneas se amontonaban.
-- Todas llevan un trazo de 1 px con `--mapa-celda`, el verde azulado del primario, por debajo de los nombres de las calles. Al seleccionar un emplazamiento, `remarcarCelda` pinta la suya con 2 px y un relleno muy suave y baja las demás al 14 %, como en el prototipo v8. Así no se amontonan líneas alrededor de la que importa.
+- Todas llevan un trazo de 1 px con `--mapa-celda`, el verde azulado del primario, por debajo de los nombres de las calles. Al seleccionar un emplazamiento, `remarcarCelda` pinta la suya con 2 px y baja las demás al 14 %, como en el prototipo v8. Así no se amontonan líneas alrededor de la que importa. El relleno de la seleccionada es el degradado de abajo.
 - Un `minzoom` por encima de 24 invalida el estilo y MapLibre ya no carga el mapa base, así que `ZOOM_CELDAS` no puede pasar de ahí.
 - Mientras se ven, la `Pista` dice «Modelo celdas@1» y qué es una celda; si el cálculo falla, lo dice con un botón «Reintentar». En el móvil la pista va a la izquierda y no llega a la columna de controles; en escritorio se centra en lo que deja libre el panel.
 - Cuándo se calculan y cuándo se cancela lo decide la web (`apps/web/src/celdas/enMapa.ts`). Se calculan en el Worker del simulador la primera vez que el mapa llega al zoom de las celdas, una vez por capa. Otra capa o cerrar el mapa a medio cálculo lo cancela.
@@ -139,11 +139,21 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 ## Vista de interferencia
 
 - La trama va en el estilo del mapa (`mapa/interferencia.ts`), escondida y con su fuente vacía hasta que la web la llena. Cada hexágono lleva `sinr` y se colorea por tramos (`CORTES_SINR`: 0, 5, 10, 15 y 20 dB) con `--mapa-sinr-1` (naranja oscuro, domina la interferencia) a `--mapa-sinr-6` (verde azulado, señal limpia), al 62 % de opacidad. Se dibujan un 8 % más pequeños que la trama, y queda una línea entre ellos.
-- `mostrarInterferencia` enseña la trama y oculta a la vez las celdas y el relleno de la seleccionada; de esta queda solo su contorno discontinuo (`celda-seleccionada-contorno`). Las capas que se cruzan se descartaron en los prototipos.
+- `mostrarInterferencia` enseña la trama y oculta a la vez las celdas y el degradado del sector que da servicio con su línea hasta el punto; de la seleccionada queda solo su contorno discontinuo (`celda-seleccionada-contorno`). Las capas que se cruzan se descartaron en los prototipos.
 - `interferencia/PanelInterferencia.tsx` tiene las piezas del panel: `PanelInterferencia` con «Simulación orientativa», la etiqueta de modelo y «Cerrar»; `TextoVista`, `ParDeControles`, `EscalaSinr`, `ValorEnPunto` (reserva su alto con valor o sin él) y `EstadoVista`. `Deslizador` (en `Eleccion.tsx`) es un `<input type="range">` de 44 px de alto con la etiqueta y el valor encima.
 - `DisposicionMapa` recibe el panel en `vista`. En escritorio va abajo a la derecha, a la izquierda de la columna de controles, con 22 rem de ancho. En el móvil es una hoja de 22,5 rem sobre los créditos y los controles suben por encima, sin hueco entre ellos para no llegar a la fecha de los datos. Con la hoja de la ficha o la de elegir un punto abiertas, en el móvil el panel se aparta. En el móvil el título solo lo lee el lector de pantalla.
 - Mientras la vista está activa no sale la pista de las celdas.
 - Medido en Chromium con GPU (Vulkan) y la CPU a ×4, arrastrando el mapa a zoom 16 en el Eixample con Movistar en 1800 MHz: 56 fps en 1400 px (59 sin la vista) y 59,5 en 390 px (60 sin ella). Tras soltar, la trama nueva llega en unos 330 ms en 1400 px y 200 ms en 390 px, con los 120 ms de espera incluidos.
+
+## Sector que da servicio en el mapa
+
+- Es la variante «A · Degradado» del prototipo v8, la que eligió el usuario (`mapa/servicio.ts`). La celda del emplazamiento seleccionado se divide en sus sectores. El que da servicio se rellena con un degradado del color de las celdas que se apaga con la distancia; los otros dos, al 7 %, y los límites entre sectores son líneas discontinuas al 40 %. Sin punto de referencia, el degradado cubre la celda entera.
+- El degradado son discos apilados, cada uno 2 dB más lejos según las pérdidas urbanas (lo calcula `sector-servicio` en el Worker). `opacidadesDelDegradado` reparte la opacidad para que la pila dé la de `opacidadDelDegradado`: la mitad al pie, un 22 % a 20 dB y un 6 % a 40 dB (unos 400 m). Las bandas van sin borde suavizado (`fill-antialias: false`): con él se veía un anillo en cada una.
+- Los rellenos van por debajo de las líneas de las celdas, y los límites y la línea hasta el punto, por encima. La línea sale de `--mapa-referencia` y no espera al Worker: sigue al punto en cada fotograma.
+- `CAPAS_SERVICIO` nombra las cuatro capas, por si otra vista tiene que apagarlas.
+- En Chromium con GPU (Vulkan) y la CPU a ×4, arrastrar el punto en 1400 px, que recalcula el sector y el degradado en cada movimiento, va a 60 fps; arrastrar el mapa con el punto y el degradado, a 60 en 390 y en 1400 px.
+- `LecturaServicio` (`ubicacion/LecturaServicio.tsx`) es el bloque de la ficha: tres casillas en una lista de definiciones, con su sitio reservado mientras llega el cálculo, la frase, la etiqueta de modelo y la nota.
+- `PuntoElegido` para el `mousedown` con un escuchador nativo. `onMouseDown` de Solid se atiende en el documento, cuando MapLibre ya ha recibido el evento en su contenedor, y el mapa se movía a la vez que el punto.
 
 ## Qué rechaza la regla fuera de `packages/ui`
 

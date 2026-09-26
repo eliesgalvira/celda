@@ -74,7 +74,17 @@ La consulta va limitada a los límites del mapa (`viewbox` y `bounded=1`), con `
 - En el mapa, la ubicación GPS es el hexágono «TÚ» con su círculo de precisión, y el punto elegido, el hexágono naranja con «PUNTO».
 - Los avisos bajo la cabecera (fallo, esperando, no guardado) no repiten lo que ya dice la ficha abierta.
 
-La distancia es la de `distanciaMetros` y el rumbo, `rumboGrados` (`packages/dominio/src/area.ts`). El sector que da servicio y el degradado son del ticket siguiente.
+La distancia es la de `distanciaMetros` y el rumbo, `rumboGrados` (`packages/dominio/src/area.ts`), mientras el emplazamiento no esté en la capa. Si está, el bloque enseña el sector que da servicio (abajo).
+
+## Sector que da servicio
+
+Con un punto de referencia y el emplazamiento en la capa, el bloque de la ficha cambia la frase de la distancia por `LecturaServicio`: tres casillas (qué sector, cuánto se pierde respecto a su eje y la distancia con el rumbo hasta el emplazamiento), la frase que lo explica, la etiqueta «Modelo sector-servicio v1» y la nota de la orientación. Los textos salen de `textosServicio` (`apps/web/src/servicio/textos.ts`), una función pura con pruebas:
+
+- Menos de 20° del eje: «Estás casi de frente al sector 3 (240°)…». Hasta 45°: los grados y los dB, «poca cosa». Desde 45°: «entre dos sectores», con los dB redondeados. A menos de 15 m: al pie, sin sector. Fuera de la celda, añade que hay otro emplazamiento más cerca.
+- Con un punto elegido dicen «El punto está» y «se pierden», nunca «tú», «te» ni «pierdes». Las pruebas lo comprueban en todos los casos.
+- El rumbo del sector va en la frase, «sector 2 (120°)», y con una orientación estimada lleva «±15°». La nota dice que la orientación es supuesta, por qué y que el sector que da servicio puede ser otro.
+
+En el mapa, el diagrama de radiación del panel rellena el sector que da servicio y marca hacia dónde queda el punto con «TÚ» o «PUNTO». Junto al punto, `EtiquetaReferencia` dice «340 m · sector 2». Va al lado contrario del emplazamiento y, si ahí no cabe, arriba o abajo, también lejos de él.
 
 ## Pruebas de componente
 

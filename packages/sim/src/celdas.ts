@@ -361,7 +361,9 @@ const cuna = (celda: Poligono, e: number, n: number, desde: number, hasta: numbe
  * empate, el primero. Con sectores iguales es el que más ganancia le da en el diagrama de sector,
  * así que coincide con el sector que da servicio.
  *
- * Devuelve un polígono por azimut, en su orden. No tienen por qué ser convexos (un sector de más
+ * Devuelve un polígono por azimut, en su orden. Cada uno empieza por el emplazamiento y sigue por
+ * el punto del borde de la celda donde acaba el límite con el sector siguiente en el sentido de
+ * las agujas del reloj. No tienen por qué ser convexos (un sector de más
  * de 180° no lo es), pero juntos cubren la celda sin solaparse. Un azimut repetido se queda sin
  * polígono: su zona es del primero. Si el emplazamiento no está dentro de su celda, que solo pasa
  * si queda fuera de la caja, no hay reparto y todos salen vacíos.

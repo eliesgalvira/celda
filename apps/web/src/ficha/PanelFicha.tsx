@@ -213,7 +213,7 @@ function ContenidoFicha(props: {
           </SeccionFicha>
         )}
       </Show>
-      <ReferenciaEnFicha emplazamiento={props.ficha.posicion} />
+      <ReferenciaEnFicha clave={props.clave} emplazamiento={props.ficha.posicion} />
       <SeccionFicha titulo={TITULO_COMO_EMITE}>
         <ComoEmite clave={props.clave} />
       </SeccionFicha>

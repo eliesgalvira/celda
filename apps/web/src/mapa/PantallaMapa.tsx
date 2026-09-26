@@ -27,6 +27,7 @@ import { pistaDeCeldas } from "../celdas/celdas.ts";
 import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { usarDatos } from "../datos.tsx";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
+import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
 import {
   crearInterferencia,
@@ -41,6 +42,8 @@ import {
   ZOOM_INTERFERENCIA,
 } from "../interferencia/interferencia.ts";
 import { VistaInterferencia } from "../interferencia/VistaInterferencia.tsx";
+import { crearServicio, lienzoDeServicio, ServicioContexto } from "../servicio/enMapa.ts";
+import { celdaDe } from "../servicio/servicio.ts";
 import { conMedir, emplazamientoDe, medirAbierto, navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
@@ -319,6 +322,26 @@ export function PantallaMapa() {
     ) : undefined,
   );
 
+  // Ninguna fuente publica hacia dónde apuntan los sectores: la orientación es la supuesta.
+  const servicio = crearServicio(datos, {
+    lienzo: createMemo(() => {
+      const actual = mapaListo();
+      return actual === undefined ? undefined : lienzoDeServicio(actual);
+    }),
+    emplazamiento: createMemo(() => {
+      const clave = seleccionada();
+      const emplazamiento = emplazamientos().find((e) => e.clave === clave);
+      return emplazamiento === undefined
+        ? undefined
+        : { clave: emplazamiento.clave, posicion: emplazamiento.posicion };
+    }),
+    punto: createMemo(() => {
+      const referencia = puntoDeReferencia.referencia();
+      return referencia === undefined ? undefined : posicionDe(referencia);
+    }),
+    celda: (clave) => celdaDe(celdas.calculadas(), clave),
+    orientacion: orientacionDe([]),
+  });
   const pista = createMemo(() => {
     // Con la vista de interferencia, su panel dice qué es cada cosa y las celdas no se ven.
     if (vistaActiva()) return undefined;
@@ -399,101 +422,107 @@ export function PantallaMapa() {
 
   return (
     <UbicacionContexto value={puntoDeReferencia}>
-      <DisposicionMapa
-        nombre={`Mapa de ${BARCELONA.nombre}`}
-        ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
-        lienzo={(elemento) => {
-          contenedor = elemento;
-        }}
-        cabecera={<Cabecera lugar={BARCELONA.nombre} />}
-        datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
-        ubicacion={
-          <>
-            <AvisosDeUbicacion panelAbierto={seleccionada() !== null} />
-            <Show when={eligiendo()}>
-              <EleccionConBuscador alUsarCentro={usarCentro} alIrA={irA} />
+      <ServicioContexto value={servicio}>
+        <DisposicionMapa
+          nombre={`Mapa de ${BARCELONA.nombre}`}
+          ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
+          lienzo={(elemento) => {
+            contenedor = elemento;
+          }}
+          cabecera={<Cabecera lugar={BARCELONA.nombre} />}
+          datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
+          ubicacion={
+            <>
+              <AvisosDeUbicacion panelAbierto={seleccionada() !== null} />
+              <Show when={eligiendo()}>
+                <EleccionConBuscador alUsarCentro={usarCentro} alIrA={irA} />
+              </Show>
+            </>
+          }
+          eligiendo={eligiendo()}
+          pinCentral={<PinCentral />}
+          dialogo={<PasoPrevio />}
+          marcadores={
+            <Show when={mapaListo()}>
+              {(actual) => (
+                <>
+                  <Marcadores
+                    mapa={actual()}
+                    emplazamientos={emplazamientos()}
+                    barrios={barrios()}
+                    seleccionada={seleccionada()}
+                    alSeleccionar={seleccionar}
+                  />
+                  <ReferenciaEnMapa
+                    mapa={actual()}
+                    escritorio={escritorio()}
+                    conEtiqueta={!vistaActiva()}
+                  />
+                </>
+              )}
             </Show>
-          </>
-        }
-        eligiendo={eligiendo()}
-        pinCentral={<PinCentral />}
-        dialogo={<PasoPrevio />}
-        marcadores={
-          <Show when={mapaListo()}>
-            {(actual) => (
-              <>
-                <Marcadores
-                  mapa={actual()}
-                  emplazamientos={emplazamientos()}
-                  barrios={barrios()}
-                  seleccionada={seleccionada()}
-                  alSeleccionar={seleccionar}
-                />
-                <ReferenciaEnMapa mapa={actual()} escritorio={escritorio()} />
-              </>
-            )}
-          </Show>
-        }
-        pista={pista()}
-        controles={
-          <>
-            <BotonHexagonal
-              etiqueta="Acercar"
-              icono="+"
-              disabled={!listo()}
-              onClick={() => mapa?.zoomIn()}
-            />
-            <BotonHexagonal
-              etiqueta="Alejar"
-              icono="−"
-              disabled={!listo()}
-              onClick={() => mapa?.zoomOut()}
-            />
-            <BotonHexagonal
-              etiqueta="Interferencia"
-              icono={<IconoOndas />}
-              activo={vistaActiva()}
-              disabled={!listo() || emplazamientos().length === 0}
-              onClick={cambiarVista}
-            />
-            <BotonHexagonal
-              etiqueta="Medir mi señal"
-              icono={<IconoSenal />}
-              aria-haspopup="dialog"
-              onClick={() => navegar(conMedir(ubicacion(), true))}
-            />
-            <MenuDeUbicacion
-              puedeCentrar={listo()}
-              alCentrar={() => {
-                const referencia = puntoDeReferencia.referencia();
-                if (referencia !== undefined) irA(posicionDe(referencia));
-              }}
-            />
-          </>
-        }
-        atribucion={<Atribucion creditos={creditos()} />}
-        aviso={aviso()}
-        panelAbierto={seleccionada() !== null}
-        vista={vista()}
-        panel={
-          <Show when={seleccionada()}>
-            {(clave) => (
-              <PanelFicha
-                clave={clave()}
-                fechaCapa={fechaCapa()}
-                alCerrar={() => navegar(ruta.mapa)}
+          }
+          pista={pista()}
+          controles={
+            <>
+              <BotonHexagonal
+                etiqueta="Acercar"
+                icono="+"
+                disabled={!listo()}
+                onClick={() => mapa?.zoomIn()}
               />
-            )}
-          </Show>
-        }
-      />
-      <Show when={midiendo()}>
-        <DialogoMedir
-          navegador={{ ...leerNavegador(), modelo: modelo() }}
-          direccionMovil={new URL(ruta.medir, window.location.origin).href}
-          alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+              <BotonHexagonal
+                etiqueta="Alejar"
+                icono="−"
+                disabled={!listo()}
+                onClick={() => mapa?.zoomOut()}
+              />
+              <BotonHexagonal
+                etiqueta="Interferencia"
+                icono={<IconoOndas />}
+                activo={vistaActiva()}
+                disabled={!listo() || emplazamientos().length === 0}
+                onClick={cambiarVista}
+              />
+              <BotonHexagonal
+                etiqueta="Medir mi señal"
+                icono={<IconoSenal />}
+                aria-haspopup="dialog"
+                onClick={() => navegar(conMedir(ubicacion(), true))}
+              />
+              <MenuDeUbicacion
+                puedeCentrar={listo()}
+                alCentrar={() => {
+                  const referencia = puntoDeReferencia.referencia();
+                  if (referencia !== undefined) irA(posicionDe(referencia));
+                }}
+              />
+            </>
+          }
+          atribucion={<Atribucion creditos={creditos()} />}
+          aviso={aviso()}
+          panelAbierto={seleccionada() !== null}
+          vista={vista()}
+          panel={
+            <Show when={seleccionada()}>
+              {(clave) => (
+                <PanelFicha
+                  clave={clave()}
+                  fechaCapa={fechaCapa()}
+                  alCerrar={() => navegar(ruta.mapa)}
+                />
+              )}
+            </Show>
+          }
         />
-      </Show>
+        <Show when={midiendo()}>
+          <DialogoMedir
+            navegador={{ ...leerNavegador(), modelo: modelo() }}
+            direccionMovil={new URL(ruta.medir, window.location.origin).href}
+            alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+          />
+        </Show>
+      </ServicioContexto>
     </UbicacionContexto>
   );
 }

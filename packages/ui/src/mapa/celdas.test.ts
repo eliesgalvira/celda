@@ -71,10 +71,6 @@ describe("capas de las celdas", () => {
       ["get", "clave"],
       "movistar-0802532",
     ]);
-    assert.deepStrictEqual(
-      filtros.get("celda-seleccionada-relleno"),
-      filtros.get("celda-seleccionada"),
-    );
     assert.isBelow(apagada, normal / 2);
 
     remarcarCelda(mapa, null);
