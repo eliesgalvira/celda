@@ -89,6 +89,8 @@
   --mapa-rotulo: oklch(46.8% 0.012 87.5);
   --mapa-halo: oklch(86.7% 0.011 89.7);
   --mapa-lugar: oklch(38.6% 0.008 97.5);
+  /* Las líneas de las celdas: el verde azulado del primario */
+  --mapa-celda: oklch(52% 0.077 203.3);
 
   /* FUENTES */
   --fuente-texto: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -159,6 +161,7 @@
   --mapa-rotulo: oklch(78% 0.01 90);
   --mapa-halo: oklch(23% 0.006 100);
   --mapa-lugar: oklch(86% 0.008 90);
+  --mapa-celda: oklch(72% 0.085 203.3);
 }
 
 /* Sin la paleta de Tailwind: solo existen los colores del tema. */

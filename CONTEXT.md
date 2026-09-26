@@ -27,7 +27,7 @@ Frecuencia en MHz en la que emite una estación base. Las bajas llegan más lejo
 _Evitar_: canal, portadora, EARFCN
 
 **Celda**:
-Zona del mapa en la que un emplazamiento es el más cercano.
+Zona del mapa en la que un emplazamiento es el más cercano de todos, sea cual sea su compañía. Es una simulación (celdas de Voronoi), no la zona a la que da servicio en la realidad.
 _Evitar_: zona de cobertura, cobertura, hexágono
 
 **Sector que da servicio**:
@@ -222,7 +222,7 @@ _Evitar_: modo asignatura, modo práctica
 ## Ambigüedades señaladas
 
 - En telecomunicaciones, «celda» suele ser lo que aquí es un sector con su banda, y así la usaba el documento de UX v0 (`celda-ux.html`). Celda la usa como la zona de un emplazamiento. El «identificador de celda» de los datos técnicos conserva el sentido técnico, y la historia de usuario «ver la medida unida a la celda que me da servicio» se lee como unida al sector que da servicio.
-- Falta decidir si la celda se calcula entre todos los emplazamientos o solo entre los de una compañía. La vista de interferencia trabaja por compañía y banda.
+- La celda se calcula entre todos los emplazamientos, no por compañía (decidido el 26/09/2026). El mapa dibuja un marcador por emplazamiento, y con celdas por compañía saldrían cinco teselados superpuestos que se cruzan, justo las capas que se descartaron en los prototipos. Un móvil se conecta a las estaciones base de su compañía, así que la celda no es la zona a la que da servicio: esa pregunta, por compañía y banda, la contesta la vista de interferencia.
 - En un emplazamiento compartido cada compañía puede orientar sus sectores de otra forma. Falta decidir de qué estación base salen los tres sectores en que se divide la celda.
 - El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. Queda por decidir si los textos de primer uso lo aceptan como palabra de entrada.
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.

@@ -6,7 +6,9 @@ import { BotonHexagonal } from "@celda/ui/BotonHexagonal.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
+import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
+import { Pista } from "@celda/ui/Pista.tsx";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
 import * as Effect from "effect/Effect";
@@ -20,6 +22,8 @@ import {
   textoDatosDelMapa,
 } from "../capa/estado.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
+import { pistaDeCeldas } from "../celdas/celdas.ts";
+import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { usarDatos } from "../datos.tsx";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
@@ -57,6 +61,8 @@ export function PantallaMapa() {
   /** El mapa, cuando ya enseña el callejero. */
   const [mapaListo, setMapaListo] = createSignal<MapaMapLibre>();
   const listo = createMemo(() => estado().tipo === "listo");
+  /** Si el mapa está al zoom de las celdas o más cerca. */
+  const [cerca, setCerca] = createSignal(false);
   let contenedor: HTMLDivElement | undefined;
   let mapa: MapaMapLibre | undefined;
   // Cada arranque tiene su número; un arranque viejo o una pantalla ya cerrada
@@ -77,6 +83,9 @@ export function PantallaMapa() {
         },
         fallo: fallar,
       });
+      const mirarZoom = () => setCerca(nuevo.getZoom() >= ZOOM_CELDAS);
+      nuevo.on("zoom", mirarZoom);
+      mirarZoom();
       mapa = nuevo;
     } catch (causa) {
       // MapLibre lanza un Error que nombra WebGL si no consigue el contexto.
@@ -201,6 +210,32 @@ export function PantallaMapa() {
     return actual.tipo === "lista" ? actual.capa.fecha : undefined;
   });
 
+  const celdas = crearCeldas(datos, {
+    lienzo: createMemo(() => {
+      const actual = mapaListo();
+      return actual === undefined ? undefined : lienzoDelMapa(actual);
+    }),
+    emplazamientos,
+    cerca,
+    seleccionada,
+  });
+  const pista = createMemo(() => {
+    const actual = pistaDeCeldas(cerca(), celdas.calculo());
+    return actual === undefined ? undefined : (
+      <Pista
+        texto={actual.texto}
+        modelo={actual.modelo}
+        accion={
+          actual.reintentar ? (
+            <Boton variante="secundario" onClick={() => celdas.reintentar()}>
+              Reintentar
+            </Boton>
+          ) : undefined
+        }
+      />
+    );
+  });
+
   /** Abre la ficha y, si el marcador queda debajo del panel, mueve el mapa lo justo. */
   const seleccionar = (clave: string) => {
     navegar(ruta.emplazamiento(clave));
@@ -297,6 +332,7 @@ export function PantallaMapa() {
             )}
           </Show>
         }
+        pista={pista()}
         controles={
           <>
             <BotonHexagonal

@@ -47,7 +47,7 @@ export const contiene = (rectangulo: Rectangulo, punto: Coordenada): boolean =>
   punto.latitud <= rectangulo.noreste.latitud;
 
 /** Radio medio de la Tierra en metros (IUGG). */
-const RADIO_TIERRA_METROS = 6_371_008.8;
+export const RADIO_TIERRA_METROS = 6_371_008.8;
 
 /**
  * Distancia en metros entre dos puntos cercanos, con la aproximación equirectangular. A las

@@ -5,7 +5,8 @@ Léelo antes de añadir o cambiar una simulación. La decisión de fondo está e
 ## Dónde está cada cosa
 
 - `packages/sim/src/simulacion.ts`: la interfaz `Simulacion<Params, R>`, la `Malla` y sus ayudas (`rumboDe`, `distanciaDe`, `mallaDeRumbos`, `mallaEnRumbo`).
-- `packages/sim/src/diagramaSector.ts` y `perdidasUrbanas.ts`: las dos simulaciones de hoy. `sinr.ts` solo tiene los tipos de la vista de interferencia (ticket 25).
+- `packages/sim/src/diagramaSector.ts`, `perdidasUrbanas.ts` y `celdas.ts`: las simulaciones de hoy. `sinr.ts` solo tiene los tipos de la vista de interferencia (ticket 25).
+- `packages/sim/src/poligono.ts`: polígonos del plano local (área, si contienen un punto, recorte por un semiplano).
 - `packages/sim/src/registro.ts`: `SIMULACIONES`, la lista de lo que sabe calcular el Worker.
 - `packages/sim/src/protocolo.ts`: `atender`, lo que hace el Worker con cada solicitud. La versión en el mismo hilo llama a la misma función.
 - `packages/sim/src/simulador.ts`: el servicio `Simulador` de Effect, con dos capas. `simuladorEnWorker` es la de la web y `simuladorEnHilo`, la de las pruebas.
@@ -57,6 +58,17 @@ La tolerancia se declara al generar el fichero y va dentro de él. Las de TypeSc
 - Los núcleos se prueban como funciones puras, sin Worker.
 - El servicio se prueba con `workerDePrueba()` (`packages/sim/src/pruebas.ts`). Guarda las solicitudes y no contesta hasta que la prueba llama a `contestar()` o `fallar()`, así se comprueban la cancelación y los fallos sin esperas.
 - Las pruebas de componentes montan `simuladorEnHilo()` en `App`. Para ver el estado de cálculo o la cancelación, montan `simuladorEnWorker(workerDePrueba().crear)`.
+
+## Celdas
+
+`celdas` recibe los emplazamientos en el plano local y una caja, y devuelve la celda de cada uno recortada a la caja. `vertices` lleva todos los vértices seguidos e `inicio`, dónde empieza cada celda. De cada punto de la malla dice en qué celda cae (el emplazamiento más cercano, o −1 fuera de la caja). Con una malla vacía solo calcula las celdas.
+
+- Cada celda es la caja recortada por la mediatriz con cada vecino. Los vecinos se buscan por anillos en una rejilla y se para cuando ninguno de los que faltan puede recortar más. Con los 1318 emplazamientos de la capa tarda unos 20 ms.
+- Las pruebas comprueban la propiedad y no solo casos: las celdas suman el área de la caja, dos celdas no tienen área en común y cada punto al azar cae en la celda de su emplazamiento más cercano, calculado comparando con todos. Hay configuraciones con repetidos, en fila, en rejilla (empates en las esquinas) y fuera de la caja.
+- Si dos emplazamientos están en el mismo punto, la celda es del primero y el otro se queda sin ella.
+- La web la calcula entre todos los emplazamientos, sea cual sea su compañía (`CONTEXT.md`), en un plano centrado en la capa (`aPlano` de `@celda/dominio/plano`) y con una caja 100 m más ancha que los emplazamientos. Fuera de la zona de la ingesta puede haber emplazamientos que Celda no conoce, así que las celdas no se alargan por ahí.
+
+`repartirEnSectores(celda, emplazamiento, azimuts)` divide una celda entre los sectores de su estación base, para el ticket 23. A cada punto le toca el sector cuyo eje queda más cerca de su rumbo, que con sectores iguales es el que da más ganancia en el diagrama de sector. Devuelve un polígono por azimut; un sector de más de 180° no es convexo, pero juntos cubren la celda sin solaparse. No está en el registro porque es geometría sobre el resultado de `celdas` y el Worker no la necesita.
 
 ## Diagrama de sector y orientación
 
