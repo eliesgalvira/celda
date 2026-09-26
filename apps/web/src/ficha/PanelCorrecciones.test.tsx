@@ -8,7 +8,7 @@ import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
-import { capaDePrueba } from "../capa/pruebas.ts";
+import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { terminosSubrayados } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
 import { FICHA_COMPANIA_ANADIDA, FICHA_CORREGIDA, FICHA_NUEVA } from "./fichasCorregidas.ts";
@@ -24,7 +24,10 @@ const CAPA: CapaLeida = {
     posicion: f.posicion,
     estado: f.estado,
     companias: f.estaciones.map((e) => e.compania),
+    barrio: null,
   })),
+  barrios: [],
+  fuenteDeBarrios: FUENTE_DE_BARRIOS,
 };
 
 /** La app abierta en la ficha, que llega en cuanto su lectura está abierta. */
