@@ -1,5 +1,6 @@
 import {
   CapaDeReferencia,
+  EtiquetaReferencia,
   PuntoElegido,
   UbicacionGps,
 } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
@@ -15,6 +16,9 @@ import {
   useContext,
 } from "solid-js";
 
+import { ServicioContexto } from "../servicio/enMapa.ts";
+import { lecturaDe } from "../servicio/servicio.ts";
+import { textosServicio } from "../servicio/textos.ts";
 import { UbicacionContexto } from "./controlador.ts";
 import { posicionDe } from "./estado.ts";
 import { textoPrecision } from "./textos.ts";
@@ -31,6 +35,7 @@ export interface ReferenciaEnMapaProps {
 /** El punto de referencia sobre el mapa: la ubicación GPS con su precisión o el punto elegido. */
 export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
   const control = useContext(UbicacionContexto);
+  const servicio = useContext(ServicioContexto);
   const [fotograma, setFotograma] = createSignal(0);
 
   // El punto se recoloca en cada fotograma en que se mueve el mapa, como los marcadores.
@@ -70,6 +75,22 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
     };
   });
 
+  /**
+   * La distancia y el sector que da servicio junto al punto, con un emplazamiento seleccionado.
+   * Va al lado contrario del emplazamiento, para no tapar la línea que los une.
+   */
+  const etiqueta = createMemo(() => {
+    const referencia = control.referencia();
+    const calculado = servicio.calculado();
+    if (referencia === undefined || calculado === undefined) return undefined;
+    const lectura = lecturaDe(calculado.resultado);
+    if (lectura === undefined) return undefined;
+    const texto = textosServicio(lectura, referencia.tipo, servicio.orientacion).enMapa;
+    // El emplazamiento queda al este del punto si el rumbo del emplazamiento al punto va al oeste.
+    const emplazamientoAlEste = Math.sin((lectura.rumbo * Math.PI) / 180) < 0;
+    return { texto, lado: emplazamientoAlEste ? ("izquierda" as const) : ("derecha" as const) };
+  });
+
   return (
     <Show when={enPantalla()}>
       {(actual) => (
@@ -101,6 +122,16 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
               />
             </Match>
           </Switch>
+          <Show when={etiqueta()}>
+            {(texto) => (
+              <EtiquetaReferencia
+                x={actual().x}
+                y={actual().y - 14}
+                texto={texto().texto}
+                lado={texto().lado}
+              />
+            )}
+          </Show>
         </CapaDeReferencia>
       )}
     </Show>
