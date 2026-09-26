@@ -41,7 +41,10 @@ export interface EntradaGlosario {
   readonly relacionados: ReadonlyArray<Termino>;
 }
 
-export const GLOSARIO: { readonly [T in Termino]: EntradaGlosario } = {
+/** Una entrada por término, ni una más ni una menos. */
+export type Glosario = { readonly [T in Termino]: EntradaGlosario };
+
+export const GLOSARIO: Glosario = {
   emplazamiento: {
     nombre: "Emplazamiento",
     explicacion:

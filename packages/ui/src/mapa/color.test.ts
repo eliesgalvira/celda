@@ -33,6 +33,7 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   ["tinta-suave", "superficie"],
   ["tinta-suave", "superficie-alta"],
   ["tinta-invertida", "superficie-invertida"],
+  ["tinta-invertida-suave", "superficie-invertida"],
   ["primario-fg", "primario"],
   ["primario-fg", "primario-hover"],
   ["primario-fg", "primario-activo"],
