@@ -166,6 +166,15 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - La zona se dibuja en el mapa con `mapa/zona.ts`: el límite del barrio con trazo discontinuo y una línea de cada estación base a su vecina, con el token `--mapa-referencia`, el naranja del punto de referencia. La web llena la fuente `zona` y encuadra el barrio dejando libre lo que tapa el panel.
 - Los cálculos y los textos son funciones puras con pruebas: `resolverEjercicio` en `packages/dominio/src/ejercicio.ts`, con su fichero de referencia, y la tabla, el CSV y el XLSX en `apps/web/src/ejercicio/tabla.ts` y `xlsx.ts`. El XLSX se escribe a mano, sin dependencias: cinco XML en un ZIP sin comprimir. De dónde salen los habitantes y las cuotas está en [docs/investigacion/poblacion-y-lineas.md](../investigacion/poblacion-y-lineas.md).
 
+## Mejorar la señal
+
+- `mejorar/Mejorar.tsx` tiene las piezas de la sección «Mejorar la señal» de la ficha, que va tras «Cómo emite»: `HaciaEmplazamiento`, `ListaConsejos` con `Consejo` (tono `principal` o `secundario`, el aparte de girar el móvil), `LlamadaPunto` sin punto de referencia, `NotaMejorar` y la `Brujula`.
+- `Brujula` es un dial SVG de 120 unidades con `role="img"`, `<title>` y `<desc>`. La parte de arriba del móvil es el triángulo fijo de arriba; el norte, las marcas y el hexágono del emplazamiento giran con el rumbo del móvil, y la flecha apunta al emplazamiento. `data-fuente` dice si el rumbo sale de la brújula o de la barra, y con la barra el título del dibujo lo dice.
+- Al lado del dial, la guía («Gira 108° a la derecha», «Apuntando al emplazamiento») va en un `<output aria-live="polite">`: cambia poco, así que el lector de pantalla no se satura. Los dos rumbos van debajo en texto y sin `aria-live`, porque con la brújula cambian a cada movimiento.
+- La flecha gira con una transición de 200 ms que acumula el ángulo sin saltar de 359° a 0°. Con la preferencia de reducir movimiento, `motion-reduce:transition-none` la quita.
+- La columna de la derecha reserva 12,5 rem de alto: pasar de un estado de la brújula a otro mueve poco la ficha. En el móvil el dial mide 6,5 rem y en escritorio 7,5.
+- La barra que simula el giro es el `Deslizador` de `Eleccion.tsx`, con la etiqueta «Simular el giro».
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.

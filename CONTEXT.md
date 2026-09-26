@@ -144,6 +144,28 @@ _Evitar_: estado, permiso
 Explicación de para qué se usa la ubicación, que se calcula en el dispositivo, que no se guarda y que se puede quitar. Va siempre antes del aviso del navegador.
 _Evitar_: modal de permiso, preaviso
 
+**Rumbo**:
+Hacia dónde queda el emplazamiento visto desde el punto de referencia, en grados desde el norte. Sale de las dos posiciones, así que es de fiar aunque la orientación de los sectores sea supuesta.
+_Evitar_: azimut (ese es el de un sector), dirección, orientación
+
+### Mejorar la señal
+
+**Consejo**:
+Lo que Celda dice que se puede hacer para recibir mejor: hacia qué ventana poner un router 4G/5G, a qué rumbo apuntar una antena exterior y que girar el móvil en la mano apenas cambia nada. Sin punto de referencia es general; con punto, depende del rumbo, la distancia y el sector que da servicio.
+_Evitar_: recomendación, truco, optimización
+
+**Router 4G/5G**:
+Aparato con tarjeta SIM que recibe la señal móvil y la reparte por wifi en casa.
+_Evitar_: módem, CPE, router a secas
+
+**Antena exterior**:
+Antena direccional que se pone fuera de casa y se conecta al router 4G/5G. Hay que apuntarla al emplazamiento.
+_Evitar_: antena a secas (el público la usa para el emplazamiento), Yagi
+
+**Brújula**:
+La del dispositivo, que dice hacia dónde apunta la parte de arriba del móvil para alinear una antena exterior. Solo está activa con lecturas de verdad. En un ordenador, o si el móvil no la da, una barra simula el giro y lo dice.
+_Evitar_: compás, giroscopio, sensor
+
 ### Medidas y aportaciones
 
 **Medida**:
@@ -255,6 +277,7 @@ _Evitar_: clientes, carga
 - Las **aportaciones** viven en el dispositivo. Una **corrección propuesta** solo pasaría a ser **corrección** si se compartiera.
 - Una **simulación** nunca es una **observación** ni una **medida**.
 - El **ejercicio de emplazamientos** se hace sobre una **zona**. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
+- Con un **punto de referencia**, cada **emplazamiento** tiene un **rumbo** y los **consejos** dicen a qué rumbo apuntar una **antena exterior**. La **brújula** ayuda a alinearla.
 
 ## Ambigüedades señaladas
 
