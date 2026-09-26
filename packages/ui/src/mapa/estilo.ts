@@ -1,6 +1,7 @@
 import type { ExpressionSpecification, FilterSpecification, StyleSpecification } from "maplibre-gl";
 
 import { capasCeldas, FUENTE_CELDAS } from "./celdas.ts";
+import { capasZona, FUENTE_ZONA } from "./zona.ts";
 import { comoRgb, leerOklch } from "./color.ts";
 import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
 import {
@@ -70,10 +71,10 @@ const AVENIDAS = ["motorway", "trunk", "primary"];
 /**
  * El estilo del mapa base de OpenFreeMap (esquema OpenMapTiles) con los
  * colores del tema. No lleva ningún color escrito: todos salen de `color`.
- * Lleva también las capas de las celdas, del sector que da servicio y de la
- * vista de interferencia, con sus fuentes vacías hasta que la web las llena
- * (`FUENTE_CELDAS`, `FUENTE_SERVICIO`, `FUENTE_SERVICIO_LINEA` y
- * `FUENTE_INTERFERENCIA`).
+ * Lleva también las capas de las celdas, del sector que da servicio, de la
+ * vista de interferencia y de la zona del ejercicio, con sus fuentes vacías
+ * hasta que la web las llena (`FUENTE_CELDAS`, `FUENTE_SERVICIO`,
+ * `FUENTE_SERVICIO_LINEA`, `FUENTE_INTERFERENCIA` y `FUENTE_ZONA`).
  */
 export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
   version: 8,
@@ -90,6 +91,7 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
     },
+    [FUENTE_ZONA]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   },
   layers: [
     { id: "fondo", type: "background", paint: { "background-color": color("mapa-fondo") } },
@@ -191,6 +193,7 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
     ...capasServicioDebajo(color("mapa-celda")),
     ...capasCeldas(color("mapa-celda")),
     ...capasServicioEncima(color("mapa-celda"), color("mapa-referencia")),
+    ...capasZona(color("mapa-referencia")),
     {
       id: "nombres-de-calles",
       type: "symbol",

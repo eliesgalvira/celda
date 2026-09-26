@@ -114,6 +114,58 @@ describe("AlmacenLocal en IndexedDB", () => {
     }),
   );
 
+  it.effect("los ajustes empiezan con el modo estudiante apagado y se recuerdan al volver", () =>
+    Effect.gen(function* () {
+      const fabrica = new IDBFactory();
+      const primera = yield* Effect.flatMap(AlmacenLocal, (a) => a.leerAjustes).pipe(
+        Effect.provide(almacen(fabrica)),
+      );
+      assert.isFalse(primera.modoEstudiante);
+      yield* Effect.flatMap(AlmacenLocal, (a) =>
+        a.guardarAjustes({ ...primera, modoEstudiante: true }),
+      ).pipe(Effect.provide(almacen(fabrica)));
+      const despues = yield* Effect.flatMap(AlmacenLocal, (a) => a.leerAjustes).pipe(
+        Effect.provide(almacen(fabrica)),
+      );
+      assert.isTrue(despues.modoEstudiante);
+    }),
+  );
+
+  it.effect("al pasar a la base con ajustes, el punto guardado por la versión anterior sigue", () =>
+    Effect.gen(function* () {
+      const fabrica = new IDBFactory();
+      const fila = {
+        ...EN_EL_MAPA,
+        id: "0f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f",
+        creada: MEDIODIA,
+      };
+      yield* Effect.callback<void>((reanudar) => {
+        const apertura = fabrica.open("celda", 1);
+        apertura.addEventListener("upgradeneeded", () => {
+          apertura.result
+            .createObjectStore("aportaciones", { keyPath: "id" })
+            .createIndex("tipo", "tipo");
+        });
+        apertura.addEventListener("success", () => {
+          const tx = apertura.result.transaction("aportaciones", "readwrite");
+          tx.objectStore("aportaciones").put(fila);
+          tx.addEventListener("complete", () => {
+            apertura.result.close();
+            reanudar(Effect.void);
+          });
+        });
+      });
+      const aportaciones = yield* Effect.flatMap(AlmacenLocal, (a) => a.leer("punto-elegido")).pipe(
+        Effect.provide(almacen(fabrica)),
+      );
+      assert.deepStrictEqual(aportaciones, [fila]);
+      const ajustes = yield* Effect.flatMap(AlmacenLocal, (a) => a.leerAjustes).pipe(
+        Effect.provide(almacen(fabrica)),
+      );
+      assert.isFalse(ajustes.modoEstudiante);
+    }),
+  );
+
   it.effect("sin IndexedDB, cada operación dice que el dispositivo no deja guardar", () =>
     Effect.gen(function* () {
       const aportaciones = yield* AlmacenLocal;
@@ -121,6 +173,7 @@ describe("AlmacenLocal en IndexedDB", () => {
       assert.strictEqual(error._tag, "AlmacenNoDisponible");
       assert.match(error.motivo, /IndexedDB/u);
       yield* Effect.flip(aportaciones.leer("punto-elegido"));
+      yield* Effect.flip(aportaciones.leerAjustes);
     }).pipe(Effect.provide(almacen(undefined))),
   );
 });

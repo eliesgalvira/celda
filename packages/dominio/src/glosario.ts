@@ -34,6 +34,9 @@ export const TERMINOS = [
   "ocupacion",
   "sinr",
   "decibelio",
+  "radio-de-cobertura",
+  "penetracion",
+  "cuota-de-lineas",
 ] as const;
 
 export type Termino = (typeof TERMINOS)[number];
@@ -288,6 +291,31 @@ export const GLOSARIO: Glosario = {
       "10 dB, con la décima parte. Por eso unos pocos dB ya se notan.",
     tecnico: "decibelio (dB)",
     relacionados: ["sector-que-da-servicio"],
+  },
+  "radio-de-cobertura": {
+    nombre: "Radio de cobertura",
+    explicacion:
+      "Hasta dónde llega, más o menos, cada estación base de una compañía. En el ejercicio se " +
+      "estima como la mitad de la distancia media a la estación más cercana de la misma " +
+      "compañía: a partir de ahí, lo normal es que dé servicio la otra.",
+    tecnico: "radio de celda",
+    relacionados: ["estacion-base", "cobertura"],
+  },
+  penetracion: {
+    nombre: "Penetración",
+    explicacion:
+      "Cuántas líneas de móvil hay por cada 100 habitantes. Pasa de 100 porque hay quien " +
+      "tiene dos líneas, o una para el trabajo.",
+    tecnico: "penetración de la telefonía móvil",
+    relacionados: ["cuota-de-lineas"],
+  },
+  "cuota-de-lineas": {
+    nombre: "Cuota de líneas",
+    explicacion:
+      "La parte de todas las líneas de móvil que tiene una compañía. Orange y Yoigo son de la " +
+      "misma empresa y la estadística oficial da sus líneas juntas.",
+    tecnico: "cuota de mercado de líneas móviles",
+    relacionados: ["penetracion", "compania"],
   },
 };
 

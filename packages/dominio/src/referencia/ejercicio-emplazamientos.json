@@ -1,0 +1,143 @@
+{
+  "habitantes": 10000,
+  "areaKm2": 0.5,
+  "densidad": 20000,
+  "lineas": 12000,
+  "companias": [
+    {
+      "compania": "movistar",
+      "estaciones": 3,
+      "vecinas": [
+        {
+          "desde": "a",
+          "hasta": "oeste",
+          "metros": 300
+        },
+        {
+          "desde": "b",
+          "hasta": "a",
+          "metros": 400
+        },
+        {
+          "desde": "c",
+          "hasta": "b",
+          "metros": 600
+        }
+      ],
+      "distanciaMedia": 433.333,
+      "radio": 216.667,
+      "habitantesPorEstacion": 3333.333,
+      "lineasDelGrupo": 3600,
+      "usuariosPorEstacion": 1200,
+      "conBandas": 2,
+      "sinFicha": 1,
+      "bandas": [
+        800,
+        900,
+        1800,
+        3500
+      ],
+      "tecnologias": {
+        "2G": "posible",
+        "3G": "posible",
+        "4G": "probable",
+        "5G": "probable"
+      }
+    },
+    {
+      "compania": "vodafone",
+      "estaciones": 2,
+      "vecinas": [
+        {
+          "desde": "a",
+          "hasta": "c",
+          "metros": 1000
+        },
+        {
+          "desde": "c",
+          "hasta": "a",
+          "metros": 1000
+        }
+      ],
+      "distanciaMedia": 1000,
+      "radio": 500,
+      "habitantesPorEstacion": 5000,
+      "lineasDelGrupo": 2400,
+      "usuariosPorEstacion": 1200,
+      "conBandas": 0,
+      "sinFicha": 1,
+      "bandas": [],
+      "tecnologias": {
+        "2G": "no-consta",
+        "3G": "no-consta",
+        "4G": "no-consta",
+        "5G": "no-consta"
+      }
+    },
+    {
+      "compania": "orange",
+      "estaciones": 1,
+      "vecinas": [
+        {
+          "desde": "b",
+          "hasta": "este",
+          "metros": 1000
+        }
+      ],
+      "distanciaMedia": 1000,
+      "radio": 500,
+      "habitantesPorEstacion": 10000,
+      "lineasDelGrupo": 4800,
+      "usuariosPorEstacion": 2400,
+      "conBandas": 1,
+      "sinFicha": 0,
+      "bandas": [
+        2600
+      ],
+      "tecnologias": {
+        "2G": "no-consta",
+        "3G": "no-consta",
+        "4G": "probable",
+        "5G": "no-consta"
+      }
+    },
+    {
+      "compania": "digi",
+      "estaciones": 0,
+      "vecinas": [],
+      "distanciaMedia": null,
+      "radio": null,
+      "habitantesPorEstacion": null,
+      "lineasDelGrupo": 1200,
+      "usuariosPorEstacion": null,
+      "conBandas": 0,
+      "sinFicha": 0,
+      "bandas": [],
+      "tecnologias": {
+        "2G": "no-consta",
+        "3G": "no-consta",
+        "4G": "no-consta",
+        "5G": "no-consta"
+      }
+    },
+    {
+      "compania": "yoigo",
+      "estaciones": 1,
+      "vecinas": [],
+      "distanciaMedia": null,
+      "radio": null,
+      "habitantesPorEstacion": 10000,
+      "lineasDelGrupo": 4800,
+      "usuariosPorEstacion": 2400,
+      "conBandas": 0,
+      "sinFicha": 1,
+      "bandas": [],
+      "tecnologias": {
+        "2G": "no-consta",
+        "3G": "no-consta",
+        "4G": "no-consta",
+        "5G": "no-consta"
+      }
+    }
+  ]
+}

@@ -27,6 +27,11 @@ export interface DisposicionMapaProps {
   /** Una indicación breve abajo en el centro, como «acércate para ver…». */
   readonly pista?: JSX.Element;
   readonly controles: JSX.Element;
+  /**
+   * Controles que van al final de la columna, como los ajustes. En el móvil se esconden mientras
+   * se ve el panel de una vista: la columna entera no cabría encima de él.
+   */
+  readonly controlesSecundarios?: JSX.Element;
   readonly atribucion: JSX.Element;
   /** Lo que se superpone al mapa mientras carga o si falla. */
   readonly aviso?: JSX.Element;
@@ -43,6 +48,8 @@ export interface DisposicionMapaProps {
    * controles encima. En el móvil cede el sitio a la hoja de la ficha y a la de elegir un punto.
    */
   readonly vista?: JSX.Element;
+  /** El panel abierto es el ancho, el del ejercicio: en escritorio los créditos se apartan más. */
+  readonly panelAncho?: boolean;
 }
 
 /**
@@ -54,6 +61,7 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
   return (
     <div
       data-panel={props.panelAbierto === true ? "" : undefined}
+      data-panel-ancho={props.panelAbierto === true && props.panelAncho === true ? "" : undefined}
       // En el móvil la hoja se aparta mientras se elige un punto: los controles y los créditos
       // vuelven abajo.
       data-hoja={props.panelAbierto === true && props.eligiendo !== true ? "" : undefined}
@@ -94,7 +102,7 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         ocupa unos 7rem con sus etiquetas. En escritorio, centrada en lo que deja libre el panel.
       */}
       <Show when={props.pista} keyed>
-        <div class="pointer-events-none absolute inset-x-0 bottom-[4.5rem] z-10 flex justify-start pr-28 pl-3 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] md:bottom-16 md:justify-center md:px-16 md:group-data-panel/mapa:pl-[calc(27rem+1rem)]">
+        <div class="pointer-events-none absolute inset-x-0 bottom-[4.5rem] z-10 flex justify-start pr-28 pl-3 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] md:bottom-16 md:justify-center md:px-16 md:group-data-panel/mapa:pl-[calc(27rem+1rem)] md:group-data-panel-ancho/mapa:pl-[calc(min(46rem,100vw-8rem)+1rem)]">
           {props.pista}
         </div>
       </Show>
@@ -122,10 +130,11 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
 
       <div class="absolute right-2 bottom-[4.5rem] z-10 flex flex-col items-center gap-2 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] max-md:group-data-vista/mapa:bottom-[calc(22.5rem+3.75rem)] max-md:group-data-vista/mapa:gap-0 max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-16">
         {props.controles}
+        <div class="contents max-md:group-data-vista/mapa:hidden">{props.controlesSecundarios}</div>
       </div>
 
       {/* Mientras se elige en el móvil, los créditos quedan por encima de la hoja, en su pie. */}
-      <div class="absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-10 max-w-[calc(100%-1rem)] max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.5rem)] max-md:group-data-eligiendo/mapa:z-30 md:group-data-panel/mapa:left-[calc(27rem+0.5rem)]">
+      <div class="absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-10 max-w-[calc(100%-1rem)] max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.5rem)] max-md:group-data-eligiendo/mapa:z-30 md:group-data-panel/mapa:left-[calc(27rem+0.5rem)] md:group-data-panel-ancho/mapa:left-[calc(min(46rem,100vw-8rem)+0.5rem)]">
         {props.atribucion}
       </div>
 

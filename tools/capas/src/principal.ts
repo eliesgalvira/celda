@@ -13,7 +13,7 @@ import * as NodeHttp from "node:http";
 
 import { almacenEnCarpeta } from "./almacen.ts";
 import { convexPorHttp } from "./convex.ts";
-import { descargarBarrios, leerLimites } from "./descarga.ts";
+import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
 
 /**
  * Generador de capas. Tres órdenes:
@@ -23,6 +23,8 @@ import { descargarBarrios, leerLimites } from "./descarga.ts";
  *   vigente.
  * - `servir`: sirve esa carpeta como origen estático local, con las cabeceras de la CDN.
  * - `barrios`: descarga de Open Data BCN los límites de barrio y los guarda en el repositorio.
+ * - `poblacion`: descarga de Open Data BCN el padrón más reciente y guarda los habitantes de
+ *   cada barrio, con su área y su límite, donde los lee la web.
  */
 
 /** Dónde se publican las capas. El origen es la URL con la que la web las descarga. */
@@ -33,6 +35,11 @@ const configCapas = Config.all({
 
 /** Los límites de barrio que usa `publicar` y que escribe `barrios`, guardados en git. */
 const configBarrios = Config.String("CELDA_BARRIOS").pipe(Config.withDefault("datos/barrios.json"));
+
+/** Los habitantes por barrio que escribe `poblacion`: la web los lee de su carpeta. */
+const configPoblacion = Config.String("CELDA_POBLACION").pipe(
+  Config.withDefault("../../apps/web/src/ejercicio/poblacion.json"),
+);
 
 const configConvex = Config.all({
   url: Config.String("CELDA_CONVEX_URL"),
@@ -90,11 +97,25 @@ const barrios = Effect.gen(function* () {
   );
 });
 
+const poblacion = Effect.gen(function* () {
+  const destino = yield* configPoblacion;
+  const limites = yield* leerLimites(yield* configBarrios);
+  const escrita = yield* descargarPoblacion(destino, limites).pipe(
+    // Punto de entrada de la orden: aquí se monta su cliente HTTP, una vez.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    Effect.provide(FetchHttpClient.layer),
+  );
+  const total = escrita.barrios.reduce((suma, b) => suma + b.habitantes, 0);
+  yield* Effect.log(
+    `${escrita.barrios.length} barrios y ${total} habitantes a ${escrita.fuente.referencia} escritos en ${destino}`,
+  );
+});
+
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «publicar», «servir» o «barrios».`;
+    return `Orden desconocida «${this.orden}». Usa «publicar», «servir», «barrios» o «poblacion».`;
   }
 }
 
@@ -103,6 +124,7 @@ const principal = Effect.gen(function* () {
   if (orden === "publicar") return yield* publicar;
   if (orden === "servir") return yield* servir;
   if (orden === "barrios") return yield* barrios;
+  if (orden === "poblacion") return yield* poblacion;
   return yield* new OrdenDesconocida({ orden });
 });
 

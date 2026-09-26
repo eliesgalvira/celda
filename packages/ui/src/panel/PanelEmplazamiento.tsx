@@ -33,6 +33,11 @@ export interface PanelEmplazamientoProps {
   readonly altura: AlturaHoja;
   readonly alCambiarAltura: (altura: AlturaHoja) => void;
   readonly alCerrar: () => void;
+  /**
+   * En escritorio, la columna de la ficha (27rem) o la del ejercicio, más ancha para que quepa su
+   * tabla. Si es `ancho`, `DisposicionMapa` también lleva `panelAncho`.
+   */
+  readonly ancho?: "normal" | "ancho";
   readonly children: JSX.Element;
 }
 
@@ -131,13 +136,14 @@ export function PanelEmplazamiento(props: PanelEmplazamientoProps) {
       tabindex="-1"
       aria-label={props.nombre}
       data-altura={props.altura}
+      data-ancho={props.ancho ?? "normal"}
       data-arrastrando={arrastre() === undefined ? undefined : ""}
       style={{ "--alto-hoja": `${arrastre() ?? pixelesDeAltura(props.altura, altoVentana())}px` }}
       class={
         "group/panel fixed z-30 flex flex-col bg-superficie font-texto text-tinta outline-none drop-shadow-panel " +
         "max-md:inset-x-0 max-md:bottom-0 max-md:h-(--alto-hoja) max-md:transition-[height] max-md:duration-300 " +
         "max-md:ease-out max-md:data-arrastrando:transition-none motion-reduce:transition-none " +
-        "md:inset-y-0 md:left-0 md:w-[27rem]"
+        "md:inset-y-0 md:left-0 md:w-[27rem] md:data-[ancho=ancho]:w-[min(46rem,calc(100vw-8rem))]"
       }
     >
       <button
