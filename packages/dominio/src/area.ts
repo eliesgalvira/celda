@@ -60,3 +60,19 @@ export const distanciaMetros = (a: Coordenada, b: Coordenada): number => {
   const y = (b.latitud - a.latitud) * radianes;
   return Math.hypot(x, y) * RADIO_TIERRA_METROS;
 };
+
+/**
+ * Rumbo inicial en grados para ir de `desde` a `hasta`: de 0 a 360, desde el norte y en el
+ * sentido de las agujas del reloj. Si los dos puntos coinciden, da 0.
+ */
+export const rumboGrados = (desde: Coordenada, hasta: Coordenada): number => {
+  const radianes = Math.PI / 180;
+  const latitud1 = desde.latitud * radianes;
+  const latitud2 = hasta.latitud * radianes;
+  const diferencia = (hasta.longitud - desde.longitud) * radianes;
+  const y = Math.sin(diferencia) * Math.cos(latitud2);
+  const x =
+    Math.cos(latitud1) * Math.sin(latitud2) -
+    Math.sin(latitud1) * Math.cos(latitud2) * Math.cos(diferencia);
+  return (Math.atan2(y, x) / radianes + 360) % 360;
+};
