@@ -453,7 +453,11 @@ export function PantallaMapa() {
                     seleccionada={seleccionada()}
                     alSeleccionar={seleccionar}
                   />
-                  <ReferenciaEnMapa mapa={actual()} escritorio={escritorio()} />
+                  <ReferenciaEnMapa
+                    mapa={actual()}
+                    escritorio={escritorio()}
+                    conEtiqueta={!vistaActiva()}
+                  />
                 </>
               )}
             </Show>

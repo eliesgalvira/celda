@@ -33,6 +33,11 @@ export interface ReferenciaEnMapaProps {
   readonly mapa: MapaMapLibre;
   /** En escritorio el punto elegido se arrastra; en el móvil el dedo mueve el mapa. */
   readonly escritorio: boolean;
+  /**
+   * Si junto al punto va la distancia y el sector que da servicio. La vista de interferencia la
+   * quita, igual que quita el degradado y la línea.
+   */
+  readonly conEtiqueta: boolean;
 }
 
 /** El punto de referencia sobre el mapa: la ubicación GPS con su precisión o el punto elegido. */
@@ -88,7 +93,9 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
   const etiqueta = createMemo(() => {
     const referencia = control.referencia();
     const calculado = servicio.calculado();
-    if (referencia === undefined || calculado === undefined) return undefined;
+    if (!props.conEtiqueta || referencia === undefined || calculado === undefined) {
+      return undefined;
+    }
     const lectura = lecturaDe(calculado.resultado);
     if (lectura === undefined) return undefined;
     const texto = textosServicio(lectura, referencia.tipo, servicio.orientacion).enMapa;
