@@ -15,6 +15,7 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 - **`peerDependencyRules` para `vite`.** Los plugins piden `vite@^8` y encuentran el alias de vite-plus. Funciona; la regla solo silencia el aviso.
 - **Diagnóstico `importFromBarrel` quitado.** `@effect/tsgo` 0.46 ya no lo tiene y avisa de regla desconocida.
 - **El worker de MapLibre 6.** MapLibre busca `maplibre-gl-worker.mjs` junto a su propio fichero, y el empaquetador lo mueve. `apps/web/src/mapa/mapaBase.ts` lo importa con `?worker&url` y llama a `setWorkerUrl`.
+- **Solid de desarrollo solo en las pruebas.** `apps/web/vite.config.ts` pide la condición `development` solo con `mode === "test"`. Antes la pedía siempre y la build publicada llevaba el Solid de desarrollo, con sus avisos en la consola y comprobaciones en cada lectura.
 - **`tema.css?raw` en Vitest.** Vitest devuelve vacías las hojas de estilo; `packages/ui/vite.config.ts` incluye `tema.css` en `test.css` para que las pruebas lean los tokens.
 - **`maplibre-gl.css` en una capa.** Se importa con `layer(base)` para que las utilidades de Tailwind ganen a sus reglas.
 - **oxfmt no toca la prosa.** Markdown y HTML quedan fuera del formateador.
