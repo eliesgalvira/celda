@@ -74,7 +74,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - `panel/Ficha.tsx` tiene las piezas de dentro. `CabeceraFicha` y `EsqueletoFicha` comparten contenedor y alto de línea, así que al llegar la ficha no se mueve nada. El esqueleto dice «Cargando la ficha…» a los 0,5 s y, a los 8 s, que tarda más de lo normal (`animate-aparecer-tarde`).
 - `MarcaDeAguaFicha` tiene dos tonos. `al-dia` enseña la fecha de la ficha y `posterior` avisa de que la ficha ha cambiado después del mapa.
 - Con un panel abierto, `DisposicionMapa` (`panelAbierto`) sube en el móvil los controles y los créditos por encima del resumen, y en escritorio aparta los créditos a la derecha de la columna.
-- `MarcadorEmplazamiento` con `seleccionado` lleva un anillo del color primario y `aria-current`. Si al alejar el seleccionado queda dentro de una agrupación, se sigue viendo suelto y la agrupación lo sigue contando.
+- `MarcadorEmplazamiento` con `seleccionado` lleva un anillo del color primario y `aria-current`. Si al alejar el seleccionado queda dentro de una agrupación, se sigue viendo suelto y la agrupación lo sigue contando. Si el emplazamiento no está verificado, lleva en la esquina un hexágono pequeño del color de su estado, como en el prototipo, y su nombre accesible acaba en el estado.
 
 ## Resumen, eje de frecuencias y datos técnicos
 
@@ -123,6 +123,9 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - La explicación es un `<dialog open>` no modal, montado con `Portal` en `<body>` para que el panel no la recorte. Si el término está en un diálogo modal, se monta en ese diálogo: fuera de él todo queda inerte. Lleva el foco a su título. La cierran Escape (escuchado en captura, para que no cierre también el panel), «Cerrar», tocar fuera y Tab al salir por un extremo, y el foco vuelve al término salvo al tocar fuera. Los relacionados se abren en la misma caja.
 - Dónde se coloca lo decide `colocarExplicacion` (`termino/posicion.ts`), con pruebas: debajo del término si cabe, encima si no, y si no cabe en ninguno, en el lado con más sitio y con desplazamiento por dentro, sin taparlo. En escritorio mide 22rem y en el móvil todo el ancho menos 8 px por lado. Se recoloca al desplazar y al cambiar el tamaño.
 - En pruebas de la web, `textoEntero` (`apps/web/src/lib/pruebas.ts`) busca un texto aunque un término lo parta en varios nodos. La explicación está fuera del contenedor de `render`: se busca con `screen`.
+## Correcciones de la comunidad
+
+- `panel/Correccion.tsx` enseña las correcciones, en la sección «Registro oficial y comunidad», justo bajo la marca de agua. `ContrasteFicha` pone lado a lado lo que dice el registro oficial y lo que dice la comunidad de una estación base, cada uno con su fecha y su enlace; el borde de la comunidad lleva el color de su estado. `ConflictosFicha` lista los conflictos entre fuentes con el tono de aviso, y `NotaFicha` es un párrafo del cuerpo, normal o de crédito. El texto sale de `apps/web/src/ficha/correcciones.ts`.
 
 ## Qué rechaza la regla fuera de `packages/ui`
 
