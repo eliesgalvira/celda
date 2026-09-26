@@ -81,9 +81,6 @@ export function VistaInterferencia(props: VistaInterferenciaProps) {
       <TextoVista tono="clave">
         <TextoConTerminos texto={FRASE_CLAVE} />
       </TextoVista>
-      <TextoVista>
-        <TextoConTerminos texto={QUE_SE_VE} />
-      </TextoVista>
       <ParDeControles>
         <Selector<Compania>
           etiqueta="Compañía"
@@ -145,6 +142,9 @@ export function VistaInterferencia(props: VistaInterferenciaProps) {
           ) : undefined
         }
       />
+      <TextoVista>
+        <TextoConTerminos texto={QUE_SE_VE} />
+      </TextoVista>
       <TextoVista tono="nota">
         {textoDeEstaciones(recuento(), props.eleccion.compania, props.eleccion.mhz)}
       </TextoVista>

@@ -50,25 +50,26 @@ export function PanelInterferencia(props: PanelInterferenciaProps) {
     <section
       aria-labelledby={titulo}
       class={
-        "chaflan flex h-full flex-col gap-2.5 overflow-y-auto overscroll-contain bg-superficie px-4 pt-3 pb-4 " +
+        "chaflan flex h-full flex-col gap-2 overflow-y-auto overscroll-contain bg-superficie px-4 pt-2.5 pb-3 " +
         "drop-shadow-panel [--corte:14px]"
       }
     >
       <div class="flex items-start justify-between gap-2">
-        <div class="flex flex-col items-start gap-1">
-          <p class="font-mono text-[11px] tracking-[0.12em] text-aviso-tinta uppercase">
-            Simulación orientativa
-          </p>
-          <h2 id={titulo} class="font-titulo text-xl leading-6">
+        <div class="flex min-w-0 flex-col gap-1">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p class="font-mono text-[11px] tracking-[0.12em] text-aviso-tinta uppercase">
+              Simulación orientativa
+            </p>
+            <Etiqueta tono="modelo">Modelo {props.modelo}</Etiqueta>
+          </div>
+          {/* En el móvil el título solo se lee con el lector: el botón «Interferencia» ya lo dice. */}
+          <h2 id={titulo} class="font-titulo text-xl leading-6 max-md:sr-only">
             {props.titulo}
           </h2>
         </div>
-        <div class="flex shrink-0 flex-col items-end gap-1">
-          <Boton variante="secundario" onClick={() => props.alCerrar()}>
-            Cerrar
-          </Boton>
-          <Etiqueta tono="modelo">Modelo {props.modelo}</Etiqueta>
-        </div>
+        <Boton variante="secundario" onClick={() => props.alCerrar()}>
+          Cerrar
+        </Boton>
       </div>
       {props.children}
     </section>
@@ -181,8 +182,8 @@ export function ValorEnPunto(props: ValorEnPuntoProps) {
         />
         <p class="text-sm leading-snug">
           {props.desde}:{" "}
-          <strong class="font-mono font-semibold whitespace-nowrap">
-            {props.valor} · {props.palabra}
+          <strong class="font-mono font-semibold">
+            <span class="whitespace-nowrap">{props.valor}</span> · {props.palabra}
           </strong>
         </p>
       </Show>
@@ -196,7 +197,7 @@ export function EstadoVista(props: {
   readonly accion?: JSX.Element | undefined;
 }) {
   return (
-    <div class="flex min-h-9 flex-wrap items-center gap-2">
+    <div class="flex min-h-5 flex-wrap items-center gap-2">
       <Show when={props.texto}>
         {(texto) => (
           <output class="flex animate-aparecer items-center gap-2 font-mono text-xs text-tinta-suave">

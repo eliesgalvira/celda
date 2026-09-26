@@ -76,7 +76,7 @@ describe("panel de la vista de interferencia", () => {
       calculo: { estado: "lista", valor: 3.2, conTrama: true },
       referencia: "elegido",
     });
-    getByText("3 dB · regular");
+    getByText(textoEntero("3 dB · regular"));
     getByText(textoEntero("En el punto: 3 dB · regular"));
   });
 
