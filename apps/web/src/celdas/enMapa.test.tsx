@@ -10,6 +10,7 @@ import { createSignal, flush, type Setter } from "solid-js";
 import { capaDePrueba } from "../capa/pruebas.ts";
 import { ProveedorDeDatos, usarDatos } from "../datos.tsx";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
+import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 import type { CeldasEnMapa } from "./celdas.ts";
 import { type CeldasDelMapa, crearCeldas, type LienzoDeCeldas } from "./enMapa.ts";
 
@@ -79,6 +80,7 @@ const montar = async () => {
         capaDePrueba([Effect.never]),
         fichasDePrueba().capa,
         simuladorEnWorker(worker.crear),
+        ubicacionDePrueba().capa,
       )}
     >
       <Prueba
