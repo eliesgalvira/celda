@@ -47,6 +47,9 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   ["primario-texto", "superficie"],
   ["primario-texto", "superficie-alta"],
   ["primario-texto", "fondo"],
+  // Las etiquetas de barrio, escritas sobre el mapa con un halo del color de su fondo.
+  ["tinta", "mapa-halo"],
+  ["primario-texto", "mapa-halo"],
 ];
 
 describe("contraste del tema", () => {

@@ -234,6 +234,14 @@
   clip-path: var(--hexagono);
 }
 
+/* Texto sobre el mapa: un halo del color del fondo lo separa de calles y rótulos. */
+@utility halo {
+  text-shadow:
+    0 0 2px var(--mapa-halo),
+    0 0 6px var(--mapa-halo),
+    0 0 12px var(--mapa-halo);
+}
+
 /* Hexágono alargado para cintas de texto: botones, etiquetas y la cabecera. */
 @utility cinta {
   --pico: 8px;
