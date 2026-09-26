@@ -1,5 +1,6 @@
 import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
+import { simuladorEnHilo } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
 import { render, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -29,7 +30,13 @@ const abrirCon = async (ficha: Ficha) => {
   const fichas = fichasDePrueba();
   navegar(ruta.emplazamiento(ficha.clave), { reemplazar: true });
   const pantalla = render(() => (
-    <App servicios={Layer.merge(capaDePrueba([Effect.succeed(CAPA)]), fichas.capa)} />
+    <App
+      servicios={Layer.mergeAll(
+        capaDePrueba([Effect.succeed(CAPA)]),
+        fichas.capa,
+        simuladorEnHilo(),
+      )}
+    />
   ));
   flush();
   await waitFor(() => {
