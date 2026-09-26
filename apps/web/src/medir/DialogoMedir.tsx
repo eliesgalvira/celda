@@ -10,6 +10,7 @@ import { Dialogo } from "@celda/ui/Dialogo.tsx";
 import { Segmentado, Selector } from "@celda/ui/Eleccion.tsx";
 import { Etiqueta } from "@celda/ui/Etiqueta.tsx";
 import { CodigoQr } from "@celda/ui/medir/CodigoQr.tsx";
+import { Termino } from "@celda/ui/termino/Termino.tsx";
 import {
   CodigoDelModo,
   MedidaMostrada,
@@ -93,8 +94,9 @@ export function DialogoMedir(props: DialogoMedirProps) {
           <Match when={instrucciones().tipo === "ordenador"}>
             <Nota tono="aviso" titulo="Desde un ordenador no se puede medir">
               <p>
-                Quien habla con las estaciones base es el móvil, a través de su tarjeta SIM. Un
-                ordenador no tiene esa radio, así que desde aquí no hay ninguna señal que medir.
+                Quien habla con las <Termino termino="estacion-base">estaciones base</Termino> es el
+                móvil, a través de su tarjeta SIM. Un ordenador no tiene esa radio, así que desde
+                aquí no hay ninguna señal que medir.
               </p>
             </Nota>
             <p>Tienes tres opciones:</p>
@@ -112,8 +114,10 @@ export function DialogoMedir(props: DialogoMedirProps) {
               etiqueta={<Etiqueta tono="pronto">PRONTO</Etiqueta>}
             >
               <p>
-                Si ya tienes una captura del modo de información de tu móvil, podrás subirla desde
-                aquí. Todavía no funciona. Falta decidir cómo leerá Celda los números de la captura.
+                Si ya tienes una captura del{" "}
+                <Termino termino="modo-de-informacion">modo de información</Termino> de tu móvil,
+                podrás subirla desde aquí. Todavía no funciona. Falta decidir cómo leerá Celda los
+                números de la captura.
               </p>
             </Opcion>
             <Opcion titulo="Ver una medida de ejemplo" acciones={verEjemplo}>
@@ -127,7 +131,8 @@ export function DialogoMedir(props: DialogoMedirProps) {
             <Nota titulo="No sabemos desde qué dispositivo abres Celda">
               <p>
                 Elige arriba si es un ordenador, un Android o un iPhone y te diremos cómo medir. Una
-                tableta sin la app Teléfono no puede marcar el código del modo de información.
+                tableta sin la app Teléfono no puede marcar el código del{" "}
+                <Termino termino="modo-de-informacion">modo de información</Termino>.
               </p>
             </Nota>
             <div>{verEjemplo}</div>
@@ -257,12 +262,13 @@ function VistaEjemplo(props: { readonly volver: () => void }) {
       >
         <p>
           Estos números son inventados y no cuentan como una medida tuya. Son los mismos datos que
-          enseña el modo de información de un móvil.
+          enseña el <Termino termino="modo-de-informacion">modo de información</Termino> de un
+          móvil.
         </p>
       </MedidaMostrada>
       <p>
-        Cuando se puedan registrar medidas, cada una se verá en el mapa unida al emplazamiento que
-        le daba servicio.
+        Cuando se puedan registrar medidas, cada una se verá en el mapa unida al{" "}
+        <Termino termino="emplazamiento">emplazamiento</Termino> que le daba servicio.
       </p>
       <div>
         <Boton variante="secundario" onClick={() => props.volver()}>
