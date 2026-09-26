@@ -1,0 +1,28 @@
+{
+  "name": "@celda/capas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vp build",
+    "publicar": "vp build && node dist/capas.js publicar",
+    "publicar:local": "vp build && ./scripts/local.sh publicar",
+    "servir": "vp build && node dist/capas.js servir",
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@celda/convex": "workspace:*",
+    "@celda/dominio": "workspace:*",
+    "@confect/core": "catalog:",
+    "@confect/server": "catalog:",
+    "@effect/platform-node": "catalog:",
+    "convex": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

@@ -2,6 +2,9 @@
   "name": "@celda/convex",
   "private": true,
   "type": "module",
+  "exports": {
+    "./capas": "./src/capas.ts"
+  },
   "scripts": {
     "codegen": "confect codegen",
     "backend": "./scripts/backend.sh",
