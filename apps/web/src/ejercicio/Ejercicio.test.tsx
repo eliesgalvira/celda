@@ -26,6 +26,7 @@ const CAPA: CapaLeida = {
       posicion: { longitud: 2.11, latitud: 41.39 },
       estado: "verificado",
       companias: ["movistar", "orange"],
+      bandas: [{ compania: "movistar", mhz: [800] }],
       barrio: "21",
     },
     {
@@ -155,6 +156,10 @@ describe("modo estudiante", () => {
       fila("Radio de cobertura")?.querySelector("th")?.textContent ?? "",
       /Mitad de la distancia media/u,
     );
+    // Antes de leer las fichas, las bandas son las de la capa: solo se conoce la de 800 MHz.
+    await findByText(/La capa del mapa trae bandas de 1 de los 2 emplazamientos/u);
+    assert.strictEqual(celdas("800 MHz")[0], "sí");
+    assert.strictEqual(celdas("4G")[0], "probable");
     assert.strictEqual(celdas("5G")[0], "no consta");
 
     // Las bandas se leen de las fichas al pedirlo.

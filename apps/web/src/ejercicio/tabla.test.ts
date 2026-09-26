@@ -33,7 +33,7 @@ const CONTEXTO = {
   limites: FUENTE_DE_BARRIOS,
   fechaCapa: Date.UTC(2026, 8, 25, 23, 44, 53),
   parametros: PARAMETROS_POR_DEFECTO,
-  fechaBandas: Date.UTC(2026, 8, 26, 10),
+  bandas: { de: "fichas" as const, fecha: Date.UTC(2026, 8, 26, 10) },
 };
 
 const tabla = () => tablaDelEjercicio(resolverEjercicio(ENTRADA), CONTEXTO, PARAMETROS_POR_DEFECTO);

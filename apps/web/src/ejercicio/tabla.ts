@@ -55,9 +55,17 @@ export interface ContextoDeTabla {
   /** Fecha de la capa de emplazamientos, en milisegundos. */
   readonly fechaCapa: number;
   readonly parametros: ParametrosDelEjercicio;
-  /** Cuándo se leyeron las fichas con las bandas, o nada si aún no se han leído. */
-  readonly fechaBandas: number | undefined;
+  /**
+   * De dónde salen las bandas: de la capa del mapa, con su fecha, o de las fichas leídas en vivo,
+   * con la fecha de la lectura.
+   */
+  readonly bandas: { readonly de: "capa" | "fichas"; readonly fecha: number };
 }
+
+const ORIGEN_BANDAS = {
+  capa: { nombre: "Capa del mapa", en: "de la capa del mapa" },
+  fichas: { nombre: "Fichas leídas en vivo", en: "de las fichas leídas en vivo" },
+} as const;
 
 const ENTERO = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
 const DECIMAL = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
@@ -114,7 +122,8 @@ export const tablaDelEjercicio = (
   const padron = `Padrón a ${contexto.poblacion.referencia}, ${contexto.poblacion.atribucion} (${contexto.poblacion.licencia})`;
   const capa = "Mapa de Celda: registro oficial y correcciones";
   const fechaCapa = dia(contexto.fechaCapa);
-  const fechaBandas = contexto.fechaBandas === undefined ? "" : dia(contexto.fechaBandas);
+  const fechaBandas = dia(contexto.bandas.fecha);
+  const origenBandas = ORIGEN_BANDAS[contexto.bandas.de];
   const sinCompania = (c: ResultadoDeCompania, valor: () => Valor) =>
     c.estaciones === 0 ? NINGUNO : valor();
 
@@ -220,7 +229,7 @@ export const tablaDelEjercicio = (
           valores: porCompania((c) =>
             sinCompania(c, () => TEXTO_CERTEZA[c.tecnologias[generacion]]),
           ),
-          fuente: "Deducida de las bandas de las fichas",
+          fuente: `Deducida de las bandas ${origenBandas.en}`,
           fecha: fechaBandas,
         })),
       },
@@ -236,7 +245,7 @@ export const tablaDelEjercicio = (
                 : { texto: "no consta", marca: "sin-datos" };
             }),
           ),
-          fuente: "Fichas de la zona, del registro oficial",
+          fuente: `${origenBandas.nombre}, del registro oficial`,
           fecha: fechaBandas,
         })),
       },

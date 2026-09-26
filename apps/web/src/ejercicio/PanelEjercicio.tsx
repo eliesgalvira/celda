@@ -43,7 +43,7 @@ import {
 } from "solid-js";
 
 import { usarDatos } from "../datos.tsx";
-import { type BandasLeidas, leerBandas } from "./bandas.ts";
+import { type BandasLeidas, bandasDeEmplazamiento, leerBandas } from "./bandas.ts";
 import { cadenaDelRadio, cadenaDeUsuarios } from "./textos.ts";
 import {
   csvDeTabla,
@@ -149,6 +149,17 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
     return actual.tipo === "leidas" ? actual : undefined;
   });
 
+  /**
+   * Las bandas de la capa del mapa (formato 3), por emplazamiento de la zona. Solo trae las
+   * conocidas; de una compañía sin ninguna no se sabe nada.
+   */
+  const bandasDeLaCapa = createMemo(
+    () => new Map(enZona().map((e) => [e.clave, bandasDeEmplazamiento(e)] as const)),
+  );
+  const conBandasEnCapa = createMemo(
+    () => enZona().filter((e) => (e.bandas?.length ?? 0) > 0).length,
+  );
+
   /** Fichas leídas sin ninguna banda conocida de ninguna compañía. */
   const sinBandas = createMemo(
     () =>
@@ -165,7 +176,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
       areaKm2: actual.areaKm2,
       enZona: enZona(),
       todos: props.emplazamientos,
-      bandas: leidas()?.leidas.bandas ?? new Map(),
+      bandas: leidas()?.leidas.bandas ?? bandasDeLaCapa(),
       parametros: parametros(),
     });
   });
@@ -224,7 +235,12 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
         limites: lista_.fuenteDeLimites,
         fechaCapa: props.fechaCapa ?? 0,
         parametros: parametros(),
-        fechaBandas: leidas()?.fecha,
+        bandas: (() => {
+          const hecho = leidas();
+          return hecho === undefined
+            ? { de: "capa" as const, fecha: props.fechaCapa ?? 0 }
+            : { de: "fichas" as const, fecha: hecho.fecha };
+        })(),
       },
       PARAMETROS_POR_DEFECTO,
     );
@@ -436,9 +452,10 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
 
                     <SeccionFicha titulo="4 · Tecnologías y bandas">
                       <TextoEjercicio>
-                        Las <Termino termino="banda">bandas</Termino> salen de la ficha de cada
-                        emplazamiento. El registro oficial no publica la tecnología: se deduce de la
-                        banda y por eso la tabla dice «probable» o «posible».
+                        Las <Termino termino="banda">bandas</Termino> salen del registro oficial,
+                        tal como las recoge la capa del mapa. Para las más recientes, lee las fichas
+                        en vivo. El registro no publica la tecnología: se deduce de la banda y por
+                        eso la tabla dice «probable» o «posible».
                       </TextoEjercicio>
                       <AccionesEjercicio>
                         <Boton
@@ -451,6 +468,13 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                             : "Volver a leerlas"}
                         </Boton>
                       </AccionesEjercicio>
+                      <Show when={leidas() === undefined}>
+                        <TextoEjercicio>
+                          La capa del mapa trae bandas de {entero(conBandasEnCapa())} de los{" "}
+                          {entero(enZona().length)} emplazamientos de la zona. De los demás, la
+                          tabla dice «no consta».
+                        </TextoEjercicio>
+                      </Show>
                       <Show when={leidas()}>
                         {(hecho) => (
                           <TextoEjercicio>

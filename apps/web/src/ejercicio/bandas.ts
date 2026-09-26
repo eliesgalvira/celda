@@ -1,3 +1,4 @@
+import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import type { BandasPorCompania } from "@celda/dominio/ejercicio";
 import type { Ficha } from "@celda/dominio/ficha";
 import * as Effect from "effect/Effect";
@@ -17,6 +18,10 @@ export const bandasDeFicha = (ficha: Ficha): BandasPorCompania =>
   Object.fromEntries(
     ficha.estaciones.map((estacion) => [estacion.compania, estacion.bandas.map((b) => b.mhz)]),
   );
+
+/** Las bandas que trae la capa del mapa para un emplazamiento: solo las conocidas. */
+export const bandasDeEmplazamiento = (emplazamiento: EmplazamientoDeCapa): BandasPorCompania =>
+  Object.fromEntries((emplazamiento.bandas ?? []).map((b) => [b.compania, b.mhz]));
 
 export interface BandasLeidas {
   readonly bandas: ReadonlyMap<string, BandasPorCompania>;
