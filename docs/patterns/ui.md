@@ -155,6 +155,15 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - `LecturaServicio` (`ubicacion/LecturaServicio.tsx`) es el bloque de la ficha: tres casillas en una lista de definiciones, con su sitio reservado mientras llega el cálculo, la frase, la etiqueta de modelo y la nota.
 - `PuntoElegido` para el `mousedown` con un escuchador nativo. `onMouseDown` de Solid se atiende en el documento, cuando MapLibre ya ha recibido el evento en su contenedor, y el mapa se movía a la vez que el punto.
 
+## Ajustes y modo estudiante
+
+- El botón «Ajustes» va siempre en la columna de controles y abre un `Dialogo` con `Interruptor`, una casilla nativa con `role="switch"` y `aria-checked`, que se cambia con toda la fila. El modo estudiante se guarda en `AlmacenLocal` (`leerAjustes` y `guardarAjustes`, en el almacén `ajustes` de la base `celda`, versión 2). Hasta que se leen valen los iniciales, con el modo apagado: nadie ve el ejercicio sin haberlo encendido.
+- Con el modo encendido aparece el botón «Ejercicio», que abre `PanelEjercicio` (`apps/web/src/ejercicio`) en el sitio de la ficha. La URL lleva `?ejercicio=<código del barrio>`; sin el modo, esa URL no abre nada.
+- `PanelEmplazamiento` con `ancho="ancho"` ocupa en escritorio `min(46rem, 100vw − 8rem)` para que quepa la tabla. `DisposicionMapa` recibe entonces `panelAncho` y aparta la pista y los créditos lo mismo.
+- `ejercicio/Ejercicio.tsx` tiene las piezas: `CadenaDelCalculo` (cada eslabón con su valor y su fuente a la vista, y la operación entre uno y otro), `TablaDelEjercicio` (tabla de ancho fijo con la fuente y la fecha bajo cada magnitud y en el `title` de cada valor; en pantallas estrechas se desplaza de lado dentro de su marco) y `EsqueletoEjercicio`, que reserva el sitio mientras llegan los habitantes. `CampoNumero` (en `Eleccion.tsx`) acepta coma o punto y marca con `aria-invalid` lo que no es un número del intervalo, sin aplicarlo.
+- La zona se dibuja en el mapa con `mapa/zona.ts`: el límite del barrio con trazo discontinuo y una línea de cada estación base a su vecina, con el token `--mapa-zona`, el naranja del punto de referencia. La web llena la fuente `zona` y encuadra el barrio dejando libre lo que tapa el panel.
+- Los cálculos y los textos son funciones puras con pruebas: `resolverEjercicio` en `packages/dominio/src/ejercicio.ts`, con su fichero de referencia, y la tabla, el CSV y el XLSX en `apps/web/src/ejercicio/tabla.ts` y `xlsx.ts`. El XLSX se escribe a mano, sin dependencias: cinco XML en un ZIP sin comprimir. De dónde salen los habitantes y las cuotas está en [docs/investigacion/poblacion-y-lineas.md](../investigacion/poblacion-y-lineas.md).
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.

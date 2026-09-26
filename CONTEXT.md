@@ -211,8 +211,36 @@ _Evitar_: calidad de la señal (esa es la medida, RSRQ), SNR, SINR a secas
 ### Ejercicios
 
 **Modo estudiante**:
-Modo discreto que relaciona lo que se ve con ejercicios de clase de comunicaciones móviles. Quien no lo activa no ve su vocabulario.
+Modo discreto que relaciona lo que se ve con ejercicios de clase de comunicaciones móviles. Se enciende en los ajustes, empieza apagado y el dispositivo lo recuerda. Quien no lo activa no ve su vocabulario.
 _Evitar_: modo asignatura, modo práctica
+
+**Ajustes**:
+Lo que la persona elige una vez y el dispositivo recuerda, sin cuenta. No es una aportación: nunca se compartiría.
+_Evitar_: preferencias, configuración
+
+**Ejercicio de emplazamientos**:
+Ejercicio del modo estudiante que cuenta, para una zona, las estaciones base de cada compañía, su radio de cobertura, los habitantes y usuarios por estación base y las tecnologías y bandas, y da la tabla para descargar.
+_Evitar_: práctica, dimensionado
+
+**Zona**:
+Área sobre la que se hace el ejercicio. En la v1 es siempre un barrio.
+_Evitar_: área de estudio, región
+
+**Radio de cobertura**:
+En el ejercicio, la mitad de la distancia media de cada estación base a su vecina más cercana de la misma compañía, esté o no en la zona. Es una estimación del ejercicio, no la cobertura real.
+_Evitar_: alcance, radio de la celda
+
+**Penetración**:
+Líneas móviles por cada 100 habitantes. Es un parámetro del ejercicio, con el valor de la CNMC por defecto.
+_Evitar_: tasa, adopción
+
+**Cuota de líneas**:
+Parte de las líneas móviles que tiene una compañía. Orange y Yoigo comparten la suya porque la estadística oficial no las separa.
+_Evitar_: cuota de mercado a secas, share
+
+**Usuarios por estación base**:
+Líneas de la zona que le tocan a cada estación base de una compañía: habitantes por penetración por cuota, entre sus estaciones base de la zona.
+_Evitar_: clientes, carga
 
 ## Relaciones
 
@@ -226,6 +254,7 @@ _Evitar_: modo asignatura, modo práctica
 - Una **medida propia** queda unida al emplazamiento y al sector que daban servicio donde se tomó.
 - Las **aportaciones** viven en el dispositivo. Una **corrección propuesta** solo pasaría a ser **corrección** si se compartiera.
 - Una **simulación** nunca es una **observación** ni una **medida**.
+- El **ejercicio de emplazamientos** se hace sobre una **zona**. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
 
 ## Ambigüedades señaladas
 
