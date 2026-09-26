@@ -43,8 +43,9 @@ describe("estado de la capa", () => {
 
   it("el crédito de los límites de barrio lleva su autor, su fecha y su licencia", () => {
     assert.deepStrictEqual(creditoDeBarrios(FUENTE_DE_BARRIOS), {
-      texto: "Ajuntament de Barcelona (barrios, 12 nov 2024, CC BY 4.0)",
+      texto: "Ajuntament de Barcelona (nov 2024, CC BY 4.0)",
       enlace: FUENTE_DE_BARRIOS.enlace,
+      detalle: "Límites de barrio de Open Data BCN, datos del 12 nov 2024",
     });
   });
 

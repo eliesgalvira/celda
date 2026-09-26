@@ -84,8 +84,9 @@ describe("capa de emplazamientos en el mapa", () => {
     const fecha = await findByText(textoEntero("Datos del mapa: 26 sept 2026"));
     assert.strictEqual(fecha.closest("output")?.getAttribute("data-tono"), "fecha");
     // Con la capa llegan sus barrios, y con ellos el crédito de sus límites.
-    const credito = getByRole("link", { name: /Ajuntament de Barcelona \(barrios, 12 nov 2024/u });
+    const credito = getByRole("link", { name: /Ajuntament de Barcelona \(nov 2024/u });
     assert.strictEqual(credito.getAttribute("href"), FUENTE_DE_BARRIOS.enlace);
+    assert.match(credito.getAttribute("title") ?? "", /^Límites de barrio/u);
     assert.include(credito.textContent ?? "", "CC BY 4.0");
     await waitFor(() => {
       assert.isNull(queryByText(/No se han podido cargar los emplazamientos/u));

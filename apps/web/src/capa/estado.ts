@@ -52,15 +52,24 @@ const FECHA = new Intl.DateTimeFormat("es-ES", {
 export const textoDatosDelMapa = (fecha: number): TextoMarcado =>
   marcado`${termino("version-de-los-datos", "Datos del mapa")}: ${FECHA.format(fecha).replace(".", "")}`;
 
+const MES = new Intl.DateTimeFormat("es-ES", {
+  month: "short",
+  year: "numeric",
+  timeZone: "Europe/Madrid",
+});
+
 /**
  * El crédito de los límites de barrio, con su fecha y su licencia, como pide CC BY 4.0:
- * «Ajuntament de Barcelona (barrios, 12 nov 2024, CC BY 4.0)».
+ * «Ajuntament de Barcelona (nov 2024, CC BY 4.0)». Así cabe en una línea del móvil; el detalle
+ * dice que son los límites de barrio y el día exacto.
  */
 export const creditoDeBarrios = (fuente: FuenteDeBarrios): Credito => {
   const fecha = Date.parse(`${fuente.fecha}T12:00:00Z`);
-  const cuando = Number.isNaN(fecha) ? fuente.fecha : FECHA.format(fecha).replace(".", "");
+  const cuando = Number.isNaN(fecha) ? fuente.fecha : MES.format(fecha).replace(".", "");
+  const dia = Number.isNaN(fecha) ? fuente.fecha : FECHA.format(fecha).replace(".", "");
   return {
-    texto: `${fuente.atribucion} (barrios, ${cuando}, ${fuente.licencia})`,
+    texto: `${fuente.atribucion} (${cuando}, ${fuente.licencia})`,
     enlace: fuente.enlace,
+    detalle: `Límites de barrio de Open Data BCN, datos del ${dia}`,
   };
 };
