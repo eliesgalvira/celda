@@ -90,8 +90,11 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         </div>
       </Show>
 
-      {/* 11.75rem es el alto del resumen de la hoja (`ALTO_RESUMEN`, 188 px). */}
-      <div class="absolute right-2 bottom-14 z-10 flex flex-col items-center gap-2 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+2.5rem)] max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-16">
+      {/*
+        11.75rem es el alto del resumen de la hoja (`ALTO_RESUMEN`, 188 px). En el móvil los
+        créditos ocupan dos líneas y los controles quedan por encima de ellas.
+      */}
+      <div class="absolute right-2 bottom-[4.5rem] z-10 flex flex-col items-center gap-2 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-16">
         {props.controles}
       </div>
 

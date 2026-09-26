@@ -8,7 +8,7 @@ import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
-import { capaDePrueba } from "../capa/pruebas.ts";
+import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
 import { textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
@@ -23,8 +23,11 @@ const CAPA: CapaLeida = {
       posicion: { longitud: 2.113412, latitud: 41.389278 },
       estado: "verificado",
       companias: ["movistar", "vodafone", "orange"],
+      barrio: "21",
     },
   ],
+  barrios: [{ codigo: "21", nombre: "Pedralbes", etiqueta: { longitud: 2.11, latitud: 41.39 } }],
+  fuenteDeBarrios: FUENTE_DE_BARRIOS,
 };
 
 const NO_LLEGA = Effect.fail(
@@ -80,6 +83,11 @@ describe("capa de emplazamientos en el mapa", () => {
 
     const fecha = await findByText(textoEntero("Datos del mapa: 26 sept 2026"));
     assert.strictEqual(fecha.closest("output")?.getAttribute("data-tono"), "fecha");
+    // Con la capa llegan sus barrios, y con ellos el crédito de sus límites.
+    const credito = getByRole("link", { name: /Ajuntament de Barcelona \(nov 2024/u });
+    assert.strictEqual(credito.getAttribute("href"), FUENTE_DE_BARRIOS.enlace);
+    assert.match(credito.getAttribute("title") ?? "", /^Límites de barrio/u);
+    assert.include(credito.textContent ?? "", "CC BY 4.0");
     await waitFor(() => {
       assert.isNull(queryByText(/No se han podido cargar los emplazamientos/u));
     });

@@ -173,7 +173,9 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       type: "symbol",
       source: FUENTE_MAPA_BASE,
       "source-layer": "place",
-      minzoom: 13,
+      // Del 13 al 14 los barrios de Barcelona llevan la etiqueta de Celda (`MarcadorBarrio`), con
+      // su número y sus ausencias; los rótulos del mapa base se pisarían con ella.
+      minzoom: 14,
       filter: deClase(["suburb", "quarter", "neighbourhood"]),
       layout: {
         "text-field": ["upcase", ["get", "name"]],

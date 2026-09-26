@@ -1,5 +1,6 @@
 import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area";
-import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
+import { type Barrio, type ResumenDeBarrio, resumirBarrios } from "@celda/dominio/barrio";
+import { COMPANIAS_DE_CAPA, type EmplazamientoLeido } from "@celda/dominio/capa";
 import Supercluster from "supercluster";
 
 /**
@@ -8,9 +9,11 @@ import Supercluster from "supercluster";
  * La jerarquía entre niveles es la de supercluster, así que se sabe a qué agrupación va cada
  * emplazamiento al alejar y de cuál sale al acercar.
  *
- * Las escenas y las transiciones no dependen de supercluster: un elemento es cualquier cosa que el
- * mapa dibuja en un sitio. Las agrupaciones por barrio (ticket 14) serán otro tipo de elemento y
- * otro tipo de nivel por debajo de cierto zoom, con la misma forma de escena y de transición.
+ * En el nivel de barrios, los emplazamientos de Barcelona se recogen por barrio, con su nombre,
+ * su número y sus ausencias. Los de fuera del municipio, que no tienen barrio, siguen agrupados
+ * en hexágonos. Las transiciones que entran o salen de ese nivel se calculan por los
+ * emplazamientos que recoge cada elemento: cada uno va al elemento que se queda con la mayoría de
+ * los suyos.
  */
 
 /**
@@ -23,6 +26,14 @@ const RADIO = 60;
 /** Último nivel con agrupaciones. En el siguiente y más cerca, todos los emplazamientos van sueltos. */
 const NIVEL_MAXIMO = 16;
 
+/**
+ * Nivel en que los emplazamientos de Barcelona se agrupan por barrio: del zoom 13 al 14. Más
+ * lejos, las etiquetas de los 73 barrios no caben en la pantalla, y las agrupaciones del nivel 12
+ * ya son más grandes que un barrio. Más cerca, las del nivel 14 son más pequeñas. Así, al alejar,
+ * cada paso recoge lo del anterior.
+ */
+export const NIVEL_DE_BARRIOS = 13;
+
 /** Tope de pasos al bajar por la jerarquía en un salto de muchos niveles. */
 const TOPE_DE_PASOS = 4000;
 
@@ -31,7 +42,7 @@ export interface ElementoEmplazamiento {
   readonly tipo: "emplazamiento";
   readonly clave: string;
   readonly posicion: Coordenada;
-  readonly emplazamiento: EmplazamientoDeCapa;
+  readonly emplazamiento: EmplazamientoLeido;
 }
 
 /** Una agrupación: el hexágono con el número de emplazamientos que recoge. */
@@ -42,8 +53,20 @@ export interface ElementoAgrupacion {
   readonly cuantos: number;
 }
 
+/** Un barrio en el nivel de barrios: su etiqueta, con su número de emplazamientos y sus ausencias. */
+export interface ElementoBarrio {
+  readonly tipo: "barrio";
+  readonly clave: string;
+  /** Dónde va la etiqueta, dentro del barrio. */
+  readonly posicion: Coordenada;
+  readonly resumen: ResumenDeBarrio;
+}
+
 /** Lo que el mapa dibuja en un sitio. La clave identifica el mismo elemento entre escenas. */
-export type Elemento = ElementoEmplazamiento | ElementoAgrupacion;
+export type Elemento = ElementoEmplazamiento | ElementoAgrupacion | ElementoBarrio;
+
+/** Lo que recoge varios emplazamientos y, al pulsarlo, acerca el mapa a su zona. */
+export type ElementoAbrible = ElementoAgrupacion | ElementoBarrio;
 
 /** Lo que se ve a un nivel de zoom dentro de una caja. */
 export interface Escena {
@@ -75,10 +98,10 @@ export interface Agrupador {
    * agrupador, como al llegar una capa nueva, no hay transición.
    */
   readonly transicion: (antes: Escena, despues: Escena) => Transicion;
-  /** El zoom al que hay que acercarse para que la agrupación se abra en varios elementos. */
-  readonly zoomDeApertura: (agrupacion: ElementoAgrupacion) => number;
-  /** Los emplazamientos que recoge un elemento: él mismo o los de la agrupación. */
-  readonly emplazamientosDe: (elemento: Elemento) => ReadonlyArray<EmplazamientoDeCapa>;
+  /** El zoom al que hay que acercarse para que la agrupación o el barrio se abra en varios elementos. */
+  readonly zoomDeApertura: (elemento: ElementoAbrible) => number;
+  /** Los emplazamientos que recoge un elemento: él mismo, los de la agrupación o los del barrio. */
+  readonly emplazamientosDe: (elemento: Elemento) => ReadonlyArray<EmplazamientoLeido>;
 }
 
 /** El nivel de agrupación de un zoom del mapa: su parte entera, hasta el primero sin agrupaciones. */
@@ -103,35 +126,92 @@ class Indice extends Supercluster<PropiedadesDePunto, PropiedadesDeAgrupacion> {
 
 const PREFIJO_EMPLAZAMIENTO = "e:";
 const PREFIJO_AGRUPACION = "a:";
+/** Las agrupaciones de fuera de Barcelona en el nivel de barrios, que salen de otro índice. */
+const PREFIJO_AGRUPACION_FUERA = "f:";
+const PREFIJO_BARRIO = "b:";
 
-const claveDeAgrupacion = (id: number): string => `${PREFIJO_AGRUPACION}${id}`;
+/** El identificador de supercluster de una clave con ese prefijo, o `undefined` si no lo lleva. */
+const idConPrefijo = (clave: string, prefijo: string): number | undefined =>
+  clave.startsWith(prefijo) ? Number(clave.slice(prefijo.length)) : undefined;
 
 /** El identificador de supercluster de una clave de agrupación, o `undefined` si no lo es. */
-const idDeClave = (clave: string): number | undefined =>
-  clave.startsWith(PREFIJO_AGRUPACION) ? Number(clave.slice(PREFIJO_AGRUPACION.length)) : undefined;
+const idDeClave = (clave: string): number | undefined => idConPrefijo(clave, PREFIJO_AGRUPACION);
 
-/** Agrupa los emplazamientos de una capa. Indexar 1300 emplazamientos cuesta unos milisegundos. */
-export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa>): Agrupador => {
+type Punto = ReturnType<Indice["getClusters"]>[number];
+
+/** Un índice de supercluster con los emplazamientos de `indices`, que guarda su posición. */
+const indexar = (
+  emplazamientos: ReadonlyArray<EmplazamientoLeido>,
+  indices: ReadonlyArray<number>,
+): Indice => {
   const indice = new Indice({ radius: RADIO, maxZoom: NIVEL_MAXIMO });
   indice.load(
-    emplazamientos.map((emplazamiento, i) => ({
-      type: "Feature",
-      properties: { indice: i },
-      geometry: {
-        type: "Point",
-        coordinates: [emplazamiento.posicion.longitud, emplazamiento.posicion.latitud],
-      },
-    })),
+    indices.map((i) => {
+      const { longitud, latitud } = emplazamientos[i]?.posicion ?? { longitud: 0, latitud: 0 };
+      return {
+        type: "Feature",
+        properties: { indice: i },
+        geometry: { type: "Point", coordinates: [longitud, latitud] },
+      };
+    }),
   );
+  return indice;
+};
 
-  const elementoDe = (punto: ReturnType<Indice["getClusters"]>[number]): Elemento | undefined => {
+/** La clave del elemento que se lleva más votos; en caso de empate, el primero que los tuvo. */
+const masVotado = (votos: ReadonlyMap<string, number>): string | undefined => {
+  let ganador: string | undefined;
+  let maximo = 0;
+  for (const [clave, n] of votos) {
+    if (n > maximo) {
+      ganador = clave;
+      maximo = n;
+    }
+  }
+  return ganador;
+};
+
+/**
+ * Agrupa los emplazamientos de una capa. Indexar 1300 emplazamientos cuesta unos milisegundos.
+ * Con `barrios`, el nivel `NIVEL_DE_BARRIOS` recoge por barrio los emplazamientos que tienen uno;
+ * sin ellos, ese nivel es uno más de hexágonos.
+ */
+export const crearAgrupador = (
+  emplazamientos: ReadonlyArray<EmplazamientoLeido>,
+  barrios: ReadonlyArray<Barrio> = [],
+): Agrupador => {
+  const todos = emplazamientos.map((_, i) => i);
+  const indice = indexar(emplazamientos, todos);
+  // Los de fuera de Barcelona se agrupan aparte en el nivel de barrios.
+  const fuera = indexar(
+    emplazamientos,
+    todos.filter((i) => emplazamientos[i]?.barrio === null),
+  );
+  const resumenes = resumirBarrios(barrios, emplazamientos, COMPANIAS_DE_CAPA);
+  const hayBarrios = resumenes.length > 0;
+  const deBarrio = new Map<string, Array<number>>();
+  for (const [i, emplazamiento] of emplazamientos.entries()) {
+    if (emplazamiento.barrio === null) continue;
+    const suyos = deBarrio.get(emplazamiento.barrio) ?? [];
+    suyos.push(i);
+    deBarrio.set(emplazamiento.barrio, suyos);
+  }
+  const barriosPorClave = new Map(
+    resumenes.map((resumen): [string, ElementoBarrio] => {
+      const clave = `${PREFIJO_BARRIO}${resumen.barrio.codigo}`;
+      return [clave, { tipo: "barrio", clave, posicion: resumen.barrio.etiqueta, resumen }];
+    }),
+  );
+  const esDeBarrios = (nivel: number): boolean => hayBarrios && nivel === NIVEL_DE_BARRIOS;
+
+  const elementoDe = (punto: Punto, prefijo = PREFIJO_AGRUPACION): Elemento | undefined => {
     const [longitud = 0, latitud = 0] = punto.geometry.coordinates;
     const posicion = { longitud, latitud };
     const propiedades = punto.properties;
     if ("cluster" in propiedades) {
       return {
         tipo: "agrupacion",
-        clave: claveDeAgrupacion(propiedades.cluster_id),
+        clave: `${prefijo}${propiedades.cluster_id}`,
         posicion,
         cuantos: propiedades.point_count,
       };
@@ -160,8 +240,16 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
       caja.noreste.longitud,
       caja.noreste.latitud,
     ];
-    for (const punto of indice.getClusters(bbox, nivel)) {
-      const elemento = elementoDe(punto);
+    if (esDeBarrios(nivel)) {
+      for (const barrio of barriosPorClave.values()) {
+        if (contiene(caja, barrio.posicion)) elementos.set(barrio.clave, barrio);
+      }
+    }
+    const [origen, prefijo] = esDeBarrios(nivel)
+      ? [fuera, PREFIJO_AGRUPACION_FUERA]
+      : [indice, PREFIJO_AGRUPACION];
+    for (const punto of origen.getClusters(bbox, nivel)) {
+      const elemento = elementoDe(punto, prefijo);
       if (elemento !== undefined) elementos.set(elemento.clave, elemento);
     }
     const suelto = emplazamientos[indicePorClave.get(aparte ?? "") ?? -1];
@@ -203,12 +291,66 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
     }
   };
 
+  /** Las posiciones en la capa de los emplazamientos que recoge un elemento. */
+  const hojasDe = (elemento: Elemento): ReadonlyArray<number> => {
+    switch (elemento.tipo) {
+      case "emplazamiento": {
+        const i = indicePorClave.get(elemento.emplazamiento.clave);
+        return i === undefined ? [] : [i];
+      }
+      case "barrio": {
+        return deBarrio.get(elemento.resumen.barrio.codigo) ?? [];
+      }
+      case "agrupacion": {
+        const id = idDeClave(elemento.clave);
+        const idFuera = idConPrefijo(elemento.clave, PREFIJO_AGRUPACION_FUERA);
+        const [origen, cual] = id === undefined ? [fuera, idFuera] : [indice, id];
+        return cual === undefined
+          ? []
+          : origen.getLeaves(cual, Number.POSITIVE_INFINITY).map((hoja) => hoja.properties.indice);
+      }
+    }
+  };
+
+  /**
+   * Al entrar o salir del nivel de barrios no hay jerarquía de supercluster que seguir: cada
+   * elemento de la escena fina va al de la gruesa que recoge más emplazamientos suyos. Un barrio
+   * sin emplazamientos no va a ninguno y aparece o se apaga en su sitio.
+   */
+  const relacionPorHojas = (fina: Escena, gruesa: Escena): Map<string, string> => {
+    const deHoja = new Map<number, string>();
+    for (const elemento of gruesa.elementos.values()) {
+      for (const hoja of hojasDe(elemento)) {
+        // El seleccionado va suelto además de contar en su grupo: manda el grupo, que va antes.
+        if (!deHoja.has(hoja)) deHoja.set(hoja, elemento.clave);
+      }
+    }
+    const relacion = new Map<string, string>();
+    for (const elemento of fina.elementos.values()) {
+      if (gruesa.elementos.has(elemento.clave)) continue;
+      const votos = new Map<string, number>();
+      for (const hoja of hojasDe(elemento)) {
+        const destino = deHoja.get(hoja);
+        if (destino !== undefined) votos.set(destino, (votos.get(destino) ?? 0) + 1);
+      }
+      const ganador = masVotado(votos);
+      if (ganador !== undefined) relacion.set(elemento.clave, ganador);
+    }
+    return relacion;
+  };
+
   const transicion = (antes: Escena, despues: Escena): Transicion => {
     if (antes.nivel === despues.nivel || !propias.has(antes) || !propias.has(despues)) {
       return SIN_TRANSICION;
     }
     const alejar = despues.nivel < antes.nivel;
     const [fina, gruesa] = alejar ? [antes, despues] : [despues, antes];
+    if (esDeBarrios(fina.nivel) || esDeBarrios(gruesa.nivel)) {
+      const relacion = relacionPorHojas(fina, gruesa);
+      return alejar
+        ? { destino: relacion, origen: SIN_TRANSICION.origen }
+        : { destino: SIN_TRANSICION.destino, origen: relacion };
+    }
     const relacion = new Map<string, string>();
     const tope = { pasos: TOPE_DE_PASOS };
     for (const elemento of gruesa.elementos.values()) {
@@ -227,21 +369,21 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
       : { destino: SIN_TRANSICION.destino, origen: relacion };
   };
 
-  const zoomDeApertura = (agrupacion: ElementoAgrupacion): number => {
-    const id = idDeClave(agrupacion.clave);
-    return id === undefined
-      ? NIVEL_MAXIMO + 1
-      : Math.min(indice.getClusterExpansionZoom(id), NIVEL_MAXIMO + 1);
+  const zoomDeApertura = (elemento: ElementoAbrible): number => {
+    if (elemento.tipo === "barrio") return NIVEL_DE_BARRIOS + 1;
+    const id = idDeClave(elemento.clave);
+    const idFuera = idConPrefijo(elemento.clave, PREFIJO_AGRUPACION_FUERA);
+    const expansion =
+      id === undefined
+        ? idFuera === undefined
+          ? NIVEL_MAXIMO + 1
+          : fuera.getClusterExpansionZoom(idFuera)
+        : indice.getClusterExpansionZoom(id);
+    return Math.min(expansion, NIVEL_MAXIMO + 1);
   };
 
-  const emplazamientosDe = (elemento: Elemento): ReadonlyArray<EmplazamientoDeCapa> => {
-    if (elemento.tipo === "emplazamiento") return [elemento.emplazamiento];
-    const id = idDeClave(elemento.clave);
-    if (id === undefined) return [];
-    return indice
-      .getLeaves(id, Number.POSITIVE_INFINITY)
-      .flatMap((hoja) => emplazamientos[hoja.properties.indice] ?? []);
-  };
+  const emplazamientosDe = (elemento: Elemento): ReadonlyArray<EmplazamientoLeido> =>
+    hojasDe(elemento).flatMap((i) => emplazamientos[i] ?? []);
 
   return { escena, transicion, zoomDeApertura, emplazamientosDe };
 };

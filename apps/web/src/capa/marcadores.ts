@@ -1,6 +1,9 @@
 import type { Rectangulo } from "@celda/dominio/area";
+import type { ResumenDeBarrio } from "@celda/dominio/barrio";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { textoDeAusencias } from "@celda/ui/marcadores/Ausencias.tsx";
+import { textoDeEmplazamientos } from "@celda/ui/marcadores/MarcadorBarrio.tsx";
 
 /** Lo que enseña el mapa en un momento: dónde mira y a qué zoom. */
 export interface Vista {
@@ -43,6 +46,20 @@ export const nombreDeMarcador = (emplazamiento: EmplazamientoDeCapa): string => 
  * por el número, que es lo que se ve.
  */
 export const nombreDeAgrupacion = (cuantos: number): string => `${cuantos} emplazamientos, acercar`;
+
+/**
+ * Nombre accesible de un barrio: lo que dice su etiqueta, en el mismo orden, y qué hace al
+ * pulsarlo. «la Clota, 1 emplazamiento, sin Vodafone, Orange ni Digi, acercar».
+ */
+export const nombreDeBarrio = (resumen: ResumenDeBarrio): string =>
+  [
+    resumen.barrio.nombre,
+    textoDeEmplazamientos(resumen.emplazamientos),
+    textoDeAusencias(resumen.ausentes),
+    "acercar",
+  ]
+    .filter((parte) => parte !== "")
+    .join(", ");
 
 /** Las combinaciones distintas de compañías de la capa, cada una una vez: un logo por cada una. */
 export const combinacionesDe = (

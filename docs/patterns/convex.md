@@ -67,7 +67,7 @@ La web no lee los emplazamientos de Convex: descarga una capa estática (ADR 000
 
 1. Lee `datos:version` y la instantánea con `capas:instantanea`, por páginas de 250 emplazamientos con sus compañías.
 2. Vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
-3. Escribe `sitios@<fecha>.json` en la carpeta del origen. La fecha es la de la versión de los datos, al segundo. Si el fichero ya existe con el mismo contenido no hace nada; si existe con otro, falla (`CapaInmutable`) y no toca nada.
+3. Pone a cada emplazamiento su barrio con los límites de `tools/capas/datos/barrios.json` y escribe `sitios@<fecha>.json` en la carpeta del origen. La fecha es la de la versión de los datos, al segundo. Si el fichero ya existe con el mismo contenido no hace nada; si existe con otro, falla (`CapaInmutable`) y no toca nada.
 4. Registra la versión y su URL con `capas:registrar`. La consulta pública `capas:vigente` devuelve la de la instantánea más reciente.
 
 `capas:instantanea` y `capas:registrar` son internas: el generador las llama por la API HTTP de Convex con la clave de administración. En local, desde `tools/capas`:
@@ -76,6 +76,8 @@ La web no lee los emplazamientos de Convex: descarga una capa estática (ADR 000
 pnpm run publicar:local   # construye, lee la URL y la clave del backend local y publica
 pnpm run servir           # sirve la carpeta salida/ en http://127.0.0.1:8852, déjalo abierto
 ```
+
+Los límites de barrio se descargan de Open Data BCN con `pnpm run barrios`, también desde `tools/capas`. Son dos peticiones con 10 s entre ellas; hazlo solo cuando el Ayuntamiento publique límites nuevos y revisa el diff de `datos/barrios.json` antes del commit. `CELDA_BARRIOS` cambia la ruta del fichero. Por qué se guardan en git y no van en la ingesta: ADR 0004.
 
 Para otro despliegue, `pnpm run publicar` con `CELDA_CONVEX_URL`, `CELDA_CONVEX_CLAVE_ADMIN`, `CELDA_CAPAS_ORIGEN` (la URL desde la que la web descargará los ficheros) y `CELDA_CAPAS_CARPETA`. `servir` escucha en el puerto de `CELDA_CAPAS_ORIGEN`. La web lee la URL de Convex de `VITE_CONVEX_URL`; `apps/web/.env.development` apunta al puerto 3240, y en otro puerto se pasa en el entorno: `VITE_CONVEX_URL=http://127.0.0.1:3250 pnpm run dev`.
 

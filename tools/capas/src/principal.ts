@@ -13,13 +13,16 @@ import * as NodeHttp from "node:http";
 
 import { almacenEnCarpeta } from "./almacen.ts";
 import { convexPorHttp } from "./convex.ts";
+import { descargarBarrios, leerLimites } from "./descarga.ts";
 
 /**
- * Generador de capas. Dos órdenes:
+ * Generador de capas. Tres órdenes:
  *
- * - `publicar`: lee la instantánea de Convex, escribe la capa en la carpeta del origen y la
- *   registra en Convex como vigente.
+ * - `publicar`: lee la instantánea de Convex, le pone a cada emplazamiento su barrio con los
+ *   límites guardados, escribe la capa en la carpeta del origen y la registra en Convex como
+ *   vigente.
  * - `servir`: sirve esa carpeta como origen estático local, con las cabeceras de la CDN.
+ * - `barrios`: descarga de Open Data BCN los límites de barrio y los guarda en el repositorio.
  */
 
 /** Dónde se publican las capas. El origen es la URL con la que la web las descarga. */
@@ -27,6 +30,9 @@ const configCapas = Config.all({
   origen: Config.String("CELDA_CAPAS_ORIGEN").pipe(Config.withDefault("http://127.0.0.1:8852")),
   carpeta: Config.String("CELDA_CAPAS_CARPETA").pipe(Config.withDefault("salida")),
 });
+
+/** Los límites de barrio que usa `publicar` y que escribe `barrios`, guardados en git. */
+const configBarrios = Config.String("CELDA_BARRIOS").pipe(Config.withDefault("datos/barrios.json"));
 
 const configConvex = Config.all({
   url: Config.String("CELDA_CONVEX_URL"),
@@ -36,7 +42,8 @@ const configConvex = Config.all({
 const publicar = Effect.gen(function* () {
   const capas = yield* configCapas;
   const convex = yield* configConvex;
-  const publicada = yield* publicarCapa().pipe(
+  const limites = yield* leerLimites(yield* configBarrios);
+  const publicada = yield* publicarCapa(limites).pipe(
     // Punto de entrada de la orden: aquí se montan sus capas, una vez.
     // @effect-diagnostics-next-line strictEffectProvide:off
     Effect.provide(
@@ -71,11 +78,23 @@ const servir = Effect.gen(function* () {
   );
 });
 
+const barrios = Effect.gen(function* () {
+  const destino = yield* configBarrios;
+  const limites = yield* descargarBarrios(destino).pipe(
+    // Punto de entrada de la orden: aquí se monta su cliente HTTP, una vez.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    Effect.provide(FetchHttpClient.layer),
+  );
+  yield* Effect.log(
+    `${limites.barrios.length} barrios con fecha ${limites.fuente.fecha} escritos en ${destino}`,
+  );
+});
+
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «publicar» o «servir».`;
+    return `Orden desconocida «${this.orden}». Usa «publicar», «servir» o «barrios».`;
   }
 }
 
@@ -83,6 +102,7 @@ const principal = Effect.gen(function* () {
   const orden = process.argv[2] ?? "";
   if (orden === "publicar") return yield* publicar;
   if (orden === "servir") return yield* servir;
+  if (orden === "barrios") return yield* barrios;
   return yield* new OrdenDesconocida({ orden });
 });
 

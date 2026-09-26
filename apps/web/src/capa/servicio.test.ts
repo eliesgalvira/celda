@@ -17,6 +17,7 @@ import * as Ref from "effect/Ref";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
+import { LIMITES_DE_PRUEBA } from "./pruebas.ts";
 import { capaEnVivo, CapaEmplazamientos, type FalloCapa } from "./servicio.ts";
 
 const CONVEX = "http://convex.prueba";
@@ -29,8 +30,8 @@ const CAMPUS_NORD: EmplazamientoDeCapa = {
   estado: "verificado",
   companias: ["movistar", "vodafone", "orange"],
 };
-const PUBLICADA = generarCapa(NOCHE, [CAMPUS_NORD]);
-const ANTERIOR = generarCapa(NOCHE - 86_400_000, [CAMPUS_NORD]);
+const PUBLICADA = generarCapa(NOCHE, [CAMPUS_NORD], LIMITES_DE_PRUEBA);
+const ANTERIOR = generarCapa(NOCHE - 86_400_000, [CAMPUS_NORD], LIMITES_DE_PRUEBA);
 
 interface Respuesta {
   readonly estado: number;
@@ -102,7 +103,11 @@ describe("carga de la capa de emplazamientos", () => {
       assert.strictEqual(salida._tag, "Success");
       if (salida._tag === "Success") {
         assert.strictEqual(salida.value.version, PUBLICADA.version);
-        assert.deepStrictEqual(salida.value.emplazamientos, [CAMPUS_NORD]);
+        assert.deepStrictEqual(salida.value.emplazamientos, [{ ...CAMPUS_NORD, barrio: "21" }]);
+        assert.deepStrictEqual(
+          salida.value.barrios.map((b) => b.nombre),
+          ["Pedralbes"],
+        );
       }
     }),
   );

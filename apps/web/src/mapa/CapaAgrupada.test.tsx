@@ -1,10 +1,11 @@
 import type { Coordenada, Rectangulo } from "@celda/dominio/area";
-import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
+import type { Barrio } from "@celda/dominio/barrio";
+import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 
-import { crearAgrupador, type ElementoAgrupacion } from "../capa/agrupacion.ts";
+import { crearAgrupador, type ElementoAbrible, NIVEL_DE_BARRIOS } from "../capa/agrupacion.ts";
 import { combinacionesDe } from "../capa/marcadores.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
 
@@ -13,25 +14,34 @@ const MUNDO: Rectangulo = {
   noreste: { longitud: 180, latitud: 85 },
 };
 
-const EMPLAZAMIENTOS: ReadonlyArray<EmplazamientoDeCapa> = [
+// A y B caen en el barrio de Sant Antoni; C, en el Poblenou. Digi solo está en C.
+const EMPLAZAMIENTOS: ReadonlyArray<EmplazamientoLeido> = [
   {
     clave: "a",
     posicion: { longitud: 2.16, latitud: 41.39 },
     estado: "verificado",
     companias: ["movistar"],
+    barrio: "10",
   },
   {
     clave: "b",
     posicion: { longitud: 2.16024, latitud: 41.39 },
     estado: "corregido",
     companias: ["vodafone", "orange"],
+    barrio: "10",
   },
   {
     clave: "c",
     posicion: { longitud: 2.18, latitud: 41.39 },
     estado: "verificado",
     companias: ["digi"],
+    barrio: "68",
   },
+];
+
+const BARRIOS: ReadonlyArray<Barrio> = [
+  { codigo: "10", nombre: "Sant Antoni", etiqueta: { longitud: 2.161, latitud: 41.391 } },
+  { codigo: "68", nombre: "el Poblenou", etiqueta: { longitud: 2.181, latitud: 41.391 } },
 ];
 
 /** Una proyección lineal cualquiera: basta con que dé píxeles distintos a sitios distintos. */
@@ -40,11 +50,11 @@ const proyectar = (posicion: Coordenada) => ({
   y: (41.4 - posicion.latitud) * 10_000,
 });
 
-const montar = (reducido: boolean, seleccionada: string | null = null) => {
-  const agrupador = crearAgrupador(EMPLAZAMIENTOS);
+const montar = (reducido: boolean, seleccionada: string | null = null, barrios = false) => {
+  const agrupador = crearAgrupador(EMPLAZAMIENTOS, barrios ? BARRIOS : []);
   const [nivel, setNivel] = createSignal(17);
   const elegidos: Array<string> = [];
-  const abiertas: Array<ElementoAgrupacion> = [];
+  const abiertas: Array<ElementoAbrible> = [];
   const contenedor = document.createElement("div");
   document.body.append(contenedor);
   render(() => (
@@ -57,6 +67,7 @@ const montar = (reducido: boolean, seleccionada: string | null = null) => {
       seVe={() => true}
       fotograma={0}
       movimientoReducido={reducido}
+      formas={new Map()}
       seleccionada={seleccionada}
       alSeleccionar={(clave) => elegidos.push(clave)}
       alAbrir={(agrupacion) => abiertas.push(agrupacion)}
@@ -96,7 +107,8 @@ describe("capa agrupada", () => {
 
     fireEvent.click(hexagono);
     assert.lengthOf(abiertas, 1);
-    assert.strictEqual(abiertas[0]?.cuantos, 3);
+    const abierta = abiertas[0];
+    assert.strictEqual(abierta?.tipo === "agrupacion" ? abierta.cuantos : 0, 3);
 
     // Al acercar de nuevo vuelven a ser pulsables.
     setNivel(17);
@@ -132,5 +144,37 @@ describe("capa agrupada", () => {
 
     assert.lengthOf(lamina.getAllByRole("button"), 1);
     lamina.getByRole("button", { name: "3 emplazamientos, acercar" });
+  });
+
+  it("en el nivel de barrios, cada barrio dice su nombre, su número y sus ausencias", () => {
+    const { setNivel, lamina, pulsables, abiertas } = montar(false, null, true);
+    setNivel(NIVEL_DE_BARRIOS);
+    flush();
+
+    const santAntoni = lamina.getByRole("button", {
+      name: "Sant Antoni, 2 emplazamientos, sin Digi, acercar",
+    });
+    const poblenou = lamina.getByRole("button", {
+      name: "el Poblenou, 1 emplazamiento, sin Movistar, Vodafone ni Orange, acercar",
+    });
+    assert.sameMembers(pulsables(), [santAntoni, poblenou]);
+    // Los emplazamientos siguen en el DOM mientras se deslizan hacia su barrio.
+    assert.lengthOf(lamina.getAllByRole("button", { name: /^Emplazamiento/u }), 3);
+
+    fireEvent.click(santAntoni);
+    assert.strictEqual(abiertas[0]?.tipo, "barrio");
+
+    // Al acercar, los emplazamientos salen de su barrio.
+    setNivel(17);
+    flush();
+    assert.lengthOf(pulsables(), 3);
+  });
+
+  it("con la preferencia de reducir movimiento, los barrios aparecen de golpe", () => {
+    const { setNivel, lamina } = montar(true, null, true);
+    setNivel(NIVEL_DE_BARRIOS);
+    flush();
+    assert.lengthOf(lamina.getAllByRole("button"), 2);
+    assert.isTrue(lamina.getAllByRole("button").every((b) => b.hasAttribute("data-forma")));
   });
 });

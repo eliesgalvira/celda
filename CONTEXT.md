@@ -38,8 +38,12 @@ _Evitar_: celda servidora, sector servidor, mi antena
 Hexágono con un número que recoge los emplazamientos cercanos cuando se aleja el mapa.
 _Evitar_: cluster, grupo, hexágono
 
+**Barrio**:
+Uno de los 73 barrios de Barcelona, con los límites que publica el Ayuntamiento. En el nivel de barrios del mapa, cada uno recoge sus emplazamientos con su número y sus ausencias. Los municipios de alrededor no tienen barrios.
+_Evitar_: zona, vecindario, distrito
+
 **Ausencia**:
-Compañía que no tiene ningún emplazamiento en un barrio.
+Compañía que no tiene ningún emplazamiento en un barrio. Solo cuenta si la compañía tiene algún emplazamiento en la capa: de una que no aparece en ninguna parte no se dice que falte en un barrio.
 _Evitar_: hueco, falta de cobertura
 
 ### Procedencia de los datos
@@ -206,6 +210,7 @@ _Evitar_: modo asignatura, modo práctica
 
 - Un **emplazamiento** tiene una o varias **estaciones base**, como mucho una por **compañía**.
 - Una **estación base** emite en una o varias **bandas** y reparte su señal en **sectores**, normalmente tres.
+- Un **emplazamiento** de Barcelona cae en un solo **barrio**; uno de otro municipio, en ninguno.
 - Cada **emplazamiento** tiene una **celda**. Con un **punto de referencia**, la celda se divide en sectores y uno de ellos es el **sector que da servicio**.
 - Una **fuente** produce **observaciones** en cada **ejecución de ingesta**. Una **corrección** es una observación.
 - La **fusión** convierte observaciones en **emplazamientos**, con su **confianza**, sus **conflictos** y su **estado**.

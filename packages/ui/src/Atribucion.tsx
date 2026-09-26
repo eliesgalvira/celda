@@ -3,6 +3,8 @@ import { For } from "solid-js";
 export interface Credito {
   readonly texto: string;
   readonly enlace: string;
+  /** Qué datos son, para quien pasa el puntero o usa un lector de pantalla. */
+  readonly detalle?: string;
 }
 
 export interface AtribucionProps {
@@ -17,6 +19,7 @@ export function Atribucion(props: AtribucionProps) {
         {(credito) => (
           <a
             href={credito.enlace}
+            title={credito.detalle}
             target="_blank"
             rel="noreferrer"
             class="inline-flex min-h-6 items-center underline-offset-2 hover:text-primario-texto hover:underline"

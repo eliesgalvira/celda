@@ -3,7 +3,8 @@ import { textoPlano } from "@celda/dominio/glosario";
 import { assert, describe, it } from "@effect/vitest";
 import * as Exit from "effect/Exit";
 
-import { estadoDeCarga, textoDatosDelMapa } from "./estado.ts";
+import { creditoDeBarrios, estadoDeCarga, textoDatosDelMapa } from "./estado.ts";
+import { FUENTE_DE_BARRIOS } from "./pruebas.ts";
 import {
   BackendNoResponde,
   CapaNoDescargada,
@@ -11,7 +12,13 @@ import {
   SinCapaPublicada,
 } from "./servicio.ts";
 
-const CAPA: CapaLeida = { version: "sitios@2026-09-25T23:44:53Z", fecha: 0, emplazamientos: [] };
+const CAPA: CapaLeida = {
+  version: "sitios@2026-09-25T23:44:53Z",
+  fecha: 0,
+  emplazamientos: [],
+  barrios: [],
+  fuenteDeBarrios: FUENTE_DE_BARRIOS,
+};
 
 describe("estado de la capa", () => {
   it("cada fallo de la carga tiene su motivo, y un defecto es un error interno", () => {
@@ -32,6 +39,14 @@ describe("estado de la capa", () => {
       "danada",
     );
     assert.strictEqual(motivo(Exit.die("se ha roto")), "interno");
+  });
+
+  it("el crédito de los límites de barrio lleva su autor, su fecha y su licencia", () => {
+    assert.deepStrictEqual(creditoDeBarrios(FUENTE_DE_BARRIOS), {
+      texto: "Ajuntament de Barcelona (nov 2024, CC BY 4.0)",
+      enlace: FUENTE_DE_BARRIOS.enlace,
+      detalle: "Límites de barrio de Open Data BCN, datos del 12 nov 2024",
+    });
   });
 
   it("la fecha de los datos es la de Barcelona, no la de UTC", () => {

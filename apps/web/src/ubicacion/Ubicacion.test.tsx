@@ -9,7 +9,7 @@ import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
-import { capaDePrueba } from "../capa/pruebas.ts";
+import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { terminosSubrayados } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
@@ -56,8 +56,11 @@ const CAPA: CapaLeida = {
       posicion: CAMPUS_NORD.posicion,
       estado: "verificado",
       companias: ["movistar"],
+      barrio: null,
     },
   ],
+  barrios: [],
+  fuenteDeBarrios: FUENTE_DE_BARRIOS,
 };
 
 // Unos 340 m al suroeste del emplazamiento.

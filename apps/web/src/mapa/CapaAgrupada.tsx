@@ -1,6 +1,7 @@
 import type { Compania } from "@celda/dominio/compania";
 import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { MarcadorAgrupacion } from "@celda/ui/marcadores/MarcadorAgrupacion.tsx";
+import { type FormaDeBarrio, MarcadorBarrio } from "@celda/ui/marcadores/MarcadorBarrio.tsx";
 import {
   CapaDeMarcadores,
   MarcadorEmplazamiento,
@@ -8,12 +9,12 @@ import {
 import { createEffect, createMemo, createSignal, For, Match, onSettled, Switch } from "solid-js";
 
 import {
-  type ElementoAgrupacion,
+  type ElementoAbrible,
   type Escena,
   SIN_TRANSICION,
   type Transicion,
 } from "../capa/agrupacion.ts";
-import { nombreDeAgrupacion, nombreDeMarcador } from "../capa/marcadores.ts";
+import { nombreDeAgrupacion, nombreDeBarrio, nombreDeMarcador } from "../capa/marcadores.ts";
 import {
   type Pintado,
   type Proyectar,
@@ -36,18 +37,21 @@ export interface CapaAgrupadaProps {
   readonly fotograma: number;
   /** La preferencia de reducir movimiento: sin transiciones. */
   readonly movimientoReducido: boolean;
+  /** Qué forma toma la etiqueta de cada barrio; la que no esté aquí va completa. */
+  readonly formas: ReadonlyMap<string, FormaDeBarrio>;
   /** Clave del emplazamiento con la ficha abierta: su marcador se resalta. */
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento: se abre su ficha. */
   readonly alSeleccionar: (clave: string) => void;
-  /** Se ha pulsado una agrupación: hay que acercar el mapa a su zona. */
-  readonly alAbrir: (agrupacion: ElementoAgrupacion) => void;
+  /** Se ha pulsado una agrupación o un barrio: hay que acercar el mapa a su zona. */
+  readonly alAbrir: (elemento: ElementoAbrible) => void;
 }
 
 /**
- * Los marcadores de la escena: logos para los emplazamientos sueltos y hexágonos con número para
- * las agrupaciones. Al alejar, cada marcador que se agrupa se desliza hacia su hexágono; al
- * acercar, sale de él. Lo que se va sigue en el DOM mientras dura la transición y luego se quita.
+ * Los marcadores de la escena: logos para los emplazamientos sueltos, hexágonos con número para
+ * las agrupaciones y etiquetas para los barrios. Al alejar, cada marcador que se agrupa se desliza
+ * hacia su hexágono o su barrio; al acercar, sale de él. Lo que se va sigue en el DOM mientras
+ * dura la transición y luego se quita.
  */
 export function CapaAgrupada(props: CapaAgrupadaProps) {
   const [pintados, setPintados] = createSignal<ReadonlyArray<Pintado>>([]);
@@ -109,9 +113,10 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
             pintado={pintado()}
             fotograma={props.fotograma}
             proyectar={props.proyectar}
+            formas={props.formas}
             seleccionada={props.seleccionada}
             alSeleccionar={(clave) => props.alSeleccionar(clave)}
-            alAbrir={(agrupacion) => props.alAbrir(agrupacion)}
+            alAbrir={(elemento) => props.alAbrir(elemento)}
           />
         )}
       </For>
@@ -123,9 +128,10 @@ function MarcadorPintado(props: {
   readonly pintado: Pintado;
   readonly fotograma: number;
   readonly proyectar: Proyectar;
+  readonly formas: ReadonlyMap<string, FormaDeBarrio>;
   readonly seleccionada: string | null;
   readonly alSeleccionar: (clave: string) => void;
-  readonly alAbrir: (agrupacion: ElementoAgrupacion) => void;
+  readonly alAbrir: (elemento: ElementoAbrible) => void;
 }) {
   const punto = createMemo(() => {
     // La proyección cambia con cada fotograma aunque no lo lea.
@@ -140,7 +146,10 @@ function MarcadorPintado(props: {
     const elemento = props.pintado.elemento;
     return elemento.tipo === "agrupacion" ? elemento : undefined;
   };
-  // Las agrupaciones por barrio (ticket 14) serán otro `Match`.
+  const barrio = () => {
+    const elemento = props.pintado.elemento;
+    return elemento.tipo === "barrio" ? elemento : undefined;
+  };
   return (
     <Switch>
       <Match when={emplazamiento()}>
@@ -166,6 +175,21 @@ function MarcadorPintado(props: {
             nombre={nombreDeAgrupacion(agrupada().cuantos)}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(agrupada())}
+          />
+        )}
+      </Match>
+      <Match when={barrio()}>
+        {(elegido) => (
+          <MarcadorBarrio
+            x={punto().x}
+            y={punto().y}
+            forma={props.formas.get(elegido().clave) ?? "completa"}
+            barrio={elegido().resumen.barrio.nombre}
+            emplazamientos={elegido().resumen.emplazamientos}
+            ausentes={elegido().resumen.ausentes}
+            nombre={nombreDeBarrio(elegido().resumen)}
+            movimiento={props.pintado.movimiento}
+            onClick={() => props.alAbrir(elegido())}
           />
         )}
       </Match>

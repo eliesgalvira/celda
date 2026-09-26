@@ -1,5 +1,6 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
+import type { LimitesDeBarrios } from "@celda/dominio/barrio";
 import { leerCapa } from "@celda/dominio/capa";
 import { capaGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
 import { MutationRunner, QueryRunner } from "@confect/server";
@@ -20,6 +21,33 @@ import * as TestConfect from "./TestConfect";
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
 const ORIGEN = "http://capas.prueba";
+
+/** Un barrio que recoge la mitad oeste de la muestra del Campus Nord, al oeste de 2,115°. */
+const LIMITES: LimitesDeBarrios = {
+  fuente: {
+    atribucion: "Ajuntament de Barcelona",
+    licencia: "CC BY 4.0",
+    enlace: "https://opendata-ajuntament.barcelona.cat/data/es/dataset/20170706-districtes-barris",
+    fecha: "2024-11-12",
+  },
+  barrios: [
+    {
+      codigo: "21",
+      nombre: "Pedralbes",
+      etiqueta: { longitud: 2.1, latitud: 41.39 },
+      poligonos: [
+        [
+          [
+            [2, 41],
+            [2.115, 41],
+            [2.115, 42],
+            [2, 42],
+          ],
+        ],
+      ],
+    },
+  ],
+};
 
 /** Un almacén en memoria que se comporta como el de ficheros: no pisa un fichero distinto. */
 const almacenEnMemoria = (ficheros: Ref.Ref<ReadonlyMap<string, string>>) =>
@@ -46,7 +74,7 @@ const almacenEnMemoria = (ficheros: Ref.Ref<ReadonlyMap<string, string>>) =>
 const publicar = (ficheros: Ref.Ref<ReadonlyMap<string, string>>) =>
   Effect.gen(function* () {
     const convex = yield* TestConfect.TestConfect;
-    return yield* publicarCapa().pipe(
+    return yield* publicarCapa(LIMITES).pipe(
       Effect.provide(
         Layer.mergeAll(
           almacenEnMemoria(ficheros),
@@ -97,7 +125,7 @@ describe("capa de emplazamientos (API de Convex en memoria)", () => {
         );
 
         // El fichero guardado es esa versión y lleva todos los emplazamientos, con todas las
-        // compañías de los compartidos.
+        // compañías de los compartidos y el barrio de los que caen en uno.
         const contenido = (yield* Ref.get(ficheros)).get("sitios@2026-09-26T02:15:00Z.json") ?? "";
         const leida = leerCapa(contenido, publicada.version);
         assert.isTrue(Result.isSuccess(leida));
@@ -105,6 +133,12 @@ describe("capa de emplazamientos (API de Convex en memoria)", () => {
         assert.strictEqual(leida.success.emplazamientos.length, publicada.emplazamientos);
         const campusNord = leida.success.emplazamientos.find((e) => e.clave === "movistar-0802532");
         assert.deepStrictEqual(campusNord?.companias, ["movistar", "vodafone", "orange"]);
+        for (const e of leida.success.emplazamientos) {
+          assert.strictEqual(e.barrio, e.posicion.longitud < 2.115 ? "21" : null, e.clave);
+        }
+        const barrios = new Set(leida.success.emplazamientos.map((e) => e.barrio));
+        assert.isTrue(barrios.has("21") && barrios.has(null), "la muestra cae a los dos lados");
+        assert.deepStrictEqual(leida.success.fuenteDeBarrios, LIMITES.fuente);
       }),
     ),
   );

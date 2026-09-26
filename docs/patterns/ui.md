@@ -50,9 +50,20 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Los dos marcadores aceptan `movimiento` (`marcadores/Deslizable.tsx`). Con `entra`, el marcador sale de su agrupación anterior o crece en su sitio. Con `sale`, se desliza hacia la agrupación que lo recoge o se apaga en su sitio, y queda `inert` hasta que la pantalla lo quita. El logo usa la utilidad `deslizar` y el hexágono `brotar`, las dos en `tema.css`, con la curva del prototipo.
 - El punto de partida de la entrada va en `@starting-style` (la variante `starting:` de Tailwind) con variables CSS por marcador. El navegador lo aplica al insertar el nodo, así que no hace falta esperar un fotograma para lanzar la transición.
 - Con la preferencia de reducir movimiento, `motion-reduce:transition-none` quita las transiciones y la web no deja nada saliendo: el cambio es directo.
-- Qué se agrupa y hacia dónde va cada marcador lo decide la web (`apps/web/src/capa/agrupacion.ts` y `pintados.ts`), con pruebas de funciones puras. La librería solo dibuja el `movimiento` que recibe. Las escenas y las transiciones no dependen de supercluster: las agrupaciones por barrio del ticket 14 serán otro tipo de elemento, con otro nivel por debajo de cierto zoom, y otro `Match` en `CapaAgrupada`.
+- Qué se agrupa y hacia dónde va cada marcador lo decide la web (`apps/web/src/capa/agrupacion.ts` y `pintados.ts`), con pruebas de funciones puras. La librería solo dibuja el `movimiento` que recibe.
 - Rendimiento medido en Chromium con GPU (Vulkan) y la CPU a ×4, con los 1318 emplazamientos: 55 fps al cruzar un nivel cada medio segundo y 59 con la rueda en una ventana de 390 px; 34 a 40 fps en una de 1400 px. Lo caro es el estilo de los nodos que aparecen al cambiar de nivel, no el JavaScript. Por eso solo se anima lo que se ve y el radio de agrupación es de 60 px: con 48 había un tercio más de nodos y el móvil bajaba a 51 fps.
 - `DatosDelMapa` es la marca de agua del mapa: la fecha de la capa, o que se está cargando. Tiene ancho fijo en `rem`; con `ch` Chromium medía otra fuente y cortaba la fecha.
+
+## Barrios y ausencias
+
+- En el nivel 13 (zoom de 13 a 14) los emplazamientos de Barcelona se recogen por barrio (`NIVEL_DE_BARRIOS` en `agrupacion.ts`). Más lejos no caben las 73 etiquetas y las agrupaciones del nivel 12 ya son más grandes que un barrio; más cerca, las del 14 son más pequeñas. Así cada paso al alejar recoge lo del anterior. Los emplazamientos de fuera del municipio siguen en hexágonos.
+- Al entrar o salir de ese nivel no hay jerarquía de supercluster: cada elemento va al que se queda con la mayoría de sus emplazamientos. Un barrio sin emplazamientos aparece y se apaga en su sitio.
+- `marcadores/MarcadorBarrio.tsx` tiene dos formas. La completa es la del prototipo v8: el nombre en mayúsculas espaciadas con un halo del color del mapa (utilidad `halo`), «N emplazamientos» y la cinta de ausencias. La compacta es un hexágono claro con el número y, si falta alguna compañía, la marca de ausencia. `formasDeBarrios` (`apps/web/src/capa/etiquetas.ts`) las reparte al pararse el mapa: de más a menos emplazamientos, completa si no pisa otra y compacta si no. Nunca esconde un barrio, porque parecería que no tiene emplazamientos. Con los datos de Barcelona, a zoom 13 se pisan algunas compactas en el Eixample; desde 13,5, casi ninguna.
+- `medidaDeBarrio` estima lo que ocupa cada forma a partir de las clases del componente. Si cambias el tamaño de letra o el ancho (`w-38`), cambia también la estimación.
+- `marcadores/Ausencias.tsx` es la cinta «sin» con el logo de cada compañía ausente. El logo va entero, del mismo dibujo que en los marcadores, y la × va en un círculo oscuro en su esquina inferior derecha, fuera del círculo del logo. En el diseño se descartaron los logos tachados y los translúcidos. Para el lector de pantalla, la cinta dice «sin Vodafone ni Digi» en texto oculto y los logos van con `aria-hidden`.
+- Las agrupaciones en hexágono no marcan ausencias; solo los barrios.
+- El mapa base no rotula barrios por debajo del zoom 14 (`estilo.ts`): se pisaban con las etiquetas de Celda.
+- El crédito de los límites de barrio va con los del mapa base. En el móvil los créditos ocupan dos líneas, así que los controles están a `bottom-[4.5rem]`.
 
 ## Panel del emplazamiento
 
