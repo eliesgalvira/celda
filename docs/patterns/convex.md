@@ -89,7 +89,7 @@ Recuento con la descarga del 26/09/2026 y el registro oficial de ese día, en la
 
 La web no lee los emplazamientos de Convex: descarga una capa estática (ADR 0004). `tools/capas` la genera así:
 
-1. Lee `datos:version` y la instantánea con `capas:instantanea`, por páginas de 250 emplazamientos con sus compañías.
+1. Lee `datos:version` y la instantánea con `capas:instantanea`, por páginas de 250 emplazamientos con sus compañías y las bandas conocidas de cada una.
 2. Vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
 3. Pone a cada emplazamiento su barrio con los límites de `tools/capas/datos/barrios.json` y escribe `sitios@<fecha>.json` en la carpeta del origen. La fecha es la de la versión de los datos, al segundo. Si el fichero ya existe con el mismo contenido no hace nada; si existe con otro, falla (`CapaInmutable`) y no toca nada.
 4. Registra la versión y su URL con `capas:registrar`. La consulta pública `capas:vigente` devuelve la de la instantánea más reciente.

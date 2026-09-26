@@ -20,6 +20,11 @@ const PLAZA_PIUS_XII: EmplazamientoDeCapa = {
   estado: "verificado",
   // Desordenadas a propósito: la capa las devuelve en su orden fijo.
   companias: ["vodafone", "orange", "movistar"],
+  // De Orange no se conoce ninguna banda.
+  bandas: [
+    { compania: "vodafone", mhz: [2600] },
+    { compania: "movistar", mhz: [3500, 800, 1800] },
+  ],
 };
 const CAMPUS_NORD: EmplazamientoDeCapa = {
   clave: "orange-CATR0228A",
@@ -32,6 +37,10 @@ const NUEVO: EmplazamientoDeCapa = {
   posicion: { longitud: 2.096728, latitud: 41.36731 },
   estado: "nuevo",
   companias: ["digi", "yoigo"],
+  bandas: [
+    { compania: "yoigo", mhz: [700, 800, 900, 1800, 2100, 2600, 3500] },
+    { compania: "digi", mhz: [700] },
+  ],
 };
 
 /** Un barrio rectangular entre dos esquinas, con la etiqueta en medio. */
@@ -85,7 +94,7 @@ describe("capa de emplazamientos", () => {
     assert.strictEqual(capa.fichero, "sitios@2026-09-26T02:15:03Z.json");
     assert.strictEqual(capa.emplazamientos, 3);
     assert.isTrue(
-      capa.contenido.startsWith('{"version":"sitios@2026-09-26T02:15:03Z","formato":2,'),
+      capa.contenido.startsWith('{"version":"sitios@2026-09-26T02:15:03Z","formato":3,'),
     );
     await expect(`${capa.contenido}\n`).toMatchFileSnapshot("./referencia/capa-tres.json");
   });
@@ -103,7 +112,7 @@ describe("capa de emplazamientos", () => {
     assert.notStrictEqual(siguiente.fichero, una.fichero);
   });
 
-  it("se lee de vuelta con todas las compañías de un emplazamiento compartido y su barrio", () => {
+  it("se lee de vuelta con las compañías de un emplazamiento compartido, sus bandas y su barrio", () => {
     const capa = generarCapa(NOCHE, [PLAZA_PIUS_XII, CAMPUS_NORD, NUEVO], LIMITES);
     const leida = leerCapa(capa.contenido, capa.version);
     assert.isTrue(Result.isSuccess(leida));
@@ -111,11 +120,22 @@ describe("capa de emplazamientos", () => {
     assert.strictEqual(leida.success.version, capa.version);
     assert.strictEqual(leida.success.fecha, Date.UTC(2026, 8, 26, 2, 15, 3));
     assert.deepStrictEqual(leida.success.emplazamientos, [
-      { ...NUEVO, barrio: null },
+      {
+        ...NUEVO,
+        bandas: [
+          { compania: "digi", mhz: [700] },
+          { compania: "yoigo", mhz: [700, 800, 900, 1800, 2100, 2600, 3500] },
+        ],
+        barrio: null,
+      },
       {
         ...PLAZA_PIUS_XII,
         posicion: { longitud: 2.122967, latitud: 41.386032 },
         companias: ["movistar", "vodafone", "orange"],
+        bandas: [
+          { compania: "movistar", mhz: [800, 1800, 3500] },
+          { compania: "vodafone", mhz: [2600] },
+        ],
         barrio: "19",
       },
       { ...CAMPUS_NORD, barrio: "21" },
@@ -136,7 +156,22 @@ describe("capa de emplazamientos", () => {
     assert.strictEqual(otra.contenido, una.contenido);
   });
 
-  it("no da por buena una capa del formato anterior, sin barrios", () => {
+  it("lee una capa del formato 2 sin ninguna banda conocida", () => {
+    const capa = generarCapa(NOCHE, [PLAZA_PIUS_XII, CAMPUS_NORD], LIMITES);
+    const { bandas: _bandas, ...columnas } = JSON.parse(capa.contenido) as Record<string, unknown>;
+    const leida = leerCapa(JSON.stringify({ ...columnas, formato: 2 }), capa.version);
+    assert.isTrue(Result.isSuccess(leida));
+    if (Result.isFailure(leida)) return;
+    assert.deepStrictEqual(
+      leida.success.emplazamientos.map((e) => [e.clave, e.bandas]),
+      [
+        ["movistar-0802532", undefined],
+        ["orange-CATR0228A", undefined],
+      ],
+    );
+  });
+
+  it("no da por buena una capa del formato 1, sin barrios", () => {
     const capa = generarCapa(NOCHE, [PLAZA_PIUS_XII], LIMITES);
     const anterior = JSON.stringify({
       version: capa.version,

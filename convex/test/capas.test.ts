@@ -134,6 +134,12 @@ describe("capa de emplazamientos (API de Convex en memoria)", () => {
         assert.strictEqual(leida.success.emplazamientos.length, publicada.emplazamientos);
         const campusNord = leida.success.emplazamientos.find((e) => e.clave === "movistar-0802532");
         assert.deepStrictEqual(campusNord?.companias, ["movistar", "vodafone", "orange"]);
+        // Las bandas que el registro da a cada estación base, sin repetir las de dos expedientes.
+        // De las compañías cuyas fichas no se han leído no se sabe ninguna y no aparecen.
+        assert.deepStrictEqual(
+          campusNord?.bandas?.find((b) => b.compania === "movistar")?.mhz,
+          [700, 800, 900, 1800, 2100, 2600, 3500],
+        );
         for (const e of leida.success.emplazamientos) {
           assert.strictEqual(e.barrio, e.posicion.longitud < 2.115 ? "21" : null, e.clave);
         }
