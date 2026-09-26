@@ -6,6 +6,7 @@ import { BotonHexagonal } from "@celda/ui/BotonHexagonal.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
+import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import * as Effect from "effect/Effect";
 import type { Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
@@ -15,7 +16,9 @@ import { CapaEmplazamientos } from "../capa/servicio.ts";
 import { usarDatos } from "../datos.tsx";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
-import { emplazamientoDe, navegar, ruta, ubicacion } from "../lib/rutas.ts";
+import { conMedir, emplazamientoDe, medirAbierto, navegar, ruta, ubicacion } from "../lib/rutas.ts";
+import { DialogoMedir } from "../medir/DialogoMedir.tsx";
+import { leerModelo, leerNavegador } from "../medir/navegador.ts";
 import { CREDITOS_MAPA_BASE, type EstadoMapa, hayWebgl, type MotivoFallo } from "./estado.ts";
 import { Marcadores } from "./Marcadores.tsx";
 
@@ -155,6 +158,19 @@ export function PantallaMapa() {
     },
   );
 
+  /** El modelo del móvil, que Chromium da un momento después de pedirlo. */
+  const [modelo, setModelo] = createSignal<string>();
+  onSettled(() => {
+    let vigente = true;
+    void leerModelo().then((leido) => {
+      if (vigente) setModelo(leido);
+    });
+    return () => {
+      vigente = false;
+    };
+  });
+  const midiendo = createMemo(() => medirAbierto(ubicacion()));
+
   const aviso = createMemo(() => {
     const actual = estado();
     return actual.tipo === "listo" ? undefined : (
@@ -163,57 +179,72 @@ export function PantallaMapa() {
   });
 
   return (
-    <DisposicionMapa
-      nombre={`Mapa de ${BARCELONA.nombre}`}
-      ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
-      lienzo={(elemento) => {
-        contenedor = elemento;
-      }}
-      cabecera={<Cabecera lugar={BARCELONA.nombre} />}
-      datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
-      marcadores={
-        <Show when={mapaListo()}>
-          {(actual) => (
-            <Marcadores
-              mapa={actual()}
-              emplazamientos={emplazamientos()}
-              seleccionada={seleccionada()}
-              alSeleccionar={seleccionar}
+    <>
+      <DisposicionMapa
+        nombre={`Mapa de ${BARCELONA.nombre}`}
+        ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
+        lienzo={(elemento) => {
+          contenedor = elemento;
+        }}
+        cabecera={<Cabecera lugar={BARCELONA.nombre} />}
+        datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
+        marcadores={
+          <Show when={mapaListo()}>
+            {(actual) => (
+              <Marcadores
+                mapa={actual()}
+                emplazamientos={emplazamientos()}
+                seleccionada={seleccionada()}
+                alSeleccionar={seleccionar}
+              />
+            )}
+          </Show>
+        }
+        controles={
+          <>
+            <BotonHexagonal
+              etiqueta="Acercar"
+              icono="+"
+              disabled={!listo()}
+              onClick={() => mapa?.zoomIn()}
             />
-          )}
-        </Show>
-      }
-      controles={
-        <>
-          <BotonHexagonal
-            etiqueta="Acercar"
-            icono="+"
-            disabled={!listo()}
-            onClick={() => mapa?.zoomIn()}
-          />
-          <BotonHexagonal
-            etiqueta="Alejar"
-            icono="−"
-            disabled={!listo()}
-            onClick={() => mapa?.zoomOut()}
-          />
-        </>
-      }
-      atribucion={<Atribucion creditos={CREDITOS_MAPA_BASE} />}
-      aviso={aviso()}
-      panelAbierto={seleccionada() !== null}
-      panel={
-        <Show when={seleccionada()}>
-          {(clave) => (
-            <PanelFicha
-              clave={clave()}
-              fechaCapa={fechaCapa()}
-              alCerrar={() => navegar(ruta.mapa)}
+            <BotonHexagonal
+              etiqueta="Alejar"
+              icono="−"
+              disabled={!listo()}
+              onClick={() => mapa?.zoomOut()}
             />
-          )}
-        </Show>
-      }
-    />
+            <BotonHexagonal
+              etiqueta="Medir mi señal"
+              icono={<IconoSenal />}
+              aria-haspopup="dialog"
+              onClick={() => navegar(conMedir(ubicacion(), true))}
+            />
+          </>
+        }
+        atribucion={<Atribucion creditos={CREDITOS_MAPA_BASE} />}
+        aviso={aviso()}
+        panelAbierto={seleccionada() !== null}
+        panel={
+          <Show when={seleccionada()}>
+            {(clave) => (
+              <PanelFicha
+                clave={clave()}
+                fechaCapa={fechaCapa()}
+                alCerrar={() => navegar(ruta.mapa)}
+              />
+            )}
+          </Show>
+        }
+      />
+      <Show when={midiendo()}>
+        <DialogoMedir
+          navegador={{ ...leerNavegador(), modelo: modelo() }}
+          direccionMovil={new URL(ruta.medir, window.location.origin).href}
+          alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+        />
+      </Show>
+    </>
   );
 }
 
