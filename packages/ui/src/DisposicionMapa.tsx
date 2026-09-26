@@ -19,6 +19,13 @@ export interface DisposicionMapaProps {
   readonly atribucion: JSX.Element;
   /** Lo que se superpone al mapa mientras carga o si falla. */
   readonly aviso?: JSX.Element;
+  /** El panel del emplazamiento seleccionado, con su propia posición (`PanelEmplazamiento`). */
+  readonly panel?: JSX.Element;
+  /**
+   * Hay un panel abierto: en escritorio los créditos se apartan a su derecha y en el móvil los
+   * controles y los créditos suben por encima del resumen de la hoja.
+   */
+  readonly panelAbierto?: boolean;
 }
 
 /**
@@ -28,7 +35,10 @@ export interface DisposicionMapaProps {
  */
 export function DisposicionMapa(props: DisposicionMapaProps) {
   return (
-    <div class="fixed inset-0 overflow-hidden bg-mapa-fondo font-texto text-tinta">
+    <div
+      data-panel={props.panelAbierto === true ? "" : undefined}
+      class="group/mapa fixed inset-0 overflow-hidden bg-mapa-fondo font-texto text-tinta"
+    >
       <main
         aria-label={props.nombre}
         aria-busy={props.ocupado ? "true" : "false"}
@@ -44,7 +54,7 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
       </div>
 
       <Show when={props.pista} keyed>
-        <div class="pointer-events-none absolute inset-x-0 bottom-14 z-10 flex justify-center px-16 md:bottom-16">
+        <div class="pointer-events-none absolute inset-x-0 bottom-14 z-10 flex justify-center px-16 max-md:group-data-panel/mapa:bottom-[calc(11.75rem+2.5rem)] md:bottom-16">
           {props.pista}
         </div>
       </Show>
@@ -56,13 +66,16 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         </div>
       </Show>
 
-      <div class="absolute right-2 bottom-14 z-10 flex flex-col items-center gap-2 md:right-[18px] md:bottom-16">
+      {/* 11.75rem es el alto del resumen de la hoja (`ALTO_RESUMEN`, 188 px). */}
+      <div class="absolute right-2 bottom-14 z-10 flex flex-col items-center gap-2 max-md:group-data-panel/mapa:bottom-[calc(11.75rem+2.5rem)] md:right-[18px] md:bottom-16">
         {props.controles}
       </div>
 
-      <div class="absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-10 max-w-[calc(100%-1rem)]">
+      <div class="absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-10 max-w-[calc(100%-1rem)] max-md:group-data-panel/mapa:bottom-[calc(11.75rem+0.5rem)] md:group-data-panel/mapa:left-[calc(27rem+0.5rem)]">
         {props.atribucion}
       </div>
+
+      {props.panel}
     </div>
   );
 }

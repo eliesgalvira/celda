@@ -27,6 +27,8 @@ export interface MarcadorEmplazamientoProps {
   readonly estado: Estado;
   /** Nombre accesible: qué compañías emiten allí y, si no está verificado, su estado. */
   readonly nombre: string;
+  /** El emplazamiento cuya ficha está abierta: se resalta y se anuncia como el actual. */
+  readonly seleccionado?: boolean;
   readonly onClick?: JSX.EventHandler<HTMLButtonElement, MouseEvent>;
 }
 
@@ -41,15 +43,24 @@ export function MarcadorEmplazamiento(props: MarcadorEmplazamientoProps) {
       type="button"
       aria-label={props.nombre}
       data-estado={props.estado}
+      aria-current={props.seleccionado === true ? "true" : undefined}
       // `cn` resuelve el choque entre el `relative` de la diana y el `absolute` del marcador.
       class={cn(
         variantesDiana(),
         "pointer-events-auto absolute top-0 left-0 -mt-[22px] -ml-[22px] will-change-transform",
+        props.seleccionado === true && "z-10",
       )}
       style={{ transform: `translate(${props.x.toFixed(1)}px, ${props.y.toFixed(1)}px)` }}
       onClick={(evento) => props.onClick?.(evento)}
     >
-      <span class="relative rounded-full drop-shadow-marcador transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-95 motion-reduce:transition-none">
+      <span
+        class={cn(
+          "relative rounded-full drop-shadow-marcador transition-transform duration-150 ease-out",
+          "group-hover:scale-110 group-active:scale-95 motion-reduce:transition-none",
+          props.seleccionado === true &&
+            "scale-125 ring-3 ring-primario ring-offset-2 ring-offset-superficie group-hover:scale-125",
+        )}
+      >
         <svg width="34" height="34" aria-hidden="true" class="block">
           <use href={`#${idDeLogo(props.companias)}`} />
         </svg>

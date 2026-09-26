@@ -140,6 +140,8 @@
 
   /* Lo que suele durar poco (una carga rápida) no llega a verse: aparece tras medio segundo. */
   --animate-aparecer: aparecer 0.2s ease-out 0.5s both;
+  /* Lo que solo importa si algo tarda mucho, como «tarda más de lo normal». */
+  --animate-aparecer-tarde: aparecer 0.2s ease-out 8s both;
 
   @keyframes aparecer {
     from {

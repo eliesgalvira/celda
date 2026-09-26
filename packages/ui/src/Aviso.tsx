@@ -14,12 +14,24 @@ export const variantesAviso = cva("chaflan flex w-full flex-col gap-2 px-5 py-4 
   defaultVariants: { tono: "espera" },
 });
 
-export type AvisoProps = VariantProps<typeof variantesAviso> & {
-  readonly titulo: string;
-  readonly children?: JSX.Element;
-  /** Botones o enlaces para salir del aviso. */
-  readonly acciones?: JSX.Element;
-};
+/** Dónde va el aviso: flotando sobre el mapa o dentro de un panel, a todo su ancho. */
+export const variantesEncajeAviso = cva("", {
+  variants: {
+    encaje: {
+      flotante: "w-[min(26rem,calc(100vw-2rem))] drop-shadow-panel",
+      panel: "w-full",
+    },
+  },
+  defaultVariants: { encaje: "flotante" },
+});
+
+export type AvisoProps = VariantProps<typeof variantesAviso> &
+  VariantProps<typeof variantesEncajeAviso> & {
+    readonly titulo: string;
+    readonly children?: JSX.Element;
+    /** Botones o enlaces para salir del aviso. */
+    readonly acciones?: JSX.Element;
+  };
 
 /**
  * Un aviso honesto: lo que pasa, en frases claras, en lugar de un hueco vacío.
@@ -27,7 +39,7 @@ export type AvisoProps = VariantProps<typeof variantesAviso> & {
  */
 export function Aviso(props: AvisoProps) {
   return (
-    <div class="w-[min(26rem,calc(100vw-2rem))] drop-shadow-panel">
+    <div class={variantesEncajeAviso({ encaje: props.encaje })}>
       <section
         role={props.tono === "fallo" ? "alert" : "status"}
         data-tono={props.tono ?? "espera"}
