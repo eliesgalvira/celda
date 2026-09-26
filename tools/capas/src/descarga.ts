@@ -13,6 +13,13 @@ import {
   RECURSO,
   RegistroDeBarrio,
 } from "./barrios.ts";
+import {
+  CONJUNTO_PADRON,
+  ENLACE_PADRON,
+  ficheroDePoblacion,
+  poblacionDeOpenData,
+  RECURSO_PADRON,
+} from "./poblacion.ts";
 
 /** Se presenta como Celda, igual que la ingesta, con un contacto. */
 const USER_AGENT = "Celda (generador de capas; contacto en celda.elies.site)";
@@ -107,4 +114,76 @@ export const leerLimites = Effect.fn("Capas.leerLimites")(function* (ruta: strin
   const fs = yield* FileSystem.FileSystem;
   const texto = yield* fs.readFileString(ruta);
   return yield* decodificarLimites(texto);
+});
+
+/** Lo que se usa de `package_show` para el padrón: sus CSV tienen la fecha en `created`. */
+const PaqueteDelPadron = Schema.Struct({
+  success: Schema.Literal(true),
+  result: Schema.Struct({
+    license_id: Schema.String,
+    resources: Schema.Array(
+      Schema.Struct({ name: Schema.String, url: Schema.String, created: Schema.String }),
+    ),
+  }),
+});
+
+/** El padrón del portal no es el que se esperaba: otra licencia, sin CSV o ilegible. */
+export class FuenteDePoblacionCambiada extends Schema.TaggedError<FuenteDePoblacionCambiada>()(
+  "FuenteDePoblacionCambiada",
+  { motivo: Schema.String },
+) {
+  override get message() {
+    return `El padrón de Open Data BCN ha cambiado: ${this.motivo}. Revisa ${ENLACE_PADRON}.`;
+  }
+}
+
+/**
+ * Descarga el padrón más reciente de Open Data BCN, suma los habitantes por barrio y los escribe
+ * en `destino` con el área y el límite simplificado de `limites`. Son dos peticiones con 10 s
+ * entre ellas, como `descargarBarrios`: los metadatos del conjunto y el CSV del último año. La
+ * lanza una persona cuando sale el padrón de un año nuevo, cada primavera.
+ */
+export const descargarPoblacion = Effect.fn("Capas.descargarPoblacion")(function* (
+  destino: string,
+  limites: LimitesDeBarrios,
+) {
+  const http = yield* HttpClient.HttpClient;
+  const fs = yield* FileSystem.FileSystem;
+  const cambiadaPadron = (motivo: string) => new FuenteDePoblacionCambiada({ motivo });
+  const pedir = (url: string) =>
+    http.get(url, { headers: { "user-agent": USER_AGENT } }).pipe(
+      Effect.flatMap(HttpClientResponse.filterStatusOk),
+      Effect.mapError((error) => cambiadaPadron(`${url} no responde bien: ${error.message}`)),
+    );
+
+  const paquete = yield* pedir(
+    `https://opendata-ajuntament.barcelona.cat/data/api/3/action/package_show?id=${CONJUNTO_PADRON}`,
+  ).pipe(
+    Effect.flatMap(HttpClientResponse.schemaBodyJson(PaqueteDelPadron)),
+    Effect.mapError((error) => cambiadaPadron(`los metadatos no se leen: ${error.message}`)),
+  );
+  if (paquete.result.license_id !== LICENCIA_ESPERADA) {
+    return yield* cambiadaPadron(`la licencia es ${paquete.result.license_id}`);
+  }
+  const [recurso] = paquete.result.resources
+    .filter((r) => RECURSO_PADRON.test(r.name))
+    .toSorted((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
+  if (recurso === undefined) return yield* cambiadaPadron("no hay ningún CSV por año");
+  const publicada = recurso.created.slice(0, 10);
+
+  yield* Effect.sleep(PAUSA);
+  const csv = yield* pedir(recurso.url).pipe(
+    Effect.flatMap((respuesta) => respuesta.text),
+    Effect.mapError((error) => cambiadaPadron(`${recurso.name} no se lee: ${error.message}`)),
+  );
+  const poblacion = yield* Effect.fromResult(
+    poblacionDeOpenData(csv, limites, {
+      atribucion: "Ajuntament de Barcelona",
+      licencia: "CC BY 4.0",
+      enlace: ENLACE_PADRON,
+      publicada,
+    }),
+  );
+  yield* fs.writeFileString(destino, ficheroDePoblacion(poblacion));
+  return poblacion;
 });
