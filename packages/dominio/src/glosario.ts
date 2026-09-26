@@ -37,6 +37,9 @@ export const TERMINOS = [
   "radio-de-cobertura",
   "penetracion",
   "cuota-de-lineas",
+  "rumbo",
+  "router-movil",
+  "antena-exterior",
 ] as const;
 
 export type Termino = (typeof TERMINOS)[number];
@@ -316,6 +319,32 @@ export const GLOSARIO: Glosario = {
       "misma empresa y la estadística oficial da sus líneas juntas.",
     tecnico: "cuota de mercado de líneas móviles",
     relacionados: ["penetracion", "compania"],
+  },
+  rumbo: {
+    nombre: "Rumbo",
+    explicacion:
+      "Hacia dónde queda el emplazamiento visto desde el punto, en grados, como en una " +
+      "brújula: 0 es el norte, 90 el este, 180 el sur y 270 el oeste. Sale de las dos " +
+      "posiciones, así que no depende de hacia dónde apunten los sectores.",
+    tecnico: "rumbo o demora (bearing)",
+    relacionados: ["punto-de-referencia", "azimut"],
+  },
+  "router-movil": {
+    nombre: "Router 4G/5G",
+    explicacion:
+      "Un aparato con tarjeta SIM que recibe la señal móvil y la reparte por wifi en casa, " +
+      "en lugar de la fibra. Recibe mejor junto a una ventana que mire hacia el emplazamiento.",
+    tecnico: "router 4G/5G (CPE de interior)",
+    relacionados: ["antena-exterior", "decibelio"],
+  },
+  "antena-exterior": {
+    nombre: "Antena exterior",
+    explicacion:
+      "Una antena que se pone en el balcón o el tejado y se conecta al router 4G/5G. Las " +
+      "direccionales captan sobre todo lo que les llega de frente, así que hay que apuntarlas " +
+      "al emplazamiento.",
+    tecnico: "antena directiva exterior (Yagi o de panel)",
+    relacionados: ["router-movil", "rumbo"],
   },
 };
 
