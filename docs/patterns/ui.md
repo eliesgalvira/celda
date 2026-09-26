@@ -82,6 +82,15 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - `Etiqueta tono="pronto"` marca algo que se enseña pero aún no funciona, como subir una captura. Va siempre con una frase que dice por qué.
 - Qué se enseña en cada dispositivo lo deciden funciones puras de `apps/web/src/medir`: `detectarDispositivo` e `instruccionesPara`, con sus pruebas. Los códigos y sus fuentes están en `packages/dominio/src/modoInformacion.ts` y en [docs/investigacion/modo-de-informacion.md](../investigacion/modo-de-informacion.md).
 
+## Diagrama de radiación
+
+- `panel/DiagramaRadiacion.tsx` es el diagrama polar del prototipo v6: el borde es 0 dB, el centro la atenuación máxima (30 dB), anillos a 0, −10 y −20 dB, marcas cada 30° y N, E, S, O. Siempre lleva `Etiqueta tono="modelo"` con el `id` y la `version` de la simulación, una leyenda por sector y las notas que dicen de dónde salen la forma y la orientación.
+- Es un `<svg role="img">` con `<title>` y `<desc>`: quien no lo ve oye qué sectores hay, hacia dónde y que es un modelo. La leyenda de debajo repite los rumbos en texto.
+- El marco y los lóbulos van por separado. `DiagramaRadiacion` dibuja los ejes y recibe como hijos `LobulosSector` o, mientras el Worker calcula, `CalculandoDiagrama`, que no ocupa nada y avisa a los 0,5 s. Así el sitio del diagrama está reservado desde el principio.
+- `LobulosSector` pinta con trazo discontinuo una orientación supuesta y con trazo continuo una estimada, y con margen dibuja dos radios a ±15° de cada eje. `destacado` rellena un sector con el primario, para el sector que da servicio (ticket 23).
+- Los dB de los anillos se escriben en `rumboLibre`, el centro del hueco más ancho entre sectores, para que no pisen el rumbo de ninguno. Los textos llevan un halo del color del panel.
+- En el mapa no se dibujan lóbulos: se solapaban entre emplazamientos. El diagrama vive en el panel.
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.

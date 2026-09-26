@@ -39,6 +39,8 @@ Vitest en orden aleatorio, con `@effect/vitest` (`it.effect` para lo que devuelv
 
 El backend y la ingesta tienen su propia guía: [docs/patterns/convex.md](docs/patterns/convex.md). Explica cómo arrancar Convex en local, cómo se prueba la API en memoria y qué no hacer contra las fuentes reales.
 
+Las simulaciones también: [docs/patterns/simulaciones.md](docs/patterns/simulaciones.md). Explica la interfaz fija, cómo se añade una sin tocar el resto y cómo se generan sus ficheros de referencia.
+
 ## Herramientas
 
 Qué hace cada herramienta y qué hubo que ajustar para las RC: [docs/patterns/herramientas.md](docs/patterns/herramientas.md). Las versiones se fijan exactas en el catálogo de `pnpm-workspace.yaml` y se suben en commits propios.

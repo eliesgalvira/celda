@@ -2,7 +2,7 @@
 
 Celda es una web que enseña en un mapa las antenas de telefonía móvil de Barcelona: de qué compañía son y cómo llega su señal. Estará en celda.elies.site.
 
-Hoy muestra sobre el mapa de Barcelona los emplazamientos del registro oficial, con los logos de las compañías que emiten en cada uno y la fecha de los datos. El backend recoge cada noche el registro oficial y lo fusiona en emplazamientos, y `tools/capas` publica esa instantánea como una capa estática que la web descarga. El resto llega por partes; el glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
+Hoy muestra sobre el mapa de Barcelona los emplazamientos del registro oficial, con los logos de las compañías que emiten en cada uno y la fecha de los datos. El panel de cada emplazamiento dibuja el diagrama de radiación de sus sectores, un modelo calculado en un Web Worker. El backend recoge cada noche el registro oficial y lo fusiona en emplazamientos, y `tools/capas` publica esa instantánea como una capa estática que la web descarga. El resto llega por partes; el glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
 
 ## Arrancar
 
@@ -37,6 +37,7 @@ apps/web/                 la web, una SPA de Solid 2
 convex/                   backend de Convex con Confect: tablas, ingesta y API pública
 packages/dominio/         tipos y esquemas del dominio y la fusión, sin E/S
 packages/ingesta/         extractores de las fuentes, como servicios Effect
+packages/sim/             simulaciones puras con su versión y sus resultados de referencia
 packages/ui/              componentes y tema: el único sitio con estilos
 tools/capas/              generador de la capa de emplazamientos y origen estático local
 tools/oxlint-plugin-celda reglas de lint propias
