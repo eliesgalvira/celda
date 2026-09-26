@@ -9,13 +9,14 @@ import { createContext, onSettled, untrack, useContext } from "solid-js";
 
 import type { CapaEmplazamientos } from "./capa/servicio.ts";
 import type { FichasEnVivo } from "./ficha/servicio.ts";
+import type { Brujula } from "./mejorar/brujula.ts";
 import type { AlmacenLocal } from "./ubicacion/almacen.ts";
 import type { BuscadorDeDirecciones } from "./ubicacion/buscador.ts";
 import type { Geolocalizacion } from "./ubicacion/geolocalizacion.ts";
 
 /**
- * Los servicios de la interfaz: los datos del mapa, el simulador, el GPS, lo guardado en el
- * dispositivo y el buscador. En las pruebas se sustituyen por capas de prueba, y el simulador, por
+ * Los servicios de la interfaz: los datos del mapa, el simulador, el GPS, la brújula, lo guardado
+ * en el dispositivo y el buscador. En las pruebas se sustituyen por capas de prueba, y el simulador, por
  * el que calcula en el mismo hilo.
  */
 export type ServiciosDeDatos =
@@ -23,6 +24,7 @@ export type ServiciosDeDatos =
   | FichasEnVivo
   | Simulador
   | Geolocalizacion
+  | Brujula
   | AlmacenLocal
   | BuscadorDeDirecciones
   | Crypto.Crypto;

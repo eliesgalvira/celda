@@ -9,6 +9,12 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import { criptoDePrueba } from "../lib/cripto.ts";
+import type { Brujula } from "../mejorar/brujula.ts";
+import {
+  type BrujulaDePrueba,
+  brujulaDePrueba,
+  type OpcionesDeBrujula,
+} from "../mejorar/pruebas.ts";
 import { AlmacenLocal, AlmacenNoDisponible } from "./almacen.ts";
 import type { Direccion } from "./buscador.ts";
 import { BuscadorDeDirecciones, BusquedaFallida } from "./buscador.ts";
@@ -143,28 +149,33 @@ export interface OpcionesDeUbicacion {
   readonly almacenRoto?: boolean;
   readonly ajustes?: Ajustes;
   readonly busquedas?: ReadonlyMap<string, ReadonlyArray<Direccion> | BusquedaFallida>;
+  /** La brújula del dispositivo: por defecto, la de un ordenador, que no tiene. */
+  readonly brujula?: OpcionesDeBrujula;
 }
 
 export interface UbicacionDePrueba {
   readonly capa: Layer.Layer<
-    Geolocalizacion | AlmacenLocal | BuscadorDeDirecciones | Crypto.Crypto
+    Geolocalizacion | Brujula | AlmacenLocal | BuscadorDeDirecciones | Crypto.Crypto
   >;
   readonly gps: GeolocalizacionDePrueba;
+  readonly brujula: BrujulaDePrueba;
   readonly almacen: AlmacenDePrueba;
   readonly buscador: BuscadorDePrueba;
 }
 
 /**
- * Los servicios de la ubicación de prueba para montar la app: por defecto, el navegador aún no ha
- * preguntado por el permiso, no hay nada guardado y el buscador no encuentra nada.
+ * Los servicios del dispositivo de prueba para montar la app: por defecto, el navegador aún no ha
+ * preguntado por el permiso, no hay brújula, no hay nada guardado y el buscador no encuentra nada.
  */
 export const ubicacionDePrueba = (opciones: OpcionesDeUbicacion = {}): UbicacionDePrueba => {
   const gps = geolocalizacionDePrueba(opciones.permiso ?? "preguntar");
   const almacen = almacenDePrueba(opciones.guardadas, opciones.almacenRoto, opciones.ajustes);
   const buscador = buscadorDePrueba(opciones.busquedas ?? new Map());
+  const brujula = brujulaDePrueba(opciones.brujula);
   return {
-    capa: Layer.mergeAll(gps.capa, almacen.capa, buscador.capa, criptoDePrueba),
+    capa: Layer.mergeAll(gps.capa, brujula.capa, almacen.capa, buscador.capa, criptoDePrueba),
     gps,
+    brujula,
     almacen,
     buscador,
   };

@@ -9,6 +9,9 @@ import { App } from "./App.tsx";
 import { capaEnVivo } from "./capa/servicio.ts";
 import { fichasEnVivo } from "./ficha/servicio.ts";
 import { criptoDelNavegador } from "./lib/cripto.ts";
+import { brujulaDelNavegador } from "./mejorar/brujula.ts";
+import { detectarDispositivo } from "./medir/dispositivo.ts";
+import { leerNavegador } from "./medir/navegador.ts";
 import { simuladorDelNavegador } from "./simulacion/navegador.ts";
 import { almacenEnIndexedDb } from "./ubicacion/almacen.ts";
 import { buscadorNominatim } from "./ubicacion/buscador.ts";
@@ -20,6 +23,7 @@ const servicios = Layer.mergeAll(
   fichasEnVivo,
   simuladorDelNavegador,
   geolocalizacionDelNavegador(navigator),
+  brujulaDelNavegador(window, detectarDispositivo(leerNavegador()).tipo),
   almacenEnIndexedDb(globalThis.indexedDB),
   criptoDelNavegador,
 ).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(import.meta.env))));
