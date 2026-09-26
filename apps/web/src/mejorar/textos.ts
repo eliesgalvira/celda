@@ -32,7 +32,7 @@ export const TEXTOS_BRUJULA = {
   explicando: {
     titulo: "Antes de usar la brújula",
     texto:
-      "Tu navegador te preguntará si Celda puede leer el movimiento y la orientación del móvil. Solo sirve para girar la flecha. Se lee en tu dispositivo y no se guarda.",
+      "Puede que tu navegador te pregunte si Celda puede leer el movimiento y la orientación del móvil. Solo sirve para girar la flecha. Se lee en tu dispositivo y no se guarda.",
   },
   pidiendo: "Contesta al aviso del navegador.",
   denegada: {
@@ -65,8 +65,8 @@ export interface TextosGiro {
   /** Qué hacer ahora. */
   readonly guia: string;
   readonly alineado: boolean;
-  /** Los dos rumbos en texto. */
-  readonly rumbos: string;
+  /** Los dos rumbos en texto, uno por línea. */
+  readonly rumbos: ReadonlyArray<string>;
 }
 
 /** Lo que dice la brújula del giro: hacia dónde girar, y los rumbos en texto. */
@@ -84,6 +84,6 @@ export const textosGiro = (
       ? "Apuntando al emplazamiento"
       : `Gira ${String(guia.grados)}° a la ${guia.sentido}`,
     alineado: guia.alineado,
-    rumbos: `Móvil ${rumboLeido(rumbo)} · emplazamiento ${rumboLeido(objetivo)}`,
+    rumbos: [`Móvil: ${rumboLeido(rumbo)}`, `Emplazamiento: ${rumboLeido(objetivo)}`],
   };
 };

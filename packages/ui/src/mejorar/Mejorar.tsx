@@ -126,8 +126,8 @@ export interface BrujulaProps {
   /** Qué hacer ahora: «Gira 108° a la derecha» o «Apuntando al emplazamiento». */
   readonly guia: string;
   readonly alineado: boolean;
-  /** Los dos rumbos en texto: «Móvil 300° · emplazamiento 48°». */
-  readonly rumbos: string;
+  /** Los rumbos en texto, uno por línea: «Móvil: 300° (noroeste)». */
+  readonly rumbos: ReadonlyArray<string>;
   /** El estado de la brújula y sus controles: botones, la barra o lo que haya que explicar. */
   readonly children: JSX.Element;
 }
@@ -150,7 +150,7 @@ export function Brujula(props: BrujulaProps) {
   return (
     <div
       data-fuente={props.fuente}
-      class="chaflan grid grid-cols-[7.5rem_minmax(0,1fr)] items-start gap-4 bg-superficie-alta p-3 [--corte:10px]"
+      class="chaflan grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-3 bg-superficie-alta p-3 [--corte:10px] md:grid-cols-[7.5rem_minmax(0,1fr)] md:gap-4"
     >
       <svg
         viewBox={`0 0 ${TAMANO} ${TAMANO}`}
@@ -226,7 +226,9 @@ export function Brujula(props: BrujulaProps) {
         <output aria-live="polite" class={variantesGuia({ alineado: props.alineado })}>
           {props.guia}
         </output>
-        <p class="font-mono text-xs text-tinta-suave tabular-nums">{props.rumbos}</p>
+        <p class="flex flex-col font-mono text-xs text-tinta-suave tabular-nums">
+          <For each={props.rumbos}>{(rumbo) => <span>{rumbo}</span>}</For>
+        </p>
         {props.children}
       </div>
     </div>

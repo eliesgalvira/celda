@@ -170,15 +170,13 @@ describe("mejorar la señal: brújula", () => {
 
     // Con la barra al norte, hay que girar hacia el emplazamiento, y el rumbo va en texto.
     assert.strictEqual(guia(seccion()), `Gira ${OBJETIVO}° a la derecha`);
-    assert.match(
-      seccion().getByText(/^Móvil 0°/u).textContent ?? "",
-      new RegExp(`emplazamiento ${OBJETIVO}°`, "u"),
-    );
+    assert.isNotNull(seccion().getByText("Móvil: 0° (norte)"));
+    assert.isNotNull(seccion().getByText(`Emplazamiento: ${OBJETIVO}° (noreste)`));
 
     fireEvent.input(barra, { target: { value: String(OBJETIVO) } });
     flush();
     assert.strictEqual(guia(seccion()), "Apuntando al emplazamiento");
-    assert.strictEqual(barra.getAttribute("aria-valuetext"), `${OBJETIVO}° · noreste`);
+    assert.strictEqual(barra.getAttribute("aria-valuetext"), `${OBJETIVO}°`);
 
     fireEvent.input(barra, { target: { value: "300" } });
     flush();

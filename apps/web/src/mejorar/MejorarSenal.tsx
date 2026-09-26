@@ -33,7 +33,6 @@ import { lecturaDe } from "../servicio/servicio.ts";
 import { UbicacionContexto } from "../ubicacion/controlador.ts";
 import { posicionDe } from "../ubicacion/estado.ts";
 import { puedePedirUbicacion } from "../ubicacion/Ubicacion.tsx";
-import { nombreRumbo } from "../ubicacion/textos.ts";
 import { Brujula } from "./brujula.ts";
 import { consejos } from "./consejos.ts";
 import {
@@ -234,7 +233,7 @@ function BrujulaEnFicha(props: { readonly objetivo: number; readonly control: Co
       minimo={0}
       maximo={359}
       paso={1}
-      texto={`${props.control.simulado()}° · ${nombreRumbo(props.control.simulado())}`}
+      texto={`${props.control.simulado()}°`}
       alCambiar={props.control.simular}
     />
   );
