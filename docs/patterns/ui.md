@@ -91,6 +91,18 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Los dB de los anillos se escriben en `rumboLibre`, el centro del hueco más ancho entre sectores, para que no pisen el rumbo de ninguno. Los textos llevan un halo del color del panel.
 - En el mapa no se dibujan lóbulos: se solapaban entre emplazamientos. El diagrama vive en el panel.
 
+## Punto de referencia
+
+Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación está en [ubicacion.md](ubicacion.md).
+
+- `MarcadorReferencia.tsx`: `UbicacionGps` es un SVG con el hexágono «TÚ» y el círculo de precisión, con el radio en píxeles que calcula la web. `PuntoElegido` es un botón de 44 px con el hexágono naranja (`--referencia`) y la cinta «PUNTO». Con `arrastrable` se arrastra con el ratón (captura el puntero y para el `mousedown` para que el mapa no se mueva a la vez); con el dedo no hace nada y el gesto mueve el mapa. Las flechas lo mueven 10 px, 50 con Mayúsculas. `CapaDeReferencia` lo monta dentro del mapa, como `CapaDeMarcadores`. `PinCentral` es el pin fijo del móvil: su punta está en el centro del mapa.
+- `MenuUbicacion.tsx`: el botón hexagonal con la mirilla y su menú, un `fieldset` con `OpcionUbicacion`. Cada opción lleva la etiqueta como nombre accesible y su explicación en `aria-describedby`; una desactivada sigue a la vista con el motivo. Escape o un clic fuera lo cierran.
+- El paso previo es un `Dialogo` con dos piezas de `PasoPrevio.tsx`: `ListaPasoPrevio` y `AccionesPasoPrevio`, la fila de botones del final.
+- `EleccionDePunto.tsx`: en escritorio, una barra bajo la cabecera; en el móvil, una hoja abajo con «Cancelar» y «Usar este punto». `BuscadorDeDirecciones` es un `<search>` con un formulario: busca al enviar, enseña el estado bajo el campo y cita el servicio.
+- `Referencia.tsx`: el bloque de la ficha. `SinReferencia`, `EsperandoReferencia` y `ConReferencia` van dentro de `SeccionReferencia`, que reserva 7,5rem de alto.
+- `DisposicionMapa` recibe `ubicacion` (bajo la fecha de los datos), `eligiendo`, `pinCentral` y `dialogo`. Con `eligiendo`, en el móvil se aparta la hoja de la ficha y los controles, y los créditos quedan por encima de la hoja de elegir. En escritorio el cursor del mapa es una cruz. Las reglas del móvil que suben piezas por encima del resumen usan `data-hoja` (panel abierto y no eligiendo); las de escritorio, `data-panel`.
+- `Boton` tiene la variante `ancho="completo"` para el botón principal de una fila, como «Usar este punto».
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.

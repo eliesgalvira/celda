@@ -123,7 +123,7 @@ const ATRIBUCION_NOMINATIM: Credito = {
 
 /**
  * El buscador sobre la API de Nominatim en `VITE_BUSCADOR_URL` (por defecto, el servidor público
- * de OpenStreetMap). Respeta su política de uso (docs/patterns/buscador.md): una petición por
+ * de OpenStreetMap). Respeta su política de uso (ADR 0013): una petición por
  * segundo como mucho desde cada navegador, solo al pedirlo la persona, con caché y limitada a la
  * zona de Barcelona. Con `VITE_BUSCADOR_URL=apagado`, el buscador queda apagado y lo dice.
  */
