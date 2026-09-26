@@ -106,7 +106,7 @@ export function CapaDeMarcadores(props: CapaDeMarcadoresProps) {
     <Portal mount={props.contenedor}>
       <section
         aria-label={props.nombre}
-        class="pointer-events-none absolute inset-0 overflow-hidden"
+        class="pointer-events-none absolute inset-0 isolate overflow-hidden"
       >
         <SimbolosDeLogos combinaciones={props.combinaciones} />
         {props.children}

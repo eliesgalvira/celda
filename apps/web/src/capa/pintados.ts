@@ -18,6 +18,20 @@ export interface Pintado {
 /** Dónde cae un punto del mapa en la pantalla, en píxeles. */
 export type Proyectar = (posicion: Coordenada) => Salto;
 
+/** El paso de una escena a otra, con lo que hace falta saber de la pantalla. */
+export interface CambioDeEscena {
+  readonly anterior: Escena | undefined;
+  readonly nueva: Escena;
+  readonly transicion: Transicion;
+  readonly proyectar: Proyectar;
+  /** Si un punto de la pantalla se ve, contando el tamaño de un marcador. */
+  readonly seVe: (punto: Salto) => boolean;
+  /** El momento del cambio, en el reloj de `performance.now()`. */
+  readonly ahora: number;
+  /** La preferencia de reducir movimiento. */
+  readonly reducido: boolean;
+}
+
 const QUIETO: Movimiento = { tipo: "quieto" };
 
 const salto = (proyectar: Proyectar, desde: Coordenada, hasta: Coordenada): Salto => {
@@ -26,78 +40,89 @@ const salto = (proyectar: Proyectar, desde: Coordenada, hasta: Coordenada): Salt
   return { x: b.x - a.x, y: b.y - a.y };
 };
 
+/** Si un movimiento entre dos sitios del mapa pasa por la pantalla. */
+const cruzaLaPantalla = (
+  cambio: CambioDeEscena,
+  desde: Coordenada,
+  hasta: Coordenada | undefined,
+): boolean =>
+  cambio.seVe(cambio.proyectar(desde)) ||
+  (hasta !== undefined && cambio.seVe(cambio.proyectar(hasta)));
+
+const hayQueAnimar = (cambio: CambioDeEscena): boolean =>
+  !cambio.reducido && cambio.anterior !== undefined && cambio.anterior.nivel !== cambio.nueva.nivel;
+
+/** Qué pasa con lo que estaba pintado y no está en la escena nueva: se va o se quita ya. */
+const loQueSeVa = (pintado: Pintado, cambio: CambioDeEscena): Pintado | undefined => {
+  if (cambio.reducido) return undefined;
+  if (pintado.quitarEn !== undefined) {
+    return pintado.quitarEn > cambio.ahora ? pintado : undefined;
+  }
+  const { posicion, clave } = pintado.elemento;
+  const destino = cambio.nueva.elementos.get(cambio.transicion.destino.get(clave) ?? "");
+  if (!hayQueAnimar(cambio) || !cruzaLaPantalla(cambio, posicion, destino?.posicion)) {
+    return undefined;
+  }
+  return {
+    elemento: pintado.elemento,
+    movimiento: {
+      tipo: "sale",
+      hacia:
+        destino === undefined ? undefined : salto(cambio.proyectar, posicion, destino.posicion),
+    },
+    quitarEn: cambio.ahora + DURACION_MOVIMIENTO_MS,
+  };
+};
+
+/** Cómo aparece lo que llega con la escena nueva. */
+const comoLlega = (elemento: Elemento, cambio: CambioDeEscena): Movimiento => {
+  const origen = cambio.anterior?.elementos.get(cambio.transicion.origen.get(elemento.clave) ?? "");
+  if (!hayQueAnimar(cambio) || !cruzaLaPantalla(cambio, elemento.posicion, origen?.posicion)) {
+    return QUIETO;
+  }
+  return {
+    tipo: "entra",
+    desde:
+      origen === undefined
+        ? undefined
+        : salto(cambio.proyectar, elemento.posicion, origen.posicion),
+  };
+};
+
 /**
  * Lo que queda en el DOM al pasar de la escena `anterior` a `nueva`.
  *
  * - Lo que sigue se queda donde estaba en la lista, para que el DOM no mueva nodos.
  * - Al cambiar de nivel, lo que desaparece se desliza hacia su destino y se quita pasado
  *   `DURACION_MOVIMIENTO_MS`, y lo que aparece sale de su origen.
+ * - Solo se anima lo que se ve: lo que se va fuera de la pantalla se quita ya y lo que llega fuera
+ *   de ella aparece sin transición. Así un cambio de nivel toca los menos nodos posibles.
  * - En el mismo nivel (el mapa se ha desplazado), lo que desaparece está fuera de la vista y se
  *   quita ya, y lo que aparece lo hace sin transición.
  * - Con `reducido` (la preferencia de reducir movimiento) todo cambia de golpe.
  */
 export const siguientesPintados = (
   pintados: ReadonlyArray<Pintado>,
-  anterior: Escena | undefined,
-  nueva: Escena,
-  transicion: Transicion,
-  proyectar: Proyectar,
-  ahora: number,
-  reducido: boolean,
+  cambio: CambioDeEscena,
 ): ReadonlyArray<Pintado> => {
-  const animar = !reducido && anterior !== undefined && anterior.nivel !== nueva.nivel;
   const resultado: Array<Pintado> = [];
   const siguen = new Set<string>();
-
   for (const pintado of pintados) {
-    const { clave } = pintado.elemento;
-    const sigue = nueva.elementos.get(clave);
-    if (sigue !== undefined) {
-      siguen.add(clave);
-      // Si se estaba yendo, vuelve a su sitio desde donde esté.
-      resultado.push({
-        elemento: sigue,
-        movimiento: pintado.movimiento.tipo === "sale" ? QUIETO : pintado.movimiento,
-        quitarEn: undefined,
-      });
+    const sigue = cambio.nueva.elementos.get(pintado.elemento.clave);
+    if (sigue === undefined) {
+      const seVa = loQueSeVa(pintado, cambio);
+      if (seVa !== undefined) resultado.push(seVa);
       continue;
     }
-    if (reducido) continue;
-    if (pintado.quitarEn !== undefined) {
-      if (pintado.quitarEn > ahora) resultado.push(pintado);
-      continue;
-    }
-    if (!animar) continue;
-    const destino = nueva.elementos.get(transicion.destino.get(clave) ?? "");
-    resultado.push({
-      elemento: pintado.elemento,
-      movimiento: {
-        tipo: "sale",
-        hacia:
-          destino === undefined
-            ? undefined
-            : salto(proyectar, pintado.elemento.posicion, destino.posicion),
-      },
-      quitarEn: ahora + DURACION_MOVIMIENTO_MS,
-    });
+    siguen.add(sigue.clave);
+    // Si se estaba yendo, vuelve a su sitio desde donde esté.
+    const movimiento = pintado.movimiento.tipo === "sale" ? QUIETO : pintado.movimiento;
+    resultado.push({ elemento: sigue, movimiento, quitarEn: undefined });
   }
-
-  for (const elemento of nueva.elementos.values()) {
-    if (siguen.has(elemento.clave)) continue;
-    const origen = anterior?.elementos.get(transicion.origen.get(elemento.clave) ?? "");
-    resultado.push({
-      elemento,
-      movimiento: animar
-        ? {
-            tipo: "entra",
-            desde:
-              origen === undefined
-                ? undefined
-                : salto(proyectar, elemento.posicion, origen.posicion),
-          }
-        : QUIETO,
-      quitarEn: undefined,
-    });
+  for (const elemento of cambio.nueva.elementos.values()) {
+    if (!siguen.has(elemento.clave)) {
+      resultado.push({ elemento, movimiento: comoLlega(elemento, cambio), quitarEn: undefined });
+    }
   }
   return resultado;
 };

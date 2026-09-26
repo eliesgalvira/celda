@@ -1,5 +1,6 @@
 import type { Coordenada } from "@celda/dominio/area";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
+import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import type { Map as MapaMapLibre } from "maplibre-gl";
 import { createMemo, createSignal, onSettled, untrack } from "solid-js";
 
@@ -20,6 +21,9 @@ const vistaDe = (mapa: MapaMapLibre): Vista => {
 };
 
 const REDUCIR_MOVIMIENTO = "(prefers-reduced-motion: reduce)";
+
+/** Medio marcador, en píxeles: lo que asoma de uno cuyo punto está justo fuera de la pantalla. */
+const MEDIO_MARCADOR = 30;
 
 export interface MarcadoresProps {
   readonly mapa: MapaMapLibre;
@@ -84,8 +88,19 @@ export function Marcadores(props: MarcadoresProps) {
       : agrupador().escena(nivelDeZoom(ahora.zoom), cajaConMargen(ahora.caja));
   });
 
-  const proyectar = (posicion: Coordenada) =>
-    props.mapa.project([posicion.longitud, posicion.latitud]);
+  // Funciones por mapa, que no leen props al llamarlas: se usan dentro de efectos.
+  const proyectar = createMemo(() => {
+    const mapa = props.mapa;
+    return (posicion: Coordenada) => mapa.project([posicion.longitud, posicion.latitud]);
+  });
+  const seVe = createMemo(() => {
+    const lienzo = props.mapa.getContainer();
+    return (punto: Salto) =>
+      punto.x > -MEDIO_MARCADOR &&
+      punto.y > -MEDIO_MARCADOR &&
+      punto.x < lienzo.clientWidth + MEDIO_MARCADOR &&
+      punto.y < lienzo.clientHeight + MEDIO_MARCADOR;
+  });
 
   /** Acerca el mapa hasta que la agrupación se abre. Con el teclado, el foco vuelve al mapa. */
   const abrir = (agrupacion: ElementoAgrupacion) => {
@@ -106,7 +121,8 @@ export function Marcadores(props: MarcadoresProps) {
       combinaciones={combinaciones()}
       escena={escena()}
       transicion={agrupador().transicion}
-      proyectar={proyectar}
+      proyectar={proyectar()}
+      seVe={seVe()}
       fotograma={fotograma()}
       movimientoReducido={reducido()}
       seleccionada={props.seleccionada}

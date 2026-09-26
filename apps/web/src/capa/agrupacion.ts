@@ -13,8 +13,11 @@ import Supercluster from "supercluster";
  * otro tipo de nivel por debajo de cierto zoom, con la misma forma de escena y de transición.
  */
 
-/** Distancia en píxeles de pantalla por debajo de la cual se agrupa, en el zoom entero del nivel. */
-const RADIO = 60;
+/**
+ * Distancia en píxeles de pantalla por debajo de la cual se agrupa, en el zoom entero del nivel. Con
+ * 48, dos logos (34 px) o un logo y un hexágono (50 px) no se pisan.
+ */
+const RADIO = 48;
 
 /** Último nivel con agrupaciones. En el siguiente y más cerca, todos los emplazamientos van sueltos. */
 const NIVEL_MAXIMO = 16;

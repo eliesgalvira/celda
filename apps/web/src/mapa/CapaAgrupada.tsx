@@ -1,5 +1,5 @@
 import type { Compania } from "@celda/dominio/compania";
-import { DURACION_MOVIMIENTO_MS } from "@celda/ui/marcadores/Deslizable.tsx";
+import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { MarcadorAgrupacion } from "@celda/ui/marcadores/MarcadorAgrupacion.tsx";
 import {
   CapaDeMarcadores,
@@ -30,6 +30,8 @@ export interface CapaAgrupadaProps {
   readonly escena: Escena | undefined;
   readonly transicion: (antes: Escena, despues: Escena) => Transicion;
   readonly proyectar: Proyectar;
+  /** Si un punto de la pantalla se ve: solo se anima lo que se ve. */
+  readonly seVe: (punto: Salto) => boolean;
   /** Cambia en cada fotograma en que se mueve el mapa: los marcadores se vuelven a colocar. */
   readonly fotograma: number;
   /** La preferencia de reducir movimiento: sin transiciones. */
@@ -57,8 +59,9 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
       reducido: props.movimientoReducido,
       transicion: props.transicion,
       proyectar: props.proyectar,
+      seVe: props.seVe,
     }),
-    ({ escena, reducido, transicion, proyectar }) => {
+    ({ escena, reducido, transicion, proyectar, seVe }) => {
       const antes = anterior;
       anterior = escena;
       if (escena === undefined) {
@@ -68,7 +71,15 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
       const t = antes === undefined || reducido ? SIN_TRANSICION : transicion(antes, escena);
       const ahora = performance.now();
       setPintados((actuales) =>
-        siguientesPintados(actuales, antes, escena, t, proyectar, ahora, reducido),
+        siguientesPintados(actuales, {
+          anterior: antes,
+          nueva: escena,
+          transicion: t,
+          proyectar,
+          seVe,
+          ahora,
+          reducido,
+        }),
       );
       quitarHasta = ahora + DURACION_MOVIMIENTO_MS;
       if (latido === 0) latido = requestAnimationFrame(latir);

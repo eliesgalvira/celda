@@ -54,6 +54,7 @@ const montar = (reducido: boolean) => {
       escena={agrupador.escena(nivel(), MUNDO)}
       transicion={agrupador.transicion}
       proyectar={proyectar}
+      seVe={() => true}
       fotograma={0}
       movimientoReducido={reducido}
       seleccionada={null}
