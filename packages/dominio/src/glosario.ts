@@ -29,6 +29,9 @@ export const TERMINOS = [
   "modelo",
   "punto-de-referencia",
   "precision",
+  "interferencia",
+  "ocupacion",
+  "sinr",
 ] as const;
 
 export type Termino = (typeof TERMINOS)[number];
@@ -242,6 +245,30 @@ export const GLOSARIO: Glosario = {
       "estar en cualquier sitio de un círculo de 25 metros. Dentro de casa suele ser peor.",
     tecnico: "precisión horizontal del GPS",
     relacionados: ["punto-de-referencia"],
+  },
+  interferencia: {
+    nombre: "Interferencia",
+    explicacion:
+      "La señal de otras antenas que llega a tu móvil y tapa la que le da servicio, como una " +
+      "conversación de fondo. Solo estorban las de la misma compañía en la misma banda.",
+    tecnico: "interferencia cocanal (reutilización 1)",
+    relacionados: ["sinr", "ocupacion", "banda"],
+  },
+  ocupacion: {
+    nombre: "Ocupación de la red",
+    explicacion:
+      "Qué parte de la capacidad de la red se está usando. Con mucha gente conectada, las " +
+      "antenas vecinas emiten más y se estorban más, sobre todo en los bordes entre celdas.",
+    tecnico: "carga de la celda",
+    relacionados: ["interferencia", "sinr"],
+  },
+  sinr: {
+    nombre: "Señal frente a interferencia",
+    explicacion:
+      "Cuánto destaca la señal que da servicio sobre la interferencia y el ruido, en dB. " +
+      "Por encima de 20 dB es limpia; por debajo de 0, la interferencia puede más que ella.",
+    tecnico: "SINR (relación señal a interferencia más ruido)",
+    relacionados: ["interferencia", "ocupacion", "modelo"],
   },
 };
 
