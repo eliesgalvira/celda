@@ -136,6 +136,15 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - Cuándo se calculan y cuándo se cancela lo decide la web (`apps/web/src/celdas/enMapa.ts`). Se calculan en el Worker del simulador la primera vez que el mapa llega al zoom de las celdas, una vez por capa. Otra capa o cerrar el mapa a medio cálculo lo cancela.
 - En Chromium con GPU (Vulkan) y la CPU a ×4 el mapa va a 60 fps con la rueda y al arrastrar entre zoom 15 y 17,5, en 390 px y en 1400 px, igual que sin celdas. El primer cruce del zoom 15, que calcula y pone las celdas, da 56-57 fps en 390 px (57-58 sin celdas) y 43-44 en 1400 px (44-45 sin ellas). En 1400 px lo que pesa son los marcadores.
 
+## Vista de interferencia
+
+- La trama va en el estilo del mapa (`mapa/interferencia.ts`), escondida y con su fuente vacía hasta que la web la llena. Cada hexágono lleva `sinr` y se colorea por tramos (`CORTES_SINR`: 0, 5, 10, 15 y 20 dB) con `--mapa-sinr-1` (naranja oscuro, domina la interferencia) a `--mapa-sinr-6` (verde azulado, señal limpia), al 62 % de opacidad. Se dibujan un 8 % más pequeños que la trama, y queda una línea entre ellos.
+- `mostrarInterferencia` enseña la trama y oculta a la vez las celdas y el relleno de la seleccionada; de esta queda solo su contorno discontinuo (`celda-seleccionada-contorno`). Las capas que se cruzan se descartaron en los prototipos.
+- `interferencia/PanelInterferencia.tsx` tiene las piezas del panel: `PanelInterferencia` con «Simulación orientativa», la etiqueta de modelo y «Cerrar»; `TextoVista`, `ParDeControles`, `EscalaSinr`, `ValorEnPunto` (reserva su alto con valor o sin él) y `EstadoVista`. `Deslizador` (en `Eleccion.tsx`) es un `<input type="range">` de 44 px de alto con la etiqueta y el valor encima.
+- `DisposicionMapa` recibe el panel en `vista`. En escritorio va abajo a la derecha, a la izquierda de la columna de controles, con 22 rem de ancho. En el móvil es una hoja de 22,5 rem sobre los créditos y los controles suben por encima, sin hueco entre ellos para no llegar a la fecha de los datos. Con la hoja de la ficha o la de elegir un punto abiertas, en el móvil el panel se aparta. En el móvil el título solo lo lee el lector de pantalla.
+- Mientras la vista está activa no sale la pista de las celdas.
+- Medido en Chromium con GPU (Vulkan) y la CPU a ×4, arrastrando el mapa a zoom 16 en el Eixample con Movistar en 1800 MHz: 56 fps en 1400 px (59 sin la vista) y 59,5 en 390 px (60 sin ella). Tras soltar, la trama nueva llega en unos 330 ms en 1400 px y 200 ms en 390 px, con los 120 ms de espera incluidos.
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.

@@ -4,8 +4,8 @@ Léelo antes de añadir o cambiar una simulación. La decisión de fondo está e
 
 ## Dónde está cada cosa
 
-- `packages/sim/src/simulacion.ts`: la interfaz `Simulacion<Params, R>`, la `Malla` y sus ayudas (`rumboDe`, `distanciaDe`, `mallaDeRumbos`, `mallaEnRumbo`).
-- `packages/sim/src/diagramaSector.ts`, `perdidasUrbanas.ts` y `celdas.ts`: las simulaciones de hoy. `sinr.ts` solo tiene los tipos de la vista de interferencia (ticket 25).
+- `packages/sim/src/simulacion.ts`: la interfaz `Simulacion<Params, R>`, la `Malla` y sus ayudas (`rumboDe`, `distanciaDe`, `mallaDeRumbos`, `mallaEnRumbo`, `mallaHexagonal`).
+- `packages/sim/src/diagramaSector.ts`, `perdidasUrbanas.ts`, `celdas.ts` y `sinr.ts`: las simulaciones de hoy.
 - `packages/sim/src/poligono.ts`: polígonos del plano local (área, si contienen un punto, recorte por un semiplano).
 - `packages/sim/src/registro.ts`: `SIMULACIONES`, la lista de lo que sabe calcular el Worker.
 - `packages/sim/src/protocolo.ts`: `atender`, lo que hace el Worker con cada solicitud. La versión en el mismo hilo llama a la misma función.
@@ -69,6 +69,17 @@ La tolerancia se declara al generar el fichero y va dentro de él. Las de TypeSc
 - La web la calcula entre todos los emplazamientos, sea cual sea su compañía (`CONTEXT.md`), en un plano centrado en la capa (`aPlano` de `@celda/dominio/plano`) y con una caja 100 m más ancha que los emplazamientos. Fuera de la zona de la ingesta puede haber emplazamientos que Celda no conoce, así que las celdas no se alargan por ahí.
 
 `repartirEnSectores(celda, emplazamiento, azimuts)` divide una celda entre los sectores de su estación base, para el ticket 23. A cada punto le toca el sector cuyo eje queda más cerca de su rumbo, que con sectores iguales es el que da más ganancia en el diagrama de sector. Devuelve un polígono por azimut; un sector de más de 180° no es convexo, pero juntos cubren la celda sin solaparse. No está en el registro porque es geometría sobre el resultado de `celdas` y el Worker no la necesita.
+
+## Señal frente a interferencia (`sinr@1`)
+
+`sinr` recibe las estaciones base de una compañía en una banda, en el plano de la malla, con sus azimuts y su potencia por sector, la frecuencia, la ocupación (0 a 1) y el ruido. En cada punto, cada sector llega con su potencia, la ganancia del diagrama de sector hacia el punto y las pérdidas urbanas. Da servicio el sector que llega con más potencia, y el resto, también los otros sectores de la misma estación, es interferencia: reutilización 1. SINR = S / (ocupación · ΣI + N), en dB. Devuelve además la estación y el sector que dan servicio. Sin estaciones, `NaN` y −1.
+
+- `RED_TIPICA` da la potencia (58 dBm: 43 dBm y 15 dBi) y el ruido (−95 dBm en 10 MHz con 9 dB de figura de ruido). Ninguna fuente publica la potencia; entre emplazamientos tan juntos manda la interferencia y apenas cambia nada.
+- Calcula en potencias lineales, sin llamar a `gananciaSector` ni a `perdidaUrbana`: una trama de 6000 puntos con 300 estaciones tarda unos 100 ms en un portátil. La prueba la compara punto a punto con esas dos funciones.
+- Las pruebas de propiedades: empeora en cada punto al subir la ocupación (configuraciones al azar), los bordes con menos de 0 dB crecen con ella, mejora al acercarse por el eje al emplazamiento que da servicio y da servicio el sector que más llega. Que otra compañía u otra banda no cambian nada se comprueba en la web, que es quien elige las estaciones (`apps/web/src/interferencia/interferencia.test.ts`).
+- `mallaHexagonal(rectangulo, radio)` da los centros de una trama de hexágonos anclada al origen del plano: dos rectángulos que se solapan comparten los puntos, así que al mover el mapa la trama no baila.
+
+La web (`apps/web/src/interferencia/`) usa un plano con origen fijo en el centro de Barcelona. Entran las estaciones base de la compañía que el registro da en la banda y las que aún no tienen bandas leídas, que se suponen en ella; las que el registro da solo en otras bandas no estorban. El panel lo dice con el recuento. Todas llevan tres sectores supuestos a 0°, 120° y 240°. Solo cuentan las que quedan a 1,5 km o menos de lo que se ve o del punto de referencia. La trama tiene hexágonos de 13 px al medio nivel de zoom y cubre lo que se ve más un 15 % por cada lado, así que un arrastre corto no vuelve a calcular (`mismaTrama`). Por debajo del zoom 14 solo se calcula el valor en el punto de referencia, que va como último punto de la malla.
 
 ## Diagrama de sector y orientación
 
