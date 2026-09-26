@@ -6,6 +6,7 @@ import { Show } from "solid-js";
 
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
+import { Deslizable, type Movimiento } from "./Deslizable.tsx";
 import { idDeLogo, SimbolosDeLogos } from "./LogoCompanias.tsx";
 
 /** Hexágono pequeño en la esquina para lo que no está verificado, como en los prototipos. */
@@ -29,45 +30,56 @@ export interface MarcadorEmplazamientoProps {
   readonly nombre: string;
   /** El emplazamiento cuya ficha está abierta: se resalta y se anuncia como el actual. */
   readonly seleccionado?: boolean;
+  /** Cómo aparece o se va al agrupar y separar. Sin él, aparece sin transición. */
+  readonly movimiento?: Movimiento;
   readonly onClick?: JSX.EventHandler<HTMLButtonElement, MouseEvent>;
 }
+
+const QUIETO: Movimiento = { tipo: "quieto" };
 
 /**
  * Marcador de un emplazamiento en el mapa: un botón con los logos de sus compañías, centrado
  * en su posición. El logo mide 34 px y la diana 44 px. Solo funciona dentro de
- * `CapaDeMarcadores`, que dibuja los logos que usa.
+ * `CapaDeMarcadores`, que dibuja los logos que usa. Mientras sale ya no se puede pulsar ni
+ * enfocar.
  */
 export function MarcadorEmplazamiento(props: MarcadorEmplazamientoProps) {
+  const saliendo = () => props.movimiento?.tipo === "sale";
   return (
     <button
       type="button"
       aria-label={props.nombre}
       data-estado={props.estado}
       aria-current={props.seleccionado === true ? "true" : undefined}
+      inert={saliendo()}
       // `cn` resuelve el choque entre el `relative` de la diana y el `absolute` del marcador.
       class={cn(
         variantesDiana(),
-        "pointer-events-auto absolute top-0 left-0 -mt-[22px] -ml-[22px] will-change-transform",
-        props.seleccionado === true && "z-10",
+        "absolute top-0 left-0 -mt-[22px] -ml-[22px] will-change-transform",
+        saliendo() ? "pointer-events-none" : "pointer-events-auto",
+        // El seleccionado queda por encima de todo, también de las agrupaciones.
+        props.seleccionado === true && "z-20",
       )}
       style={{ transform: `translate(${props.x.toFixed(1)}px, ${props.y.toFixed(1)}px)` }}
       onClick={(evento) => props.onClick?.(evento)}
     >
-      <span
-        class={cn(
-          "relative rounded-full drop-shadow-marcador transition-transform duration-150 ease-out",
-          "group-hover:scale-110 group-active:scale-95 motion-reduce:transition-none",
-          props.seleccionado === true &&
-            "scale-125 ring-3 ring-primario ring-offset-2 ring-offset-superficie group-hover:scale-125",
-        )}
-      >
-        <svg width="34" height="34" aria-hidden="true" class="block">
-          <use href={`#${idDeLogo(props.companias)}`} />
-        </svg>
-        <Show when={props.estado !== "verificado"}>
-          <span aria-hidden="true" class={variantesSenal({ estado: props.estado })} />
-        </Show>
-      </span>
+      <Deslizable forma="logo" movimiento={props.movimiento ?? QUIETO}>
+        <span
+          class={cn(
+            "relative block rounded-full drop-shadow-marcador transition-transform duration-150 ease-out",
+            "group-hover:scale-110 group-active:scale-95 motion-reduce:transition-none",
+            props.seleccionado === true &&
+              "scale-125 ring-3 ring-primario ring-offset-2 ring-offset-superficie group-hover:scale-125",
+          )}
+        >
+          <svg width="34" height="34" aria-hidden="true" class="block">
+            <use href={`#${idDeLogo(props.companias)}`} />
+          </svg>
+          <Show when={props.estado !== "verificado"}>
+            <span aria-hidden="true" class={variantesSenal({ estado: props.estado })} />
+          </Show>
+        </span>
+      </Deslizable>
     </button>
   );
 }
