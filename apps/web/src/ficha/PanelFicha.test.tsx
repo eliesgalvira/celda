@@ -13,6 +13,7 @@ import { capaDePrueba } from "../capa/pruebas.ts";
 import { navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { type FichasDePrueba, fichasDePrueba } from "./pruebas.ts";
 import { FichaNoLeida } from "./servicio.ts";
+import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 
 const NOCHE = Date.UTC(2026, 8, 26, 0, 15, 3);
 const DIA = 86_400_000;
@@ -126,7 +127,14 @@ const abrir = (clave: string, simulador: Layer.Layer<Simulador> = simuladorEnHil
   const fichas: FichasDePrueba = fichasDePrueba();
   navegar(ruta.emplazamiento(clave), { reemplazar: true });
   const pantalla = render(() => (
-    <App servicios={Layer.mergeAll(capaDePrueba([Effect.succeed(CAPA)]), fichas.capa, simulador)} />
+    <App
+      servicios={Layer.mergeAll(
+        capaDePrueba([Effect.succeed(CAPA)]),
+        fichas.capa,
+        simulador,
+        ubicacionDePrueba().capa,
+      )}
+    />
   ));
   flush();
   return { ...pantalla, fichas };

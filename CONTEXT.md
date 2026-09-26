@@ -133,8 +133,12 @@ Punto de referencia que la persona marca a mano en el mapa o con una dirección.
 _Evitar_: marcador, chincheta, pin
 
 **Estado de la ubicación**:
-Ninguna, denegada, ubicación GPS o punto elegido.
+Ninguna, denegada, ubicación GPS o punto elegido. Si la ubicación GPS no llega, queda en fallo, con el motivo. Mientras se explica el paso previo, se espera al GPS o se elige un punto, vale el punto de referencia que había.
 _Evitar_: estado, permiso
+
+**Paso previo**:
+Explicación de para qué se usa la ubicación, que se calcula en el dispositivo, que no se guarda y que se puede quitar. Va siempre antes del aviso del navegador.
+_Evitar_: modal de permiso, preaviso
 
 ### Medidas y aportaciones
 

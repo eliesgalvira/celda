@@ -27,6 +27,7 @@
     "@solidjs/testing-library": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
     "@tailwindcss/vite": "catalog:",
+    "fake-indexeddb": "catalog:",
     "happy-dom": "catalog:",
     "tailwindcss": "catalog:",
     "vite": "catalog:",
