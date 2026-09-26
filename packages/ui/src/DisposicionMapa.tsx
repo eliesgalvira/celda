@@ -27,6 +27,11 @@ export interface DisposicionMapaProps {
   /** Una indicación breve abajo en el centro, como «acércate para ver…». */
   readonly pista?: JSX.Element;
   readonly controles: JSX.Element;
+  /**
+   * Controles que van al final de la columna, como los ajustes. En el móvil se esconden mientras
+   * se ve el panel de una vista: la columna entera no cabría encima de él.
+   */
+  readonly controlesSecundarios?: JSX.Element;
   readonly atribucion: JSX.Element;
   /** Lo que se superpone al mapa mientras carga o si falla. */
   readonly aviso?: JSX.Element;
@@ -125,6 +130,7 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
 
       <div class="absolute right-2 bottom-[4.5rem] z-10 flex flex-col items-center gap-2 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] max-md:group-data-vista/mapa:bottom-[calc(22.5rem+3.75rem)] max-md:group-data-vista/mapa:gap-0 max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-16">
         {props.controles}
+        <div class="contents max-md:group-data-vista/mapa:hidden">{props.controlesSecundarios}</div>
       </div>
 
       {/* Mientras se elige en el móvil, los créditos quedan por encima de la hoja, en su pie. */}
