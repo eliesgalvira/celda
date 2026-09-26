@@ -3,13 +3,14 @@ import type { Ficha } from "@celda/dominio/ficha";
 import { workerDePrueba } from "@celda/sim/pruebas";
 import { type Simulador, simuladorEnHilo, simuladorEnWorker } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
-import { fireEvent, render, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
 import { capaDePrueba } from "../capa/pruebas.ts";
+import { estaEnElGlosario, terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { type FichasDePrueba, fichasDePrueba } from "./pruebas.ts";
 import { FichaNoLeida } from "./servicio.ts";
@@ -187,7 +188,7 @@ describe("panel del emplazamiento", () => {
     const titulo = await findByRole("heading", { name: TITULO_CAMPUS_NORD });
     assert.isNotNull(titulo);
     assert.isNotNull(getByText("BARCELONA"));
-    assert.isNotNull(getByText("Emplazamiento compartido"));
+    assert.isNotNull(getByText(textoEntero("Emplazamiento compartido")));
     assert.isNotNull(getByRole("heading", { name: "Movistar" }));
     // Los códigos salen también en los datos técnicos, plegados.
     assert.lengthOf(getAllByText("Códigos 086040 y 86040"), 2);
@@ -213,9 +214,11 @@ describe("panel del emplazamiento", () => {
     // La tecnología no la publica nadie: se deduce de la banda y se dice «probablemente».
     assert.isNotNull(
       getByText(
-        "Movistar y Vodafone comparten este emplazamiento. Por las bandas que se conocen, " +
-          "probablemente da 5G con Movistar. Llega lejos y entra bien en los edificios, y tiene " +
-          "bandas altas que dan más velocidad. De Vodafone aún no se conocen las bandas.",
+        textoEntero(
+          "Movistar y Vodafone comparten este emplazamiento. Por las bandas que se conocen, " +
+            "probablemente da 5G con Movistar. Llega lejos y entra bien en los edificios, y tiene " +
+            "bandas altas que dan más velocidad. De Vodafone aún no se conocen las bandas.",
+        ),
       ),
     );
 
@@ -288,6 +291,59 @@ describe("panel del emplazamiento", () => {
     assert.strictEqual(worker.creados(), 2);
   });
 
+  it("los términos técnicos salen subrayados una vez por bloque, y todos están en el glosario", async () => {
+    const { findByRole, getByRole, fichas } = abrir(CAMPUS_NORD.clave);
+    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+    fireEvent.click(getByRole("button", { name: "Datos técnicos" }));
+    flush();
+
+    const ficha = getByRole("article", { name: TITULO_CAMPUS_NORD });
+    const todos = terminosSubrayados(ficha);
+    for (const termino of todos) assert.isTrue(estaEnElGlosario(termino), termino);
+    assert.includeMembers(
+      [...todos],
+      [
+        "emplazamiento",
+        "banda",
+        "5g",
+        "version-de-los-datos",
+        "mhz",
+        "registro-oficial",
+        "expediente",
+        "tramo",
+        "tecnologia",
+        "azimut",
+        "identificador-de-celda",
+      ],
+    );
+    // Cada bloque de la ficha (cabecera, frase, marca de agua, secciones y datos técnicos)
+    // subraya un término solo la primera vez.
+    for (const bloque of Array.from(ficha.children)) {
+      const deBloque = terminosSubrayados(bloque);
+      assert.strictEqual(new Set(deBloque).size, deBloque.length, deBloque.join(", "));
+    }
+  });
+
+  it("un término se abre en el panel y Escape lo cierra sin cerrar el panel", async () => {
+    const { findByRole, getByRole, fichas } = abrir(CAMPUS_NORD.clave);
+    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+
+    const termino = getByRole("button", { name: "bandas" });
+    termino.focus();
+    fireEvent.click(termino);
+    flush();
+    const explicacion = screen.getByRole("dialog", { name: "Banda" });
+    assert.match(explicacion.textContent ?? "", /Término técnico: banda de frecuencias/u);
+
+    fireEvent.keyDown(document.activeElement ?? explicacion, { key: "Escape" });
+    flush();
+    assert.isNull(screen.queryByRole("dialog"));
+    assert.strictEqual(document.activeElement, termino);
+    assert.isNotNull(getByRole("heading", { name: TITULO_CAMPUS_NORD }));
+  });
+
   it("al cambiar de emplazamiento con la respuesta lenta, nunca enseña el anterior", async () => {
     const { findByRole, queryByText, getByText, fichas } = abrir(CAMPUS_NORD.clave);
     await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
@@ -354,7 +410,7 @@ describe("panel del emplazamiento", () => {
     // Misma ejecución que la capa: la ficha va al milisegundo y la capa al segundo.
     await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
-    assert.isNotNull(await findByText("Datos de la ficha: 26 sept 2026"));
+    assert.isNotNull(await findByText(textoEntero("Datos de la ficha: 26 sept 2026")));
     assert.isNull(queryByText(/Actualizado después del mapa/u));
 
     await responder(fichas, CAMPUS_NORD.clave, { ...CAMPUS_NORD, version: NOCHE + DIA });

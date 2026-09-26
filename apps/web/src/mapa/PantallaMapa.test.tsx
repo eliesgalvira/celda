@@ -10,6 +10,7 @@ import { App } from "../App.tsx";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { capaDePrueba } from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
+import { textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
 import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 
@@ -77,7 +78,7 @@ describe("capa de emplazamientos en el mapa", () => {
     fireEvent.click(getByRole("button", { name: "Reintentar" }));
     flush();
 
-    const fecha = await findByText("Datos del mapa: 26 sept 2026");
+    const fecha = await findByText(textoEntero("Datos del mapa: 26 sept 2026"));
     assert.strictEqual(fecha.closest("output")?.getAttribute("data-tono"), "fecha");
     await waitFor(() => {
       assert.isNull(queryByText(/No se han podido cargar los emplazamientos/u));

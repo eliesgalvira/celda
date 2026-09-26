@@ -1,6 +1,7 @@
 import type { Banda } from "@celda/dominio/banda";
 import type { Estado } from "@celda/dominio/emplazamiento";
-import type { Ficha, OrigenDeFicha } from "@celda/dominio/ficha";
+import type { EstacionDeFicha, Ficha, OrigenDeFicha } from "@celda/dominio/ficha";
+import { bloque, llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 import type { Fuente } from "@celda/dominio/observacion";
 
 import type { ComparacionConCapa } from "./marcaDeAgua.ts";
@@ -34,8 +35,8 @@ export const enumerar = (partes: ReadonlyArray<string>): string =>
     : `${partes.slice(0, -1).join(", ")} y ${partes.at(-1) ?? ""}`;
 
 /** Qué es, sobre el título: «Emplazamiento» o «Emplazamiento compartido». */
-export const antetituloDe = (ficha: Ficha): string =>
-  ficha.estaciones.length > 1 ? "Emplazamiento compartido" : "Emplazamiento";
+export const antetituloDe = (ficha: Ficha): TextoMarcado =>
+  marcado`${termino("emplazamiento", "Emplazamiento")}${ficha.estaciones.length > 1 ? " compartido" : ""}`;
 
 /**
  * El título de la ficha. Ninguna fuente da un nombre a los emplazamientos, así que es la calle
@@ -93,32 +94,57 @@ const codigoDeOrigen = (origen: OrigenDeFicha): string => {
   return codigo === "" || codigo === origen.clave ? "" : `${codigo}, `;
 };
 
-/** Cómo se cuenta una observación en la ficha: quién lo dice, qué y desde cuándo, y su enlace. */
+/** El nombre de una fuente en la ficha; el registro oficial lleva su explicación. */
+const fuenteMarcada = (fuente: Fuente): TextoMarcado =>
+  fuente === "registro-oficial"
+    ? termino("registro-oficial", NOMBRE_FUENTE[fuente])
+    : llano(NOMBRE_FUENTE[fuente]);
+
+/**
+ * Cómo se cuenta una observación en la ficha: quién lo dice, qué y desde cuándo, y su enlace.
+ * Una corrección explica qué es con sus propias palabras, «la da por desmontada».
+ */
 export const textosOrigen = (origen: OrigenDeFicha) => ({
-  fuente: NOMBRE_FUENTE[origen.fuente],
-  detalle: `${codigoDeOrigen(origen)}${
+  fuente: fuenteMarcada(origen.fuente),
+  detalle:
     origen.afirma === "desmontada"
-      ? `la da por desmontada desde el ${fechaCorta(origen.fecha)}`
-      : `desde el ${fechaCorta(origen.fecha)}`
-  }`,
+      ? marcado`${codigoDeOrigen(origen)}${termino("correccion", "la da por desmontada")} desde el ${fechaCorta(origen.fecha)}`
+      : llano(`${codigoDeOrigen(origen)}desde el ${fechaCorta(origen.fecha)}`),
+  enlace: origen.url,
   textoEnlace: ENLACE_FUENTE[origen.fuente],
   tono: origen.afirma === "desmontada" ? ("correccion" as const) : ("presente" as const),
 });
 
+/**
+ * Las observaciones de todas las estaciones base, ya escritas. Son un solo bloque: el registro
+ * oficial y la corrección se subrayan la primera vez que salen, no en cada estación base.
+ */
+export const textosDeOrigenes = (estaciones: ReadonlyArray<EstacionDeFicha>) => {
+  const marcar = bloque();
+  return estaciones.map((estacion) =>
+    estacion.origenes.map((origen) => {
+      const textos = textosOrigen(origen);
+      return { ...textos, fuente: marcar(textos.fuente), detalle: marcar(textos.detalle) };
+    }),
+  );
+};
+
 /** Lo que dice la marca de agua de la ficha: un título y, si va por delante del mapa, por qué. */
 export interface TextosMarca {
-  readonly titulo: string;
+  readonly titulo: TextoMarcado;
   readonly detalle?: string;
 }
 
 /** La marca de agua de la ficha, comparada con la del mapa (historia 57). */
 export const textosMarca = (ficha: Ficha, comparacion: ComparacionConCapa): TextosMarca => {
   if (comparacion.tipo !== "posterior") {
-    return { titulo: `Datos de la ficha: ${fechaCorta(ficha.version)}` };
+    return {
+      titulo: marcado`${termino("version-de-los-datos", "Datos de la ficha")}: ${fechaCorta(ficha.version)}`,
+    };
   }
   const [deLaFicha, delMapa] = fechasDistinguibles(comparacion.ficha, comparacion.capa);
   return {
-    titulo: "Actualizado después del mapa",
+    titulo: termino("marca-de-agua", "Actualizado después del mapa"),
     detalle:
       `Esta ficha es del ${deLaFicha} y el mapa, del ${delMapa}. ` +
       "El marcador cambiará cuando se publique el mapa nuevo.",

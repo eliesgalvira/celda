@@ -7,6 +7,7 @@ import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
+import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
 import * as Effect from "effect/Effect";
 import type { Map as MapaMapLibre } from "maplibre-gl";
@@ -355,7 +356,7 @@ export function EstadoDeLaCapa(props: {
       <Match when={props.estado.tipo === "lista" ? props.estado.capa : undefined}>
         {(lista) => (
           <DatosDelMapa
-            texto={textoDatosDelMapa(lista().fecha)}
+            texto={<TextoConTerminos texto={textoDatosDelMapa(lista().fecha)} />}
             detalle={`${lista().emplazamientos.length} emplazamientos · capa ${lista().version}`}
           />
         )}
@@ -368,7 +369,7 @@ export function EstadoDeLaCapa(props: {
             acciones={reintentar}
           >
             {EXPLICACION_FALLO_CAPA[motivo()]} El mapa se ve, pero sin marcadores: eso no quiere
-            decir que no haya emplazamientos.
+            decir que no haya <Termino termino="emplazamiento">emplazamientos</Termino>.
           </Aviso>
         )}
       </Match>

@@ -1,8 +1,16 @@
 import type { Ficha } from "@celda/dominio/ficha";
+import { terminosDe, textoPlano } from "@celda/dominio/glosario";
 import { assert, describe, it } from "@effect/vitest";
 
 import { compararConCapa } from "./marcaDeAgua.ts";
-import { textosMarca, textosOrigen, textoTramo, tituloDe } from "./textos.ts";
+import {
+  antetituloDe,
+  textosDeOrigenes,
+  textosMarca,
+  textosOrigen,
+  textoTramo,
+  tituloDe,
+} from "./textos.ts";
 
 /** 01:44 en Barcelona. */
 const CAPA = Date.UTC(2026, 8, 25, 23, 44, 53);
@@ -38,9 +46,15 @@ describe("textos de la ficha", () => {
       textosMarca(FICHA, compararConCapa(CAPA, otroDia)).detalle ?? "",
       /^Esta ficha es del 27 sept 2026 y el mapa, del 26 sept 2026\./u,
     );
-    assert.deepStrictEqual(textosMarca(FICHA, compararConCapa(CAPA, CAPA)), {
-      titulo: "Datos de la ficha: 26 sept 2026",
-    });
+    const alDia = textosMarca(FICHA, compararConCapa(CAPA, CAPA));
+    assert.strictEqual(textoPlano(alDia.titulo), "Datos de la ficha: 26 sept 2026");
+    assert.isUndefined(alDia.detalle);
+    // El título explica qué es: la versión de los datos o que la ficha va por delante del mapa.
+    assert.deepStrictEqual(terminosDe([alDia.titulo]), ["version-de-los-datos"]);
+    assert.deepStrictEqual(
+      terminosDe([textosMarca(FICHA, compararConCapa(CAPA, otroDia)).titulo]),
+      ["marca-de-agua"],
+    );
   });
 
   it("el tramo de un expediente sale exacto, con coma decimal y sus dos rangos si los tiene", () => {
@@ -75,14 +89,48 @@ describe("textos de la ficha", () => {
       fecha: CAPA,
       afirma: "presente" as const,
     };
-    assert.deepStrictEqual(textosOrigen(origen), {
-      fuente: "Registro oficial",
-      detalle: "086040, desde el 26 sept 2026",
-      textoEnlace: "Ver en el registro oficial",
-      tono: "presente",
-    });
+    const presente = textosOrigen(origen);
+    assert.strictEqual(textoPlano(presente.fuente), "Registro oficial");
+    assert.strictEqual(textoPlano(presente.detalle), "086040, desde el 26 sept 2026");
+    assert.strictEqual(presente.textoEnlace, "Ver en el registro oficial");
+    assert.strictEqual(presente.tono, "presente");
     const correccion = textosOrigen({ ...origen, fuente: "antenasmoviles", afirma: "desmontada" });
-    assert.strictEqual(correccion.detalle, "086040, la da por desmontada desde el 26 sept 2026");
+    assert.strictEqual(
+      textoPlano(correccion.detalle),
+      "086040, la da por desmontada desde el 26 sept 2026",
+    );
     assert.strictEqual(correccion.tono, "correccion");
+    assert.deepStrictEqual(terminosDe([correccion.fuente, correccion.detalle]), ["correccion"]);
+  });
+
+  it("en «de dónde salen los datos», el registro oficial y la corrección se subrayan una vez", () => {
+    const origen = {
+      fuente: "registro-oficial" as const,
+      clave: "VODAFONE ESPAÑA, S.A.U. - 086040",
+      url: "https://geoportal.minetur.gob.es/",
+      fecha: CAPA,
+      afirma: "presente" as const,
+    };
+    const desmontada = {
+      ...origen,
+      fuente: "antenasmoviles" as const,
+      afirma: "desmontada" as const,
+    };
+    const estacion = (compania: "movistar" | "vodafone") => ({
+      compania,
+      codigos: ["086040"],
+      bandas: [],
+      origenes: [origen, desmontada],
+    });
+    const textos = textosDeOrigenes([estacion("movistar"), estacion("vodafone")]);
+    assert.deepStrictEqual(terminosDe(textos.flat().flatMap((t) => [t.fuente, t.detalle])), [
+      "registro-oficial",
+      "correccion",
+    ]);
+  });
+
+  it("el antetítulo explica qué es un emplazamiento", () => {
+    assert.strictEqual(textoPlano(antetituloDe(FICHA)), "Emplazamiento");
+    assert.deepStrictEqual(terminosDe([antetituloDe(FICHA)]), ["emplazamiento"]);
   });
 });

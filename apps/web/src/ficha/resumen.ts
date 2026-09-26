@@ -1,6 +1,7 @@
 import type { Mhz } from "@celda/dominio/banda";
 import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import type { EstacionDeFicha } from "@celda/dominio/ficha";
+import { llano, marcado, termino, textoPlano, type TextoMarcado } from "@celda/dominio/glosario";
 import {
   BANDAS_NOMINALES,
   FRANJA_DE_BANDA,
@@ -36,19 +37,23 @@ const quienEmite = (estaciones: ReadonlyArray<EstacionDeFicha>): string => {
   return `${nombres(estaciones)} comparten este emplazamiento.`;
 };
 
+const CUATRO_G = termino("4g", "4G");
+const CINCO_G = termino("5g", "5G");
+
 /**
  * Qué generación da, deducida de las bandas. El 5G dice con qué compañías si no lo dan todas:
  * es lo que más cambia de una a otra.
  */
-const queGeneracion = (estaciones: ReadonlyArray<EstacionDeFicha>): string => {
+const queGeneracion = (estaciones: ReadonlyArray<EstacionDeFicha>): TextoMarcado => {
   const con = (generacion: "4G" | "5G") =>
     estaciones.filter((e) => bandasDe(e).some((mhz) => generacionProbable(mhz) === generacion));
   const con4G = con("4G");
   const con5G = con("5G");
-  const cinco = con5G.length === estaciones.length ? "5G" : `5G con ${nombres(con5G)}`;
-  if (con5G.length === 0) return "4G";
+  const todas = con5G.length === estaciones.length;
+  const cinco = todas ? CINCO_G : marcado`${CINCO_G} con ${nombres(con5G)}`;
+  if (con5G.length === 0) return CUATRO_G;
   if (con4G.length === 0) return cinco;
-  return con5G.length === estaciones.length ? "4G y 5G" : `4G, y ${cinco}`;
+  return todas ? marcado`${CUATRO_G} y ${CINCO_G}` : marcado`${CUATRO_G}, y ${cinco}`;
 };
 
 /** Si llega lejos o da velocidad. Solo dice lo que falta si se conocen todas las bandas. */
@@ -76,37 +81,38 @@ const queAlcance = (bandas: ReadonlyArray<Mhz>, completo: boolean): string => {
 
 const mayuscula = (texto: string): string => texto.charAt(0).toUpperCase() + texto.slice(1);
 
+const BANDAS = termino("banda", "bandas");
+
 /**
  * La frase que abre la ficha (historia 13): quién emite, si da 4G o 5G y si llega lejos o da
  * velocidad. El registro oficial no publica la tecnología, así que se deduce de la banda y se
- * dice «probablemente». Lo que no se conoce se dice que no se conoce.
+ * dice «probablemente». Lo que no se conoce se dice que no se conoce. Lleva marcados la banda,
+ * el 4G y el 5G, que se subrayan la primera vez.
  */
-export const fraseDeResumen = (estaciones: ReadonlyArray<EstacionDeFicha>): string => {
+export const fraseDeResumen = (estaciones: ReadonlyArray<EstacionDeFicha>): TextoMarcado => {
   const quien = quienEmite(estaciones);
-  if (estaciones.length === 0) return quien;
+  if (estaciones.length === 0) return llano(quien);
 
   const bandas = BANDAS_NOMINALES.filter((mhz) =>
     estaciones.some((e) => bandasDe(e).includes(mhz)),
   );
   if (bandas.length === 0) {
-    return (
-      `${quien} Aún no se conocen sus bandas, así que no se sabe si da 4G o 5G ` +
-      "ni si llega lejos o da velocidad."
-    );
+    return marcado`${quien} Aún no se conocen sus ${BANDAS}, así que no se sabe si da ${CUATRO_G} o ${CINCO_G} ni si llega lejos o da velocidad.`;
   }
 
   const completo = estaciones.every(conocidaDelTodo);
   const sinBandas = estaciones.filter((e) => bandasDe(e).length === 0);
-  const segun = completo ? "Por sus bandas" : "Por las bandas que se conocen";
+  const segun = completo ? marcado`Por sus ${BANDAS}` : marcado`Por las ${BANDAS} que se conocen`;
   const falta =
     sinBandas.length === 0 ? "" : ` De ${nombres(sinBandas)} aún no se conocen las bandas.`;
-  return (
-    `${quien} ${segun}, probablemente da ${queGeneracion(estaciones)}. ` +
-    `${mayuscula(queAlcance(bandas, completo))}.${falta}`
-  );
+  return marcado`${quien} ${segun}, probablemente da ${queGeneracion(estaciones)}. ${mayuscula(queAlcance(bandas, completo))}.${falta}`;
 };
 
-export const TITULO_EJE = "Qué frecuencia usa cada compañía (MHz)";
+/** El título del eje de frecuencias, con la frecuencia y los MHz explicados. */
+export const TITULO_EJE: TextoMarcado = marcado`Qué ${termino("banda", "frecuencia")} usa cada compañía (${termino("mhz", "MHz")})`;
+
+/** El mismo título, llano: el nombre accesible de la tabla. */
+export const NOMBRE_EJE = textoPlano(TITULO_EJE);
 
 /** Las filas del eje de frecuencias (historia 14): una por compañía, con sus bandas nominales. */
 export const filasDelEje = (estaciones: ReadonlyArray<EstacionDeFicha>): ReadonlyArray<FilaEje> =>
@@ -152,8 +158,4 @@ export const datosTecnicosDe = (
     })),
   }));
 
-export const NOTA_TECNICA =
-  "El registro oficial no publica la tecnología, la orientación de los sectores, la altura ni " +
-  "la potencia, y Celda aún no tiene los identificadores de celda. La tecnología probable se " +
-  "deduce de la banda. En España, el 700 y el 3500 MHz se subastaron para 5G, y el resto se " +
-  "usa sobre todo para 4G.";
+export const NOTA_TECNICA: TextoMarcado = marcado`El registro oficial no publica la tecnología, la ${termino("azimut", "orientación de los sectores")}, la altura ni la potencia, y Celda aún no tiene los ${termino("identificador-de-celda", "identificadores de celda")}. La tecnología probable se deduce de la banda. En España, el 700 y el 3500 MHz se subastaron para 5G, y el resto se usa sobre todo para 4G.`;

@@ -1,4 +1,5 @@
 import { CapaIlegible, type CapaLeida, VersionDistinta } from "@celda/dominio/capa";
+import { textoPlano } from "@celda/dominio/glosario";
 import { assert, describe, it } from "@effect/vitest";
 import * as Exit from "effect/Exit";
 
@@ -36,7 +37,7 @@ describe("estado de la capa", () => {
   it("la fecha de los datos es la de Barcelona, no la de UTC", () => {
     // Las 23:44 UTC del 25 son la 1:44 del 26 en Barcelona.
     assert.strictEqual(
-      textoDatosDelMapa(Date.UTC(2026, 8, 25, 23, 44, 53)),
+      textoPlano(textoDatosDelMapa(Date.UTC(2026, 8, 25, 23, 44, 53))),
       "Datos del mapa: 26 sept 2026",
     );
   });
