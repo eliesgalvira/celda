@@ -18,8 +18,8 @@ const LUGAR = "font-mono text-xs leading-4 text-tinta-suave";
 const FILA_LOGOS = "mt-2 flex min-h-10 items-center gap-3";
 
 export interface CabeceraFichaProps {
-  /** Qué es, en pocas palabras: «Emplazamiento compartido». */
-  readonly antetitulo: string;
+  /** Qué es, en pocas palabras: «Emplazamiento compartido». Puede llevar un `Termino`. */
+  readonly antetitulo: JSX.Element;
   readonly titulo: string;
   /** Dónde está: el municipio o el barrio. */
   readonly lugar: string;
@@ -83,7 +83,8 @@ export function EsqueletoFicha() {
 }
 
 export interface SeccionFichaProps {
-  readonly titulo: string;
+  /** El título en versalitas. Puede llevar un `Termino`. */
+  readonly titulo: JSX.Element;
   readonly children: JSX.Element;
 }
 
@@ -145,9 +146,9 @@ export const variantesOrigen = cva("flex flex-wrap items-center gap-x-2 text-sm"
 });
 
 export type OrigenFichaProps = VariantProps<typeof variantesOrigen> & {
-  readonly fuente: string;
+  readonly fuente: JSX.Element;
   /** Qué dice y desde cuándo: «lo dice desde el 26 sept 2026». */
-  readonly detalle: string;
+  readonly detalle: JSX.Element;
   readonly enlace: string;
   readonly textoEnlace: string;
 };
@@ -184,7 +185,7 @@ export const variantesMarcaFicha = cva("flex flex-col gap-1 px-5 py-3 md:px-6", 
 });
 
 export type MarcaDeAguaFichaProps = VariantProps<typeof variantesMarcaFicha> & {
-  readonly titulo: string;
+  readonly titulo: JSX.Element;
   readonly children?: JSX.Element;
 };
 

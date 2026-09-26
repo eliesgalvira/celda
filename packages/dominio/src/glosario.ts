@@ -279,12 +279,13 @@ export const terminosDe = (textos: ReadonlyArray<TextoMarcado>): ReadonlyArray<T
   textos.flatMap((texto) => texto.flatMap((f) => (f.termino === undefined ? [] : [f.termino])));
 
 /**
- * Deja marcada solo la primera aparición de cada término en un bloque de textos, que se leen en
- * orden. Así un término se subraya una vez por bloque y no en cada frase.
+ * Un bloque de textos que se leen en orden, como una sección del panel. Cada texto que pasa por
+ * él conserva marcados solo los términos que aún no habían salido en el bloque, así que un
+ * término se subraya una vez por bloque y no en cada frase.
  */
-export const primeraVezEn = (textos: ReadonlyArray<TextoMarcado>): ReadonlyArray<TextoMarcado> => {
+export const bloque = (): ((texto: TextoMarcado) => TextoMarcado) => {
   const vistos = new Set<Termino>();
-  return textos.map((texto) =>
+  return (texto) =>
     juntar(
       texto.map((fragmento) => {
         if (fragmento.termino === undefined) return fragmento;
@@ -292,9 +293,12 @@ export const primeraVezEn = (textos: ReadonlyArray<TextoMarcado>): ReadonlyArray
         vistos.add(fragmento.termino);
         return fragmento;
       }),
-    ),
-  );
+    );
 };
+
+/** Unos textos leídos en orden como un solo bloque. */
+export const primeraVezEn = (textos: ReadonlyArray<TextoMarcado>): ReadonlyArray<TextoMarcado> =>
+  textos.map(bloque());
 
 /** `primeraVezEn` para un solo texto. */
 export const primeraVez = (texto: TextoMarcado): TextoMarcado => primeraVezEn([texto])[0] ?? [];

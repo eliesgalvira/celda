@@ -1,7 +1,10 @@
 import type { Compania } from "@celda/dominio/compania";
-import { For, Show } from "solid-js";
+import type { Termino as CualTermino } from "@celda/dominio/glosario";
+import type { JSX } from "@solidjs/web";
+import { createMemo, For, Show } from "solid-js";
 
 import { LogoCompanias } from "../marcadores/LogoCompanias.tsx";
+import { Termino } from "../termino/Termino.tsx";
 
 /** Un expediente tal como lo publica la fuente, ya escrito. */
 export interface ExpedienteTecnico {
@@ -34,21 +37,33 @@ export interface EstacionTecnica {
 
 export interface DatosTecnicosProps {
   readonly estaciones: ReadonlyArray<EstacionTecnica>;
-  /** Qué no publica ninguna fuente y qué es deducción. */
-  readonly nota: string;
+  /** Qué no publica ninguna fuente y qué es deducción. Puede llevar términos. */
+  readonly nota: JSX.Element;
 }
 
 const CELDA = "py-1 pr-2 align-top";
+
+/** Las columnas de cada tabla de expedientes, con el término que explica cada una. */
+const COLUMNAS: ReadonlyArray<{ readonly texto: string; readonly termino: CualTermino }> = [
+  { texto: "Expediente", termino: "expediente" },
+  { texto: "Tramo publicado", termino: "tramo" },
+  { texto: "Banda", termino: "banda" },
+  { texto: "Tecnología probable", termino: "tecnologia" },
+];
 
 /**
  * Los datos técnicos de la ficha (historia 19), para quien quiera comprobarlos: cada expediente
  * con su tramo exacto, y de dónde sale cada estación base. Va dentro de un `Desplegable`.
  */
 export function DatosTecnicos(props: DatosTecnicosProps) {
+  /** Los términos de las columnas se subrayan una vez, en la primera tabla. */
+  const primeraTabla = createMemo(() =>
+    props.estaciones.findIndex((estacion) => estacion.expedientes.length > 0),
+  );
   return (
     <div class="flex flex-col gap-4">
       <For each={props.estaciones}>
-        {(estacion) => (
+        {(estacion, indice) => (
           <section class="flex flex-col gap-1.5">
             <div class="flex items-center gap-2">
               <LogoCompanias companias={[estacion.compania]} tamano={20} />
@@ -63,18 +78,24 @@ export function DatosTecnicos(props: DatosTecnicosProps) {
                 <caption class="sr-only">{`Expedientes de ${estacion.nombre}`}</caption>
                 <thead class="text-left text-tinta-suave">
                   <tr>
-                    <th scope="col" class={`${CELDA} font-normal`}>
-                      Expediente
-                    </th>
-                    <th scope="col" class={`${CELDA} font-normal`}>
-                      Tramo publicado
-                    </th>
-                    <th scope="col" class={`${CELDA} font-normal`}>
-                      Banda
-                    </th>
-                    <th scope="col" class="py-1 align-top font-normal">
-                      Tecnología probable
-                    </th>
+                    <For each={COLUMNAS}>
+                      {(columna, i) => (
+                        <th
+                          scope="col"
+                          class={
+                            i() === COLUMNAS.length - 1
+                              ? "py-1 align-top font-normal"
+                              : `${CELDA} font-normal`
+                          }
+                        >
+                          {indice() === primeraTabla() ? (
+                            <Termino termino={columna.termino}>{columna.texto}</Termino>
+                          ) : (
+                            columna.texto
+                          )}
+                        </th>
+                      )}
+                    </For>
                   </tr>
                 </thead>
                 <tbody>
