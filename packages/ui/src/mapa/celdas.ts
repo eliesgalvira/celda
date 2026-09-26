@@ -7,7 +7,8 @@ import type {
 /**
  * Cómo se dibujan las celdas en el mapa, como en el prototipo v8: un trazo fino del color primario
  * para todas y, al seleccionar un emplazamiento, su celda remarcada y las demás casi invisibles,
- * para que no se amontonen líneas alrededor de la que importa.
+ * para que no se amontonen líneas alrededor de la que importa. El relleno de la seleccionada es el
+ * degradado de `servicio.ts`.
  */
 
 /** La fuente GeoJSON de las celdas. Cada polígono lleva la `clave` de su emplazamiento. */
@@ -25,7 +26,6 @@ const FUNDIDO = 0.5;
 
 const CAPA_BORDES = "celdas";
 const CAPA_SELECCIONADA = "celda-seleccionada";
-const CAPA_SELECCIONADA_RELLENO = "celda-seleccionada-relleno";
 /** El contorno discontinuo de la seleccionada, que la sustituye con la vista de interferencia. */
 const CAPA_SELECCIONADA_CONTORNO = "celda-seleccionada-contorno";
 
@@ -53,14 +53,6 @@ const deLaCelda = (clave: string | null): FilterSpecification => [
  * calles, que se siguen leyendo encima de las líneas.
  */
 export const capasCeldas = (color: string): ReadonlyArray<LayerSpecification> => [
-  {
-    id: CAPA_SELECCIONADA_RELLENO,
-    type: "fill",
-    source: FUENTE_CELDAS,
-    minzoom: ZOOM_CELDAS,
-    filter: deLaCelda(null),
-    paint: { "fill-color": color, "fill-opacity": conFundido(0.1) },
-  },
   {
     id: CAPA_BORDES,
     type: "line",
@@ -114,7 +106,6 @@ export interface MapaConCeldas {
  */
 export const remarcarCelda = (mapa: MapaConCeldas, clave: string | null): void => {
   mapa.setFilter(CAPA_SELECCIONADA, deLaCelda(clave));
-  mapa.setFilter(CAPA_SELECCIONADA_RELLENO, deLaCelda(clave));
   mapa.setFilter(CAPA_SELECCIONADA_CONTORNO, deLaCelda(clave));
   mapa.setPaintProperty(
     CAPA_BORDES,
@@ -133,8 +124,7 @@ export interface MapaConCapasOcultables {
 }
 
 /**
- * Con `soloContorno`, oculta las celdas y el relleno de la seleccionada y deja de esta solo su
- * contorno discontinuo: lo que se ve con la vista de interferencia encima. Sin él, las vuelve a
+ * Con `soloContorno`, oculta las celdas y deja de la seleccionada solo su contorno discontinuo: lo que se ve con la vista de interferencia encima. Sin él, las vuelve a
  * dibujar como siempre.
  */
 export const ocultarCeldasSalvoContorno = (
@@ -142,7 +132,7 @@ export const ocultarCeldasSalvoContorno = (
   soloContorno: boolean,
 ): void => {
   const normal = soloContorno ? "none" : "visible";
-  for (const capa of [CAPA_BORDES, CAPA_SELECCIONADA, CAPA_SELECCIONADA_RELLENO]) {
+  for (const capa of [CAPA_BORDES, CAPA_SELECCIONADA]) {
     mapa.setLayoutProperty(capa, "visibility", normal);
   }
   mapa.setLayoutProperty(

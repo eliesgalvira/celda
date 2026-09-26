@@ -3,6 +3,12 @@ import type { ExpressionSpecification, FilterSpecification, StyleSpecification }
 import { capasCeldas, FUENTE_CELDAS } from "./celdas.ts";
 import { comoRgb, leerOklch } from "./color.ts";
 import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
+import {
+  capasServicioDebajo,
+  capasServicioEncima,
+  FUENTE_SERVICIO,
+  FUENTE_SERVICIO_LINEA,
+} from "./servicio.ts";
 
 /** Los tokens del tema que pinta el mapa base. Cada uno es una variable `--mapa-*` de tema.css. */
 export const TOKENS_MAPA = [
@@ -26,6 +32,7 @@ export const TOKENS_MAPA = [
   "mapa-sinr-4",
   "mapa-sinr-5",
   "mapa-sinr-6",
+  "mapa-referencia",
 ] as const;
 
 export type TokenMapa = (typeof TOKENS_MAPA)[number];
@@ -63,8 +70,9 @@ const AVENIDAS = ["motorway", "trunk", "primary"];
 /**
  * El estilo del mapa base de OpenFreeMap (esquema OpenMapTiles) con los
  * colores del tema. No lleva ningún color escrito: todos salen de `color`.
- * Lleva también las capas de las celdas y de la vista de interferencia, con
- * sus fuentes vacías hasta que la web las llena (`FUENTE_CELDAS` y
+ * Lleva también las capas de las celdas, del sector que da servicio y de la
+ * vista de interferencia, con sus fuentes vacías hasta que la web las llena
+ * (`FUENTE_CELDAS`, `FUENTE_SERVICIO`, `FUENTE_SERVICIO_LINEA` y
  * `FUENTE_INTERFERENCIA`).
  */
 export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
@@ -73,6 +81,11 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
   sources: {
     [FUENTE_MAPA_BASE]: { type: "vector", url: `${OPENFREEMAP}/planet` },
     [FUENTE_CELDAS]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+    [FUENTE_SERVICIO]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+    [FUENTE_SERVICIO_LINEA]: {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    },
     [FUENTE_INTERFERENCIA]: {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
@@ -175,7 +188,9 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       color("mapa-sinr-5"),
       color("mapa-sinr-6"),
     ]),
+    ...capasServicioDebajo(color("mapa-celda")),
     ...capasCeldas(color("mapa-celda")),
+    ...capasServicioEncima(color("mapa-celda"), color("mapa-referencia")),
     {
       id: "nombres-de-calles",
       type: "symbol",

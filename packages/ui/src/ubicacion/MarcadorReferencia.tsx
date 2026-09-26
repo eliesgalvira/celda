@@ -1,4 +1,5 @@
 import { type JSX, Portal } from "@solidjs/web";
+import { cva, type VariantProps } from "class-variance-authority";
 
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
@@ -189,6 +190,47 @@ export function PuntoElegido(props: PuntoElegidoProps) {
         PUNTO
       </span>
     </button>
+  );
+}
+
+export const variantesEtiquetaReferencia = cva(
+  "cinta absolute top-0 left-0 -translate-y-1/2 bg-referencia px-2.5 font-mono text-[11px] leading-5 font-bold whitespace-nowrap text-referencia-fg drop-shadow-marcador [--pico:6px]",
+  {
+    variants: {
+      /** Al lado contrario de la línea que va al emplazamiento, para no taparla. */
+      lado: {
+        derecha: "ml-6",
+        izquierda: "-ml-6 -translate-x-full",
+      },
+    },
+    defaultVariants: { lado: "derecha" },
+  },
+);
+
+export type EtiquetaReferenciaProps = VariantProps<typeof variantesEtiquetaReferencia> & {
+  readonly x: number;
+  readonly y: number;
+  readonly texto: string;
+};
+
+/**
+ * La etiqueta junto al punto de referencia con la distancia y el sector que da servicio, como
+ * «340 m · sector 2». Va al lado del hexágono, sin tapar la línea ni la cinta «PUNTO».
+ */
+export function EtiquetaReferencia(props: EtiquetaReferenciaProps) {
+  return (
+    <div
+      aria-hidden="true"
+      class="absolute top-0 left-0 will-change-transform"
+      style={{ transform: `translate(${props.x.toFixed(1)}px, ${props.y.toFixed(1)}px)` }}
+    >
+      <span
+        data-lado={props.lado ?? "derecha"}
+        class={variantesEtiquetaReferencia({ lado: props.lado })}
+      >
+        {props.texto}
+      </span>
+    </div>
   );
 }
 

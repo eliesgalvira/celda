@@ -78,6 +78,11 @@ export type ConReferenciaProps = VariantProps<typeof variantesMarcaReferencia> &
   readonly desde: JSX.Element;
   /** Dónde queda el emplazamiento visto desde el punto. */
   readonly relacion: string;
+  /**
+   * El sector que da servicio (`LecturaServicio`), que dice también la distancia y el rumbo: si
+   * está, va en lugar de `relacion`.
+   */
+  readonly servicio?: JSX.Element | undefined;
   /** Si la distancia es aproximada por el margen del GPS. Puede llevar términos. */
   readonly margen?: JSX.Element | undefined;
   /** Cambiar y quitar el punto (historia 33). */
@@ -97,7 +102,12 @@ export function ConReferencia(props: ConReferenciaProps) {
         </p>
         <div class="flex">{props.acciones}</div>
       </div>
-      <p class="text-sm leading-relaxed">{props.relacion}</p>
+      <Show
+        when={props.servicio}
+        fallback={<p class="text-sm leading-relaxed">{props.relacion}</p>}
+      >
+        {props.servicio}
+      </Show>
       <Show when={props.margen}>
         <p class="text-xs leading-snug text-tinta-suave">{props.margen}</p>
       </Show>
