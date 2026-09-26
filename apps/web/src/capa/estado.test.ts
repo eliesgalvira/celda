@@ -3,7 +3,7 @@ import { textoPlano } from "@celda/dominio/glosario";
 import { assert, describe, it } from "@effect/vitest";
 import * as Exit from "effect/Exit";
 
-import { estadoDeCarga, textoDatosDelMapa } from "./estado.ts";
+import { creditoDeBarrios, estadoDeCarga, textoDatosDelMapa } from "./estado.ts";
 import { FUENTE_DE_BARRIOS } from "./pruebas.ts";
 import {
   BackendNoResponde,
@@ -39,6 +39,13 @@ describe("estado de la capa", () => {
       "danada",
     );
     assert.strictEqual(motivo(Exit.die("se ha roto")), "interno");
+  });
+
+  it("el crédito de los límites de barrio lleva su autor, su fecha y su licencia", () => {
+    assert.deepStrictEqual(creditoDeBarrios(FUENTE_DE_BARRIOS), {
+      texto: "Ajuntament de Barcelona (barrios, 12 nov 2024, CC BY 4.0)",
+      enlace: FUENTE_DE_BARRIOS.enlace,
+    });
   });
 
   it("la fecha de los datos es la de Barcelona, no la de UTC", () => {

@@ -13,7 +13,12 @@ import * as Effect from "effect/Effect";
 import type { Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
-import { type EstadoCapa, estadoDeCarga, textoDatosDelMapa } from "../capa/estado.ts";
+import {
+  creditoDeBarrios,
+  type EstadoCapa,
+  estadoDeCarga,
+  textoDatosDelMapa,
+} from "../capa/estado.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
 import { usarDatos } from "../datos.tsx";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
@@ -177,6 +182,17 @@ export function PantallaMapa() {
     const actual = capa();
     return actual.tipo === "lista" ? actual.capa.emplazamientos : [];
   });
+  const barrios = createMemo(() => {
+    const actual = capa();
+    return actual.tipo === "lista" ? actual.capa.barrios : [];
+  });
+  /** Los créditos del mapa base y, con la capa, los de los límites de barrio que usa. */
+  const creditos = createMemo(() => {
+    const actual = capa();
+    return actual.tipo === "lista"
+      ? [...CREDITOS_MAPA_BASE, creditoDeBarrios(actual.capa.fuenteDeBarrios)]
+      : CREDITOS_MAPA_BASE;
+  });
 
   /** El emplazamiento con la ficha abierta, que dice la URL. */
   const seleccionada = createMemo(() => emplazamientoDe(ubicacion()));
@@ -272,6 +288,7 @@ export function PantallaMapa() {
                 <Marcadores
                   mapa={actual()}
                   emplazamientos={emplazamientos()}
+                  barrios={barrios()}
                   seleccionada={seleccionada()}
                   alSeleccionar={seleccionar}
                 />
@@ -309,7 +326,7 @@ export function PantallaMapa() {
             />
           </>
         }
-        atribucion={<Atribucion creditos={CREDITOS_MAPA_BASE} />}
+        atribucion={<Atribucion creditos={creditos()} />}
         aviso={aviso()}
         panelAbierto={seleccionada() !== null}
         panel={

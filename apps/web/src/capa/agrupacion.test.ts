@@ -1,5 +1,6 @@
 import type { Rectangulo } from "@celda/dominio/area";
-import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
+import type { Barrio } from "@celda/dominio/barrio";
+import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import { assert, describe, it } from "@effect/vitest";
 
 import {
@@ -7,7 +8,9 @@ import {
   crearAgrupador,
   type Elemento,
   type ElementoAgrupacion,
+  type ElementoBarrio,
   type Escena,
+  NIVEL_DE_BARRIOS,
   nivelDeZoom,
 } from "./agrupacion.ts";
 
@@ -16,11 +19,12 @@ const MUNDO: Rectangulo = {
   noreste: { longitud: 180, latitud: 85 },
 };
 
-const en = (clave: string, longitud: number, latitud: number): EmplazamientoDeCapa => ({
+const en = (clave: string, longitud: number, latitud: number): EmplazamientoLeido => ({
   clave,
   posicion: { longitud, latitud },
   estado: "verificado",
   companias: ["movistar"],
+  barrio: null,
 });
 
 /** Generador pseudoaleatorio con semilla (mulberry32): las pruebas dan siempre lo mismo. */
@@ -38,7 +42,7 @@ const azar = (semilla: number) => {
  * 600 emplazamientos sintéticos por Barcelona: la mitad repartidos por el área y la otra mitad en
  * tres núcleos densos, como el Eixample, donde hay agrupaciones a casi todos los niveles.
  */
-const SINTETICOS: ReadonlyArray<EmplazamientoDeCapa> = (() => {
+const SINTETICOS: ReadonlyArray<EmplazamientoLeido> = (() => {
   const r = azar(13);
   const nucleos = [
     [2.165, 41.392],
@@ -234,5 +238,159 @@ describe("una agrupación que ya existía en el nivel fino", () => {
       noreste: { longitud: 2.19, latitud: 41.4 },
     };
     assert.deepStrictEqual([...agrupador.escena(17, caja).elementos.keys()], ["e:c"]);
+  });
+});
+
+describe("nivel de barrios", () => {
+  // Tres barrios por franjas de longitud, al norte de 41,36°, y un cuarto sin emplazamientos. Lo
+  // que queda al sur es «fuera de Barcelona». Los emplazamientos pares son de Movistar y los
+  // impares de Vodafone, salvo en el barrio 03, donde solo hay de Movistar.
+  const barrioDe = (longitud: number, latitud: number): string | null => {
+    if (latitud < 41.36) return null;
+    if (longitud < 2.12) return "01";
+    return longitud < 2.17 ? "02" : "03";
+  };
+  const CON_BARRIO: ReadonlyArray<EmplazamientoLeido> = SINTETICOS.map((e, i) => {
+    const barrio = barrioDe(e.posicion.longitud, e.posicion.latitud);
+    return {
+      ...e,
+      barrio,
+      companias: barrio === "03" || i % 2 === 0 ? ["movistar"] : ["vodafone"],
+    };
+  });
+  const BARRIOS: ReadonlyArray<Barrio> = [
+    { codigo: "01", nombre: "Oeste", etiqueta: { longitud: 2.09, latitud: 41.4 } },
+    { codigo: "02", nombre: "Centro", etiqueta: { longitud: 2.145, latitud: 41.4 } },
+    { codigo: "03", nombre: "Este", etiqueta: { longitud: 2.2, latitud: 41.42 } },
+    { codigo: "04", nombre: "Vacío", etiqueta: { longitud: 2.3, latitud: 41.45 } },
+  ];
+  const agrupador = crearAgrupador(CON_BARRIO, BARRIOS);
+  const sinBarrios = crearAgrupador(CON_BARRIO);
+
+  const barriosDe = (escena: Escena): ReadonlyArray<ElementoBarrio> =>
+    [...escena.elementos.values()].filter((e) => e.tipo === "barrio");
+
+  it("cada emplazamiento de Barcelona va en su barrio y los de fuera, en hexágonos", () => {
+    const escena = agrupador.escena(NIVEL_DE_BARRIOS, MUNDO);
+    const barrios = barriosDe(escena);
+    assert.deepStrictEqual(
+      barrios.map((b) => b.resumen.barrio.codigo),
+      ["01", "02", "03", "04"],
+    );
+    let suma = 0;
+    for (const e of escena.elementos.values()) {
+      const suyos = agrupador.emplazamientosDe(e);
+      if (e.tipo === "barrio") {
+        assert.strictEqual(e.resumen.emplazamientos, suyos.length);
+        assert.isTrue(suyos.every((s) => s.barrio === e.resumen.barrio.codigo));
+        suma += e.resumen.emplazamientos;
+      } else {
+        assert.isTrue(
+          suyos.every((s) => s.barrio === null),
+          `${e.clave} mezcla barrios`,
+        );
+        suma += suyos.length;
+      }
+    }
+    assert.strictEqual(suma, CON_BARRIO.length);
+    assert.isAbove(escena.elementos.size, barrios.length, "hay emplazamientos fuera de Barcelona");
+  });
+
+  it("cada barrio dice sus ausencias, y el vacío las tiene todas", () => {
+    const porCodigo = new Map(
+      barriosDe(agrupador.escena(NIVEL_DE_BARRIOS, MUNDO)).map((b) => [
+        b.resumen.barrio.codigo,
+        b.resumen,
+      ]),
+    );
+    assert.deepStrictEqual(porCodigo.get("02")?.ausentes, []);
+    assert.deepStrictEqual(porCodigo.get("03")?.ausentes, ["vodafone"]);
+    assert.strictEqual(porCodigo.get("04")?.emplazamientos, 0);
+    assert.deepStrictEqual(porCodigo.get("04")?.ausentes, ["movistar", "vodafone"]);
+  });
+
+  it("fuera del nivel de barrios, la agrupación es la de siempre", () => {
+    for (const nivel of [NIVEL_DE_BARRIOS - 1, NIVEL_DE_BARRIOS + 1]) {
+      assert.deepStrictEqual(
+        [...agrupador.escena(nivel, MUNDO).elementos.keys()],
+        [...sinBarrios.escena(nivel, MUNDO).elementos.keys()],
+      );
+    }
+    assert.lengthOf(barriosDe(sinBarrios.escena(NIVEL_DE_BARRIOS, MUNDO)), 0);
+  });
+
+  /** Los emplazamientos de `parte` que también están en `todo`. */
+  const enComun = (todo: Elemento, parte: Elemento): number => {
+    const deTodo = new Set(claves(agrupador, todo));
+    return claves(agrupador, parte).filter((clave) => deTodo.has(clave)).length;
+  };
+
+  /**
+   * Al alejar de `fino` a `grueso`, cada elemento que desaparece va al que recoge más
+   * emplazamientos suyos; al acercar, sale de ese mismo.
+   */
+  const comprobarSalto = (fino: number, grueso: number) => {
+    const escenaFina = agrupador.escena(fino, MUNDO);
+    const escenaGruesa = agrupador.escena(grueso, MUNDO);
+    const alejar = agrupador.transicion(escenaFina, escenaGruesa);
+    assert.strictEqual(alejar.origen.size, 0);
+    for (const e of escenaFina.elementos.values()) {
+      if (escenaGruesa.elementos.has(e.clave)) continue;
+      const destino = alejar.destino.get(e.clave);
+      if (claves(agrupador, e).length === 0) {
+        assert.isUndefined(destino, `${e.clave} no tiene emplazamientos y se apaga en su sitio`);
+        continue;
+      }
+      assert.isDefined(destino, `${e.clave} desaparece de ${fino} a ${grueso} sin destino`);
+      const suyo = elemento(escenaGruesa, destino ?? "");
+      for (const otro of escenaGruesa.elementos.values()) {
+        assert.isAtLeast(enComun(suyo, e), enComun(otro, e), `${e.clave} va a ${suyo.clave}`);
+      }
+    }
+    const acercar = agrupador.transicion(escenaGruesa, escenaFina);
+    assert.strictEqual(acercar.destino.size, 0);
+    assert.deepStrictEqual([...acercar.origen].toSorted(), [...alejar.destino].toSorted());
+  };
+
+  it("al alejar hasta los barrios, cada hexágono va al barrio que recoge la mayoría de los suyos", () => {
+    comprobarSalto(NIVEL_DE_BARRIOS + 1, NIVEL_DE_BARRIOS);
+    comprobarSalto(17, NIVEL_DE_BARRIOS);
+  });
+
+  it("al alejar desde los barrios, cada barrio va al hexágono que recoge la mayoría de los suyos", () => {
+    comprobarSalto(NIVEL_DE_BARRIOS, NIVEL_DE_BARRIOS - 1);
+    comprobarSalto(NIVEL_DE_BARRIOS, 9);
+  });
+
+  it("pulsar un barrio acerca hasta el primer nivel sin barrios", () => {
+    const centro = barriosDe(agrupador.escena(NIVEL_DE_BARRIOS, MUNDO)).find(
+      (b) => b.resumen.barrio.codigo === "02",
+    );
+    assert.isDefined(centro);
+    if (centro === undefined) return;
+    const zoom = agrupador.zoomDeApertura(centro);
+    assert.strictEqual(zoom, NIVEL_DE_BARRIOS + 1);
+    assert.lengthOf(barriosDe(agrupador.escena(nivelDeZoom(zoom), MUNDO)), 0);
+  });
+
+  it("el seleccionado se ve suelto y su barrio lo sigue contando", () => {
+    const seleccionado = CON_BARRIO.find((e) => e.barrio === "01");
+    assert.isDefined(seleccionado);
+    const clave = seleccionado?.clave ?? "";
+    const escena = agrupador.escena(NIVEL_DE_BARRIOS, MUNDO, clave);
+    assert.isTrue(escena.elementos.has(`e:${clave}`));
+    const oeste = elemento(escena, "b:01");
+    assert.include(claves(agrupador, oeste), clave);
+  });
+
+  it("solo dibuja los barrios cuya etiqueta cae en la caja", () => {
+    const caja: Rectangulo = {
+      suroeste: { longitud: 2.13, latitud: 41.39 },
+      noreste: { longitud: 2.16, latitud: 41.41 },
+    };
+    assert.deepStrictEqual(
+      barriosDe(agrupador.escena(NIVEL_DE_BARRIOS, caja)).map((b) => b.clave),
+      ["b:02"],
+    );
   });
 });
