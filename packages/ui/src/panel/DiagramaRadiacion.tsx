@@ -164,8 +164,8 @@ export interface DiagramaRadiacionProps {
   readonly modelo: string;
   /** Una línea por sector bajo el diagrama, como «Sector 1 · 0°». */
   readonly leyenda: ReadonlyArray<string>;
-  /** De dónde sale la forma y la orientación. */
-  readonly notas: ReadonlyArray<string>;
+  /** De dónde sale la forma y la orientación. Pueden llevar términos. */
+  readonly notas: ReadonlyArray<JSX.Element>;
   /** La atenuación en el centro del diagrama, en dB positivos. */
   readonly atenuacionMaxima: number;
   /** Hacia dónde apuntan los sectores, en grados: los dB se escriben lejos de ellos. */

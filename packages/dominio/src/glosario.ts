@@ -26,6 +26,7 @@ export const TERMINOS = [
   "marca-de-agua",
   "modo-de-informacion",
   "identificador-de-celda",
+  "modelo",
 ] as const;
 
 export type Termino = (typeof TERMINOS)[number];
@@ -214,6 +215,14 @@ export const GLOSARIO: Glosario = {
       "el modo de información, pero el registro oficial no lo publica.",
     tecnico: "Cell ID (ECI en 4G, NCI en 5G)",
     relacionados: ["sector", "modo-de-informacion", "celda"],
+  },
+  modelo: {
+    nombre: "Modelo",
+    explicacion:
+      "Un cálculo que imita cómo se suele comportar la señal. No es una medida: Celda lo marca " +
+      "siempre como modelo, con su versión, para que no se confunda con un dato.",
+    tecnico: "simulación",
+    relacionados: ["sector", "azimut"],
   },
 };
 
