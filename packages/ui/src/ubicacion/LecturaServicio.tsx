@@ -27,7 +27,7 @@ export interface LecturaServicioProps {
 }
 
 const CASILLA =
-  "chaflan flex min-h-[4.25rem] flex-col items-center justify-center gap-0.5 bg-superficie px-1.5 py-2 text-center [--corte:8px]";
+  "chaflan flex min-h-[4.25rem] flex-col items-center justify-center gap-0.5 bg-superficie-alta px-1.5 py-2 text-center [--corte:8px]";
 
 /** El sector que da servicio al punto de referencia (historia 30). */
 export function LecturaServicio(props: LecturaServicioProps) {
