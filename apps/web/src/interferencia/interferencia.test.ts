@@ -1,0 +1,222 @@
+import type { Coordenada } from "@celda/dominio/area";
+import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
+import { desdePlano } from "@celda/dominio/plano";
+import { sinr } from "@celda/sim/sinr";
+import { assert, describe, it } from "@effect/vitest";
+
+import {
+  bandaInicial,
+  companiasDeLaCapa,
+  type Encuadre,
+  type EntradaSinr,
+  metrosPorPixel,
+  ORIGEN_VISTA,
+  palabraDeSinr,
+  pedirSinr,
+  RADIO_HEXAGONO_PX,
+  recuentoDe,
+  textoDb,
+  tramaEnMapa,
+  tratoDe,
+  valorEnPunto,
+  ZOOM_INTERFERENCIA,
+} from "./interferencia.ts";
+import { textoDeEstaciones } from "./textos.ts";
+
+/** Un punto a tantos metros al este y al norte del origen de la vista. */
+const en = (este: number, norte: number): Coordenada => desdePlano(ORIGEN_VISTA, { este, norte });
+
+const emplazamiento = (
+  clave: string,
+  este: number,
+  norte: number,
+  resto: Partial<EmplazamientoDeCapa> = {},
+): EmplazamientoDeCapa => ({
+  clave,
+  posicion: en(este, norte),
+  estado: "verificado",
+  companias: ["movistar"],
+  ...resto,
+});
+
+/** Un panal de Movistar cada 400 m: uno en 1800 confirmado y el resto sin bandas leídas. */
+const PANAL: ReadonlyArray<EmplazamientoDeCapa> = [
+  emplazamiento("centro", 0, 0, { bandas: [{ compania: "movistar", mhz: [800, 1800] }] }),
+  ...Array.from({ length: 6 }, (_, k) => {
+    const radianes = ((30 + 60 * k) * Math.PI) / 180;
+    return emplazamiento(`vecino-${k}`, 400 * Math.sin(radianes), 400 * Math.cos(radianes));
+  }),
+];
+
+const ENCUADRE: Encuadre = { suroeste: en(-600, -400), noreste: en(600, 400), zoom: 16 };
+
+const entrada = (resto: Partial<EntradaSinr> = {}): EntradaSinr => ({
+  emplazamientos: PANAL,
+  eleccion: { compania: "movistar", mhz: 1800, ocupacion: 0.5 },
+  encuadre: ENCUADRE,
+  referencia: en(50, 120),
+  ...resto,
+});
+
+const calcular = (datos: EntradaSinr) => {
+  const pedida = pedirSinr(datos);
+  if (pedida === undefined) throw new Error("no hay nada que calcular");
+  return { pedida, resultado: sinr.ejecutar(pedida.params, pedida.malla) };
+};
+
+describe("estaciones de la vista de interferencia", () => {
+  it("entran las confirmadas en la banda y las que no tienen bandas leídas, no las de otras", () => {
+    const conBandas = emplazamiento("a", 0, 0, {
+      companias: ["movistar", "orange"],
+      bandas: [{ compania: "movistar", mhz: [800] }],
+    });
+    assert.strictEqual(tratoDe(conBandas, "movistar", 800), "confirmada");
+    assert.strictEqual(tratoDe(conBandas, "movistar", 1800), "otra-banda");
+    assert.strictEqual(tratoDe(conBandas, "orange", 1800), "supuesta");
+    assert.strictEqual(tratoDe(conBandas, "vodafone", 1800), undefined);
+    assert.deepStrictEqual(recuentoDe([...PANAL, conBandas], "movistar", 1800), {
+      confirmada: 1,
+      supuesta: 6,
+      "otra-banda": 1,
+    });
+  });
+
+  it("la cuenta de estaciones dice qué se supone, con el recuento", () => {
+    assert.strictEqual(
+      textoDeEstaciones({ confirmada: 3, supuesta: 820, "otra-banda": 32 }, "movistar", 1800),
+      "El registro confirma 3 estaciones base de Movistar en 1800 MHz. Las 820 que aún no tienen bandas leídas se suponen en esa banda. No cuentan las 32 que solo emiten en otras bandas.",
+    );
+    assert.strictEqual(
+      textoDeEstaciones({ confirmada: 0, supuesta: 1, "otra-banda": 0 }, "digi", 3500),
+      "El registro aún no confirma ninguna estación base de Digi en 3500 MHz. La que aún no tiene bandas leídas se supone en esa banda.",
+    );
+    assert.strictEqual(
+      textoDeEstaciones({ confirmada: 12, supuesta: 0, "otra-banda": 1 }, "orange", 800),
+      "Entran las 12 estaciones base de Orange que el registro da en 800 MHz. No cuenta la que solo emite en otras bandas.",
+    );
+    assert.strictEqual(
+      textoDeEstaciones({ confirmada: 0, supuesta: 0, "otra-banda": 4 }, "vodafone", 700),
+      "El registro no da ninguna estación base de Vodafone en 700 MHz.",
+    );
+  });
+
+  it("ofrece las compañías de la capa y abre en la banda con más estaciones confirmadas", () => {
+    const capa = [
+      ...PANAL,
+      emplazamiento("d1", 0, 900, {
+        companias: ["digi"],
+        bandas: [{ compania: "digi", mhz: [2100, 3500] }],
+      }),
+      emplazamiento("d2", 0, 1200, {
+        companias: ["digi"],
+        bandas: [{ compania: "digi", mhz: [3500] }],
+      }),
+    ];
+    assert.deepStrictEqual(companiasDeLaCapa(capa), ["movistar", "digi"]);
+    assert.strictEqual(bandaInicial(capa, "digi"), 3500);
+    assert.strictEqual(bandaInicial(capa, "movistar"), 800);
+    // Sin ninguna confirmada, 1800 MHz.
+    assert.strictEqual(bandaInicial([emplazamiento("x", 0, 0)], "movistar"), 1800);
+  });
+
+  it("añadir una estación base de otra compañía o de otra banda no cambia nada", () => {
+    const antes = calcular(entrada());
+    for (const extra of [
+      emplazamiento("orange", 120, 60, { companias: ["orange"] }),
+      emplazamiento("otra-banda", -80, 150, { bandas: [{ compania: "movistar", mhz: [2600] }] }),
+      emplazamiento("compartido", 200, -90, {
+        companias: ["movistar", "vodafone"],
+        bandas: [{ compania: "movistar", mhz: [700, 3500] }],
+      }),
+    ]) {
+      const despues = calcular(entrada({ emplazamientos: [...PANAL, extra] }));
+      assert.deepStrictEqual(despues.pedida.params, antes.pedida.params, extra.clave);
+      assert.deepStrictEqual(
+        Array.from(despues.resultado.sinrDb),
+        Array.from(antes.resultado.sinrDb),
+        extra.clave,
+      );
+    }
+    // Una de la misma compañía en la misma banda sí cambia la vista.
+    const misma = calcular(
+      entrada({ emplazamientos: [...PANAL, emplazamiento("nueva", 120, 60)] }),
+    );
+    assert.notDeepEqual(Array.from(misma.resultado.sinrDb), Array.from(antes.resultado.sinrDb));
+  });
+
+  it("solo cuentan las estaciones cercanas a lo que se ve o al punto", () => {
+    const lejos = emplazamiento("lejos", 9000, 9000);
+    const { pedida } = calcular(entrada({ emplazamientos: [...PANAL, lejos] }));
+    assert.strictEqual(pedida.params.estaciones.length, PANAL.length);
+    // Con el punto junto a ella, entra.
+    const conPunto = calcular(
+      entrada({ emplazamientos: [...PANAL, lejos], referencia: en(9000, 9100) }),
+    );
+    assert.strictEqual(conPunto.pedida.params.estaciones.length, PANAL.length + 1);
+    assert.deepStrictEqual(conPunto.pedida.params.estaciones.at(-1)?.azimuts, [0, 120, 240]);
+  });
+});
+
+describe("trama y valor en el punto", () => {
+  it("cubre lo que se ve con un margen, con hexágonos de 12 px al zoom del mapa", () => {
+    const { pedida, resultado } = calcular(entrada());
+    const radio = RADIO_HEXAGONO_PX * metrosPorPixel(16, ORIGEN_VISTA.latitud);
+    assert.closeTo(pedida.radio, radio, 1e-9);
+    assert.strictEqual(pedida.malla.este.length, pedida.hexagonos + 1);
+    const trama = tramaEnMapa(pedida, resultado);
+    assert.strictEqual(trama.features.length, pedida.hexagonos);
+    const este = pedida.malla.este.slice(0, pedida.hexagonos);
+    assert.isBelow(Math.min(...este), -600);
+    assert.isAbove(Math.max(...este), 600);
+    const anillo = trama.features[0]?.geometry.coordinates[0] ?? [];
+    assert.strictEqual(anillo.length, 7);
+    assert.deepStrictEqual(anillo[0], anillo[6]);
+  });
+
+  it("empeora al subir la ocupación, en la trama y en el punto", () => {
+    const valores = [0.1, 0.5, 1].map((ocupacion) => {
+      const { pedida, resultado } = calcular(
+        entrada({ eleccion: { compania: "movistar", mhz: 1800, ocupacion } }),
+      );
+      const trama = tramaEnMapa(pedida, resultado).features.map((f) => f.properties.sinr);
+      return {
+        punto: valorEnPunto(pedida, resultado) ?? Number.NaN,
+        malos: trama.filter((v) => v < 0).length,
+      };
+    });
+    assert.isAbove(valores[0]?.punto ?? Number.NaN, valores[1]?.punto ?? Number.NaN);
+    assert.isAbove(valores[1]?.punto ?? Number.NaN, valores[2]?.punto ?? Number.NaN);
+    assert.isBelow(valores[0]?.malos ?? 0, valores[2]?.malos ?? 0);
+  });
+
+  it("lejos del zoom de la vista solo calcula el punto, y sin punto nada", () => {
+    const alejado = { ...ENCUADRE, zoom: ZOOM_INTERFERENCIA - 0.5 };
+    const soloPunto = pedirSinr(entrada({ encuadre: alejado }));
+    assert.strictEqual(soloPunto?.hexagonos, 0);
+    assert.strictEqual(soloPunto?.malla.este.length, 1);
+    assert.isUndefined(pedirSinr(entrada({ encuadre: alejado, referencia: undefined })));
+    assert.isUndefined(pedirSinr(entrada({ encuadre: undefined, referencia: undefined })));
+  });
+
+  it("sin estaciones cerca no hay valor en el punto", () => {
+    const { pedida, resultado } = calcular(
+      entrada({ encuadre: undefined, referencia: en(20_000, 0) }),
+    );
+    assert.strictEqual(pedida.params.estaciones.length, 0);
+    assert.isUndefined(valorEnPunto(pedida, resultado));
+  });
+
+  it("interpreta el valor con una palabra y lo escribe en dB enteros", () => {
+    assert.deepStrictEqual(
+      [-3, 0, 3.4, 7, 12, 25].map((db) => `${textoDb(db)} · ${palabraDeSinr(db)}`),
+      [
+        "−3 dB · mala: domina la interferencia",
+        "0 dB · regular",
+        "3 dB · regular",
+        "7 dB · aceptable",
+        "12 dB · buena",
+        "25 dB · excelente",
+      ],
+    );
+  });
+});
