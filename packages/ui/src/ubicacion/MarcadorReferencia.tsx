@@ -135,9 +135,13 @@ export function PuntoElegido(props: PuntoElegidoProps) {
         props.arrastrable && "cursor-grab touch-none active:cursor-grabbing",
       )}
       style={{ transform: `translate(${props.x.toFixed(1)}px, ${props.y.toFixed(1)}px)` }}
-      // Que el mapa no empiece a moverse con el mismo gesto que arrastra el punto.
-      onMouseDown={(evento) => {
-        if (props.arrastrable) evento.stopPropagation();
+      // Que el mapa no empiece a moverse con el mismo gesto que arrastra el punto. Con un
+      // escuchador nativo: `onMouseDown` de Solid se atiende en el documento, cuando el mapa ya
+      // ha recibido el evento en su contenedor.
+      ref={(boton) => {
+        boton.addEventListener("mousedown", (evento) => {
+          if (props.arrastrable) evento.stopPropagation();
+        });
       }}
       onPointerDown={(evento) => {
         if (!props.arrastrable || evento.pointerType !== "mouse" || evento.button !== 0) return;
