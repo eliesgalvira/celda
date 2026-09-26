@@ -92,20 +92,25 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
     const lectura = lecturaDe(calculado.resultado);
     if (lectura === undefined) return undefined;
     const texto = textosServicio(lectura, referencia.tipo, servicio.orientacion).enMapa;
-    // El emplazamiento queda al este del punto si el rumbo del emplazamiento al punto va al oeste.
-    const emplazamientoAlEste = Math.sin((lectura.rumbo * Math.PI) / 180) < 0;
-    return { texto, emplazamientoAlEste };
+    // Hacia dónde queda el emplazamiento visto desde el punto, en la pantalla.
+    const radianes = (lectura.rumbo * Math.PI) / 180;
+    return { texto, alEste: Math.sin(radianes) < 0, alNorte: Math.cos(radianes) < 0 };
   });
 
   /**
-   * A qué lado del punto va la etiqueta: al contrario del emplazamiento, salvo que no quepa en la
-   * pantalla; los controles del mapa ocupan el borde derecho.
+   * A qué lado del punto va la etiqueta: al contrario del emplazamiento, para no tapar la línea
+   * que los une. Si a ese lado no cabe (los controles ocupan el borde derecho), va arriba o abajo,
+   * también lejos del emplazamiento.
    */
-  const ladoEtiqueta = (x: number, emplazamientoAlEste: boolean): "izquierda" | "derecha" => {
+  const ladoEtiqueta = (
+    x: number,
+    hacia: { readonly alEste: boolean; readonly alNorte: boolean },
+  ): "izquierda" | "derecha" | "arriba" | "abajo" => {
     const ancho = props.mapa.getContainer().clientWidth;
-    if (x > ancho - SITIO_ETIQUETA) return "izquierda";
-    if (x < SITIO_ETIQUETA) return "derecha";
-    return emplazamientoAlEste ? "izquierda" : "derecha";
+    const lado = hacia.alEste ? "izquierda" : "derecha";
+    const cabe = lado === "derecha" ? x < ancho - SITIO_ETIQUETA : x > SITIO_ETIQUETA;
+    if (cabe) return lado;
+    return hacia.alNorte ? "abajo" : "arriba";
   };
 
   return (
@@ -143,9 +148,9 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
             {(texto) => (
               <EtiquetaReferencia
                 x={actual().x}
-                y={actual().y - 14}
+                y={actual().y}
                 texto={texto().texto}
-                lado={ladoEtiqueta(actual().x, texto().emplazamientoAlEste)}
+                lado={ladoEtiqueta(actual().x, texto())}
               />
             )}
           </Show>

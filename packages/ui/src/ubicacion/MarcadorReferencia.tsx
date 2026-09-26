@@ -201,10 +201,15 @@ export const variantesEtiquetaReferencia = cva(
   "cinta absolute top-0 left-0 -translate-y-1/2 bg-referencia px-2.5 font-mono text-[11px] leading-5 font-bold whitespace-nowrap text-referencia-fg drop-shadow-marcador [--pico:6px]",
   {
     variants: {
-      /** Al lado contrario de la línea que va al emplazamiento, para no taparla. */
+      /**
+       * Al lado contrario de la línea que va al emplazamiento, para no taparla. Debajo deja sitio
+       * a la cinta «PUNTO».
+       */
       lado: {
-        derecha: "ml-6",
-        izquierda: "-ml-6 -translate-x-full",
+        derecha: "-mt-3.5 ml-6",
+        izquierda: "-mt-3.5 -ml-6 -translate-x-full",
+        arriba: "-mt-10 -translate-x-1/2",
+        abajo: "mt-13 -translate-x-1/2",
       },
     },
     defaultVariants: { lado: "derecha" },
