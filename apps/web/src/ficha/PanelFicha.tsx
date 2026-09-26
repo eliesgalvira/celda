@@ -28,6 +28,8 @@ import * as Stream from "effect/Stream";
 import { createEffect, createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 
 import { enVivo, usarDatos } from "../datos.tsx";
+import { MejorarSenal } from "../mejorar/MejorarSenal.tsx";
+import { TITULO_MEJORAR } from "../mejorar/textos.ts";
 import { ReferenciaEnFicha } from "../ubicacion/Ubicacion.tsx";
 import { ComoEmite } from "./ComoEmite.tsx";
 import { TITULO_COMO_EMITE } from "./diagrama.ts";
@@ -145,8 +147,8 @@ function FichaInexistente(props: { readonly clave: string; readonly alCerrar: ()
 }
 
 /**
- * La ficha ya leída: cabecera, frase de resumen, marca de agua, cómo emite, eje de frecuencias,
- * de dónde sale cada dato y, plegados, los datos técnicos.
+ * La ficha ya leída: cabecera, frase de resumen, marca de agua, cómo emite, cómo mejorar la
+ * señal, eje de frecuencias, de dónde sale cada dato y, plegados, los datos técnicos.
  */
 function ContenidoFicha(props: {
   readonly ficha: Ficha;
@@ -216,6 +218,9 @@ function ContenidoFicha(props: {
       <ReferenciaEnFicha clave={props.clave} emplazamiento={props.ficha.posicion} />
       <SeccionFicha titulo={TITULO_COMO_EMITE}>
         <ComoEmite clave={props.clave} />
+      </SeccionFicha>
+      <SeccionFicha titulo={TITULO_MEJORAR}>
+        <MejorarSenal clave={props.clave} emplazamiento={props.ficha.posicion} />
       </SeccionFicha>
       <SeccionFicha titulo={<TextoConTerminos texto={TITULO_EJE} />}>
         <EjeFrecuencias

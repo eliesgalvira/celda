@@ -35,7 +35,7 @@ import {
   LETRAS_MINIMAS,
   normalizarConsulta,
 } from "./buscador.ts";
-import { UbicacionContexto } from "./controlador.ts";
+import { type ControlUbicacion, UbicacionContexto } from "./controlador.ts";
 import { asentado, type MotivoFalloGps } from "./estado.ts";
 import {
   COMO_REACTIVAR,
@@ -47,6 +47,17 @@ import {
 
 /** El navegador no puede dar la ubicación: pedirla otra vez no serviría. */
 const sinGeolocalizacion = (motivo: MotivoFalloGps | undefined) => motivo === "no-disponible";
+
+/**
+ * Si tiene sentido ofrecer «Usar mi ubicación» sin punto de referencia: no con el permiso
+ * bloqueado ni en un navegador que no la da.
+ */
+export const puedePedirUbicacion = (control: ControlUbicacion): boolean => {
+  const actual = asentado(control.ubicacion().estado);
+  if (actual.tipo === "denegada") return false;
+  if (actual.tipo === "fallo") return !sinGeolocalizacion(actual.motivo);
+  return control.ubicacion().permiso !== "denegado";
+};
 
 export interface MenuDeUbicacionProps {
   /** El mapa ya se ve y se puede mover hasta el punto. */
