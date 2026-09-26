@@ -141,17 +141,17 @@ describe("sector que da servicio", () => {
     for (let k = 1; k < cuantas; k++) assert.isAbove(areas[k] ?? 0, areas[k - 1] ?? 0);
     // La última es el sector entero.
     assert.closeTo(areas.at(-1) ?? 0, areaDe(sectores, inicioSectores, 1), 1e-6);
-    // Cada banda llega a donde las pérdidas urbanas suben su paso: un punto a 40 m no está en
-    // la primera (35 m) y sí en la segunda (3 dB más, unos 42 m).
+    // Cada banda llega a donde las pérdidas urbanas suben su paso: un punto a 37 m no está en
+    // la primera (35 m) y sí en la segunda (2 dB más, unos 39,6 m).
     const primera = trozo(bandas, inicioBandas, 0);
     const segunda = trozo(bandas, inicioBandas, 1);
     assert.isFalse(
-      contiene(primera, 40 * Math.sin((2 * Math.PI) / 3), 40 * Math.cos((2 * Math.PI) / 3)),
+      contiene(primera, 37 * Math.sin((2 * Math.PI) / 3), 37 * Math.cos((2 * Math.PI) / 3)),
     );
     assert.isTrue(
-      contiene(segunda, 40 * Math.sin((2 * Math.PI) / 3), 40 * Math.cos((2 * Math.PI) / 3)),
+      contiene(segunda, 37 * Math.sin((2 * Math.PI) / 3), 37 * Math.cos((2 * Math.PI) / 3)),
     );
-    assert.closeTo(perdidaUrbana(42.07, 1800) - perdidaUrbana(35, 1800), PASO_DEGRADADO_DB, 0.01);
+    assert.closeTo(perdidaUrbana(39.56, 1800) - perdidaUrbana(35, 1800), PASO_DEGRADADO_DB, 0.01);
   });
 
   it("sin punto, o junto al emplazamiento, el degradado cubre la celda entera", () => {

@@ -38,10 +38,10 @@ export type ParamsSectorServicio = typeof ParamsSectorServicio.Type;
 export const DISTANCIA_JUNTO_M = 15;
 
 /** Cada banda del degradado pierde esto más que la anterior, en dB. */
-export const PASO_DEGRADADO_DB = 3;
+export const PASO_DEGRADADO_DB = 2;
 
-/** Lo más que se estira el degradado: 40 bandas de 3 dB llegan a unos 50 km. */
-const BANDAS_MAXIMAS = 40;
+/** Lo más que se estira el degradado: 60 bandas de 2 dB llegan a unos 50 km. */
+const BANDAS_MAXIMAS = 60;
 
 /** Lados del polígono que hace de círculo al recortar las bandas. */
 const LADOS_CIRCULO = 64;
