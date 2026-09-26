@@ -1,3 +1,4 @@
+import { terminosDe, textoPlano } from "@celda/dominio/glosario";
 import { diagramaSector } from "@celda/sim/diagramaSector";
 import { assert, describe, it } from "@effect/vitest";
 
@@ -16,8 +17,11 @@ describe("diagrama de radiación del panel", () => {
     assert.deepStrictEqual(orientacion, { tipo: "supuesta", azimuts: [0, 120, 240] });
     const textos = textosDiagrama(orientacion);
     assert.deepStrictEqual(textos.leyenda, ["Sector 1 · 0°", "Sector 2 · 120°", "Sector 3 · 240°"]);
-    assert.match(textos.notas[0] ?? "", /^Orientación supuesta\. Ninguna fuente publica/u);
-    assert.include(textos.notas[0], "0°, 120° y 240°");
+    assert.match(
+      textoPlano(textos.notas[0] ?? []),
+      /^Orientación supuesta\. Ninguna fuente publica/u,
+    );
+    assert.include(textoPlano(textos.notas[0] ?? []), "0°, 120° y 240°");
     assert.match(textos.descripcion, /^Modelo, no medida\. 3 sectores con orientación supuesta/u);
     // Una orientación supuesta no lleva margen: no es una estimación.
     assert.notInclude(textos.leyenda.join(" "), "±");
@@ -30,14 +34,16 @@ describe("diagrama de radiación del panel", () => {
       "Sector 2 · 160° ±15°",
       "Sector 3 · 280° ±15°",
     ]);
-    assert.strictEqual(textos.notas[0], "Orientación estimada ±15°.");
+    assert.strictEqual(textoPlano(textos.notas[0] ?? []), "Orientación estimada ±15°.");
     assert.include(textos.descripcion, "orientación estimada a 40°, 160° y 280°, ±15°");
   });
 
   it("dice qué modelo es y su versión", () => {
     const textos = textosDiagrama(orientacionDe([]));
     assert.strictEqual(textos.modelo, `diagrama-sector v${diagramaSector.version}`);
-    assert.include(textos.notas.at(-1), "haz de 65°");
+    assert.include(textoPlano(textos.notas.at(-1) ?? []), "haz de 65°");
+    // La orientación, los sectores y el modelo se subrayan una vez entre todas las notas.
+    assert.deepStrictEqual(terminosDe(textos.notas), ["azimut", "sector", "modelo"]);
   });
 
   it("cada lóbulo lleva la ganancia de su sector en cada rumbo del diagrama", () => {

@@ -7,6 +7,7 @@ import {
   DiagramaRadiacion,
   LobulosSector,
 } from "@celda/ui/panel/DiagramaRadiacion.tsx";
+import { TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import { createMemo, Errored, Loading } from "solid-js";
@@ -74,7 +75,9 @@ export function ComoEmite(props: { readonly clave: string }) {
         descripcion={textos.descripcion}
         modelo={textos.modelo}
         leyenda={textos.leyenda}
-        notas={textos.notas}
+        notas={textos.notas.map((nota) => (
+          <TextoConTerminos texto={nota} />
+        ))}
         atenuacionMaxima={paramsDiagrama(orientacion).atenuacionMaximaDb}
         azimuts={orientacion.azimuts}
       >

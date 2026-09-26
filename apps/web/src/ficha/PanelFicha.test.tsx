@@ -254,7 +254,12 @@ describe("panel del emplazamiento", () => {
     assert.isNotNull(getByText("Modelo"));
     assert.isNotNull(getByText("diagrama-sector v1"));
     assert.isNotNull(getByText("Sector 2 · 120°"));
-    assert.isNotNull(getByText(/^Orientación supuesta\. Ninguna fuente publica/u));
+    // «Orientación» va subrayada: el párrafo se busca entero.
+    const nota = Array.from(diagrama.closest("figure")?.querySelectorAll("p") ?? []).find((p) =>
+      (p.textContent ?? "").startsWith("Orientación supuesta. Ninguna fuente publica"),
+    );
+    assert.isDefined(nota);
+    assert.deepStrictEqual(terminosSubrayados(nota ?? diagrama), ["azimut", "sector"]);
   });
 
   it("al cambiar de emplazamiento a medio calcular, cancela el diagrama anterior", async () => {
