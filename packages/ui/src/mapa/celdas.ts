@@ -26,6 +26,8 @@ const FUNDIDO = 0.5;
 const CAPA_BORDES = "celdas";
 const CAPA_SELECCIONADA = "celda-seleccionada";
 const CAPA_SELECCIONADA_RELLENO = "celda-seleccionada-relleno";
+/** El contorno discontinuo de la seleccionada, que la sustituye con la vista de interferencia. */
+const CAPA_SELECCIONADA_CONTORNO = "celda-seleccionada-contorno";
 
 /** Opacidad de las líneas de todas las celdas, sin selección y con ella. */
 const OPACIDAD_BORDES = { normal: 0.45, apagada: 0.14 } as const;
@@ -80,6 +82,20 @@ export const capasCeldas = (color: string): ReadonlyArray<LayerSpecification> =>
     layout: { "line-join": "round" },
     paint: { "line-color": color, "line-width": 2, "line-opacity": conFundido(1) },
   },
+  {
+    id: CAPA_SELECCIONADA_CONTORNO,
+    type: "line",
+    source: FUENTE_CELDAS,
+    minzoom: ZOOM_CELDAS,
+    filter: deLaCelda(null),
+    layout: { "line-join": "round", "line-cap": "round", visibility: "none" },
+    paint: {
+      "line-color": color,
+      "line-width": 2,
+      "line-dasharray": [2, 2],
+      "line-opacity": conFundido(1),
+    },
+  },
 ];
 
 /** Lo que hace falta del mapa de MapLibre para remarcar una celda. */
@@ -99,9 +115,39 @@ export interface MapaConCeldas {
 export const remarcarCelda = (mapa: MapaConCeldas, clave: string | null): void => {
   mapa.setFilter(CAPA_SELECCIONADA, deLaCelda(clave));
   mapa.setFilter(CAPA_SELECCIONADA_RELLENO, deLaCelda(clave));
+  mapa.setFilter(CAPA_SELECCIONADA_CONTORNO, deLaCelda(clave));
   mapa.setPaintProperty(
     CAPA_BORDES,
     "line-opacity",
     conFundido(clave === null ? OPACIDAD_BORDES.normal : OPACIDAD_BORDES.apagada),
+  );
+};
+
+/** Lo que hace falta del mapa de MapLibre para ocultar las celdas. */
+export interface MapaConCapasOcultables {
+  readonly setLayoutProperty: (
+    capa: string,
+    propiedad: "visibility",
+    valor: "visible" | "none",
+  ) => void;
+}
+
+/**
+ * Con `soloContorno`, oculta las celdas y el relleno de la seleccionada y deja de esta solo su
+ * contorno discontinuo: lo que se ve con la vista de interferencia encima. Sin él, las vuelve a
+ * dibujar como siempre.
+ */
+export const ocultarCeldasSalvoContorno = (
+  mapa: MapaConCapasOcultables,
+  soloContorno: boolean,
+): void => {
+  const normal = soloContorno ? "none" : "visible";
+  for (const capa of [CAPA_BORDES, CAPA_SELECCIONADA, CAPA_SELECCIONADA_RELLENO]) {
+    mapa.setLayoutProperty(capa, "visibility", normal);
+  }
+  mapa.setLayoutProperty(
+    CAPA_SELECCIONADA_CONTORNO,
+    "visibility",
+    soloContorno ? "visible" : "none",
   );
 };
