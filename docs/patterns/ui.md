@@ -127,6 +127,15 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 
 - `panel/Correccion.tsx` enseña las correcciones, en la sección «Registro oficial y comunidad», justo bajo la marca de agua. `ContrasteFicha` pone lado a lado lo que dice el registro oficial y lo que dice la comunidad de una estación base, cada uno con su fecha y su enlace; el borde de la comunidad lleva el color de su estado. `ConflictosFicha` lista los conflictos entre fuentes con el tono de aviso, y `NotaFicha` es un párrafo del cuerpo, normal o de crédito. El texto sale de `apps/web/src/ficha/correcciones.ts`.
 
+## Celdas en el mapa
+
+- Las capas de las celdas van en el estilo del mapa (`mapa/celdas.ts`), con una fuente GeoJSON vacía que la web llena. Salen desde `ZOOM_CELDAS` (15) y se funden en medio nivel. En Barcelona una de cada diez celdas mide menos de 140 m de lado a lado; a zoom 15 eso son unos 80 px, casi el doble que un marcador. A zoom 14 bajaba a 40 px y las líneas se amontonaban.
+- Todas llevan un trazo de 1 px con `--mapa-celda`, el verde azulado del primario, por debajo de los nombres de las calles. Al seleccionar un emplazamiento, `remarcarCelda` pinta la suya con 2 px y un relleno muy suave y baja las demás al 14 %, como en el prototipo v8. Así no se amontonan líneas alrededor de la que importa.
+- Un `minzoom` por encima de 24 invalida el estilo y MapLibre ya no carga el mapa base, así que `ZOOM_CELDAS` no puede pasar de ahí.
+- Mientras se ven, la `Pista` dice «Modelo celdas@1» y qué es una celda; si el cálculo falla, lo dice con un botón «Reintentar». En el móvil la pista va a la izquierda y no llega a la columna de controles; en escritorio se centra en lo que deja libre el panel.
+- Cuándo se calculan y cuándo se cancela lo decide la web (`apps/web/src/celdas/enMapa.ts`). Se calculan en el Worker del simulador la primera vez que el mapa llega al zoom de las celdas, una vez por capa. Otra capa o cerrar el mapa a medio cálculo lo cancela.
+- En Chromium con GPU (Vulkan) y la CPU a ×4 el mapa va a 60 fps con la rueda y al arrastrar entre zoom 15 y 17,5, en 390 px y en 1400 px, igual que sin celdas. El primer cruce del zoom 15, que calcula y pone las celdas, da 56-57 fps en 390 px (57-58 sin celdas) y 43-44 en 1400 px (44-45 sin ellas). En 1400 px lo que pesa son los marcadores.
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.
