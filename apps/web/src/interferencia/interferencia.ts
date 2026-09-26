@@ -37,7 +37,7 @@ export const AZIMUTS_SUPUESTOS: ReadonlyArray<number> = [0, 120, 240];
 export const ZOOM_INTERFERENCIA = 14;
 
 /** Radio de cada hexágono en la pantalla, en píxeles. */
-export const RADIO_HEXAGONO_PX = 12;
+export const RADIO_HEXAGONO_PX = 13;
 
 /**
  * Las estaciones que se tienen en cuenta llegan hasta esta distancia más allá de lo que se ve.
@@ -164,6 +164,25 @@ const ampliar = (r: Rectangulo, metros: number): Rectangulo => ({
 
 const dentro = (r: Rectangulo, p: PuntoLocal): boolean =>
   p.este >= r.oeste && p.este <= r.este && p.norte >= r.sur && p.norte <= r.norte;
+
+/**
+ * Si la trama calculada para `anterior` sirve para `nuevo`: mismo medio nivel de zoom (los
+ * hexágonos miden lo mismo) y lo que se ve cae dentro de lo que cubre, margen incluido. Así un
+ * arrastre corto no vuelve a calcular.
+ */
+export const mismaTrama = (
+  anterior: Encuadre | undefined,
+  nuevo: Encuadre | undefined,
+): boolean => {
+  if (anterior === undefined || nuevo === undefined) return anterior === nuevo;
+  if (Math.round(anterior.zoom * 2) !== Math.round(nuevo.zoom * 2)) return false;
+  const cubierto = rectanguloDe(anterior, MARGEN_TRAMA);
+  const visto = rectanguloDe(nuevo, 0);
+  return (
+    dentro(cubierto, { este: visto.oeste, norte: visto.sur }) &&
+    dentro(cubierto, { este: visto.este, norte: visto.norte })
+  );
+};
 
 /** La simulación que pide la vista, con lo que hace falta para dibujarla y contarla. */
 export interface SinrPedida {
@@ -314,10 +333,10 @@ export const valorEnPunto = (pedida: SinrPedida, resultado: ResultadoSinr): numb
 
 /**
  * La palabra que interpreta un valor, como en el prototipo v8: por debajo de 0 dB manda la
- * interferencia; a partir de 20 dB la señal es limpia.
+ * interferencia (la escala lo dice) y a partir de 20 dB la señal es limpia.
  */
 export const palabraDeSinr = (db: number): string => {
-  if (db < 0) return "mala: domina la interferencia";
+  if (db < 0) return "mala";
   if (db < 5) return "regular";
   if (db < 10) return "aceptable";
   if (db < 20) return "buena";

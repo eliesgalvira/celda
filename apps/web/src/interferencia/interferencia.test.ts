@@ -10,6 +10,7 @@ import {
   type Encuadre,
   type EntradaSinr,
   metrosPorPixel,
+  mismaTrama,
   ORIGEN_VISTA,
   palabraDeSinr,
   pedirSinr,
@@ -158,7 +159,7 @@ describe("estaciones de la vista de interferencia", () => {
 });
 
 describe("trama y valor en el punto", () => {
-  it("cubre lo que se ve con un margen, con hexágonos de 12 px al zoom del mapa", () => {
+  it("cubre lo que se ve con un margen, con hexágonos de 13 px al zoom del mapa", () => {
     const { pedida, resultado } = calcular(entrada());
     const radio = RADIO_HEXAGONO_PX * metrosPorPixel(16, ORIGEN_VISTA.latitud);
     assert.closeTo(pedida.radio, radio, 1e-9);
@@ -189,6 +190,20 @@ describe("trama y valor en el punto", () => {
     assert.isBelow(valores[0]?.malos ?? 0, valores[2]?.malos ?? 0);
   });
 
+  it("un arrastre corto o acercarse dentro del medio nivel usan la trama calculada", () => {
+    const corrido = (este: number, norte: number, zoom = ENCUADRE.zoom): Encuadre => ({
+      suroeste: en(-600 + este, -400 + norte),
+      noreste: en(600 + este, 400 + norte),
+      zoom,
+    });
+    assert.isTrue(mismaTrama(ENCUADRE, corrido(150, -50)));
+    assert.isTrue(mismaTrama(ENCUADRE, { ...corrido(0, 0), zoom: 16.2 }));
+    // Fuera de lo que cubre, o con hexágonos de otro tamaño, hay que calcular otra.
+    assert.isFalse(mismaTrama(ENCUADRE, corrido(400, 0)));
+    assert.isFalse(mismaTrama(ENCUADRE, { ...corrido(0, 0), zoom: 16.5 }));
+    assert.isFalse(mismaTrama(ENCUADRE, undefined));
+  });
+
   it("lejos del zoom de la vista solo calcula el punto, y sin punto nada", () => {
     const alejado = { ...ENCUADRE, zoom: ZOOM_INTERFERENCIA - 0.5 };
     const soloPunto = pedirSinr(entrada({ encuadre: alejado }));
@@ -210,7 +225,7 @@ describe("trama y valor en el punto", () => {
     assert.deepStrictEqual(
       [-3, 0, 3.4, 7, 12, 25].map((db) => `${textoDb(db)} · ${palabraDeSinr(db)}`),
       [
-        "−3 dB · mala: domina la interferencia",
+        "−3 dB · mala",
         "0 dB · regular",
         "3 dB · regular",
         "7 dB · aceptable",

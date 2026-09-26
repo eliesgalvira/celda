@@ -171,8 +171,12 @@ describe("vista de interferencia en el mapa", () => {
     await esperar(() => assert.lengthOf(m.worker.pendientes(), 1));
     assert.strictEqual(m.worker.creados(), 1);
 
-    // Mover el mapa con el cálculo en marcha lo cancela: termina ese Worker y otro calcula.
-    m.setEncuadre({ ...ENCUADRE, suroeste: en(-200, -200) });
+    // Un arrastre corto no pide nada: la trama ya lo cubre.
+    m.setEncuadre({ ...ENCUADRE, suroeste: en(-280, -190), noreste: en(320, 210) });
+    await esperar();
+    assert.strictEqual(m.worker.creados(), 1);
+    // Salir de ella con el cálculo en marcha lo cancela: termina ese Worker y otro calcula.
+    m.setEncuadre({ ...ENCUADRE, suroeste: en(700, -200), noreste: en(1300, 200) });
     await esperar(() => assert.strictEqual(m.worker.creados(), 2));
     await esperar(() => assert.lengthOf(m.worker.pendientes(), 1));
     assert.strictEqual(m.worker.terminados(), 1);

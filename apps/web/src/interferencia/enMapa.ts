@@ -7,11 +7,12 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal } from "solid-js";
 
 import {
   type EleccionVista,
   type Encuadre,
+  mismaTrama,
   pedirSinr,
   SIN_TRAMA,
   type TramaEnMapa,
@@ -75,9 +76,10 @@ export interface InterferenciaDelMapa {
 }
 
 /**
- * La vista de interferencia en el mapa. Mientras está activa, cada cambio de lo que se ve, de la
- * elección, de la capa o del punto de referencia pide `sinr@1` al simulador (en el navegador, su
- * Worker) y dibuja la trama. Un cambio a medio cálculo lo cancela, y apagar la vista lo cancela y
+ * La vista de interferencia en el mapa. Mientras está activa, cada cambio de la elección, de la
+ * capa o del punto de referencia pide `sinr@1` al simulador (en el navegador, su Worker) y dibuja
+ * la trama. Lo que se ve solo cuenta si sale de la trama ya calculada o cambia el tamaño de sus
+ * hexágonos. Un cambio a medio cálculo lo cancela, y apagar la vista lo cancela y
  * borra la trama.
  */
 export function crearInterferencia(
@@ -86,6 +88,8 @@ export function crearInterferencia(
 ): InterferenciaDelMapa {
   const [calculo, setCalculo] = createSignal<CalculoVista>(SIN_CALCULO);
   const [intento, setIntento] = createSignal(0);
+  // Un encuadre nuevo que cae dentro de la trama ya calculada no cuenta como cambio.
+  const encuadre = createMemo(() => entrada.encuadre(), { equals: mismaTrama });
 
   createEffect(
     () => ({ lienzo: entrada.lienzo(), activa: entrada.activa() }),
@@ -105,7 +109,7 @@ export function crearInterferencia(
       activa: entrada.activa(),
       emplazamientos: entrada.emplazamientos(),
       eleccion: entrada.eleccion(),
-      encuadre: entrada.encuadre(),
+      encuadre: encuadre(),
       referencia: entrada.referencia(),
       intento: intento(),
     }),
