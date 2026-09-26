@@ -81,12 +81,12 @@ export const MEDIDA_DE_EJEMPLO: MedidaDeEjemplo = {
   senal: { compania: "movistar", red: "4g", mhz: 1800, rsrpDbm: -95, rsrqDb: -11, pci: 212 },
 };
 
-/** Cómo es la potencia de la señal (RSRP), por tramos de 10 dB. */
+/** Cómo es la potencia de la señal (RSRP). */
 export type NivelDePotencia = "excelente" | "buena" | "regular" | "mala";
 
 /**
- * Tramos habituales de RSRP en 4G. Son una regla práctica, no una norma: ver
- * docs/investigacion/modo-de-informacion.md.
+ * Tramos habituales de RSRP en 4G, por decenas de dB. Son una regla práctica y no una norma:
+ * salen de la guía de Teltonika citada en docs/investigacion/modo-de-informacion.md.
  */
 export const potenciaDeLaSenal = (rsrpDbm: number): NivelDePotencia => {
   if (rsrpDbm >= -80) return "excelente";
@@ -96,11 +96,12 @@ export const potenciaDeLaSenal = (rsrpDbm: number): NivelDePotencia => {
 };
 
 /** Cómo es la calidad de la señal (RSRQ). */
-export type NivelDeCalidad = "buena" | "regular" | "mala";
+export type NivelDeCalidad = "excelente" | "buena" | "regular" | "mala";
 
-/** Tramos habituales de RSRQ en 4G, con la misma fuente que los de la potencia. */
+/** Tramos habituales de RSRQ en 4G, de la misma guía que los de la potencia. */
 export const calidadDeLaSenal = (rsrqDb: number): NivelDeCalidad => {
-  if (rsrqDb >= -10) return "buena";
-  if (rsrqDb >= -15) return "regular";
+  if (rsrqDb >= -10) return "excelente";
+  if (rsrqDb > -15) return "buena";
+  if (rsrqDb > -20) return "regular";
   return "mala";
 };
