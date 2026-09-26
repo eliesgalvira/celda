@@ -12,21 +12,33 @@ const version = FunctionImpl.make(databaseSchema, datos, "version", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     const ultimo = yield* reader.table("emplazamientos").index("por_version", "desc").first();
-    const consultas = yield* Effect.forEach(Fuente.literals, (fuente) =>
+    const porFuente = yield* Effect.forEach(Fuente.literals, (fuente) =>
       Effect.map(
         reader
           .table("ejecuciones")
           .index("por_fuente", (q) => q.eq("fuente", fuente), "desc")
           .take(50),
-        (ejecuciones) =>
-          Option.fromNullishOr(ejecuciones.find((e) => e.estado === "completada")).pipe(
+        (ejecuciones) => ({
+          consulta: Option.fromNullishOr(ejecuciones.find((e) => e.estado === "completada")).pipe(
             Option.map((e) => ({ fuente, consultadoEl: e.inicio })),
           ),
+          // Un emplazamiento retirado se borra y no deja versión: la fecha de su retirada es
+          // la de la ejecución que lo retiró.
+          retirada: Option.fromNullishOr(
+            ejecuciones.find(
+              (e) => e.estado === "completada" && e.cambios.emplazamientos.retirados > 0,
+            ),
+          ).pipe(Option.map((e) => e.inicio)),
+        }),
       ),
     );
+    const candidatas = [
+      ...Option.toArray(Option.map(ultimo, (e) => e.version)),
+      ...porFuente.flatMap((f) => Option.toArray(f.retirada)),
+    ];
     return {
-      version: Option.match(ultimo, { onNone: () => null, onSome: (e) => e.version }),
-      consultas: consultas.flatMap(Option.toArray),
+      version: candidatas.length === 0 ? null : Math.max(...candidatas),
+      consultas: porFuente.flatMap((f) => Option.toArray(f.consulta)),
     };
   }).pipe(Effect.orDie),
 );
