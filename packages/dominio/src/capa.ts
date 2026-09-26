@@ -286,15 +286,16 @@ const filas = (
     if (posicionBarrio !== SIN_BARRIO && barrio === undefined) {
       return Result.fail(new CapaIlegible({ motivo: `barrio desconocido en la fila ${i}` }));
     }
-    const bandas = bandasDeCodigo(c.bandas?.[i] ?? 0);
-    emplazamientos.push({
+    const leido: EmplazamientoLeido = {
       clave: c.clave[i] ?? "",
       posicion: { longitud: c.lon[i] ?? 0, latitud: c.lat[i] ?? 0 },
       estado,
       companias: companiasDe(c.companias[i] ?? 0),
-      ...(bandas.length === 0 ? {} : { bandas }),
       barrio: barrio?.codigo ?? null,
-    });
+    };
+    // Sin ninguna banda conocida, el emplazamiento no lleva la clave.
+    const bandas = bandasDeCodigo(c.bandas?.[i] ?? 0);
+    emplazamientos.push(bandas.length === 0 ? leido : { ...leido, bandas });
   }
   return Result.succeed({ emplazamientos, barrios: barrios.success });
 };

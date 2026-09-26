@@ -158,8 +158,12 @@ describe("capa de emplazamientos", () => {
 
   it("lee una capa del formato 2 sin ninguna banda conocida", () => {
     const capa = generarCapa(NOCHE, [PLAZA_PIUS_XII, CAMPUS_NORD], LIMITES);
-    const { bandas: _bandas, ...columnas } = JSON.parse(capa.contenido) as Record<string, unknown>;
-    const leida = leerCapa(JSON.stringify({ ...columnas, formato: 2 }), capa.version);
+    // La misma capa sin la columna de bandas, que va al final, y con el número del formato 2.
+    const formato2 = capa.contenido
+      .replace('"formato":3', '"formato":2')
+      .replace(/,"bandas":\[[\d,]*\]\}$/u, "}");
+    assert.notInclude(formato2, '"bandas"');
+    const leida = leerCapa(formato2, capa.version);
     assert.isTrue(Result.isSuccess(leida));
     if (Result.isFailure(leida)) return;
     assert.deepStrictEqual(
