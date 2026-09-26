@@ -1,12 +1,15 @@
 import type { JSX } from "@solidjs/web";
+import * as Effect from "effect/Effect";
 import type * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Stream from "effect/Stream";
 import { createContext, onSettled, untrack, useContext } from "solid-js";
 
 import type { CapaEmplazamientos } from "./capa/servicio.ts";
+import type { FichasEnVivo } from "./ficha/servicio.ts";
 
 /** Los servicios de datos de la interfaz. En las pruebas se sustituyen por capas de prueba. */
-export type ServiciosDeDatos = CapaEmplazamientos;
+export type ServiciosDeDatos = CapaEmplazamientos | FichasEnVivo;
 
 const Datos = createContext<ManagedRuntime.ManagedRuntime<ServiciosDeDatos, never>>();
 
@@ -27,3 +30,19 @@ export function ProveedorDeDatos(props: {
 
 /** El runtime de los servicios de datos. */
 export const usarDatos = () => useContext(Datos);
+
+/**
+ * Una lectura en vivo como la consume Solid (ADR 0003): devuelta desde `createMemo`, cada valor
+ * del flujo es el nuevo valor del memo y sus fallos llegan a `<Errored>`. Cuando el memo se
+ * recalcula o se desmonta, Solid cierra el iterable y el flujo se interrumpe, así que su lectura
+ * se libera y una respuesta tardía ya no llega a nadie.
+ */
+export const enVivo = <A, E>(
+  runtime: ManagedRuntime.ManagedRuntime<ServiciosDeDatos, never>,
+  lectura: Stream.Stream<A, E, ServiciosDeDatos>,
+): AsyncIterable<A> =>
+  Stream.toAsyncIterable(
+    Stream.unwrap(
+      Effect.map(runtime.contextEffect, (contexto) => Stream.provideContext(lectura, contexto)),
+    ),
+  );
