@@ -20,8 +20,8 @@ export function SeccionReferencia(props: { readonly children: JSX.Element }) {
 
 export interface SinReferenciaProps {
   readonly titulo: string;
-  /** Qué se gana con un punto. */
-  readonly texto: string;
+  /** Qué se gana con un punto. Puede llevar términos. */
+  readonly texto: JSX.Element;
   /** Por qué no se puede usar la ubicación ahora, y qué hacer. */
   readonly aviso?: string | undefined;
   readonly acciones: JSX.Element;
@@ -74,12 +74,12 @@ const variantesMarcaReferencia = cva("hexagono mt-0.5 h-4 w-3.5 shrink-0", {
 });
 
 export type ConReferenciaProps = VariantProps<typeof variantesMarcaReferencia> & {
-  /** Desde dónde se mira: «tu ubicación (±25 m)» o «el punto elegido». */
-  readonly desde: string;
+  /** Desde dónde se mira: «tu ubicación (±25 m)» o «el punto elegido». Puede llevar términos. */
+  readonly desde: JSX.Element;
   /** Dónde queda el emplazamiento visto desde el punto. */
   readonly relacion: string;
-  /** Si la distancia es aproximada por el margen del GPS. */
-  readonly margen?: string | undefined;
+  /** Si la distancia es aproximada por el margen del GPS. Puede llevar términos. */
+  readonly margen?: JSX.Element | undefined;
   /** Cambiar y quitar el punto (historia 33). */
   readonly acciones: JSX.Element;
 };

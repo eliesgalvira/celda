@@ -27,6 +27,8 @@ export const TERMINOS = [
   "modo-de-informacion",
   "identificador-de-celda",
   "modelo",
+  "punto-de-referencia",
+  "precision",
 ] as const;
 
 export type Termino = (typeof TERMINOS)[number];
@@ -223,6 +225,23 @@ export const GLOSARIO: Glosario = {
       "siempre como modelo, con su versión, para que no se confunda con un dato.",
     tecnico: "simulación",
     relacionados: ["sector", "azimut"],
+  },
+  "punto-de-referencia": {
+    nombre: "Punto de referencia",
+    explicacion:
+      "El sitio desde el que Celda mide la distancia y la dirección hasta cada emplazamiento. " +
+      "Puede ser tu ubicación, la que da el GPS del dispositivo, o un punto que marques a mano " +
+      "en el mapa.",
+    tecnico: "posición del terminal",
+    relacionados: ["precision", "emplazamiento"],
+  },
+  precision: {
+    nombre: "Precisión",
+    explicacion:
+      "Cuánto se puede equivocar el GPS al decir dónde estás. «±25 m» quiere decir que puedes " +
+      "estar en cualquier sitio de un círculo de 25 metros. Dentro de casa suele ser peor.",
+    tecnico: "precisión horizontal del GPS",
+    relacionados: ["punto-de-referencia"],
   },
 };
 
