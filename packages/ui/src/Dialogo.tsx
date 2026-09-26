@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import { createUniqueId, onSettled, Show } from "solid-js";
+import { createEffect, createUniqueId, onSettled, Show } from "solid-js";
 
 import { Boton } from "./Boton.tsx";
 
@@ -27,12 +27,15 @@ export interface DialogoProps {
  * queda centrado. Al abrirse lleva el foco a su título, el tabulador no sale de él, Escape y el
  * botón «Cerrar» lo cierran, y al cerrarse devuelve el foco a donde estaba.
  *
+ * Si cambia el título, es otra vista: vuelve arriba y el foco pasa al título nuevo.
+ *
  * El padre lo monta para abrirlo y lo desmonta para cerrarlo: `alCerrar` solo lo pide.
  */
 export function Dialogo(props: DialogoProps) {
   const idTitulo = createUniqueId();
   let dialogo: HTMLDialogElement | undefined;
   let titulo: HTMLHeadingElement | undefined;
+  let cuerpo: HTMLDivElement | undefined;
 
   onSettled(() => {
     const previo = document.activeElement;
@@ -44,6 +47,17 @@ export function Dialogo(props: DialogoProps) {
         previo.focus({ preventScroll: true });
     };
   });
+
+  // Un título nuevo es otra vista dentro del mismo diálogo: empieza arriba y con el foco en el
+  // título, porque el control que la abrió ya no está.
+  createEffect(
+    () => props.titulo,
+    () => {
+      if (cuerpo !== undefined) cuerpo.scrollTop = 0;
+      titulo?.focus({ preventScroll: true });
+    },
+    { defer: true },
+  );
 
   const alPulsarTecla = (evento: KeyboardEvent) => {
     if (evento.key === "Escape") {
@@ -120,7 +134,12 @@ export function Dialogo(props: DialogoProps) {
               Cerrar
             </Boton>
           </header>
-          <div class="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain px-5 pt-4 pb-6 text-sm leading-relaxed">
+          <div
+            ref={(elemento) => {
+              cuerpo = elemento;
+            }}
+            class="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain px-5 pt-4 pb-6 text-sm leading-relaxed"
+          >
             {props.children}
           </div>
         </div>

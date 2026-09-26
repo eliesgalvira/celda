@@ -66,6 +66,27 @@ describe("Dialogo", () => {
     assert.strictEqual(document.activeElement, abridor);
   });
 
+  it("con otro título es otra vista, y el foco pasa al título nuevo", () => {
+    const [titulo, setTitulo] = createSignal("Medir tu señal");
+    const { getByRole } = render(() => (
+      <Dialogo titulo={titulo()} alCerrar={() => undefined}>
+        <button type="button" onClick={() => setTitulo("Una medida de ejemplo")}>
+          Ver el ejemplo
+        </button>
+      </Dialogo>
+    ));
+    flush();
+    const boton = getByRole("button", { name: "Ver el ejemplo" });
+    boton.focus();
+    assert.strictEqual(document.activeElement, boton);
+    boton.click();
+    flush();
+    assert.strictEqual(
+      document.activeElement,
+      getByRole("heading", { name: "Una medida de ejemplo" }),
+    );
+  });
+
   it("el botón con la etiqueta «Cerrar» lo cierra", () => {
     const { getByRole, cierres } = montar();
     fireEvent.click(getByRole("button", { name: "Cerrar" }));
