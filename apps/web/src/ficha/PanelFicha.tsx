@@ -25,6 +25,8 @@ import * as Stream from "effect/Stream";
 import { createEffect, createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 
 import { enVivo, usarDatos } from "../datos.tsx";
+import { ComoEmite } from "./ComoEmite.tsx";
+import { TITULO_COMO_EMITE } from "./diagrama.ts";
 import { compararConCapa } from "./marcaDeAgua.ts";
 import {
   datosTecnicosDe,
@@ -105,7 +107,9 @@ export function PanelFicha(props: PanelFichaProps) {
             when={Option.getOrUndefined(ficha())}
             fallback={<FichaInexistente clave={props.clave} alCerrar={() => props.alCerrar()} />}
           >
-            {(leida) => <ContenidoFicha ficha={leida()} fechaCapa={props.fechaCapa} />}
+            {(leida) => (
+              <ContenidoFicha ficha={leida()} clave={props.clave} fechaCapa={props.fechaCapa} />
+            )}
           </Show>
         </Loading>
       </Errored>
@@ -134,10 +138,18 @@ function FichaInexistente(props: { readonly clave: string; readonly alCerrar: ()
 }
 
 /**
- * La ficha ya leída: cabecera, frase de resumen, marca de agua, eje de frecuencias, de dónde
- * sale cada dato y, plegados, los datos técnicos.
+ * La ficha ya leída: cabecera, frase de resumen, marca de agua, cómo emite, eje de frecuencias,
+ * de dónde sale cada dato y, plegados, los datos técnicos.
  */
-function ContenidoFicha(props: { readonly ficha: Ficha; readonly fechaCapa: number | undefined }) {
+function ContenidoFicha(props: {
+  readonly ficha: Ficha;
+  /**
+   * El emplazamiento seleccionado ahora. Mientras llega su ficha, la anterior sigue montada
+   * aunque no se vea; con la clave nueva deja de calcular lo que ya no hace falta.
+   */
+  readonly clave: string;
+  readonly fechaCapa: number | undefined;
+}) {
   const marca = createMemo(() =>
     textosMarca(props.ficha, compararConCapa(props.fechaCapa, props.ficha.version)),
   );
@@ -159,6 +171,9 @@ function ContenidoFicha(props: { readonly ficha: Ficha; readonly fechaCapa: numb
       <MarcaDeAguaFicha tono={posterior() ? "posterior" : "al-dia"} titulo={marca().titulo}>
         {marca().detalle}
       </MarcaDeAguaFicha>
+      <SeccionFicha titulo={TITULO_COMO_EMITE}>
+        <ComoEmite clave={props.clave} />
+      </SeccionFicha>
       <SeccionFicha titulo={TITULO_EJE}>
         <EjeFrecuencias
           titulo={TITULO_EJE}

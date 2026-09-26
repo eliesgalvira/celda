@@ -12,6 +12,7 @@
   "dependencies": {
     "@celda/convex": "workspace:*",
     "@celda/dominio": "workspace:*",
+    "@celda/sim": "workspace:*",
     "@celda/ui": "workspace:*",
     "@confect/core": "catalog:",
     "@confect/js": "catalog:",

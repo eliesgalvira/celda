@@ -19,7 +19,7 @@ Conjunto de equipos de una compañía en un emplazamiento.
 _Evitar_: antena, EB, eNB, gNB, nodo
 
 **Sector**:
-Porción de unos 120° alrededor de una estación base hacia la que emite una de sus antenas. Se orienta con un azimut, que casi siempre es una estimación con ±15° de margen.
+Porción de unos 120° alrededor de una estación base hacia la que emite una de sus antenas. Se orienta con un azimut, que ninguna fuente publica: es una estimación con ±15° de margen o, si no hay ninguna, una orientación supuesta (0°, 120° y 240°) que la interfaz dice como tal.
 _Evitar_: cara, celda
 
 **Banda**:
