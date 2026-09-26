@@ -54,7 +54,7 @@ describe("tabla del ejercicio", () => {
         assert.match(fecha, /^\d{4}-\d{2}-\d{2}$/u, magnitud);
       }
     }
-    assert.match(fila("Habitantes").fuente, /Padrón municipal a 2026-01-01.*CC BY 4\.0/u);
+    assert.match(fila("Habitantes").fuente, /Padrón a 2026-01-01.*CC BY 4\.0/u);
     assert.strictEqual(fila("Habitantes").fecha, "2026-05-28");
     assert.match(fila("Penetración").fuente, /CNMC.*julio de 2026/u);
     assert.strictEqual(fila("Estaciones base en la zona").fecha, "2026-09-26");
@@ -90,9 +90,9 @@ describe("tabla del ejercicio", () => {
     const lineas = csv.split("\r\n");
     assert.include(
       lineas,
-      "Zona;Habitantes;;12479;;;;;Padrón municipal a 2026-01-01, Ajuntament de Barcelona (Open Data BCN, CC BY 4.0);2026-05-28",
+      "Zona;Habitantes;;12479;;;;;Padrón a 2026-01-01, Ajuntament de Barcelona (CC BY 4.0);2026-05-28",
     );
-    assert.include(lineas, "Zona;Área;km²;2,68;;;;;Calculada con los límites de barrio;2024-11-12");
+    assert.include(lineas, "Zona;Área;km²;2,68;;;;;Calculada con los límites;2024-11-12");
     assert.isTrue(csv.endsWith("\r\n"));
   });
 

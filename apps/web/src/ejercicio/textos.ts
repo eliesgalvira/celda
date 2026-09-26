@@ -28,8 +28,8 @@ export const cadenaDelRadio = (c: ResultadoDeCompania): ReadonlyArray<Eslabon> =
   const distancias = c.vecinas.map((v) => entero(v.metros));
   const lista =
     distancias.length <= 6
-      ? distancias.join(" + ")
-      : `${distancias.slice(0, 5).join(" + ")} + … (${distancias.length} en total)`;
+      ? `${distancias.join(", ")} m`
+      : `${distancias.slice(0, 5).join(", ")} m…`;
   return [
     {
       etiqueta: `Estaciones base de ${nombre} en la zona`,
@@ -43,7 +43,7 @@ export const cadenaDelRadio = (c: ResultadoDeCompania): ReadonlyArray<Eslabon> =
       fuente:
         c.vecinas.length === 0
           ? `${nombre} no tiene ninguna otra estación base en el mapa`
-          : `(${lista}) ÷ ${entero(c.vecinas.length)} m`,
+          : `Media de ${entero(c.vecinas.length)} distancias: ${lista}`,
     },
     {
       operacion: "÷ 2",

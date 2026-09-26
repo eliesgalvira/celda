@@ -97,7 +97,7 @@ export const fuenteDeParametros = (
 ): { readonly texto: string; readonly fecha: string } =>
   sonLosDeFabrica(parametros, porDefecto)
     ? {
-        texto: `${FUENTE_DE_PARAMETROS.atribucion}, ${FUENTE_DE_PARAMETROS.titulo} (toda España, ${FUENTE_DE_PARAMETROS.periodo})`,
+        texto: `${FUENTE_DE_PARAMETROS.atribucion}, toda España, ${FUENTE_DE_PARAMETROS.periodo}`,
         fecha: FUENTE_DE_PARAMETROS.publicada,
       }
     : { texto: "Valor puesto a mano en el ejercicio", fecha: "" };
@@ -111,8 +111,8 @@ export const tablaDelEjercicio = (
   const companias = resultado.companias;
   const porCompania = (valor: (c: ResultadoDeCompania) => Valor) => companias.map(valor);
   const parametros = fuenteDeParametros(contexto.parametros, porDefecto);
-  const padron = `Padrón municipal a ${contexto.poblacion.referencia}, ${contexto.poblacion.atribucion} (Open Data BCN, ${contexto.poblacion.licencia})`;
-  const capa = "Emplazamientos del mapa de Celda (registro oficial y correcciones de la comunidad)";
+  const padron = `Padrón a ${contexto.poblacion.referencia}, ${contexto.poblacion.atribucion} (${contexto.poblacion.licencia})`;
+  const capa = "Mapa de Celda: registro oficial y correcciones";
   const fechaCapa = dia(contexto.fechaCapa);
   const fechaBandas = contexto.fechaBandas === undefined ? "" : dia(contexto.fechaBandas);
   const sinCompania = (c: ResultadoDeCompania, valor: () => Valor) =>
@@ -128,14 +128,14 @@ export const tablaDelEjercicio = (
           {
             magnitud: "Zona",
             valores: [{ texto: contexto.zona }],
-            fuente: `Límites de barrio, ${contexto.limites.atribucion} (Open Data BCN, ${contexto.limites.licencia})`,
+            fuente: `Límites de barrio, ${contexto.limites.atribucion} (${contexto.limites.licencia})`,
             fecha: contexto.limites.fecha,
           },
           {
             magnitud: "Área",
             unidad: "km²",
             valores: [numero(resultado.areaKm2, decimal)],
-            fuente: "Calculada con los límites de barrio",
+            fuente: "Calculada con los límites",
             fecha: contexto.limites.fecha,
           },
           {
@@ -148,7 +148,7 @@ export const tablaDelEjercicio = (
             magnitud: "Densidad",
             unidad: "habitantes por km²",
             valores: [numero(resultado.densidad, entero)],
-            fuente: "Calculada: habitantes entre área",
+            fuente: "Habitantes entre área",
             fecha: contexto.poblacion.publicada,
           },
           {
@@ -161,7 +161,7 @@ export const tablaDelEjercicio = (
           {
             magnitud: "Líneas móviles en la zona",
             valores: [numero(resultado.lineas, entero)],
-            fuente: "Calculadas: habitantes por la penetración",
+            fuente: "Habitantes por penetración",
             fecha: contexto.poblacion.publicada,
           },
         ],
@@ -179,42 +179,36 @@ export const tablaDelEjercicio = (
             magnitud: "Distancia media a la vecina",
             unidad: "m",
             valores: porCompania((c) => numero(c.distanciaMedia, entero)),
-            fuente:
-              "Calculada: de cada estación a la más cercana de su compañía, esté o no en la zona",
+            fuente: "A la más cercana de la compañía, dentro o fuera",
             fecha: fechaCapa,
           },
           {
             magnitud: "Radio de cobertura",
             unidad: "m",
             valores: porCompania((c) => numero(c.radio, entero)),
-            fuente: "Calculado: la mitad de la distancia media a la vecina",
+            fuente: "Mitad de la distancia media a la vecina",
             fecha: fechaCapa,
           },
           {
             magnitud: "Habitantes por estación base",
             valores: porCompania((c) => numero(c.habitantesPorEstacion, entero)),
-            fuente: "Calculados: habitantes de la zona entre estaciones de la compañía",
+            fuente: "Habitantes entre estaciones",
             fecha: contexto.poblacion.publicada,
           },
           {
             magnitud: "Cuota de líneas móviles",
             unidad: "%",
             valores: porCompania((c) => ({
-              texto: `${decimal(contexto.parametros.cuotas[GRUPO_DE_LINEAS[c.compania]])} ${
-                c.compania === "orange" || c.compania === "yoigo"
-                  ? `(${NOMBRE_GRUPO.masorange})`
-                  : ""
-              }`.trim(),
+              texto: decimal(contexto.parametros.cuotas[GRUPO_DE_LINEAS[c.compania]]),
               numero: contexto.parametros.cuotas[GRUPO_DE_LINEAS[c.compania]],
             })),
-            fuente: parametros.texto,
+            fuente: `${parametros.texto}; ${NOMBRE_GRUPO.masorange}, juntas`,
             fecha: parametros.fecha,
           },
           {
             magnitud: "Usuarios por estación base",
             valores: porCompania((c) => numero(c.usuariosPorEstacion, entero)),
-            fuente:
-              "Calculados: líneas de la zona por la cuota, entre estaciones de la compañía (Orange y Yoigo, juntas)",
+            fuente: "Líneas por cuota, entre estaciones del grupo",
             fecha: parametros.fecha === "" ? contexto.poblacion.publicada : parametros.fecha,
           },
         ],
@@ -226,8 +220,7 @@ export const tablaDelEjercicio = (
           valores: porCompania((c) =>
             sinCompania(c, () => TEXTO_CERTEZA[c.tecnologias[generacion]]),
           ),
-          fuente:
-            "Deducidas de las bandas de las fichas: el registro oficial no publica la tecnología",
+          fuente: "Deducida de las bandas de las fichas",
           fecha: fechaBandas,
         })),
       },
@@ -243,7 +236,7 @@ export const tablaDelEjercicio = (
                 : { texto: "no consta", marca: "sin-datos" };
             }),
           ),
-          fuente: "Fichas de los emplazamientos de la zona, del registro oficial",
+          fuente: "Fichas de la zona, del registro oficial",
           fecha: fechaBandas,
         })),
       },

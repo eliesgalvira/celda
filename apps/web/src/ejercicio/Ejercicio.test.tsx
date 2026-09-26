@@ -151,7 +151,10 @@ describe("modo estudiante", () => {
     // Unos 300 m entre los dos de Movistar: radio de unos 150 m.
     const radio = Number(celdas("Radio de cobertura")[0]);
     assert.approximately(radio, 150, 3);
-    assert.match(celdas("Radio de cobertura").at(-1) ?? "", /mitad de la distancia media/u);
+    assert.match(
+      fila("Radio de cobertura")?.querySelector("th")?.textContent ?? "",
+      /Mitad de la distancia media/u,
+    );
     assert.strictEqual(celdas("5G")[0], "no consta");
 
     // Las bandas se leen de las fichas al pedirlo.

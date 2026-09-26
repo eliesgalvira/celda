@@ -149,6 +149,14 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
     return actual.tipo === "leidas" ? actual : undefined;
   });
 
+  /** Fichas leídas sin ninguna banda conocida de ninguna compañía. */
+  const sinBandas = createMemo(
+    () =>
+      [...(leidas()?.leidas.bandas.values() ?? [])].filter((porCompania) =>
+        Object.values(porCompania).every((bandas) => bandas.every((mhz) => mhz === null)),
+      ).length,
+  );
+
   const resultado = createMemo(() => {
     const actual = barrio();
     if (actual === undefined) return undefined;
@@ -245,6 +253,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
   return (
     <PanelEmplazamiento
       nombre="Ejercicio de emplazamientos"
+      ancho="ancho"
       altura={altura()}
       alCambiarAltura={setAltura}
       alCerrar={props.alCerrar}
@@ -450,6 +459,9 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                             {hecho().leidas.fallidas.length > 0
                               ? ` ${entero(hecho().leidas.fallidas.length)} no han llegado: de sus bandas la tabla dice «no consta».`
                               : ""}
+                            {sinBandas() > 0
+                              ? ` ${entero(sinBandas())} no traen ninguna banda conocida: de ellas la tabla también dice «no consta».`
+                              : ""}
                           </TextoEjercicio>
                         )}
                       </Show>
@@ -459,8 +471,8 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       {(hecha) => (
                         <SeccionFicha titulo="5 · Tabla">
                           <TextoEjercicio>
-                            Cada fila dice de dónde sale y de qué fecha es. Pasa el cursor por un
-                            valor para verlo junto a él.
+                            Bajo cada magnitud se lee de dónde sale y de qué fecha es. En un
+                            ordenador, también al pasar el cursor por un valor.
                           </TextoEjercicio>
                           <TablaDelEjercicio
                             titulo={hecha().titulo}
