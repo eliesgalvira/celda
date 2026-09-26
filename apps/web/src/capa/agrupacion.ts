@@ -14,10 +14,11 @@ import Supercluster from "supercluster";
  */
 
 /**
- * Distancia en píxeles de pantalla por debajo de la cual se agrupa, en el zoom entero del nivel. Con
- * 48, dos logos (34 px) o un logo y un hexágono (50 px) no se pisan.
+ * Distancia en píxeles de pantalla por debajo de la cual se agrupa, en el zoom entero del nivel.
+ * Con 48 salían más logos sueltos a zoom medio, pero con un tercio más de nodos el móvil simulado
+ * bajaba de 55 a 51 fps al cruzar niveles. Con 60 nada se pisa: el hexágono mide 50 px.
  */
-const RADIO = 48;
+const RADIO = 60;
 
 /** Último nivel con agrupaciones. En el siguiente y más cerca, todos los emplazamientos van sueltos. */
 const NIVEL_MAXIMO = 16;
