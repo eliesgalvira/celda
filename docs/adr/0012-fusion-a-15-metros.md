@@ -1,6 +1,6 @@
 # Fusión: observaciones a 15 m o menos, de cualquier compañía
 
-Estado: aceptada el 26/09/2026. Sustituye la regla de fusión del ADR 0009 («mismo operador a menos de 60 m»).
+Estado: aceptada el 26/09/2026. Sustituye la regla de fusión del ADR 0009 («mismo operador a menos de 60 m»). Ampliada el mismo día con la unión por código (al final).
 
 ## Contexto
 
@@ -36,3 +36,15 @@ La arquitectura juntaba en un emplazamiento las observaciones de una misma compa
 - «Verificado» con una sola fuente es verdad por omisión: nadie lo contradice porque aún no hay nadie más. La confianza `media` lo deja ver.
 - Las observaciones de la comunidad sin coordenadas propias fiables (ER5, OpenCelliD) tendrán que ajustar la regla cuando lleguen, con un radio propio o uniendo por código como propone la investigación de fuentes comunitarias.
 - Fuera de la ciudad 15 m puede quedarse corto. Si Celda sale de Barcelona hay que repetir este análisis.
+
+## Ampliación: unión por código con la comunidad (26/09/2026, ticket 18)
+
+antenasmoviles.es copia el registro oficial y publica cada estación con el código de emplazamiento del registro (investigación de fuentes comunitarias, apartado 3). Sus coordenadas no tienen por qué coincidir con las del registro: las copia en una fecha y el registro puede moverlas después. Si solo se juntara por distancia, una estación que la comunidad da por desmontada y que el registro ha movido más de 15 m no llegaría a su emplazamiento, y la corrección se perdería.
+
+- Una observación de otra fuente con la compañía y el código exacto de una del registro oficial va al emplazamiento de esa, esté donde esté. Sin quitar ceros, por lo mismo que la clave.
+- Si están a más de 15 m, el emplazamiento lleva un conflicto `posicion-distinta` con la distancia. La posición sigue siendo la del registro.
+- Una observación `desmontada` busca primero la del registro con su código. Si no la hay, va como antes a la más cercana de su compañía dentro del radio.
+- Las ER5 no tienen código del registro y se siguen juntando por distancia. Una ER5 a 15 m o menos de una estación del registro de su misma compañía da `codigos-distintos`, que puede ser un duplicado. Si es de otra compañía, el emplazamiento queda `corregido`.
+- Cambia un caso de las pruebas: el mismo código en el registro y en la comunidad a 800 m ya no son dos emplazamientos con conflicto, sino uno con conflicto. El mismo código repetido dentro del registro sigue dando dos.
+
+Con la descarga del 26/09/2026 (registro de la caja de Barcelona y las 40 ER5 con compañía) salen 1354 emplazamientos: 1317 verificados, 36 nuevos y 1 corregido, sin conflictos.

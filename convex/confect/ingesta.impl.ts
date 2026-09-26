@@ -1,7 +1,8 @@
 import { EmplazamientoSinEstaciones, EstacionBase } from "@celda/dominio/emplazamiento";
 import { Banda } from "@celda/dominio/banda";
 import { Fuente, Observacion } from "@celda/dominio/observacion";
-import { Registro } from "@celda/ingesta/extractor";
+import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
+import { ObservacionDePunto, Punto, Registro } from "@celda/ingesta/extractor";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import { ConvexConfigProvider, FunctionImpl, GroupImpl } from "@confect/server";
 import * as Clock from "effect/Clock";
@@ -12,16 +13,40 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
-import { ejecutarIngesta, fusionarTodo, opcionesProcesoDesdeConfig } from "../src/proceso";
+import {
+  ejecutarIngesta,
+  ejecutarIngestaDePuntos,
+  fusionarTodo,
+  opcionesProcesoDePuntosDesdeConfig,
+  opcionesProcesoDesdeConfig,
+} from "../src/proceso";
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 import ingesta from "./ingesta.spec";
 import { SIN_CAMBIOS } from "./tables/ejecuciones";
+import { INTERRUPTOR_POR_DEFECTO } from "./tables/interruptores";
 
 const mismoEmplazamiento = Schema.toEquivalence(EmplazamientoSinEstaciones);
 const mismaEstacion = Schema.toEquivalence(EstacionBase);
 const mismoRegistro = Schema.toEquivalence(Registro);
 const mismasBandas = Schema.toEquivalence(Schema.Array(Banda));
+const mismoPunto = Schema.toEquivalence(Punto);
+const mismaObservacionDePunto = Schema.toEquivalence(ObservacionDePunto);
+
+/** Los campos del listado de un punto guardado. */
+const puntoDe = (p: Punto): Punto => ({
+  clave: p.clave,
+  codigos: p.codigos,
+  posicion: p.posicion,
+  huella: p.huella,
+  prioridad: p.prioridad,
+});
+
+/** Lo que dijo el detalle de un punto de una observación guardada. */
+const observacionDePuntoDe = (o: ObservacionDePunto): ObservacionDePunto => ({
+  ...registroDe(o),
+  afirma: o.afirma,
+});
 
 /** Los campos del listado de una observación guardada. */
 const registroDe = (o: Registro): Registro => ({
@@ -51,7 +76,8 @@ const iniciar = FunctionImpl.make(databaseSchema, ingesta, "iniciar", ({ fuente,
       .table("interruptores")
       .index("por_fuente", (q) => q.eq("fuente", fuente))
       .first();
-    const apagado = Option.filter(interruptor, (i) => !i.activo);
+    const vigente = Option.getOrElse(interruptor, () => INTERRUPTOR_POR_DEFECTO[fuente]);
+    const apagado = vigente.activo ? Option.none() : Option.some(vigente);
     const ejecucion = yield* writer.table("ejecuciones").insert({
       fuente,
       inicio: fecha,
@@ -202,6 +228,214 @@ const cerrarBarrido = FunctionImpl.make(
         retirados += retirada ? 1 : 0;
       }
       return { retirados };
+    }).pipe(Effect.orDie),
+);
+
+/**
+ * Guarda los puntos del listado. Un punto nuevo, o con otra huella, queda pendiente de leer su
+ * detalle; uno sin cambios no se escribe.
+ */
+const aplicarPuntos = FunctionImpl.make(
+  databaseSchema,
+  ingesta,
+  "aplicarPuntos",
+  ({ fuente, puntos }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const writer = yield* DatabaseWriter;
+      let creados = 0;
+      let cambiados = 0;
+      for (const punto of puntos) {
+        const previo = yield* reader
+          .table("puntos")
+          .index("por_clave", (q) => q.eq("fuente", fuente).eq("clave", punto.clave))
+          .first();
+        if (Option.isNone(previo)) {
+          yield* writer.table("puntos").insert({
+            ...punto,
+            fuente,
+            detalleLeidoEn: null,
+            observaciones: [],
+            ausencias: 0,
+            retiradoEn: null,
+          });
+          creados++;
+          continue;
+        }
+        const { _id, _creationTime, ...guardado } = previo.value;
+        const igual = mismoPunto(puntoDe(guardado), punto);
+        if (igual && guardado.ausencias === 0 && guardado.retiradoEn === null) {
+          continue;
+        }
+        yield* writer.table("puntos").replace(_id, {
+          ...guardado,
+          ...punto,
+          // Si cambia el listado, o vuelve tras retirarse, el detalle se lee otra vez.
+          detalleLeidoEn: igual && guardado.retiradoEn === null ? guardado.detalleLeidoEn : null,
+          ausencias: 0,
+          retiradoEn: null,
+        });
+        if (!igual || guardado.retiradoEn !== null) {
+          cambiados++;
+        }
+      }
+      return { creados, cambiados };
+    }).pipe(Effect.orDie),
+);
+
+/** Los puntos cuyo detalle toca leer: primero los nuevos o cambiados, luego los más antiguos. */
+const pendientesDeDetalle = FunctionImpl.make(
+  databaseSchema,
+  ingesta,
+  "pendientesDeDetalle",
+  ({ fuente, leidosAntesDe, limite }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const pendientes = yield* reader
+        .table("puntos")
+        .index("por_detalle", (q) => q.eq("fuente", fuente).lt("detalleLeidoEn", leidosAntesDe))
+        .stream()
+        .pipe(
+          Stream.filter((p) => p.retiradoEn === null),
+          Stream.take(limite),
+          Stream.runCollect,
+        );
+      return pendientes.map(puntoDe);
+    }).pipe(Effect.orDie),
+);
+
+/**
+ * Guarda lo que dice el detalle de un punto: crea o cambia sus observaciones, retira las que ya
+ * no salen y apunta cuándo se leyó. Una observación igual a la guardada no se escribe.
+ */
+const aplicarDetalle = FunctionImpl.make(
+  databaseSchema,
+  ingesta,
+  "aplicarDetalle",
+  ({ fuente, punto: clavePunto, fecha, observaciones }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const writer = yield* DatabaseWriter;
+      const cuentas = { creados: 0, cambiados: 0, retirados: 0 };
+      const punto = yield* reader
+        .table("puntos")
+        .index("por_clave", (q) => q.eq("fuente", fuente).eq("clave", clavePunto))
+        .first();
+      if (Option.isNone(punto) || punto.value.retiradoEn !== null) {
+        return cuentas;
+      }
+      const buscar = (clave: string) =>
+        reader
+          .table("observaciones")
+          .index("por_clave", (q) => q.eq("fuente", fuente).eq("clave", clave))
+          .first();
+      for (const observacion of observaciones) {
+        const previa = yield* buscar(observacion.clave);
+        if (Option.isNone(previa)) {
+          yield* writer.table("observaciones").insert({
+            ...observacion,
+            fuente,
+            bandas: [],
+            fecha,
+            fichaLeidaEn: fecha,
+            ausencias: 0,
+            retiradaEn: null,
+            punto: clavePunto,
+          });
+          cuentas.creados++;
+          continue;
+        }
+        const { _id, _creationTime, ...guardada } = previa.value;
+        const igual = mismaObservacionDePunto(observacionDePuntoDe(guardada), observacion);
+        if (igual && guardada.retiradaEn === null && guardada.punto === clavePunto) {
+          continue;
+        }
+        yield* writer.table("observaciones").replace(_id, {
+          ...guardada,
+          ...observacion,
+          fecha: igual && guardada.retiradaEn === null ? guardada.fecha : fecha,
+          fichaLeidaEn: fecha,
+          ausencias: 0,
+          retiradaEn: null,
+          punto: clavePunto,
+        });
+        cuentas.cambiados += igual && guardada.retiradaEn === null ? 0 : 1;
+      }
+      const vigentes = new Set(observaciones.map((o) => o.clave));
+      for (const clave of punto.value.observaciones.filter((c) => !vigentes.has(c))) {
+        const previa = yield* buscar(clave);
+        // Solo retira lo que sigue siendo de este punto: otro punto puede habérsela quedado.
+        if (
+          Option.isSome(previa) &&
+          previa.value.retiradaEn === null &&
+          previa.value.punto === clavePunto
+        ) {
+          yield* writer.table("observaciones").patch(previa.value._id, { retiradaEn: fecha });
+          cuentas.retirados++;
+        }
+      }
+      yield* writer.table("puntos").patch(punto.value._id, {
+        detalleLeidoEn: fecha,
+        observaciones: [...vigentes],
+      });
+      return cuentas;
+    }).pipe(Effect.orDie),
+);
+
+/**
+ * Cuenta una ausencia a los puntos que no ha traído el listado. Tras dos barridos seguidos sin
+ * verlo, el punto se retira y con él sus observaciones.
+ */
+const cerrarBarridoDePuntos = FunctionImpl.make(
+  databaseSchema,
+  ingesta,
+  "cerrarBarridoDePuntos",
+  ({ ejecucion, vistos }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const writer = yield* DatabaseWriter;
+      const actual = yield* reader.table("ejecuciones").get(ejecucion);
+      const cuentas = { puntos: 0, observaciones: 0 };
+      if (actual.estado !== "en curso") {
+        return cuentas;
+      }
+      const vistosEnListado = new Set(vistos);
+      // Unos 1300 puntos en la caja de Barcelona, por debajo del límite de 4096 lecturas.
+      const guardados = yield* reader
+        .table("puntos")
+        .index("por_clave", (q) => q.eq("fuente", actual.fuente))
+        .collect();
+      for (const punto of guardados) {
+        if (punto.retiradoEn !== null || vistosEnListado.has(punto.clave)) {
+          continue;
+        }
+        const ausencias = punto.ausencias + 1;
+        const retirado = ausencias >= 2;
+        yield* writer
+          .table("puntos")
+          .patch(punto._id, { ausencias, retiradoEn: retirado ? actual.inicio : null });
+        if (!retirado) {
+          continue;
+        }
+        cuentas.puntos++;
+        for (const clave of punto.observaciones) {
+          const observacion = yield* reader
+            .table("observaciones")
+            .index("por_clave", (q) => q.eq("fuente", actual.fuente).eq("clave", clave))
+            .first();
+          if (
+            Option.isSome(observacion) &&
+            observacion.value.retiradaEn === null &&
+            observacion.value.punto === punto.clave
+          ) {
+            yield* writer
+              .table("observaciones")
+              .patch(observacion.value._id, { retiradaEn: actual.inicio });
+            cuentas.observaciones++;
+          }
+        }
+      }
+      return cuentas;
     }).pipe(Effect.orDie),
 );
 
@@ -417,12 +651,11 @@ const estado = FunctionImpl.make(databaseSchema, ingesta, "estado", () =>
         .table("ejecuciones")
         .index("por_fuente", (q) => q.eq("fuente", fuente), "desc")
         .take(10);
-      return {
-        fuente,
-        activo: Option.match(interruptor, { onNone: () => true, onSome: (i) => i.activo }),
-        motivo: Option.match(interruptor, { onNone: () => "", onSome: (i) => i.motivo }),
-        ejecuciones,
-      };
+      const { activo, motivo } = Option.getOrElse(
+        interruptor,
+        () => INTERRUPTOR_POR_DEFECTO[fuente],
+      );
+      return { fuente, activo, motivo, ejecuciones };
     }),
   ).pipe(Effect.orDie),
 );
@@ -448,6 +681,27 @@ const registroOficial = FunctionImpl.make(databaseSchema, ingesta, "registroOfic
   ),
 );
 
+/** El extractor real de antenasmoviles.es sobre `fetch`, con sus opciones de Convex. */
+const capaDeAntenasMoviles = Layer.merge(
+  Layer.unwrap(Effect.map(AntenasMoviles.opcionesDesdeConfig, AntenasMoviles.capa)).pipe(
+    Layer.provide(FetchHttpClient.layer),
+  ),
+  ConvexConfigProvider.layer,
+).pipe(Layer.provide(ConvexConfigProvider.layer));
+
+/**
+ * La ingesta de antenasmoviles.es que lanza el cron. Con el interruptor apagado, que es como
+ * empieza, queda omitida sin pedir nada a la fuente.
+ */
+const antenasMoviles = FunctionImpl.make(databaseSchema, ingesta, "antenasMoviles", () =>
+  Effect.flatMap(opcionesProcesoDePuntosDesdeConfig, ejecutarIngestaDePuntos).pipe(
+    // Como en el registro oficial, la acción monta sus capas una vez.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    Effect.provide(capaDeAntenasMoviles),
+    Effect.orDie,
+  ),
+);
+
 /** Vuelve a fusionar sin pedir nada a las fuentes, por ejemplo tras cambiar la regla. */
 const recalcularFusion = FunctionImpl.make(databaseSchema, ingesta, "recalcularFusion", () =>
   Effect.flatMap(Clock.currentTimeMillis, fusionarTodo),
@@ -459,6 +713,10 @@ export default GroupImpl.make(databaseSchema, ingesta).pipe(
   Layer.provide(pendientesDeFicha),
   Layer.provide(aplicarFicha),
   Layer.provide(cerrarBarrido),
+  // `pipe` admite 20 pasos: las funciones de las fuentes por puntos van aparte.
+  Layer.provide(
+    Layer.mergeAll(aplicarPuntos, pendientesDeDetalle, aplicarDetalle, cerrarBarridoDePuntos),
+  ),
   Layer.provide(observacionesVigentes),
   Layer.provide(clavesDeEmplazamientos),
   Layer.provide(escribirEmplazamientos),
@@ -469,6 +727,7 @@ export default GroupImpl.make(databaseSchema, ingesta).pipe(
   Layer.provide(ejecucion),
   Layer.provide(estado),
   Layer.provide(registroOficial),
+  Layer.provide(antenasMoviles),
   Layer.provide(recalcularFusion),
   GroupImpl.finalize,
 );

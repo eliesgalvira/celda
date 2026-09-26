@@ -2,37 +2,25 @@
 // @effect-diagnostics strictEffectProvide:off
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
-import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
-import * as HttpClient from "effect/unstable/http/HttpClient";
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import { Extractor, RespuestaInesperada } from "../extractor.ts";
 import { leerMuestra } from "../pruebas/grabado.ts";
+import {
+  clienteDePrueba,
+  NO_HAY_ROBOTS,
+  type Peticion,
+  type Respondedor,
+} from "../pruebas/http.ts";
 import { esperarConReloj } from "../pruebas/reloj.ts";
 import { capa, OPCIONES, type Opciones } from "./extractor.ts";
-import type { Caja } from "./normalizar.ts";
-
-interface Peticion {
-  readonly ruta: string;
-  readonly userAgent: string | undefined;
-  readonly en: number;
-}
-
-interface Respuesta {
-  readonly estado: number;
-  readonly cuerpo: string | Uint8Array<ArrayBuffer>;
-}
-
-type Respondedor = (url: URL, intento: number) => Respuesta;
+import type { Caja } from "../zona.ts";
 
 const CAJA: Caja = [2.105, 41.382, 2.125, 41.392];
-
-const NO_HAY_ROBOTS: Respuesta = { estado: 404, cuerpo: "" };
 
 /** Bytes en ISO-8859-1, como los manda el geoportal. */
 const latin1 = (texto: string): Uint8Array<ArrayBuffer> =>
@@ -50,27 +38,6 @@ const elementos = (n: number, prefijo: string, [oeste, sur]: Caja) =>
         properties: { Gis_ID: `${prefijo}${i}`, Dirección: "CL X, 1. BARCELONA, BARCELONA" },
       })),
     }),
-  );
-
-/**
- * Cliente HTTP de prueba: apunta cada petición con la hora del `TestClock` y contesta con
- * `responder`, que recibe cuántas veces se ha pedido ya esa misma URL.
- */
-const clienteDePrueba = (peticiones: Ref.Ref<ReadonlyArray<Peticion>>, responder: Respondedor) =>
-  Layer.succeed(
-    HttpClient.HttpClient,
-    HttpClient.make((request, url) =>
-      Effect.gen(function* () {
-        const en = yield* Clock.currentTimeMillis;
-        const ruta = `${url.pathname}${url.search}`;
-        const previas = yield* Ref.getAndUpdate(peticiones, (p) => [
-          ...p,
-          { ruta, userAgent: request.headers["user-agent"], en },
-        ]);
-        const { estado, cuerpo } = responder(url, previas.filter((p) => p.ruta === ruta).length);
-        return HttpClientResponse.fromWeb(request, new Response(cuerpo, { status: estado }));
-      }),
-    ),
   );
 
 const opciones = (cambios: Partial<Opciones> = {}): Opciones => ({

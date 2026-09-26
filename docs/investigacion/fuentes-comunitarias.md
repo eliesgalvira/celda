@@ -289,6 +289,10 @@ Todas se obtuvieron el 26/09/2026 y son respuestas literales, salvo el extracto 
 | `muestras/antenasmoviles/v1-markers_0806460.json` | `GET /v1/markers?id=0806460,110480,CATR0250A`: bandas con primera fecha reciente |
 | `muestras/antenasmoviles/v1-markers_MV-BCN-82383.json` | `GET /v1/markers?id=MV-BCN-82383`: ER5 añadida por usuarios |
 | `muestras/antenasmoviles/v1-radiations_000455.json` | `GET /v1/radiations?id=000455,455` |
+| `muestras/antenasmoviles/v1-showf-er5_extracto-campus-nord.json` | Ticket 18. Las 41 filas de `GET /v1/showf?er5` dentro de `41.3790–41.3945, 2.1020–2.1275`, literales. |
+| `muestras/antenasmoviles/v1-showf-er5_extracto-er5-barcelona.json` | Ticket 18. Las 42 ER5 de la misma respuesta dentro de la caja de Barcelona del registro oficial. |
+| `muestras/antenasmoviles/v1-markers_0802532.json` | Ticket 18. `GET /v1/markers?id=0802532,086040,86040,CATR0228A`: la entrada de Campus Nord, sin fotos |
+| `muestras/antenasmoviles/v1-markers_CATR6031A.json` | Ticket 18. `GET /v1/markers?id=CATR6031A`: una ER5 de Orange con código de aspecto oficial, a 7 m de Movistar `0800542` |
 | `muestras/registro-oficial/detalleEstacion_0802314.html` | `https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0802314`, en ISO-8859-1 y con CRLF |
 | `muestras/opencellid/ajax-getCells_trelawny.geojson` | `https://opencellid.org/ajax/getCells.php?bbox=2.1915,41.3830,2.1995,41.3870`. Es el mapa público, sin `cell`, y no refleja el formato CSV. |
 

@@ -238,22 +238,76 @@ describe("fusionar", () => {
     );
   });
 
-  it("el mismo código en dos sitios da dos claves distintas y un conflicto en cada uno", () => {
+  it("el mismo código dos veces en el registro, lejos, da dos claves distintas y un conflicto en cada uno", () => {
+    const emplazamientos = fusionar([
+      observacion({ compania: "orange", codigo: "CATR6046A" }),
+      observacion({ compania: "orange", codigo: "CATR6046A", posicion: alEste(PIUS_XII, 800) }),
+    ]);
+    assert.deepStrictEqual(
+      emplazamientos.map((e) => [e.clave, e.estado, e.conflictos.map((c) => c.tipo)]),
+      [
+        ["orange-CATR6046A", "verificado", ["posicion-distinta"]],
+        ["orange-CATR6046A-2", "verificado", ["posicion-distinta"]],
+      ],
+    );
+  });
+
+  it("une por código: la comunidad con el código del registro va a su emplazamiento aunque esté lejos", async () => {
     const emplazamientos = fusionar([
       observacion({ compania: "orange", codigo: "CATR6046A" }),
       observacion({
         fuente: "antenasmoviles",
         compania: "orange",
         codigo: "CATR6046A",
-        posicion: alEste(PIUS_XII, 800),
+        posicion: alEste(PIUS_XII, 40),
+      }),
+    ]);
+    assert.strictEqual(emplazamientos.length, 1);
+    assert.strictEqual(emplazamientos[0]?.estado, "verificado");
+    assert.strictEqual(emplazamientos[0]?.confianza, "baja");
+    assert.deepStrictEqual(emplazamientos[0]?.conflictos, [
+      { tipo: "posicion-distinta", compania: "orange", codigo: "CATR6046A", metros: 40 },
+    ]);
+    // La posición del emplazamiento es la del registro oficial.
+    assert.deepStrictEqual(emplazamientos[0]?.posicion, PIUS_XII);
+    await expect(json(emplazamientos)).toMatchFileSnapshot(referencia("union-por-codigo"));
+  });
+
+  it("une por código sin quitar ceros: `3248` de la comunidad no es `003248` del registro", () => {
+    const emplazamientos = fusionar([
+      observacion({ compania: "vodafone", codigo: "003248" }),
+      observacion({
+        fuente: "antenasmoviles",
+        compania: "vodafone",
+        codigo: "3248",
+        posicion: alEste(PIUS_XII, 400),
       }),
     ]);
     assert.deepStrictEqual(
-      emplazamientos.map((e) => [e.clave, e.estado, e.conflictos.map((c) => c.tipo)]),
+      emplazamientos.map((e) => [e.clave, e.estado]),
       [
-        ["orange-CATR6046A", "verificado", ["posicion-distinta"]],
-        ["orange-CATR6046A-2", "nuevo", ["posicion-distinta"]],
+        ["vodafone-003248", "verificado"],
+        ["vodafone-3248", "nuevo"],
       ],
+    );
+  });
+
+  it("una desmontada con el código del registro va con él aunque esté más allá del radio", () => {
+    const emplazamientos = fusionar([
+      observacion({ compania: "movistar", codigo: "0802314" }),
+      observacion({
+        fuente: "antenasmoviles",
+        compania: "movistar",
+        codigo: "0802314",
+        afirma: "desmontada",
+        posicion: alEste(PIUS_XII, 25),
+      }),
+    ]);
+    assert.strictEqual(emplazamientos.length, 1);
+    assert.strictEqual(emplazamientos[0]?.estado, "corregido");
+    assert.deepStrictEqual(
+      emplazamientos[0]?.conflictos.map((c) => c.tipo),
+      ["desmontada", "posicion-distinta"],
     );
   });
 

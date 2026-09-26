@@ -2,6 +2,7 @@
 // @effect-diagnostics strictEffectProvide:off
 import type { LimitesDeBarrios } from "@celda/dominio/barrio";
 import { leerCapa } from "@celda/dominio/capa";
+import { capaDePuntosGrabada, muestraAntenasMoviles } from "@celda/ingesta/pruebas/antenasmoviles";
 import { capaGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
 import { MutationRunner, QueryRunner } from "@confect/server";
 import { NodeServices } from "@effect/platform-node";
@@ -15,7 +16,7 @@ import { TestClock } from "effect/testing";
 
 import refs from "../confect/_generated/refs";
 import { AlmacenDeCapas, CapaInmutable, publicarCapa } from "../src/capas";
-import { ejecutar } from "./ayudas";
+import { ejecutar, ejecutarDePuntos } from "./ayudas";
 import * as TestConfect from "./TestConfect";
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
@@ -185,6 +186,47 @@ describe("capa de emplazamientos (API de Convex en memoria)", () => {
         assert.strictEqual(Option.getOrNull(vigente)?.version, segunda.version);
       }),
     ),
+  );
+
+  it.effect(
+    "con las correcciones de la comunidad, la capa lleva sus estados y cambia de versión",
+    () =>
+      conConvex(
+        Effect.gen(function* () {
+          const convex = yield* TestConfect.TestConfect;
+          yield* TestClock.setTime(NOCHE);
+          yield* ejecutar(capaGrabada("registro-oficial", yield* muestraCampusNord));
+          const ficheros = yield* Ref.make<ReadonlyMap<string, string>>(new Map());
+          const soloRegistro = yield* publicar(ficheros);
+
+          yield* convex.mutation(refs.internal.ingesta.cambiarInterruptor, {
+            fuente: "antenasmoviles",
+            activo: true,
+            motivo: "prueba",
+          });
+          yield* TestClock.adjust(3_600_000);
+          yield* ejecutarDePuntos(capaDePuntosGrabada(yield* muestraAntenasMoviles));
+          const conComunidad = yield* publicar(ficheros);
+          assert.strictEqual(conComunidad.version, "sitios@2026-09-26T03:15:00Z");
+          assert.notStrictEqual(conComunidad.version, soloRegistro.version);
+          assert.strictEqual(conComunidad.emplazamientos, soloRegistro.emplazamientos + 2);
+
+          const contenido = (yield* Ref.get(ficheros)).get(`${conComunidad.version}.json`) ?? "";
+          const leida = leerCapa(contenido, conComunidad.version);
+          assert.isTrue(Result.isSuccess(leida));
+          if (Result.isFailure(leida)) return;
+          const estadoDe = (clave: string) =>
+            leida.success.emplazamientos.find((e) => e.clave === clave)?.estado;
+          assert.strictEqual(estadoDe("movistar-0802532"), "corregido");
+          assert.strictEqual(estadoDe("movistar-MV-BCN-82383"), "nuevo");
+          assert.strictEqual(estadoDe("orange-CATR6031A"), "nuevo");
+          assert.strictEqual(estadoDe("orange-CATR0508Z"), "verificado");
+          assert.sameMembers(
+            [...new Set(leida.success.emplazamientos.map((e) => e.estado))],
+            ["verificado", "corregido", "nuevo"],
+          );
+        }),
+      ),
   );
 
   it.effect("no pisa un fichero publicado con otro contenido ni registra la versión", () =>

@@ -238,9 +238,12 @@ const emplazamientoDe = (
  *
  * - Las observaciones `presente` a `radioMetros` o menos, de cualquier compañía, van al mismo
  *   emplazamiento. La cercanía se encadena: si A está cerca de B y B de C, van juntas.
+ * - Una observación de otra fuente con la compañía y el código exacto de una del registro
+ *   oficial va con ella, esté donde esté. Si está a más del radio, es un conflicto de posición.
  * - En cada emplazamiento hay una estación base por compañía, con la unión de las bandas.
- * - Una observación `desmontada` se une al emplazamiento más cercano que tenga esa compañía
- *   dentro del radio. Si no hay ninguno, no crea nada.
+ * - Una observación `desmontada` va con la del registro de su mismo código o, si no hay, al
+ *   emplazamiento más cercano que tenga esa compañía dentro del radio. Si no hay ninguno, no
+ *   crea nada.
  *
  * Es determinista: el resultado no depende del orden de la entrada y sale ordenado por clave.
  * La clave es la compañía y el código de la observación de menor clave del registro oficial
@@ -259,6 +262,20 @@ export const fusionar = (
   )) {
     conjuntos.unir(a, b);
   }
+  // Una observación de otra fuente con el código exacto de una del registro oficial es la misma
+  // estación base, esté donde esté: va a su emplazamiento.
+  const oficialPorCodigo = new Map<string, number>();
+  presentes.forEach((observacion, indice) => {
+    if (esOficial(observacion) && !oficialPorCodigo.has(claveDeEstacion(observacion))) {
+      oficialPorCodigo.set(claveDeEstacion(observacion), indice);
+    }
+  });
+  presentes.forEach((observacion, indice) => {
+    const oficial = oficialPorCodigo.get(claveDeEstacion(observacion));
+    if (!esOficial(observacion) && oficial !== undefined) {
+      conjuntos.unir(indice, oficial);
+    }
+  });
   const grupos = new Map<number, Array<Observacion>>();
   presentes.forEach((observacion, indice) => {
     const raiz = conjuntos.raiz(indice);
@@ -266,6 +283,12 @@ export const fusionar = (
   });
 
   for (const desmontada of ordenadas.filter((o) => o.afirma === "desmontada")) {
+    const oficial = oficialPorCodigo.get(claveDeEstacion(desmontada));
+    const delMismoCodigo = oficial === undefined ? undefined : grupos.get(conjuntos.raiz(oficial));
+    if (delMismoCodigo !== undefined) {
+      delMismoCodigo.push(desmontada);
+      continue;
+    }
     const candidatos = [...grupos.values()]
       .flatMap((grupo) =>
         grupo
@@ -280,9 +303,41 @@ export const fusionar = (
   const conflictosPorGrupo = posicionesDistintas([...grupos.values()]);
   return clavesUnicas(
     [...grupos.values()].map((grupo) =>
-      emplazamientoDe(grupo, conflictosPorGrupo.get(grupo) ?? []),
+      emplazamientoDe(grupo, [
+        ...(conflictosPorGrupo.get(grupo) ?? []),
+        ...lejosDelRegistro(grupo, regla),
+      ]),
     ),
   );
+};
+
+/**
+ * Observaciones de otras fuentes que la unión por código ha llevado junto a la del registro
+ * oficial, pero que la sitúan a más del radio: un conflicto de posición por cada código, con la
+ * mayor distancia.
+ */
+const lejosDelRegistro = (
+  grupo: ReadonlyArray<Observacion>,
+  regla: ReglaFusion,
+): ReadonlyArray<Conflicto> => {
+  const oficiales = grupo.filter((o) => esOficial(o) && o.afirma === "presente");
+  const metrosPorCodigo = new Map<string, { readonly muestra: Observacion; metros: number }>();
+  for (const otra of grupo.filter((o) => !esOficial(o))) {
+    const clave = claveDeEstacion(otra);
+    for (const oficial of oficiales.filter((o) => claveDeEstacion(o) === clave)) {
+      const metros = distanciaMetros(oficial.posicion, otra.posicion);
+      const previa = metrosPorCodigo.get(clave);
+      if (metros > regla.radioMetros && (previa === undefined || metros > previa.metros)) {
+        metrosPorCodigo.set(clave, { muestra: otra, metros });
+      }
+    }
+  }
+  return [...metrosPorCodigo.values()].map(({ muestra, metros }): Conflicto => ({
+    tipo: "posicion-distinta",
+    compania: muestra.compania,
+    codigo: muestra.codigo.trim(),
+    metros: Math.round(metros),
+  }));
 };
 
 /**

@@ -1,0 +1,45 @@
+[
+  {
+    "clave": "orange-CATR6046A",
+    "posicion": {
+      "longitud": 2.122967,
+      "latitud": 41.386032
+    },
+    "direccion": "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "baja",
+    "conflictos": [
+      {
+        "tipo": "posicion-distinta",
+        "compania": "orange",
+        "codigo": "CATR6046A",
+        "metros": 40
+      }
+    ],
+    "estaciones": [
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR6046A"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "antenasmoviles",
+            "clave": "ORANGE - CATR6046A"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE - CATR6046A"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "antenasmoviles",
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  }
+]

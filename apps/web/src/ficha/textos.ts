@@ -40,10 +40,17 @@ export const antetituloDe = (ficha: Ficha): TextoMarcado =>
 
 /**
  * El título de la ficha. Ninguna fuente da un nombre a los emplazamientos, así que es la calle
- * y el número tal como los publica la fuente, sin el municipio ni la provincia del final.
+ * y el número tal como los publica la fuente, sin el municipio ni la provincia del final. El
+ * registro escribe «CL X, 1. MUNICIPIO, PROVINCIA»; las ER5 de antenasmoviles.es traen la
+ * dirección de OpenStreetMap, «Carrer de X, 1, Barrio, 08014 Barcelona».
  */
 export const tituloDe = (ficha: Ficha): string => {
-  const calle = ficha.direccion.split(". ")[0]?.trim() ?? "";
+  const direccion = ficha.direccion.trim();
+  if (/,\s*\d{5}\s+[^,]+$/u.test(direccion)) {
+    const [via = "", numero = ""] = direccion.split(",").map((parte) => parte.trim());
+    return /^\d/u.test(numero) ? `${via}, ${numero}` : via;
+  }
+  const calle = direccion.split(". ")[0]?.trim() ?? "";
   return calle === "" ? "Emplazamiento sin dirección" : calle;
 };
 
@@ -72,6 +79,12 @@ export const textoTramo = (banda: Banda): string =>
     : `${enumerar(banda.rangos.map((r) => `${MHZ.format(r.desdeMhz)}–${MHZ.format(r.hastaMhz)}`))} MHz`;
 
 export const SIN_BANDAS = "Celda aún no ha leído sus bandas en el registro oficial.";
+
+/** Qué decir de una estación base sin bandas: si no está en el registro, no hay de dónde leerlas. */
+export const sinBandasDe = (estacion: EstacionDeFicha): string =>
+  estacion.origenes.some((o) => o.fuente === "registro-oficial")
+    ? SIN_BANDAS
+    : "No está en el registro oficial, así que no se conocen sus bandas.";
 
 export const NOMBRE_FUENTE: Readonly<Record<Fuente, string>> = {
   "registro-oficial": "Registro oficial",

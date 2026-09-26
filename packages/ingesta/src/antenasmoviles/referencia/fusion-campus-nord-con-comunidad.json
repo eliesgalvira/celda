@@ -1,0 +1,2107 @@
+[
+  {
+    "clave": "movistar-0800199",
+    "posicion": {
+      "longitud": 2.108997,
+      "latitud": 41.387577
+    },
+    "direccion": "CL SOR EULALIA DANZIZU, 11. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0800199"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800199"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR0510J"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR0510J"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "085206"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 085206"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0800268",
+    "posicion": {
+      "longitud": 2.119775,
+      "latitud": 41.388466
+    },
+    "direccion": "AV PEDRALBES, 1. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0800268"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2401288",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 778,
+                "hastaMhz": 788
+              }
+            ],
+            "mhz": 700,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -1900059",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 852,
+                "hastaMhz": 862
+              }
+            ],
+            "mhz": 800,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -0432119",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2004
+          },
+          {
+            "referencia": "B B -1200100",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2012
+          },
+          {
+            "referencia": "B B -2401286",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -1301718",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 1805.1,
+                "hastaMhz": 1825.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2013
+          },
+          {
+            "referencia": "B B -2000681",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2155,
+                "hastaMhz": 2170
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2020
+          },
+          {
+            "referencia": "B B -1903447",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2620,
+                "hastaMhz": 2640
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -2401287",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 3460,
+                "hastaMhz": 3600
+              }
+            ],
+            "mhz": 3500,
+            "anio": 2024
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800268"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0800307",
+    "posicion": {
+      "longitud": 2.122967,
+      "latitud": 41.386032
+    },
+    "direccion": "CL SABINO ARANA, 29. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0800307"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800307"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR6158A"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR6158A"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "028723"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -1600031",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 1825.1,
+                "hastaMhz": 1845.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2016
+          },
+          {
+            "referencia": "B B -1802229",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 1905,
+                "hastaMhz": 1910
+              },
+              {
+                "desdeMhz": 2140,
+                "hastaMhz": 2155
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2018
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A. - 028723"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0800351",
+    "posicion": {
+      "longitud": 2.112922,
+      "latitud": 41.382298
+    },
+    "direccion": "AV Doctor Marañon, 17-31. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0800351"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2201448",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 778,
+                "hastaMhz": 788
+              }
+            ],
+            "mhz": 700,
+            "anio": 2022
+          },
+          {
+            "referencia": "B B -1803104",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 852,
+                "hastaMhz": 862
+              }
+            ],
+            "mhz": 800,
+            "anio": 2018
+          },
+          {
+            "referencia": "B B -0432249",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2004
+          },
+          {
+            "referencia": "B B -1200923",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2012
+          },
+          {
+            "referencia": "B B -2201449",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2022
+          },
+          {
+            "referencia": "B B -1301750",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 1805.1,
+                "hastaMhz": 1825.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2013
+          },
+          {
+            "referencia": "B B -2001391",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2155,
+                "hastaMhz": 2170
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2020
+          },
+          {
+            "referencia": "B B -2300925",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2620,
+                "hastaMhz": 2640
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -2201447",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 3460,
+                "hastaMhz": 3600
+              }
+            ],
+            "mhz": 3500,
+            "anio": 2022
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800351"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0800542",
+    "posicion": {
+      "longitud": 2.173606,
+      "latitud": 41.389709
+    },
+    "direccion": "PZ DURQUINAONA, 7. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "corregido",
+    "confianza": "alta",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0800542"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800542"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR6031A"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "antenasmoviles",
+            "clave": "orange - CATR6031A"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "antenasmoviles",
+      "registro-oficial"
+    ],
+    "datosDel": 1790467200000
+  },
+  {
+    "clave": "movistar-0800840",
+    "posicion": {
+      "longitud": 2.118194,
+      "latitud": 41.382111
+    },
+    "direccion": "CL Baldiri Reixac, 2. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0800840"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800840"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0800942",
+    "posicion": {
+      "longitud": 2.113886,
+      "latitud": 41.390648
+    },
+    "direccion": "VP Eusebi Güell, 6. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0800942"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2201854",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 1805.1,
+                "hastaMhz": 1825.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2022
+          },
+          {
+            "referencia": "B B -0900936",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 1910,
+                "hastaMhz": 1915
+              },
+              {
+                "desdeMhz": 2155,
+                "hastaMhz": 2170
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2009
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800942"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0801205",
+    "posicion": {
+      "longitud": 2.106914,
+      "latitud": 41.382526
+    },
+    "direccion": "AV DIAGONAL, 687. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0801205"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0801205"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR2756A"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2401654",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 758,
+                "hastaMhz": 768
+              }
+            ],
+            "mhz": 700,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -1801725",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 832,
+                "hastaMhz": 842
+              }
+            ],
+            "mhz": 800,
+            "anio": 2018
+          },
+          {
+            "referencia": "B B -1202130",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2012
+          },
+          {
+            "referencia": "B B -2401648",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -1302019",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 1855.1,
+                "hastaMhz": 1879.9
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2013
+          },
+          {
+            "referencia": "B B -2302081",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2120,
+                "hastaMhz": 2140
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -2302075",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2640,
+                "hastaMhz": 2660
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -2401653",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 3600,
+                "hastaMhz": 3700
+              }
+            ],
+            "mhz": 3500,
+            "anio": 2024
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR2756A"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "018172",
+          "18172"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -1300856",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 1825.1,
+                "hastaMhz": 1845.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2013
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 018172"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 18172"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0801690",
+    "posicion": {
+      "longitud": 2.1095,
+      "latitud": 41.383141
+    },
+    "direccion": "AV DIAGONAL, 661-671. HOSPITALET DE LLOBREGAT (L), BARCELONA",
+    "municipio": "HOSPITALET DE LLOBREGAT (L)",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0801690"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -0434908",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2004
+          },
+          {
+            "referencia": "B B -1100492",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2155,
+                "hastaMhz": 2170
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2011
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0801690"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0801694",
+    "posicion": {
+      "longitud": 2.122289,
+      "latitud": 41.389847
+    },
+    "direccion": "CL PEDRO I PONS, 9. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0801694"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0801694"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR3021A"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR3021A"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "054846",
+          "54846"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2500558",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 768,
+                "hastaMhz": 778
+              }
+            ],
+            "mhz": 700,
+            "anio": 2025
+          },
+          {
+            "referencia": "B B -2500557",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 842,
+                "hastaMhz": 852
+              }
+            ],
+            "mhz": 800,
+            "anio": 2025
+          },
+          {
+            "referencia": "B B -2000415",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 2140,
+                "hastaMhz": 2155
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2020
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 054846"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 54846"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0802015",
+    "posicion": {
+      "longitud": 2.117706,
+      "latitud": 41.385036
+    },
+    "direccion": "AV DIAGONAL, 645. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0802015"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -1502435",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 852,
+                "hastaMhz": 862
+              }
+            ],
+            "mhz": 800,
+            "anio": 2015
+          },
+          {
+            "referencia": "B B -0700083",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2007
+          },
+          {
+            "referencia": "B B -1200049",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2012
+          },
+          {
+            "referencia": "B B -1301958",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 1805.1,
+                "hastaMhz": 1825.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2013
+          },
+          {
+            "referencia": "B B -2000152",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2155,
+                "hastaMhz": 2170
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2020
+          },
+          {
+            "referencia": "B B -1900551",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2620,
+                "hastaMhz": 2640
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2019
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802015"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "000715",
+          "00715"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2500216",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 768,
+                "hastaMhz": 778
+              }
+            ],
+            "mhz": 700,
+            "anio": 2025
+          },
+          {
+            "referencia": "B B -2400433",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 842,
+                "hastaMhz": 852
+              }
+            ],
+            "mhz": 800,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -0433608",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 949.9,
+                "hastaMhz": 959.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2004
+          },
+          {
+            "referencia": "B B -0433772",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 949.9,
+                "hastaMhz": 959.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2004
+          },
+          {
+            "referencia": "B B -0433448",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 1825.1,
+                "hastaMhz": 1845.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2004
+          },
+          {
+            "referencia": "B B -2400434",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 1825.1,
+                "hastaMhz": 1845.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -1903489",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 2140,
+                "hastaMhz": 2155
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -2400439",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 2660,
+                "hastaMhz": 2680
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -1902304",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 3710,
+                "hastaMhz": 3800
+              }
+            ],
+            "mhz": 3500,
+            "anio": 2019
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 000715"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 00715"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0802532",
+    "posicion": {
+      "longitud": 2.113628,
+      "latitud": 41.388344
+    },
+    "direccion": "CL JORDI GIRONA, 1. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "corregido",
+    "confianza": "baja",
+    "conflictos": [
+      {
+        "tipo": "desmontada",
+        "compania": "vodafone",
+        "procedencia": {
+          "fuente": "antenasmoviles",
+          "clave": "vodafone - 086040"
+        },
+        "fecha": 1790467200000
+      }
+    ],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0802532"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2300445",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 778,
+                "hastaMhz": 788
+              }
+            ],
+            "mhz": 700,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -1902346",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 852,
+                "hastaMhz": 862
+              }
+            ],
+            "mhz": 800,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -1900102",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -2300446",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 935.1,
+                "hastaMhz": 949.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -1900103",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 1805.1,
+                "hastaMhz": 1825.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -2102125",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2155,
+                "hastaMhz": 2170
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2021
+          },
+          {
+            "referencia": "B B -2102124",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 2620,
+                "hastaMhz": 2640
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2021
+          },
+          {
+            "referencia": "B B -2300444",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 3460,
+                "hastaMhz": 3600
+              }
+            ],
+            "mhz": 3500,
+            "anio": 2023
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802532"
+          }
+        ]
+      },
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR0228A"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2403166",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 758,
+                "hastaMhz": 768
+              }
+            ],
+            "mhz": 700,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -2403163",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 832,
+                "hastaMhz": 842
+              }
+            ],
+            "mhz": 800,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -2403159",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -2403161",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -2403165",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 1855.1,
+                "hastaMhz": 1879.9
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2024
+          },
+          {
+            "referencia": "B B -2403167",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2120,
+                "hastaMhz": 2140
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2024
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR0228A"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "086040",
+          "86040"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2200007",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 768,
+                "hastaMhz": 778
+              }
+            ],
+            "mhz": 700,
+            "anio": 2022
+          },
+          {
+            "referencia": "B B -2301675",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 842,
+                "hastaMhz": 852
+              }
+            ],
+            "mhz": 800,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -1900926",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 949.9,
+                "hastaMhz": 959.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -2301676",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 1825.1,
+                "hastaMhz": 1845.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2023
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 086040"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 86040"
+          },
+          {
+            "fuente": "antenasmoviles",
+            "clave": "vodafone - 086040"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "antenasmoviles",
+      "registro-oficial"
+    ],
+    "datosDel": 1790467200000
+  },
+  {
+    "clave": "movistar-0806642",
+    "posicion": {
+      "longitud": 2.124214,
+      "latitud": 41.387012
+    },
+    "direccion": "AV Diagonal, 631. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0806642"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0806642"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-0807565",
+    "posicion": {
+      "longitud": 2.121719,
+      "latitud": 41.385502
+    },
+    "direccion": "AV Joan XXIII, 27. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "0807565",
+          "0807566"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2200203",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 1805.1,
+                "hastaMhz": 1825.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2022
+          },
+          {
+            "referencia": "B B -2201839",
+            "compania": "movistar",
+            "rangos": [
+              {
+                "desdeMhz": 1805.1,
+                "hastaMhz": 1825.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2022
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0807565"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0807566"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "movistar-MV-BCN-82383",
+    "posicion": {
+      "longitud": 2.14306,
+      "latitud": 41.37958
+    },
+    "direccion": "Carrer de Tarragona, 177, Sants-Montjuïc, 08014 Barcelona",
+    "municipio": "BARCELONA",
+    "estado": "nuevo",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "movistar",
+        "codigos": [
+          "MV-BCN-82383"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "antenasmoviles",
+            "clave": "movistar - MV-BCN-82383"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "antenasmoviles"
+    ],
+    "datosDel": 1790467200000
+  },
+  {
+    "clave": "orange-CATR0508Z",
+    "posicion": {
+      "longitud": 2.116,
+      "latitud": 41.384083
+    },
+    "direccion": "AV DIAGONAL, 647. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR0508Z"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2201664",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 758,
+                "hastaMhz": 768
+              }
+            ],
+            "mhz": 700,
+            "anio": 2022
+          },
+          {
+            "referencia": "B B -1802810",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 832,
+                "hastaMhz": 842
+              }
+            ],
+            "mhz": 800,
+            "anio": 2018
+          },
+          {
+            "referencia": "B B -1300472",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2013
+          },
+          {
+            "referencia": "B B -1300473",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2013
+          },
+          {
+            "referencia": "B B -1502907",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 1855.1,
+                "hastaMhz": 1879.9
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2015
+          },
+          {
+            "referencia": "B B -0430892",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2125,
+                "hastaMhz": 2140
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2004
+          },
+          {
+            "referencia": "B B -1901731",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2120,
+                "hastaMhz": 2140
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -1400050",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2640,
+                "hastaMhz": 2660
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2014
+          },
+          {
+            "referencia": "B B -1900732",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2680,
+                "hastaMhz": 2690
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -1902467",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 3600,
+                "hastaMhz": 3700
+              }
+            ],
+            "mhz": 3500,
+            "anio": 2019
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR0508Z"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "orange-CATR0514A",
+    "posicion": {
+      "longitud": 2.105164,
+      "latitud": 41.385632
+    },
+    "direccion": "AV DESPLUGUES, 22. HOSPITALET DE LLOBREGAT (L), BARCELONA",
+    "municipio": "HOSPITALET DE LLOBREGAT (L)",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR0514A"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2001232",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2020
+          },
+          {
+            "referencia": "B B -2001233",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2020
+          },
+          {
+            "referencia": "B B -2000438",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 1855.1,
+                "hastaMhz": 1879.9
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2020
+          },
+          {
+            "referencia": "B B -2100634",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2120,
+                "hastaMhz": 2140
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2021
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR0514A"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "000647",
+          "00647",
+          "647"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 000647"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 00647"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 647"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "orange-CATR0515L",
+    "posicion": {
+      "longitud": 2.105022,
+      "latitud": 41.386616
+    },
+    "direccion": "CL ESPLUGUES, 35. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR0515L"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR0515L"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "orange-CATR3023B",
+    "posicion": {
+      "longitud": 2.111831,
+      "latitud": 41.391285
+    },
+    "direccion": "AV ESPLUGUES, 92. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR3023B"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -2302710",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 832,
+                "hastaMhz": 842
+              }
+            ],
+            "mhz": 800,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -1201674",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2012
+          },
+          {
+            "referencia": "B B -1201683",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2012
+          },
+          {
+            "referencia": "B B -2302713",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 1855.1,
+                "hastaMhz": 1879.9
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -0600159",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2125,
+                "hastaMhz": 2140
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2006
+          },
+          {
+            "referencia": "B B -2302721",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2120,
+                "hastaMhz": 2140
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2023
+          },
+          {
+            "referencia": "B B -1400180",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 2640,
+                "hastaMhz": 2660
+              }
+            ],
+            "mhz": 2600,
+            "anio": 2014
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR3023B"
+          }
+        ]
+      },
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "011481",
+          "11481"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -1900522",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 949.9,
+                "hastaMhz": 959.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2019
+          },
+          {
+            "referencia": "B B -2402825",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 949.9,
+                "hastaMhz": 959.9
+              }
+            ],
+            "mhz": 900,
+            "anio": 2024
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 011481"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 11481"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "orange-CATR6190A",
+    "posicion": {
+      "longitud": 2.11,
+      "latitud": 41.38279
+    },
+    "direccion": "AV DIAGONAL, 661. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "orange",
+        "codigos": [
+          "CATR6190A"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -1701716",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2017
+          },
+          {
+            "referencia": "B B -1701717",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 925.1,
+                "hastaMhz": 935.1
+              }
+            ],
+            "mhz": 900,
+            "anio": 2017
+          },
+          {
+            "referencia": "B B -1900796",
+            "compania": "orange",
+            "rangos": [
+              {
+                "desdeMhz": 1859.9,
+                "hastaMhz": 1879.9
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2019
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "ORANGE ESPAGNE, S.A.U. - CATR6190A"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  },
+  {
+    "clave": "vodafone-079808",
+    "posicion": {
+      "longitud": 2.121478,
+      "latitud": 41.383217
+    },
+    "direccion": "AV JOAN XXIII, 3. BARCELONA, BARCELONA",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "079808"
+        ],
+        "bandas": [
+          {
+            "referencia": "B B -1300787",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 1825.1,
+                "hastaMhz": 1845.1
+              }
+            ],
+            "mhz": 1800,
+            "anio": 2013
+          },
+          {
+            "referencia": "B B -0800843",
+            "compania": "vodafone",
+            "rangos": [
+              {
+                "desdeMhz": 2140,
+                "hastaMhz": 2155
+              }
+            ],
+            "mhz": 2100,
+            "anio": 2008
+          }
+        ],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE ESPAÑA, S.A.U. - 079808"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  }
+]

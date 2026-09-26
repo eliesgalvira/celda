@@ -12,6 +12,7 @@ import * as Schema from "effect/Schema";
 
 import type { Listado, Registro } from "../extractor.ts";
 import { repararTexto, textoDeHtml } from "../texto.ts";
+import type { Caja } from "../zona.ts";
 
 export const ORIGEN = "https://geoportal.minetur.gob.es";
 
@@ -50,8 +51,6 @@ export const urlDeFicha = (codigo: string, clave: string): string =>
  */
 export const urlDeListado = (caja: Caja): string =>
   `${ORIGEN}/VCTEL/infoantenasGeoJSON.do?idCapa=null&zoom=4&bbox=${caja.map((grados) => grados.toFixed(6)).join(",")}`;
-
-export type Caja = readonly [oeste: number, sur: number, este: number, norte: number];
 
 const Elemento = Schema.Struct({
   id: Schema.String,

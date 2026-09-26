@@ -9,11 +9,11 @@ convex/confect/tables/     una tabla por fichero, con esquema Effect
 convex/confect/*.spec.ts   la API de cada grupo (ingesta, datos)
 convex/confect/*.impl.ts   su implementación
 convex/confect/crons.ts    el cron nocturno de la ingesta
-convex/src/proceso.ts      el proceso de una ejecución, fuera de Convex
+convex/src/proceso.ts      el proceso de una ejecución, fuera de Convex (por fichas y por puntos)
 convex/src/capas.ts        la publicación de una capa, fuera de Convex
 tools/capas/               el generador de capas y el origen estático local
 convex/convex/             generado por Confect y Convex; no se edita
-packages/ingesta/          extractores, sin nada de Convex
+packages/ingesta/          extractores (registro-oficial/, antenasmoviles/), sin nada de Convex
 packages/dominio/          esquemas y la fusión, sin E/S
 ```
 
@@ -61,6 +61,30 @@ Una descarga real del registro oficial hace unas 11 peticiones con 5 fichas: `ro
 - La primera descarga real, sin el parámetro `zoom` y con las coordenadas tal cual, recibió `{}`. Con `zoom=4` y seis decimales, como el visor y los scripts de la investigación, llegaron los 2380 registros. Por eso una zona entera vacía cuenta como fallo de la fuente y no como «no hay estaciones».
 - `TextDecoder` en el runtime de Convex solo garantiza UTF-8; el Latin-1 del geoportal se decodifica a mano (`packages/ingesta/src/texto.ts`).
 
+## antenasmoviles.es
+
+> **El interruptor de antenasmoviles.es empieza apagado y así tiene que quedarse.** La investigación de fuentes comunitarias recomienda escribir a `admin@antenasmoviles.es` antes de publicar nada suyo, y el autor aún no ha decidido. Hasta entonces no lo enciendas en ningún despliegue público. En local, enciéndelo solo para una prueba y apágalo después.
+
+El extractor y la fusión están completos. Sin fila en `interruptores`, `INTERRUPTOR_POR_DEFECTO` (`confect/tables/interruptores.ts`) deja el registro oficial encendido y antenasmoviles.es y OpenCelliD apagados. El cron `ingesta de antenasmoviles.es` corre a las 3:15 UTC, una hora después del registro, y con el interruptor apagado solo apunta una ejecución omitida.
+
+```sh
+pnpm exec convex run ingesta:cambiarInterruptor '{"fuente":"antenasmoviles","activo":true,"motivo":"prueba local"}'
+pnpm exec convex run ingesta:antenasMoviles     # una ejecución ahora, con peticiones reales
+pnpm exec convex run ingesta:cambiarInterruptor '{"fuente":"antenasmoviles","activo":false,"motivo":"apagado tras la prueba"}'
+```
+
+Cómo funciona:
+
+- La fuente no tiene una ficha por estación sino puntos, los marcadores de su mapa. `GET /v1/showf?er5` da todos los de España de una vez (4 MB). El extractor busca con una expresión regular el principio de cada fila y solo analiza las de la caja de Barcelona, porque el runtime de Convex tiene poca memoria. La descarga del 26/09/2026 dio 42.851 filas y 1309 puntos en la caja.
+- La fuente no manda `ETag`. Cada punto guarda la huella FNV-1a de su fila (`packages/ingesta/src/huella.ts`) en la tabla `puntos`. Un punto nuevo o con otra huella queda pendiente de leer su detalle (`GET /v1/markers?id=<códigos>`).
+- Cada noche se leen como mucho 100 detalles (`CELDA_ANTENASMOVILES_MAX_DETALLES`), a una petición cada 5 s: unos 8 minutos, dentro del límite de una acción. Primero las ER5, luego los nuevos o cambiados y luego los leídos hace más de 14 días. Las fotos nuevas no cambian la huella, y esa vuelta cada 14 días es lo que las encuentra. El tope de peticiones por ejecución es 110 (`CELDA_ANTENASMOVILES_MAX_PETICIONES`).
+- Del detalle solo se guardan las correcciones: cada ER5 como observación `presente` y cada estación del registro cuya foto más reciente lleva `desmantelada` como `desmontada`. Lo demás copia el registro y no se guarda. Tampoco se copian fotos ni historial: `/archive` está en `Disallow` y no hacen falta para el estado.
+- Un 403 o una página HTML donde debería haber JSON cuenta como fuente bloqueada. Si pasa en el listado, la ejecución queda fallida sin tocar nada. Si pasa en un detalle, se deja de pedir y los pendientes quedan para la noche siguiente.
+- Un punto que falta en dos barridos seguidos se retira con sus observaciones. Cada observación apunta el punto del que salió (`punto`), así que si la fuente reagrupa códigos y otro punto se la queda, retirar el viejo no la borra.
+- La ejecución apunta los puntos creados, cambiados y retirados en `cambios.puntos`, y los detalles leídos en `cambios.fichas`.
+
+Recuento con la descarga del 26/09/2026 y el registro oficial de ese día, en la caja de Barcelona: 42 ER5, dos sin compañía (`er5` a secas) y 40 con ella. Con la fusión salen 1354 emplazamientos: 1317 verificados, 36 nuevos (tres compartidos por dos compañías) y uno corregido, Urquinaona, donde una ER5 de Orange queda a 7 m de Movistar. No hay conflictos. Las fotos «desmantelada» no se pueden contar sin leer los ~1300 detalles, y en los cinco detalles grabados no hay ninguna.
+
 ## Capas
 
 La web no lee los emplazamientos de Convex: descarga una capa estática (ADR 0004). `tools/capas` la genera así:
@@ -98,6 +122,8 @@ Tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
 **Dominio.** La fusión se compara con ficheros de referencia en `packages/dominio/src/referencia/` y `packages/ingesta/src/registro-oficial/referencia/` (`toMatchFileSnapshot`). Si cambias la regla a propósito, regenera con `pnpm exec vp test run -u` en el paquete y revisa el diff de los JSON en el commit.
 
 **Extractor.** `packages/ingesta/src/registro-oficial/extractor.test.ts` monta el extractor real sobre un `HttpClient` de prueba (una `Layer`) que apunta cada petición con la hora del `TestClock`. Así se comprueban el `User-Agent`, `robots.txt`, la pausa entre peticiones, los reintentos con espera exponencial y el tope de peticiones. Las esperas se encadenan tras respuestas asíncronas, y un solo `TestClock.adjust` no las ve todas; `esperarConReloj` (`packages/ingesta/src/pruebas/reloj.ts`) adelanta el reloj de segundo en segundo hasta que la fibra termina.
+
+**antenasmoviles.es.** Las muestras de `docs/investigacion/muestras/antenasmoviles/` pasan por el analizador real en `packages/ingesta/src/antenasmoviles/`. No hay ninguna foto real con `desmantelada` puesta, así que `desmantelar` (`src/pruebas/antenasmoviles.ts`) añade una a un detalle grabado. `muestraAntenasMoviles` junta los 41 puntos de Campus Nord, el detalle real de la entrada del campus con Vodafone desmontada y dos ER5 reales. `convex/test/antenasmoviles.test.ts` la usa con `ejecutarDePuntos` para probar el interruptor, la idempotencia, la huella, el tope de detalles y la retirada.
 
 **API de Convex.** `convex/test/` usa `@confect/test` (convex-test en memoria). `ejecutar(extractor)` en `convex/test/ayudas.ts` lanza `ejecutarIngesta` con `MutationRunner` y `QueryRunner` sacados del `TestConfect`, y el extractor que se le pase. El de prueba es `capaGrabada` con `muestraCampusNord`, el registro grabado en la investigación. Para comprobar que una ejecución no escribe nada, adelanta el reloj un día y compara `instantanea` antes y después: cualquier escritura por cambio habría movido una fecha.
 

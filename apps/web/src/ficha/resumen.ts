@@ -15,7 +15,7 @@ import {
   enumerar,
   fechaCorta,
   NOMBRE_FUENTE,
-  SIN_BANDAS,
+  sinBandasDe,
   textoCodigos,
   textoTramo,
 } from "./textos.ts";
@@ -147,7 +147,7 @@ export const datosTecnicosDe = (
       banda: banda.mhz === null ? "Sin banda conocida" : `${banda.mhz} MHz`,
       tecnologia: textoTecnologia(banda.mhz),
     })),
-    sinExpedientes: SIN_BANDAS,
+    sinExpedientes: sinBandasDe(estacion),
     origenes: estacion.origenes.map((origen) => ({
       fuente: NOMBRE_FUENTE[origen.fuente],
       clave: origen.clave,

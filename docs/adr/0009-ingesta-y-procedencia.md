@@ -7,7 +7,7 @@ Ninguna fuente basta sola: el registro oficial está desactualizado y las demás
 - Cada fuente tiene su extractor en `packages/ingesta`, un servicio Effect con reintentos y un `Schedule`, que produce observaciones con fuente, fecha y URL.
 - La ingesta se programa con los crons del backend y es incremental: solo escribe lo que cambia.
 - La fusión es una función pura del dominio. Junta las observaciones cercanas en emplazamientos, calcula la confianza y detecta conflictos. Los conflictos nunca se ocultan. La regla («misma compañía a menos de 60 m») la cambió el ADR 0012: 15 m entre cualquier compañía.
-- Cada extractor tiene su propio límite hacia la fuente, por ejemplo una petición por segundo en lotes nocturnos. También lleva un `User-Agent` identificable, caché con ETag, respeto de `robots.txt` y un interruptor para apagarlo sin tocar el resto. El registro oficial no manda ETag: su caché es lo que ya está guardado en Convex, y solo se escribe lo que cambia.
+- Cada extractor tiene su propio límite hacia la fuente, por ejemplo una petición por segundo en lotes nocturnos. También lleva un `User-Agent` identificable, caché con ETag, respeto de `robots.txt` y un interruptor para apagarlo sin tocar el resto. El registro oficial no manda ETag: su caché es lo que ya está guardado en Convex, y solo se escribe lo que cambia. antenasmoviles.es tampoco lo manda: cada punto de su listado guarda una huella, y solo se vuelve a pedir el detalle de los que cambian (ticket 18).
 - Cada ejecución de ingesta guarda su fuente, fecha, cambios y errores, para que el mantenedor vea su estado.
 - La primera tarea de la fase 1 es averiguar qué campos publica el registro oficial y cómo se descarga.
 

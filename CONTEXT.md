@@ -65,7 +65,7 @@ Observación de la comunidad que contradice al registro oficial.
 _Evitar_: enmienda, parche, edición
 
 **Fusión**:
-Unión de las observaciones de todas las fuentes en emplazamientos. Junta las que están a 15 m o menos, sean de la compañía que sean, y en cada emplazamiento deja una estación base por compañía (ADR 0012).
+Unión de las observaciones de todas las fuentes en emplazamientos. Junta las que están a 15 m o menos, sean de la compañía que sean, y las de otras fuentes que llevan el mismo código que una del registro oficial. En cada emplazamiento deja una estación base por compañía (ADR 0012).
 _Evitar_: cruce, deduplicación, merge
 
 **Confianza**:
