@@ -6,18 +6,11 @@ import { BotonHexagonal } from "@celda/ui/BotonHexagonal.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
-import { Pista } from "@celda/ui/Pista.tsx";
 import * as Effect from "effect/Effect";
 import type { Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
 
 import { type EstadoCapa, estadoDeCarga, textoDatosDelMapa } from "../capa/estado.ts";
-import {
-  combinacionesDe,
-  distanciaDeZoom,
-  marcadoresVisibles,
-  type Vista,
-} from "../capa/marcadores.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
 import { usarDatos } from "../datos.tsx";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
@@ -28,18 +21,6 @@ import { Marcadores } from "./Marcadores.tsx";
 
 type ModuloMapaBase = typeof import("./mapaBase.ts");
 
-/** La vista que enseña ahora el mapa. */
-const vistaDe = (mapa: MapaMapLibre): Vista => {
-  const caja = mapa.getBounds();
-  return {
-    caja: {
-      suroeste: { longitud: caja.getWest(), latitud: caja.getSouth() },
-      noreste: { longitud: caja.getEast(), latitud: caja.getNorth() },
-    },
-    zoom: mapa.getZoom(),
-  };
-};
-
 /**
  * El mapa de Barcelona a pantalla completa con los emplazamientos de la capa vigente, la fecha
  * de sus datos y un aviso claro si algo no carga.
@@ -48,13 +29,8 @@ export function PantallaMapa() {
   const datos = usarDatos();
   const [estado, setEstado] = createSignal<EstadoMapa>({ tipo: "cargando" });
   const [capa, setCapa] = createSignal<EstadoCapa>({ tipo: "cargando" });
-  /** El mapa, cuando ya enseña el callejero, y el módulo que lo ha creado. */
-  const [mapaListo, setMapaListo] = createSignal<{
-    readonly mapa: MapaMapLibre;
-    readonly modulo: ModuloMapaBase;
-  }>();
-  const [fotograma, setFotograma] = createSignal(0);
-  const [vista, setVista] = createSignal<Vista>();
+  /** El mapa, cuando ya enseña el callejero. */
+  const [mapaListo, setMapaListo] = createSignal<MapaMapLibre>();
   const listo = createMemo(() => estado().tipo === "listo");
   let contenedor: HTMLDivElement | undefined;
   let mapa: MapaMapLibre | undefined;
@@ -66,39 +42,13 @@ export function PantallaMapa() {
 
   const fallar = (motivo: MotivoFallo) => setEstado({ tipo: "fallo", motivo });
 
-  /**
-   * Los marcadores se recolocan en cada fotograma del movimiento, pero cuáles hay solo se decide
-   * al pararse o al cruzar el zoom de los logos: crear y quitar nodos es lo caro.
-   */
-  const seguirMapa = (nuevo: MapaMapLibre) => {
-    let pendiente = 0;
-    const mover = () => {
-      pendiente = 0;
-      setFotograma((n) => n + 1);
-      const actual = vista();
-      if (
-        actual === undefined ||
-        distanciaDeZoom(actual.zoom) !== distanciaDeZoom(nuevo.getZoom())
-      ) {
-        setVista(vistaDe(nuevo));
-      }
-    };
-    // Como mucho una vez por fotograma: el mapa emite varios `move` entre dos.
-    nuevo.on("move", () => {
-      if (pendiente === 0) pendiente = requestAnimationFrame(mover);
-    });
-    nuevo.on("moveend", () => setVista(vistaDe(nuevo)));
-    setVista(vistaDe(nuevo));
-  };
-
   const crear = (modulo: ModuloMapaBase) => {
     if (contenedor === undefined) return;
     try {
       const nuevo = modulo.crearMapaBase(contenedor, BARCELONA, {
         listo: () => {
           setEstado({ tipo: "listo" });
-          setMapaListo({ mapa: nuevo, modulo });
-          seguirMapa(nuevo);
+          setMapaListo(nuevo);
         },
         fallo: fallar,
       });
@@ -115,7 +65,6 @@ export function PantallaMapa() {
     mapa?.remove();
     mapa = undefined;
     setMapaListo(undefined);
-    setVista(undefined);
     if (!hayWebgl()) {
       fallar("sin-webgl");
       return;
@@ -160,34 +109,6 @@ export function PantallaMapa() {
     return actual.tipo === "lista" ? actual.capa.emplazamientos : [];
   });
 
-  // Los puntos de zoom bajo los pinta el mapa: se le pasan cuando están el mapa y la capa.
-  createEffect(
-    () => ({ listo: mapaListo(), puntos: emplazamientos() }),
-    ({ listo: actual, puntos }) => {
-      actual?.modulo.ponerEmplazamientos(actual.mapa, puntos);
-    },
-  );
-
-  /** Qué marcadores tocan con la capa y la vista actuales. */
-  const marcadores = createMemo(() => {
-    const ahora = vista();
-    if (capa().tipo !== "lista" || ahora === undefined) return undefined;
-    const decision = marcadoresVisibles(emplazamientos(), ahora);
-    return decision.tipo === "lejos"
-      ? decision
-      : {
-          tipo: decision.tipo,
-          emplazamientos: decision.indices.flatMap((i) => emplazamientos()[i] ?? []),
-        };
-  });
-
-  const visibles = createMemo(() => {
-    const actual = marcadores();
-    return actual?.tipo === "cerca" ? actual.emplazamientos : [];
-  });
-
-  const combinaciones = createMemo(() => combinacionesDe(emplazamientos()));
-
   /** El emplazamiento con la ficha abierta, que dice la URL. */
   const seleccionada = createMemo(() => emplazamientoDe(ubicacion()));
   const fechaCapa = createMemo(() => {
@@ -227,9 +148,9 @@ export function PantallaMapa() {
       if (enfocadoAlCargar || actual === undefined || !lista) return;
       enfocadoAlCargar = true;
       if (posicion === undefined) return;
-      actual.mapa.jumpTo({
+      actual.jumpTo({
         center: [posicion.longitud, posicion.latitud],
-        zoom: Math.max(actual.mapa.getZoom(), 16),
+        zoom: Math.max(actual.getZoom(), 16),
       });
     },
   );
@@ -254,20 +175,13 @@ export function PantallaMapa() {
         <Show when={mapaListo()}>
           {(actual) => (
             <Marcadores
-              mapa={actual().mapa}
-              fotograma={fotograma()}
-              emplazamientos={visibles()}
-              combinaciones={combinaciones()}
+              mapa={actual()}
+              emplazamientos={emplazamientos()}
               seleccionada={seleccionada()}
               alSeleccionar={seleccionar}
             />
           )}
         </Show>
-      }
-      pista={
-        marcadores()?.tipo === "lejos" ? (
-          <Pista texto="Acércate para ver las compañías de cada emplazamiento" />
-        ) : undefined
       }
       controles={
         <>

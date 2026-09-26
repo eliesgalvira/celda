@@ -70,8 +70,6 @@
   --mapa-rotulo: oklch(46.8% 0.012 87.5);
   --mapa-halo: oklch(86.7% 0.011 89.7);
   --mapa-lugar: oklch(38.6% 0.008 97.5);
-  --mapa-emplazamiento: oklch(45% 0.075 203.3);
-  --mapa-emplazamiento-borde: oklch(94.1% 0.009 84.6);
 
   /* FUENTES */
   --fuente-texto: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -129,8 +127,6 @@
   --mapa-rotulo: oklch(78% 0.01 90);
   --mapa-halo: oklch(23% 0.006 100);
   --mapa-lugar: oklch(86% 0.008 90);
-  --mapa-emplazamiento: oklch(80% 0.08 203.3);
-  --mapa-emplazamiento-borde: oklch(23% 0.006 100);
 }
 
 /* Sin la paleta de Tailwind: solo existen los colores del tema. */

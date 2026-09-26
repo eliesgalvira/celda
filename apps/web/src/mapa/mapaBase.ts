@@ -1,15 +1,8 @@
 import type { Area } from "@celda/dominio/area";
-import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
-import {
-  coloresDelTema,
-  estiloMapa,
-  FUENTE_EMPLAZAMIENTOS,
-  FUENTE_MAPA_BASE,
-} from "@celda/ui/mapa/estilo.ts";
-import { type GeoJSONSource, Map as MapaMapLibre, setWorkerUrl } from "maplibre-gl";
+import { coloresDelTema, estiloMapa, FUENTE_MAPA_BASE } from "@celda/ui/mapa/estilo.ts";
+import { Map as MapaMapLibre, setWorkerUrl } from "maplibre-gl";
 import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
-import { puntosDe } from "../capa/marcadores.ts";
 import type { MotivoFallo } from "./estado.ts";
 
 // MapLibre 6 busca su worker junto a su propio fichero, que el empaquetador
@@ -71,12 +64,4 @@ export const crearMapaBase = (
     if (!conCallejero) avisos.fallo("sin-respuesta");
   });
   return mapa;
-};
-
-/** Pone los emplazamientos en la capa de puntos que el mapa pinta a zoom bajo. */
-export const ponerEmplazamientos = (
-  mapa: MapaMapLibre,
-  emplazamientos: ReadonlyArray<EmplazamientoDeCapa>,
-): void => {
-  void mapa.getSource<GeoJSONSource>(FUENTE_EMPLAZAMIENTOS)?.setData(puntosDe(emplazamientos));
 };

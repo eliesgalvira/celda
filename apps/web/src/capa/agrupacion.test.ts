@@ -156,6 +156,12 @@ describe("agrupación por zoom", () => {
     const t = agrupador.transicion(escena, agrupador.escena(13, MUNDO));
     assert.strictEqual(t.destino.size + t.origen.size, 0);
   });
+
+  it("entre escenas de dos capas distintas no hay transición", () => {
+    const otra = crearAgrupador(SINTETICOS.slice(0, 200)).escena(12, MUNDO);
+    const t = agrupador.transicion(otra, agrupador.escena(11, MUNDO));
+    assert.strictEqual(t.destino.size + t.origen.size, 0);
+  });
 });
 
 describe("una agrupación que ya existía en el nivel fino", () => {

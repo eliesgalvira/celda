@@ -62,7 +62,10 @@ export const SIN_TRANSICION: Transicion = { destino: new Map(), origen: new Map(
 export interface Agrupador {
   /** Los elementos del nivel `nivel` cuyo punto cae dentro de `caja`. */
   readonly escena: (nivel: number, caja: Rectangulo) => Escena;
-  /** Cómo pasan los elementos de la escena `antes` a la escena `despues`. */
+  /**
+   * Cómo pasan los elementos de la escena `antes` a la escena `despues`. Si alguna la ha hecho otro
+   * agrupador, como al llegar una capa nueva, no hay transición.
+   */
   readonly transicion: (antes: Escena, despues: Escena) => Transicion;
   /** El zoom al que hay que acercarse para que la agrupación se abra en varios elementos. */
   readonly zoomDeApertura: (agrupacion: ElementoAgrupacion) => number;
@@ -136,6 +139,9 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
         };
   };
 
+  // Las escenas de este agrupador: las claves de agrupación de otro no valen en este índice.
+  const propias = new WeakSet<Escena>();
+
   const escena = (nivel: number, caja: Rectangulo): Escena => {
     const elementos = new Map<string, Elemento>();
     const bbox: [number, number, number, number] = [
@@ -148,7 +154,9 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
       const elemento = elementoDe(punto);
       if (elemento !== undefined) elementos.set(elemento.clave, elemento);
     }
-    return { nivel, elementos };
+    const hecha = { nivel, elementos };
+    propias.add(hecha);
+    return hecha;
   };
 
   /**
@@ -176,7 +184,9 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
   };
 
   const transicion = (antes: Escena, despues: Escena): Transicion => {
-    if (antes.nivel === despues.nivel) return SIN_TRANSICION;
+    if (antes.nivel === despues.nivel || !propias.has(antes) || !propias.has(despues)) {
+      return SIN_TRANSICION;
+    }
     const alejar = despues.nivel < antes.nivel;
     const [fina, gruesa] = alejar ? [antes, despues] : [despues, antes];
     const relacion = new Map<string, string>();
