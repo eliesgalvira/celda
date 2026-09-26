@@ -103,6 +103,16 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - `DisposicionMapa` recibe `ubicacion` (bajo la fecha de los datos), `eligiendo`, `pinCentral` y `dialogo`. Con `eligiendo`, en el móvil se aparta la hoja de la ficha y los controles, y los créditos quedan por encima de la hoja de elegir. En escritorio el cursor del mapa es una cruz. Las reglas del móvil que suben piezas por encima del resumen usan `data-hoja` (panel abierto y no eligiendo); las de escritorio, `data-panel`.
 - `Boton` tiene la variante `ancho="completo"` para el botón principal de una fila, como «Usar este punto».
 
+## Términos subrayados
+
+- Las explicaciones salen de un solo sitio, `packages/dominio/src/glosario.ts` (`GLOSARIO`): por término, su nombre, de una a tres frases llanas, el término técnico y los relacionados. Siguen al `CONTEXT.md`, que manda, pero están escritas para quien no sabe nada de redes. `glosario.test.ts` comprueba la longitud y que los relacionados existan.
+- Los textos con términos son `TextoMarcado`, una lista de trozos, y se escriben con la plantilla `marcado` y `termino`: ``marcado`Por sus ${termino("banda", "bandas")}, da 5G.` ``. `textoPlano` los devuelve como texto, para nombres accesibles y pruebas.
+- Se subraya la primera aparición de cada término en cada bloque (la cabecera, la frase, la marca de agua, cada sección, los datos técnicos), no todas. `TextoConTerminos` lo hace dentro de un texto; para varios textos del mismo bloque, como las observaciones de «De dónde salen los datos», se pasan todos por un mismo `bloque()`.
+- `termino/Termino.tsx` es un `<button>` en línea con subrayado de puntos del color primario, que crece por fuera con `::after` para el dedo. Lleva `pointer-events-auto`, porque la marca de agua del mapa está en una pieza que deja pasar los gestos.
+- La explicación es un `<dialog open>` no modal, montado con `Portal` en `<body>` para que el panel no la recorte. Lleva el foco a su título. La cierran Escape (escuchado en captura, para que no cierre también el panel), «Cerrar», tocar fuera y Tab al salir por un extremo, y el foco vuelve al término salvo al tocar fuera. Los relacionados se abren en la misma caja.
+- Dónde se coloca lo decide `colocarExplicacion` (`termino/posicion.ts`), con pruebas: debajo del término si cabe, encima si no, y si no cabe en ninguno, en el lado con más sitio y con desplazamiento por dentro, sin taparlo. En escritorio mide 22rem y en el móvil todo el ancho menos 8 px por lado. Se recoloca al desplazar y al cambiar el tamaño.
+- En pruebas de la web, `textoEntero` (`apps/web/src/lib/pruebas.ts`) busca un texto aunque un término lo parta en varios nodos. La explicación está fuera del contenedor de `render`: se busca con `screen`.
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.

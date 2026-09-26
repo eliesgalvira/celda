@@ -1,6 +1,6 @@
 # Celda
 
-Celda es una web pública que enseña en un mapa las antenas de telefonía móvil de Barcelona, de qué compañía son y cómo llega su señal. Este glosario fija las palabras que usan la interfaz, el código y las conversaciones sobre el proyecto.
+Celda es una web pública que enseña en un mapa las antenas de telefonía móvil de Barcelona, de qué compañía son y cómo llega su señal. Este glosario fija las palabras que usan la interfaz, el código y las conversaciones sobre el proyecto. Lo que la interfaz explica al tocar un término subrayado está en `packages/dominio/src/glosario.ts`, con palabras más llanas, y no puede contradecir a este glosario.
 
 ## Lenguaje
 
