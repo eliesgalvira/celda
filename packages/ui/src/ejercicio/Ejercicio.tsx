@@ -82,9 +82,8 @@ const MARCA_CLASE: Readonly<Record<MarcaDeValor | "ninguna", string>> = {
 };
 
 /**
- * La tabla del ejercicio: una fila por magnitud, una columna por compañía y, al final, de dónde
- * sale y de qué fecha es cada fila. La fuente se ve siempre en su columna y también al pasar el
- * cursor por cada valor. En pantallas estrechas la tabla se desplaza de lado dentro de su marco;
+ * La tabla del ejercicio: una fila por magnitud y una columna por compañía. Bajo cada magnitud se
+ * lee de dónde sale y de qué fecha es, y también al pasar el cursor por cada valor. En pantallas estrechas la tabla se desplaza de lado dentro de su marco;
  * los navegadores actuales dejan recorrerlo con el teclado.
  */
 export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
@@ -94,10 +93,14 @@ export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
       aria-labelledby={id}
       class="overflow-x-auto overscroll-x-contain shadow-[inset_0_0_0_1px_var(--linea)] focus-visible:outline-3 focus-visible:outline-foco"
     >
-      <table class="w-full min-w-[40rem] border-collapse text-left text-sm">
+      <table class="w-full min-w-[34rem] table-fixed border-collapse text-left text-sm">
         <caption id={id} class="sr-only">
           {props.titulo}
         </caption>
+        <colgroup>
+          <col class="w-[36%]" />
+          <For each={props.columnas}>{() => <col />}</For>
+        </colgroup>
         <thead>
           <tr class="border-b border-linea-fuerte bg-superficie-alta">
             <th scope="col" class="px-3 py-2 font-mono text-xs font-semibold text-tinta-suave">
@@ -113,9 +116,6 @@ export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
                 </th>
               )}
             </For>
-            <th scope="col" class="px-3 py-2 font-mono text-xs font-semibold text-tinta-suave">
-              Fuente y fecha
-            </th>
           </tr>
         </thead>
         <For each={props.secciones}>
@@ -124,7 +124,7 @@ export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
               <tr class="bg-superficie-invertida text-tinta-invertida">
                 <th
                   scope="colgroup"
-                  colspan={props.columnas.length + 2}
+                  colspan={props.columnas.length + 1}
                   class="px-3 py-1 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase"
                 >
                   {seccion.titulo}
@@ -137,11 +137,18 @@ export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
                       {fila.magnitud}
                       <Show when={fila.unidad}>
                         {(unidad) => (
-                          <span class="block font-mono text-[11px] font-normal text-tinta-suave">
-                            {unidad()}
+                          <span class="font-mono text-[11px] font-normal text-tinta-suave">
+                            {" "}
+                            ({unidad()})
                           </span>
                         )}
                       </Show>
+                      <span class="block text-xs leading-snug font-normal text-tinta-suave">
+                        {fila.fuente}
+                        <Show when={fila.fecha}>
+                          {(fecha) => <span class="font-mono"> · {fecha()}</span>}
+                        </Show>
+                      </span>
                     </th>
                     <For each={fila.valores} keyed={false}>
                       {(valor) => (
@@ -150,8 +157,8 @@ export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
                           title={`${fila.fuente} (${fila.fecha})`}
                           data-marca={valor().marca}
                           class={
-                            (fila.valores.length === 1 ? "px-2 py-2 " : "px-2 py-2 text-center ") +
-                            "font-mono whitespace-nowrap " +
+                            (fila.valores.length === 1 ? "px-2 py-2 " : "px-1 py-2 text-center ") +
+                            "font-mono text-[13px] leading-snug " +
                             MARCA_CLASE[valor().marca ?? "ninguna"]
                           }
                         >
@@ -159,10 +166,6 @@ export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
                         </td>
                       )}
                     </For>
-                    <td class="min-w-48 px-3 py-2 text-xs leading-snug text-tinta-suave">
-                      {fila.fuente}
-                      <span class="block font-mono">{fila.fecha}</span>
-                    </td>
                   </tr>
                 )}
               </For>
