@@ -1,4 +1,4 @@
-import type { Coordenada, Rectangulo } from "@celda/dominio/area";
+import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import Supercluster from "supercluster";
 
@@ -63,8 +63,12 @@ export interface Transicion {
 export const SIN_TRANSICION: Transicion = { destino: new Map(), origen: new Map() };
 
 export interface Agrupador {
-  /** Los elementos del nivel `nivel` cuyo punto cae dentro de `caja`. */
-  readonly escena: (nivel: number, caja: Rectangulo) => Escena;
+  /**
+   * Los elementos del nivel `nivel` cuyo punto cae dentro de `caja`. El emplazamiento de clave
+   * `aparte` (el seleccionado) se ve siempre suelto, aunque una agrupación lo recoja; esa
+   * agrupación lo sigue contando en su número.
+   */
+  readonly escena: (nivel: number, caja: Rectangulo, aparte?: string | null) => Escena;
   /**
    * Cómo pasan los elementos de la escena `antes` a la escena `despues`. Si alguna la ha hecho otro
    * agrupador, como al llegar una capa nueva, no hay transición.
@@ -145,7 +149,9 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
   // Las escenas de este agrupador: las claves de agrupación de otro no valen en este índice.
   const propias = new WeakSet<Escena>();
 
-  const escena = (nivel: number, caja: Rectangulo): Escena => {
+  const indicePorClave = new Map(emplazamientos.map((e, i) => [e.clave, i]));
+
+  const escena = (nivel: number, caja: Rectangulo, aparte: string | null = null): Escena => {
     const elementos = new Map<string, Elemento>();
     const bbox: [number, number, number, number] = [
       caja.suroeste.longitud,
@@ -156,6 +162,16 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
     for (const punto of indice.getClusters(bbox, nivel)) {
       const elemento = elementoDe(punto);
       if (elemento !== undefined) elementos.set(elemento.clave, elemento);
+    }
+    const suelto = emplazamientos[indicePorClave.get(aparte ?? "") ?? -1];
+    if (suelto !== undefined && contiene(caja, suelto.posicion)) {
+      const clave = `${PREFIJO_EMPLAZAMIENTO}${suelto.clave}`;
+      elementos.set(clave, {
+        tipo: "emplazamiento",
+        clave,
+        posicion: suelto.posicion,
+        emplazamiento: suelto,
+      });
     }
     const hecha = { nivel, elementos };
     propias.add(hecha);
@@ -199,7 +215,8 @@ export const crearAgrupador = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa
       const descendientes: Array<string> = [];
       bajar(elemento.clave, Math.min(fina.nivel, NIVEL_MAXIMO + 1), descendientes, tope);
       for (const descendiente of descendientes) {
-        if (descendiente !== elemento.clave && fina.elementos.has(descendiente)) {
+        // Lo que está en las dos escenas, como el seleccionado, no se mueve.
+        if (fina.elementos.has(descendiente) && !gruesa.elementos.has(descendiente)) {
           relacion.set(descendiente, elemento.clave);
         }
       }

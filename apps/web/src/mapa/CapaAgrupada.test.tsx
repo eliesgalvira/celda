@@ -40,7 +40,7 @@ const proyectar = (posicion: Coordenada) => ({
   y: (41.4 - posicion.latitud) * 10_000,
 });
 
-const montar = (reducido: boolean) => {
+const montar = (reducido: boolean, seleccionada: string | null = null) => {
   const agrupador = crearAgrupador(EMPLAZAMIENTOS);
   const [nivel, setNivel] = createSignal(17);
   const elegidos: Array<string> = [];
@@ -51,13 +51,13 @@ const montar = (reducido: boolean) => {
     <CapaAgrupada
       contenedor={contenedor}
       combinaciones={combinacionesDe(EMPLAZAMIENTOS)}
-      escena={agrupador.escena(nivel(), MUNDO)}
+      escena={agrupador.escena(nivel(), MUNDO, seleccionada)}
       transicion={agrupador.transicion}
       proyectar={proyectar}
       seVe={() => true}
       fotograma={0}
       movimientoReducido={reducido}
-      seleccionada={null}
+      seleccionada={seleccionada}
       alSeleccionar={(clave) => elegidos.push(clave)}
       alAbrir={(agrupacion) => abiertas.push(agrupacion)}
     />
@@ -107,6 +107,22 @@ describe("capa agrupada", () => {
         (boton.getAttribute("aria-label") ?? "").startsWith("Emplazamiento"),
       ),
     );
+  });
+
+  it("el seleccionado sigue a la vista y marcado al quedar dentro de una agrupación", () => {
+    const { setNivel, lamina, pulsables } = montar(false, "b");
+    setNivel(8);
+    flush();
+
+    const seleccionado = lamina.getByRole("button", { current: true });
+    assert.strictEqual(
+      seleccionado.getAttribute("aria-label"),
+      "Emplazamiento compartido por Vodafone y Orange, corregido",
+    );
+    assert.sameMembers(pulsables(), [
+      seleccionado,
+      lamina.getByRole("button", { name: "3 emplazamientos, acercar" }),
+    ]);
   });
 
   it("con la preferencia de reducir movimiento el cambio es directo", () => {

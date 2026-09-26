@@ -85,7 +85,12 @@ export function Marcadores(props: MarcadoresProps) {
     const ahora = vista();
     return ahora === undefined
       ? undefined
-      : agrupador().escena(nivelDeZoom(ahora.zoom), cajaConMargen(ahora.caja));
+      : agrupador().escena(
+          nivelDeZoom(ahora.zoom),
+          cajaConMargen(ahora.caja),
+          // El seleccionado se ve siempre, aunque al alejar quede dentro de una agrupación.
+          props.seleccionada,
+        );
   });
 
   // Funciones por mapa, que no leen props al llamarlas: se usan dentro de efectos.

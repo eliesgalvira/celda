@@ -212,6 +212,22 @@ describe("una agrupación que ya existía en el nivel fino", () => {
     assert.isTrue(abierta.elementos.has("e:c"));
   });
 
+  it("el seleccionado se ve suelto aunque su agrupación lo siga contando", () => {
+    const lejos = agrupador.escena(8, MUNDO, "a");
+    const abc = unica(lejos, 3);
+    assert.deepStrictEqual([...lejos.elementos.keys()].toSorted(), [abc.clave, "e:a"].toSorted());
+    // Al acercar sigue en su sitio: no sale de ninguna agrupación.
+    const cerca = agrupador.escena(17, MUNDO, "a");
+    assert.isFalse(agrupador.transicion(lejos, cerca).origen.has("e:a"));
+    // Sin selección, o si cae fuera de la caja, no se añade nada.
+    assert.strictEqual(agrupador.escena(8, MUNDO, null).elementos.size, 1);
+    const lejosDeA: Rectangulo = {
+      suroeste: { longitud: 2.17, latitud: 41.38 },
+      noreste: { longitud: 2.19, latitud: 41.4 },
+    };
+    assert.isFalse(agrupador.escena(17, lejosDeA, "a").elementos.has("e:a"));
+  });
+
   it("solo dibuja lo que cae en la caja", () => {
     const caja: Rectangulo = {
       suroeste: { longitud: 2.17, latitud: 41.38 },
