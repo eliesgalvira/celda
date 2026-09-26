@@ -20,6 +20,9 @@ import {
 } from "../capa/marcadores.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
 import { usarDatos } from "../datos.tsx";
+import { desplazamientoParaVer } from "../ficha/enfoque.ts";
+import { PanelFicha } from "../ficha/PanelFicha.tsx";
+import { emplazamientoDe, navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { CREDITOS_MAPA_BASE, type EstadoMapa, hayWebgl, type MotivoFallo } from "./estado.ts";
 import { Marcadores } from "./Marcadores.tsx";
 
@@ -185,6 +188,46 @@ export function PantallaMapa() {
 
   const combinaciones = createMemo(() => combinacionesDe(emplazamientos()));
 
+  /** El emplazamiento con la ficha abierta, que dice la URL. */
+  const seleccionada = createMemo(() => emplazamientoDe(ubicacion()));
+  const fechaCapa = createMemo(() => {
+    const actual = capa();
+    return actual.tipo === "lista" ? actual.capa.fecha : undefined;
+  });
+
+  /** Abre la ficha y, si el marcador queda debajo del panel, mueve el mapa lo justo. */
+  const seleccionar = (clave: string) => {
+    navegar(ruta.emplazamiento(clave));
+    const posicion = emplazamientos().find((e) => e.clave === clave)?.posicion;
+    if (mapa === undefined || posicion === undefined) return;
+    const desplazamiento = desplazamientoParaVer(
+      mapa.project([posicion.longitud, posicion.latitud]),
+      {
+        ancho: window.innerWidth,
+        alto: window.innerHeight,
+        escritorio: window.matchMedia("(min-width: 48rem)").matches,
+      },
+    );
+    if (desplazamiento !== undefined) mapa.panBy([...desplazamiento], { duration: 300 });
+  };
+
+  // Si la página se abre con un emplazamiento en la URL, el mapa empieza en él. Solo al cargar:
+  // después, abrir o cerrar la ficha no mueve el mapa (historia 22).
+  let enfocadoAlCargar = false;
+  createEffect(
+    () => ({ listo: mapaListo(), lista: capa().tipo === "lista", clave: seleccionada() }),
+    ({ listo: actual, lista, clave }) => {
+      if (enfocadoAlCargar || actual === undefined || !lista) return;
+      enfocadoAlCargar = true;
+      const posicion = emplazamientos().find((e) => e.clave === clave)?.posicion;
+      if (posicion === undefined) return;
+      actual.mapa.jumpTo({
+        center: [posicion.longitud, posicion.latitud],
+        zoom: Math.max(actual.mapa.getZoom(), 16),
+      });
+    },
+  );
+
   const aviso = createMemo(() => {
     const actual = estado();
     return actual.tipo === "listo" ? undefined : (
@@ -209,6 +252,8 @@ export function PantallaMapa() {
               fotograma={fotograma()}
               emplazamientos={visibles()}
               combinaciones={combinaciones()}
+              seleccionada={seleccionada()}
+              alSeleccionar={seleccionar}
             />
           )}
         </Show>
@@ -236,6 +281,18 @@ export function PantallaMapa() {
       }
       atribucion={<Atribucion creditos={CREDITOS_MAPA_BASE} />}
       aviso={aviso()}
+      panelAbierto={seleccionada() !== null}
+      panel={
+        <Show when={seleccionada()}>
+          {(clave) => (
+            <PanelFicha
+              clave={clave()}
+              fechaCapa={fechaCapa()}
+              alCerrar={() => navegar(ruta.mapa)}
+            />
+          )}
+        </Show>
+      }
     />
   );
 }

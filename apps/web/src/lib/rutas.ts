@@ -28,10 +28,24 @@ export const navegar = (href: string, opciones?: { readonly reemplazar?: boolean
   setUbicacion(leerUbicacion());
 };
 
+/** El parámetro de la URL con la clave del emplazamiento seleccionado. */
+const EMPLAZAMIENTO = "emplazamiento";
+
 /** Los destinos con nombre: la única forma de escribir una URL de la app. */
 export const ruta = {
   mapa: "/",
+  /**
+   * El mapa con la ficha de un emplazamiento abierta. Es la misma pantalla, así que abrir y
+   * cerrar la ficha no mueve el mapa; la dirección se puede compartir y recargar.
+   */
+  emplazamiento: (clave: string) => `/?${EMPLAZAMIENTO}=${encodeURIComponent(clave)}`,
 } as const;
+
+/** La clave del emplazamiento seleccionado en una ubicación, o `null` si no hay ninguno. */
+export const emplazamientoDe = (ubicacion: Ubicacion): string | null => {
+  const clave = ubicacion.search.get(EMPLAZAMIENTO)?.trim() ?? "";
+  return clave === "" ? null : clave;
+};
 
 /** Un clic normal con el botón principal y sin modificadores: el que navega dentro de la app. */
 export const esClicDeNavegacion = (evento: MouseEvent): boolean =>

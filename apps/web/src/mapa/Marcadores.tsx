@@ -17,6 +17,9 @@ export interface MarcadoresProps {
   readonly emplazamientos: ReadonlyArray<EmplazamientoDeCapa>;
   /** Todas las combinaciones de compañías de la capa. */
   readonly combinaciones: ReadonlyArray<ReadonlyArray<Compania>>;
+  /** Clave del emplazamiento con la ficha abierta. */
+  readonly seleccionada: string | null;
+  readonly alSeleccionar: (clave: string) => void;
 }
 
 /** Los marcadores DOM de los emplazamientos visibles, colocados sobre el mapa en cada fotograma. */
@@ -44,6 +47,8 @@ export function Marcadores(props: MarcadoresProps) {
               companias={emplazamiento.companias}
               estado={emplazamiento.estado}
               nombre={nombreDeMarcador(emplazamiento)}
+              seleccionado={props.seleccionada === emplazamiento.clave}
+              onClick={() => props.alSeleccionar(emplazamiento.clave)}
             />
           );
         }}
