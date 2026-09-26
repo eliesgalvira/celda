@@ -5,6 +5,7 @@ import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
 import { Desplegable } from "@celda/ui/Desplegable.tsx";
 import { Etiqueta } from "@celda/ui/Etiqueta.tsx";
+import { ConflictosFicha, ContrasteFicha, NotaFicha } from "@celda/ui/panel/Correccion.tsx";
 import {
   AvisoFicha,
   CabeceraFicha,
@@ -29,6 +30,7 @@ import { enVivo, usarDatos } from "../datos.tsx";
 import { ReferenciaEnFicha } from "../ubicacion/Ubicacion.tsx";
 import { ComoEmite } from "./ComoEmite.tsx";
 import { TITULO_COMO_EMITE } from "./diagrama.ts";
+import { textosCorrecciones } from "./correcciones.ts";
 import { compararConCapa } from "./marcaDeAgua.ts";
 import {
   datosTecnicosDe,
@@ -181,6 +183,30 @@ function ContenidoFicha(props: {
       >
         {marca().detalle}
       </MarcaDeAguaFicha>
+      <Show when={textosCorrecciones(props.ficha)}>
+        {(correcciones) => (
+          <SeccionFicha titulo="Registro oficial y comunidad">
+            <NotaFicha>{correcciones().resumen}</NotaFicha>
+            <For each={correcciones().contrastes}>
+              {(contraste) => (
+                <ContrasteFicha
+                  tono={contraste.tono}
+                  compania={contraste.compania}
+                  nombre={contraste.nombre}
+                  oficial={contraste.oficial}
+                  comunidad={contraste.comunidad}
+                />
+              )}
+            </For>
+            <Show when={correcciones().conflictos.length > 0}>
+              <ConflictosFicha conflictos={correcciones().conflictos} />
+            </Show>
+            <Show when={correcciones().credito}>
+              {(credito) => <NotaFicha tono="credito">{credito()}</NotaFicha>}
+            </Show>
+          </SeccionFicha>
+        )}
+      </Show>
       <ReferenciaEnFicha emplazamiento={props.ficha.posicion} />
       <SeccionFicha titulo={TITULO_COMO_EMITE}>
         <ComoEmite clave={props.clave} />
