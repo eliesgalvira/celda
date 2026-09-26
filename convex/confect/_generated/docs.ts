@@ -6,6 +6,7 @@ export type EmplazamientosDoc = Document.Document<typeof schemaDefinition, "empl
 export type EstacionesBaseDoc = Document.Document<typeof schemaDefinition, "estacionesBase">;
 export type InterruptoresDoc = Document.Document<typeof schemaDefinition, "interruptores">;
 export type ObservacionesDoc = Document.Document<typeof schemaDefinition, "observaciones">;
+export type VersionesCapaDoc = Document.Document<typeof schemaDefinition, "versionesCapa">;
 
 export interface Docs {
   ejecuciones: EjecucionesDoc;
@@ -13,4 +14,5 @@ export interface Docs {
   estacionesBase: EstacionesBaseDoc;
   interruptores: InterruptoresDoc;
   observaciones: ObservacionesDoc;
+  versionesCapa: VersionesCapaDoc;
 }

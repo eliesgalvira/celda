@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as capas from "../capas.js";
 import type * as crons from "../crons.js";
 import type * as datos from "../datos.js";
 import type * as ingesta from "../ingesta.js";
@@ -19,6 +20,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  capas: typeof capas;
   crons: typeof crons;
   datos: typeof datos;
   ingesta: typeof ingesta;

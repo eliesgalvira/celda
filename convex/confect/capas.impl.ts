@@ -1,0 +1,88 @@
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+
+import databaseSchema from "./_generated/schema";
+import { DatabaseReader, DatabaseWriter } from "./_generated/services";
+import capas from "./capas.spec";
+
+/**
+ * Una página de emplazamientos con sus compañías. Lee `limite` emplazamientos y sus estaciones
+ * base (entre una y cuatro cada uno), lejos del límite de 4096 lecturas por función.
+ */
+const instantanea = FunctionImpl.make(
+  databaseSchema,
+  capas,
+  "instantanea",
+  ({ despuesDe, limite }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const pagina = yield* reader
+        .table("emplazamientos")
+        .index("por_clave", (q) => (despuesDe === null ? q : q.gt("clave", despuesDe)))
+        .take(limite);
+      const elementos = yield* Effect.forEach(pagina, (e) =>
+        Effect.map(
+          reader
+            .table("estacionesBase")
+            .index("por_emplazamiento", (q) => q.eq("emplazamiento", e.clave))
+            .collect(),
+          (estaciones) => ({
+            clave: e.clave,
+            posicion: e.posicion,
+            estado: e.estado,
+            companias: estaciones.map((estacion) => estacion.compania),
+          }),
+        ),
+      );
+      return {
+        elementos,
+        ultima: pagina.length < limite ? null : (pagina.at(-1)?.clave ?? null),
+      };
+    }).pipe(Effect.orDie),
+);
+
+/**
+ * Apunta una capa publicada. Registrar otra vez la misma versión solo actualiza su URL: el
+ * fichero es el mismo y puede haber cambiado de origen.
+ */
+const registrar = FunctionImpl.make(databaseSchema, capas, "registrar", (capa) =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    const writer = yield* DatabaseWriter;
+    const previa = yield* reader
+      .table("versionesCapa")
+      .index("por_version", (q) => q.eq("version", capa.version))
+      .first();
+    if (Option.isNone(previa)) {
+      yield* writer.table("versionesCapa").insert(capa);
+      return { nueva: true };
+    }
+    if (previa.value.url !== capa.url) {
+      yield* writer.table("versionesCapa").patch(previa.value._id, { url: capa.url });
+    }
+    return { nueva: false };
+  }).pipe(Effect.orDie),
+);
+
+/** La capa que debe cargar el mapa: la de la instantánea más reciente. */
+const vigente = FunctionImpl.make(databaseSchema, capas, "vigente", () =>
+  Effect.gen(function* () {
+    const reader = yield* DatabaseReader;
+    const ultima = yield* reader.table("versionesCapa").index("por_fecha", "desc").first();
+    return Option.map(ultima, ({ version, fecha, url, emplazamientos }) => ({
+      version,
+      fecha,
+      url,
+      emplazamientos,
+    }));
+  }).pipe(Effect.orDie),
+);
+
+export default GroupImpl.make(databaseSchema, capas).pipe(
+  Layer.provide(instantanea),
+  Layer.provide(registrar),
+  Layer.provide(vigente),
+  GroupImpl.finalize,
+);
