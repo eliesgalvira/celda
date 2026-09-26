@@ -1,23 +1,7 @@
+import { Ficha } from "@celda/dominio/ficha";
 import { Fuente } from "@celda/dominio/observacion";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
-
-import emplazamientos from "./_generated/tables/emplazamientos";
-import estacionesBase from "./_generated/tables/estacionesBase";
-
-/** De dónde sale un dato de la ficha: fuente, enlace y desde cuándo lo dice. */
-export const Origen = Schema.Struct({
-  fuente: Fuente,
-  clave: Schema.String,
-  url: Schema.String,
-  fecha: Schema.Finite,
-});
-
-export const Ficha = Schema.Struct({
-  emplazamiento: emplazamientos.Doc,
-  estaciones: Schema.Array(estacionesBase.Doc),
-  origenes: Schema.Array(Origen),
-});
 
 /** Versión de los datos: la marca de agua con la que se comparan las vistas. */
 export const Version = Schema.Struct({
@@ -38,6 +22,10 @@ export default GroupSpec.make()
     }),
   )
   .addFunction(
+    /**
+     * La ficha de un emplazamiento para el panel, con la marca de agua de sus datos. Nula si no
+     * hay ningún emplazamiento con esa clave, por ejemplo porque se retiró después de la capa.
+     */
     FunctionSpec.publicQuery({
       name: "ficha",
       args: () => ({ clave: Schema.String }),

@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./capas": "./src/capas.ts"
+    "./capas": "./src/capas.ts",
+    "./publica": "./src/publica.ts"
   },
   "scripts": {
     "codegen": "confect codegen",

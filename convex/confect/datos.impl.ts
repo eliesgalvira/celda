@@ -1,3 +1,4 @@
+import { compararBandas } from "@celda/dominio/banda";
 import { Fuente } from "@celda/dominio/observacion";
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
@@ -43,37 +44,61 @@ const version = FunctionImpl.make(databaseSchema, datos, "version", () =>
   }).pipe(Effect.orDie),
 );
 
+/**
+ * La ficha de un emplazamiento: sus campos, sus estaciones base con las bandas ordenadas y, para
+ * cada una, las observaciones de las que sale con su fecha y su enlace. Lee el emplazamiento,
+ * sus estaciones (una por compañía) y una observación por código.
+ */
 const ficha = FunctionImpl.make(databaseSchema, datos, "ficha", ({ clave }) =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    const emplazamiento = yield* reader
+    const encontrado = yield* reader
       .table("emplazamientos")
       .index("por_clave", (q) => q.eq("clave", clave))
       .first();
-    if (Option.isNone(emplazamiento)) {
+    if (Option.isNone(encontrado)) {
       return Option.none();
     }
-    const estaciones = yield* reader
+    const emplazamiento = encontrado.value;
+    const guardadas = yield* reader
       .table("estacionesBase")
       .index("por_emplazamiento", (q) => q.eq("emplazamiento", clave))
       .collect();
-    const origenes = yield* Effect.forEach(
-      estaciones.flatMap((e) => e.observaciones),
-      ({ fuente, clave: claveFuente }) =>
-        reader
-          .table("observaciones")
-          .index("por_clave", (q) => q.eq("fuente", fuente).eq("clave", claveFuente))
-          .first()
-          .pipe(
-            Effect.map(
-              Option.map((o) => ({ fuente: o.fuente, clave: o.clave, url: o.url, fecha: o.fecha })),
-            ),
-          ),
+    const estaciones = yield* Effect.forEach(guardadas, (estacion) =>
+      Effect.map(
+        Effect.forEach(estacion.observaciones, ({ fuente, clave: claveFuente }) =>
+          reader
+            .table("observaciones")
+            .index("por_clave", (q) => q.eq("fuente", fuente).eq("clave", claveFuente))
+            .first(),
+        ),
+        (observaciones) => ({
+          compania: estacion.compania,
+          codigos: estacion.codigos,
+          bandas: estacion.bandas.toSorted(compararBandas),
+          origenes: observaciones
+            .flatMap(Option.toArray)
+            .map(({ fuente, clave: claveFuente, url, fecha, afirma }) => ({
+              fuente,
+              clave: claveFuente,
+              url,
+              fecha,
+              afirma,
+            })),
+        }),
+      ),
     );
     return Option.some({
-      emplazamiento: emplazamiento.value,
+      clave: emplazamiento.clave,
+      posicion: emplazamiento.posicion,
+      direccion: emplazamiento.direccion,
+      municipio: emplazamiento.municipio,
+      estado: emplazamiento.estado,
+      confianza: emplazamiento.confianza,
+      conflictos: emplazamiento.conflictos,
       estaciones,
-      origenes: origenes.flatMap(Option.toArray),
+      datosDel: emplazamiento.datosDel,
+      version: emplazamiento.version,
     });
   }).pipe(Effect.orDie),
 );
