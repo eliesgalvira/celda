@@ -31,7 +31,7 @@ Zona del mapa en la que un emplazamiento es el más cercano de todos, sea cual s
 _Evitar_: zona de cobertura, cobertura, hexágono
 
 **Sector que da servicio**:
-Sector de un emplazamiento que da servicio a un punto de referencia.
+Sector de un emplazamiento que da servicio a un punto de referencia: el que más señal manda en su dirección según el diagrama de sector. Es una simulación sobre la orientación de los sectores, que hoy es siempre supuesta, y no mira si otro emplazamiento queda más cerca.
 _Evitar_: celda servidora, sector servidor, mi antena
 
 **Agrupación**:
