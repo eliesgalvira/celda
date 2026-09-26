@@ -14,7 +14,8 @@ export const variantesEtiqueta = cva(
         /** Una medida de ejemplo: nunca se confunde con una propia (historia 49). */
         ejemplo: "bg-ejemplo text-ejemplo-fg",
         /** Algo que se enseña pero todavía no funciona. */
-        pronto: "bg-superficie-alta text-tinta-suave shadow-[inset_0_0_0_1.5px_var(--linea-fuerte)]",
+        pronto:
+          "bg-superficie-alta text-tinta-suave shadow-[inset_0_0_0_1.5px_var(--linea-fuerte)]",
       },
     },
     defaultVariants: { tono: "verificado" },

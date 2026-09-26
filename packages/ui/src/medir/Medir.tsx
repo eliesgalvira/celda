@@ -210,3 +210,15 @@ export function MedidaMostrada(props: MedidaMostradaProps) {
     </section>
   );
 }
+
+/** Rayas de cobertura para el botón «Medir mi señal» del mapa. */
+export function IconoSenal() {
+  return (
+    <svg width="20" height="18" viewBox="0 0 20 18" aria-hidden="true" fill="currentColor">
+      <rect x="1" y="12" width="3" height="5" />
+      <rect x="6" y="8" width="3" height="9" />
+      <rect x="11" y="4" width="3" height="13" />
+      <rect x="16" y="0" width="3" height="17" />
+    </svg>
+  );
+}

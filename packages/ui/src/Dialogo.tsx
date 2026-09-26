@@ -40,7 +40,8 @@ export function Dialogo(props: DialogoProps) {
     titulo?.focus({ preventScroll: true });
     return () => {
       dialogo?.close();
-      if (previo instanceof HTMLElement && previo.isConnected) previo.focus({ preventScroll: true });
+      if (previo instanceof HTMLElement && previo.isConnected)
+        previo.focus({ preventScroll: true });
     };
   });
 
