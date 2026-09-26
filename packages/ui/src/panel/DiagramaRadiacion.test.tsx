@@ -2,7 +2,12 @@ import { assert, describe, it } from "@effect/vitest";
 import { render } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 
-import { CalculandoDiagrama, DiagramaRadiacion, LobulosSector } from "./DiagramaRadiacion.tsx";
+import {
+  CalculandoDiagrama,
+  DiagramaRadiacion,
+  LobulosSector,
+  rumboLibre,
+} from "./DiagramaRadiacion.tsx";
 
 const RUMBOS = Array.from({ length: 72 }, (_, i) => i * 5);
 const lobulo = (azimut: number) =>
@@ -18,6 +23,7 @@ const marco = {
   leyenda: ["Sector 1 · 0°", "Sector 2 · 120°", "Sector 3 · 240°"],
   notas: ["Orientación supuesta."],
   atenuacionMaxima: 30,
+  azimuts: [0, 120, 240],
 };
 
 describe("DiagramaRadiacion", () => {
@@ -82,5 +88,14 @@ describe("DiagramaRadiacion", () => {
     assert.lengthOf(imagen.querySelectorAll("path"), 0);
     assert.lengthOf(imagen.querySelectorAll("circle"), 3);
     assert.include(imagen.textContent, "Calculando el modelo…");
+  });
+});
+
+describe("rumboLibre", () => {
+  it("es el centro del hueco más ancho entre sectores", () => {
+    assert.strictEqual(rumboLibre([0, 120, 240]), 60);
+    assert.strictEqual(rumboLibre([350, 10, 100]), 225);
+    assert.strictEqual(rumboLibre([40]), 220);
+    assert.strictEqual(rumboLibre([]), 0);
   });
 });

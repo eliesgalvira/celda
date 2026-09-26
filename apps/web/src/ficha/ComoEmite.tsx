@@ -76,6 +76,7 @@ export function ComoEmite(props: { readonly clave: string }) {
         leyenda={textos.leyenda}
         notas={textos.notas}
         atenuacionMaxima={paramsDiagrama(orientacion).atenuacionMaximaDb}
+        azimuts={orientacion.azimuts}
       >
         <Loading on={props.clave} fallback={<CalculandoDiagrama />}>
           <LobulosSector

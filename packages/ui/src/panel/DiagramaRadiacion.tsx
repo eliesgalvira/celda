@@ -27,6 +27,25 @@ const punto = (rumbo: number, r: number): readonly [number, number] => {
 const radioDe = (ganancia: number, maxima: number): number =>
   RADIO * Math.max(0, 1 + ganancia / maxima);
 
+/**
+ * El rumbo más alejado de todos los ejes: el centro del hueco más ancho entre sectores. Ahí se
+ * escriben los dB de los anillos, para que no pisen el rumbo de ningún sector.
+ */
+export const rumboLibre = (azimuts: ReadonlyArray<number>): number => {
+  const ordenados = azimuts.map((a) => ((a % 360) + 360) % 360).sort((a, b) => a - b);
+  const primero = ordenados[0] ?? 0;
+  const huecos = ordenados.map((desde, i) => ({
+    desde,
+    hueco: (ordenados[i + 1] ?? primero + 360) - desde,
+  }));
+  const mayor = huecos.reduce((a, b) => (b.hueco > a.hueco ? b : a), { desde: 0, hueco: 0 });
+  return (mayor.desde + mayor.hueco / 2) % 360;
+};
+
+/** Texto sobre el dibujo, con un halo del color del panel para que se lea encima de las líneas. */
+const TEXTO_CON_HALO =
+  "font-mono stroke-superficie stroke-[3px] [paint-order:stroke] [stroke-linejoin:round]";
+
 const hexagono = (cx: number, cy: number, r: number): string =>
   [0, 1, 2, 3, 4, 5]
     .map((i) => {
@@ -111,7 +130,7 @@ export function LobulosSector(props: LobulosSectorProps) {
               x={punto(sector.azimut, RADIO * 0.62)[0]}
               y={punto(sector.azimut, RADIO * 0.62)[1] + 3.5}
               text-anchor="middle"
-              class="fill-tinta-suave font-mono text-[10px]"
+              class={`${TEXTO_CON_HALO} fill-tinta-suave text-[10px]`}
             >
               {sector.etiqueta}
             </text>
@@ -149,6 +168,8 @@ export interface DiagramaRadiacionProps {
   readonly notas: ReadonlyArray<string>;
   /** La atenuación en el centro del diagrama, en dB positivos. */
   readonly atenuacionMaxima: number;
+  /** Hacia dónde apuntan los sectores, en grados: los dB se escriben lejos de ellos. */
+  readonly azimuts: ReadonlyArray<number>;
   /** Los lóbulos, o lo que ocupa su sitio mientras se calculan. */
   readonly children: JSX.Element;
 }
@@ -159,6 +180,8 @@ export interface DiagramaRadiacionProps {
  */
 export function DiagramaRadiacion(props: DiagramaRadiacionProps) {
   const id = createUniqueId();
+  const escala = (db: number) =>
+    punto(rumboLibre(props.azimuts), radioDe(db, props.atenuacionMaxima) - 7);
   return (
     <figure class="flex flex-col items-center gap-3">
       <div class="flex w-full flex-wrap items-center gap-x-3 gap-y-1">
@@ -190,9 +213,10 @@ export function DiagramaRadiacion(props: DiagramaRadiacionProps) {
                 }
               />
               <text
-                x={CENTRO + 4}
-                y={CENTRO - radioDe(db, props.atenuacionMaxima) + 11}
-                class="fill-tinta-suave font-mono text-[9px]"
+                x={escala(db)[0]}
+                y={escala(db)[1] + 3}
+                text-anchor="middle"
+                class={`${TEXTO_CON_HALO} fill-tinta-suave text-[9px]`}
               >
                 {db === 0 ? "0 dB" : `−${-db} dB`}
               </text>
