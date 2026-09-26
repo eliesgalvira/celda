@@ -327,25 +327,24 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
         });
         assert.isTrue(Option.isSome(campusNord));
         if (Option.isSome(campusNord)) {
-          const { emplazamiento, estaciones, origenes } = campusNord.value;
-          assert.strictEqual(emplazamiento.version, NOCHE);
-          assert.strictEqual(emplazamiento.datosDel, NOCHE);
+          const { version, datosDel, estaciones } = campusNord.value;
+          assert.strictEqual(version, NOCHE);
+          assert.strictEqual(datosDel, NOCHE);
           assert.deepStrictEqual(
             estaciones.map((e) => e.compania),
             ["movistar", "orange", "vodafone"],
           );
           assert.isTrue(
-            origenes.every(
-              (o) => o.fecha === NOCHE && o.url.startsWith("https://geoportal.minetur.gob.es/"),
-            ),
+            estaciones
+              .flatMap((e) => e.origenes)
+              .every(
+                (o) => o.fecha === NOCHE && o.url.startsWith("https://geoportal.minetur.gob.es/"),
+              ),
           );
         }
         // La de Digi es nueva: su versión es la de la segunda noche.
         const digi = yield* convex.query(refs.public.datos.ficha, { clave: "digi-0800143" });
-        assert.strictEqual(
-          Option.map(digi, (f) => f.emplazamiento.version).pipe(Option.getOrNull),
-          NOCHE + DIA,
-        );
+        assert.strictEqual(Option.map(digi, (f) => f.version).pipe(Option.getOrNull), NOCHE + DIA);
         assert.isTrue(
           Option.isNone(yield* convex.query(refs.public.datos.ficha, { clave: "no-existe" })),
         );

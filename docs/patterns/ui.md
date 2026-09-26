@@ -45,6 +45,17 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Por debajo de `ZOOM_LOGOS` (14, en `mapa/estilo.ts`) no hay marcadores DOM: el estilo del mapa pinta cada emplazamiento como un punto (`--mapa-emplazamiento`) y una `Pista` pide acercarse. Con los 1318 emplazamientos como botones, el zoom iba a 17 fps con la CPU a ×4. Cuando llegue la agrupación en hexágonos (ticket 13) los puntos se sustituyen por ella.
 - `DatosDelMapa` es la marca de agua del mapa: la fecha de la capa, o que se está cargando. Tiene ancho fijo en `rem`; con `ch` Chromium medía otra fuente y cortaba la fecha.
 
+## Panel del emplazamiento
+
+- `panel/PanelEmplazamiento.tsx` es el contenedor. En escritorio ocupa una columna de 27rem a la izquierda. En el móvil es una hoja inferior con tres alturas (resumen, media y completa) y el padre controla cuál toca con `altura` y `alCambiarAltura`.
+- Qué altura sale de un toque, un arrastre o una tecla lo deciden funciones puras en `panel/hoja.ts`, con sus pruebas. El componente solo mide el dedo y llama a esas funciones.
+- El tirador es un `<button>` con la etiqueta visible «Ver más» o «Ver menos». Recibe él mismo los eventos de puntero, con `setPointerCapture` y `touch-none`, y el botón de cerrar va debajo de él y no encima. En el prototipo v6 el arrastre no funcionaba porque otra pieza tapaba el tirador. Si lo mueves, comprueba el arrastre en Chromium con eventos táctiles de verdad.
+- Un toque sube una altura y desde la completa vuelve al resumen. Las flechas suben y bajan, e Inicio y Fin van a los extremos. Escape cierra el panel. Al abrirse se lleva el foco y al cerrarse lo devuelve al marcador.
+- `panel/Ficha.tsx` tiene las piezas de dentro. `CabeceraFicha` y `EsqueletoFicha` comparten contenedor y alto de línea, así que al llegar la ficha no se mueve nada. El esqueleto dice «Cargando la ficha…» a los 0,5 s y, a los 8 s, que tarda más de lo normal (`animate-aparecer-tarde`).
+- `MarcaDeAguaFicha` tiene dos tonos. `al-dia` enseña la fecha de la ficha y `posterior` avisa de que la ficha ha cambiado después del mapa.
+- Con un panel abierto, `DisposicionMapa` (`panelAbierto`) sube en el móvil los controles y los créditos por encima del resumen, y en escritorio aparta los créditos a la derecha de la columna.
+- `MarcadorEmplazamiento` con `seleccionado` lleva un anillo del color primario y `aria-current`.
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.

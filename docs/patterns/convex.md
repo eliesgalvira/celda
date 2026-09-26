@@ -83,6 +83,12 @@ Publicar sin cambios en los datos no escribe nada, así que se puede lanzar tras
 
 `datos:version` es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la consulta también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
 
+## Ficha
+
+`datos:ficha` es la consulta pública del panel. Devuelve la `Ficha` de `packages/dominio/src/ficha.ts`, o `null` si no hay emplazamiento con esa clave exacta. La ficha lleva la dirección y el municipio, cada estación base con sus bandas ordenadas por frecuencia y, por cada código, la observación de la que sale, con su fuente, su enlace y desde cuándo lo dice. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. La web la compara con la de la capa para decir si la ficha va por delante del mapa. No lleva los `_id` de Convex. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene.
+
+La web la lee con el servicio `FichasEnVivo` (`apps/web/src/ficha/servicio.ts`), que hoy es un `reactiveQuery` del cliente WebSocket de Confect. El cliente solo se conecta al abrir la primera ficha. Las referencias vienen de `@celda/convex/publica`, que solo incluye el grupo `datos` para no llevar al navegador la spec de la ingesta. Si la ficha pasa a leerse con una mutación limitada o desde la CDN (exploración 04), el cambio se queda dentro de ese servicio.
+
 ## Pruebas
 
 Tres niveles, todos con `@effect/vitest` y sin mocks de módulos.

@@ -2,9 +2,11 @@ import type { CapaLeida } from "@celda/dominio/capa";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
+import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { capaDePrueba } from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
@@ -32,7 +34,7 @@ describe("capa de emplazamientos en el mapa", () => {
   it("mientras carga lo dice, y no aparenta un mapa vacío ni sin emplazamientos", () => {
     navegar(ruta.mapa, { reemplazar: true });
     const { getByRole, getByText, queryByText, queryAllByRole } = render(() => (
-      <App servicios={capaDePrueba([Effect.never])} />
+      <App servicios={Layer.merge(capaDePrueba([Effect.never]), fichasDePrueba().capa)} />
     ));
     flush();
 
@@ -46,7 +48,12 @@ describe("capa de emplazamientos en el mapa", () => {
   it("si no carga, lo dice con un reintento; al reintentar enseña la fecha de los datos", async () => {
     navegar(ruta.mapa, { reemplazar: true });
     const { getByRole, findByText, queryByText } = render(() => (
-      <App servicios={capaDePrueba([NO_LLEGA, Effect.succeed(CAPA)])} />
+      <App
+        servicios={Layer.merge(
+          capaDePrueba([NO_LLEGA, Effect.succeed(CAPA)]),
+          fichasDePrueba().capa,
+        )}
+      />
     ));
     flush();
 
