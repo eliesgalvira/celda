@@ -50,6 +50,10 @@
   --aviso-fondo: oklch(95.5% 0.02 70);
   --aviso-tinta: oklch(43.1% 0.102 52.4);
 
+  /* PUNTO DE REFERENCIA: el punto elegido y el círculo de precisión del GPS */
+  --referencia: oklch(55% 0.15 50);
+  --referencia-fg: oklch(98.5% 0.004 90);
+
   --sombra: oklch(0% 0 0 / 0.18);
   /* Lo que queda detrás de un diálogo */
   --velo: oklch(29.9% 0.005 121.8 / 0.45);
@@ -128,6 +132,9 @@
   --aviso-fondo: oklch(29% 0.04 55);
   --aviso-tinta: oklch(88% 0.06 70);
 
+  --referencia: oklch(74% 0.14 55);
+  --referencia-fg: oklch(22% 0.03 55);
+
   --sombra: oklch(0% 0 0 / 0.5);
   --velo: oklch(0% 0 0 / 0.6);
 
@@ -195,6 +202,8 @@
   --color-aviso: var(--aviso);
   --color-aviso-fondo: var(--aviso-fondo);
   --color-aviso-tinta: var(--aviso-tinta);
+  --color-referencia: var(--referencia);
+  --color-referencia-fg: var(--referencia-fg);
   --color-sombra: var(--sombra);
   --color-velo: var(--velo);
   --color-eje-lejos: var(--eje-lejos);

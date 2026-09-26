@@ -34,8 +34,13 @@ export const variantesBoton = cva(
         normal: "min-h-9 px-4 text-sm",
         grande: "min-h-11 px-5 text-base",
       },
+      /** `completo` ocupa todo el ancho que le deja su contenedor. */
+      ancho: {
+        ajustado: "",
+        completo: "w-full",
+      },
     },
-    defaultVariants: { variante: "primario", tamano: "normal" },
+    defaultVariants: { variante: "primario", tamano: "normal", ancho: "ajustado" },
   },
 );
 
@@ -49,7 +54,16 @@ export type BotonProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "clas
 
 /** El botón de Celda. Si una pantalla necesita otro aspecto, se añade una variante aquí. */
 export function Boton(props: BotonProps) {
-  const resto = omit(props, "variante", "tamano", "cargando", "disabled", "children", "type");
+  const resto = omit(
+    props,
+    "variante",
+    "tamano",
+    "ancho",
+    "cargando",
+    "disabled",
+    "children",
+    "type",
+  );
   const cargando = () => props.cargando === true;
   return (
     <button
@@ -57,10 +71,16 @@ export function Boton(props: BotonProps) {
       data-variante={props.variante ?? "primario"}
       disabled={props.disabled === true || cargando()}
       aria-busy={cargando() ? "true" : "false"}
-      class={variantesDiana()}
+      class={variantesDiana({ class: props.ancho === "completo" ? "flex-1" : undefined })}
       {...resto}
     >
-      <span class={variantesBoton({ variante: props.variante, tamano: props.tamano })}>
+      <span
+        class={variantesBoton({
+          variante: props.variante,
+          tamano: props.tamano,
+          ancho: props.ancho,
+        })}
+      >
         <span class={cn("contents", cargando() && "invisible")}>{props.children}</span>
       </span>
       <Show when={cargando()}>
@@ -77,10 +97,16 @@ export type EnlaceProps = Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "cla
 
 /** Un enlace con el aspecto de un botón, para navegar. */
 export function Enlace(props: EnlaceProps) {
-  const resto = omit(props, "variante", "tamano", "children");
+  const resto = omit(props, "variante", "tamano", "ancho", "children");
   return (
     <a data-variante={props.variante ?? "primario"} class={variantesDiana()} {...resto}>
-      <span class={variantesBoton({ variante: props.variante, tamano: props.tamano })}>
+      <span
+        class={variantesBoton({
+          variante: props.variante,
+          tamano: props.tamano,
+          ancho: props.ancho,
+        })}
+      >
         {props.children}
       </span>
     </a>

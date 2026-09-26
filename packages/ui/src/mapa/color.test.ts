@@ -42,6 +42,7 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   ["ejemplo-fg", "ejemplo"],
   ["qr-tinta", "qr-fondo"],
   ["aviso-tinta", "aviso-fondo"],
+  ["referencia-fg", "referencia"],
   ["primario-texto", "superficie"],
   ["primario-texto", "superficie-alta"],
   ["primario-texto", "fondo"],
