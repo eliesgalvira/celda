@@ -10,6 +10,8 @@ convex/confect/*.spec.ts   la API de cada grupo (ingesta, datos)
 convex/confect/*.impl.ts   su implementación
 convex/confect/crons.ts    el cron nocturno de la ingesta
 convex/src/proceso.ts      el proceso de una ejecución, fuera de Convex
+convex/src/capas.ts        la publicación de una capa, fuera de Convex
+tools/capas/               el generador de capas y el origen estático local
 convex/convex/             generado por Confect y Convex; no se edita
 packages/ingesta/          extractores, sin nada de Convex
 packages/dominio/          esquemas y la fusión, sin E/S
@@ -25,6 +27,7 @@ Sin cuenta, con el modo anónimo de Convex, en los puertos 3240 (API) y 3241 (ac
 
 ```sh
 pnpm run backend        # confect codegen + convex dev; déjalo en otra terminal
+CELDA_CONVEX_PUERTO=3250 pnpm run backend   # en 3250 y 3251, si 3240 está ocupado
 ```
 
 Guarda el estado en `.convex/` y la URL en `.env.local`, los dos fuera de git. Para empezar de cero, para el backend y borra `.convex/local` y `.env.local`.
@@ -47,7 +50,7 @@ pnpm exec convex run ingesta:recalcularFusion         # vuelve a fusionar sin de
 pnpm exec convex export --path /tmp/celda.zip         # todas las tablas en JSONL
 ```
 
-`unzip` rechaza el zip de `convex export` como posible bomba; se abre con `UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip`.
+`unzip` rechaza el zip de `convex export` como posible bomba; se abre con `UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip`. Para no volver a descargar el registro oficial, un backend nuevo se puede llenar con la exportación de otro: `pnpm exec convex import --replace -y /tmp/celda.zip`.
 
 Una descarga real del registro oficial hace unas 11 peticiones con 5 fichas: `robots.txt`, 5 de listado y las fichas, con 3 s entre cada una. Hazla solo cuando haga falta y con el interruptor apagado después.
 
@@ -57,6 +60,28 @@ Una descarga real del registro oficial hace unas 11 peticiones con 5 fichas: `ro
 - Convex corta una función que lee más de 4096 documentos. Por eso la fusión lee las observaciones y las claves por páginas de 1000 y escribe los emplazamientos en lotes de 100. `cerrarBarrido` lee de una vez las observaciones de una fuente (unas 2400 en la caja de Barcelona); para una zona más grande habría que repartirlo.
 - La primera descarga real, sin el parámetro `zoom` y con las coordenadas tal cual, recibió `{}`. Con `zoom=4` y seis decimales, como el visor y los scripts de la investigación, llegaron los 2380 registros. Por eso una zona entera vacía cuenta como fallo de la fuente y no como «no hay estaciones».
 - `TextDecoder` en el runtime de Convex solo garantiza UTF-8; el Latin-1 del geoportal se decodifica a mano (`packages/ingesta/src/texto.ts`).
+
+## Capas
+
+La web no lee los emplazamientos de Convex: descarga una capa estática (ADR 0004). `tools/capas` la genera así:
+
+1. Lee `datos:version` y la instantánea con `capas:instantanea`, por páginas de 250 emplazamientos con sus compañías.
+2. Vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
+3. Escribe `sitios@<fecha>.json` en la carpeta del origen. La fecha es la de la versión de los datos, al segundo. Si el fichero ya existe con el mismo contenido no hace nada; si existe con otro, falla (`CapaInmutable`) y no toca nada.
+4. Registra la versión y su URL con `capas:registrar`. La consulta pública `capas:vigente` devuelve la de la instantánea más reciente.
+
+`capas:instantanea` y `capas:registrar` son internas: el generador las llama por la API HTTP de Convex con la clave de administración. En local, desde `tools/capas`:
+
+```sh
+pnpm run publicar:local   # construye, lee la URL y la clave del backend local y publica
+pnpm run servir           # sirve la carpeta salida/ en http://127.0.0.1:8852, déjalo abierto
+```
+
+Para otro despliegue, `pnpm run publicar` con `CELDA_CONVEX_URL`, `CELDA_CONVEX_CLAVE_ADMIN`, `CELDA_CAPAS_ORIGEN` (la URL desde la que la web descargará los ficheros) y `CELDA_CAPAS_CARPETA`. `servir` escucha en el puerto de `CELDA_CAPAS_ORIGEN`. La web lee la URL de Convex de `VITE_CONVEX_URL`; `apps/web/.env.development` apunta al puerto 3240, y en otro puerto se pasa en el entorno: `VITE_CONVEX_URL=http://127.0.0.1:3250 pnpm run dev`.
+
+Publicar sin cambios en los datos no escribe nada, así que se puede lanzar tras cada ingesta. Lanzarlo solo tras la ingesta y subir el fichero a la CDN queda para el ticket del alojamiento.
+
+`datos:version` es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la consulta también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
 
 ## Pruebas
 
@@ -69,5 +94,7 @@ Tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
 **API de Convex.** `convex/test/` usa `@confect/test` (convex-test en memoria). `ejecutar(extractor)` en `convex/test/ayudas.ts` lanza `ejecutarIngesta` con `MutationRunner` y `QueryRunner` sacados del `TestConfect`, y el extractor que se le pase. El de prueba es `capaGrabada` con `muestraCampusNord`, el registro grabado en la investigación. Para comprobar que una ejecución no escribe nada, adelanta el reloj un día y compara `instantanea` antes y después: cualquier escritura por cambio habría movido una fecha.
 
 El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8. `convex/test/TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
+
+`convex/test/capas.test.ts` publica con `publicarCapa` sobre el Convex en memoria y un almacén de prueba (una `Layer` con un `Ref` de ficheros) que, como el real, no pisa un fichero distinto.
 
 La prueba de carga `convex/scripts/prueba-de-carga.sh` mete 2400 observaciones falsas en el backend local y fusiona dos veces. Deja basura: úsala en un backend que vayas a borrar.

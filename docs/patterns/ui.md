@@ -35,6 +35,16 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Lo que dura poco no se ve: el aviso de espera aparece tras medio segundo (`animate-aparecer`).
 - Un fallo se dice con `Aviso tono="fallo"`: qué ha pasado, por qué si se sabe y qué hacer.
 
+## Marcadores y logos
+
+- `marcadores/LogoCompanias.tsx` dibuja el logo de un emplazamiento: el de su compañía o, si es compartido, un círculo en porciones con el de cada una, como la función `logo()` de los prototipos. Los colores son tokens `--compania-*`.
+- Los logos son aproximaciones dibujadas a mano, no los oficiales. Falta revisar qué permite cada marca (Movistar, Vodafone, Orange, Digi, Yoigo) y cambiarlos por los oficiales donde se pueda.
+- `MarcadorEmplazamiento` es un botón de 44 px con el logo a 34 px. No lleva el dibujo dentro: usa con `<use>` un símbolo que `CapaDeMarcadores` dibuja una vez por combinación de compañías. Con 700 marcadores a la vista son unos 3.000 nodos en lugar de unos 15.000.
+- `CapaDeMarcadores` monta la lámina dentro del contenedor del mapa con un `Portal`. Fuera de él, la rueda y los arrastres que empiezan sobre un marcador no llegan al mapa.
+- Una clase de posición que choca con la diana (`absolute` frente a `relative`) se une con `cn`, no con el `class` de `cva`: sin `tailwind-merge` gana la que llegue antes en el CSS, y los marcadores quedaban en fila.
+- Por debajo de `ZOOM_LOGOS` (14, en `mapa/estilo.ts`) no hay marcadores DOM: el estilo del mapa pinta cada emplazamiento como un punto (`--mapa-emplazamiento`) y una `Pista` pide acercarse. Con los 1318 emplazamientos como botones, el zoom iba a 17 fps con la CPU a ×4. Cuando llegue la agrupación en hexágonos (ticket 13) los puntos se sustituyen por ella.
+- `DatosDelMapa` es la marca de agua del mapa: la fecha de la capa, o que se está cargando. Tiene ancho fijo en `rem`; con `ch` Chromium medía otra fuente y cortaba la fecha.
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.

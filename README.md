@@ -2,7 +2,7 @@
 
 Celda es una web que enseña en un mapa las antenas de telefonía móvil de Barcelona: de qué compañía son y cómo llega su señal. Estará en celda.elies.site.
 
-Hoy muestra el mapa base de Barcelona con el tema Hexágono, y el backend recoge cada noche el registro oficial de Barcelona y lo fusiona en emplazamientos. El resto llega por partes; el glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
+Hoy muestra sobre el mapa de Barcelona los emplazamientos del registro oficial, con los logos de las compañías que emiten en cada uno y la fecha de los datos. El backend recoge cada noche el registro oficial y lo fusiona en emplazamientos, y `tools/capas` publica esa instantánea como una capa estática que la web descarga. El resto llega por partes; el glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
 
 ## Arrancar
 
@@ -26,7 +26,7 @@ pnpm run test
 pnpm run build
 ```
 
-El backend de Convex se arranca aparte; ver [docs/patterns/convex.md](docs/patterns/convex.md).
+El backend de Convex y el origen local de las capas se arrancan aparte; ver [docs/patterns/convex.md](docs/patterns/convex.md). Sin ellos la web enseña el mapa base y dice que no ha podido cargar los emplazamientos.
 
 El entorno trae Node 24, pnpm 10, tippecanoe y pmtiles.
 
@@ -38,6 +38,7 @@ convex/                   backend de Convex con Confect: tablas, ingesta y API p
 packages/dominio/         tipos y esquemas del dominio y la fusión, sin E/S
 packages/ingesta/         extractores de las fuentes, como servicios Effect
 packages/ui/              componentes y tema: el único sitio con estilos
+tools/capas/              generador de la capa de emplazamientos y origen estático local
 tools/oxlint-plugin-celda reglas de lint propias
 docs/                     arquitectura, ADR y patrones
 nix/                      módulos del entorno Nix
