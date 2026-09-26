@@ -1,8 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
 import { render } from "@solidjs/testing-library";
+import * as Effect from "effect/Effect";
 import { flush } from "solid-js";
 
 import { App } from "./App.tsx";
+import { capaDePrueba } from "./capa/pruebas.ts";
 import { navegar, ruta } from "./lib/rutas.ts";
 
 const esperarAjuste = () => new Promise<void>((resolver) => queueMicrotask(resolver));
@@ -11,7 +13,9 @@ describe("App", () => {
   // happy-dom no tiene WebGL: es el caso de un navegador que no puede dibujar el mapa.
   it("dice por qué no hay mapa en lugar de dejar el lienzo vacío", async () => {
     navegar(ruta.mapa, { reemplazar: true });
-    const { getByRole, findByRole } = render(() => <App />);
+    const { getByRole, findByRole } = render(() => (
+      <App servicios={capaDePrueba([Effect.never])} />
+    ));
     flush();
     await esperarAjuste();
 
@@ -27,7 +31,7 @@ describe("App", () => {
 
   it("una dirección que no existe lleva de vuelta al mapa", () => {
     navegar("/no-existe", { reemplazar: true });
-    const { getByRole } = render(() => <App />);
+    const { getByRole } = render(() => <App servicios={capaDePrueba([Effect.never])} />);
     flush();
 
     assert.match(getByRole("alert").textContent ?? "", /\/no-existe/u);
