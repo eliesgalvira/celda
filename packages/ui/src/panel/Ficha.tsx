@@ -213,7 +213,7 @@ export function MarcaDeAguaFicha(props: MarcaDeAguaFichaProps) {
   );
 }
 
-/** Un aviso dentro del panel, como que la ficha no ha llegado o no existe. */
+/** Un aviso dentro del panel, como que la ficha no ha llegado o no existe. Deja libre el botón de cerrar. */
 export function AvisoFicha(props: { readonly children: JSX.Element }) {
-  return <div class="px-4 py-4 md:px-5">{props.children}</div>;
+  return <div class="px-4 pt-14 pb-4 md:px-5 md:pt-16">{props.children}</div>;
 }
