@@ -107,11 +107,14 @@ describe("DialogoMedir en Android", () => {
     assert.isNotNull(getByText("Haz una captura de pantalla"));
     assert.isNotNull(getByText(/La marca sale de tu navegador/u));
 
-    const queLePasa = getByText("¿Qué le pasa a mi móvil?").closest("details");
-    assert.isTrue(queLePasa?.open);
-    assert.match(queLePasa?.textContent ?? "", /No se instala nada ni cambia ningún ajuste/u);
-    assert.match(queLePasa?.textContent ?? "", /No es una llamada/u);
-    assert.match(queLePasa?.textContent ?? "", /Celda solo ve la captura que tú subas/u);
+    // Abierto desde el principio: es lo que da confianza para marcar el código.
+    const queLePasa = getByRole("button", { name: "¿Qué le pasa a mi móvil?" });
+    assert.strictEqual(queLePasa.getAttribute("aria-expanded"), "true");
+    const contenido = document.getElementById(queLePasa.getAttribute("aria-controls") ?? "");
+    assert.isFalse(contenido?.hidden);
+    assert.match(contenido?.textContent ?? "", /No se instala nada ni cambia ningún ajuste/u);
+    assert.match(contenido?.textContent ?? "", /No es una llamada/u);
+    assert.match(contenido?.textContent ?? "", /Celda solo ve la captura que tú subas/u);
 
     assert.strictEqual(getByRole("combobox", { name: "Marca del móvil" }).tagName, "SELECT");
   });

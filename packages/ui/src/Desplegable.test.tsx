@@ -41,4 +41,20 @@ describe("Desplegable", () => {
     assert.strictEqual(boton.getAttribute("aria-expanded"), "false");
     assert.isTrue(getByText("Expediente B B -2300445").parentElement?.hidden);
   });
+
+  it("con «abierto» empieza abierto y se puede cerrar", () => {
+    const { getByRole, getByText } = render(() => (
+      <Desplegable titulo="¿Qué le pasa a mi móvil?" abierto variante="recuadro">
+        <p>No se instala nada</p>
+      </Desplegable>
+    ));
+    flush();
+    const boton = getByRole("button", { name: "¿Qué le pasa a mi móvil?" });
+    assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
+    assert.isFalse(getByText("No se instala nada").parentElement?.hidden);
+
+    fireEvent.click(boton);
+    flush();
+    assert.isTrue(getByText("No se instala nada").parentElement?.hidden);
+  });
 });

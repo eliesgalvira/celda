@@ -171,7 +171,7 @@ export function DialogoMedir(props: DialogoMedirProps) {
                 </p>
               </Paso>
             </Pasos>
-            <Desplegable titulo="¿Qué le pasa a mi móvil?" abierto>
+            <Desplegable titulo="¿Qué le pasa a mi móvil?" abierto variante="recuadro">
               <Puntos>
                 <li>
                   No se instala nada ni cambia ningún ajuste. El código abre una pantalla que el
