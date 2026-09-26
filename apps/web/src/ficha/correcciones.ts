@@ -85,9 +85,12 @@ const contrasteDe = (ficha: Ficha, estacion: EstacionDeFicha): TextosContraste |
     };
   }
   if (presente !== undefined && oficiales.length === 0) {
+    const nuevo = ficha.estado === "nuevo";
     return {
       ...base,
-      tono: ficha.estado === "nuevo" ? "nuevo" : "corregido",
+      tono: nuevo ? "nuevo" : "corregido",
+      // Si el emplazamiento sí está en el registro, lo que falta es esta compañía allí.
+      oficial: { fuente: "Registro oficial", dice: nuevo ? "No la tiene" : "No la tiene aquí" },
       comunidad: ladoComunidad(presente, "La han añadido sus usuarios"),
     };
   }

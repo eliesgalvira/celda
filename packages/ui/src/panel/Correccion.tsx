@@ -58,8 +58,11 @@ function Lado(props: { readonly lado: LadoContraste; readonly tono: Tono }) {
               rel="noreferrer"
               class="inline-flex min-h-11 items-center text-sm text-primario-texto underline underline-offset-2 hover:text-tinta"
             >
-              {props.lado.textoEnlace ?? enlace()}
-              <span aria-hidden="true">&nbsp;↗</span>
+              {/* Texto y flecha en una sola caja: al partirse en dos líneas, la flecha sigue al texto. */}
+              <span>
+                {props.lado.textoEnlace ?? enlace()}
+                <span aria-hidden="true">&nbsp;↗</span>
+              </span>
             </a>
           </dd>
         )}

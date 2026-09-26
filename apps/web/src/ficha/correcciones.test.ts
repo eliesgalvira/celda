@@ -63,7 +63,7 @@ describe("correcciones en la ficha", () => {
     const textos = textosCorrecciones(FICHA_COMPANIA_ANADIDA);
     assert.deepStrictEqual(
       textos?.contrastes.map((c) => [c.nombre, c.tono, c.oficial.dice, c.comunidad.dice]),
-      [["Orange", "corregido", "No la tiene", "La han añadido sus usuarios"]],
+      [["Orange", "corregido", "No la tiene aquí", "La han añadido sus usuarios"]],
     );
   });
 
