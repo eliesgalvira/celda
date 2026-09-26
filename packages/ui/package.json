@@ -18,7 +18,8 @@
     "maplibre-gl": "catalog:",
     "solid-js": "catalog:",
     "tailwind-merge": "catalog:",
-    "tailwindcss": "catalog:"
+    "tailwindcss": "catalog:",
+    "uqr": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
