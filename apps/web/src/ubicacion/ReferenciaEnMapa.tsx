@@ -23,6 +23,9 @@ import { UbicacionContexto } from "./controlador.ts";
 import { posicionDe } from "./estado.ts";
 import { textoPrecision } from "./textos.ts";
 
+/** Lo que ocupa a un lado del punto la etiqueta con la distancia y el sector, en píxeles. */
+const SITIO_ETIQUETA = 200;
+
 /** Metros de un grado de latitud: basta para dibujar el círculo de precisión. */
 const METROS_POR_GRADO = 111_320;
 
@@ -91,8 +94,19 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
     const texto = textosServicio(lectura, referencia.tipo, servicio.orientacion).enMapa;
     // El emplazamiento queda al este del punto si el rumbo del emplazamiento al punto va al oeste.
     const emplazamientoAlEste = Math.sin((lectura.rumbo * Math.PI) / 180) < 0;
-    return { texto, lado: emplazamientoAlEste ? ("izquierda" as const) : ("derecha" as const) };
+    return { texto, emplazamientoAlEste };
   });
+
+  /**
+   * A qué lado del punto va la etiqueta: al contrario del emplazamiento, salvo que no quepa en la
+   * pantalla; los controles del mapa ocupan el borde derecho.
+   */
+  const ladoEtiqueta = (x: number, emplazamientoAlEste: boolean): "izquierda" | "derecha" => {
+    const ancho = props.mapa.getContainer().clientWidth;
+    if (x > ancho - SITIO_ETIQUETA) return "izquierda";
+    if (x < SITIO_ETIQUETA) return "derecha";
+    return emplazamientoAlEste ? "izquierda" : "derecha";
+  };
 
   return (
     <Show when={enPantalla()}>
@@ -131,7 +145,7 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
                 x={actual().x}
                 y={actual().y - 14}
                 texto={texto().texto}
-                lado={texto().lado}
+                lado={ladoEtiqueta(actual().x, texto().emplazamientoAlEste)}
               />
             )}
           </Show>
