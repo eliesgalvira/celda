@@ -1,3 +1,4 @@
+import { simuladorEnHilo } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
 import { render } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -16,7 +17,13 @@ describe("App", () => {
   it("dice por qué no hay mapa en lugar de dejar el lienzo vacío", async () => {
     navegar(ruta.mapa, { reemplazar: true });
     const { getByRole, findByRole } = render(() => (
-      <App servicios={Layer.merge(capaDePrueba([Effect.never]), fichasDePrueba().capa)} />
+      <App
+        servicios={Layer.mergeAll(
+          capaDePrueba([Effect.never]),
+          fichasDePrueba().capa,
+          simuladorEnHilo(),
+        )}
+      />
     ));
     flush();
     await esperarAjuste();
@@ -34,7 +41,13 @@ describe("App", () => {
   it("una dirección que no existe lleva de vuelta al mapa", () => {
     navegar("/no-existe", { reemplazar: true });
     const { getByRole } = render(() => (
-      <App servicios={Layer.merge(capaDePrueba([Effect.never]), fichasDePrueba().capa)} />
+      <App
+        servicios={Layer.mergeAll(
+          capaDePrueba([Effect.never]),
+          fichasDePrueba().capa,
+          simuladorEnHilo(),
+        )}
+      />
     ));
     flush();
 

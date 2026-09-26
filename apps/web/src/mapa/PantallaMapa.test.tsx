@@ -1,4 +1,5 @@
 import type { CapaLeida } from "@celda/dominio/capa";
+import { simuladorEnHilo } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -34,7 +35,13 @@ describe("capa de emplazamientos en el mapa", () => {
   it("mientras carga lo dice, y no aparenta un mapa vacío ni sin emplazamientos", () => {
     navegar(ruta.mapa, { reemplazar: true });
     const { getByRole, getByText, queryByText, queryAllByRole } = render(() => (
-      <App servicios={Layer.merge(capaDePrueba([Effect.never]), fichasDePrueba().capa)} />
+      <App
+        servicios={Layer.mergeAll(
+          capaDePrueba([Effect.never]),
+          fichasDePrueba().capa,
+          simuladorEnHilo(),
+        )}
+      />
     ));
     flush();
 
@@ -49,9 +56,10 @@ describe("capa de emplazamientos en el mapa", () => {
     navegar(ruta.mapa, { reemplazar: true });
     const { getByRole, findByText, queryByText } = render(() => (
       <App
-        servicios={Layer.merge(
+        servicios={Layer.mergeAll(
           capaDePrueba([NO_LLEGA, Effect.succeed(CAPA)]),
           fichasDePrueba().capa,
+          simuladorEnHilo(),
         )}
       />
     ));

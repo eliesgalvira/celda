@@ -1,3 +1,4 @@
+import type { Simulador } from "@celda/sim/simulador";
 import type { JSX } from "@solidjs/web";
 import * as Effect from "effect/Effect";
 import type * as Layer from "effect/Layer";
@@ -8,8 +9,11 @@ import { createContext, onSettled, untrack, useContext } from "solid-js";
 import type { CapaEmplazamientos } from "./capa/servicio.ts";
 import type { FichasEnVivo } from "./ficha/servicio.ts";
 
-/** Los servicios de datos de la interfaz. En las pruebas se sustituyen por capas de prueba. */
-export type ServiciosDeDatos = CapaEmplazamientos | FichasEnVivo;
+/**
+ * Los servicios de datos de la interfaz, con el simulador. En las pruebas se sustituyen por capas
+ * de prueba, y el simulador, por el que calcula en el mismo hilo.
+ */
+export type ServiciosDeDatos = CapaEmplazamientos | FichasEnVivo | Simulador;
 
 const Datos = createContext<ManagedRuntime.ManagedRuntime<ServiciosDeDatos, never>>();
 

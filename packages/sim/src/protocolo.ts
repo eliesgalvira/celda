@@ -54,6 +54,10 @@ export const atender = (
 };
 
 /** Los búferes que se pueden pasar al otro hilo sin copiarlos. */
-export const transferibles = (resultado: Resultado): ReadonlyArray<ArrayBufferLike> => [
-  ...new Set(Object.values(resultado).map((array) => array.buffer)),
+export const transferibles = (resultado: Resultado): Array<ArrayBuffer> => [
+  ...new Set(
+    Object.values(resultado).flatMap((array) =>
+      array.buffer instanceof ArrayBuffer ? [array.buffer] : [],
+    ),
+  ),
 ];

@@ -1,0 +1,55 @@
+import { diagramaSector } from "@celda/sim/diagramaSector";
+import { assert, describe, it } from "@effect/vitest";
+
+import {
+  lobulosDe,
+  MALLA_DIAGRAMA,
+  orientacionDe,
+  paramsDiagrama,
+  RUMBOS_DIAGRAMA,
+  textosDiagrama,
+} from "./diagrama.ts";
+
+describe("diagrama de radiación del panel", () => {
+  it("sin ninguna estimación, la orientación es la supuesta y lo dice", () => {
+    const orientacion = orientacionDe([]);
+    assert.deepStrictEqual(orientacion, { tipo: "supuesta", azimuts: [0, 120, 240] });
+    const textos = textosDiagrama(orientacion);
+    assert.deepStrictEqual(textos.leyenda, ["Sector 1 · 0°", "Sector 2 · 120°", "Sector 3 · 240°"]);
+    assert.match(textos.notas[0] ?? "", /^Orientación supuesta\. Ninguna fuente publica/u);
+    assert.include(textos.notas[0], "0°, 120° y 240°");
+    assert.match(textos.descripcion, /^Modelo, no medida\. 3 sectores con orientación supuesta/u);
+    // Una orientación supuesta no lleva margen: no es una estimación.
+    assert.notInclude(textos.leyenda.join(" "), "±");
+  });
+
+  it("con azimuts estimados, cada uno lleva su margen de ±15°", () => {
+    const textos = textosDiagrama(orientacionDe([40, 160, 280]));
+    assert.deepStrictEqual(textos.leyenda, [
+      "Sector 1 · 40° ±15°",
+      "Sector 2 · 160° ±15°",
+      "Sector 3 · 280° ±15°",
+    ]);
+    assert.strictEqual(textos.notas[0], "Orientación estimada ±15°.");
+    assert.include(textos.descripcion, "orientación estimada a 40°, 160° y 280°, ±15°");
+  });
+
+  it("dice qué modelo es y su versión", () => {
+    const textos = textosDiagrama(orientacionDe([]));
+    assert.strictEqual(textos.modelo, `diagrama-sector v${diagramaSector.version}`);
+    assert.include(textos.notas.at(-1), "haz de 65°");
+  });
+
+  it("cada lóbulo lleva la ganancia de su sector en cada rumbo del diagrama", () => {
+    const orientacion = orientacionDe([]);
+    const resultado = diagramaSector.ejecutar(paramsDiagrama(orientacion), MALLA_DIAGRAMA);
+    const lobulos = lobulosDe(orientacion, resultado);
+    assert.lengthOf(lobulos, 3);
+    for (const [k, lobulo] of lobulos.entries()) {
+      assert.strictEqual(lobulo.ganancia.length, RUMBOS_DIAGRAMA.length);
+      // En su propio eje, 0 dB.
+      const eje = RUMBOS_DIAGRAMA.indexOf(orientacion.azimuts[k] ?? -1);
+      assert.closeTo(lobulo.ganancia[eje] ?? Number.NaN, 0, 1e-9);
+    }
+  });
+});

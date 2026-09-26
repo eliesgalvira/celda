@@ -1,5 +1,7 @@
 import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
+import { workerDePrueba } from "@celda/sim/pruebas";
+import { type Simulador, simuladorEnHilo, simuladorEnWorker } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -116,12 +118,15 @@ const CAPA: CapaLeida = {
   ],
 };
 
-/** La app con la capa de prueba y las fichas en manos de la prueba, abierta en `clave`. */
-const abrir = (clave: string) => {
+/**
+ * La app con la capa de prueba y las fichas en manos de la prueba, abierta en `clave`. Las
+ * simulaciones se calculan en el mismo hilo, salvo que la prueba traiga su simulador.
+ */
+const abrir = (clave: string, simulador: Layer.Layer<Simulador> = simuladorEnHilo()) => {
   const fichas: FichasDePrueba = fichasDePrueba();
   navegar(ruta.emplazamiento(clave), { reemplazar: true });
   const pantalla = render(() => (
-    <App servicios={Layer.merge(capaDePrueba([Effect.succeed(CAPA)]), fichas.capa)} />
+    <App servicios={Layer.mergeAll(capaDePrueba([Effect.succeed(CAPA)]), fichas.capa, simulador)} />
   ));
   flush();
   return { ...pantalla, fichas };
@@ -225,6 +230,54 @@ describe("panel del emplazamiento", () => {
     assert.include(expedientes.textContent, "B B -2300445");
     assert.include(expedientes.textContent, "3460–3600 MHz");
     assert.isNotNull(getByText(/no publica la tecnología/u));
+  });
+
+  it("dibuja cómo emite: un diagrama de modelo, con su versión y la orientación supuesta", async () => {
+    const { findByRole, getByText, fichas } = abrir(CAMPUS_NORD.clave);
+    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    const diagrama = await findByRole("img", { name: "Diagrama de radiación de los sectores" });
+    await waitFor(() => {
+      assert.lengthOf(diagrama.querySelectorAll("path"), 3);
+    });
+    assert.include(diagrama.querySelector("desc")?.textContent, "orientación supuesta");
+    assert.isNotNull(getByText("Modelo"));
+    assert.isNotNull(getByText("diagrama-sector v1"));
+    assert.isNotNull(getByText("Sector 2 · 120°"));
+    assert.isNotNull(getByText(/^Orientación supuesta\. Ninguna fuente publica/u));
+  });
+
+  it("al cambiar de emplazamiento a medio calcular, cancela el diagrama anterior", async () => {
+    const worker = workerDePrueba();
+    const { findByRole, getByText, fichas } = abrir(
+      CAMPUS_NORD.clave,
+      simuladorEnWorker(worker.crear),
+    );
+    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+    await waitFor(() => {
+      assert.lengthOf(worker.pendientes(), 1);
+    });
+    // El marco ya ocupa su sitio mientras el Worker calcula.
+    const antes = getByText("Calculando el modelo…").closest("svg");
+    assert.lengthOf(antes?.querySelectorAll("path") ?? [], 0);
+
+    // Se cancela en cuanto cambia, sin esperar a la ficha nueva.
+    navegar(ruta.emplazamiento(PEDRALBES.clave));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(worker.terminados(), 1);
+    });
+    await responder(fichas, PEDRALBES.clave, PEDRALBES);
+    await findByRole("heading", { name: TITULO_PEDRALBES });
+    await waitFor(() => {
+      assert.lengthOf(worker.pendientes(), 1);
+    });
+    worker.contestar();
+    const diagrama = await findByRole("img", { name: "Diagrama de radiación de los sectores" });
+    await waitFor(() => {
+      assert.lengthOf(diagrama.querySelectorAll("path"), 3);
+    });
+    assert.strictEqual(worker.creados(), 2);
   });
 
   it("al cambiar de emplazamiento con la respuesta lenta, nunca enseña el anterior", async () => {

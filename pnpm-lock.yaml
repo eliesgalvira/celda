@@ -122,6 +122,9 @@ importers:
       '@celda/dominio':
         specifier: workspace:*
         version: link:../../packages/dominio
+      '@celda/sim':
+        specifier: workspace:*
+        version: link:../../packages/sim
       '@celda/ui':
         specifier: workspace:*
         version: link:../../packages/ui

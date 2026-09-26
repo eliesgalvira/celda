@@ -96,7 +96,6 @@ const guardar = <P, R extends Resultado>(
   tolerancia: number,
 ) =>
   Effect.gen(function* () {
-    // oxlint-disable-next-line celda/no-inline-schema-compile -- cada simulación trae su esquema
     const encode = Schema.encodeEffect(simulacion.params);
     const guardados = yield* Effect.forEach(casos, (caso) =>
       Effect.map(encode(caso.params), (params) => ({
@@ -154,7 +153,6 @@ export const compararConReferencia = <P, R extends Resultado>(
         `Los casos de la prueba (${nombres}) no son los del fichero (${guardados}). Si lo que calcula ha cambiado, sube la versión.`,
       ];
     }
-    // oxlint-disable-next-line celda/no-inline-schema-compile -- cada simulación trae su esquema
     const decode = Schema.decodeEffect(simulacion.params);
     const porCaso = yield* Effect.forEach(fichero.casos, (caso) =>
       Effect.map(decode(caso.params), (params) =>
