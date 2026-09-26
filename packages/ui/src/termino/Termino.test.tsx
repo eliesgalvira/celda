@@ -3,6 +3,7 @@ import { afterEach, assert, describe, it } from "@effect/vitest";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 
+import { Dialogo } from "../Dialogo.tsx";
 import { Termino, TextoConTerminos } from "./Termino.tsx";
 
 /** La explicación se monta en `<body>`, fuera del contenedor de `render`: se busca con `screen`. */
@@ -157,6 +158,33 @@ describe("Termino", () => {
     const explicacion = screen.getByRole("dialog", { name: "MHz" });
     assert.include(explicacion.textContent, GLOSARIO.mhz.explicacion);
     assert.strictEqual(document.activeElement, screen.getByRole("heading", { name: "MHz" }));
+  });
+});
+
+describe("Termino dentro de un diálogo modal", () => {
+  it("la explicación va dentro del diálogo, y Escape la cierra sin cerrar el diálogo", () => {
+    let cierres = 0;
+    render(() => (
+      <Dialogo titulo="Medir tu señal" alCerrar={() => (cierres += 1)}>
+        <p>
+          Una captura del <Termino termino="modo-de-informacion">modo de información</Termino>.
+        </p>
+      </Dialogo>
+    ));
+    flush();
+    const boton = screen.getByRole("button", { name: "modo de información" });
+    abrir(boton);
+    const explicacion = screen.getByRole("dialog", { name: "Modo de información" });
+    // Fuera del diálogo modal todo queda inerte: la explicación tiene que ir dentro.
+    assert.isTrue(screen.getByRole("dialog", { name: "Medir tu señal" }).contains(explicacion));
+
+    fireEvent.keyDown(screen.getByRole("heading", { name: "Modo de información" }), {
+      key: "Escape",
+    });
+    flush();
+    assert.isNull(screen.queryByRole("dialog", { name: "Modo de información" }));
+    assert.strictEqual(cierres, 0);
+    assert.strictEqual(document.activeElement, boton);
   });
 });
 

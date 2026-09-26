@@ -65,7 +65,11 @@ export function Termino(props: TerminoProps) {
         {props.children}
       </button>
       <Show when={abierto()}>
-        <Portal mount={document.body}>
+        {/*
+          Dentro de un diálogo modal, en el propio diálogo: lo de fuera queda inerte y la
+          explicación no se podría tocar.
+        */}
+        <Portal mount={boton?.closest("dialog") ?? document.body}>
           <Explicacion id={id} termino={props.termino} ancla={boton} alCerrar={cerrar} />
         </Portal>
       </Show>
@@ -85,8 +89,8 @@ const DIANA_TEXTO =
   "decoration-dotted underline-offset-4 hover:decoration-solid";
 
 /**
- * La explicación abierta: flota junto al término sin taparlo, en la capa de arriba del
- * documento para que el panel no la recorte. Sus términos relacionados se abren en el mismo
+ * La explicación abierta: flota junto al término sin taparlo, al final del documento (o del
+ * diálogo modal que tenga el término) para que el panel no la recorte. Sus términos relacionados se abren en el mismo
  * sitio.
  */
 function Explicacion(props: ExplicacionProps) {
@@ -182,7 +186,9 @@ function Explicacion(props: ExplicacionProps) {
     const saleHaciaAtras = evento.shiftKey && (activo === titulo || activo === controles[0]);
     const saleHaciaDelante = !evento.shiftKey && activo === controles.at(-1);
     if (saleHaciaAtras || saleHaciaDelante) {
+      // Tampoco llega al diálogo que la contenga, que daría la vuelta por su cuenta.
       evento.preventDefault();
+      evento.stopPropagation();
       props.alCerrar(true);
     }
   };
