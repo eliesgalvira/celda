@@ -69,8 +69,18 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 
 - Bajo la cabecera, `ResumenFicha` enseña la frase en lenguaje llano. La escribe `fraseDeResumen` (`apps/web/src/ficha/resumen.ts`), una función pura con pruebas. El registro oficial no publica la tecnología, así que la frase la deduce de la banda y dice «probablemente». Si de alguna compañía faltan las bandas, habla de «las bandas que se conocen» y no afirma lo que falta. La tabla de deducción está en `packages/dominio/src/tecnologia.ts` y sus fuentes, en `docs/investigacion/tecnologia-por-banda.md`.
 - `panel/EjeFrecuencias.tsx` es una tabla de verdad: una fila por compañía (`th scope="row"`), una columna por banda y un hexágono relleno (`variantesCasilla`) donde emite, con «Sí» o «No» para lectores de pantalla. Una compañía sin bandas conocidas lleva una nota en lugar de casillas. La barra de abajo va de `--eje-lejos` al primario, con «Llega más lejos» y «Más velocidad» escritos. Las flechas salen de `content` en CSS porque la regla de accesibilidad solo busca texto a dos niveles de profundidad dentro de una celda.
-- `Desplegable` es un `<button>` con `aria-expanded` y `aria-controls`. Empieza cerrado. El contenido está en el DOM con `hidden`, así que las consultas por rol de las pruebas no lo ven hasta abrirlo, pero `getByText` sí.
+- `Desplegable` es un `<button>` con `aria-expanded` y `aria-controls`. Empieza cerrado salvo con `abierto`, y la variante `recuadro` lo enmarca para usarlo dentro de un diálogo. El contenido está en el DOM con `hidden`, así que las consultas por rol de las pruebas no lo ven hasta abrirlo, pero `getByText` sí.
 - `panel/DatosTecnicos.tsx` va dentro del desplegable: por estación base, sus expedientes con el tramo exacto, la banda y la tecnología probable, y la clave de cada observación con su fecha. Termina con una nota que dice qué no publica ninguna fuente.
+
+## Diálogos y el paso de medir
+
+- `Dialogo` es el diálogo modal: un `<dialog>` abierto con `showModal()`, a todo el ancho desde abajo en el móvil y centrado en escritorio (34 rem). Al abrirse lleva el foco al título, el tabulador da la vuelta dentro, Escape, el botón «Cerrar» y un clic en el velo piden cerrarlo, y al cerrarse devuelve el foco a lo que lo abrió. El padre lo monta y lo desmonta; `alCerrar` solo lo pide. Si cambia el título es otra vista: vuelve arriba y el foco pasa al título nuevo.
+- `Eleccion.tsx` tiene `Segmentado`, unos botones de radio de verdad con aspecto de botones pegados, y `Selector`, un `<select>` nativo. Los dos llevan la etiqueta visible encima.
+- `medir/Medir.tsx` tiene las piezas del paso de medir: `CodigoDelModo` (ocupa lo mismo con código o sin él, así que elegir la marca no mueve nada), `Pasos` y `Paso`, `Puntos`, `Opcion`, `Nota` y `MedidaMostrada`, que enseña una medida con cada valor explicado.
+- `medir/CodigoQr.tsx` dibuja el código QR en el navegador con `uqr`, sin pedir nada a ningún servidor. Cada fila es un solo trazo SVG. Usa `--qr-tinta` sobre `--qr-fondo`, que no cambian en el tema oscuro porque las cámaras leen mejor oscuro sobre claro. La figura se nombra por su pie visible.
+- La medida de ejemplo tiene su propio color, `--ejemplo`, que no usa ningún dato: `Etiqueta tono="ejemplo"` y el marco de `MedidaMostrada tipo="ejemplo"`. En el dominio es además otro tipo (`MedidaDeEjemplo`), así que no se distingue solo por el color.
+- `Etiqueta tono="pronto"` marca algo que se enseña pero aún no funciona, como subir una captura. Va siempre con una frase que dice por qué.
+- Qué se enseña en cada dispositivo lo deciden funciones puras de `apps/web/src/medir`: `detectarDispositivo` e `instruccionesPara`, con sus pruebas. Los códigos y sus fuentes están en `packages/dominio/src/modoInformacion.ts` y en [docs/investigacion/modo-de-informacion.md](../investigacion/modo-de-informacion.md).
 
 ## Qué rechaza la regla fuera de `packages/ui`
 
