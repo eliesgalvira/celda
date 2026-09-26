@@ -51,6 +51,9 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
       }
     };
     mapa.on("move", alMover);
+    // El mapa puede haberse movido entre el primer cálculo y ahora (al abrir con un emplazamiento
+    // en la dirección salta hasta él): se recoloca una vez.
+    alMover();
     return () => {
       mapa.off("move", alMover);
       cancelAnimationFrame(pendiente);
