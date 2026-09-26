@@ -16,6 +16,7 @@ import {
 } from "solid-js";
 
 import { variantesDiana } from "../Boton.tsx";
+import { cn } from "../cn.ts";
 import { colocarExplicacion } from "./posicion.ts";
 
 export interface TerminoProps {
@@ -53,7 +54,8 @@ export function Termino(props: TerminoProps) {
         aria-controls={abierto() ? id : undefined}
         onClick={() => setAbierto((antes) => !antes)}
         class={
-          "relative inline cursor-pointer rounded-sm text-left underline decoration-primario " +
+          // Se puede tocar aunque vaya en una pieza que deja pasar los gestos al mapa.
+          "pointer-events-auto relative inline cursor-pointer rounded-sm text-left underline decoration-primario " +
           "decoration-dotted decoration-2 underline-offset-[0.22em] hover:decoration-solid " +
           "aria-expanded:bg-primario/15 aria-expanded:decoration-solid " +
           // El objetivo táctil crece por fuera de la palabra sin mover el texto.
@@ -229,7 +231,7 @@ function Explicacion(props: ExplicacionProps) {
           <button
             type="button"
             onClick={() => props.alCerrar(true)}
-            class={`${variantesDiana()} ml-auto px-3 ${DIANA_TEXTO}`}
+            class={cn(variantesDiana(), "ml-auto px-3", DIANA_TEXTO)}
           >
             Cerrar
           </button>
@@ -241,13 +243,15 @@ function Explicacion(props: ExplicacionProps) {
         </p>
         <Show when={entrada().relacionados.length > 0}>
           <div class="-mb-2 flex flex-wrap items-center gap-x-3 border-t border-tinta-invertida-suave/30 pr-3">
-            <span class="font-mono text-xs text-tinta-invertida-suave">Ver también</span>
+            <span class="w-full pt-2 font-mono text-xs text-tinta-invertida-suave">
+              Ver también
+            </span>
             <For each={entrada().relacionados}>
               {(relacionado) => (
                 <button
                   type="button"
                   onClick={() => setMostrado(relacionado)}
-                  class={`${variantesDiana()} ${DIANA_TEXTO}`}
+                  class={cn(variantesDiana(), "justify-start", DIANA_TEXTO)}
                 >
                   {GLOSARIO[relacionado].nombre}
                 </button>

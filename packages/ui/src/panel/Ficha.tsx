@@ -197,7 +197,8 @@ export function MarcaDeAguaFicha(props: MarcaDeAguaFichaProps) {
         <Show when={props.tono === "posterior"}>
           <span aria-hidden="true" class="hexagono size-2.5 shrink-0 bg-aviso" />
         </Show>
-        {props.titulo}
+        {/* En un solo hijo: el hueco del flex no separa el término de lo que le sigue. */}
+        <span>{props.titulo}</span>
       </p>
       <Show when={props.children}>
         <p class="text-sm leading-relaxed">{props.children}</p>
