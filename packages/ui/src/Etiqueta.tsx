@@ -11,6 +11,11 @@ export const variantesEtiqueta = cva(
         nuevo: "bg-nuevo text-nuevo-fg",
         /** Una simulación: siempre se marca como modelo, nunca como dato. */
         modelo: "bg-superficie-alta text-tinta shadow-[inset_0_0_0_1.5px_var(--tinta)]",
+        /** Una medida de ejemplo: nunca se confunde con una propia (historia 49). */
+        ejemplo: "bg-ejemplo text-ejemplo-fg",
+        /** Algo que se enseña pero todavía no funciona. */
+        pronto:
+          "bg-superficie-alta text-tinta-suave shadow-[inset_0_0_0_1.5px_var(--linea-fuerte)]",
       },
     },
     defaultVariants: { tono: "verificado" },
@@ -21,7 +26,10 @@ export type EtiquetaProps = VariantProps<typeof variantesEtiqueta> & {
   readonly children: JSX.Element;
 };
 
-/** Etiqueta de estado del tema Hexágono: estado de un emplazamiento o marca de modelo. */
+/**
+ * Etiqueta del tema Hexágono: estado de un emplazamiento, marca de modelo o de ejemplo, o algo que
+ * llega pronto.
+ */
 export function Etiqueta(props: EtiquetaProps) {
   return (
     <span data-tono={props.tono ?? "verificado"} class={variantesEtiqueta({ tono: props.tono })}>

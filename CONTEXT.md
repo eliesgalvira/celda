@@ -147,11 +147,19 @@ Medida que la persona registra en su dispositivo a partir de una captura.
 _Evitar_: mi medida, medida real
 
 **Medida de ejemplo**:
-Medida que trae Celda para enseñar cómo funciona. No cuenta como de nadie.
+Medida que trae Celda para enseñar cómo funciona. No cuenta como de nadie y no es una aportación: no se guarda ni tiene identificador.
 _Evitar_: demo, medida falsa, medida simulada
 
+**Potencia de la señal**:
+Cuánta señal llega al móvil desde el sector que le da servicio, en dBm. En los textos, su nombre técnico (RSRP) va al final.
+_Evitar_: cobertura, intensidad, RSRP a secas
+
+**Calidad de la señal**:
+Cuánto se ensucia la señal con la de otras estaciones base y con la gente conectada, en dB. En los textos, su nombre técnico (RSRQ) va al final.
+_Evitar_: ruido, RSRQ a secas
+
 **Modo de información**:
-Pantalla oculta del móvil, que se abre marcando un código, con los datos de la red a la que está conectado.
+Pantalla oculta del móvil, que se abre marcando un código, con los datos de la red a la que está conectado. El código depende de la marca y del sistema. Las pantallas se llaman como las llama el móvil («Field Test», «ServiceMode»), pero el concepto es este.
 _Evitar_: modo servicio, field test, modo ingeniero
 
 **Captura**:

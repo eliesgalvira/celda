@@ -84,6 +84,9 @@ catalogs:
     typescript:
       specifier: 7.0.2
       version: 7.0.2
+    uqr:
+      specifier: 0.1.3
+      version: 0.1.3
     vite:
       specifier: npm:@voidzero-dev/vite-plus-core@1.0.0-rc.0
       version: 1.0.0-rc.0
@@ -270,6 +273,9 @@ importers:
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.3
+      uqr:
+        specifier: 'catalog:'
+        version: 0.1.3
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'
@@ -2479,6 +2485,9 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
+
   vite-plus@1.0.0-rc.0:
     resolution: {integrity: sha512-yEnHJhd231DLe+2ZNcTf6eNHkxkgrBEQQTGsz7padndcq0Ro8tF2QwdBBxPybY0lG+lckZKR9SDJc6qv7Kdm9w==}
     engines: {node: ^22.18.0 || ^24.11.0 || >=26.0.0}
@@ -4221,6 +4230,8 @@ snapshots:
       browserslist: 4.29.1
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  uqr@0.1.3: {}
 
   vite-plus@1.0.0-rc.0(@types/node@24.19.0)(@vitest/ui@5.0.1(vitest@5.0.1))(esbuild@0.28.2)(happy-dom@20.14.5)(jiti@2.7.0)(typescript@7.0.2):
     dependencies:

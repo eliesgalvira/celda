@@ -41,12 +41,18 @@
   --nuevo: oklch(53.6% 0.1 291.8);
   --nuevo-fg: oklch(98.5% 0.004 90);
 
+  /* MEDIDA DE EJEMPLO: otro color que el de cualquier dato, para no confundirla con una propia */
+  --ejemplo: oklch(50% 0.1 85);
+  --ejemplo-fg: oklch(98.5% 0.004 90);
+
   /* AVISOS */
   --aviso: oklch(66% 0.155 53.6);
   --aviso-fondo: oklch(95.5% 0.02 70);
   --aviso-tinta: oklch(43.1% 0.102 52.4);
 
   --sombra: oklch(0% 0 0 / 0.18);
+  /* Lo que queda detrás de un diálogo */
+  --velo: oklch(29.9% 0.005 121.8 / 0.45);
 
   /* EJE DE FRECUENCIAS: el extremo de «llega más lejos»; el de «más velocidad» es el primario */
   --eje-lejos: oklch(73% 0.08 78);
@@ -58,6 +64,10 @@
   --compania-digi: oklch(40.3% 0.152 265.2);
   --compania-yoigo: oklch(53.4% 0.218 356.8);
   --compania-tinta: oklch(99% 0 0);
+
+  /* CÓDIGO QR: oscuro sobre claro también en el tema oscuro, que es como lo leen las cámaras */
+  --qr-fondo: oklch(99% 0 0);
+  --qr-tinta: oklch(20% 0 0);
 
   /* MAPA BASE */
   --mapa-fondo: oklch(86.7% 0.011 89.7);
@@ -111,11 +121,18 @@
   --nuevo: oklch(74% 0.09 291.8);
   --nuevo-fg: oklch(22% 0.03 291.8);
 
+  --ejemplo: oklch(80% 0.12 85);
+  --ejemplo-fg: oklch(22% 0.03 85);
+
   --aviso: oklch(74% 0.14 55);
   --aviso-fondo: oklch(29% 0.04 55);
   --aviso-tinta: oklch(88% 0.06 70);
 
   --sombra: oklch(0% 0 0 / 0.5);
+  --velo: oklch(0% 0 0 / 0.6);
+
+  --qr-fondo: oklch(99% 0 0);
+  --qr-tinta: oklch(20% 0 0);
 
   --eje-lejos: oklch(70% 0.09 78);
 
@@ -173,10 +190,13 @@
   --color-corregido-fg: var(--corregido-fg);
   --color-nuevo: var(--nuevo);
   --color-nuevo-fg: var(--nuevo-fg);
+  --color-ejemplo: var(--ejemplo);
+  --color-ejemplo-fg: var(--ejemplo-fg);
   --color-aviso: var(--aviso);
   --color-aviso-fondo: var(--aviso-fondo);
   --color-aviso-tinta: var(--aviso-tinta);
   --color-sombra: var(--sombra);
+  --color-velo: var(--velo);
   --color-eje-lejos: var(--eje-lejos);
   --color-mapa-fondo: var(--mapa-fondo);
   --color-movistar: var(--compania-movistar);
@@ -185,6 +205,8 @@
   --color-digi: var(--compania-digi);
   --color-yoigo: var(--compania-yoigo);
   --color-compania-tinta: var(--compania-tinta);
+  --color-qr-fondo: var(--qr-fondo);
+  --color-qr-tinta: var(--qr-tinta);
 
   --font-texto: var(--fuente-texto);
   --font-titulo: var(--fuente-titulo);
