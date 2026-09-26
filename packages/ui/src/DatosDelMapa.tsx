@@ -1,3 +1,4 @@
+import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Show } from "solid-js";
 
@@ -19,7 +20,8 @@ export const variantesDatosDelMapa = cva(
 );
 
 export type DatosDelMapaProps = VariantProps<typeof variantesDatosDelMapa> & {
-  readonly texto: string;
+  /** Qué se ve. Puede llevar un `Termino`. */
+  readonly texto: JSX.Element;
   /** Detalle para quien pasa el puntero, como la versión exacta de la capa. */
   readonly detalle?: string;
 };

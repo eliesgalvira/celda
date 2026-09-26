@@ -1,4 +1,5 @@
 import type { CapaLeida } from "@celda/dominio/capa";
+import { marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 import * as Cause from "effect/Cause";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
@@ -46,5 +47,5 @@ const FECHA = new Intl.DateTimeFormat("es-ES", {
 });
 
 /** El texto de la marca de agua del mapa: la fecha de los datos de la capa, en Barcelona. */
-export const textoDatosDelMapa = (fecha: number): string =>
-  `Datos del mapa: ${FECHA.format(fecha).replace(".", "")}`;
+export const textoDatosDelMapa = (fecha: number): TextoMarcado =>
+  marcado`${termino("version-de-los-datos", "Datos del mapa")}: ${FECHA.format(fecha).replace(".", "")}`;

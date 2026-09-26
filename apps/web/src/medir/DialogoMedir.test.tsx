@@ -53,7 +53,12 @@ describe("DialogoMedir en un ordenador", () => {
     const opcion = captura.closest("section");
     assert.match(opcion?.textContent ?? "", /PRONTO/u);
     assert.match(opcion?.textContent ?? "", /Todavía no funciona/u);
-    assert.lengthOf(within(opcion ?? dialogo).queryAllByRole("button"), 0);
+    // Solo el término subrayado, que abre su explicación, es un botón.
+    const botones = within(opcion ?? dialogo).queryAllByRole("button");
+    assert.deepStrictEqual(
+      botones.map((boton) => boton.getAttribute("data-termino")),
+      ["modo-de-informacion"],
+    );
     assert.isNull(queryByRole("button", { name: /Subir/u }));
 
     assert.strictEqual(

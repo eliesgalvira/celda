@@ -11,6 +11,7 @@ import { flush } from "solid-js";
 import { App } from "../App.tsx";
 import { capaDePrueba } from "../capa/pruebas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
+import { terminosSubrayados } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
 import type { Direccion } from "./buscador.ts";
 import type { LecturaGps } from "./estado.ts";
@@ -143,6 +144,9 @@ describe("punto de referencia: pedir la ubicación", () => {
     assert.isNotNull(
       panel().getByText("El emplazamiento está a 340 m de ti, hacia el noreste (42°)."),
     );
+    // «Tu ubicación» y su precisión abren su explicación.
+    const desde = panel().getByText(/^Desde:/u);
+    assert.deepStrictEqual(terminosSubrayados(desde), ["punto-de-referencia", "precision"]);
     // La ubicación GPS no se guarda en el dispositivo.
     assert.deepStrictEqual(almacen.guardadas(), []);
   });

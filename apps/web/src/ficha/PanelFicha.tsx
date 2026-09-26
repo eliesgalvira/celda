@@ -19,6 +19,7 @@ import { DatosTecnicos } from "@celda/ui/panel/DatosTecnicos.tsx";
 import { EjeFrecuencias } from "@celda/ui/panel/EjeFrecuencias.tsx";
 import type { AlturaHoja } from "@celda/ui/panel/hoja.ts";
 import { PanelEmplazamiento } from "@celda/ui/panel/PanelEmplazamiento.tsx";
+import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
@@ -33,6 +34,7 @@ import {
   datosTecnicosDe,
   filasDelEje,
   fraseDeResumen,
+  NOMBRE_EJE,
   NOTA_TECNICA,
   TITULO_EJE,
 } from "./resumen.ts";
@@ -42,8 +44,8 @@ import {
   lugarDe,
   NOMBRE_ESTADO,
   textoCodigos,
+  textosDeOrigenes,
   textosMarca,
-  textosOrigen,
   tituloDe,
 } from "./textos.ts";
 
@@ -131,8 +133,9 @@ function FichaInexistente(props: { readonly clave: string; readonly alCerrar: ()
           </Boton>
         }
       >
-        No hay ningún emplazamiento con la clave {props.clave}. Puede que se haya retirado después
-        de publicarse el mapa, o que la dirección esté mal copiada.
+        No hay ningún <Termino termino="emplazamiento">emplazamiento</Termino> con la clave{" "}
+        {props.clave}. Puede que se haya retirado después de publicarse el mapa, o que la dirección
+        esté mal copiada.
       </Aviso>
     </AvisoFicha>
   );
@@ -157,10 +160,11 @@ function ContenidoFicha(props: {
   const posterior = createMemo(
     () => compararConCapa(props.fechaCapa, props.ficha.version).tipo === "posterior",
   );
+  const origenes = createMemo(() => textosDeOrigenes(props.ficha.estaciones));
   return (
     <article aria-label={tituloDe(props.ficha)}>
       <CabeceraFicha
-        antetitulo={antetituloDe(props.ficha)}
+        antetitulo={<TextoConTerminos texto={antetituloDe(props.ficha)} />}
         titulo={tituloDe(props.ficha)}
         lugar={lugarDe(props.ficha)}
         companias={props.ficha.estaciones.map((e) => e.compania)}
@@ -168,49 +172,54 @@ function ContenidoFicha(props: {
           <Etiqueta tono={props.ficha.estado}>{NOMBRE_ESTADO[props.ficha.estado]}</Etiqueta>
         }
       />
-      <ResumenFicha>{fraseDeResumen(props.ficha.estaciones)}</ResumenFicha>
-      <MarcaDeAguaFicha tono={posterior() ? "posterior" : "al-dia"} titulo={marca().titulo}>
+      <ResumenFicha>
+        <TextoConTerminos texto={fraseDeResumen(props.ficha.estaciones)} />
+      </ResumenFicha>
+      <MarcaDeAguaFicha
+        tono={posterior() ? "posterior" : "al-dia"}
+        titulo={<TextoConTerminos texto={marca().titulo} />}
+      >
         {marca().detalle}
       </MarcaDeAguaFicha>
       <ReferenciaEnFicha emplazamiento={props.ficha.posicion} />
       <SeccionFicha titulo={TITULO_COMO_EMITE}>
         <ComoEmite clave={props.clave} />
       </SeccionFicha>
-      <SeccionFicha titulo={TITULO_EJE}>
+      <SeccionFicha titulo={<TextoConTerminos texto={TITULO_EJE} />}>
         <EjeFrecuencias
-          titulo={TITULO_EJE}
+          titulo={NOMBRE_EJE}
           bandas={BANDAS_NOMINALES}
           filas={filasDelEje(props.ficha.estaciones)}
         />
       </SeccionFicha>
       <SeccionFicha titulo="De dónde salen los datos">
         <For each={props.ficha.estaciones}>
-          {(estacion) => (
+          {(estacion, i) => (
             <EstacionFicha
               compania={estacion.compania}
               nombre={NOMBRE_COMPANIA[estacion.compania]}
               codigos={textoCodigos(estacion.codigos)}
             >
-              <For each={estacion.origenes}>
-                {(origen) => {
-                  const textos = createMemo(() => textosOrigen(origen));
-                  return (
-                    <OrigenFicha
-                      tono={textos().tono}
-                      fuente={textos().fuente}
-                      detalle={textos().detalle}
-                      enlace={origen.url}
-                      textoEnlace={textos().textoEnlace}
-                    />
-                  );
-                }}
+              <For each={origenes()[i()] ?? []}>
+                {(textos) => (
+                  <OrigenFicha
+                    tono={textos.tono}
+                    fuente={<TextoConTerminos texto={textos.fuente} />}
+                    detalle={<TextoConTerminos texto={textos.detalle} />}
+                    enlace={textos.enlace}
+                    textoEnlace={textos.textoEnlace}
+                  />
+                )}
               </For>
             </EstacionFicha>
           )}
         </For>
       </SeccionFicha>
       <Desplegable titulo="Datos técnicos">
-        <DatosTecnicos estaciones={datosTecnicosDe(props.ficha.estaciones)} nota={NOTA_TECNICA} />
+        <DatosTecnicos
+          estaciones={datosTecnicosDe(props.ficha.estaciones)}
+          nota={<TextoConTerminos texto={NOTA_TECNICA} />}
+        />
       </Desplegable>
     </article>
   );

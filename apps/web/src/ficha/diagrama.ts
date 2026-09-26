@@ -4,6 +4,7 @@ import {
   type ResultadoDiagramaSector,
   SECTOR_TIPICO,
 } from "@celda/sim/diagramaSector";
+import { bloque, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 import { mallaDeRumbos } from "@celda/sim/simulacion";
 import type { LobuloSector } from "@celda/ui/panel/DiagramaRadiacion.tsx";
 
@@ -63,19 +64,22 @@ const enumerar = (azimuts: ReadonlyArray<number>): string => {
     : `${partes.slice(0, -1).join(", ")} y ${partes.at(-1) ?? ""}`;
 };
 
+const ORIENTACION = termino("azimut", "Orientación");
+
 export interface TextosDiagrama {
   readonly titulo: string;
   readonly descripcion: string;
   readonly modelo: string;
   readonly leyenda: ReadonlyArray<string>;
-  readonly notas: ReadonlyArray<string>;
+  /** Con la orientación, los sectores y el modelo subrayados una vez entre todas. */
+  readonly notas: ReadonlyArray<TextoMarcado>;
 }
 
 /** Lo que dice el diagrama: qué modelo es, hacia dónde apunta cada sector y de dónde sale. */
 export const textosDiagrama = (orientacion: Orientacion): TextosDiagrama => {
   const n = orientacion.azimuts.length;
   const sectores = n === 1 ? "Un sector" : `${n} sectores`;
-  const forma = `Forma: modelo típico de antena de sector, con un haz de ${SECTOR_TIPICO.anchoHazGrados}°.`;
+  const forma = marcado`Forma: ${termino("modelo", "modelo")} típico de antena de ${termino("sector", "sector")}, con un haz de ${String(SECTOR_TIPICO.anchoHazGrados)}°.`;
   const hacia =
     orientacion.tipo === "estimada"
       ? `con orientación estimada a ${enumerar(orientacion.azimuts)}, ±${orientacion.margen}°`
@@ -87,13 +91,13 @@ export const textosDiagrama = (orientacion: Orientacion): TextosDiagrama => {
     leyenda: orientacion.azimuts.map(
       (azimut, k) => `Sector ${k + 1} · ${azimutDe(orientacion, azimut)}`,
     ),
-    notas:
-      orientacion.tipo === "estimada"
-        ? [`Orientación estimada ±${orientacion.margen}°.`, forma]
-        : [
-            `Orientación supuesta. Ninguna fuente publica hacia dónde apuntan los sectores de este emplazamiento, así que se dibujan a ${enumerar(orientacion.azimuts)}, el reparto más común, solo para enseñar la forma.`,
-            forma,
-          ],
+    notas: (orientacion.tipo === "estimada"
+      ? [marcado`${ORIENTACION} estimada ±${String(orientacion.margen)}°.`, forma]
+      : [
+          marcado`${ORIENTACION} supuesta. Ninguna fuente publica hacia dónde apuntan los ${termino("sector", "sectores")} de este emplazamiento, así que se dibujan a ${enumerar(orientacion.azimuts)}, el reparto más común, solo para enseñar la forma.`,
+          forma,
+        ]
+    ).map(bloque()),
   };
 };
 

@@ -8,6 +8,7 @@ import {
   EleccionDePunto,
   type EstadoBusqueda,
 } from "@celda/ui/ubicacion/EleccionDePunto.tsx";
+import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { MenuUbicacion, OpcionUbicacion } from "@celda/ui/ubicacion/MenuUbicacion.tsx";
 import { AccionesPasoPrevio, ListaPasoPrevio } from "@celda/ui/ubicacion/PasoPrevio.tsx";
 import {
@@ -138,7 +139,8 @@ export function PasoPrevio() {
         <p>Ahora tu navegador te preguntará si quieres compartir tu ubicación con Celda.</p>
         <ListaPasoPrevio>
           <li>
-            Solo sirve para calcular a qué distancia y en qué dirección quedan los emplazamientos.
+            Solo sirve para calcular a qué distancia y en qué dirección quedan los{" "}
+            <Termino termino="emplazamiento">emplazamientos</Termino>.
           </li>
           <li>
             Se calcula en tu dispositivo. Celda no la guarda ni la envía a ningún servidor. El mapa
@@ -362,7 +364,7 @@ export function ReferenciaEnFicha(props: { readonly emplazamiento: Coordenada })
         fallback={
           <SinReferencia
             titulo="¿Desde dónde lo miramos?"
-            texto={PARA_QUE_SIRVE}
+            texto={<TextoConTerminos texto={PARA_QUE_SIRVE} />}
             aviso={sinPunto().aviso}
             acciones={
               <>
@@ -392,9 +394,12 @@ export function ReferenciaEnFicha(props: { readonly emplazamiento: Coordenada })
             return (
               <ConReferencia
                 tipo={referencia().tipo}
-                desde={textos().desde}
+                desde={<TextoConTerminos texto={textos().desde} />}
                 relacion={textos().relacion}
-                margen={textos().margen}
+                margen={(() => {
+                  const margen = textos().margen;
+                  return margen === undefined ? undefined : <TextoConTerminos texto={margen} />;
+                })()}
                 acciones={
                   <>
                     <Boton variante="enlace" onClick={() => control.elegirEnMapa()}>

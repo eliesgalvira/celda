@@ -1,4 +1,5 @@
 import { type Coordenada, distanciaMetros, rumboGrados } from "@celda/dominio/area";
+import { bloque, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
 import { type MotivoFalloGps, posicionDe, type Referencia } from "./estado.ts";
 
@@ -33,11 +34,11 @@ const PRECISION_GRUESA = 100;
 
 export interface TextosReferencia {
   /** Desde dónde se mira: «tu ubicación (±25 m)» o «el punto elegido». */
-  readonly desde: string;
+  readonly desde: TextoMarcado;
   /** Dónde queda el emplazamiento visto desde el punto de referencia. */
   readonly relacion: string;
   /** Si la precisión del GPS no da para fiarse de la distancia, lo dice. */
-  readonly margen: string | undefined;
+  readonly margen: TextoMarcado | undefined;
 }
 
 /**
@@ -54,25 +55,30 @@ export const textosReferencia = (
   const hacia = metros < 5 ? "." : `, hacia el ${nombreRumbo(rumbo)} (${rumbo}°).`;
   if (referencia.tipo === "elegido") {
     return {
-      desde: "el punto elegido",
+      desde: termino("punto-de-referencia", "el punto elegido"),
       relacion: `El emplazamiento está a ${textoDistancia(metros)} del punto${hacia}`,
       margen: undefined,
     };
   }
   const { precision } = referencia.lectura;
+  // «Desde» y el margen van en el mismo bloque: la precisión se subraya una sola vez.
+  const marcar = bloque();
   return {
-    desde: `tu ubicación (${textoPrecision(precision)})`,
+    desde: marcar(
+      marcado`${termino("punto-de-referencia", "tu ubicación")} (${termino("precision", textoPrecision(precision))})`,
+    ),
     relacion: `El emplazamiento está a ${textoDistancia(metros)} de ti${hacia}`,
     margen:
       precision > PRECISION_GRUESA || precision > metros / 2
-        ? `Tu ubicación tiene un margen de ${textoPrecision(precision)}, así que la distancia es aproximada.`
+        ? marcar(
+            marcado`Tu ubicación tiene un ${termino("precision", "margen")} de ${textoPrecision(precision)}, así que la distancia es aproximada.`,
+          )
         : undefined,
   };
 };
 
 /** Qué se gana con un punto de referencia, en el panel sin punto. */
-export const PARA_QUE_SIRVE =
-  "Con un punto te decimos a qué distancia queda este emplazamiento y en qué dirección.";
+export const PARA_QUE_SIRVE: TextoMarcado = marcado`Con un ${termino("punto-de-referencia", "punto")} te decimos a qué distancia queda este ${termino("emplazamiento", "emplazamiento")} y en qué dirección.`;
 
 /** Cómo reactivar la ubicación bloqueada (historia 25). */
 export const COMO_REACTIVAR =
