@@ -1,18 +1,16 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import type { Ficha } from "@celda/dominio/ficha";
-import * as WebSocketClient from "@confect/js/WebSocketClient";
 import { make, type Transport } from "@confect/js/internal/WebSocketClient";
 import { assert, describe, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-import { FichaNoLeida, fichasDesdeCliente, FichasEnVivo } from "./servicio.ts";
+import { type Cliente, FichaNoLeida, fichasDesdeCliente, FichasEnVivo } from "./servicio.ts";
 
 const FICHA: Ficha = {
   clave: "movistar-0802532",
@@ -38,49 +36,52 @@ interface Registro {
 
 /**
  * Un cliente de Confect sobre un transporte de prueba que contesta a cada suscripción con la
- * respuesta de su clave y apunta cuántas conexiones y suscripciones hay abiertas.
+ * respuesta de su clave y apunta cuántas conexiones y suscripciones hay abiertas. La primera
+ * conexión falla si `fallarLaPrimera`.
  */
 const clienteDePrueba = (
   respuestas: ReadonlyMap<string, Respuesta>,
   registro: Registro,
-): Layer.Layer<WebSocketClient.WebSocketClient> =>
-  Layer.effect(
-    WebSocketClient.WebSocketClient,
-    Effect.sync(() => {
-      registro.conexiones += 1;
-      const cambiar = (f: (abiertas: ReadonlyArray<string>) => ReadonlyArray<string>) => {
-        registro.abiertas = f(registro.abiertas);
-      };
-      const transporte: Transport = {
-        setAuth: () => undefined,
-        close: () => Promise.resolve(),
-        query: () => Promise.reject(new Error("sin consultas sueltas")),
-        mutation: () => Promise.reject(new Error("sin mutaciones")),
-        action: () => Promise.reject(new Error("sin acciones")),
-        onUpdate: (_referencia, argumentos, alActualizar, alFallar) => {
-          // SAFETY: la única lectura en vivo de la web es `datos:ficha`, con argumentos `{ clave }`.
-          const { clave } = argumentos as { readonly clave: string };
-          cambiar((abiertas) => [...abiertas, clave]);
-          const respuesta = respuestas.get(clave) ?? { valor: null };
-          queueMicrotask(() => {
-            if ("valor" in respuesta) alActualizar(respuesta.valor);
-            else alFallar(new Error(respuesta.error));
-          });
-          return () => cambiar((abiertas) => abiertas.filter((a) => a !== clave));
-        },
-      };
-      return make("http://convex.prueba", transporte);
-    }),
-  );
+  fallarLaPrimera: boolean,
+): Effect.Effect<Cliente, FichaNoLeida> =>
+  Effect.suspend(() => {
+    registro.conexiones += 1;
+    if (fallarLaPrimera && registro.conexiones === 1) {
+      return Effect.fail(new FichaNoLeida({ motivo: "sin red" }));
+    }
+    const cambiar = (f: (abiertas: ReadonlyArray<string>) => ReadonlyArray<string>) => {
+      registro.abiertas = f(registro.abiertas);
+    };
+    const transporte: Transport = {
+      setAuth: () => undefined,
+      close: () => Promise.resolve(),
+      query: () => Promise.reject(new Error("sin consultas sueltas")),
+      mutation: () => Promise.reject(new Error("sin mutaciones")),
+      action: () => Promise.reject(new Error("sin acciones")),
+      onUpdate: (_referencia, argumentos, alActualizar, alFallar) => {
+        // SAFETY: la única lectura en vivo de la web es `datos:ficha`, con argumentos `{ clave }`.
+        const { clave } = argumentos as { readonly clave: string };
+        cambiar((abiertas) => [...abiertas, clave]);
+        const respuesta = respuestas.get(clave) ?? { valor: null };
+        queueMicrotask(() => {
+          if ("valor" in respuesta) alActualizar(respuesta.valor);
+          else alFallar(new Error(respuesta.error));
+        });
+        return () => cambiar((abiertas) => abiertas.filter((a) => a !== clave));
+      },
+    };
+    return Effect.succeed(make("http://convex.prueba", transporte));
+  });
 
 /** Ejecuta `prueba` con el servicio real sobre el cliente de prueba. */
 const conFichas = <A, E>(
   respuestas: ReadonlyMap<string, Respuesta>,
   prueba: (servicio: FichasEnVivo["Service"], registro: Registro) => Effect.Effect<A, E>,
+  fallarLaPrimera = false,
 ) => {
   const registro: Registro = { abiertas: [], conexiones: 0 };
   return Effect.flatMap(FichasEnVivo, (servicio) => prueba(servicio, registro)).pipe(
-    Effect.provide(fichasDesdeCliente(clienteDePrueba(respuestas, registro))),
+    Effect.provide(fichasDesdeCliente(clienteDePrueba(respuestas, registro, fallarLaPrimera))),
   );
 };
 
@@ -137,6 +138,21 @@ describe("fichas en vivo sobre el cliente de Confect", () => {
             }
           }
         }),
+    ),
+  );
+
+  it.effect("si la conexión falla, la ficha lo dice y la siguiente lo vuelve a intentar", () =>
+    conFichas(
+      new Map(),
+      (servicio, registro) =>
+        Effect.gen(function* () {
+          const primera = yield* Effect.exit(Stream.runHead(servicio.seguir("a")));
+          assert.isTrue(Exit.isFailure(primera));
+          const segunda = yield* Stream.runHead(servicio.seguir("a"));
+          assert.deepStrictEqual(segunda, Option.some(Option.none()));
+          assert.strictEqual(registro.conexiones, 2);
+        }),
+      true,
     ),
   );
 });
