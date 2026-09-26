@@ -166,7 +166,9 @@ const TITULO_PEDRALBES = "PZ EUSEBI GÜELL, 1";
 
 describe("panel del emplazamiento", () => {
   it("enseña la dirección, cada compañía con sus bandas y de dónde sale cada dato", async () => {
-    const { findByRole, getByRole, getByText, getAllByRole, fichas } = abrir(CAMPUS_NORD.clave);
+    const { findByRole, getByRole, getByText, getAllByText, getAllByRole, fichas } = abrir(
+      CAMPUS_NORD.clave,
+    );
     await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
 
     const titulo = await findByRole("heading", { name: TITULO_CAMPUS_NORD });
@@ -174,13 +176,8 @@ describe("panel del emplazamiento", () => {
     assert.isNotNull(getByText("BARCELONA"));
     assert.isNotNull(getByText("Emplazamiento compartido"));
     assert.isNotNull(getByRole("heading", { name: "Movistar" }));
-    assert.deepStrictEqual(
-      Array.from(getByRole("list", { name: "Bandas de Movistar" }).children, (b) => b.textContent),
-      ["700 MHz", "3500 MHz"],
-    );
-    // Sin bandas leídas lo dice, en lugar de dejar el hueco.
-    assert.isNotNull(getByText(/aún no ha leído sus bandas/u));
-    assert.isNotNull(getByText("Códigos 086040 y 86040"));
+    // Los códigos salen también en los datos técnicos, plegados.
+    assert.lengthOf(getAllByText("Códigos 086040 y 86040"), 2);
 
     const enlaces = getAllByRole("link", { name: /Ver en el registro oficial/u });
     assert.deepStrictEqual(
@@ -193,6 +190,41 @@ describe("panel del emplazamiento", () => {
       ),
       2,
     );
+  });
+
+  it("abre con una frase llana, el eje de frecuencias y los datos técnicos plegados", async () => {
+    const { findByRole, getByRole, getByText, queryByRole, fichas } = abrir(CAMPUS_NORD.clave);
+    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+
+    // La tecnología no la publica nadie: se deduce de la banda y se dice «probablemente».
+    assert.isNotNull(
+      getByText(
+        "Movistar y Vodafone comparten este emplazamiento. Por las bandas que se conocen, " +
+          "probablemente da 5G con Movistar. Llega lejos y entra bien en los edificios, y tiene " +
+          "bandas altas que dan más velocidad. De Vodafone aún no se conocen las bandas.",
+      ),
+    );
+
+    const eje = getByRole("table", { name: "Qué frecuencia usa cada compañía (MHz)" });
+    const movistar = getByRole("row", { name: /^Movistar/u });
+    assert.isTrue(eje.contains(movistar));
+    assert.deepStrictEqual(
+      Array.from(movistar.querySelectorAll("[data-emite]"), (c) => c.getAttribute("data-emite")),
+      ["si", "no", "no", "no", "no", "no", "si"],
+    );
+    assert.include(getByRole("row", { name: /^Vodafone/u }).textContent, "Aún no se conocen");
+
+    // Plegados: los expedientes no se ven hasta abrirlos.
+    const tecnicos = getByRole("button", { name: "Datos técnicos" });
+    assert.strictEqual(tecnicos.getAttribute("aria-expanded"), "false");
+    assert.isNull(queryByRole("table", { name: "Expedientes de Movistar" }));
+    fireEvent.click(tecnicos);
+    flush();
+    const expedientes = getByRole("table", { name: "Expedientes de Movistar" });
+    assert.include(expedientes.textContent, "B B -2300445");
+    assert.include(expedientes.textContent, "3460–3600 MHz");
+    assert.isNotNull(getByText(/no publica la tecnología/u));
   });
 
   it("al cambiar de emplazamiento con la respuesta lenta, nunca enseña el anterior", async () => {

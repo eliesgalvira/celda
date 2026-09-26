@@ -104,39 +104,31 @@ export interface EstacionFichaProps {
   readonly nombre: string;
   /** Los códigos con que la publica la compañía. */
   readonly codigos: string;
-  /** Las bandas ya escritas, como «800 MHz». */
-  readonly bandas: ReadonlyArray<string>;
-  /** Qué decir si no se conoce ninguna banda. */
-  readonly sinBandas: string;
   /** De dónde sale: una `OrigenFicha` por observación. */
   readonly children: JSX.Element;
 }
 
-/** Una estación base: la compañía, sus bandas y de dónde sale cada dato. */
+/** Una estación base: la compañía, sus códigos y de dónde sale cada dato. */
 export function EstacionFicha(props: EstacionFichaProps) {
   return (
-    <article class="flex flex-col gap-2 border-t border-linea pt-3 first:border-t-0 first:pt-0">
+    <article class="flex flex-col gap-1 border-t border-linea pt-3 first:border-t-0 first:pt-0">
       <div class="flex items-center gap-2.5">
         <LogoCompanias companias={[props.compania]} tamano={28} />
         <h4 class="font-semibold">{props.nombre}</h4>
         <span class="ml-auto font-mono text-[11px] text-tinta-suave">{props.codigos}</span>
       </div>
-      <Show
-        when={props.bandas.length > 0}
-        fallback={<p class="text-sm text-tinta-suave">{props.sinBandas}</p>}
-      >
-        <ul aria-label={`Bandas de ${props.nombre}`} class="flex flex-wrap gap-1.5">
-          <For each={props.bandas}>
-            {(banda) => (
-              <li class="cinta bg-superficie-alta px-3 py-0.5 font-mono text-xs font-semibold [--pico:6px]">
-                {banda}
-              </li>
-            )}
-          </For>
-        </ul>
-      </Show>
       <ul class="flex flex-col">{props.children}</ul>
     </article>
+  );
+}
+
+/**
+ * La frase que resume el emplazamiento en lenguaje llano (historia 13): lo primero que se lee
+ * bajo la cabecera.
+ */
+export function ResumenFicha(props: { readonly children: JSX.Element }) {
+  return (
+    <p class="px-5 pt-4 font-titulo text-[1.0625rem] leading-relaxed md:px-6">{props.children}</p>
   );
 }
 

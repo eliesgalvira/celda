@@ -2,7 +2,7 @@ import type { Ficha } from "@celda/dominio/ficha";
 import { assert, describe, it } from "@effect/vitest";
 
 import { compararConCapa } from "./marcaDeAgua.ts";
-import { textosBandas, textosMarca, textosOrigen, tituloDe } from "./textos.ts";
+import { textosMarca, textosOrigen, textoTramo, tituloDe } from "./textos.ts";
 
 /** 01:44 en Barcelona. */
 const CAPA = Date.UTC(2026, 8, 25, 23, 44, 53);
@@ -43,19 +43,28 @@ describe("textos de la ficha", () => {
     });
   });
 
-  it("las bandas salen una vez cada una, y la que no encaja con su tramo", () => {
-    const banda = (mhz: 800 | 900 | null, desdeMhz: number) => ({
-      referencia: `B B -${desdeMhz}`,
+  it("el tramo de un expediente sale exacto, con coma decimal y sus dos rangos si los tiene", () => {
+    const banda = (rangos: ReadonlyArray<{ desdeMhz: number; hastaMhz: number }>) => ({
+      referencia: "B B -2300445",
       compania: "movistar" as const,
-      rangos: [{ desdeMhz, hastaMhz: desdeMhz + 10 }],
-      mhz,
+      rangos,
+      mhz: null,
       anio: 2023,
     });
-    assert.deepStrictEqual(textosBandas([banda(800, 852), banda(900, 935), banda(900, 940)]), [
-      "800 MHz",
-      "900 MHz",
-    ]);
-    assert.deepStrictEqual(textosBandas([banda(null, 1452)]), ["1452–1462 MHz"]);
+    assert.strictEqual(
+      textoTramo(banda([{ desdeMhz: 925.1, hastaMhz: 935.1 }])),
+      "925,1–935,1 MHz",
+    );
+    assert.strictEqual(
+      textoTramo(
+        banda([
+          { desdeMhz: 1910, hastaMhz: 1915 },
+          { desdeMhz: 2155, hastaMhz: 2170 },
+        ]),
+      ),
+      "1910–1915 y 2155–2170 MHz",
+    );
+    assert.strictEqual(textoTramo(banda([])), "Sin tramo publicado");
   });
 
   it("una observación dice su código y desde cuándo; una corrección, que la da por desmontada", () => {
