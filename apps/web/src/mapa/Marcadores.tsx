@@ -14,18 +14,7 @@ import {
 import { formasDeBarrios } from "../capa/etiquetas.ts";
 import { cajaConMargen, combinacionesDe, type Vista } from "../capa/marcadores.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
-
-/** La vista que enseña ahora el mapa. */
-const vistaDe = (mapa: MapaMapLibre): Vista => {
-  const caja = mapa.getBounds();
-  return {
-    caja: {
-      suroeste: { longitud: caja.getWest(), latitud: caja.getSouth() },
-      noreste: { longitud: caja.getEast(), latitud: caja.getNorth() },
-    },
-    zoom: mapa.getZoom(),
-  };
-};
+import { seguirVista } from "./vista.ts";
 
 const REDUCIR_MOVIMIENTO = "(prefers-reduced-motion: reduce)";
 
@@ -46,8 +35,8 @@ export interface MarcadoresProps {
 
 /**
  * Los emplazamientos sobre el mapa, agrupados por zoom. Los marcadores se recolocan en cada
- * fotograma del movimiento, pero qué se dibuja solo se decide al pararse el mapa o al cambiar de
- * nivel de agrupación: crear y quitar nodos es lo caro.
+ * fotograma del movimiento, pero qué se dibuja se decide al asentarse el mapa (ver `seguirVista`):
+ * crear y quitar nodos es lo caro.
  */
 export function Marcadores(props: MarcadoresProps) {
   const agrupador = createMemo(() => crearAgrupador(props.emplazamientos, props.barrios));
@@ -57,25 +46,13 @@ export function Marcadores(props: MarcadoresProps) {
   const [reducido, setReducido] = createSignal(false);
 
   onSettled(() => {
-    const mapa = untrack(() => props.mapa);
-    let pendiente = 0;
-    let nivel = nivelDeZoom(mapa.getZoom());
-    const mirar = () => {
-      nivel = nivelDeZoom(mapa.getZoom());
-      setVista(vistaDe(mapa));
-    };
-    const mover = () => {
-      pendiente = 0;
-      setFotograma((n) => n + 1);
-      if (nivelDeZoom(mapa.getZoom()) !== nivel) mirar();
-    };
-    // Como mucho una vez por fotograma: el mapa emite varios `move` entre dos.
-    const alMover = () => {
-      if (pendiente === 0) pendiente = requestAnimationFrame(mover);
-    };
-    mapa.on("move", alMover);
-    mapa.on("moveend", mirar);
-    mirar();
+    const dejarDeSeguir = seguirVista(
+      untrack(() => props.mapa),
+      {
+        fotograma: () => setFotograma((n) => n + 1),
+        vista: setVista,
+      },
+    );
 
     const preferencia = matchMedia(REDUCIR_MOVIMIENTO);
     const alCambiarPreferencia = () => setReducido(preferencia.matches);
@@ -83,9 +60,7 @@ export function Marcadores(props: MarcadoresProps) {
     alCambiarPreferencia();
 
     return () => {
-      mapa.off("move", alMover);
-      mapa.off("moveend", mirar);
-      cancelAnimationFrame(pendiente);
+      dejarDeSeguir();
       preferencia.removeEventListener("change", alCambiarPreferencia);
     };
   });
