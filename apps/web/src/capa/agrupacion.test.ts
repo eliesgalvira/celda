@@ -13,6 +13,14 @@ import {
   NIVEL_DE_BARRIOS,
   nivelDeZoom,
 } from "./agrupacion.ts";
+import {
+  type Indice,
+  type IndiceSerializado,
+  indexarCapa,
+  indicesDeCapa,
+  rehidratarIndice,
+  serializarIndice,
+} from "./indice.ts";
 
 const MUNDO: Rectangulo = {
   suroeste: { longitud: -180, latitud: -85 },
@@ -392,5 +400,90 @@ describe("nivel de barrios", () => {
       barriosDe(agrupador.escena(NIVEL_DE_BARRIOS, caja)).map((b) => b.clave),
       ["b:02"],
     );
+  });
+});
+
+describe("índice construido en un Worker y rehidratado aquí", () => {
+  // Los mismos emplazamientos con barrios que arriba: así pasa también por el índice de los de
+  // fuera de Barcelona.
+  const barrioDe = (longitud: number, latitud: number): string | null =>
+    latitud < 41.36 ? null : longitud < 2.15 ? "01" : "02";
+  const CON_BARRIO: ReadonlyArray<EmplazamientoLeido> = SINTETICOS.map((e, i) => ({
+    ...e,
+    barrio: barrioDe(e.posicion.longitud, e.posicion.latitud),
+    companias: i % 2 === 0 ? ["movistar"] : ["vodafone"],
+  }));
+  const BARRIOS: ReadonlyArray<Barrio> = [
+    { codigo: "01", nombre: "Oeste", etiqueta: { longitud: 2.1, latitud: 41.4 } },
+    { codigo: "02", nombre: "Este", etiqueta: { longitud: 2.2, latitud: 41.4 } },
+  ];
+
+  /** Lo que haría `postMessage` con los búferes transferidos: los mueve a otro sitio. */
+  const porElWorker = (indice: Indice): IndiceSerializado => {
+    const { serializado, transferibles } = serializarIndice(indice);
+    return structuredClone(serializado, { transfer: [...transferibles] });
+  };
+
+  const enHilo = crearAgrupador(CON_BARRIO, BARRIOS, { prefijo: "08:" });
+  const construidos = indexarCapa(CON_BARRIO, true);
+  const posiciones = indicesDeCapa(CON_BARRIO, true);
+  const deFuera = construidos.fuera;
+  assert.isDefined(deFuera);
+  const rehidratado = crearAgrupador(CON_BARRIO, BARRIOS, {
+    prefijo: "08:",
+    indices: {
+      todos: rehidratarIndice(porElWorker(construidos.todos), posiciones.todos),
+      fuera:
+        deFuera === undefined
+          ? undefined
+          : rehidratarIndice(porElWorker(deFuera), posiciones.fuera ?? []),
+    },
+  });
+
+  it("los búferes del índice construido se van con el mensaje", () => {
+    assert.strictEqual(construidos.todos.coords.byteLength, 0);
+  });
+
+  it("da las mismas escenas a todos los niveles, con lo mismo dentro de cada elemento", () => {
+    for (let nivel = 0; nivel <= 18; nivel++) {
+      const antes = enHilo.escena(nivel, MUNDO, "s7");
+      const despues = rehidratado.escena(nivel, MUNDO, "s7");
+      assert.deepStrictEqual(despues.elementos, antes.elementos, `nivel ${nivel}`);
+      for (const e of antes.elementos.values()) {
+        assert.deepStrictEqual(claves(rehidratado, e), claves(enHilo, e), e.clave);
+        if (e.tipo === "agrupacion" || e.tipo === "barrio") {
+          assert.strictEqual(rehidratado.zoomDeApertura(e), enHilo.zoomDeApertura(e), e.clave);
+        }
+      }
+    }
+  });
+
+  it("da las mismas transiciones entre cualquier par de niveles", () => {
+    for (let fino = 18; fino >= 1; fino--) {
+      for (let grueso = fino - 1; grueso >= 0; grueso -= 3) {
+        const alejar = enHilo.transicion(enHilo.escena(fino, MUNDO), enHilo.escena(grueso, MUNDO));
+        const alejarRehidratado = rehidratado.transicion(
+          rehidratado.escena(fino, MUNDO),
+          rehidratado.escena(grueso, MUNDO),
+        );
+        assert.deepStrictEqual(alejarRehidratado, alejar, `de ${fino} a ${grueso}`);
+        const acercar = rehidratado.transicion(
+          rehidratado.escena(grueso, MUNDO),
+          rehidratado.escena(fino, MUNDO),
+        );
+        assert.deepStrictEqual(
+          acercar,
+          enHilo.transicion(enHilo.escena(grueso, MUNDO), enHilo.escena(fino, MUNDO)),
+          `de ${grueso} a ${fino}`,
+        );
+      }
+    }
+  });
+
+  it("las claves llevan la provincia, para no chocar con las de otra en la misma escena", () => {
+    const claves = [...rehidratado.escena(10, MUNDO).elementos.keys()];
+    assert.isTrue(claves.some((clave) => clave.startsWith("a:08:")));
+    assert.isTrue(claves.every((clave) => clave.startsWith("a:08:") || clave.startsWith("e:")));
+    assert.isTrue(rehidratado.escena(NIVEL_DE_BARRIOS, MUNDO).elementos.has("b:08:01"));
   });
 });

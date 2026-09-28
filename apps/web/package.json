@@ -15,6 +15,7 @@
     "@celda/ui": "workspace:*",
     "@solidjs/web": "catalog:",
     "effect": "catalog:",
+    "kdbush": "catalog:",
     "maplibre-gl": "catalog:",
     "solid-js": "catalog:",
     "supercluster": "catalog:"
