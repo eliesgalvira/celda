@@ -32,6 +32,8 @@ const { values: opciones } = NodeUtil.parseArgs({
     cascada: { type: "boolean", default: false },
     perfil: { type: "string" },
     "solo-carga": { type: "boolean", default: false },
+    // Fracción de CPU ocupada por encima de la cual se espera antes de cada ronda.
+    calma: { type: "string", default: "0.08" },
   },
 });
 
@@ -51,6 +53,36 @@ const RED = {
   },
   sin: { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 },
 } as const;
+
+/** Lo que ha trabajado la CPU desde el arranque, en ticks de /proc/stat: ocupada y total. */
+const ticks = async () => {
+  const linea = (await NodeFSP.readFile("/proc/stat", "utf8")).split("\n")[0] ?? "";
+  const campos = linea.split(/\s+/u).slice(1).map(Number);
+  const total = campos.reduce((a, b) => a + b, 0);
+  // idle e iowait son los campos 4 y 5.
+  return { ocupada: total - (campos[3] ?? 0) - (campos[4] ?? 0), total };
+};
+
+/**
+ * Espera a que la máquina esté tranquila antes de una ronda: con otro navegador o una compilación
+ * en marcha, el móvil simulado va más lento de lo que toca. Como mucho diez minutos; si no se
+ * calma, sigue y lo dice. Solo en Linux: en otro sistema no espera.
+ */
+const esperarCalma = async (): Promise<void> => {
+  if (process.platform !== "linux") return;
+  for (let intento = 0; intento < 120; intento += 1) {
+    const antes = await ticks();
+    await esperar(1000);
+    const despues = await ticks();
+    const uso = (despues.ocupada - antes.ocupada) / Math.max(1, despues.total - antes.total);
+    if (uso < Number(opciones.calma)) return;
+    if (intento % 12 === 0) {
+      process.stderr.write(`  máquina ocupada (${Math.round(uso * 100)} %), esperando…\n`);
+    }
+    await esperar(4000);
+  }
+  process.stderr.write("  la máquina no se calma: la ronda puede salir más lenta\n");
+};
 
 const ANCHO = 390;
 const ALTO = 844;
@@ -637,7 +669,10 @@ const informeDeTrazas = (trazada: Ronda): string => {
 };
 
 const principal = async () => {
-  const sitio = await servirSitio(NodePath.resolve(opciones.web), NodePath.resolve(capas));
+  // Varias webs a la vez (`--web antes,despues`): las rondas se alternan, así el ruido de la
+  // máquina reparte igual entre ellas.
+  const webs = opciones.web.split(",").map((web) => NodePath.resolve(web));
+  const sitios = await Promise.all(webs.map((web) => servirSitio(web, NodePath.resolve(capas))));
   const navegador = await chromium.launch({
     executablePath: opciones.chromium,
     args: [
@@ -648,28 +683,38 @@ const principal = async () => {
       "--enable-unsafe-swiftshader=false",
     ],
   });
-  const rondas: Array<Ronda> = [];
+  const rondas = webs.map((): Array<Ronda> => []);
   try {
     for (const cpu of opciones.cpu.split(",").map(Number)) {
       for (let i = 0; i < Number(opciones.repeticiones); i += 1) {
-        process.stderr.write(`CPU ×${cpu}, ronda ${i + 1}…\n`);
-        rondas.push(await ronda(navegador, sitio.origen, cpu, undefined));
+        for (const [j, sitio] of sitios.entries()) {
+          await esperarCalma();
+          process.stderr.write(`${webs[j] ?? ""}: CPU ×${cpu}, ronda ${i + 1}…\n`);
+          rondas[j]?.push(await ronda(navegador, sitio.origen, cpu, undefined));
+        }
       }
     }
     // La traza frena lo que mide: va en una ronda aparte que no cuenta en las medianas.
     if (opciones.trazas !== undefined) {
       const cpu = Number(opciones.cpu.split(",")[0]);
-      process.stderr.write(`CPU ×${cpu}, ronda con traza…\n`);
-      const trazada = await ronda(navegador, sitio.origen, cpu, opciones.trazas);
-      process.stdout.write(`${informeDeTrazas(trazada)}\n`);
+      for (const [j, sitio] of sitios.entries()) {
+        await esperarCalma();
+        process.stderr.write(`${webs[j] ?? ""}: CPU ×${cpu}, ronda con traza…\n`);
+        const carpeta = NodePath.join(opciones.trazas, NodePath.basename(webs[j] ?? `${j}`));
+        const trazada = await ronda(navegador, sitio.origen, cpu, carpeta);
+        process.stdout.write(`\n# ${webs[j] ?? ""}\n${informeDeTrazas(trazada)}\n`);
+      }
     }
   } finally {
     await navegador.close();
-    await sitio.cerrar();
+    await Promise.all(sitios.map((sitio) => sitio.cerrar()));
   }
-  if (opciones.json !== undefined)
-    await NodeFSP.writeFile(opciones.json, JSON.stringify(rondas, null, 2));
-  process.stdout.write(`${informe(rondas)}\n`);
+  if (opciones.json !== undefined) {
+    await NodeFSP.writeFile(opciones.json, JSON.stringify(Object.fromEntries(webs.map((w, j) => [w, rondas[j]])), null, 2));
+  }
+  for (const [j, web] of webs.entries()) {
+    process.stdout.write(`\n# ${web}\n${informe(rondas[j] ?? [])}\n`);
+  }
 };
 
 await principal();
