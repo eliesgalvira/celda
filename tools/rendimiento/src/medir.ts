@@ -710,7 +710,10 @@ const principal = async () => {
     await Promise.all(sitios.map((sitio) => sitio.cerrar()));
   }
   if (opciones.json !== undefined) {
-    await NodeFSP.writeFile(opciones.json, JSON.stringify(Object.fromEntries(webs.map((w, j) => [w, rondas[j]])), null, 2));
+    await NodeFSP.writeFile(
+      opciones.json,
+      JSON.stringify(Object.fromEntries(webs.map((w, j) => [w, rondas[j]])), null, 2),
+    );
   }
   for (const [j, web] of webs.entries()) {
     process.stdout.write(`\n# ${web}\n${informe(rondas[j] ?? [])}\n`);
