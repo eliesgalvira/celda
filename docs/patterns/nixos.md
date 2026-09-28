@@ -19,14 +19,15 @@ nix flake check
 
 Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias/` del directorio desde el que se lanza, como `pnpm run ingesta`. La configuración y sus variables están en [convex.md](convex.md#configuración).
 
-`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal y un R2 de mentira que contestan por HTTPS. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. La prueba:
+`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal, un antenasmoviles.es y un R2 de mentira que contestan por HTTPS. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. antenasmoviles.es da como listado los marcadores grabados en el Campus Nord, las 42 ER5 grabadas de Barcelona y una ER5 de Madrid, y los detalles grabados. La prueba enciende antenasmoviles.es con 4 detalles por noche y:
 
 1. crea el fichero de credenciales de R2 con valores al azar;
 2. adelanta el reloj hasta la hora del temporizador y espera a que la noche acabe bien;
 3. comprueba que la base está en `/var/lib/celda-nocturna`, que la copia está en el directorio de copias y que `vigente.json` y la capa llegaron al cubo, firmados con la clave del fichero;
 4. lanza `celda-nocturna estado` como el usuario del servicio;
 5. comprueba que la noche barrió Cataluña cada noche y `centro`, la primera de las zonas que se turnan, con una petición por cuadro;
-6. busca la clave y el secreto en todo el almacén de Nix de la máquina y no los encuentra.
+6. comprueba que antenasmoviles.es recibió un solo `showf` y cuatro detalles, los de las dos ER5 sin compañía de Barcelona primero, ninguno de Madrid ni de una copia del registro, y que la ER5 de Urquinaona se publicó con su enlace a antenasmoviles.es;
+7. busca la clave y el secreto en todo el almacén de Nix de la máquina y no los encuentra.
 
 Con todo construido, la máquina virtual tarda unos 30 s en arrancar y pasar la prueba.
 
@@ -139,6 +140,13 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `registroOficial.zonasEnTurno` | `[ ]` | Zonas de barrido que se turnan |
 | `registroOficial.zonasPorNoche` | 1 | Cuántas de las que se turnan se barren cada noche |
 | `registroOficial.userAgent` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición. Si montas tu propia ingesta, pon tu contacto |
+| `antenasmoviles.enable` | `false` | Interruptor de antenasmoviles.es. Déjalo apagado hasta escribir a su administrador |
+| `antenasmoviles.motivo` | `apagado por defecto hasta escribir a su administrador…` | Lo que se apunta si está apagado |
+| `antenasmoviles.pausa` | 5 | Segundos entre peticiones, entre 5 y 3600 |
+| `antenasmoviles.maxDetalles` | 100 | Detalles de ER5 nuevas o cambiadas por noche |
+| `antenasmoviles.maxPeticiones` | `maxDetalles` + 10 | Tope de peticiones por noche |
+| `antenasmoviles.zonas` | `registroOficial.zonas` y `zonasEnTurno` | Zonas de barrido cuyos marcadores se guardan, todas cada noche |
+| `antenasmoviles.userAgent` | `registroOficial.userAgent` | Se envía en cada petición |
 
 Las zonas de barrido son `cataluna`, `centro`, `andalucia`, `levante`, `norte`, `ebro-y-duero` y `oeste-y-canarias` (la guía de la ingesta, en [convex.md](convex.md), dice qué comunidades lleva cada una). Toda España en siete noches, con Cataluña todas:
 
@@ -149,7 +157,9 @@ services.celda-nocturna.registroOficial = {
 };
 ```
 
-La ventana de fichas (#41) y antenasmoviles.es (#48) aún no existen en el programa. Tendrán su opción cuando lleguen. Mientras tanto, cualquier variable del programa se puede poner a mano, sin secretos:
+El listado de antenasmoviles.es es de toda España y se pide una vez por noche, así que sus zonas se barren todas cada noche, también las que el registro turna. Qué hace cada noche está en [convex.md](convex.md#antenasmovileses-en-la-noche).
+
+La ventana de fichas (#41) aún no existe en el programa. Tendrá su opción cuando llegue. Mientras tanto, cualquier variable del programa se puede poner a mano, sin secretos:
 
 ```nix
 systemd.services.celda-nocturna.environment.CELDA_REGISTRO_MAX_PETICIONES = "100";

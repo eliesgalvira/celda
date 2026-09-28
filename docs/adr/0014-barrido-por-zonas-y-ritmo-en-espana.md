@@ -45,3 +45,12 @@ El usuario decidió que los correos al ministerio (`emisionesysalud@economia.gob
 - La protección contra un listado vacío pasa a ser por cuadro: un cuadro que vuelve vacío con estaciones vigentes hace fallar el barrido de su zona.
 - Las ausencias se cuentan al cerrar el barrido, a las observaciones de sus cuadros que ningún listado ha traído desde que empezó. Los barridos de una noche se cierran cuando han acabado todos.
 - La primera pasada real de Cataluña hizo 37 peticiones de listado y trajo 10.305 registros (investigación 08).
+
+## antenasmoviles.es por zonas (ticket 48, 29/09/2026)
+
+La ingesta nocturna lee antenasmoviles.es con las mismas zonas de barrido. Sigue la propuesta de la investigación 08, apartado 5.
+
+- `showf` una vez por noche. Se guardan los marcadores de los cuadros de las zonas configuradas, que por defecto son las del registro, las de cada noche y las que se turnan.
+- Detalle solo de las ER5 nuevas o cambiadas en el listado, primero las que no dicen su compañía, 100 por noche y a una petición cada 5 s. No hay repaso de las leídas ni se lee el detalle de los marcadores que copian el registro, así que la nocturna no ve las fotos de desmontaje. Convex sí las lee mientras siga (#51).
+- La zona de un marcador es la del cuadro en que cae. Uno que falta en dos barridos seguidos de su zona se retira con sus observaciones, y una zona que vuelve vacía cuando tenía marcadores falla sin contar ausencias.
+- El interruptor sigue apagado por defecto, en el programa y en el módulo de NixOS.
