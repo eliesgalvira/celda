@@ -37,6 +37,12 @@ export interface OpcionesRecurso<K> {
 /** Aperturas por segundo de un recurso a partir de las cuales el vigilante avisa. */
 export const MAXIMO_POR_SEGUNDO = 10;
 
+/**
+ * El tope de un recurso que se reabre con cada evento de un gesto (arrastrar el punto, mover un
+ * deslizador): uno por fotograma en una pantalla de 120 Hz.
+ */
+export const SIGUE_UN_GESTO = 120;
+
 const cerrada = <K>(clave: K | Cerrado): clave is Cerrado =>
   clave === false || clave === null || clave === undefined;
 
@@ -85,11 +91,12 @@ export const recursoFijo = (nombre: string, abrir: () => (() => void) | undefine
   recurso(nombre, () => true, abrir);
 
 /** Compara dos objetos campo a campo con `Object.is`: para claves con varias lecturas. */
-export const mismosCampos = <T extends Readonly<Record<string, unknown>>>(a: T, b: T): boolean => {
-  const campos = Object.keys(a);
+export const mismosCampos = <T extends object>(a: T, b: T): boolean => {
+  const deA = Object.entries(a);
+  const deB = new Map(Object.entries(b));
   return (
-    campos.length === Object.keys(b).length &&
-    campos.every((campo) => Object.is(a[campo], b[campo]))
+    deA.length === deB.size &&
+    deA.every(([campo, valor]) => deB.has(campo) && Object.is(valor, deB.get(campo)))
   );
 };
 

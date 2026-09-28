@@ -161,6 +161,21 @@ describe("vista de interferencia en el mapa", () => {
     m.desmontar();
   });
 
+  it("una lectura nueva del GPS en el mismo punto no cancela el cálculo ni pide otro", async () => {
+    const m = await montar();
+    m.setReferencia(en(100, 50));
+    m.setActiva(true);
+    await esperar(() => assert.lengthOf(m.worker.pendientes(), 1));
+    // Cada lectura del GPS trae una posición nueva, aunque las coordenadas sean las mismas.
+    m.setReferencia(en(100, 50));
+    flush();
+    m.worker.contestar();
+    await esperar(() => assert.strictEqual(m.vista.calculo().estado, "lista"));
+    assert.strictEqual(m.worker.terminados(), 0);
+    assert.strictEqual(m.worker.recibidas(), 1);
+    m.desmontar();
+  });
+
   it("varios cambios seguidos piden un solo cálculo, y uno nuevo cancela el que había", async () => {
     const m = await montar();
     m.setActiva(true);

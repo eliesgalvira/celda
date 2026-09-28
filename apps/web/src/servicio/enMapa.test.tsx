@@ -11,6 +11,7 @@ import { capaDePrueba } from "../capa/pruebas.ts";
 import { ProveedorDeDatos, usarDatos } from "../datos.tsx";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
+import { otraTarea } from "../lib/pruebas.ts";
 import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 import { crearServicio, type LienzoDeServicio, type ServicioDelMapa } from "./enMapa.ts";
 import { lecturaDe, type RasgosServicio } from "./servicio.ts";
@@ -133,6 +134,22 @@ describe("sector que da servicio en el mapa", () => {
     await esperar(() => assert.closeTo(distanciaCalculada(m.servicio) ?? 0, 180, 2));
     assert.lengthOf(m.worker.pendientes(), 0);
     assert.strictEqual(m.worker.creados(), 1);
+    m.desmontar();
+  });
+
+  it("una lectura nueva del GPS en el mismo punto no pide otro cálculo", async () => {
+    const m = await montar();
+    m.setPunto(alEste(100));
+    await esperar(() => assert.lengthOf(m.worker.pendientes(), 1));
+    // Cada lectura del GPS trae una posición nueva, aunque las coordenadas sean las mismas.
+    m.setPunto(alEste(100));
+    flush();
+    m.worker.contestar();
+    await esperar(() => assert.closeTo(distanciaCalculada(m.servicio) ?? 0, 100, 2));
+    await otraTarea();
+    await esperar();
+    assert.lengthOf(m.worker.pendientes(), 0);
+    assert.strictEqual(m.worker.recibidas(), 1);
     m.desmontar();
   });
 

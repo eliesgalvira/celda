@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { BARCELONA, Coordenada, contiene, rumboGrados } from "./area.ts";
+import { BARCELONA, Coordenada, contiene, mismaCoordenada, rumboGrados } from "./area.ts";
 
 const decodificar = Schema.decodeUnknownEffect(Coordenada);
 
@@ -52,5 +52,15 @@ describe("rumboGrados", () => {
     assert.closeTo((ida + 180) % 360, rumboGrados(campusNord, CENTRO), 0.1);
     // Campus Nord queda al oeste de la plaza de Catalunya, un poco al norte.
     assert.closeTo(ida, 272, 2);
+  });
+});
+
+describe("mismaCoordenada", () => {
+  it("compara por valor y acepta que falten las dos", () => {
+    const a = { longitud: 2.11, latitud: 41.38 };
+    assert.isTrue(mismaCoordenada(a, { ...a }));
+    assert.isTrue(mismaCoordenada(undefined, undefined));
+    assert.isFalse(mismaCoordenada(a, undefined));
+    assert.isFalse(mismaCoordenada(a, { ...a, latitud: 41.3800001 }));
   });
 });

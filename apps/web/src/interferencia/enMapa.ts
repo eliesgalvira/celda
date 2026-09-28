@@ -1,8 +1,9 @@
-import type { Coordenada } from "@celda/dominio/area";
+import { type Coordenada, mismaCoordenada } from "@celda/dominio/area";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { Simulador } from "@celda/sim/simulador";
 import { sinr } from "@celda/sim/sinr";
 import { FUENTE_INTERFERENCIA, mostrarInterferencia } from "@celda/ui/mapa/interferencia.ts";
+import { mismosCampos, recurso, SIGUE_UN_GESTO } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
@@ -103,23 +104,32 @@ export function crearInterferencia(
     },
   );
 
-  createEffect(
-    () => ({
-      lienzo: entrada.lienzo(),
-      activa: entrada.activa(),
-      emplazamientos: entrada.emplazamientos(),
-      eleccion: entrada.eleccion(),
-      encuadre: encuadre(),
-      referencia: entrada.referencia(),
-      intento: intento(),
-    }),
-    ({ lienzo, activa, emplazamientos, eleccion, encuadre, referencia }) => {
-      if (lienzo === undefined || !activa || eleccion === undefined) return;
+  // Un cálculo por cada cosa distinta que ver. La clave se compara campo a campo; la referencia,
+  // por sus coordenadas: una lectura nueva del GPS en el mismo sitio no cancela nada. Sigue al
+  // deslizador y al punto que se arrastra, así que abre muchas veces por segundo; la espera va
+  // dentro.
+  const referencia = createMemo(() => entrada.referencia(), { equals: mismaCoordenada });
+  recurso(
+    "simulador:interferencia",
+    () => {
+      const lienzo = entrada.lienzo();
+      const eleccion = entrada.eleccion();
+      if (lienzo === undefined || !entrada.activa() || eleccion === undefined) return undefined;
+      return {
+        lienzo,
+        emplazamientos: entrada.emplazamientos(),
+        eleccion,
+        encuadre: encuadre(),
+        referencia: referencia(),
+        intento: intento(),
+      };
+    },
+    ({ lienzo, emplazamientos, eleccion, encuadre, referencia }) => {
       const pedida = pedirSinr({ emplazamientos, eleccion, encuadre, referencia });
       if (pedida === undefined) {
         lienzo.dibujar(SIN_TRAMA);
         setCalculo(SIN_CALCULO);
-        return;
+        return undefined;
       }
       setCalculo((anterior) => ({ ...anterior, estado: "calculando" }));
       const cancelar = new AbortController();
@@ -147,6 +157,7 @@ export function crearInterferencia(
         });
       return () => cancelar.abort();
     },
+    { iguales: mismosCampos, maximoPorSegundo: SIGUE_UN_GESTO },
   );
 
   return { calculo, reintentar: () => setIntento((n) => n + 1) };
