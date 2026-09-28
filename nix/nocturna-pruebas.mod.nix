@@ -41,6 +41,7 @@
             import os
             import ssl
             import sys
+            import time
             import urllib.parse
             from xml.sax.saxutils import escape
 
@@ -96,7 +97,7 @@
                     host = self.headers.get("Host", "").split(":")[0]
                     firma = self.headers.get("Authorization", "")
                     with open(PETICIONES, "a") as registro:
-                        registro.write(f"{self.command} {host} {self.path} {firma}\n")
+                        registro.write(f"{time.monotonic():.3f} {self.command} {host} {self.path} {firma}\n")
                     ruta = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path)
                     return host, ruta, firma
 
@@ -187,7 +188,14 @@
               credenciales.r2 = "/run/secretos/celda-r2.env";
               copias.directorio = "/srv/copias/celda";
               origenPublico = "https://capas.prueba";
-              registroOficial.maxFichas = 2;
+              # Una ficha cada 4 s durante los 2 primeros minutos de la noche: el listado se lleva
+              # uno, y no caben las 40.
+              registroOficial.fichas.ritmo = 4;
+              registroOficial.fichas.ventana = 2;
+              registroOficial.fichas.prioridad = [
+                "17"
+                "08"
+              ];
               registroOficial.zonas = singleton "cataluna";
               registroOficial.zonasEnTurno = [
                 "cataluna"
@@ -284,14 +292,44 @@
                   listados = maquina.succeed("grep --count 'GET antenasmoviles.es /v1/showf' /var/lib/fuentes-de-prueba/peticiones.log").strip()
                   assert listados == "1", listados
                   detalles = [
-                      linea.split()[2].removeprefix("/v1/markers?id=")
+                      linea.split()[3].removeprefix("/v1/markers?id=")
                       for linea in maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
-                      if linea.startswith("GET antenasmoviles.es /v1/markers?")
+                      if " GET antenasmoviles.es /v1/markers?" in linea
                   ]
                   # Primero las dos ER5 sin compañía de Barcelona; nunca la de Madrid ni las copias del registro.
                   assert detalles == ["ER5-08033-1", "MIC-08902-1", "CATR2888X", "CATR6031A"], detalles
                   # La ER5 de Orange de Urquinaona se publica citando antenasmoviles.es con su enlace.
                   maquina.succeed("grep --recursive --fixed-strings --quiet 'https://antenasmoviles.es/#19/41.389648/2.173639' /var/lib/fuentes-de-prueba/r2/celda")
+
+              with subtest("las fichas van a su ritmo y paran al cerrar la ventana, dejando el resto en la cola"):
+                  entorno = maquina.succeed("systemctl show celda-nocturna.service --property=Environment")
+                  for variable in (
+                      "CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS=4",
+                      "CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS=2",
+                      "CELDA_REGISTRO_FICHAS_PRIORIDAD=17,08",
+                      "CELDA_REGISTRO_FICHAS_RELECTURA_DIAS=30",
+                  ):
+                      assert variable in entorno, entorno
+                  assert "CELDA_INGESTA_MAX_FICHAS" not in entorno, entorno
+                  # 2 minutos de ventana, la hora de espera antes de repetir la publicación y una hora más.
+                  tiempo = maquina.succeed("systemctl show celda-nocturna.service --property=TimeoutStartUSec --value").strip()
+                  assert tiempo == "2h 2min", tiempo
+
+                  lineas = maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
+                  geoportal = [linea.split() for linea in lineas if " geoportal.minetur.gob.es " in linea]
+                  inicio = float(geoportal[0][0])
+                  fichas = [float(campos[0]) for campos in geoportal if "/VCTEL/detalleEstacion.do" in campos[3]]
+                  huecos = [b - a for a, b in zip(fichas, fichas[1:])]
+                  print(f"{len(fichas)} fichas, huecos de {min(huecos):.2f} a {max(huecos):.2f} s")
+                  assert 5 <= len(fichas) < 40, len(fichas)
+                  assert min(huecos) >= 3.9, huecos
+                  assert fichas[-1] - inicio < 120, fichas[-1] - inicio
+                  assert f"fichas {len(fichas)} leídas" in estado, estado
+                  assert f"- provincia 08 (Barcelona): {40 - len(fichas)} sin leer, 0 por releer" in estado, estado
+                  assert "ventana cerrada" in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
+                  # Se publica a mitad de la ventana y otra vez al cerrarla.
+                  capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^sitios@'").strip()
+                  assert capas == "2", capas
 
               with subtest("el servicio corre endurecido"):
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))
