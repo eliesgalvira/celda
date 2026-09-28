@@ -1,6 +1,6 @@
 # Capa por provincias con resumen nacional, indexada en un Worker
 
-Estado: propuesta (28/09/2026). Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 3). Si se acepta, cambia el formato de la capa y la parte del ADR 0004 que reservaba PMTiles para más de 20.000 emplazamientos.
+Estado: aceptada el 29/09/2026 con el #43, que la implementa de punta a punta. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 3). Cambia el formato de la capa y la parte del ADR 0004 que reservaba PMTiles para más de 20.000 emplazamientos. Lo que se decidió al implementarla va en «Cómo quedó».
 
 ## Contexto
 
@@ -32,11 +32,46 @@ Con 100.000 sintéticos, la capa única tarda 1.040 ms en indexarse en el hilo p
 - **Transición fiel donde hay detalle.** Entre dos niveles del 8 hacia arriba, la jerarquía de supercluster de cada provincia dice a qué hexágono va cada emplazamiento, como hoy. Entre el resumen y el detalle, cada elemento sale del hexágono de su provincia o va a él. En el borde entre dos provincias pueden quedar dos hexágonos cerca uno del otro, uno de cada una: cada uno cuenta bien los suyos.
 - **Fichas por provincia.** Los lotes de 128 se hacen dentro de cada provincia, ordenados por la curva de Hilbert como hoy, y se nombran por su contenido. Una publicación solo escribe los de las provincias que cambian.
 
+## Cómo quedó (#43)
+
+**Ficheros.** Todo lo publica la publicación compartida (`packages/publicacion`, ADR 0015), igual desde Convex que desde la ingesta nocturna:
+
+- `fichas/<provincia>/<huella>.json`: un lote de hasta 128 fichas vecinas de una provincia, con el lugar de cada una. No lleva la versión dentro: se nombra por su contenido (SHA-256, 16 cifras), así que lo comparten las versiones que no cambian la provincia.
+- `provincias/<provincia>/<huella>.json`: la capa de una provincia, con las columnas del formato 4 salvo la versión, el municipio de cada emplazamiento y la tabla de municipios de la provincia (habitantes, área, número de emplazamientos y compañías). El lote de cada emplazamiento es la posición de su fichero en la lista de lotes de la capa. Los barrios van solo en la de Barcelona.
+- `ficheros@<fecha>.json`: el manifiesto de la versión, con sus capas y sus lotes. La web no lo lee; la retirada de versiones viejas borra solo lo que ya no lista ninguna versión que se queda.
+- `resumen@<fecha>.<huella>.json`: el resumen nacional, con la versión como primera clave, las fuentes de las zonas, las zonas barridas y, por provincia, su nombre, su etiqueta, la caja de sus emplazamientos, su número, sus compañías, si está cubierta, su último barrido y su capa. `vigente.json` lleva su nombre y se escribe el último.
+
+**Cobertura.** En vez de «si alguna zona la cubre entera», una provincia está cubierta si se han barrido todos los cuadros con datos (los 94 de `ZONAS_DE_BARRIDO`, ADR 0014) que tocan sus límites; así una provincia repartida entre dos zonas queda cubierta al barrer las dos. Su último barrido es el más reciente de las zonas que barren alguno de sus cuadros o tocan la caja de sus emplazamientos. Con Cataluña barrida quedan cubiertas sus cuatro provincias, y Huesca, Castellón, Teruel y Zaragoza quedan a medias: tienen los emplazamientos de los cuadros de Cataluña que las tocan, que están todos, pero su número no es el de la provincia. La web enseña esas con su número, el borde discontinuo y «solo una parte», y sin ausencias; las que no tienen nada barrido, sin número y «aún no está».
+
+**Una fecha de barrido nueva no es una versión nueva.** La versión sigue siendo la fecha del último cambio en los datos, y la del barrido va en el resumen. Por eso el resumen lleva la huella en el nombre: si una noche barre sin cambiar nada, la publicación rehace el resumen del anterior con la cobertura nueva, sin leer la instantánea, y escribe solo el resumen y `vigente.json` (`tipo: "barrido"`). Publicar otra vez sin otro barrido no escribe nada.
+
+**Emplazamientos sin provincia.** Uno en el mar lejos de la costa o en un territorio sin provincia va a la capa de la provincia de etiqueta más cercana; su ficha sigue diciendo que no tiene ni municipio ni provincia.
+
+**Web.**
+
+- Por debajo del zoom 8 dibuja el resumen (`crearAgrupadorNacional` en `apps/web/src/capa/nacional.ts`). Desde el 8 pide las provincias con capa cuya caja corta la vista con su margen (`provinciasDeLaVista`) y, al abrir, las de la vista inicial en cuanto llega el resumen, sin esperar al mapa.
+- **Un índice por provincia, no uno global.** Cada provincia se lee y se agrupa en un solo Worker de capas (`capa/worker.ts`), que devuelve la capa leída y los árboles de supercluster transferidos; el hilo principal los rehidrata (`capa/indice.ts`). Un índice global de las provincias cargadas habría que rehacerlo, entero, cada vez que llega una: con 100.000 emplazamientos son 477 ms de Worker con la CPU a ×4 y 45 ms de rehidratar por cada llegada (investigación 08), frente a lo de la provincia que llega. A cambio, en el borde entre dos provincias puede haber dos hexágonos cerca, uno de cada una, y ningún emplazamiento está en dos (prueba en `nacional.test.ts`).
+- Las claves de las agrupaciones y los barrios llevan la provincia (`a:08:123`), así no chocan en la misma escena. La transición es la del agrupador de la provincia donde hay detalle a los dos lados, y desde su hexágono o hacia él cuando un lado es el resumen; también en el mismo nivel, cuando llega una provincia mientras se mira (`pintados.ts` anima entonces aunque no cambie el nivel).
+- Mientras llega una provincia se ve su hexágono dentro de lo que se ve de ella, latiendo y con `aria-busy`. Si no llega, la marca de agua lo dice con un reintento y no se vuelve a pedir sola al mover el mapa. Una provincia leída se queda para la visita; si su capa ya no está en el origen, se lee la de la vigente y se marca con su versión, y la marca de agua da entonces la fecha de lo que se ve de la más antigua a la más reciente.
+- Fuera de lo barrido, de cerca, la marca de agua dice «Celda aún no tiene datos de aquí». El aviso del punto de referencia (#38) usa las cajas de las zonas barridas del resumen, no la de los emplazamientos.
+- Un enlace a una ficha lleva su provincia (`?emplazamiento=…&provincia=08`), que se pide en cuanto llega el resumen; uno sin ella es de antes, de Barcelona.
+- La web solo lee el formato 5. Con un `vigente.json` del 4 dice que la capa no es la esperada; la siguiente publicación, aunque la versión sea la misma, publica el 5.
+
+Medidas del 29/09/2026. La tabla completa y cómo repetirlas están en `docs/patterns/rendimiento.md`.
+
+| Chromium con GPU, CPU ×4, 390 px; medianas de 3 rondas | España sintética, 100.000 | Cataluña real, 5.049 | Barcelona real, 1.294 |
+|---|---|---|---|
+| Primer marcador (hexágono de Barcelona) | 1515 ms | 1509 ms | 1515 ms |
+| Primeros emplazamientos o agrupaciones | 2125 ms | 1991 ms | 1941 ms |
+| Capas al abrir, con gzip | 226 KB | 50 KB | 28 KB |
+| fps: alejar a España · acercar a la calle · alejar a provincias · cruzar provincias | 58,4 · 56,8 · 52,1 · 59,2 | 59,3 · 58,3 · 58,1 · 60,0 | 59,9 · 58,3 · 58,7 · 60,0 |
+| Memoria de la página y sus Workers | 73 MB | 60 MB | 57 MB |
+
 ## Consecuencias
 
-- Abrir la web descarga el resumen (2 KB con gzip) y las provincias de la vista inicial, no toda España.
-- Buscar un emplazamiento por su clave ya no puede recorrer toda la capa en el navegador. Hace falta un índice de claves por provincia en el resumen, o buscar solo en las provincias cargadas y decirlo.
-- La vista de interferencia y las celdas se calculan con las provincias cargadas. En el borde de una provincia sin cargar faltarían vecinos, así que hay que cargar también las provincias vecinas antes de calcular.
+- Abrir la web descarga el resumen (de 2 a 4 KB con gzip, según cuántas zonas lleve) y las provincias de la vista inicial, no toda España.
+- Buscar un emplazamiento por su clave ya no puede recorrer toda la capa en el navegador. Los enlaces llevan la provincia; buscar una clave sin ella queda pendiente.
+- La vista de interferencia y las celdas se calculan con las provincias cargadas. En el borde de una provincia sin cargar faltan vecinos: cargar antes las provincias vecinas queda pendiente para el ticket que lleve esas vistas a toda España.
 - La agrupación sigue dependiendo de detalles internos de supercluster 9.1: `_getOriginZoom` y, ahora, la forma de sus árboles. La versión sigue fijada y una prueba compara las escenas del índice rehidratado con las del construido en el hilo.
 - El resumen es una segunda fuente de verdad para los números por provincia. Sale de la misma instantánea en la misma publicación, así que no puede discrepar de las capas de su versión.
 
