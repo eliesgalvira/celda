@@ -111,6 +111,13 @@ const compararNoches = (
         for (const [fichero, contenido] of deConvex) {
           assert.strictEqual(deNocturna.get(fichero), contenido, `noche ${i + 1}: ${fichero}`);
         }
+        // Las dos ponen en las fichas el municipio del IGN, con los mismos límites.
+        const lotes = [...deConvex].filter(([fichero]) => fichero.startsWith("fichas@"));
+        assert.isNotEmpty(lotes);
+        for (const [fichero, contenido] of lotes) {
+          assert.include(contenido, '"fuenteDeLugares"', fichero);
+          assert.include(contenido, '"municipio":{"codigo":"08019","nombre":"Barcelona"}', fichero);
+        }
       }
     }),
   ).pipe(Effect.provide(TestConfect.layer));

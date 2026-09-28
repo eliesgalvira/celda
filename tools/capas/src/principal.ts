@@ -62,7 +62,9 @@ const configMunicipios = Config.all({
   municipios: Config.String("CELDA_MUNICIPIOS").pipe(
     Config.withDefault("../../packages/publicacion/datos/municipios.json"),
   ),
-  padron: Config.String("CELDA_PADRON").pipe(Config.withDefault("../../packages/publicacion/datos/padron.json")),
+  padron: Config.String("CELDA_PADRON").pipe(
+    Config.withDefault("../../packages/publicacion/datos/padron.json"),
+  ),
   cache: Config.String("CELDA_CACHE").pipe(
     Config.orElse(() =>
       Config.String("XDG_CACHE_HOME").pipe(Config.map((carpeta) => `${carpeta}/celda`)),
