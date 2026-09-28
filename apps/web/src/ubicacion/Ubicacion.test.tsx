@@ -239,6 +239,109 @@ describe("punto de referencia: pedir la ubicación", () => {
   });
 });
 
+describe("punto de referencia: volver a pedir la ubicación", () => {
+  it("encender, quitar y volver a encender: la segunda vez también llega", async () => {
+    const { panel, gps } = await abrir({ permiso: "concedido" });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    gps.responder(LECTURA);
+    fireEvent.click(await panel().findByRole("button", { name: "Quitar" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 0);
+    });
+    // Una lectura tardía de la vigilancia quitada no vuelve a poner la ubicación.
+    gps.responderTarde(LECTURA);
+    flush();
+    assert.isNotNull(panel().getByRole("heading", { name: "¿Desde dónde lo miramos?" }));
+
+    fireEvent.click(panel().getByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    assert.strictEqual(gps.pedidas(), 2);
+    gps.responder({ ...LECTURA, precision: 15 });
+    await waitFor(() => {
+      assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /±15 m/u);
+    });
+  });
+
+  it("al recargar con el permiso ya dado, la pide sin paso previo y llega", async () => {
+    const { panel, gps, queryByRole } = await abrir({ permiso: "concedido" });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    assert.isNull(queryByRole("dialog"));
+    await waitFor(() => {
+      assert.strictEqual(gps.pedidas(), 1);
+    });
+    gps.responder({ ...LECTURA, precision: 1500 });
+    // Una lectura aproximada ya se enseña, con su margen, mientras mejora.
+    await waitFor(() => {
+      assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /±1500 m/u);
+    });
+    assert.isNotNull(panel().getByText(/la distancia es aproximada/u));
+  });
+
+  it("si no llega a tiempo, lo dice y deja volver a intentarlo o elegir en el mapa", async () => {
+    const { panel, gps } = await abrir({ permiso: "concedido" });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    gps.fallar("tiempo-agotado");
+    await panel().findByText(/ha tardado demasiado/u);
+    assert.strictEqual(gps.abiertas(), 0);
+    assert.isNull(panel().queryByText("Buscando tu ubicación…"));
+    assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
+
+    fireEvent.click(panel().getByRole("button", { name: "Volver a intentarlo" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    assert.strictEqual(gps.pedidas(), 2);
+    gps.responder(LECTURA);
+    await waitFor(() => {
+      assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /±25 m/u);
+    });
+  });
+
+  it("mientras la busca, elegir en el mapa deja de buscarla", async () => {
+    const { panel, gps, findByRole } = await abrir({ permiso: "concedido" });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    assert.isNotNull(panel().getByText("Buscando tu ubicación…"));
+    fireEvent.click(panel().getByRole("button", { name: "Elegir en el mapa" }));
+    flush();
+    assert.isNotNull(await findByRole("region", { name: "Elige un punto" }));
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 0);
+    });
+  });
+
+  it("en un ordenador sin de dónde sacar la posición, explica que no es un fallo de Celda", async () => {
+    const { panel, gps } = await abrir({ permiso: "concedido" });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    gps.fallar("sin-fuente");
+    const aviso = await panel().findByText(/Los ordenadores no tienen GPS/u);
+    assert.match(aviso.textContent ?? "", /No es un fallo de Celda/u);
+    assert.match(aviso.textContent ?? "", /busca una dirección/u);
+    assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
+  });
+});
+
 describe("punto de referencia: ubicación denegada", () => {
   it("si se deniega, explica cómo reactivarla y ofrece elegir un punto", async () => {
     const { panel, pulsar, getByRole, gps } = await abrir();

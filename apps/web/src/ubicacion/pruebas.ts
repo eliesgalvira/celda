@@ -29,6 +29,11 @@ export interface GeolocalizacionDePrueba {
   readonly abiertas: () => number;
   /** Entrega una lectura a las peticiones abiertas. */
   readonly responder: (lectura: LecturaGps) => void;
+  /**
+   * Entrega una lectura a las peticiones ya cerradas, como un navegador que llama tarde a la
+   * función de una vigilancia que ya se quitó.
+   */
+  readonly responderTarde: (lectura: LecturaGps) => void;
   /** Hace fallar las peticiones abiertas, como si el navegador lo dijera. */
   readonly fallar: (motivo: MotivoFalloGps) => void;
 }
@@ -37,6 +42,7 @@ export interface GeolocalizacionDePrueba {
 export const geolocalizacionDePrueba = (permiso: Permiso): GeolocalizacionDePrueba => {
   let pedidas = 0;
   const colas: Array<Queue.Queue<LecturaGps, UbicacionNoDisponible | Cause.Done>> = [];
+  const cerradas: Array<Queue.Queue<LecturaGps, UbicacionNoDisponible | Cause.Done>> = [];
   const seguir = Stream.callback<LecturaGps, UbicacionNoDisponible>((cola) =>
     Effect.acquireRelease(
       Effect.sync(() => {
@@ -46,6 +52,7 @@ export const geolocalizacionDePrueba = (permiso: Permiso): GeolocalizacionDePrue
       () =>
         Effect.sync(() => {
           colas.splice(colas.indexOf(cola), 1);
+          cerradas.push(cola);
         }),
     ),
   );
@@ -58,6 +65,9 @@ export const geolocalizacionDePrueba = (permiso: Permiso): GeolocalizacionDePrue
     abiertas: () => colas.length,
     responder: (lectura) => {
       for (const cola of colas) Queue.offerUnsafe(cola, lectura);
+    },
+    responderTarde: (lectura) => {
+      for (const cola of cerradas) Queue.offerUnsafe(cola, lectura);
     },
     fallar: (motivo) => {
       for (const cola of colas) {
