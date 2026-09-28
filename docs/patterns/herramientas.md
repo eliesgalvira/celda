@@ -7,7 +7,7 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 - **vite-plus** (`vp`) hace el build, el lint con oxlint, el formato con oxfmt y las pruebas con Vitest 5. `vite` es un alias de `@voidzero-dev/vite-plus-core`.
 - **TypeScript 7** (`typescript@7.0.2`, el compilador nativo) con el parche de `@effect/tsgo`. El script `prepare` lo aplica en cada `pnpm install`. `tsc --noEmit` da los errores de tipos y los diagnósticos de Effect del `tsconfig.base.json` como errores. En un worktree nuevo el parche no estaba aplicado tras `pnpm install`, y `typecheck` pasaba en local sin los diagnósticos de Effect que la CI sí da. Si dudas, ejecuta `pnpm run prepare` antes de `typecheck`.
 - **Solid 2** RC con `@solidjs/vite-plugin` en modo SPA. Las pruebas de componentes usan `@solidjs/testing-library` sobre happy-dom.
-- **Nix** con flake-parts e import-tree: cada `nix/*.mod.nix` se carga solo.
+- **Nix** con flake-parts e import-tree: cada `nix/*.mod.nix` se carga solo. El flake también exporta la ingesta nocturna como paquete y módulo de NixOS, con sus comprobaciones en `nix flake check`. Cómo se usa desde otro flake y cómo se actualiza el hash de sus dependencias de pnpm cuando cambia el lockfile: [nixos.md](nixos.md).
 - **SQLite** en la ingesta nocturna con `@effect/sql-sqlite-node`, que en Effect 4 va sobre `node:sqlite` de Node 24, sin compilar nada. El módulo es síncrono: dos conexiones del mismo proceso que se esperan bloquean el bucle de eventos (ver [convex.md](convex.md)).
 
 ## Ajustes
