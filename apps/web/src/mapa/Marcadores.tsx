@@ -3,7 +3,7 @@ import type { Barrio } from "@celda/dominio/barrio";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import type { Map as MapaMapLibre } from "maplibre-gl";
-import { createMemo, createSignal, onSettled, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 
 import {
   crearAgrupador,
@@ -31,6 +31,11 @@ export interface MarcadoresProps {
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento (con el ratón, el dedo o el teclado). */
   readonly alSeleccionar: (clave: string) => void;
+  /**
+   * Los emplazamientos sueltos que se ven al decidir qué se dibuja: sus fichas se pueden abrir
+   * con un toque, así que conviene tenerlas ya.
+   */
+  readonly alVer?: (claves: ReadonlyArray<string>) => void;
 }
 
 /**
@@ -90,6 +95,22 @@ export function Marcadores(props: MarcadoresProps) {
       punto.x < lienzo.clientWidth + MEDIO_MARCADOR &&
       punto.y < lienzo.clientHeight + MEDIO_MARCADOR;
   });
+
+  createEffect(
+    () => {
+      const ahora = escena();
+      const proyectarAhora = proyectar();
+      const seVeAhora = seVe();
+      return [...(ahora?.elementos.values() ?? [])].flatMap((elemento) =>
+        elemento.tipo === "emplazamiento" && seVeAhora(proyectarAhora(elemento.posicion))
+          ? [elemento.emplazamiento.clave]
+          : [],
+      );
+    },
+    (claves) => {
+      if (claves.length > 0) props.alVer?.(claves);
+    },
+  );
 
   /**
    * Las etiquetas de barrio que caben enteras en la pantalla y las que van compactas. Se decide

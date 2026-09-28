@@ -47,7 +47,10 @@ export const fichasDePrueba = (): FichasDePrueba => {
     });
 
   return {
-    capa: Layer.succeed(FichasPublicadas, FichasPublicadas.of({ leer })),
+    capa: Layer.succeed(
+      FichasPublicadas,
+      FichasPublicadas.of({ leer, precargar: () => Effect.void }),
+    ),
     responder: (clave, respuesta) => {
       for (const lectura of lecturas.filter((l) => l.clave === clave)) {
         lecturas.splice(lecturas.indexOf(lectura), 1);

@@ -36,6 +36,7 @@ import { SIN_ZONA, type ZonaEnMapa } from "../ejercicio/zona.ts";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
+import { FichasPublicadas } from "../ficha/servicio.ts";
 import {
   crearInterferencia,
   lienzoDelMapa as lienzoDeInterferencia,
@@ -434,6 +435,11 @@ export function PantallaMapa() {
     );
   });
 
+  /** Las fichas de lo que se ve de cerca se descargan antes de tocarlas (ver `FichasPublicadas`). */
+  const precargarFichas = (claves: ReadonlyArray<string>) => {
+    void datos.runPromise(Effect.flatMap(FichasPublicadas, (fichas) => fichas.precargar(claves)));
+  };
+
   /** Abre la ficha y, si el marcador queda debajo del panel, mueve el mapa lo justo. */
   const seleccionar = (clave: string) => {
     navegar(ruta.emplazamiento(clave));
@@ -526,6 +532,7 @@ export function PantallaMapa() {
                       barrios={barrios()}
                       seleccionada={seleccionada()}
                       alSeleccionar={seleccionar}
+                      alVer={precargarFichas}
                     />
                     <ReferenciaEnMapa
                       mapa={actual()}

@@ -28,8 +28,22 @@ class LoteRetirado extends Schema.TaggedError<LoteRetirado>()("LoteRetirado", {
  */
 export class FichasPublicadas extends Context.Service<
   FichasPublicadas,
-  { readonly leer: (clave: string) => Effect.Effect<Option.Option<Ficha>, FichaNoLeida> }
+  {
+    readonly leer: (clave: string) => Effect.Effect<Option.Option<Ficha>, FichaNoLeida>;
+    /**
+     * Descarga ya el lote de las fichas de estas claves, sin abrir ninguna, para que abrirlas
+     * después no espere a la red. Pide como mucho `LOTES_PRECARGADOS` lotes, los que más claves
+     * tienen. No falla: si no llega, abrir la ficha lo vuelve a intentar.
+     */
+    readonly precargar: (claves: ReadonlyArray<string>) => Effect.Effect<void>;
+  }
 >()("@celda/web/ficha/servicio/FichasPublicadas") {}
+
+/**
+ * Cuántos lotes se precargan de una vez. De cerca, lo que se ve cae en uno o dos lotes; más lejos,
+ * los marcadores sueltos caen en muchos y no se sabe cuál se va a abrir.
+ */
+export const LOTES_PRECARGADOS = 2;
 
 /** Qué lote de fichas tiene cada clave en cada capa leída. */
 const lotesPorCapa = new WeakMap<CapaLeida, ReadonlyMap<string, number>>();
@@ -154,6 +168,28 @@ export const fichasDelOrigen = Layer.effect(
       );
     });
 
-    return FichasPublicadas.of({ leer });
+    const precargar = Effect.fn("FichasPublicadas.precargar")(
+      function* (claves: ReadonlyArray<string>) {
+        const capa = yield* capas.cargar;
+        const cuantas = new Map<number, number>();
+        for (const clave of claves) {
+          const lote = Option.getOrUndefined(loteDe(capa, clave));
+          if (lote !== undefined) cuantas.set(lote, (cuantas.get(lote) ?? 0) + 1);
+        }
+        const lotes = [...cuantas]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, LOTES_PRECARGADOS)
+          .map(([lote]) => lote);
+        yield* Effect.forEach(lotes, (lote) => loteLeido(capa.version, lote), {
+          concurrency: "unbounded",
+          discard: true,
+        });
+      },
+      Effect.catch((error) =>
+        Effect.logDebug("No se ha podido precargar un lote de fichas", error),
+      ),
+    );
+
+    return FichasPublicadas.of({ leer, precargar });
   }),
 );
