@@ -458,18 +458,20 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                         tecnología: se deduce de la banda y por eso la tabla dice «probable» o
                         «posible».
                       </TextoEjercicio>
-                      <AccionesEjercicio>
-                        <Boton
-                          variante="secundario"
-                          cargando={bandas().tipo === "leyendo"}
-                          onClick={leer}
-                        >
-                          {leidas() === undefined
-                            ? `Leer las fichas de ${entero(enZona().length)} emplazamientos`
-                            : "Volver a leerlas"}
-                        </Boton>
-                      </AccionesEjercicio>
+                      {/*
+                        Leídas una vez no hay nada que volver a leer: las fichas y la capa son de
+                        la misma versión publicada.
+                      */}
                       <Show when={leidas() === undefined}>
+                        <AccionesEjercicio>
+                          <Boton
+                            variante="secundario"
+                            cargando={bandas().tipo === "leyendo"}
+                            onClick={leer}
+                          >
+                            {`Leer las fichas de ${entero(enZona().length)} emplazamientos`}
+                          </Boton>
+                        </AccionesEjercicio>
                         <TextoEjercicio>
                           La capa del mapa trae bandas de {entero(conBandasEnCapa())} de los{" "}
                           {entero(enZona().length)} emplazamientos de la zona. De los demás, la
