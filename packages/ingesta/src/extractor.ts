@@ -1,5 +1,6 @@
 import { Coordenada } from "@celda/dominio/area";
 import type { Banda } from "@celda/dominio/banda";
+import type { Caja } from "@celda/dominio/barrido";
 import { Compania } from "@celda/dominio/compania";
 import { Afirmacion, type Fuente } from "@celda/dominio/observacion";
 import * as Context from "effect/Context";
@@ -82,6 +83,38 @@ export class Extractor extends Context.Service<
     readonly ficha: (registro: Registro) => Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor>;
   }
 >()("@celda/ingesta/extractor") {}
+
+/** Lo que devuelve una fuente al pedirle el listado de una caja, en una sola petición. */
+export interface ListadoDeCaja {
+  /** Sin repetir y ordenados por clave. */
+  readonly registros: ReadonlyArray<Registro>;
+  readonly avisos: ReadonlyArray<string>;
+  /**
+   * Si la respuesta llega al tope de elementos de la fuente. Entonces le pueden faltar
+   * registros sin que la fuente avise, y la caja hay que dividirla.
+   */
+  readonly enElTope: boolean;
+  /** Bytes de la respuesta. */
+  readonly bytes: number;
+}
+
+/**
+ * Extractor de una fuente cuyo listado se pide por cajas y corta en un tope, como el registro
+ * oficial. Qué cajas se piden lo decide el barrido por zonas (`barrido.ts`). Igual que
+ * `Extractor`, vive lo que dura una ejecución.
+ */
+export class ExtractorPorCajas extends Context.Service<
+  ExtractorPorCajas,
+  {
+    readonly fuente: Fuente;
+    /** El listado de una caja, bordes incluidos. */
+    readonly caja: (caja: Caja) => Effect.Effect<ListadoDeCaja, ErrorDeExtractor>;
+    /** Lee las bandas de la ficha de un registro. */
+    readonly ficha: (registro: Registro) => Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor>;
+    /** Peticiones hechas a la fuente desde que se construyó, con los reintentos. */
+    readonly peticiones: Effect.Effect<number>;
+  }
+>()("@celda/ingesta/extractor/ExtractorPorCajas") {}
 
 /**
  * Un punto del listado de una fuente que agrupa estaciones base, como un marcador de

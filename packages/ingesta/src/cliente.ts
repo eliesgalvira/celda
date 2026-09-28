@@ -59,6 +59,8 @@ export interface ClienteDeFuente {
    * pasajeros y devuelve la respuesta con su estado, sea cual sea.
    */
   readonly pedir: (url: string) => Effect.Effect<Respuesta, ErrorDeExtractor>;
+  /** Peticiones hechas hasta ahora, con `robots.txt` y los reintentos. */
+  readonly peticiones: Effect.Effect<number>;
 }
 
 /**
@@ -150,6 +152,9 @@ export const clienteDeFuente = Effect.fn("ClienteDeFuente.crear")(function* (
     return yield* conReintentos(url);
   });
 
-  const resultado: ClienteDeFuente = { pedir };
+  const resultado: ClienteDeFuente = {
+    pedir,
+    peticiones: Effect.map(Ref.get(cuenta), (c) => c.hechas),
+  };
   return resultado;
 });

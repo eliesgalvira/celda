@@ -39,7 +39,7 @@ export const EstadoEjecucion = Schema.Literals([
 ]);
 export type EstadoEjecucion = typeof EstadoEjecucion.Type;
 
-const Cuentas = Schema.Struct({
+export const Cuentas = Schema.Struct({
   creados: Schema.Int,
   cambiados: Schema.Int,
   retirados: Schema.Int,

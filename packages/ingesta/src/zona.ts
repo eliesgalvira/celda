@@ -1,5 +1,6 @@
-/** Rectángulo en grados, en el orden de `bbox`: oeste, sur, este y norte. */
-export type Caja = readonly [oeste: number, sur: number, este: number, norte: number];
+import type { Caja } from "@celda/dominio/barrido";
+
+export type { Caja };
 
 /** La caja de Barcelona de la investigación del registro oficial. */
 export const ZONA_BARCELONA: Caja = [2.052, 41.317, 2.229, 41.468];

@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 
 import { type Cambios, type Cuentas, SIN_CAMBIOS } from "./ejecucion.ts";
-import { describirError, Extractor, type Registro } from "./extractor.ts";
+import { describirError, type ErrorDeExtractor, Extractor, type Registro } from "./extractor.ts";
 
 /** Cuánto hace cada ejecución, aparte del extractor. */
 export interface OpcionesProceso {
@@ -123,6 +123,52 @@ const trozos = <A>(elementos: ReadonlyArray<A>, tamano: number): ReadonlyArray<R
     elementos.slice(i * tamano, (i + 1) * tamano),
   );
 
+/** Lo que necesita `leerFichas`. */
+export interface LecturaDeFichas {
+  /** Los registros cuya ficha toca leer, en orden. */
+  readonly pendientes: ReadonlyArray<Registro>;
+  readonly ficha: (registro: Registro) => Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor>;
+  /** Guarda las bandas de una ficha; `true` si han cambiado. */
+  readonly aplicar: (clave: string, bandas: ReadonlyArray<Banda>) => Effect.Effect<boolean>;
+  readonly fallosSeguidos: number;
+}
+
+/** Lo que ha hecho `leerFichas`. */
+export interface FichasLeidas {
+  readonly leidas: number;
+  readonly cambiadas: number;
+  readonly errores: ReadonlyArray<string>;
+}
+
+/**
+ * Lee las fichas pendientes una a una y guarda sus bandas. Tras `fallosSeguidos` fallos
+ * seguidos, o al gastar el tope de peticiones, deja las demás para la próxima ejecución.
+ */
+export const leerFichas = Effect.fn("Ingesta.leerFichas")(function* (lectura: LecturaDeFichas) {
+  const errores: Array<string> = [];
+  let leidas = 0;
+  let cambiadas = 0;
+  let fallos = 0;
+  for (const registro of lectura.pendientes) {
+    const bandas = yield* Effect.result(lectura.ficha(registro));
+    if (Result.isFailure(bandas)) {
+      errores.push(describirError(bandas.failure));
+      fallos++;
+      if (fallos >= lectura.fallosSeguidos || bandas.failure._tag === "LimiteDePeticiones") {
+        errores.push("Fichas pendientes para la próxima ejecución");
+        break;
+      }
+      continue;
+    }
+    fallos = 0;
+    const cambiada = yield* lectura.aplicar(registro.clave, bandas.success);
+    leidas++;
+    cambiadas += cambiada ? 1 : 0;
+  }
+  const hecho: FichasLeidas = { leidas, cambiadas, errores };
+  return hecho;
+});
+
 /**
  * Una ejecución de ingesta de la fuente del `Extractor`, sobre la `BaseDeIngesta`:
  *
@@ -162,36 +208,24 @@ export const ejecutarIngesta = Effect.fn("Ingesta.ejecutar")(function* (opciones
   const { registros, avisos } = listado.success;
 
   const observaciones = { creados: 0, cambiados: 0 };
-  const fichas = { leidas: 0, cambiadas: 0 };
   for (const lote of trozos(registros, opciones.lote)) {
     const escritos = yield* base.aplicarListado(fuente, inicio, lote);
     observaciones.creados += escritos.creados;
     observaciones.cambiados += escritos.cambiados;
   }
 
-  const pendientes = yield* base.pendientesDeFicha(
-    fuente,
-    inicio - Duration.toMillis(opciones.rotacion),
-    opciones.maxFichas,
-  );
-  const errores: Array<string> = [...avisos];
-  let fallos = 0;
-  for (const registro of pendientes) {
-    const bandas = yield* Effect.result(extractor.ficha(registro));
-    if (Result.isFailure(bandas)) {
-      errores.push(describirError(bandas.failure));
-      fallos++;
-      if (fallos >= opciones.fallosSeguidos || bandas.failure._tag === "LimiteDePeticiones") {
-        errores.push("Fichas pendientes para la próxima ejecución");
-        break;
-      }
-      continue;
-    }
-    fallos = 0;
-    const cambiada = yield* base.aplicarFicha(fuente, registro.clave, inicio, bandas.success);
-    fichas.leidas++;
-    fichas.cambiadas += cambiada ? 1 : 0;
-  }
+  const leidas = yield* leerFichas({
+    pendientes: yield* base.pendientesDeFicha(
+      fuente,
+      inicio - Duration.toMillis(opciones.rotacion),
+      opciones.maxFichas,
+    ),
+    ficha: extractor.ficha,
+    aplicar: (clave, bandas) => base.aplicarFicha(fuente, clave, inicio, bandas),
+    fallosSeguidos: opciones.fallosSeguidos,
+  });
+  const errores = [...avisos, ...leidas.errores];
+  const fichas = { leidas: leidas.leidas, cambiadas: leidas.cambiadas };
 
   const { retirados } = yield* base.cerrarBarrido(
     ejecucion,
