@@ -23,6 +23,7 @@ import { capaDePuntosGrabada, muestraAntenasMoviles } from "@celda/ingesta/prueb
 import { capaGrabada, type FuenteGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
+import { conCuadros } from "@celda/publicacion/zonas";
 import { retirarVersionesViejas, VERSIONES_ANTERIORES } from "@celda/publicacion/publicar";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
@@ -127,7 +128,7 @@ const MUNICIPIOS: LimitesDeMunicipios = {
     [v(2.115), v(41), v(0.885), 0, 0, v(1), -v(0.885), 0],
   ],
 };
-const ZONAS = {
+const ZONAS = conCuadros({
   barrios: LIMITES,
   municipios: indexarMunicipios(MUNICIPIOS),
   padron: {
@@ -140,7 +141,7 @@ const ZONAS = {
     },
     municipios: [{ codigo: "08019", habitantes: 1_702_547 }],
   },
-};
+});
 
 interface Escrituras {
   /** Ficheros escritos de nuevo, en orden, con `vigente.json` cada vez que cambia. */
@@ -796,6 +797,8 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
             }
           }),
         ),
+      // Nueve publicaciones seguidas: con la máquina cargada pasa de los 5 s por defecto.
+      30_000,
     );
 
     it.effect("publicar retira la más vieja cuando la nueva deja ocho anteriores", () =>

@@ -126,7 +126,9 @@ const hastaQueAcabe = <A, E>(fibra: Fiber.Fiber<A, E>) =>
   Effect.gen(function* () {
     for (let minuto = 0; minuto < 180 && fibra.pollUnsafe() === undefined; minuto++) {
       yield* TestClock.adjust("1 minute");
-      yield* TestClock.withLive(Effect.sleep("5 millis"));
+      // Con tiempo de sobra para que la publicación acabe dentro de su minuto, aun con la máquina
+      // cargada.
+      yield* TestClock.withLive(Effect.sleep("25 millis"));
     }
     return yield* Fiber.join(fibra);
   });

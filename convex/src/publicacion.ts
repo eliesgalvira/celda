@@ -1,7 +1,7 @@
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import type { AlmacenDeFicheros } from "@celda/publicacion/almacen";
-import { coberturaCon, zonaDeLaCaja } from "@celda/publicacion/cobertura";
+import { zonaDeLaCaja } from "@celda/publicacion/cobertura";
 import {
   DatosNoDisponibles,
   DatosPublicables,
@@ -54,12 +54,13 @@ const datosDeConvex = Effect.gen(function* () {
       consulta(refs.internal.capas.fichas, { claves }).pipe(Effect.mapError(noDisponible)),
     // La caja que recorre el extractor, con su última ejecución completada.
     cobertura: consulta(refs.internal.datos.version).pipe(
-      Effect.map(({ consultas }) =>
-        coberturaCon(
-          [zonaDeLaCaja(RegistroOficial.OPCIONES.zona)],
+      Effect.map(({ consultas }) => [
+        zonaDeLaCaja(
+          RegistroOficial.OPCIONES.zona,
+          "Caja de Barcelona",
           consultas.find((c) => c.fuente === "registro-oficial")?.consultadoEl ?? null,
         ),
-      ),
+      ]),
       Effect.mapError(noDisponible),
     ),
     registrar: ({ ficheros: _ficheros, ...capa }) =>

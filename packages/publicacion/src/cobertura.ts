@@ -1,24 +1,28 @@
-import type { Caja, ZonaBarrida } from "@celda/dominio/cobertura";
-
-/** Una zona de barrido tal como la configura la ingesta, sin la fecha de su último barrido. */
-export type ZonaDeBarrido = Omit<ZonaBarrida, "barrido">;
+import { type Caja, cajaDeCuadro, type ZonaDeBarrido } from "@celda/dominio/barrido";
+import type { ZonaBarrida } from "@celda/dominio/cobertura";
 
 /**
- * La zona de barrido mientras el registro oficial se lee en una sola caja: la caja entera, que no
- * barre de punta a punta ninguna provincia. Las zonas por celdas y provincias del ADR 0014
- * sustituyen a esta.
+ * La zona de una ingesta que lee el registro oficial en una sola caja, como la de Convex con la
+ * caja de Barcelona: la caja entera, que no barre de punta a punta ningún cuadro.
  */
-export const zonaDeLaCaja = (caja: Caja): ZonaDeBarrido => ({
+export const zonaDeLaCaja = (caja: Caja, titulo: string, barrido: number | null): ZonaBarrida => ({
   nombre: "registro-oficial",
+  titulo,
   cajas: [caja],
-  provincias: [],
+  barrido,
 });
 
 /**
- * Las zonas con la fecha de su último barrido completo: la de la última ejecución completada del
- * registro oficial, que hoy las recorre todas en cada ejecución.
+ * Las zonas de barrido por cuadros (ADR 0014) tal como se publican: sus cuadros como cajas y la
+ * fecha de su último barrido completo, o `null` si aún no se ha completado ninguno.
  */
-export const coberturaCon = (
+export const zonasBarridas = (
   zonas: ReadonlyArray<ZonaDeBarrido>,
-  barrido: number | null,
-): ReadonlyArray<ZonaBarrida> => zonas.map((zona) => ({ ...zona, barrido }));
+  barridos: ReadonlyMap<string, number | null>,
+): ReadonlyArray<ZonaBarrida> =>
+  zonas.map((zona) => ({
+    nombre: zona.nombre,
+    titulo: zona.titulo,
+    cajas: zona.cuadros.map(cajaDeCuadro),
+    barrido: barridos.get(zona.nombre) ?? null,
+  }));

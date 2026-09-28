@@ -3,7 +3,8 @@ import * as Result from "effect/Result";
 
 import type { LimitesDeBarrios } from "./barrio.ts";
 import { type EmplazamientoDeCapa, versionDeCapa } from "./capa.ts";
-import { distanciaALoBarrido, type ZonaBarrida } from "./cobertura.ts";
+import { cajaDeCuadro, zonaDeBarrido } from "./barrido.ts";
+import { cuadrosDeProvincias, distanciaALoBarrido, type ZonaBarrida } from "./cobertura.ts";
 import type { Ficha } from "./ficha.ts";
 import {
   indexarMunicipios,
@@ -106,7 +107,7 @@ const LIMITES: LimitesDeMunicipios = {
     rectangulo(2.1, 41.3, 2.2, 41.5),
     rectangulo(2, 41.3, 2.1, 41.5),
     rectangulo(2.7, 41.9, 2.85, 42.1),
-    rectangulo(2.85, 41.9, 3, 42.1),
+    rectangulo(2.85, 41.9, 2.98, 42.1),
   ],
 };
 const INDICE = indexarMunicipios(LIMITES);
@@ -184,17 +185,19 @@ const ficha = (e: EmplazamientoDeCapa): Ficha => ({
 });
 
 const CATALUNA: ZonaBarrida = {
-  nombre: "Cataluña",
-  cajas: [[0, 40.5, 3.4, 42.9]],
-  provincias: ["08", "17", "25", "43"],
+  nombre: "cataluna",
+  titulo: "Cataluña",
+  cajas: (zonaDeBarrido("cataluna")?.cuadros ?? []).map(cajaDeCuadro),
   barrido: NOCHE,
 };
 const CAJA_DE_BARCELONA: ZonaBarrida = {
-  nombre: "Caja de Barcelona",
+  nombre: "registro-oficial",
+  titulo: "Caja de Barcelona",
   cajas: [[2.052, 41.317, 2.229, 41.468]],
-  provincias: [],
   barrido: NOCHE - 86_400_000,
 };
+/** Los cuadros con datos que toca cada provincia de los límites de prueba. */
+const CUADROS = cuadrosDeProvincias(INDICE);
 
 describe("situar los emplazamientos por provincias", () => {
   it("cada uno va a la provincia de su municipio, y las provincias y sus listas van ordenadas", () => {
@@ -394,6 +397,7 @@ describe("resumen nacional", () => {
       fuentes: FUENTES,
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
+      cuadros: CUADROS,
     });
     assert.isTrue(contenido.startsWith(`{"version":"${VERSION}","formato":5,`));
     const leido = leerResumen(contenido, VERSION);
@@ -421,18 +425,19 @@ describe("resumen nacional", () => {
     );
   });
 
-  it("una provincia solo está cubierta si una zona la barre entera; el barrido es el de lo que la toca", () => {
+  it("una provincia está cubierta si se han barrido todos sus cuadros con datos", () => {
     const contenido = generarResumen({
       version: VERSION,
       fuentes: FUENTES,
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
+      cuadros: CUADROS,
     });
     const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
     assert.deepStrictEqual(
       leido?.provincias.map((p) => [p.codigo, p.cubierta, p.barrido]),
       [
-        // La caja de Barcelona toca sus emplazamientos, pero no la barre entera.
+        // La caja de Barcelona toca sus emplazamientos, pero no barre ningún cuadro entero.
         ["08", false, NOCHE - 86_400_000],
         ["17", false, null],
         ["43", false, null],
@@ -446,6 +451,7 @@ describe("resumen nacional", () => {
           fuentes: FUENTES,
           cobertura: [CAJA_DE_BARCELONA, CATALUNA],
           provincias,
+          cuadros: CUADROS,
         }),
         VERSION,
       ),
@@ -455,7 +461,8 @@ describe("resumen nacional", () => {
       [
         ["08", true, NOCHE],
         ["17", true, NOCHE],
-        ["43", true, NOCHE],
+        // Sin límites en la prueba no toca ningún cuadro: no se sabe nada de ella.
+        ["43", false, null],
       ],
     );
   });
@@ -466,6 +473,7 @@ describe("resumen nacional", () => {
       fuentes: FUENTES,
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
+      cuadros: CUADROS,
     });
     const leido = Result.getOrUndefined(leerResumen(antes, VERSION));
     if (leido === undefined) return assert.fail("no se lee");
@@ -474,10 +482,17 @@ describe("resumen nacional", () => {
       fuentes: leido.fuentes,
       cobertura: [CATALUNA],
       provincias: leido.provincias,
+      cuadros: CUADROS,
     });
     assert.strictEqual(
       rehecho,
-      generarResumen({ version: VERSION, fuentes: FUENTES, cobertura: [CATALUNA], provincias }),
+      generarResumen({
+        version: VERSION,
+        fuentes: FUENTES,
+        cobertura: [CATALUNA],
+        provincias,
+        cuadros: CUADROS,
+      }),
     );
   });
 
@@ -487,6 +502,7 @@ describe("resumen nacional", () => {
       fuentes: FUENTES,
       cobertura: [],
       provincias,
+      cuadros: CUADROS,
     });
     const leido = leerResumen(contenido, versionDeCapa(NOCHE + 1000));
     assert.isTrue(Result.isFailure(leido));
@@ -502,6 +518,17 @@ describe("resumen nacional", () => {
 });
 
 describe("hasta dónde llegan los datos", () => {
+  it("cada provincia toca los cuadros con datos en que caen sus límites", () => {
+    assert.deepStrictEqual([...(CUADROS.get("08") ?? [])], ["2,41"]);
+    assert.deepStrictEqual([...(CUADROS.get("17") ?? [])].toSorted(), ["2,41", "2,42"]);
+    assert.isUndefined(CUADROS.get("43"));
+  });
+
+  it("una zona que aún no ha acabado ningún barrido no cuenta", () => {
+    const sinAcabar = { ...CATALUNA, barrido: null };
+    assert.isUndefined(distanciaALoBarrido({ longitud: 2.15, latitud: 41.4 }, [sinAcabar]));
+  });
+
   it("un punto en una caja barrida está a 0 m; fuera, a la distancia de la más cercana", () => {
     assert.strictEqual(
       distanciaALoBarrido({ longitud: 2.15, latitud: 41.4 }, [CAJA_DE_BARCELONA]),

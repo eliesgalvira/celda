@@ -1,5 +1,6 @@
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import { CACHE_INMUTABLE, CACHE_VIGENTE } from "@celda/publicacion/almacenes/r2";
+import { conCuadros } from "@celda/publicacion/zonas";
 import { publicar as publicarInstantanea } from "@celda/convex/publicacion";
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import { NodeHttpServer, NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -88,7 +89,9 @@ const publicar = Effect.gen(function* () {
   const rutas = yield* configMunicipios;
   const municipios = yield* leerMunicipios(rutas.municipios);
   const padron = yield* leerPadron(rutas.padron);
-  const publicada = yield* publicarInstantanea({ barrios: limites, municipios, padron }).pipe(
+  const publicada = yield* publicarInstantanea(
+    conCuadros({ barrios: limites, municipios, padron }),
+  ).pipe(
     // Punto de entrada de la orden: aquí se montan sus capas, una vez.
     // @effect-diagnostics-next-line strictEffectProvide:off
     Effect.provide(

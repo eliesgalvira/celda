@@ -1,4 +1,6 @@
+import type { Cuadro } from "@celda/dominio/barrido";
 import type { LimitesDeBarrios } from "@celda/dominio/barrio";
+import { cuadrosDeProvincias } from "@celda/dominio/cobertura";
 import {
   type IndiceDeMunicipios,
   indexarMunicipios,
@@ -22,7 +24,18 @@ export interface ZonasDePublicacion {
   readonly barrios: LimitesDeBarrios;
   readonly municipios: IndiceDeMunicipios;
   readonly padron: PadronDeMunicipios;
+  /**
+   * Los cuadros con datos que toca cada provincia (`cuadrosDeProvincias`), para saber si una
+   * provincia está cubierta. Se calculan una vez con los límites.
+   */
+  readonly cuadros: ReadonlyMap<string, ReadonlySet<Cuadro>>;
 }
+
+/** Las zonas con los cuadros de cada provincia calculados. */
+export const conCuadros = (zonas: Omit<ZonasDePublicacion, "cuadros">): ZonasDePublicacion => ({
+  ...zonas,
+  cuadros: cuadrosDeProvincias(zonas.municipios),
+});
 
 const decodificarMunicipios = Schema.decodeUnknownEffect(LimitesDeMunicipios);
 const decodificarPadron = Schema.decodeUnknownEffect(PadronDeMunicipios);
@@ -37,8 +50,11 @@ export const municipiosDeEspana = Effect.map(decodificarMunicipios(municipios), 
 export const padronDeEspana = decodificarPadron(padron);
 
 /** Las zonas de verdad: los barrios de Open Data BCN, los municipios del IGN y el padrón. */
-export const zonasDePublicacion = Effect.all({
-  barrios: limitesDeBarcelona,
-  municipios: municipiosDeEspana,
-  padron: padronDeEspana,
-});
+export const zonasDePublicacion = Effect.map(
+  Effect.all({
+    barrios: limitesDeBarcelona,
+    municipios: municipiosDeEspana,
+    padron: padronDeEspana,
+  }),
+  conCuadros,
+);

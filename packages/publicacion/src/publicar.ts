@@ -122,8 +122,8 @@ export class DatosPublicables extends Context.Service<
       claves: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<Ficha>, DatosNoDisponibles>;
     /**
-     * Las zonas de barrido del registro oficial, con la fecha de su último barrido completo
-     * (ADR 0014): hasta dónde llegan los datos.
+     * Las zonas de barrido del registro oficial que se han empezado a barrer, con la fecha de su
+     * último barrido completo (ADR 0014): hasta dónde llegan los datos.
      */
     readonly cobertura: Effect.Effect<ReadonlyArray<ZonaBarrida>, DatosNoDisponibles>;
     /** Apunta una versión publicada. Registrar otra vez la misma no la duplica. */
@@ -294,9 +294,12 @@ const ficheroPublicado = (fichero: string, contenido: string) =>
 const huellaDe = (contenido: string) => Effect.orDie(sha256(contenido));
 
 /** El resumen de una versión, nombrado por su contenido. */
-const resumenNombrado = (resumen: Parameters<typeof generarResumen>[0]) =>
+const resumenNombrado = (
+  resumen: Omit<Parameters<typeof generarResumen>[0], "cuadros">,
+  zonas: ZonasDePublicacion,
+) =>
   Effect.gen(function* () {
-    const contenido = generarResumen(resumen);
+    const contenido = generarResumen({ ...resumen, cuadros: zonas.cuadros });
     const fichero = ficheroDeResumen(resumen.version, yield* huellaDe(contenido));
     return { fichero, contenido };
   });
@@ -347,7 +350,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
   const previa = yield* vigenteDelAlmacen;
   if (Option.isSome(previa)) {
     if (previa.value.version === version) {
-      const soloCobertura = yield* rehacerCobertura(previa.value, cobertura);
+      const soloCobertura = yield* rehacerCobertura(previa.value, cobertura, zonas);
       if (soloCobertura !== undefined) {
         yield* retirarTrasPublicar(version);
         return soloCobertura;
@@ -448,12 +451,10 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
   );
   const ficheroManifiesto = ficheroDeManifiesto(version);
   yield* guardar(ficheroManifiesto, manifiesto);
-  const resumen = yield* resumenNombrado({
-    version,
-    fuentes: fuentesDe(zonas),
-    cobertura,
-    provincias,
-  });
+  const resumen = yield* resumenNombrado(
+    { version, fuentes: fuentesDe(zonas), cobertura, provincias },
+    zonas,
+  );
   yield* guardar(resumen.fichero, resumen.contenido);
   const publicadoResumen = yield* ficheroPublicado(resumen.fichero, resumen.contenido);
   yield* datos.registrar({
@@ -514,6 +515,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
 const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
   vigente: Vigente,
   cobertura: ReadonlyArray<ZonaBarrida>,
+  zonas: ZonasDePublicacion,
 ) {
   const almacen = yield* AlmacenDeFicheros;
   if (vigente.resumen === undefined) return undefined;
@@ -521,12 +523,15 @@ const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
   if (Option.isNone(contenido)) return undefined;
   const leido = leerResumen(contenido.value, vigente.version);
   if (Result.isFailure(leido)) return undefined;
-  const resumen = yield* resumenNombrado({
-    version: vigente.version,
-    fuentes: leido.success.fuentes,
-    cobertura,
-    provincias: leido.success.provincias,
-  });
+  const resumen = yield* resumenNombrado(
+    {
+      version: vigente.version,
+      fuentes: leido.success.fuentes,
+      cobertura,
+      provincias: leido.success.provincias,
+    },
+    zonas,
+  );
   const igual = resumen.fichero === vigente.resumen;
   if (!igual) {
     yield* almacen.guardar(resumen.fichero, resumen.contenido);

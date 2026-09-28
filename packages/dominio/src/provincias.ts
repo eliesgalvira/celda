@@ -21,11 +21,10 @@ import {
   VersionDistinta,
   versionDeCabecera,
 } from "./capa.ts";
+import { Caja, type Cuadro } from "./barrido.ts";
 import {
-  barridoDeProvincia,
-  Caja,
   cajaDeRectangulo,
-  provinciaCubierta,
+  coberturaDeProvincia,
   rectanguloDeCaja,
   ZonaBarrida,
 } from "./cobertura.ts";
@@ -529,9 +528,9 @@ const ColumnasDelResumen = Schema.Struct({
     caja: Schema.Array(Schema.NullOr(Caja)),
     emplazamientos: Schema.Array(Schema.Int),
     companias: Schema.Array(Schema.Int),
-    /** Si alguna zona de barrido la cubre entera. */
+    /** Si se han barrido todos los cuadros con datos que la tocan (`coberturaDeProvincia`). */
     cubierta: Schema.Array(Schema.Boolean),
-    /** El último barrido completo de lo que se sabe de ella (`barridoDeProvincia`). */
+    /** El último barrido completo de lo que se sabe de ella (`coberturaDeProvincia`). */
     barrido: Schema.Array(Schema.NullOr(Schema.Finite)),
     /** Su capa, o `null` si no tiene emplazamientos. */
     fichero: Schema.Array(Schema.NullOr(Schema.String)),
@@ -594,15 +593,20 @@ export const companiasDeSituados = (
 
 /**
  * El resumen nacional de una versión: una fila por provincia, por código, con si está cubierta y
- * su último barrido según `cobertura`. Es una función pura.
+ * su último barrido según `cobertura` y los cuadros con datos que toca cada una
+ * (`cuadrosDeProvincias`). Es una función pura.
  */
 export const generarResumen = (resumen: {
   readonly version: string;
   readonly fuentes: FuentesDeZonas;
   readonly cobertura: ReadonlyArray<ZonaBarrida>;
   readonly provincias: ReadonlyArray<DatosDeProvincia>;
+  readonly cuadros: ReadonlyMap<string, ReadonlySet<Cuadro>>;
 }): string => {
   const provincias = resumen.provincias.slice().sort(porCodigo);
+  const estados = provincias.map((p) =>
+    coberturaDeProvincia(resumen.cuadros.get(p.codigo) ?? new Set(), p.caja, resumen.cobertura),
+  );
   const columnas: ColumnasDelResumen = {
     version: resumen.version,
     formato: FORMATO_PROVINCIAS,
@@ -616,8 +620,8 @@ export const generarResumen = (resumen: {
       caja: provincias.map((p) => (p.caja === undefined ? null : cajaDeRectangulo(p.caja))),
       emplazamientos: provincias.map((p) => p.emplazamientos),
       companias: provincias.map((p) => mascaraDeCompanias(p.companias)),
-      cubierta: provincias.map((p) => provinciaCubierta(p.codigo, resumen.cobertura)),
-      barrido: provincias.map((p) => barridoDeProvincia(p.codigo, p.caja, resumen.cobertura)),
+      cubierta: estados.map((e) => e.cubierta),
+      barrido: estados.map((e) => e.barrido),
       fichero: provincias.map((p) => p.fichero ?? null),
     },
   };
