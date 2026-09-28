@@ -39,16 +39,30 @@ export const OPCIONES: Opciones = {
   zona: ZONA_BARCELONA,
 };
 
-/** Las opciones se pueden cambiar con variables de entorno del despliegue. */
+/**
+ * Las opciones se pueden cambiar con variables de entorno del despliegue, sin bajar de 3 s entre
+ * peticiones. El primer producto del `User-Agent` es el nombre con el que se busca a Celda en
+ * `robots.txt`, que se respeta siempre.
+ */
 export const opcionesDesdeConfig: Config.Config<Opciones> = Config.all({
   maxPeticiones: Config.Int("CELDA_REGISTRO_MAX_PETICIONES").pipe(
     Config.withDefault(OPCIONES.maxPeticiones),
   ),
   pausaSegundos: Config.Int("CELDA_REGISTRO_PAUSA_SEGUNDOS").pipe(Config.withDefault(3)),
+  userAgent: Config.String("CELDA_REGISTRO_USER_AGENT").pipe(
+    Config.withDefault(OPCIONES.userAgent),
+  ),
+  reintentos: Config.Int("CELDA_REGISTRO_REINTENTOS").pipe(Config.withDefault(OPCIONES.reintentos)),
+  esperaSegundos: Config.Int("CELDA_REGISTRO_ESPERA_SEGUNDOS").pipe(
+    Config.withDefault(Duration.toSeconds(OPCIONES.espera)),
+  ),
 }).pipe(
-  Config.map(({ maxPeticiones, pausaSegundos }) => ({
+  Config.map(({ maxPeticiones, pausaSegundos, userAgent, reintentos, esperaSegundos }) => ({
     ...OPCIONES,
     maxPeticiones,
+    userAgent,
+    reintentos: Math.max(reintentos, 0),
+    espera: Duration.seconds(Math.max(esperaSegundos, 1)),
     pausa: Duration.seconds(Math.max(pausaSegundos, 3)),
   })),
 );

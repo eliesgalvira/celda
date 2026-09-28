@@ -1,0 +1,22 @@
+{
+  "name": "@celda/publicacion",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@celda/dominio": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

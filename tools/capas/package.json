@@ -15,6 +15,7 @@
   "dependencies": {
     "@celda/convex": "workspace:*",
     "@celda/dominio": "workspace:*",
+    "@celda/publicacion": "workspace:*",
     "@confect/core": "catalog:",
     "@confect/server": "catalog:",
     "@effect/platform-node": "catalog:",

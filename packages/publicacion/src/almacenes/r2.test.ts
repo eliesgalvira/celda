@@ -10,9 +10,9 @@ import { TestClock } from "effect/testing";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
-import { codificarConsulta, codificarRuta, firmarV4 } from "../src/almacenes/firma";
-import { almacenEnR2, leerListado } from "../src/almacenes/r2";
-import { AlmacenDeFicheros } from "../src/publicacion";
+import { codificarConsulta, codificarRuta, firmarV4 } from "./firma.ts";
+import { almacenEnR2, leerListado } from "./r2.ts";
+import { AlmacenDeFicheros } from "../almacen.ts";
 
 const PUNTO = "http://r2.prueba";
 const FICHERO = "sitios@2026-09-26T02:15:03Z.json";

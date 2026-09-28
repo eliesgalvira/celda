@@ -7,7 +7,7 @@ import { Coordenada } from "./area.ts";
 import { Mhz } from "./banda.ts";
 import { type Barrio, barrioDelPunto, FuenteDeBarrios, type LimitesDeBarrios } from "./barrio.ts";
 import { Compania } from "./compania.ts";
-import { Estado } from "./emplazamiento.ts";
+import { type Emplazamiento, Estado, type EstacionBase } from "./emplazamiento.ts";
 import { EMPLAZAMIENTOS_POR_LOTE, repartirEnLotes } from "./lotes.ts";
 
 /** Las bandas en que emite la estación base de una compañía, de menor a mayor frecuencia. */
@@ -35,6 +35,32 @@ export const EmplazamientoDeCapa = Schema.Struct({
   bandas: Schema.optionalKey(Schema.Array(BandasDeCapa)),
 });
 export type EmplazamientoDeCapa = typeof EmplazamientoDeCapa.Type;
+
+/**
+ * Las bandas de cada estación base que el registro ya ha dado, sin repetir. Una estación base de
+ * la que no se conoce ninguna no aparece: en la capa, eso es «sin leer», no «sin bandas».
+ */
+const bandasConocidas = (
+  estaciones: ReadonlyArray<Pick<EstacionBase, "compania" | "bandas">>,
+): Array<BandasDeCapa> =>
+  estaciones.flatMap(({ compania, bandas }) => {
+    const mhz = [...new Set(bandas.flatMap((b) => (b.mhz === null ? [] : [b.mhz])))].toSorted(
+      (a, b) => a - b,
+    );
+    return mhz.length === 0 ? [] : [{ compania, mhz }];
+  });
+
+/** Lo que la capa guarda de un emplazamiento con sus estaciones base: compañías y bandas. */
+export const emplazamientoDeCapa = (
+  emplazamiento: Pick<Emplazamiento, "clave" | "posicion" | "estado">,
+  estaciones: ReadonlyArray<Pick<EstacionBase, "compania" | "bandas">>,
+): EmplazamientoDeCapa => ({
+  clave: emplazamiento.clave,
+  posicion: emplazamiento.posicion,
+  estado: emplazamiento.estado,
+  companias: estaciones.map((estacion) => estacion.compania),
+  bandas: bandasConocidas(estaciones),
+});
 
 /** Un emplazamiento tal como sale de la capa: con el barrio en que cae. */
 export interface EmplazamientoLeido extends EmplazamientoDeCapa {

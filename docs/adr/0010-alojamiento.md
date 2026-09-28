@@ -13,7 +13,7 @@ Desde el ADR 0008, lo que se publica son ficheros JSON inmutables, no PMTiles: l
 ## Decisión
 
 - La web estática se sirve desde Vercel en `celda.elies.site`.
-- La publicación escribe la capa, las fichas y `vigente.json` en un cubo de R2, por su API compatible con S3 (`convex/src/almacenes/r2.ts`). Un Worker o una Pages Function con binding a R2 los sirve con sus cabeceras. Es el origen principal de las capas.
+- La publicación escribe la capa, las fichas y `vigente.json` en un cubo de R2, por su API compatible con S3 (`packages/publicacion/src/almacenes/r2.ts`). Un Worker o una Pages Function con binding a R2 los sirve con sus cabeceras. Es el origen principal de las capas.
 - Vercel tiene una copia de los mismos ficheros en `/capas`, en el mismo origen que la web. Es el origen de reserva. `apps/web/scripts/sitio.sh` monta ese sitio: la web construida, lo publicado y `apps/web/vercel.json`.
 - Cabeceras: los ficheros con versión en el nombre llevan `public, max-age=31536000, immutable`; `vigente.json`, `public, max-age=0, must-revalidate`. Una petición de un fichero que no existe da 404, no la página de la web.
 - Los ficheros con versión no cambian nunca y `vigente.json` se escribe el último, cuando la capa y todas sus fichas ya están. El cliente no compara ETag entre orígenes: el nombre versionado basta.

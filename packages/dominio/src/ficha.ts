@@ -1,10 +1,16 @@
 import * as Schema from "effect/Schema";
 
 import { Coordenada } from "./area.ts";
-import { Banda } from "./banda.ts";
+import { Banda, compararBandas, compararTexto } from "./banda.ts";
 import { Compania } from "./compania.ts";
-import { Confianza, Conflicto, Estado } from "./emplazamiento.ts";
-import { Afirmacion, Fuente } from "./observacion.ts";
+import {
+  Confianza,
+  Conflicto,
+  type EmplazamientoSinEstaciones,
+  Estado,
+  type EstacionBase,
+} from "./emplazamiento.ts";
+import { Afirmacion, Fuente, type Observacion } from "./observacion.ts";
 
 /** De dónde sale un dato de la ficha: la observación de una fuente, con su fecha y su enlace. */
 export const OrigenDeFicha = Schema.Struct({
@@ -49,3 +55,47 @@ export const Ficha = Schema.Struct({
   version: Schema.Finite,
 });
 export type Ficha = typeof Ficha.Type;
+
+/** Una estación base del emplazamiento con las observaciones de las que sale, ya leídas. */
+export interface EstacionConOrigenes {
+  readonly estacion: EstacionBase;
+  /** Las observaciones de `estacion.observaciones` que se han encontrado, en su orden. */
+  readonly observaciones: ReadonlyArray<
+    Pick<Observacion, "fuente" | "clave" | "url" | "fecha" | "afirma">
+  >;
+}
+
+/**
+ * La ficha de un emplazamiento con `version`, la fecha en que cambió por última vez. Las
+ * estaciones van por compañía y sus bandas por frecuencia, así que las mismas estaciones dan
+ * siempre la misma ficha, sea cual sea el orden en que lleguen.
+ */
+export const fichaDe = (
+  emplazamiento: EmplazamientoSinEstaciones,
+  version: number,
+  estaciones: ReadonlyArray<EstacionConOrigenes>,
+): Ficha => ({
+  clave: emplazamiento.clave,
+  posicion: emplazamiento.posicion,
+  direccion: emplazamiento.direccion,
+  municipio: emplazamiento.municipio,
+  estado: emplazamiento.estado,
+  confianza: emplazamiento.confianza,
+  conflictos: emplazamiento.conflictos,
+  estaciones: estaciones
+    .toSorted((a, b) => compararTexto(a.estacion.compania, b.estacion.compania))
+    .map(({ estacion, observaciones }) => ({
+      compania: estacion.compania,
+      codigos: estacion.codigos,
+      bandas: estacion.bandas.toSorted(compararBandas),
+      origenes: observaciones.map(({ fuente, clave, url, fecha, afirma }) => ({
+        fuente,
+        clave,
+        url,
+        fecha,
+        afirma,
+      })),
+    })),
+  datosDel: emplazamiento.datosDel,
+  version,
+});

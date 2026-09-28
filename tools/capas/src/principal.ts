@@ -1,5 +1,5 @@
-import { almacenEnCarpeta } from "@celda/convex/almacenes/carpeta";
-import { CACHE_INMUTABLE, CACHE_VIGENTE } from "@celda/convex/almacenes/r2";
+import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
+import { CACHE_INMUTABLE, CACHE_VIGENTE } from "@celda/publicacion/almacenes/r2";
 import { publicar as publicarInstantanea } from "@celda/convex/publicacion";
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import { NodeHttpServer, NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -37,11 +37,11 @@ const configCapas = Config.all({
 });
 
 /**
- * Los límites de barrio que usa `publicar` y que escribe `barrios`, guardados en git junto a la
- * publicación de Convex, que también los lee.
+ * Los límites de barrio que usa `publicar` y que escribe `barrios`, guardados en git en el
+ * paquete de la publicación, que también los lee.
  */
 const configBarrios = Config.String("CELDA_BARRIOS").pipe(
-  Config.withDefault("../../convex/datos/barrios.json"),
+  Config.withDefault("../../packages/publicacion/datos/barrios.json"),
 );
 
 /** Los habitantes por barrio que escribe `poblacion`: la web los lee de su carpeta. */

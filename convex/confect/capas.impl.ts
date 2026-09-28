@@ -1,5 +1,4 @@
-import type { BandasDeCapa } from "@celda/dominio/capa";
-import type { EstacionBase } from "@celda/dominio/emplazamiento";
+import { emplazamientoDeCapa } from "@celda/dominio/capa";
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -9,20 +8,6 @@ import { leerFicha } from "../src/lecturas";
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 import capas from "./capas.spec";
-
-/**
- * Las bandas de cada estación base que el registro ya ha dado, sin repetir. Una estación base de
- * la que no se conoce ninguna no aparece: en la capa, eso es «sin leer», no «sin bandas».
- */
-const bandasConocidas = (
-  estaciones: ReadonlyArray<Pick<EstacionBase, "compania" | "bandas">>,
-): Array<BandasDeCapa> =>
-  estaciones.flatMap(({ compania, bandas }) => {
-    const mhz = [...new Set(bandas.flatMap((b) => (b.mhz === null ? [] : [b.mhz])))].toSorted(
-      (a, b) => a - b,
-    );
-    return mhz.length === 0 ? [] : [{ compania, mhz }];
-  });
 
 /**
  * Una página de emplazamientos con sus compañías y sus bandas. Lee `limite` emplazamientos y sus estaciones
@@ -45,13 +30,7 @@ const instantanea = FunctionImpl.make(
             .table("estacionesBase")
             .index("por_emplazamiento", (q) => q.eq("emplazamiento", e.clave))
             .collect(),
-          (estaciones) => ({
-            clave: e.clave,
-            posicion: e.posicion,
-            estado: e.estado,
-            companias: estaciones.map((estacion) => estacion.compania),
-            bandas: bandasConocidas(estaciones),
-          }),
+          (estaciones) => emplazamientoDeCapa(e, estaciones),
         ),
       );
       return {

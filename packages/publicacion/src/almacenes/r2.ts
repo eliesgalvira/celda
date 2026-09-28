@@ -8,8 +8,8 @@ import * as Redacted from "effect/Redacted";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
-import { AlmacenDeFicheros, AlmacenNoDisponible, FicheroInmutable } from "../publicacion";
-import { codificarConsulta, codificarRuta, firmarV4, sha256 } from "./firma";
+import { AlmacenDeFicheros, AlmacenNoDisponible, FicheroInmutable } from "../almacen.ts";
+import { codificarConsulta, codificarRuta, firmarV4, sha256 } from "./firma.ts";
 
 export interface OpcionesR2 {
   /** Identificador de la cuenta de Cloudflare: el punto de entrada es `<cuenta>.r2.cloudflarestorage.com`. */

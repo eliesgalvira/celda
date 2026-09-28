@@ -11,6 +11,7 @@
     "lint": "vp lint --report-unused-disable-directives",
     "test": "vp run -r test",
     "resistencia": "vp run --filter @celda/rendimiento resistencia",
+    "ingesta": "pnpm --filter @celda/nocturna run ingesta",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check"
   },

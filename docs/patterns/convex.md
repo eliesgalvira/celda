@@ -1,6 +1,8 @@
 # Convex e ingesta
 
-Cómo está montado el backend, cómo se arranca en local y cómo se prueba. Las decisiones están en los ADR 0003 (Confect), 0009 (ingesta) y 0012 (fusión).
+Cómo está montado el backend, cómo se arranca en local y cómo se prueba. Las decisiones están en los ADR 0003 (Confect), 0009 (ingesta), 0012 (fusión) y 0015 (ingesta fuera de Convex).
+
+La ingesta corre hoy en dos sitios que publican lo mismo: en Convex, con sus crons, y en la ingesta nocturna de `apps/nocturna`, un programa de Node con su estado en SQLite. Convex se retira cuando la nocturna lleve una semana publicando lo mismo (#51). Mientras tanto, cualquier cambio en el proceso o en la publicación vale para las dos, porque comparten el código.
 
 ## Dónde está cada cosa
 
@@ -9,21 +11,103 @@ convex/confect/tables/     una tabla por fichero, con esquema Effect
 convex/confect/*.spec.ts   la API de cada grupo (ingesta, datos)
 convex/confect/*.impl.ts   su implementación
 convex/confect/crons.ts    el cron nocturno de la ingesta
-convex/src/proceso.ts      el proceso de una ejecución, fuera de Convex (por fichas y por puntos)
-convex/src/publicacion.ts  la publicación de la capa y las fichas
-convex/src/almacenes/      dónde se publica: una carpeta o R2
-convex/datos/barrios.json  los límites de barrio que usa la publicación
+convex/src/proceso.ts      la BaseDeIngesta sobre Convex y el proceso por puntos
+convex/src/publicacion.ts  los datos de la publicación sacados de Convex
 tools/capas/               la publicación a mano y el origen estático local
 convex/convex/             generado por Confect y Convex; no se edita
 packages/ingesta/          extractores (registro-oficial/, antenasmoviles/), sin nada de Convex
+packages/ingesta/src/proceso.ts   el proceso de una ejecución sobre una BaseDeIngesta
+packages/ingesta/src/guardado.ts  qué cambia en una observación con el listado, la ficha o un barrido
+packages/publicacion/      la publicación, el almacén en carpeta o en R2 y la retención
+packages/publicacion/datos/barrios.json   los límites de barrio que usa la publicación
 packages/dominio/          esquemas y la fusión, sin E/S
+apps/nocturna/             la ingesta nocturna: base SQLite, noche, estado y órdenes
 ```
 
 `convex/convex/` y `convex/confect/_generated/` se guardan en git: las pruebas en memoria los necesitan. `pnpm run typecheck` ejecuta `confect codegen` antes de `tsc`, así que un cambio en una spec sin regenerar sale en los tipos.
 
 Codegen se lanza siempre con `convex/scripts/codegen.sh` (`pnpm run codegen`, `typecheck` y `backend` lo usan). Confect importa cada fichero de `confect/` escribiendo antes su bundle al lado, `<fichero>.bundled_<id>.mjs`, y lo borra al acabar. Un codegen matado con SIGKILL justo entonces lo deja, casi siempre el de `publicacion.impl.ts` (2,3 MB, la importación más lenta). El script borra los restos, y `.gitignore`, el lint y el formateador no los miran.
 
-La acción `ingesta:registroOficial` es fina: lee la configuración, monta el extractor real sobre `FetchHttpClient` y llama a `ejecutarIngesta`. Todo lo que hace el proceso pasa por funciones internas de Convex (`MutationRunner` y `QueryRunner` de Confect), y así se prueba igual en memoria que en el backend real.
+La acción `ingesta:registroOficial` es fina: lee la configuración, monta el extractor real sobre `FetchHttpClient` y llama a `ejecutarIngesta`. El proceso (`packages/ingesta/src/proceso.ts`) no sabe dónde guarda: pide cada paso a una `BaseDeIngesta`. En Convex, esa base son sus funciones internas (`MutationRunner` y `QueryRunner` de Confect), y así se prueba igual en memoria que en el backend real. En la ingesta nocturna es la base SQLite.
+
+## Ingesta nocturna
+
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de la caja de Barcelona, la publicación y una copia de la base. El paquete de Nix y el módulo de NixOS que lo lanzan cada noche son el #36; antenasmoviles.es llega con el #48 y el deploy hook de Vercel con el #46.
+
+### Lanzarla en local
+
+Desde la raíz de Celda, dentro de `nix develop`:
+
+```sh
+pnpm run ingesta noche      # ingesta, publicación y copia de seguridad
+pnpm run ingesta estado     # última ejecución de cada fuente, fichas pendientes, errores y lo publicado
+pnpm run ingesta publicar   # publica lo que haya en la base, sin pedir nada a las fuentes
+pnpm run ingesta copia      # copia la base a la carpeta de copias
+```
+
+Cada orden construye `apps/nocturna/dist/nocturna.js`, un solo fichero, y lo ejecuta en `apps/nocturna`. Las rutas relativas de la configuración cuentan desde ahí: sin tocar nada, la base es `apps/nocturna/datos/ingesta.sqlite` y las copias van a `apps/nocturna/datos/copias/`, las dos fuera de git.
+
+`noche` hace peticiones reales. Para probar contra el geoportal sin leer fichas, que son la mayor parte de las peticiones:
+
+```sh
+CELDA_INGESTA_MAX_FICHAS=0 \
+CELDA_ALMACEN_CARPETA=$PWD/tools/capas/salida \
+pnpm run ingesta noche
+```
+
+Son seis peticiones, `robots.txt` y cinco de listado, unos 20 s. La del 28/09/2026 trajo 2380 registros y publicó 1294 emplazamientos en 11 lotes. Con `pnpm run servir` en `tools/capas`, la web en desarrollo lee esa carpeta.
+
+### Configuración
+
+Todo va en variables de entorno, con los valores de hoy por defecto (`apps/nocturna/src/configuracion.ts`):
+
+| Variable | Por defecto | Qué es |
+|---|---|---|
+| `CELDA_INGESTA_BASE` | `datos/ingesta.sqlite` | La base SQLite |
+| `CELDA_INGESTA_COPIAS` | `datos/copias` | Carpeta de las copias de seguridad |
+| `CELDA_INGESTA_COPIAS_CONSERVADAS` | 14 | Copias que se conservan |
+| `CELDA_INGESTA_MAX_FICHAS` | 250 | Fichas por noche |
+| `CELDA_PUBLICAR_REINTENTO_MINUTOS` | 60 | Espera antes de repetir una publicación fallida |
+| `CELDA_REGISTRO_ACTIVO` | `true` | Interruptor del registro oficial |
+| `CELDA_REGISTRO_MOTIVO` | | Lo que se apunta si está apagado |
+| `CELDA_REGISTRO_PAUSA_SEGUNDOS` | 3 | Pausa entre peticiones; nunca baja de 3 |
+| `CELDA_REGISTRO_MAX_PETICIONES` | 300 | Tope de peticiones por noche, `robots.txt` y reintentos incluidos |
+| `CELDA_REGISTRO_REINTENTOS` | 3 | Reintentos de un fallo pasajero |
+| `CELDA_REGISTRO_ESPERA_SEGUNDOS` | 10 | Tiempo máximo de una respuesta |
+| `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
+
+`robots.txt` se respeta siempre. El grupo que se aplica es el del primer producto del `User-Agent`, así que cambiarlo cambia también con qué nombre se busca a Celda en él. El almacén se elige como en Convex: `CELDA_ALMACEN_CARPETA` o las cuatro de R2, con `CELDA_ALMACEN_ORIGEN` (`almacenDesdeConfig` en `packages/publicacion`). Sin almacén, la noche ingiere y apunta `sin-almacen`.
+
+### La base
+
+La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sql-sqlite-node`, que en Effect 4 usa ese módulo y no trae extensiones nativas. Tablas (`apps/nocturna/src/base.ts`):
+
+- `observaciones`: lo último que dice cada fuente de cada estación base, cuándo se leyó su ficha y si está retirada;
+- `emplazamientos`: los de la última fusión, con la fecha en que cambió cada uno;
+- `ejecuciones`: cada pasada de un extractor, con sus cambios, sus errores y cómo acabó la publicación de su noche;
+- `publicaciones`: cada intento de publicar;
+- `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero.
+
+El esquema lleva su versión en `PRAGMA user_version`, y una base vieja se pone al día al abrirla. Cada paso de la noche escribe en su propia transacción. Si la noche se corta, su ejecución queda en curso; la siguiente la da por interrumpida y rehace el trabajo, y acaba igual que si no se hubiera cortado.
+
+`node:sqlite` es síncrono. Si una conexión espera el cerrojo de otra del mismo proceso, bloquea el bucle de eventos y la otra no puede soltarlo. Por eso abrir una base al día no toma el cerrojo de escritura, y `estado` se puede lanzar en mitad de una noche desde otro proceso.
+
+### Publicar y copias
+
+Al final de la noche se publica siempre: sin cambios no se escribe nada, y si la noche anterior no pudo publicar, esta lo hace. Si falla porque el almacén o la base no responden, o porque los datos se movieron a mitad, se apunta en `publicaciones` y en las ejecuciones de la noche, se espera una hora y se intenta otra vez. Si vuelve a fallar, queda para la noche siguiente. Los datos ya están en la base.
+
+Después, `VACUUM INTO` copia la base a `ingesta-<fecha>.sqlite` en la carpeta de copias, y se borran las más viejas hasta dejar catorce. Para restaurar, para la ingesta y copia una de ellas encima de la base:
+
+```sh
+cp datos/copias/ingesta-2026-09-28T21-40-45.318Z.sqlite datos/ingesta.sqlite
+rm -f datos/ingesta.sqlite-wal datos/ingesta.sqlite-shm
+```
+
+### Pruebas
+
+`apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord (`capaGrabada`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
+
+`convex/test/nocturna.test.ts` comprueba que las dos ingestas publican lo mismo. Hace las mismas noches en Convex en memoria y en la nocturna, con las mismas respuestas grabadas y a la misma hora, y compara byte a byte las dos carpetas tras cada noche: con cambios, una baja, una alta y las fichas repartidas en varias noches. Se borra con la ingesta de Convex (#51).
 
 ## Backend local
 
@@ -91,11 +175,11 @@ Recuento con la descarga del 26/09/2026 y el registro oficial de ese día, en la
 
 ## Publicación
 
-La web no lee nada de Convex: descarga `vigente.json`, la capa y los lotes de fichas de un almacén de ficheros estático (ADR 0004, 0008 y 0010). Los escribe `publicar` (`convex/src/publicacion.ts`), así:
+La web no lee nada de Convex: descarga `vigente.json`, la capa y los lotes de fichas de un almacén de ficheros estático (ADR 0004, 0008 y 0010). Los escribe `publicar` (`packages/publicacion/src/publicar.ts`), que lee la instantánea de un servicio `DatosPublicables`: Convex en `convex/src/publicacion.ts` y la base SQLite en la ingesta nocturna. Así:
 
 1. Lee `datos:version`. Si `vigente.json` del almacén ya apunta a esa versión, termina sin escribir nada. Si apunta a una posterior, falla (`VigentePosterior`): no retrocede.
-2. Lee la instantánea con `capas:instantanea`, por páginas de 250 emplazamientos con sus compañías y las bandas conocidas de cada una, y vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
-3. Genera la capa, con el barrio de cada emplazamiento según `convex/datos/barrios.json` y su lote de fichas.
+2. Lee la instantánea (en Convex, con `capas:instantanea`, por páginas de 250 emplazamientos) con sus compañías y las bandas conocidas de cada una, y vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
+3. Genera la capa, con el barrio de cada emplazamiento según `packages/publicacion/datos/barrios.json` y su lote de fichas.
 4. Lee las fichas de cada lote con `capas:fichas` y escribe `fichas@<fecha>/<lote>.json`, cuatro lotes a la vez. Si falta alguna ficha, los datos han cambiado.
 5. Vuelve a comprobar la versión, escribe `sitios@<fecha>.json` y la registra con `capas:registrar`.
 6. Escribe `vigente.json`, el último.
@@ -129,7 +213,7 @@ pnpm run servir           # sirve salida/ en http://127.0.0.1:8852, déjalo abie
 
 Para otro despliegue, `pnpm run publicar` con `CELDA_CONVEX_URL`, `CELDA_CONVEX_CLAVE_ADMIN`, `CELDA_CAPAS_ORIGEN` (la URL desde la que la web descargará los ficheros) y `CELDA_CAPAS_CARPETA`. `servir` escucha en el puerto de `CELDA_CAPAS_ORIGEN`.
 
-Los límites de barrio se descargan de Open Data BCN con `pnpm run barrios`, también desde `tools/capas`. Son dos peticiones con 10 s entre ellas; hazlo solo cuando el Ayuntamiento publique límites nuevos y revisa el diff de `convex/datos/barrios.json` antes del commit. `CELDA_BARRIOS` cambia la ruta del fichero. Por qué se guardan en git y no van en la ingesta: ADR 0004.
+Los límites de barrio se descargan de Open Data BCN con `pnpm run barrios`, también desde `tools/capas`. Son dos peticiones con 10 s entre ellas; hazlo solo cuando el Ayuntamiento publique límites nuevos y revisa el diff de `packages/publicacion/datos/barrios.json` antes del commit. `CELDA_BARRIOS` cambia la ruta del fichero. Por qué se guardan en git y no van en la ingesta: ADR 0004.
 
 `datos:version` es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la consulta también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
 
@@ -145,7 +229,7 @@ La web la lee con el servicio `FichasPublicadas` (`apps/web/src/ficha/servicio.t
 
 ## Pruebas
 
-Tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
+Las de Convex tienen tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
 
 **Dominio.** La fusión se compara con ficheros de referencia en `packages/dominio/src/referencia/` y `packages/ingesta/src/registro-oficial/referencia/` (`toMatchFileSnapshot`). Si cambias la regla a propósito, regenera con `pnpm exec vp test run -u` en el paquete y revisa el diff de los JSON en el commit.
 
@@ -157,7 +241,7 @@ Tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
 
 El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8. `convex/test/TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
 
-`convex/test/publicacion.test.ts` publica sobre el Convex en memoria y el almacén en una carpeta temporal, envuelto para apuntar cada fichero que escribe. Comprueba que cada clave de la capa tiene su ficha en su lote, que publicar sin cambios no escribe nada, que la ingesta publica sola tras cada ejecución completada y no tras una omitida, que un fichero ocupado con otro contenido para la publicación sin tocar `vigente.json`, y que la retención deja la vigente, sus siete anteriores y las posteriores. Las versiones viejas de esa prueba se escriben a mano en la carpeta, sin publicarlas. `almacenR2.test.ts` prueba la firma con dos casos de la batería de AWS (uno con consulta) y el almacén de R2 contra un cubo S3 de prueba en memoria, que lista de dos en dos claves para obligar a pedir varias páginas.
+`convex/test/publicacion.test.ts` publica sobre el Convex en memoria y el almacén en una carpeta temporal, envuelto para apuntar cada fichero que escribe. Comprueba que cada clave de la capa tiene su ficha en su lote, que publicar sin cambios no escribe nada, que la ingesta publica sola tras cada ejecución completada y no tras una omitida, que un fichero ocupado con otro contenido para la publicación sin tocar `vigente.json`, y que la retención deja la vigente, sus siete anteriores y las posteriores. Las versiones viejas de esa prueba se escriben a mano en la carpeta, sin publicarlas. `packages/publicacion/src/almacenes/r2.test.ts` prueba la firma con dos casos de la batería de AWS (uno con consulta) y el almacén de R2 contra un cubo S3 de prueba en memoria, que lista de dos en dos claves para obligar a pedir varias páginas.
 
 Las pruebas de Convex corren en orden aleatorio. `pnpm run test:repetido` (desde `convex/`) las pasa cinco veces con semillas seguidas a partir de una al azar, y la CI lo hace en cada push. Si falla, el registro dice la semilla; `pnpm exec vp test run --sequence.seed=<semilla>` repite ese orden. Una carrera no siempre sale con la misma semilla: la de la retención (dos borrados que quitaban a la vez la carpeta de lotes, septiembre de 2026) necesitaba carga, y salió con cuatro bucles de la suite a la vez y `--pool=threads` o `--no-file-parallelism`. Si una prueba falla una vez y luego pasa, búscala así antes de repetirla.
 

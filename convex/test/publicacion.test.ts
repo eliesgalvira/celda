@@ -11,6 +11,9 @@ import {
 import { leerLote } from "@celda/dominio/loteDeFichas";
 import { capaDePuntosGrabada, muestraAntenasMoviles } from "@celda/ingesta/pruebas/antenasmoviles";
 import { capaGrabada, type FuenteGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
+import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
+import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
+import { retirarVersionesViejas, VERSIONES_ANTERIORES } from "@celda/publicacion/publicar";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -23,14 +26,10 @@ import * as Result from "effect/Result";
 import { TestClock } from "effect/testing";
 
 import refs from "../confect/_generated/refs";
-import { almacenEnCarpeta } from "../src/almacenes/carpeta";
 import {
-  AlmacenDeFicheros,
   Publicacion,
   publicacionDirecta,
   publicar as publicarInstantanea,
-  retirarVersionesViejas,
-  VERSIONES_ANTERIORES,
 } from "../src/publicacion";
 import { convexEnMemoria, ejecutar, ejecutarDePuntos } from "./ayudas";
 import * as TestConfect from "./TestConfect";

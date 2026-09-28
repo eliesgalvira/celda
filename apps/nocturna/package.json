@@ -1,0 +1,28 @@
+{
+  "name": "@celda/nocturna",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "vp build",
+    "ingesta": "vp build && node dist/nocturna.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@celda/dominio": "workspace:*",
+    "@celda/ingesta": "workspace:*",
+    "@celda/publicacion": "workspace:*",
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
