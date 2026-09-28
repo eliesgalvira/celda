@@ -2,18 +2,18 @@ import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 
-import { BotonHexagonal } from "../BotonHexagonal.tsx";
+import { ControlDelMapa } from "../ControlDelMapa.tsx";
 import { AspectoDeControl } from "./aspecto.ts";
 import { MenuDeControles } from "./MenuDeControles.tsx";
 
 const esperarMicrotareas = () => new Promise<void>((resolver) => queueMicrotask(resolver));
 
-describe("aspectos de los controles (prototipo)", () => {
+describe("aspectos de los controles", () => {
   it("con la etiqueta a la vista o no, el nombre accesible es la etiqueta", () => {
-    for (const aspecto of ["hexagono", "piedra", "zoom", "barra", "pastilla", "fila"] as const) {
+    for (const aspecto of ["pastilla", "zoom", "fila"] as const) {
       const { getByRole, unmount } = render(() => (
         <AspectoDeControl value={aspecto}>
-          <BotonHexagonal
+          <ControlDelMapa
             etiqueta="Interferencia"
             detalle="Simula dónde se pisan las señales."
             icono="≈"
@@ -29,7 +29,7 @@ describe("aspectos de los controles (prototipo)", () => {
   it("en una fila, la explicación es la descripción del botón", () => {
     const { getByRole } = render(() => (
       <AspectoDeControl value="fila">
-        <BotonHexagonal etiqueta="Ajustes" detalle="Activa o apaga el modo estudiante." icono="≡" />
+        <ControlDelMapa etiqueta="Ajustes" detalle="Activa o apaga el modo estudiante." icono="≡" />
       </AspectoDeControl>
     ));
     flush();
@@ -43,9 +43,9 @@ describe("MenuDeControles", () => {
   const montar = () => {
     const [usado, setUsado] = createSignal(0);
     const pantalla = render(() => (
-      <AspectoDeControl value="barra">
-        <MenuDeControles etiqueta="Más" titulo="Más funciones" icono="…" posicion="barra">
-          <BotonHexagonal etiqueta="Ajustes" icono="≡" onClick={() => setUsado(usado() + 1)} />
+      <AspectoDeControl value="pastilla">
+        <MenuDeControles etiqueta="Más" titulo="Más funciones" icono="…">
+          <ControlDelMapa etiqueta="Ajustes" icono="≡" onClick={() => setUsado(usado() + 1)} />
         </MenuDeControles>
       </AspectoDeControl>
     ));

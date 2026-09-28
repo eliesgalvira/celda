@@ -1,7 +1,7 @@
 /**
- * PROTOTIPO (logo y controles): un rasterizador mínimo para los iconos PNG, sin dependencias.
+ * Un rasterizador mínimo para los iconos PNG, sin dependencias.
  * Rellena polígonos par-impar con suavizado: exacto en horizontal y con 16 muestras por fila de
- * píxeles en vertical. Los iconos solo tienen polígonos y círculos, así que no hace falta más.
+ * píxeles en vertical. Los iconos solo tienen polígonos, así que no hace falta más.
  */
 import type { Punto } from "./geometria.ts";
 
@@ -106,10 +106,3 @@ export const rasterizar = (tamano: number, capas: ReadonlyArray<Capa>): Uint8Arr
   }
   return pixeles;
 };
-
-/** Un círculo como polígono de 64 lados, para el rasterizador. */
-export const circuloComoPoligono = (centro: Punto, radio: number): ReadonlyArray<Punto> =>
-  Array.from({ length: 64 }, (_, i) => {
-    const angulo = (i / 64) * 2 * Math.PI;
-    return [centro[0] + radio * Math.cos(angulo), centro[1] + radio * Math.sin(angulo)] as const;
-  });

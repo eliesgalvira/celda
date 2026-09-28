@@ -1,78 +1,48 @@
 /**
- * PROTOTIPO (logo y controles, 28/09/2026): tres variantes del logo y tres de los controles del
- * mapa en la misma pantalla, para compararlas en el móvil. Se eligen en la URL:
+ * PROTOTIPO (logo, 28/09/2026): tres versiones mejoradas de la marca vigente (B) en la misma
+ * pantalla, para compararlas en el móvil. Se eligen con `?logo=B1|B2|B3`; `?logo=B` es la vigente
+ * con la barra del prototipo a la vista.
  *
- * - `?variante=A|B|C` pone las dos a la vez;
- * - `?logo=A|B|C` y `?controles=A|B|C` las cambian por separado, y ganan a `variante`;
- * - `hoy` en cualquiera de los tres es lo de hoy, con la barra a la vista para comparar.
- *
- * Sin ningún parámetro, la web es la de hoy y no sale la barra del prototipo. Cuando se elija,
- * se lleva lo elegido al código de verdad y esto se borra.
+ * Sin el parámetro, la web lleva la marca vigente y no sale la barra. Cuando se elija, la
+ * elegida pasa a ser la vigente y esto se borra.
  */
-import type { DisposicionControles } from "@celda/ui/controles/aspecto.ts";
-import type { VarianteMarca } from "@celda/ui/marca/geometria.ts";
+import { MARCA_VIGENTE, type VarianteMarca, VARIANTES_MARCA } from "@celda/ui/marca/geometria.ts";
 
-export type Variante = "A" | "B" | "C";
-
-export const VARIANTES: ReadonlyArray<Variante> = ["A", "B", "C"];
-
-const VARIANTE = "variante";
 const LOGO = "logo";
-const CONTROLES = "controles";
 
-const PARAMETROS: ReadonlyArray<string> = [VARIANTE, LOGO, CONTROLES];
-
-/** Lo de hoy, con la barra del prototipo a la vista. */
-const HOY = "hoy";
-
-const leer = (busqueda: URLSearchParams, nombre: string): Variante | "actual" | undefined => {
-  const valor = busqueda.get(nombre)?.trim().toUpperCase();
-  if (valor === HOY.toUpperCase()) return "actual";
-  return VARIANTES.find((variante) => variante === valor);
+const leer = (busqueda: URLSearchParams): VarianteMarca | undefined => {
+  const valor = busqueda.get(LOGO)?.trim().toUpperCase();
+  return VARIANTES_MARCA.find((variante) => variante === valor);
 };
 
-/** Si la URL pide alguna variante, aunque sea la de hoy: entonces se ve la barra del prototipo. */
-export const hayPrototipo = (busqueda: URLSearchParams): boolean =>
-  PARAMETROS.some((nombre) => leer(busqueda, nombre) !== undefined);
+/** Si la URL pide una versión del logo, aunque sea la vigente: entonces se ve la barra. */
+export const hayPrototipo = (busqueda: URLSearchParams): boolean => leer(busqueda) !== undefined;
 
-export const logoDe = (busqueda: URLSearchParams): VarianteMarca =>
-  leer(busqueda, LOGO) ?? leer(busqueda, VARIANTE) ?? "actual";
-
-export const controlesDe = (busqueda: URLSearchParams): DisposicionControles =>
-  leer(busqueda, CONTROLES) ?? leer(busqueda, VARIANTE) ?? "actual";
-
-/** La dirección con otras variantes; el resto de la URL no cambia. */
-export const conVariantes = (
-  ubicacion: { readonly pathname: string; readonly search: URLSearchParams },
-  elegidas: { readonly logo: VarianteMarca; readonly controles: DisposicionControles },
-): string => {
-  const parametros = new URLSearchParams(ubicacion.search);
-  parametros.delete(VARIANTE);
-  parametros.set(LOGO, elegidas.logo === "actual" ? HOY : elegidas.logo);
-  parametros.set(CONTROLES, elegidas.controles === "actual" ? HOY : elegidas.controles);
-  return `${ubicacion.pathname}?${sinIgualesVacios(parametros)}`;
-};
+export const logoDe = (busqueda: URLSearchParams): VarianteMarca => leer(busqueda) ?? MARCA_VIGENTE;
 
 /** `medir` y `ajustes` van sin `=`, como los escribe `rutas.ts`. */
 const sinIgualesVacios = (parametros: URLSearchParams): string =>
   parametros.toString().replace(/(^|&)(medir|ajustes)=(?=&|$)/gu, "$1$2");
 
+/** La dirección con otra versión del logo; el resto de la URL no cambia. */
+export const conLogo = (
+  ubicacion: { readonly pathname: string; readonly search: URLSearchParams },
+  logo: VarianteMarca,
+): string => {
+  const parametros = new URLSearchParams(ubicacion.search);
+  parametros.set(LOGO, logo);
+  return `${ubicacion.pathname}?${sinIgualesVacios(parametros)}`;
+};
+
 /**
- * Las direcciones de la app se escriben sin las variantes (`ruta`). Para que no se pierdan al
- * abrir una ficha o un diálogo, `navegar` copia las de la dirección actual a la nueva.
+ * Las direcciones de la app se escriben sin el logo (`ruta`). Para que no se pierda al abrir una
+ * ficha o un diálogo, `navegar` lo copia de la dirección actual a la nueva, salvo si la nueva ya
+ * lo dice.
  */
 export const conservarVariantes = (actual: URLSearchParams, href: string): string => {
+  const valor = actual.get(LOGO);
   const destino = new URL(href, "http://celda.invalid");
-  // Si la dirección nueva ya dice qué variantes, manda ella (la barra del prototipo).
-  if (PARAMETROS.some((nombre) => destino.searchParams.has(nombre))) return href;
-  let cambiada = false;
-  for (const nombre of PARAMETROS) {
-    const valor = actual.get(nombre);
-    if (valor !== null) {
-      destino.searchParams.set(nombre, valor);
-      cambiada = true;
-    }
-  }
-  if (!cambiada) return href;
+  if (valor === null || destino.searchParams.has(LOGO)) return href;
+  destino.searchParams.set(LOGO, valor);
   return `${destino.pathname}?${sinIgualesVacios(destino.searchParams)}${destino.hash}`;
 };

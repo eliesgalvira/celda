@@ -3,21 +3,20 @@ import { fireEvent, render } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 
 import { Atribucion } from "./Atribucion.tsx";
-import { BotonHexagonal } from "./BotonHexagonal.tsx";
-import type { DisposicionControles } from "./controles/aspecto.ts";
+import { ControlDelMapa } from "./ControlDelMapa.tsx";
 import { DisposicionMapa } from "./DisposicionMapa.tsx";
 
-const montar = (disposicion: DisposicionControles) => {
+const montar = () => {
   const pantalla = render(() => (
     <DisposicionMapa
       nombre="Mapa de Barcelona"
       ocupado={false}
       lienzo={() => {}}
       cabecera={<header>Celda</header>}
-      disposicion={disposicion}
-      zoom={<BotonHexagonal etiqueta="Acercar" icono="+" />}
-      controles={<BotonHexagonal etiqueta="Interferencia" icono="≈" />}
-      controlesSecundarios={<BotonHexagonal etiqueta="Ajustes" icono="≡" />}
+      zoom={<ControlDelMapa etiqueta="Acercar" icono="+" />}
+      controles={<ControlDelMapa etiqueta="Interferencia" icono="≈" />}
+      botonUbicacion={<ControlDelMapa etiqueta="Ubicación" icono="⌖" />}
+      controlesSecundarios={<ControlDelMapa etiqueta="Ajustes" icono="≡" />}
       atribucion={
         <Atribucion
           creditos={[{ texto: "OpenStreetMap", enlace: "https://www.openstreetmap.org/copyright" }]}
@@ -29,17 +28,12 @@ const montar = (disposicion: DisposicionControles) => {
   return pantalla;
 };
 
-describe("DisposicionMapa: créditos plegables (prototipo de controles)", () => {
-  it("hoy los créditos se ven siempre, sin botón «i»", () => {
-    const { queryByRole, getByRole } = montar("actual");
-    assert.isNull(queryByRole("button", { name: "Créditos del mapa" }));
-    assert.isDefined(getByRole("link", { name: "© OpenStreetMap" }));
-  });
-
-  it("con una variante se ven al cargar y se pliegan al tocar el mapa", () => {
-    const { getByRole } = montar("B");
+describe("DisposicionMapa", () => {
+  it("los créditos se ven al cargar y se pliegan al tocar el mapa", () => {
+    const { getByRole } = montar();
     const boton = getByRole("button", { name: "Créditos del mapa" });
     assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
+    assert.isDefined(getByRole("link", { name: "© OpenStreetMap" }));
 
     fireEvent.pointerDown(getByRole("main", { name: "Mapa de Barcelona" }));
     flush();
@@ -54,12 +48,14 @@ describe("DisposicionMapa: créditos plegables (prototipo de controles)", () => 
     assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
   });
 
-  it("en la barra (B) las funciones secundarias van dentro de «Más»", () => {
-    const { getByRole, queryByRole } = montar("B");
-    assert.isDefined(getByRole("navigation", { name: "Funciones del mapa" }));
+  it("a la vista, Ubicación y Funciones; el resto, dentro de Funciones", () => {
+    const { getByRole, queryByRole } = montar();
+    assert.isDefined(getByRole("button", { name: "Ubicación" }));
+    assert.isNull(queryByRole("button", { name: "Interferencia" }));
     assert.isNull(queryByRole("button", { name: "Ajustes" }));
-    fireEvent.click(getByRole("button", { name: "Más" }));
+    fireEvent.click(getByRole("button", { name: "Funciones" }));
     flush();
+    assert.isDefined(getByRole("button", { name: "Interferencia" }));
     assert.isDefined(getByRole("button", { name: "Ajustes" }));
   });
 });

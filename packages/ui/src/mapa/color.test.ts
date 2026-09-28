@@ -50,7 +50,7 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   // Las etiquetas de barrio, escritas sobre el mapa con un halo del color de su fondo.
   ["tinta", "mapa-halo"],
   ["primario-texto", "mapa-halo"],
-  // Las etiquetas y los iconos de los controles claros (prototipo de controles).
+  // Las etiquetas y los iconos de los controles claros.
   ["control-tinta", "control"],
   ["control-tinta", "control-hover"],
   ["prototipo-fg", "prototipo"],
@@ -69,15 +69,15 @@ const FONDOS_DEL_MAPA = [
 
 /**
  * Pares de piezas que no son texto y que tienen que distinguirse: 3:1, como pide WCAG 1.4.11
- * para los componentes de la interfaz. Los controles de hoy no lo cumplen frente a las
- * agrupaciones: los dos son `superficie-invertida` (1:1), y por eso se probaron los claros.
+ * para los componentes de la interfaz. Los controles eran hexágonos oscuros como las
+ * agrupaciones, los dos `superficie-invertida` (1:1): por eso ahora son claros.
  */
 const PARES_NO_TEXTO: ReadonlyArray<readonly [pieza: string, fondo: string]> = [
   // El borde de un control claro frente a cualquier fondo del mapa.
   ...FONDOS_DEL_MAPA.map((fondo) => ["control-borde", fondo] as const),
   // El relleno de un control claro frente a una agrupación, que es oscura.
   ["control", "superficie-invertida"],
-  // El favicon: la figura y el acento frente a su baldosa.
+  // El favicon: lo recortado y el borde frente a la figura oscura.
   ["icono-figura", "icono-fondo"],
   ["icono-acento", "icono-fondo"],
 ];

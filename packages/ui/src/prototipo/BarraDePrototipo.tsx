@@ -95,7 +95,7 @@ export function BarraDePrototipo(props: BarraDePrototipoProps) {
                       ‹
                     </span>
                   </button>
-                  <output aria-live="polite" class="w-[6.5rem] text-center leading-tight font-bold">
+                  <output aria-live="polite" class="w-[8.5rem] text-center leading-tight font-bold">
                     {fila.opciones.find((opcion) => opcion.clave === fila.actual)?.nombre ??
                       fila.actual}
                   </output>

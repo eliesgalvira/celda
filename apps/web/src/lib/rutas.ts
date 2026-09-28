@@ -22,7 +22,7 @@ window.addEventListener("popstate", () => setUbicacion(leerUbicacion()));
 export { ubicacion };
 
 export const navegar = (destino: string, opciones?: { readonly reemplazar?: boolean }): void => {
-  // PROTOTIPO (logo y controles): las variantes elegidas siguen al navegar.
+  // PROTOTIPO (logo): la versión elegida sigue al navegar.
   const href = conservarVariantes(new URLSearchParams(window.location.search), destino);
   if (opciones?.reemplazar === true) {
     window.history.replaceState(null, "", href);

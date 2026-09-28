@@ -87,6 +87,14 @@ const montar = (modoEstudiante: boolean) => {
   return { ...pantalla, fichas, almacen: ubicacionPrueba.almacen };
 };
 
+/** Ejercicio y Ajustes van dentro del botón «Funciones» de los controles. */
+const abrirFunciones = async (
+  findByRole: (rol: string, opciones: { name: string }) => Promise<HTMLElement>,
+) => {
+  fireEvent.click(await findByRole("button", { name: "Funciones" }));
+  flush();
+};
+
 describe("modo estudiante", () => {
   // Cada prueba monta la app entera: la anterior se desmonta, con sus diálogos.
   afterEach(cleanup);
@@ -94,6 +102,7 @@ describe("modo estudiante", () => {
   it("apagado, nadie ve el ejercicio, ni aunque lo pida la dirección", async () => {
     navegar("/?ejercicio=21", { reemplazar: true });
     const { findByRole, queryByRole, container } = montar(false);
+    await abrirFunciones(findByRole);
     await findByRole("button", { name: "Ajustes" });
     await screen.findByTitle(/3 emplazamientos/u);
     assert.isNull(queryByRole("button", { name: "Ejercicio" }));
@@ -104,6 +113,7 @@ describe("modo estudiante", () => {
   it("se enciende y se apaga en los ajustes, y el dispositivo lo recuerda", async () => {
     navegar(ruta.mapa, { reemplazar: true });
     const { findByRole, queryByRole, almacen } = montar(false);
+    await abrirFunciones(findByRole);
     fireEvent.click(await findByRole("button", { name: "Ajustes" }));
     flush();
     const interruptor = await screen.findByRole("switch", { name: /Modo estudiante/u });
@@ -112,6 +122,9 @@ describe("modo estudiante", () => {
     fireEvent.click(interruptor);
     flush();
     await waitFor(() => assert.isTrue(almacen.ajustes().modoEstudiante));
+    // El menú se cerró al abrir los ajustes; se vuelve a abrir para ver el botón nuevo.
+    fireEvent.click(await findByRole("button", { name: "Funciones", hidden: true }));
+    flush();
     assert.isNotNull(queryByRole("button", { name: "Ejercicio", hidden: true }));
 
     fireEvent.click(interruptor);
@@ -123,6 +136,7 @@ describe("modo estudiante", () => {
   it("encendido, resuelve el ejercicio de un barrio con sus fuentes y lee las bandas", async () => {
     navegar(ruta.mapa, { reemplazar: true });
     const { findByRole, findByText, fichas } = montar(true);
+    await abrirFunciones(findByRole);
     fireEvent.click(await findByRole("button", { name: "Ejercicio" }));
     flush();
     const panel = await findByRole("complementary", { name: "Ejercicio de emplazamientos" });

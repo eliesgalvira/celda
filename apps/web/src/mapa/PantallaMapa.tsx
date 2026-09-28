@@ -2,7 +2,7 @@ import { BARCELONA, type Rectangulo } from "@celda/dominio/area";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
-import { BotonHexagonal } from "@celda/ui/BotonHexagonal.tsx";
+import { ControlDelMapa } from "@celda/ui/ControlDelMapa.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
@@ -15,7 +15,7 @@ import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
-import { MARCAS } from "@celda/ui/marca/geometria.ts";
+import { MARCAS, VARIANTES_MARCA } from "@celda/ui/marca/geometria.ts";
 import { BarraDePrototipo } from "@celda/ui/prototipo/BarraDePrototipo.tsx";
 import * as Effect from "effect/Effect";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
@@ -68,13 +68,7 @@ import {
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
 import { ponerIconos } from "../prototipo/iconos.ts";
-import {
-  controlesDe,
-  conVariantes,
-  hayPrototipo,
-  logoDe,
-  VARIANTES,
-} from "../prototipo/variantes.ts";
+import { conLogo, hayPrototipo, logoDe } from "../prototipo/variantes.ts";
 import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
 import { posicionDe } from "../ubicacion/estado.ts";
 import { ReferenciaEnMapa } from "../ubicacion/ReferenciaEnMapa.tsx";
@@ -88,14 +82,6 @@ import { CREDITOS_MAPA_BASE, type EstadoMapa, hayWebgl, type MotivoFallo } from 
 import { Marcadores } from "./Marcadores.tsx";
 
 type ModuloMapaBase = typeof import("./mapaBase.ts");
-
-/** PROTOTIPO (controles): el nombre corto de cada disposición en la barra del prototipo. */
-const NOMBRES_CONTROLES = {
-  actual: "Hoy",
-  A: "A · Losas",
-  B: "B · Barra",
-  C: "C · Un menú",
-} as const;
 
 /** Solo para los tipos: el panel de la vista no se monta sin elección. */
 const ELECCION_VACIA: EleccionVista = { compania: "movistar", mhz: 1800, ocupacion: 0.5 };
@@ -497,9 +483,8 @@ export function PantallaMapa() {
   });
   const midiendo = createMemo(() => medirAbierto(ubicacion()));
 
-  // PROTOTIPO (logo y controles): las variantes que pide la URL.
+  // PROTOTIPO (logo): la versión que pide la URL.
   const logo = createMemo(() => logoDe(ubicacion().search));
-  const disposicion = createMemo(() => controlesDe(ubicacion().search));
   const conPrototipo = createMemo(() => hayPrototipo(ubicacion().search));
   createEffect(
     () => logo(),
@@ -524,7 +509,6 @@ export function PantallaMapa() {
               contenedor = elemento;
             }}
             cabecera={<Cabecera lugar={BARCELONA.nombre} marca={logo()} />}
-            disposicion={disposicion()}
             datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
             ubicacion={
               <>
@@ -560,13 +544,13 @@ export function PantallaMapa() {
             pista={pista()}
             zoom={
               <>
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Acercar"
                   icono="+"
                   disabled={!listo()}
                   onClick={() => mapa?.zoomIn()}
                 />
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Alejar"
                   icono="−"
                   disabled={!listo()}
@@ -576,7 +560,7 @@ export function PantallaMapa() {
             }
             controles={
               <>
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Interferencia"
                   detalle="Simula dónde se pisan las señales de una compañía."
                   icono={<IconoOndas />}
@@ -584,7 +568,7 @@ export function PantallaMapa() {
                   disabled={!listo() || emplazamientos().length === 0}
                   onClick={cambiarVista}
                 />
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Medir mi señal"
                   detalle="Cómo leer en el móvil la señal que te llega."
                   icono={<IconoSenal />}
@@ -605,7 +589,7 @@ export function PantallaMapa() {
             controlesSecundarios={
               <>
                 <Show when={ajustes.ajustes().modoEstudiante}>
-                  <BotonHexagonal
+                  <ControlDelMapa
                     etiqueta="Ejercicio"
                     detalle="Los cálculos de un barrio paso a paso, con sus fuentes."
                     icono={<IconoEjercicio />}
@@ -615,9 +599,9 @@ export function PantallaMapa() {
                     }
                   />
                 </Show>
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Ajustes"
-                  detalle="Activa o apaga el modo estudiante."
+                  detalle="Las preferencias de Celda en este dispositivo."
                   icono={<IconoAjustes />}
                   aria-haspopup="dialog"
                   onClick={() => navegar(conAjustes(ubicacion(), true))}
@@ -672,39 +656,17 @@ export function PantallaMapa() {
               filas={[
                 {
                   titulo: "Logo",
-                  opciones: [
-                    { clave: "actual", nombre: "Hoy" },
-                    ...VARIANTES.map((clave) => ({
-                      clave,
-                      nombre: `${clave} · ${MARCAS[clave].nombre}`,
-                    })),
-                  ],
+                  opciones: VARIANTES_MARCA.map((clave) => ({
+                    clave,
+                    nombre: `${clave} · ${MARCAS[clave].nombre}`,
+                  })),
                   actual: logo(),
-                  alElegir: (clave) =>
-                    navegar(
-                      conVariantes(ubicacion(), {
-                        logo: clave === "A" || clave === "B" || clave === "C" ? clave : "actual",
-                        controles: disposicion(),
-                      }),
-                      { reemplazar: true },
-                    ),
-                },
-                {
-                  titulo: "Controles",
-                  opciones: [
-                    { clave: "actual", nombre: NOMBRES_CONTROLES.actual },
-                    ...VARIANTES.map((clave) => ({ clave, nombre: NOMBRES_CONTROLES[clave] })),
-                  ],
-                  actual: disposicion(),
-                  alElegir: (clave) =>
-                    navegar(
-                      conVariantes(ubicacion(), {
-                        logo: logo(),
-                        controles:
-                          clave === "A" || clave === "B" || clave === "C" ? clave : "actual",
-                      }),
-                      { reemplazar: true },
-                    ),
+                  alElegir: (clave) => {
+                    const elegida = VARIANTES_MARCA.find((variante) => variante === clave);
+                    if (elegida !== undefined) {
+                      navegar(conLogo(ubicacion(), elegida), { reemplazar: true });
+                    }
+                  },
                 },
               ]}
             />

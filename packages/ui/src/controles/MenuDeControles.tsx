@@ -1,40 +1,22 @@
 import type { JSX } from "@solidjs/web";
-import { cva, type VariantProps } from "class-variance-authority";
 import { createSignal, createUniqueId, onSettled, Show } from "solid-js";
 
-import { BotonHexagonal } from "../BotonHexagonal.tsx";
+import { ControlDelMapa } from "../ControlDelMapa.tsx";
 import { AspectoDeControl } from "./aspecto.ts";
 
-const variantesPanelMenu = cva(
-  "chaflan absolute z-20 flex w-72 flex-col gap-0.5 bg-superficie p-1.5 drop-shadow-panel [--corte:10px]",
-  {
-    variants: {
-      posicion: {
-        /** Encima del botón, alineado a su derecha: los botones de abajo a la derecha. */
-        arriba: "right-0 bottom-full mb-2",
-        /** A la izquierda del botón: la columna o el riel de la derecha. */
-        izquierda: "right-full bottom-0 mr-2",
-        /** Encima en la barra del móvil y a la izquierda en el riel de escritorio. */
-        barra: "right-0 bottom-full mb-2 md:right-full md:bottom-0 md:mr-2 md:mb-0",
-      },
-    },
-    defaultVariants: { posicion: "izquierda" },
-  },
-);
-
-export type MenuDeControlesProps = VariantProps<typeof variantesPanelMenu> & {
+export interface MenuDeControlesProps {
   readonly etiqueta: string;
   readonly icono: JSX.Element;
-  /** Título del menú para el lector de pantalla. */
+  /** Título del grupo para el lector de pantalla. */
   readonly titulo: string;
   /** Los controles del menú; se dibujan como filas con su explicación. */
   readonly children: JSX.Element;
-};
+}
 
 /**
- * PROTOTIPO (controles): un botón que despliega otros controles, como «Más» en la barra o
- * «Funciones». Es un desplegable, no un menú de aplicación: el botón lleva `aria-expanded` y
- * el panel es un grupo de botones normales. Se cierra al usar uno, con Escape o tocando fuera.
+ * El botón «Funciones», que despliega encima el resto de controles del mapa. Es un desplegable,
+ * no un menú de aplicación: el botón lleva `aria-expanded` y el panel es un grupo de botones
+ * normales. Se cierra al usar uno, con Escape o tocando fuera.
  */
 export function MenuDeControles(props: MenuDeControlesProps) {
   const id = createUniqueId();
@@ -63,9 +45,9 @@ export function MenuDeControles(props: MenuDeControlesProps) {
           }
         });
       }}
-      class={props.posicion === "barra" ? "relative flex max-md:flex-1 md:w-full" : "relative"}
+      class="relative"
     >
-      <BotonHexagonal
+      <ControlDelMapa
         etiqueta={props.etiqueta}
         icono={props.icono}
         aria-expanded={abierto() ? "true" : "false"}
@@ -86,7 +68,7 @@ export function MenuDeControles(props: MenuDeControlesProps) {
               }
             });
           }}
-          class={variantesPanelMenu({ posicion: props.posicion })}
+          class="chaflan absolute right-0 bottom-full z-20 mb-2 flex w-72 flex-col gap-0.5 bg-superficie p-1.5 drop-shadow-panel [--corte:10px]"
         >
           <legend class="sr-only">{props.titulo}</legend>
           <AspectoDeControl value="fila">{props.children}</AspectoDeControl>

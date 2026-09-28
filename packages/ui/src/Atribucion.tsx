@@ -11,13 +11,12 @@ export interface Credito {
 }
 
 /**
- * PROTOTIPO (controles): en el móvil los créditos se pliegan tras un botón «i». Se ven al cargar
- * y se pliegan al tocar el mapa o a los cinco segundos, como permiten las pautas de atribución
- * de OpenStreetMap. En escritorio se ven siempre. Lo decide `DisposicionMapa`, que sabe cuándo
- * se toca el mapa.
+ * En el móvil los créditos se pliegan tras un botón «i». Se ven al cargar y se pliegan al tocar
+ * el mapa o a los cinco segundos, como permiten las pautas de atribución de OpenStreetMap. En
+ * escritorio se ven siempre. Lo decide `DisposicionMapa`, que sabe cuándo se toca el mapa; sin
+ * ella, los créditos no se pliegan.
  */
 export interface PliegueCreditos {
-  readonly plegable: () => boolean;
   readonly plegada: () => boolean;
   readonly cambiar: (plegada: boolean) => void;
 }
@@ -32,7 +31,7 @@ export interface AtribucionProps {
 export function Atribucion(props: AtribucionProps) {
   const id = createUniqueId();
   const pliegue = useContext(PliegueDeCreditos);
-  const plegable = () => pliegue?.plegable() === true;
+  const plegable = () => pliegue !== undefined;
   const plegada = () => plegable() && pliegue?.plegada() === true;
   return (
     <div class="flex items-end gap-1">

@@ -1,10 +1,10 @@
 /**
- * PROTOTIPO (logo y controles): el favicon, los iconos PNG y el manifiesto, generados en la build
+ * El favicon, los iconos PNG y el manifiesto, generados en la build
  * desde la geometría de la marca (`geometria.ts`) y los tokens de `tema.css`. Así no hay colores
  * sueltos ni ficheros binarios que se desfasen del tema: cambiar un token cambia los iconos.
  *
  * `iconosDeCelda()` es un plugin de Vite: en desarrollo sirve los ficheros y en la build los
- * escribe en `dist/iconos/`. También pone en el HTML los enlaces a los de la marca de hoy.
+ * escribe en `dist/iconos/`. También pone en el HTML los enlaces a los de la marca vigente.
  */
 // El plugin corre en Node al construir, fuera de cualquier programa de Effect.
 // @effect-diagnostics-next-line nodeBuiltinImport:off
@@ -19,16 +19,15 @@ import {
   CAJA_MARCA,
   carpetaDeIconos,
   ICONOS,
+  MARCA_VIGENTE,
   MARCAS,
-  type Marca,
-  type Pieza,
   type Punto,
   type Tono,
   trayecto,
   type VarianteMarca,
   VARIANTES_MARCA,
 } from "./geometria.ts";
-import { type Capa, circuloComoPoligono, rasterizar, type Rgb } from "./raster.ts";
+import { type Capa, rasterizar, type Rgb } from "./raster.ts";
 
 /** Los colores de un icono, leídos de los tokens `--icono-*` y del tema claro. */
 export interface ColoresIcono {
@@ -68,22 +67,6 @@ export const comoHex = (color: Rgb): string =>
 
 type Destino = "favicon" | "tapiz";
 
-interface Composicion {
-  /** El fondo, en unidades de la caja de 32: la baldosa del favicon o el cuadrado entero. */
-  readonly fondo: ReadonlyArray<Punto> | undefined;
-  readonly escala: number;
-  readonly tonos: Readonly<Record<Tono, Rgb>>;
-}
-
-/** Baldosa con dos esquinas cortadas, como los paneles (`chaflan`). */
-const BALDOSA: ReadonlyArray<Punto> = [
-  [6, 0],
-  [32, 0],
-  [32, 26],
-  [26, 32],
-  [0, 32],
-  [0, 6],
-];
 const CUADRADO: ReadonlyArray<Punto> = [
   [0, 0],
   [32, 0],
@@ -92,48 +75,39 @@ const CUADRADO: ReadonlyArray<Punto> = [
 ];
 
 /**
- * Cómo se pinta una marca en cada destino. Con baldosa, la figura va clara sobre oscuro. Sin
- * ella (la celda), el hexágono es el fondo oscuro y lo recortado va claro, para que se vea
- * también en una pestaña oscura.
+ * Los colores de cada tono en los iconos. La figura oscura es el fondo del icono y lo recortado
+ * va claro: así se ve en pestañas claras y oscuras sin baldosa detrás.
  */
-const componer = (marca: Marca, destino: Destino, colores: ColoresIcono): Composicion => {
-  const tonos: Record<Tono, Rgb> = marca.baldosa
-    ? { tinta: colores.figura, acento: colores.acento, claro: colores.fondo }
-    : { tinta: colores.fondo, acento: colores.acento, claro: colores.figura };
-  if (destino === "tapiz") {
-    // El icono de la pantalla de inicio va a sangre: el sistema lo recorta a su forma.
-    return { fondo: CUADRADO, escala: marca.baldosa ? 0.62 : 0.74, tonos };
-  }
-  return marca.baldosa
-    ? { fondo: BALDOSA, escala: 0.8, tonos }
-    : { fondo: undefined, escala: 1, tonos };
-};
+const tonosDeIcono = (colores: ColoresIcono): Readonly<Record<Tono, Rgb>> => ({
+  tinta: colores.fondo,
+  acento: colores.acento,
+  claro: colores.figura,
+});
+
+/**
+ * El favicon es la figura a tamaño completo, sin fondo. El icono de la pantalla de inicio va a
+ * sangre, sobre un cuadrado oscuro, porque el sistema lo recorta a su forma.
+ */
+const composicion = (destino: Destino) =>
+  destino === "tapiz" ? { fondo: CUADRADO, escala: 0.74 } : { fondo: undefined, escala: 1 };
 
 const escalar = (punto: Punto, escala: number): Punto => [
   CAJA_MARCA / 2 + (punto[0] - CAJA_MARCA / 2) * escala,
   CAJA_MARCA / 2 + (punto[1] - CAJA_MARCA / 2) * escala,
 ];
 
-const contornosDe = (pieza: Pieza): ReadonlyArray<ReadonlyArray<Punto>> =>
-  pieza.tipo === "poligono" ? pieza.contornos : [circuloComoPoligono(pieza.centro, pieza.radio)];
-
 /** El SVG del favicon: la misma figura que la cabecera, con los colores del icono. */
 export const svgDeIcono = (variante: VarianteMarca, colores: ColoresIcono): string => {
-  const marca = MARCAS[variante];
-  const { fondo, escala, tonos } = componer(marca, "favicon", colores);
-  const piezas = marca.piezas.map((pieza) =>
-    pieza.tipo === "poligono"
-      ? `<path fill-rule="evenodd" fill="${comoHex(tonos[pieza.tono])}" d="${trayecto(pieza.contornos)}"/>`
-      : `<circle fill="${comoHex(tonos[pieza.tono])}" cx="${pieza.centro[0]}" cy="${pieza.centro[1]}" r="${pieza.radio}"/>`,
+  const tonos = tonosDeIcono(colores);
+  const piezas = MARCAS[variante].piezas.map(
+    (pieza) =>
+      `<path fill-rule="evenodd" fill="${comoHex(tonos[pieza.tono])}" d="${trayecto(pieza.contornos)}"/>`,
   );
-  const centro = CAJA_MARCA / 2;
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CAJA_MARCA} ${CAJA_MARCA}">`,
     `<title>Celda</title>`,
-    fondo === undefined ? "" : `<path fill="${comoHex(colores.fondo)}" d="${trayecto([fondo])}"/>`,
-    `<g transform="translate(${centro} ${centro}) scale(${escala}) translate(${-centro} ${-centro})">`,
     ...piezas,
-    `</g></svg>`,
+    `</svg>`,
     "",
   ].join("");
 };
@@ -145,17 +119,17 @@ export const pixelesDeIcono = (
   tamano: number,
   colores: ColoresIcono,
 ): Uint8Array => {
-  const marca = MARCAS[variante];
-  const { fondo, escala, tonos } = componer(marca, destino, colores);
+  const { fondo, escala } = composicion(destino);
+  const tonos = tonosDeIcono(colores);
   const aPixeles = (punto: Punto): Punto => [
     (punto[0] * tamano) / CAJA_MARCA,
     (punto[1] * tamano) / CAJA_MARCA,
   ];
   const capas: Array<Capa> = [];
   if (fondo !== undefined) capas.push({ contornos: [fondo.map(aPixeles)], color: colores.fondo });
-  for (const pieza of marca.piezas) {
+  for (const pieza of MARCAS[variante].piezas) {
     capas.push({
-      contornos: contornosDe(pieza).map((contorno) =>
+      contornos: pieza.contornos.map((contorno) =>
         contorno.map((punto) => aPixeles(escalar(punto, escala))),
       ),
       color: tonos[pieza.tono],
@@ -248,7 +222,7 @@ const tipoDe = (ruta: string): string =>
 export const iconosDeCelda = (): Plugin => {
   const leer = () =>
     ficherosDeIconos(NodeFS.readFileSync(new URL("../tema.css", import.meta.url), "utf8"));
-  const carpeta = carpetaDeIconos("actual");
+  const carpeta = carpetaDeIconos(MARCA_VIGENTE);
   return {
     name: "celda-iconos",
     configureServer(servidor) {

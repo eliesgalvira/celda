@@ -76,15 +76,15 @@
   --qr-tinta: oklch(20% 0 0);
 
   /*
-   * ICONOS: el favicon y el de la pantalla de inicio (marca/iconos.ts). Figura clara sobre la
-   * baldosa oscura de las agrupaciones, para que se vean en pestañas claras y oscuras.
+   * ICONOS: el favicon y el de la pantalla de inicio (marca/iconos.ts). La figura, oscura como
+   * las agrupaciones, con lo recortado claro: se ven en pestañas claras y oscuras.
    */
   --icono-fondo: oklch(29.9% 0.005 121.8);
   --icono-figura: oklch(94.1% 0.009 84.6);
   --icono-acento: oklch(72% 0.085 203.3);
 
   /*
-   * CONTROLES DEL MAPA (prototipo de controles): piedra clara con tinta y borde oscuro. Así no se
+   * CONTROLES DEL MAPA: piedra clara con tinta y borde oscuro. Así no se
    * confunden con las agrupaciones, que son los datos y van en oscuro.
    */
   --control: oklch(95.5% 0.008 84.6);
@@ -92,7 +92,7 @@
   --control-tinta: oklch(29.9% 0.005 121.8);
   --control-borde: oklch(29.9% 0.005 121.8);
 
-  /* PROTOTIPO: la barra que cambia de variante. Un color que no usa nada más de la web. */
+  /* PROTOTIPO: la barra que cambia de versión del logo. Un color que no usa nada más de la web. */
   --prototipo: oklch(42% 0.17 330);
   --prototipo-fg: oklch(98.5% 0.004 90);
 
