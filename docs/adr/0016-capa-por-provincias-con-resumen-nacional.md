@@ -20,12 +20,13 @@ Con 100.000 sintéticos, la capa única tarda 1.040 ms en indexarse en el hilo p
 ## Decisión
 
 - **La capa de una versión son varios ficheros:**
-  - un resumen nacional con una fila por provincia: código INE, nombre, etiqueta, caja de sus emplazamientos, número, compañías presentes y el nombre del fichero de su capa;
+  - un resumen nacional con una fila por provincia: código INE, nombre, etiqueta, caja de sus emplazamientos, número, compañías presentes, si alguna zona de barrido la cubre entera y el nombre del fichero de su capa;
   - una capa por provincia, con las columnas del formato 4 más el municipio;
   - la tabla de municipios de cada provincia, con sus habitantes (ADR 0017).
 
   El formato pasa a 5. `vigente.json` apunta al resumen.
 - **Por debajo del zoom 8**, la web solo dibuja el resumen: un hexágono por provincia con su número y sus ausencias.
+- **Provincias sin cubrir.** Mientras la ingesta solo barre Cataluña (ADR 0014), el resto de provincias va en el resumen como no cubiertas. La web las dibuja sin número y, si se acerca a una, dice que Celda aún no la cubre. Nunca pinta un trozo de provincia como si estuviera completo.
 - **Desde el zoom 8** pide las provincias cuya caja corta la vista con margen y las indexa. Mientras una no ha llegado, se ve su hexágono del resumen, nunca un hueco. Una provincia leída se queda durante la visita.
 - **Índice en un Worker.** supercluster 9.1 guarda cada nivel en un KDBush sobre búferes que se pueden transferir. El Worker construye el índice y devuelve los búferes, y el hilo principal lo rehidrata sin volver a agrupar. Las escenas y las transiciones siguen siendo síncronas, que es lo que hizo descartar el Worker en `docs/patterns/rendimiento.md`. Con 100.000 emplazamientos la rehidratación cuesta 45 ms en el hilo principal, frente a 1.040 ms de construir el índice allí.
 - **Transición fiel donde hay detalle.** Entre dos niveles del 8 hacia arriba, la jerarquía de supercluster de cada provincia dice a qué hexágono va cada emplazamiento, como hoy. Entre el resumen y el detalle, cada elemento sale del hexágono de su provincia o va a él. En el borde entre dos provincias pueden quedar dos hexágonos cerca uno del otro, uno de cada una: cada uno cuenta bien los suyos.
