@@ -118,7 +118,8 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 | `ajustes/ajustes.ts` | lectura de IndexedDB | fija | `onSettled` | seguro | `recursoFijo` |
 | `datos.tsx`, runtime | los servicios (Worker, GPS…) hasta desmontar | fija | `onSettled` que solo cierra | seguro | `recursoFijo` |
 | `mapa/PantallaMapa.tsx`, mapa | MapLibre, WebGL, sus workers y escuchadores | fija | `onSettled` | seguro | `recursoFijo("mapa")` |
-| `mapa/PantallaMapa.tsx`, capa | `fetch` de `vigente.json` y la capa | fija | `onSettled` | seguro | `recursoFijo("capa")` |
+| `mapa/PantallaMapa.tsx`, capa | `fetch` de `vigente.json` y del resumen; con él, las capas de las provincias de la vista inicial y de la ficha de la dirección | fija | `onSettled` | seguro | `recursoFijo("capa")`, que al cerrar cancela también las provincias que se estén pidiendo |
+| `mapa/PantallaMapa.tsx`, provincias | `fetch` de la capa de una provincia y su índice en el Worker de capas | la vista que decide `Marcadores` (`alCambiarVista`) o el botón de reintentar | — | seguro | se abre desde esos manejadores, una vez por provincia y visita; una que falla no se vuelve a pedir sola al mover el mapa |
 | `mapa/PantallaMapa.tsx`, ancho de pantalla | `matchMedia` y su `change` | fija | `onSettled` | seguro | `recursoFijo` |
 | `mapa/PantallaMapa.tsx`, clic en el mapa | `map.on("click")` | el mapa listo | `createEffect(mapaListo)`, cambia al crear el mapa | seguro | `recurso("mapa:clic")` |
 | `mapa/PantallaMapa.tsx`, modelo del móvil | `getHighEntropyValues` | fija | `onSettled` | seguro | `recursoFijo` |
@@ -165,6 +166,7 @@ Se abre una vez por lo que lo crea, no por una reejecución:
 
 - Al cargar el módulo: `lib/rutas.ts` (`popstate`) y `mapa/precarga.ts` (MapLibre, `prefetch` y `preload`).
 - Una vez por mapa: `mapa/mapaBase.ts` (`sourcedata`, `error`) y `PantallaMapa.crear` (`zoom`, `moveend`, `load`).
+- Una vez por Worker: `capa/navegador.ts`, el Worker que lee e indexa las capas de provincia; se crea con la primera provincia y dura la visita, y una lectura interrumpida no lo termina: su respuesta se descarta.
 - Una vez por Worker: `simulacion/navegador.ts` (`new Worker` y sus escuchadores). El simulador arranca uno con la primera simulación y lo termina si se interrumpe un cálculo a medias. Por eso los cálculos que se cancelan de más cuestan tanto.
 - Los servicios de Effect (`geolocalizacion.ts`, `brujula.ts`, `almacen.ts`, las lecturas de red de `capa/`, `ficha/` y `buscador.ts`) abren con `acquireRelease` y cierran al interrumpirse. Los abre el sitio de Solid de la primera tabla.
 - Escuchadores en el propio nodo desde un `ref` (`Dialogo`, `MenuDeControles`, `MenuUbicacion`, `PanelEmplazamiento`, `MarcadorReferencia`): uno por nodo, y mueren con él.
