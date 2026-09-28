@@ -175,6 +175,25 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - La columna de la derecha reserva 12,5 rem de alto: pasar de un estado de la brújula a otro mueve poco la ficha. En el móvil el dial mide 6,5 rem y en escritorio 7,5.
 - La barra que simula el giro es el `Deslizador` de `Eleccion.tsx`, con la etiqueta «Simular el giro».
 
+## Prototipo del logo y los controles (28/09/2026)
+
+Tras probar la web en Android, el usuario pidió una Trifuerza como logo y favicon, y se quejó del poco contraste entre los controles y las agrupaciones: los dos eran hexágonos oscuros y la columna de siete tapaba grupos del mapa. Hay tres variantes de cada cosa en la web de verdad, para compararlas en el móvil. Todo lo del prototipo lleva `PROTOTIPO` en su comentario; cuando se elija, lo elegido pasa al código normal y el resto se borra.
+
+- La URL decide: `?variante=A|B|C` pone las dos cosas, y `?logo=` y `?controles=` ganan a `variante`; `hoy` es lo de ahora. Sin ninguno de los tres, la web es la de antes y no sale la barra. Lo lee `apps/web/src/prototipo/variantes.ts`, y `navegar` copia los parámetros a la dirección nueva para que abrir una ficha no los pierda.
+- `prototipo/BarraDePrototipo.tsx` es la barra magenta con borde discontinuo que los cambia, arriba a la izquierda. Se encoge con «‹». Con el foco fuera de los controles, ← y → cambian los controles, y con Mayúsculas, el logo.
+- Logo (`marca/geometria.ts`): A «Tres sectores» son los tres triángulos separados del centro, los sectores de 120° de un emplazamiento, con el mástil como hexágono; B «Celda» es el hexágono oscuro de las agrupaciones con la Trifuerza recortada; C «Triangulación» son seis emplazamientos unidos con sus vecinos. Ninguno copia la Trifuerza tal cual.
+- Controles (`DisposicionMapa` con `disposicion`, y el aspecto de cada botón por el contexto `AspectoDeControl`): A «Losas» es la columna de hoy con losas claras de borde oscuro y la etiqueta dentro; B «Barra» es una barra fija abajo en el móvil y un riel a la derecha en escritorio, con Ejercicio y Ajustes en «Más»; C «Un menú» deja solo «Ubicación» y «Funciones», que despliega el resto con una línea que explica cada uno. En el móvil de C, Acercar y Alejar van dentro del menú.
+- Con cualquiera de las tres, en el móvil los créditos se pliegan tras un botón «i». Se ven al cargar y se pliegan al primer toque en el mapa o a los 5 s, como permiten las [pautas de atribución de la OSMF](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines). En escritorio se ven siempre.
+- Los controles claros usan `--control`, `--control-tinta` y `--control-borde`. `mapa/color.test.ts` exige 3:1 (WCAG 1.4.11) entre el borde y cada fondo del mapa, y entre el relleno y una agrupación. Los hexágonos de hoy dan 1:1 frente a las agrupaciones.
+
+## Favicon, iconos y manifiesto
+
+No hay ficheros de iconos en el repositorio: el plugin `iconosDeCelda` (`marca/iconos.ts`, en `apps/web/vite.config.ts`) los genera desde la geometría de la marca y los tokens `--icono-*` de `tema.css`. En desarrollo los sirve y en la build los escribe en `dist/iconos/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180 px), `icono-192.png`, `icono-512.png` y `manifest.webmanifest`, más una carpeta `prototipo-a`, `-b` y `-c` por variante. Pone en el HTML los enlaces de la marca de hoy, y con `?logo=` la web los cambia (`apps/web/src/prototipo/iconos.ts`).
+
+- Los PNG salen de `marca/raster.ts`, un rasterizador de polígonos par-impar con suavizado, sin dependencias, y se codifican con `node:zlib`.
+- El favicon va sobre una baldosa oscura con dos esquinas cortadas, para verse en pestañas claras y oscuras. La variante B no la lleva: su hexágono ya es oscuro. El icono de la pantalla de inicio va a sangre, porque el sistema lo recorta a su forma.
+- `vercel.json` deja `/iconos/` fuera de la reescritura a `index.html`: un icono que falta da 404.
+
 ## Qué rechaza la regla fuera de `packages/ui`
 
 Atributos `style`; `class`, `className` o `classList` que no salgan de `@celda/ui`; importar hojas de estilo; y colores sueltos en cualquier cadena: hexadecimales, `rgb()`, `hsl()`, `oklch()` y similares, y clases de la paleta de Tailwind (`text-sky-600`, `bg-white`). Las pruebas de la regla están en `tools/oxlint-plugin-celda/reglas/sin-estilos-a-medida.test.ts`.
