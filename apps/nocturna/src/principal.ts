@@ -2,6 +2,7 @@ import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { almacenDesdeConfig } from "@celda/publicacion/configuracion";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -10,6 +11,7 @@ import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { baseNocturna } from "./base.ts";
 import { configuracion } from "./configuracion.ts";
+import { credencialesDeSystemd } from "./credenciales.ts";
 import {
   copiarBase,
   estado,
@@ -29,7 +31,8 @@ import {
  * - `publicar`: publica a mano lo que haya en la base, sin pedir nada a las fuentes.
  * - `copia`: copia la base a la carpeta de copias.
  *
- * La configuración va en variables de entorno (`configuracion.ts`).
+ * La configuración va en variables de entorno (`configuracion.ts`). Los secretos pueden llegar
+ * también como credenciales de systemd (`credenciales.ts`).
  */
 
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
@@ -83,6 +86,11 @@ const principal = Effect.gen(function* () {
   return yield* efecto.pipe(Effect.provide(entorno));
 });
 
+/** Node y, detrás de las variables de entorno, las credenciales de systemd. */
+const programa = ConfigProvider.layerAdd(credencialesDeSystemd).pipe(
+  Layer.provideMerge(NodeServices.layer),
+);
+
 // El punto de entrada del programa monta aquí sus capas, una vez.
 // @effect-diagnostics-next-line strictEffectProvide:off
-NodeRuntime.runMain(principal.pipe(Effect.provide(NodeServices.layer)));
+NodeRuntime.runMain(principal.pipe(Effect.provide(programa)));
