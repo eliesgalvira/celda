@@ -12,9 +12,11 @@ import {
   type Punto,
   RespuestaInesperada,
 } from "../extractor.ts";
-import { type Caja, ZONA_BARCELONA } from "../zona.ts";
+import { ZONA_BARCELONA } from "../zona.ts";
 import {
+  enLaCaja,
   esHtml,
+  type Filtro,
   observacionesDeDetalle,
   ORIGEN,
   puntosDeListado,
@@ -27,38 +29,50 @@ import {
  * poco y pocas por noche. Ver `docs/investigacion/fuentes-comunitarias.md`, apartado 2.
  */
 export interface Opciones extends OpcionesCliente {
-  /** Caja cuyos puntos se guardan. El listado es de toda España y se filtra aquí. */
-  readonly zona: Caja;
+  /** Qué puntos se guardan. El listado es de toda España y se filtra aquí. */
+  readonly dentro: Filtro;
 }
 
-export const OPCIONES: Opciones = {
+/** La pausa más corta entre dos peticiones a antenasmoviles.es. */
+export const PAUSA_MINIMA = Duration.seconds(5);
+
+/** El cliente por defecto: una petición cada 5 s y unas 110 por ejecución. */
+export const OPCIONES_CLIENTE: OpcionesCliente = {
   userAgent: "Celda (ingesta; contacto en celda.elies.site)",
-  pausa: Duration.seconds(5),
+  pausa: PAUSA_MINIMA,
   // `robots.txt`, el listado, unos 100 detalles y margen para reintentos.
   maxPeticiones: 110,
   // El listado de toda España son unos 850 KB comprimidos.
   espera: Duration.seconds(30),
   reintentos: 2,
-  zona: ZONA_BARCELONA,
 };
+
+/** Las de Convex: la caja de Barcelona. */
+export const OPCIONES: Opciones = { ...OPCIONES_CLIENTE, dentro: enLaCaja(ZONA_BARCELONA) };
+
+/** La pausa desde la configuración, en segundos, sin bajar nunca de `PAUSA_MINIMA`. */
+export const pausaDesdeSegundos = (segundos: number): Duration.Duration =>
+  Duration.max(Duration.seconds(segundos), PAUSA_MINIMA);
 
 /** Las opciones se pueden cambiar con variables de entorno del despliegue, sin bajar de 5 s. */
 export const opcionesDesdeConfig: Config.Config<Opciones> = Config.all({
   maxPeticiones: Config.Int("CELDA_ANTENASMOVILES_MAX_PETICIONES").pipe(
     Config.withDefault(OPCIONES.maxPeticiones),
   ),
-  pausaSegundos: Config.Int("CELDA_ANTENASMOVILES_PAUSA_SEGUNDOS").pipe(Config.withDefault(5)),
+  pausaSegundos: Config.Int("CELDA_ANTENASMOVILES_PAUSA_SEGUNDOS").pipe(
+    Config.withDefault(Duration.toSeconds(PAUSA_MINIMA)),
+  ),
 }).pipe(
   Config.map(({ maxPeticiones, pausaSegundos }) => ({
     ...OPCIONES,
     maxPeticiones,
-    pausa: Duration.seconds(Math.max(pausaSegundos, 5)),
+    pausa: pausaDesdeSegundos(pausaSegundos),
   })),
 );
 
 /**
  * Extractor de antenasmoviles.es. Lee el listado de toda España una vez, se queda con los
- * puntos de la zona y pide el detalle de los puntos que le pida el proceso. Un 403 o una página
+ * puntos que deja pasar `dentro` y pide el detalle de los puntos que le pida el proceso. Un 403 o una página
  * HTML donde debería haber JSON es la fuente bloqueando a Celda, no una zona sin antenas.
  */
 export const capa = (
@@ -89,7 +103,7 @@ export const capa = (
        * los puntos como ausentes y dos noches así retirarían sus correcciones.
        */
       const puntos = Effect.gen(function* () {
-        const listado = puntosDeListado(yield* obtener(URL_LISTADO), opciones.zona);
+        const listado = puntosDeListado(yield* obtener(URL_LISTADO), opciones.dentro);
         if (Result.isFailure(listado)) {
           return yield* new RespuestaInesperada({ url: URL_LISTADO, motivo: listado.failure });
         }
