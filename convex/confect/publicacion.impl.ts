@@ -1,6 +1,6 @@
-import { limitesDeBarcelona } from "@celda/publicacion/barrios";
 import { almacenDesdeConfig } from "@celda/publicacion/configuracion";
 import type { ResultadoPublicacion } from "@celda/publicacion/publicar";
+import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { ConvexConfigProvider, FunctionImpl, GroupImpl } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -21,7 +21,7 @@ const publicar = FunctionImpl.make(databaseSchema, publicacion, "publicar", () =
     if (Option.isNone(almacen)) {
       return { tipo: "sin-almacen" } satisfies ResultadoPublicacion;
     }
-    return yield* publicarYContar(yield* limitesDeBarcelona).pipe(
+    return yield* publicarYContar(yield* zonasDePublicacion).pipe(
       // La acción es el punto de entrada de la publicación: aquí se monta su almacén, una vez.
       // @effect-diagnostics-next-line strictEffectProvide:off
       Effect.provide(almacen.value),

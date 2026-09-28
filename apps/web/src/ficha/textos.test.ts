@@ -5,6 +5,8 @@ import { assert, describe, it } from "@effect/vitest";
 import { compararConCapa } from "./marcaDeAgua.ts";
 import {
   antetituloDe,
+  creditoDelLugar,
+  lugarDe,
   textosDeOrigenes,
   textosMarca,
   textosOrigen,
@@ -28,7 +30,64 @@ const FICHA: Ficha = {
   version: CAPA,
 };
 
+const IGN = {
+  atribucion: "Instituto Geográfico Nacional",
+  producto: "Base de Datos de Límites Jurisdiccionales de España",
+  licencia: "CC BY 4.0",
+  enlace: "https://www.ign.es/atom/dataset_feeds/lin_lim_mun.es.xml",
+  fecha: "2026-08-10",
+  huella: "sha256:prueba",
+};
+
 describe("textos de la ficha", () => {
+  it("bajo el título van el municipio y la provincia del IGN, o lo que dice la fuente", () => {
+    const en = (lugar: Ficha["lugar"]): Ficha =>
+      lugar === undefined ? FICHA : { ...FICHA, lugar };
+    const barcelona = { codigo: "08", nombre: "Barcelona" };
+    assert.strictEqual(
+      lugarDe(
+        en({
+          municipio: { codigo: "08205", nombre: "Sant Cugat del Vallès" },
+          provincia: barcelona,
+        }),
+      ),
+      "Sant Cugat del Vallès, provincia de Barcelona",
+    );
+    assert.strictEqual(
+      lugarDe(
+        en({
+          municipio: { codigo: "51001", nombre: "Ceuta" },
+          provincia: { codigo: "51", nombre: "Ceuta" },
+        }),
+      ),
+      "Ceuta",
+    );
+    assert.strictEqual(
+      lugarDe(en({ municipio: null, provincia: { codigo: "31", nombre: "Navarra" } })),
+      "Territorio compartido entre municipios, provincia de Navarra",
+    );
+    // Sin lugar del IGN, o lejos de todo municipio, lo que escribe la fuente.
+    assert.strictEqual(lugarDe(en(undefined)), "BARCELONA");
+    assert.strictEqual(lugarDe(en({ municipio: null, provincia: null })), "BARCELONA");
+  });
+
+  it("el crédito del lugar cita al IGN como obra derivada, con su fecha y su licencia", () => {
+    const ficha: Ficha = {
+      ...FICHA,
+      lugar: {
+        municipio: { codigo: "08019", nombre: "Barcelona" },
+        provincia: { codigo: "08", nombre: "Barcelona" },
+        fuente: IGN,
+      },
+    };
+    assert.strictEqual(
+      creditoDelLugar(ficha),
+      "Municipio y provincia: obra derivada de Base de Datos de Límites Jurisdiccionales de " +
+        "España 10 ago 2026, CC BY 4.0, Instituto Geográfico Nacional (ign.es).",
+    );
+    assert.isUndefined(creditoDelLugar(FICHA));
+  });
+
   it("el título es la calle y el número, sin el municipio ni la provincia", () => {
     assert.strictEqual(tituloDe(FICHA), "CL Rossello, 353");
     assert.strictEqual(tituloDe({ ...FICHA, direccion: "" }), "Emplazamiento sin dirección");

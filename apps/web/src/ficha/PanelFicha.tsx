@@ -46,6 +46,7 @@ import {
 import { FichasPublicadas } from "./servicio.ts";
 import {
   antetituloDe,
+  creditoDelLugar,
   lugarDe,
   NOMBRE_ESTADO,
   textoCodigos,
@@ -254,6 +255,9 @@ function ContenidoFicha(props: {
             </EstacionFicha>
           )}
         </For>
+        <Show when={creditoDelLugar(props.ficha)}>
+          {(credito) => <NotaFicha tono="credito">{credito()}</NotaFicha>}
+        </Show>
       </SeccionFicha>
       <Desplegable titulo="Datos técnicos">
         <DatosTecnicos

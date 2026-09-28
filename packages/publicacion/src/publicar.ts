@@ -1,4 +1,3 @@
-import type { LimitesDeBarrios } from "@celda/dominio/barrio";
 import {
   codificarVigente,
   decodificarVigente,
@@ -22,6 +21,7 @@ import * as Schema from "effect/Schema";
 
 import { AlmacenDeFicheros, type AlmacenNoDisponible, type FicheroInmutable } from "./almacen.ts";
 import { sha256 } from "./almacenes/firma.ts";
+import type { ZonasDePublicacion } from "./zonas.ts";
 
 /** Lo que ha hecho una publicación. */
 export const Publicada = Schema.Struct({
@@ -222,8 +222,9 @@ const ficheroPublicado = (fichero: string, contenido: string) =>
  *
  * 1. Lee la versión de los datos. Si `vigente.json` ya apunta a ella, termina sin escribir nada.
  * 2. Lee todos los emplazamientos y comprueba que la versión no se ha movido.
- * 3. Genera la capa, con el barrio de cada emplazamiento según `limites` y su lote de fichas.
- * 4. Lee las fichas de cada lote y guarda el lote. Si falta alguna, los datos han cambiado.
+ * 3. Genera la capa, con el barrio de cada emplazamiento según `zonas.barrios` y su lote de fichas.
+ * 4. Lee las fichas de cada lote, les pone el municipio y la provincia según `zonas.municipios` y
+ *    guarda el lote. Si falta alguna, los datos han cambiado.
  * 5. Vuelve a comprobar la versión, guarda la capa y la registra en la base.
  * 6. Cambia `vigente.json`, salvo que otra publicación haya dejado ya una versión posterior.
  * 7. Retira las versiones que sobran (`retirarVersionesViejas`), también si estaba al día.
@@ -232,7 +233,7 @@ const ficheroPublicado = (fichero: string, contenido: string) =>
  * cuando todo lo que necesita ya está en el almacén. Repetirla sin cambios no escribe nada.
  */
 export const publicar = Effect.fn("Publicacion.publicar")(function* (
-  limites: LimitesDeBarrios,
+  zonas: ZonasDePublicacion,
   porLote: number = EMPLAZAMIENTOS_POR_LOTE,
 ) {
   const datos = yield* DatosPublicables;
@@ -272,7 +273,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
   });
   yield* comprobarVersion;
 
-  const capa = generarCapa(fecha, emplazamientos, limites, porLote);
+  const capa = generarCapa(fecha, emplazamientos, zonas.barrios, porLote);
   const escritos = yield* Ref.make(0);
   const guardar = (fichero: string, contenido: string) =>
     Effect.tap(almacen.guardar(fichero, contenido), (nuevo) =>
@@ -287,7 +288,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
         if (fichas.length !== claves.length) {
           return yield* new InstantaneaMovida({ antes: fecha, despues: null });
         }
-        const generado = generarLote(version, lote, fichas);
+        const generado = generarLote(version, lote, fichas, zonas.municipios);
         yield* guardar(generado.fichero, generado.contenido);
         return yield* ficheroPublicado(generado.fichero, generado.contenido);
       }),
@@ -361,8 +362,8 @@ export const describirFallo = (fallo: FalloPublicacion): string => {
  * Publica, y convierte un fallo en un resultado que lo cuenta. Una publicación fallida no deshace
  * la ingesta, y la siguiente la repite.
  */
-export const publicarYContar = (limites: LimitesDeBarrios, porLote?: number) =>
-  publicar(limites, porLote).pipe(
+export const publicarYContar = (zonas: ZonasDePublicacion, porLote?: number) =>
+  publicar(zonas, porLote).pipe(
     Effect.catch((fallo) =>
       Effect.succeed<ResultadoPublicacion>({ tipo: "fallida", motivo: describirFallo(fallo) }),
     ),

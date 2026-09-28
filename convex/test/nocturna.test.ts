@@ -11,7 +11,7 @@ import {
   unaNoche,
 } from "@celda/nocturna/pruebas/entorno";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
-import { limitesDeBarcelona } from "@celda/publicacion/barrios";
+import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -78,7 +78,7 @@ const compararNoches = (
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const carpetaDeConvex = path.join(yield* fs.makeTempDirectoryScoped(), "almacen");
-      const publicacion = publicacionDirecta(yield* limitesDeBarcelona, POR_LOTE).pipe(
+      const publicacion = publicacionDirecta(yield* zonasDePublicacion, POR_LOTE).pipe(
         Layer.provide(
           Layer.merge(
             almacenEnCarpeta({ carpeta: carpetaDeConvex, origen: "http://capas.prueba" }).pipe(
@@ -110,6 +110,13 @@ const compararNoches = (
         assert.deepStrictEqual([...deNocturna.keys()], [...deConvex.keys()], `noche ${i + 1}`);
         for (const [fichero, contenido] of deConvex) {
           assert.strictEqual(deNocturna.get(fichero), contenido, `noche ${i + 1}: ${fichero}`);
+        }
+        // Las dos ponen en las fichas el municipio del IGN, con los mismos límites.
+        const lotes = [...deConvex].filter(([fichero]) => fichero.startsWith("fichas@"));
+        assert.isNotEmpty(lotes);
+        for (const [fichero, contenido] of lotes) {
+          assert.include(contenido, '"fuenteDeLugares"', fichero);
+          assert.include(contenido, '"municipio":{"codigo":"08019","nombre":"Barcelona"}', fichero);
         }
       }
     }),

@@ -1,5 +1,5 @@
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
-import { limitesDeBarcelona } from "@celda/publicacion/barrios";
+import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { almacenDesdeConfig } from "@celda/publicacion/configuracion";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as Effect from "effect/Effect";
@@ -45,10 +45,10 @@ const principal = Effect.gen(function* () {
   const c = yield* configuracion;
   const base = baseNocturna({ fichero: c.base, interruptores: c.interruptores });
   const almacen = yield* almacenDesdeConfig;
-  const limites = yield* limitesDeBarcelona;
+  const zonas = yield* zonasDePublicacion;
   const publicador = Option.match(almacen, {
     onNone: () => sinAlmacen,
-    onSome: (capa) => publicadorEn(limites).pipe(Layer.provide(capa)),
+    onSome: (capa) => publicadorEn(zonas).pipe(Layer.provide(capa)),
   });
   const extractores = Layer.succeed(
     Extractores,

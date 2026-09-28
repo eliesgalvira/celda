@@ -7,6 +7,7 @@ import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as HttpClient from "effect/unstable/http/HttpClient";
+import type * as Headers from "effect/unstable/http/Headers";
 
 import {
   type ErrorDeExtractor,
@@ -34,6 +35,8 @@ export interface OpcionesCliente {
 export interface Respuesta {
   readonly estado: number;
   readonly cuerpo: Uint8Array;
+  /** Las cabeceras, en minúsculas, como `last-modified`. */
+  readonly cabeceras: Headers.Headers;
 }
 
 /** Un fallo que puede desaparecer al repetir: red, tiempo agotado, 408, 429 o 5xx. */
@@ -94,6 +97,7 @@ export const clienteDeFuente = Effect.fn("ClienteDeFuente.crear")(function* (
         Effect.map(respuesta.arrayBuffer, (cuerpo): Respuesta => ({
           estado: respuesta.status,
           cuerpo: new Uint8Array(cuerpo),
+          cabeceras: respuesta.headers,
         })),
       ),
       Effect.timeoutOrElse({

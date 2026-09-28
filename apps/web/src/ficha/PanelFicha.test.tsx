@@ -6,6 +6,8 @@ import {
   versionDeCapa,
 } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
+import { generarLote } from "@celda/dominio/loteDeFichas";
+import { indexarMunicipios, type LimitesDeMunicipios } from "@celda/dominio/municipio";
 import { simuladorDePrueba, workerDePrueba } from "@celda/sim/pruebas";
 import { type Simulador, simuladorEnWorker } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
@@ -211,6 +213,33 @@ const grabarPanel = () => {
   };
 };
 
+/** Un municipio de Barcelona cuadrado alrededor de la muestra, como lo guarda el IGN en arcos. */
+const MUNICIPIOS: LimitesDeMunicipios = {
+  fuente: {
+    atribucion: "Instituto Geográfico Nacional",
+    producto: "Base de Datos de Límites Jurisdiccionales de España",
+    licencia: "CC BY 4.0",
+    enlace: "https://www.ign.es/atom/dataset_feeds/lin_lim_mun.es.xml",
+    fecha: "2026-08-10",
+    huella: "sha256:prueba",
+  },
+  toleranciaMetros: 50,
+  unidadesPorGrado: 100,
+  provincias: [{ codigo: "08", nombre: "Barcelona", etiqueta: { longitud: 2.1, latitud: 41.4 } }],
+  territorios: [
+    {
+      codigo: "08019",
+      tipo: "municipio",
+      nombre: "Barcelona",
+      provincia: "08",
+      etiqueta: { longitud: 2.1, latitud: 41.4 },
+      areaKm2: 101,
+      poligonos: [[[0]]],
+    },
+  ],
+  arcos: [[200, 4100, 100, 0, 0, 100, -100, 0, 0, -100]],
+};
+
 const TITULO_CAMPUS_NORD = "CL JORDI GIRONA, 1";
 const TITULO_PEDRALBES = "PZ EUSEBI GÜELL, 1";
 
@@ -239,6 +268,21 @@ describe("panel del emplazamiento", () => {
         /, desde el 26 sept 2026/u.test(li.textContent ?? ""),
       ),
       2,
+    );
+  });
+
+  it("dice el municipio y la provincia del IGN y lo cita como obra derivada", async () => {
+    const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
+    const lote = generarLote(CAPA.version, 0, [CAMPUS_NORD], indexarMunicipios(MUNICIPIOS));
+    await contestar(origen, urlDelLote(CAMPUS_NORD.clave), 200, lote.contenido);
+    await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+
+    assert.isNotNull(getByText("Barcelona, provincia de Barcelona"));
+    assert.isNotNull(
+      getByText(
+        "Municipio y provincia: obra derivada de Base de Datos de Límites Jurisdiccionales de " +
+          "España 10 ago 2026, CC BY 4.0, Instituto Geográfico Nacional (ign.es).",
+      ),
     );
   });
 

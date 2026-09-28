@@ -1,4 +1,3 @@
-import type { LimitesDeBarrios } from "@celda/dominio/barrio";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import type { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import {
@@ -8,6 +7,7 @@ import {
   publicarYContar as publicarYContarDatos,
   type ResultadoPublicacion,
 } from "@celda/publicacion/publicar";
+import type { ZonasDePublicacion } from "@celda/publicacion/zonas";
 import { MutationRunner, QueryRunner } from "@confect/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -59,18 +59,18 @@ const datosDeConvex = Effect.gen(function* () {
 });
 
 /** Publica la instantánea de Convex en el almacén del contexto (`publicar` de `@celda/publicacion`). */
-export const publicar = (limites: LimitesDeBarrios, porLote?: number) =>
+export const publicar = (zonas: ZonasDePublicacion, porLote?: number) =>
   Effect.flatMap(datosDeConvex, (datos) =>
-    publicarDatos(limites, porLote).pipe(Effect.provideService(DatosPublicables, datos)),
+    publicarDatos(zonas, porLote).pipe(Effect.provideService(DatosPublicables, datos)),
   );
 
 /**
  * Publica, y convierte un fallo en un resultado que lo cuenta. La usan la acción de publicar y
  * las pruebas: una publicación fallida no deshace la ingesta, y la siguiente la repite.
  */
-export const publicarYContar = (limites: LimitesDeBarrios, porLote?: number) =>
+export const publicarYContar = (zonas: ZonasDePublicacion, porLote?: number) =>
   Effect.flatMap(datosDeConvex, (datos) =>
-    publicarYContarDatos(limites, porLote).pipe(Effect.provideService(DatosPublicables, datos)),
+    publicarYContarDatos(zonas, porLote).pipe(Effect.provideService(DatosPublicables, datos)),
   );
 
 /**
@@ -83,14 +83,14 @@ export class Publicacion extends Context.Service<
 >()("@celda/convex/publicacion") {}
 
 /** La publicación en el mismo proceso, con el Convex y el almacén que haya en el contexto. */
-export const publicacionDirecta = (limites: LimitesDeBarrios, porLote?: number) =>
+export const publicacionDirecta = (zonas: ZonasDePublicacion, porLote?: number) =>
   Layer.effect(
     Publicacion,
     Effect.map(
       Effect.context<QueryRunner.QueryRunner | MutationRunner.MutationRunner | AlmacenDeFicheros>(),
       (contexto) =>
         Publicacion.of({
-          publicar: publicarYContar(limites, porLote).pipe(Effect.provideContext(contexto)),
+          publicar: publicarYContar(zonas, porLote).pipe(Effect.provideContext(contexto)),
         }),
     ),
   );

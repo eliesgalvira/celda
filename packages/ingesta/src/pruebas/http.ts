@@ -15,6 +15,7 @@ export interface Peticion {
 export interface Respuesta {
   readonly estado: number;
   readonly cuerpo: string | Uint8Array<ArrayBuffer>;
+  readonly cabeceras?: Readonly<Record<string, string>>;
 }
 
 /** Contesta una URL; `intento` es cuántas veces se ha pedido ya esa misma URL. */
@@ -40,8 +41,14 @@ export const clienteDePrueba = (
           ...p,
           { ruta, userAgent: request.headers["user-agent"], en },
         ]);
-        const { estado, cuerpo } = responder(url, previas.filter((p) => p.ruta === ruta).length);
-        return HttpClientResponse.fromWeb(request, new Response(cuerpo, { status: estado }));
+        const { estado, cuerpo, cabeceras } = responder(
+          url,
+          previas.filter((p) => p.ruta === ruta).length,
+        );
+        return HttpClientResponse.fromWeb(
+          request,
+          new Response(cuerpo, { status: estado, headers: cabeceras ?? {} }),
+        );
       }),
     ),
   );

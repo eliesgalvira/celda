@@ -394,6 +394,9 @@ importers:
       '@celda/dominio':
         specifier: workspace:*
         version: link:../../packages/dominio
+      '@celda/ingesta':
+        specifier: workspace:*
+        version: link:../../packages/ingesta
       '@celda/publicacion':
         specifier: workspace:*
         version: link:../../packages/publicacion

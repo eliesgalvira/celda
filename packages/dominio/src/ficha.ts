@@ -10,6 +10,7 @@ import {
   Estado,
   type EstacionBase,
 } from "./emplazamiento.ts";
+import { Lugar } from "./municipio.ts";
 import { Afirmacion, Fuente, type Observacion } from "./observacion.ts";
 
 /** De dónde sale un dato de la ficha: la observación de una fuente, con su fecha y su enlace. */
@@ -44,7 +45,13 @@ export const Ficha = Schema.Struct({
   posicion: Coordenada,
   /** Dirección tal como la publica la fuente, con el municipio y la provincia al final. */
   direccion: Schema.String,
+  /** El municipio tal como lo escribe la fuente en la dirección, en mayúsculas. */
   municipio: Schema.String,
+  /**
+   * El municipio y la provincia del IGN en que cae, que pone el publicador por punto en polígono
+   * (ADR 0017). Las fichas publicadas antes no lo llevan.
+   */
+  lugar: Schema.optionalKey(Lugar),
   estado: Estado,
   confianza: Confianza,
   conflictos: Schema.Array(Conflicto),

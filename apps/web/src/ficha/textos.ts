@@ -54,8 +54,36 @@ export const tituloDe = (ficha: Ficha): string => {
   return calle === "" ? "Emplazamiento sin dirección" : calle;
 };
 
-/** Dónde está, bajo el título. El barrio llegará con los límites de barrio. */
-export const lugarDe = (ficha: Ficha): string => ficha.municipio;
+/** Ceuta y Melilla son ciudades autónomas: municipio y provincia a la vez, con el mismo nombre. */
+const CIUDADES_AUTONOMAS = new Set(["51", "52"]);
+
+/**
+ * Dónde está, bajo el título: el municipio y la provincia del IGN que pone el publicador,
+ * «Sant Cugat del Vallès, provincia de Barcelona». En un territorio compartido por varios
+ * municipios, solo la provincia. Si la ficha no los trae, porque se publicó antes o porque el
+ * emplazamiento cae lejos de todo municipio, el municipio tal como lo escribe la fuente.
+ */
+export const lugarDe = (ficha: Ficha): string => {
+  const { municipio, provincia } = ficha.lugar ?? { municipio: null, provincia: null };
+  if (provincia === null) return municipio?.nombre ?? ficha.municipio;
+  if (municipio === null)
+    return `Territorio compartido entre municipios, provincia de ${provincia.nombre}`;
+  return CIUDADES_AUTONOMAS.has(provincia.codigo)
+    ? municipio.nombre
+    : `${municipio.nombre}, provincia de ${provincia.nombre}`;
+};
+
+/**
+ * El crédito del municipio y la provincia, en la forma que piden las condiciones del IGN para
+ * una obra derivada: producto, fecha, licencia y atribución.
+ */
+export const creditoDelLugar = (ficha: Ficha): string | undefined => {
+  const fuente = ficha.lugar?.fuente;
+  if (fuente === undefined) return undefined;
+  const fecha = Date.parse(`${fuente.fecha}T12:00:00Z`);
+  const cuando = Number.isNaN(fecha) ? fuente.fecha : fechaCorta(fecha);
+  return `Municipio y provincia: obra derivada de ${fuente.producto} ${cuando}, ${fuente.licencia}, ${fuente.atribucion} (ign.es).`;
+};
 
 export const NOMBRE_ESTADO: Readonly<Record<Estado, string>> = {
   verificado: "Verificado",

@@ -19,6 +19,7 @@ packages/ingesta/          extractores (registro-oficial/, antenasmoviles/), sin
 packages/ingesta/src/proceso.ts   el proceso de una ejecución sobre una BaseDeIngesta
 packages/ingesta/src/guardado.ts  qué cambia en una observación con el listado, la ficha o un barrido
 packages/publicacion/      la publicación, el almacén en carpeta o en R2 y la retención
+packages/publicacion/datos/  los límites de barrio y de municipios y el padrón del INE, en git
 packages/publicacion/datos/barrios.json   los límites de barrio que usa la publicación
 packages/dominio/          esquemas y la fusión, sin E/S
 apps/nocturna/             la ingesta nocturna: base SQLite, noche, estado y órdenes
@@ -180,7 +181,7 @@ La web no lee nada de Convex: descarga `vigente.json`, la capa y los lotes de fi
 1. Lee `datos:version`. Si `vigente.json` del almacén ya apunta a esa versión, termina sin escribir nada. Si apunta a una posterior, falla (`VigentePosterior`): no retrocede.
 2. Lee la instantánea (en Convex, con `capas:instantanea`, por páginas de 250 emplazamientos) con sus compañías y las bandas conocidas de cada una, y vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
 3. Genera la capa, con el barrio de cada emplazamiento según `packages/publicacion/datos/barrios.json` y su lote de fichas.
-4. Lee las fichas de cada lote con `capas:fichas` y escribe `fichas@<fecha>/<lote>.json`, cuatro lotes a la vez. Si falta alguna ficha, los datos han cambiado.
+4. Lee las fichas de cada lote con `capas:fichas`, les pone el municipio y la provincia según `packages/publicacion/datos/municipios.json` y escribe `fichas@<fecha>/<lote>.json`, cuatro lotes a la vez. Si falta alguna ficha, los datos han cambiado.
 5. Vuelve a comprobar la versión, escribe `sitios@<fecha>.json` y la registra con `capas:registrar`.
 6. Escribe `vigente.json`, el último.
 7. Borra las versiones que sobran: se quedan la vigente y las 7 anteriores (`VERSIONES_ANTERIORES`). Lo hace también cuando no había nada que publicar, así que un borrado fallido se repite la noche siguiente sin más.
@@ -215,6 +216,8 @@ Para otro despliegue, `pnpm run publicar` con `CELDA_CONVEX_URL`, `CELDA_CONVEX_
 
 Los límites de barrio se descargan de Open Data BCN con `pnpm run barrios`, también desde `tools/capas`. Son dos peticiones con 10 s entre ellas; hazlo solo cuando el Ayuntamiento publique límites nuevos y revisa el diff de `packages/publicacion/datos/barrios.json` antes del commit. `CELDA_BARRIOS` cambia la ruta del fichero. Por qué se guardan en git y no van en la ingesta: ADR 0004.
 
+Los municipios, las provincias y el padrón se descargan con `pnpm run municipios`, desde `tools/capas`. Lánzala cuando el IGN cambie la fecha de su canal o cuando el INE publique el padrón del año, hacia diciembre. Pide el `robots.txt` de cada sitio, espera 5 s entre dos peticiones al mismo y hace siete como mucho. El ZIP del IGN (66 MB) se queda en `~/.cache/celda` (o en `CELDA_CACHE`) con la fecha del canal en el nombre, así que repetir la orden sin cambios en el IGN solo pide cinco cosas pequeñas. `CELDA_MUNICIPIOS` y `CELDA_PADRON` cambian las rutas de los dos ficheros. Si la licencia deja de ser CC BY 4.0, si falta una fecha o si un municipio no está a los dos lados, falla sin escribir nada. Con el mismo ZIP y el mismo CSV salen los mismos bytes: revisa el diff antes del commit. `tools/capas/src/municipiosReales.test.ts` comprueba los ficheros del repositorio con puntos conocidos (Ceuta, Melilla, Llívia, Treviño, El Hierro, Bardenas Reales, el mar de la Barceloneta) y que la orden los volvería a escribir igual. Por qué se guardan en git: ADR 0017.
+
 `datos:version` es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la consulta también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
 
 ### Vista previa
@@ -223,7 +226,7 @@ Los límites de barrio se descargan de Open Data BCN con `pnpm run barrios`, tam
 
 ## Ficha
 
-`datos:ficha` (interna) y `capas:fichas` dan la `Ficha` de `packages/dominio/src/ficha.ts`, que sale de `leerFicha` (`convex/src/lecturas.ts`). La ficha lleva la dirección y el municipio, cada estación base con sus bandas ordenadas por frecuencia y, por cada código, la observación de la que sale, con su fuente, su enlace y desde cuándo lo dice. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. No lleva los `_id` de Convex. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene.
+`datos:ficha` (interna) y `capas:fichas` dan la `Ficha` de `packages/dominio/src/ficha.ts`, que sale de `leerFicha` (`convex/src/lecturas.ts`). La ficha lleva la dirección y el municipio tal como los escribe la fuente, cada estación base con sus bandas ordenadas por frecuencia y, por cada código, la observación de la que sale, con su fuente, su enlace y desde cuándo lo dice. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. No lleva los `_id` de Convex. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene. El municipio y la provincia del IGN (`lugar`) no salen de Convex: los pone la publicación, y el lote cita su fuente una vez.
 
 La web la lee con el servicio `FichasPublicadas` (`apps/web/src/ficha/servicio.ts`): busca el lote en la capa del mapa, lo descarga una vez por visita y, si el origen ya no tiene esa versión, lee la vigente. Así la marca de agua solo es posterior al mapa en ese caso (ADR 0004).
 
