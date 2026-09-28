@@ -90,13 +90,13 @@ const PLAZAS_MAYORES: ReadonlyArray<Direccion> = [
     nombre: "Plaza Mayor",
     detalle: "",
     lugar: "Medinaceli (Soria)",
-    posicion: { longitud: 2.4344, latitud: 41.1722 },
+    posicion: { longitud: -2.4354347, latitud: 41.1722846 },
   },
   {
     nombre: "Plaza Mayor",
     detalle: "",
     lugar: "Ágreda (Soria)",
-    posicion: { longitud: -1.9224, latitud: 41.8545 },
+    posicion: { longitud: -1.9200179, latitud: 41.8545747 },
   },
 ];
 
@@ -536,6 +536,46 @@ describe("punto de referencia: buscar una dirección en toda España", () => {
       assert.lengthOf(almacen.guardadas(), 1);
     });
     assert.deepStrictEqual(almacen.guardadas()[0]?.posicion, PLAZAS_MAYORES[1]?.posicion);
+  });
+
+  it("elegir un sitio lejos de los emplazamientos de la capa dice que ahí aún no hay datos", async () => {
+    const { eleccion, findByRole, queryByRole } = await buscarEnLaEleccion(
+      "Plaza Mayor",
+      new Map([["Plaza Mayor", PLAZAS_MAYORES]]),
+    );
+    fireEvent.click(await eleccion.findByRole("button", { name: /Ágreda/u }));
+    flush();
+    const titulo = await findByRole("heading", { name: "Celda aún no tiene datos de ese punto" });
+    const aviso = titulo.closest("section");
+    assert.strictEqual(aviso?.getAttribute("role"), "status");
+    // La distancia sale de la capa (solo Campus Nord), no de un nombre escrito a mano.
+    assert.match(
+      aviso?.textContent ?? "",
+      /Los datos más cercanos que tiene quedan a unos \d+\u00a0km/u,
+    );
+    assert.notMatch(aviso?.textContent ?? "", /Barcelona/u);
+
+    fireEvent.click(within(aviso ?? document.body).getByRole("button", { name: "Cerrar" }));
+    flush();
+    assert.isNull(queryByRole("heading", { name: "Celda aún no tiene datos de ese punto" }));
+  });
+
+  it("un punto cerca de los emplazamientos de la capa no avisa de nada", async () => {
+    const { eleccion, queryByRole, almacen } = await buscarEnLaEleccion(
+      "Campus Nord",
+      new Map([
+        [
+          "Campus Nord",
+          [{ nombre: "Campus Nord", detalle: "", lugar: "Barcelona (Barcelona)", posicion: CERCA }],
+        ],
+      ]),
+    );
+    fireEvent.click(await eleccion.findByRole("button", { name: /Campus Nord/u }));
+    flush();
+    await waitFor(() => {
+      assert.lengthOf(almacen.guardadas(), 1);
+    });
+    assert.isNull(queryByRole("heading", { name: /aún no tiene datos/u }));
   });
 
   it("sin resultados, dice que no hay nada así en España y cómo afinar", async () => {

@@ -41,8 +41,10 @@ import { asentado, type MotivoFalloGps } from "./estado.ts";
 import {
   COMO_REACTIVAR,
   EXPLICACION_FALLO,
+  fueraDeLosDatos,
   PARA_QUE_SIRVE,
   TITULO_FALLO,
+  textosFueraDeLosDatos,
   textosReferencia,
 } from "./textos.ts";
 
@@ -204,8 +206,24 @@ const TEXTO_ALMACEN = {
  * y que el dispositivo no ha guardado o borrado el punto. Con la ficha abierta, lo que ya cuenta
  * la ficha no se repite aquí.
  */
-export function AvisosDeUbicacion(props: { readonly panelAbierto: boolean }) {
+export function AvisosDeUbicacion(props: {
+  readonly panelAbierto: boolean;
+  /** La caja de los emplazamientos de la capa vigente: hasta dónde llegan los datos. */
+  readonly cajaDeLosDatos: Rectangulo | undefined;
+}) {
   const control = useContext(UbicacionContexto);
+  /** El punto de referencia cuyo aviso de «sin datos» se ha cerrado: el GPS o un punto elegido. */
+  const [sinDatosCerrado, setSinDatosCerrado] = createSignal<string>();
+  const sinDatos = createMemo(() => {
+    const referencia = control.referencia();
+    if (referencia === undefined) return undefined;
+    const clave = referencia.tipo === "gps" ? "gps" : referencia.punto.id;
+    if (clave === sinDatosCerrado()) return undefined;
+    const metros = fueraDeLosDatos(referencia, props.cajaDeLosDatos);
+    return metros === undefined
+      ? undefined
+      : { clave, ...textosFueraDeLosDatos(referencia, metros) };
+  });
   const fallo = createMemo(() => {
     const { aviso } = control.ubicacion();
     const conPunto = control.referencia() !== undefined;
@@ -236,6 +254,21 @@ export function AvisosDeUbicacion(props: { readonly panelAbierto: boolean }) {
             }
           >
             {EXPLICACION_FALLO[motivo]}
+          </Aviso>
+        )}
+      </Show>
+      <Show when={sinDatos()}>
+        {(aviso) => (
+          <Aviso
+            tono="limite"
+            titulo={aviso().titulo}
+            acciones={
+              <Boton variante="secundario" onClick={() => setSinDatosCerrado(aviso().clave)}>
+                Cerrar
+              </Boton>
+            }
+          >
+            {aviso().texto}
           </Aviso>
         )}
       </Show>

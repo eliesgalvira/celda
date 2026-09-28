@@ -2,7 +2,16 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { BARCELONA, Coordenada, contiene, mismaCoordenada, rumboGrados } from "./area.ts";
+import {
+  BARCELONA,
+  cajaDe,
+  Coordenada,
+  contiene,
+  distanciaAlRectangulo,
+  distanciaMetros,
+  mismaCoordenada,
+  rumboGrados,
+} from "./area.ts";
 
 const decodificar = Schema.decodeUnknownEffect(Coordenada);
 
@@ -62,5 +71,40 @@ describe("mismaCoordenada", () => {
     assert.isTrue(mismaCoordenada(undefined, undefined));
     assert.isFalse(mismaCoordenada(a, undefined));
     assert.isFalse(mismaCoordenada(a, { ...a, latitud: 41.3800001 }));
+  });
+});
+
+describe("cajaDe y distanciaAlRectangulo", () => {
+  const PUNTOS = [
+    { longitud: 2.11, latitud: 41.39 },
+    { longitud: 2.19, latitud: 41.36 },
+    { longitud: 2.15, latitud: 41.43 },
+  ];
+  const CAJA = {
+    suroeste: { longitud: 2.11, latitud: 41.36 },
+    noreste: { longitud: 2.19, latitud: 41.43 },
+  };
+
+  it("la caja es la más pequeña que contiene todos los puntos, y sin puntos no hay caja", () => {
+    assert.deepStrictEqual(cajaDe(PUNTOS), CAJA);
+    assert.isUndefined(cajaDe([]));
+  });
+
+  it("dentro de la caja, o en su borde, la distancia es 0", () => {
+    assert.strictEqual(distanciaAlRectangulo({ longitud: 2.15, latitud: 41.4 }, CAJA), 0);
+    assert.strictEqual(distanciaAlRectangulo(CAJA.noreste, CAJA), 0);
+  });
+
+  it("fuera, es la distancia al lado o a la esquina más cercanos", () => {
+    // Encima del lado de arriba: lo mismo que hasta el punto del lado que tiene debajo.
+    const alNorte = { longitud: 2.15, latitud: 41.45 };
+    assert.closeTo(
+      distanciaAlRectangulo(alNorte, CAJA),
+      distanciaMetros(alNorte, { longitud: 2.15, latitud: 41.43 }),
+      1,
+    );
+    // Medinaceli (Soria) queda a unos 380 km de la esquina suroeste.
+    const medinaceli = { longitud: -2.4354347, latitud: 41.1722846 };
+    assert.closeTo(distanciaAlRectangulo(medinaceli, CAJA) / 1000, 381, 3);
   });
 });

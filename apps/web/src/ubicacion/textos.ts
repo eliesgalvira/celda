@@ -1,4 +1,10 @@
-import { type Coordenada, distanciaMetros, rumboGrados } from "@celda/dominio/area";
+import {
+  type Coordenada,
+  distanciaAlRectangulo,
+  distanciaMetros,
+  type Rectangulo,
+  rumboGrados,
+} from "@celda/dominio/area";
 import { bloque, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
 import { type MotivoFalloGps, posicionDe, type Referencia } from "./estado.ts";
@@ -103,4 +109,53 @@ export const EXPLICACION_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
     "Tu dispositivo ha tardado demasiado en calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo apagada. Puedes volver a intentarlo o elegir el punto en el mapa.",
   "no-disponible":
     "El navegador no deja que la web pida la ubicación. Suele pasar si la página no va por https o si el navegador no lo admite. Puedes elegir el punto en el mapa.",
+};
+
+/**
+ * Hasta dónde, pasado el borde de los emplazamientos de la capa, el punto de referencia aún cuenta
+ * como dentro: a 3 km del borde siguen viéndose emplazamientos de la capa alrededor del punto.
+ */
+export const MARGEN_DE_LOS_DATOS = 3000;
+
+/**
+ * A cuántos metros queda el punto de referencia de la caja de los emplazamientos de la capa, si
+ * queda fuera de ella y de su margen. Sin capa no se sabe, y no dice nada.
+ */
+export const fueraDeLosDatos = (
+  referencia: Referencia,
+  caja: Rectangulo | undefined,
+): number | undefined => {
+  if (caja === undefined) return undefined;
+  const metros = distanciaAlRectangulo(posicionDe(referencia), caja);
+  return metros > MARGEN_DE_LOS_DATOS ? metros : undefined;
+};
+
+export interface TextosFueraDeLosDatos {
+  readonly titulo: string;
+  readonly texto: string;
+}
+
+/**
+ * Qué decir cuando el punto de referencia queda lejos de los datos. Los kilómetros van con un
+ * espacio que no parte la línea. No nombra la zona cubierta:
+ * sale de la distancia a los emplazamientos de la capa, y sigue siendo verdad al ampliarla.
+ */
+export const textosFueraDeLosDatos = (
+  referencia: Referencia,
+  metros: number,
+): TextosFueraDeLosDatos => {
+  const lejos =
+    metros < 10_000
+      ? textoDistancia(metros)
+      : `unos ${KILOMETROS.format(Math.round(metros / 1000))}\u00a0km`;
+  if (referencia.tipo === "elegido") {
+    return {
+      titulo: "Celda aún no tiene datos de ese punto",
+      texto: `Los datos más cercanos que tiene quedan a ${lejos}. Que no se vean antenas alrededor del punto no quiere decir que no las haya: ese lugar todavía no está en el mapa.`,
+    };
+  }
+  return {
+    titulo: "Celda aún no tiene datos de donde estás",
+    texto: `Los datos más cercanos que tiene quedan a ${lejos} de ti. Que no veas antenas a tu alrededor no quiere decir que no las haya: ese lugar todavía no está en el mapa.`,
+  };
 };
