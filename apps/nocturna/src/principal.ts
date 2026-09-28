@@ -56,7 +56,7 @@ const principal = Effect.gen(function* () {
   const extractores = Layer.succeed(
     Extractores,
     Extractores.of({
-      registroOficial: RegistroOficial.capa(c.registroOficial).pipe(
+      registroOficial: RegistroOficial.capaPorCajas(c.registroOficial).pipe(
         Layer.provide(FetchHttpClient.layer),
       ),
     }),

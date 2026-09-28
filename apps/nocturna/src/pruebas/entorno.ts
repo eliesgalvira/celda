@@ -3,8 +3,9 @@
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Fuente } from "@celda/dominio/observacion";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
-import type { Extractor } from "@celda/ingesta/extractor";
-import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
+import { OPCIONES_ZONAS, type OpcionesBarrido } from "@celda/ingesta/barrido";
+import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
+import { OPCIONES_PROCESO } from "@celda/ingesta/proceso";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
@@ -76,8 +77,11 @@ export const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
 /** Las opciones de la noche por defecto, con las carpetas del entorno. */
+/** Las del proceso por defecto, con Cataluña cada noche. */
+export const OPCIONES_BARRIDO: OpcionesBarrido = { ...OPCIONES_PROCESO, zonas: OPCIONES_ZONAS };
+
 export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
-  proceso: OPCIONES_PROCESO,
+  proceso: OPCIONES_BARRIDO,
   reintento: REINTENTO_DE_PUBLICACION,
   copias: { carpeta: entorno.copias, conservar: COPIAS_CONSERVADAS },
 });
@@ -87,7 +91,7 @@ export interface Variante {
   readonly almacen?: Layer.Layer<AlmacenDeFicheros>;
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
   readonly reintento?: Duration.Duration;
-  readonly proceso?: OpcionesProceso;
+  readonly proceso?: OpcionesBarrido;
 }
 
 /**
@@ -96,7 +100,7 @@ export interface Variante {
  */
 export const unaNoche = (
   entorno: Entorno,
-  extractor: Layer.Layer<Extractor>,
+  extractor: Layer.Layer<ExtractorPorCajas>,
   variante: Variante = {},
 ) =>
   Effect.gen(function* () {
@@ -117,7 +121,7 @@ export const unaNoche = (
     return yield* noche({
       ...opcionesDe(entorno),
       reintento: variante.reintento ?? REINTENTO_DE_PUBLICACION,
-      proceso: variante.proceso ?? OPCIONES_PROCESO,
+      proceso: variante.proceso ?? OPCIONES_BARRIDO,
     }).pipe(Effect.provide(entornoDeLaNoche));
   });
 

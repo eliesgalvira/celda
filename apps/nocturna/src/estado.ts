@@ -1,9 +1,10 @@
 import { versionDeCapa } from "@celda/dominio/capa";
+import type { ZonaEnLaEjecucion } from "@celda/ingesta/barrido";
 import type { Cambios } from "@celda/ingesta/ejecucion";
 import type { ResultadoPublicacion } from "@celda/publicacion/publicar";
 import * as DateTime from "effect/DateTime";
 
-import type { EjecucionGuardada, Resumen, ResumenDeFuente } from "./base.ts";
+import type { EjecucionGuardada, Resumen, ResumenDeFuente, ResumenDeZona } from "./base.ts";
 
 /** Una fecha en UTC, al segundo: `2026-09-26 02:15:00 UTC`. */
 const fecha = (milisegundos: number): string =>
@@ -29,10 +30,28 @@ const describirPublicacion = (resultado: ResultadoPublicacion): string => {
   }
 };
 
+const kilobytes = (bytes: number): string => `${Math.round(bytes / 1000)} kB`;
+
+const describirZonaEnLaEjecucion = (z: ZonaEnLaEjecucion): string =>
+  `    - ${z.zona}: ${z.estado}, ${z.cuadros} cuadros, ${z.peticiones} peticiones, ` +
+  `${kilobytes(z.bytes)}, ${z.registros} registros; observaciones ` +
+  `+${z.observaciones.creados} ~${z.observaciones.cambiados} -${z.observaciones.retirados}` +
+  (z.error === undefined ? "" : `; ${z.error}`);
+
+const describirZona = (z: ResumenDeZona): string =>
+  `    - ${z.zona}: ` +
+  (z.completado === null
+    ? "ningún barrido completado"
+    : `último barrido completado ${fecha(z.completado)}`) +
+  (z.aMedias ? "; tiene uno a medias, que se retoma" : "");
+
 const describirEjecucion = (e: EjecucionGuardada): ReadonlyArray<string> => [
   `  Última ejecución: ${fecha(e.inicio)}, ${e.estado}` +
     (e.registros === null ? "" : `, ${e.registros} registros en el listado`),
   ...(e.estado === "completada" ? [`  Cambios: ${describirCambios(e.cambios)}`] : []),
+  ...(e.zonas === null || e.zonas.length === 0
+    ? []
+    : ["  Zonas:", ...e.zonas.map(describirZonaEnLaEjecucion)]),
   ...(e.publicacion === null ? [] : [`  Publicación: ${describirPublicacion(e.publicacion)}`]),
   ...(e.errores.length === 0
     ? ["  Errores: ninguno"]
@@ -48,6 +67,7 @@ const describirFuente = (f: ResumenDeFuente): ReadonlyArray<string> => [
         `  Observaciones vigentes: ${f.vigentes}; fichas pendientes: ${f.sinLeer} sin leer y ` +
           `${f.porReleer} por releer`,
       ]),
+  ...(f.zonas.length === 0 ? [] : ["  Zonas de barrido:", ...f.zonas.map(describirZona)]),
 ];
 
 /** El estado de la base en texto, para la orden `estado`. */

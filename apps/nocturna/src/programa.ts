@@ -1,6 +1,10 @@
 import type { Fuente } from "@celda/dominio/observacion";
-import type { Extractor } from "@celda/ingesta/extractor";
-import { ejecutarIngesta, type OpcionesProceso } from "@celda/ingesta/proceso";
+import {
+  ejecutarBarrido,
+  type OpcionesBarrido,
+  type ZonaEnLaEjecucion,
+} from "@celda/ingesta/barrido";
+import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
 import type { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import {
   DatosPublicables,
@@ -29,7 +33,7 @@ import { describirResumen } from "./estado.ts";
  */
 export class Extractores extends Context.Service<
   Extractores,
-  { readonly registroOficial: Layer.Layer<Extractor> }
+  { readonly registroOficial: Layer.Layer<ExtractorPorCajas> }
 >()("@celda/nocturna/programa/Extractores") {}
 
 /** Un intento de publicar, y si merece la pena repetirlo al cabo de un rato. */
@@ -90,7 +94,7 @@ export interface OpcionesCopias {
 
 /** Lo que hace la noche, aparte de los extractores. */
 export interface OpcionesNoche {
-  readonly proceso: OpcionesProceso;
+  readonly proceso: OpcionesBarrido;
   /** Si publicar falla por algo pasajero, cuánto se espera para repetirlo una vez. */
   readonly reintento: Duration.Duration;
   readonly copias: OpcionesCopias;
@@ -101,6 +105,7 @@ export interface EjecucionDeLaNoche {
   readonly fuente: Fuente;
   readonly ejecucion: string;
   readonly estado: "omitida" | "fallida" | "completada";
+  readonly zonas: ReadonlyArray<ZonaEnLaEjecucion>;
 }
 
 /** Lo que ha hecho una noche. */
@@ -164,19 +169,25 @@ const publicarYApuntar = Effect.fn("Nocturna.publicar")(function* (
   return intento;
 });
 
-/** Una ejecución de ingesta con el extractor que da `capa`, construido para ella sola. */
-const ejecutarCon = (opciones: OpcionesProceso, capa: Layer.Layer<Extractor>) =>
+/** Una ejecución del barrido por zonas con el extractor que da `capa`, construido para ella sola. */
+const ejecutarCon = (opciones: OpcionesBarrido, capa: Layer.Layer<ExtractorPorCajas>) =>
   Effect.scoped(
     Effect.flatMap(Layer.build(capa), (extractor) =>
-      ejecutarIngesta(opciones).pipe(Effect.provideContext(extractor)),
+      ejecutarBarrido(opciones).pipe(Effect.provideContext(extractor)),
     ),
   );
+
+const describirZona = (z: ZonaEnLaEjecucion): string =>
+  `Zona ${z.zona}: ${z.estado}, ${z.cuadros} cuadros, ${z.peticiones} peticiones, ` +
+  `${Math.round(z.bytes / 1000)} kB, ${z.registros} registros, observaciones ` +
+  `+${z.observaciones.creados} ~${z.observaciones.cambiados} -${z.observaciones.retirados}` +
+  (z.error === undefined ? "" : ` (${z.error})`);
 
 /**
  * La noche entera:
  *
- * 1. Una ejecución de ingesta por fuente, con su interruptor: lee el listado y las fichas
- *    pendientes, cierra el barrido y fusiona.
+ * 1. Una ejecución de ingesta por fuente, con su interruptor: barre sus zonas de barrido, lee
+ *    las fichas pendientes y fusiona (`ejecutarBarrido`).
  * 2. Publica la capa y las fichas. Sin cambios no escribe nada, y si la noche anterior no pudo
  *    publicar, lo hace ahora. Si falla por algo pasajero, lo apunta, espera `reintento` y lo
  *    intenta otra vez; si vuelve a fallar, queda para la noche siguiente. Los datos ya están en
@@ -184,7 +195,8 @@ const ejecutarCon = (opciones: OpcionesProceso, capa: Layer.Layer<Extractor>) =>
  * 3. Copia la base a la carpeta de copias y deja las `conservar` últimas.
  *
  * Una noche cortada a mitad deja su ejecución en curso; la siguiente la da por interrumpida y la
- * rehace, porque cada paso es idempotente.
+ * rehace, porque cada paso es idempotente. Un barrido de zona cortado se retoma por el primer
+ * cuadro que no llegó a guardarse.
  */
 export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNoche) {
   const extractores = yield* Extractores;
@@ -192,8 +204,11 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
   const ejecuciones: ReadonlyArray<EjecucionDeLaNoche> = [
     { fuente: "registro-oficial", ...registro },
   ];
-  for (const { fuente, estado } of ejecuciones) {
+  for (const { fuente, estado, zonas } of ejecuciones) {
     yield* Effect.logInfo(`Ejecución de ${fuente}: ${estado}`);
+    for (const zona of zonas) {
+      yield* Effect.logInfo(describirZona(zona));
+    }
   }
   const completadas = ejecuciones.filter((e) => e.estado === "completada").map((e) => e.ejecucion);
 
