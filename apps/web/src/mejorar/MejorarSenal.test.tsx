@@ -185,6 +185,13 @@ describe("mejorar la señal: brújula", () => {
     assert.strictEqual(brujula.abiertas(), 0);
   });
 
+  it("con el emplazamiento justo al norte (rumbo 0°) también sale la brújula", async () => {
+    const alSur = { longitud: CAMPUS_NORD.posicion.longitud, latitud: CERCA.latitud };
+    const { seccion } = await abrir({ guardadas: [{ ...PUNTO, posicion: alSur }] });
+    await seccion().findByRole("slider", { name: "Simular el giro" });
+    assert.isNotNull(seccion().getByText("Emplazamiento: 0° (norte)"));
+  });
+
   it("en el iPhone explica antes de pedir permiso y, si se deniega, lo dice y deja la barra", async () => {
     const { seccion, pulsar, brujula } = await abrir({
       guardadas: [PUNTO],

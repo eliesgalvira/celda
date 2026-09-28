@@ -194,8 +194,9 @@ export function MejorarSenal(props: {
       <Show when={conPunto()}>
         {(actuales) => (
           <>
-            <Show when={actuales().objetivo}>
-              {(objetivo) => <BrujulaEnFicha objetivo={objetivo()} control={brujula} />}
+            {/* Un rumbo de 0° (el norte) también es un objetivo: `when` no puede ser el número. */}
+            <Show when={actuales().objetivo !== undefined}>
+              <BrujulaEnFicha objetivo={actuales().objetivo ?? 0} control={brujula} />
             </Show>
             <NotaMejorar>
               <TextoConTerminos texto={actuales().nota} />
