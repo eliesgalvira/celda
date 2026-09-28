@@ -1,6 +1,7 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
+import { ficheroDeManifiesto } from "@celda/dominio/provincias";
 import { OPCIONES_BARRIDO } from "@celda/ingesta/barrido";
 import {
   ExtractorPorCajas,
@@ -179,12 +180,15 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
 
           // A mitad se ha publicado una versión, y al cerrar la ventana, otra posterior.
           const escritos = yield* entorno.escritos;
-          const capas = escritos.filter((f) => f.startsWith("sitios@"));
-          assert.strictEqual(capas.length, 2);
+          const manifiestos = escritos.filter((f) => f.startsWith("ficheros@"));
+          assert.strictEqual(manifiestos.length, 2);
           assert.strictEqual(escritos.filter((f) => f === FICHERO_VIGENTE).length, 2);
           assert.strictEqual(primera.publicacion.tipo, "publicada");
           if (primera.publicacion.tipo === "publicada") {
-            assert.strictEqual(`${primera.publicacion.version}.json`, capas.at(-1));
+            assert.strictEqual(
+              ficheroDeManifiesto(primera.publicacion.version),
+              manifiestos.at(-1),
+            );
           }
 
           // La noche siguiente no repite ninguna y sigue por la cola.

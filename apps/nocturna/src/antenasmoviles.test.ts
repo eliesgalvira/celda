@@ -1,8 +1,9 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import { type ZonaDeBarrido, zonaDeBarrido } from "@celda/dominio/barrido";
-import { ficheroDeLote, leerCapa } from "@celda/dominio/capa";
-import { leerLote } from "@celda/dominio/loteDeFichas";
+import { decodificarVigente, FICHERO_VIGENTE } from "@celda/dominio/capa";
+import type { Ficha } from "@celda/dominio/ficha";
+import { leerCapaDeProvincia, leerLoteDeProvincia, leerResumen } from "@celda/dominio/provincias";
 import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
 import {
   enLosCuadros,
@@ -198,13 +199,29 @@ const detallesPedidos = (rutas: ReadonlyArray<string>) =>
     .filter((ruta) => ruta.startsWith("/v1/markers"))
     .map((ruta) => decodeURIComponent(ruta.slice("/v1/markers?id=".length)));
 
-/** La versión de la última capa publicada en el almacén, como `sitios@<fecha>`. */
-const ultimaVersion = (almacen: ReadonlyMap<string, string>): string =>
-  [...almacen.keys()]
-    .filter((fichero) => fichero.startsWith("sitios@"))
-    .toSorted()
-    .at(-1)
-    ?.slice(0, -".json".length) ?? "";
+/** La ficha de cada emplazamiento de la publicación vigente, leída de la capa de su provincia. */
+const fichasPublicadas = (almacen: ReadonlyMap<string, string>): ReadonlyArray<Ficha> => {
+  const vigente = decodificarVigente(almacen.get(FICHERO_VIGENTE) ?? "");
+  if (Result.isFailure(vigente)) return assert.fail("vigente.json no se entiende");
+  const resumen = leerResumen(
+    almacen.get(vigente.success.resumen ?? "") ?? "",
+    vigente.success.version,
+  );
+  if (Result.isFailure(resumen)) return assert.fail(resumen.failure.message);
+  return resumen.success.provincias.flatMap((provincia) => {
+    if (provincia.fichero === undefined) return [];
+    const capa = leerCapaDeProvincia(almacen.get(provincia.fichero) ?? "", provincia.codigo);
+    if (Result.isFailure(capa)) return assert.fail(capa.failure.message);
+    return capa.success.emplazamientos.flatMap((emplazamiento) => {
+      const lote = leerLoteDeProvincia(
+        almacen.get(capa.success.lotes[emplazamiento.lote ?? -1] ?? "") ?? "",
+        provincia.codigo,
+      );
+      if (Result.isFailure(lote)) return assert.fail(lote.failure.message);
+      return lote.success.filter((ficha) => ficha.clave === emplazamiento.clave);
+    });
+  });
+};
 
 /** antenasmoviles.es en el resumen de la base. */
 const fuenteDe = (entorno: Entorno) =>
@@ -315,23 +332,9 @@ describe("antenasmoviles.es en la ingesta nocturna (#48)", () => {
           });
 
           // Cada ER5 publicada cita antenasmoviles.es con el enlace a su sitio en su mapa.
-          const almacen = yield* contenidoDe(entorno.almacen);
-          const version = ultimaVersion(almacen);
-          const capa = leerCapa(almacen.get(`${version}.json`) ?? "", version);
-          if (Result.isFailure(capa)) return assert.fail(capa.failure.message);
-          const citas = capa.success.emplazamientos.flatMap((emplazamiento) => {
-            const numero = emplazamiento.lote ?? -1;
-            const lote = leerLote(
-              almacen.get(ficheroDeLote(version, numero)) ?? "",
-              version,
-              numero,
-            );
-            if (Result.isFailure(lote)) return assert.fail(lote.failure.message);
-            return lote.success.fichas
-              .filter((ficha) => ficha.clave === emplazamiento.clave)
-              .flatMap((ficha) => ficha.estaciones.flatMap((e) => e.origenes))
-              .filter((origen) => origen.fuente === "antenasmoviles");
-          });
+          const citas = fichasPublicadas(yield* contenidoDe(entorno.almacen))
+            .flatMap((ficha) => ficha.estaciones.flatMap((e) => e.origenes))
+            .filter((origen) => origen.fuente === "antenasmoviles");
           assert.strictEqual(citas.length, 132);
           const tarragona = citas.find((c) => c.clave === `movistar - ${er5(3).codigo}`);
           assert.strictEqual(tarragona?.url, "https://antenasmoviles.es/#19/41.401500/2.170000");
@@ -447,10 +450,11 @@ describe("antenasmoviles.es en la ingesta nocturna (#48)", () => {
           });
           assert.strictEqual(trasDos.ultima?.cambios.observaciones.retirados, 1);
           assert.strictEqual(tercera.publicacion.tipo, "publicada");
-          const almacen = yield* contenidoDe(entorno.almacen);
-          const capa = almacen.get(`${ultimaVersion(almacen)}.json`) ?? "";
-          assert.include(capa, queda.codigo);
-          assert.notInclude(capa, quitado.codigo);
+          const citadas = fichasPublicadas(yield* contenidoDe(entorno.almacen)).flatMap((ficha) =>
+            ficha.estaciones.flatMap((e) => e.origenes.map((origen) => origen.clave)),
+          );
+          assert.isTrue(citadas.some((clave) => clave.includes(queda.codigo)));
+          assert.isFalse(citadas.some((clave) => clave.includes(quitado.codigo)));
 
           // Una zona que vuelve sin ningún marcador cuando tenía alguno falla y no cuenta ausencias.
           for (let noches = 0; noches < 2; noches++) {
