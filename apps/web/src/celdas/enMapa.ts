@@ -3,6 +3,7 @@ import { celdas, type ResultadoCeldas } from "@celda/sim/celdas";
 import type { Coordenada } from "@celda/dominio/area";
 import { Simulador } from "@celda/sim/simulador";
 import { FUENTE_CELDAS, remarcarCelda } from "@celda/ui/mapa/celdas.ts";
+import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
@@ -86,21 +87,28 @@ export function crearCeldas(
     },
   );
 
-  createEffect(
-    () => ({
-      lienzo: entrada.lienzo(),
-      emplazamientos: entrada.emplazamientos(),
-      pedidas: pedidas(),
-      intento: intento(),
-    }),
+  // Un cálculo por capa pedida (y por reintento). La clave es un objeto nuevo cada vez: se
+  // compara campo a campo, y lo que no cambia ninguno de sus campos no vuelve a pedir nada.
+  recurso(
+    "simulador:celdas",
+    () => {
+      const lienzo = entrada.lienzo();
+      return lienzo === undefined
+        ? undefined
+        : {
+            lienzo,
+            emplazamientos: entrada.emplazamientos(),
+            pedidas: pedidas(),
+            intento: intento(),
+          };
+    },
     ({ lienzo, emplazamientos, pedidas: pedidasAhora }) => {
-      if (lienzo === undefined) return;
       if (pedidasAhora !== emplazamientos) {
         // Otra capa, todavía sin pedir: las celdas de la anterior ya no valen.
         lienzo.dibujar(SIN_CELDAS);
         setCalculadas(undefined);
         setCalculo("sin-pedir");
-        return;
+        return undefined;
       }
       setCalculo("calculando");
       const cancelar = new AbortController();
@@ -125,6 +133,7 @@ export function crearCeldas(
       });
       return () => cancelar.abort();
     },
+    { iguales: mismosCampos },
   );
 
   createEffect(

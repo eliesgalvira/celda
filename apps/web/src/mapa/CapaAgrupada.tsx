@@ -6,7 +6,8 @@ import {
   CapaDeMarcadores,
   MarcadorEmplazamiento,
 } from "@celda/ui/marcadores/MarcadorEmplazamiento.tsx";
-import { createEffect, createMemo, createSignal, For, Match, onSettled, Switch } from "solid-js";
+import { recurso } from "@celda/ui/recurso.ts";
+import { createEffect, createMemo, createSignal, For, Match, Switch } from "solid-js";
 
 import {
   type ElementoAbrible,
@@ -55,7 +56,10 @@ export interface CapaAgrupadaProps {
  */
 export function CapaAgrupada(props: CapaAgrupadaProps) {
   const [pintados, setPintados] = createSignal<ReadonlyArray<Pintado>>([]);
+  /** Si queda algo yéndose: mientras tanto se mira en cada fotograma. */
+  const [animando, setAnimando] = createSignal(false);
   let anterior: Escena | undefined;
+  let quitarHasta = 0;
 
   createEffect(
     () => ({
@@ -86,20 +90,27 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
         }),
       );
       quitarHasta = ahora + DURACION_MOVIMIENTO_MS;
-      if (latido === 0) latido = requestAnimationFrame(latir);
+      setAnimando(true);
     },
   );
 
   // Lo que se va se quita del DOM cuando termina su transición. Se mira en cada fotograma
-  // mientras quede algo yéndose, que es como mucho `DURACION_MOVIMIENTO_MS` tras el último cambio.
-  let quitarHasta = 0;
-  let latido = 0;
-  const latir = (ahora: number) => {
-    latido = 0;
-    setPintados((actuales) => quitarLosIdos(actuales, ahora));
-    if (ahora < quitarHasta) latido = requestAnimationFrame(latir);
-  };
-  onSettled(() => () => cancelAnimationFrame(latido));
+  // mientras quede algo yéndose, que es como mucho `DURACION_MOVIMIENTO_MS` tras el último cambio;
+  // un cambio a mitad alarga la espera sin volver a empezar.
+  recurso("marcadores:latido", animando, () => {
+    let latido = 0;
+    const latir = (ahora: number) => {
+      setPintados((actuales) => quitarLosIdos(actuales, ahora));
+      if (ahora < quitarHasta) {
+        latido = requestAnimationFrame(latir);
+      } else {
+        latido = 0;
+        setAnimando(false);
+      }
+    };
+    latido = requestAnimationFrame(latir);
+    return () => cancelAnimationFrame(latido);
+  });
 
   return (
     <CapaDeMarcadores

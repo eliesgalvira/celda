@@ -1,4 +1,4 @@
-import { BARCELONA, type Rectangulo } from "@celda/dominio/area";
+import { BARCELONA, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
@@ -13,11 +13,12 @@ import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
 import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
+import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
 import * as Effect from "effect/Effect";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
-import { createEffect, createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, Match, Show, Switch } from "solid-js";
 
 import {
   creditoDeBarrios,
@@ -190,25 +191,31 @@ export function PantallaMapa() {
       });
   };
 
-  onSettled(() => {
+  recursoFijo("mapa", () => {
     arrancar();
-    cargarCapa();
-    const pantalla = window.matchMedia(ESCRITORIO);
-    const medir = () => setEscritorio(pantalla.matches);
-    pantalla.addEventListener("change", medir);
     return () => {
       intento += 1;
-      intentoCapa += 1;
-      pantalla.removeEventListener("change", medir);
       mapa?.remove();
     };
   });
+  recursoFijo("capa", () => {
+    cargarCapa();
+    return () => {
+      intentoCapa += 1;
+    };
+  });
+  recursoFijo("pantalla:escritorio", () => {
+    const pantalla = window.matchMedia(ESCRITORIO);
+    const medir = () => setEscritorio(pantalla.matches);
+    pantalla.addEventListener("change", medir);
+    return () => pantalla.removeEventListener("change", medir);
+  });
 
   // En escritorio, mientras se elige un punto, un clic en el mapa lo marca (historia 26).
-  createEffect(
+  recurso(
+    "mapa:clic",
     () => mapaListo(),
     (actual) => {
-      if (actual === undefined) return;
       const alClic = (evento: {
         readonly lngLat: { readonly lng: number; readonly lat: number };
       }) => {
@@ -319,6 +326,18 @@ export function PantallaMapa() {
     return actual.tipo === "lista" ? actual.capa.fecha : undefined;
   });
 
+  /**
+   * Dónde está el punto de referencia. Cada lectura del GPS trae un objeto nuevo aunque no se haya
+   * movido; solo cambia si cambian las coordenadas, y así no se vuelve a calcular nada.
+   */
+  const posicionDeReferencia = createMemo(
+    () => {
+      const referencia = puntoDeReferencia.referencia();
+      return referencia === undefined ? undefined : posicionDe(referencia);
+    },
+    { equals: mismaCoordenada },
+  );
+
   const celdas = crearCeldas(datos, {
     lienzo: createMemo(() => {
       const actual = mapaListo();
@@ -337,10 +356,7 @@ export function PantallaMapa() {
     emplazamientos,
     eleccion,
     encuadre,
-    referencia: createMemo(() => {
-      const referencia = puntoDeReferencia.referencia();
-      return referencia === undefined ? undefined : posicionDe(referencia);
-    }),
+    referencia: posicionDeReferencia,
   });
 
   /**
@@ -409,10 +425,7 @@ export function PantallaMapa() {
         ? undefined
         : { clave: emplazamiento.clave, posicion: emplazamiento.posicion };
     }),
-    punto: createMemo(() => {
-      const referencia = puntoDeReferencia.referencia();
-      return referencia === undefined ? undefined : posicionDe(referencia);
-    }),
+    punto: posicionDeReferencia,
     celda: (clave) => celdaDe(celdas.calculadas(), clave),
     orientacion: orientacionDe([]),
   });
@@ -481,7 +494,7 @@ export function PantallaMapa() {
 
   /** El modelo del móvil, que Chromium da un momento después de pedirlo. */
   const [modelo, setModelo] = createSignal<string>();
-  onSettled(() => {
+  recursoFijo("navegador:modelo", () => {
     let vigente = true;
     void leerModelo().then((leido) => {
       if (vigente) setModelo(leido);

@@ -1,7 +1,8 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, onSettled } from "solid-js";
+import { createSignal } from "solid-js";
 
 import { Boton } from "../Boton.tsx";
+import { recursoFijo } from "../recurso.ts";
 import {
   type AlturaHoja,
   alturaConTecla,
@@ -56,7 +57,7 @@ export function PanelEmplazamiento(props: PanelEmplazamientoProps) {
   // El `click` que sigue a soltar un arrastre no es un toque.
   let acabaDeArrastrar = false;
 
-  onSettled(() => {
+  recursoFijo("panel:ventana", () => {
     const medir = () => setAltoVentana(window.innerHeight);
     window.addEventListener("resize", medir);
     const previo = document.activeElement;

@@ -8,6 +8,7 @@ import {
   EleccionDePunto,
   type EstadoBusqueda,
 } from "@celda/ui/ubicacion/EleccionDePunto.tsx";
+import { recursoFijo } from "@celda/ui/recurso.ts";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { MenuUbicacion, OpcionUbicacion } from "@celda/ui/ubicacion/MenuUbicacion.tsx";
 import { LecturaServicio } from "@celda/ui/ubicacion/LecturaServicio.tsx";
@@ -22,7 +23,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
-import { createMemo, createSignal, Match, onSettled, Show, Switch, useContext } from "solid-js";
+import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js";
 
 import { usarDatos } from "../datos.tsx";
 import { ServicioContexto } from "../servicio/enMapa.ts";
@@ -306,10 +307,14 @@ export function EleccionConBuscador(props: EleccionConBuscadorProps) {
   // Solo cuenta la respuesta de la última búsqueda.
   let busqueda = 0;
 
-  onSettled(() => {
-    void datos
-      .runPromise(Effect.map(BuscadorDeDirecciones, (b) => b.atribucion))
-      .then(setAtribucion);
+  recursoFijo("buscador:atribucion", () => {
+    let vigente = true;
+    void datos.runPromise(Effect.map(BuscadorDeDirecciones, (b) => b.atribucion)).then((leida) => {
+      if (vigente) setAtribucion(leida);
+    });
+    return () => {
+      vigente = false;
+    };
   });
 
   const buscar = () => {

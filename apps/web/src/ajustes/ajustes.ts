@@ -1,8 +1,9 @@
 import { AJUSTES_INICIALES, type Ajustes } from "@celda/dominio/ajustes";
+import { recursoFijo } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
-import { createContext, createSignal, onSettled } from "solid-js";
+import { createContext, createSignal } from "solid-js";
 
 import type { ServiciosDeDatos } from "../datos.tsx";
 import { AlmacenLocal } from "../ubicacion/almacen.ts";
@@ -31,7 +32,7 @@ export const crearAjustes = (
   // Un cambio hecho antes de que llegue la lectura manda sobre ella.
   let cambiados = false;
 
-  onSettled(() => {
+  recursoFijo("almacen:ajustes", () => {
     const parar = new AbortController();
     void runtime
       .runPromiseExit(

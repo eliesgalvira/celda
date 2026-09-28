@@ -1,11 +1,12 @@
 import type { Simulador } from "@celda/sim/simulador";
+import { recursoFijo } from "@celda/ui/recurso.ts";
 import type { JSX } from "@solidjs/web";
 import type * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import type * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Stream from "effect/Stream";
-import { createContext, onSettled, untrack, useContext } from "solid-js";
+import { createContext, untrack, useContext } from "solid-js";
 
 import type { CapaEmplazamientos } from "./capa/servicio.ts";
 import type { FichasPublicadas } from "./ficha/servicio.ts";
@@ -40,7 +41,7 @@ export function ProveedorDeDatos(props: {
   readonly children: JSX.Element;
 }) {
   const runtime = ManagedRuntime.make(untrack(() => props.servicios));
-  onSettled(() => () => {
+  recursoFijo("runtime", () => () => {
     void runtime.dispose();
   });
   return <Datos value={runtime}>{props.children}</Datos>;

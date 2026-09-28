@@ -1,8 +1,9 @@
 import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
-import { createUniqueId, onSettled, Show } from "solid-js";
+import { createUniqueId, Show } from "solid-js";
 
 import { ControlDelMapa } from "../ControlDelMapa.tsx";
+import { recursoFijo } from "../recurso.ts";
 import { IconoMirilla } from "./MarcadorReferencia.tsx";
 
 export interface MenuUbicacionProps {
@@ -23,7 +24,7 @@ export function MenuUbicacion(props: MenuUbicacionProps) {
   const id = createUniqueId();
   let caja: HTMLDivElement | undefined;
 
-  onSettled(() => {
+  recursoFijo("menu-de-ubicacion:fuera", () => {
     const fuera = (evento: PointerEvent) => {
       if (
         props.abierto &&

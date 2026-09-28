@@ -27,20 +27,12 @@ import { Nota } from "@celda/ui/medir/Medir.tsx";
 import { CabeceraFicha, SeccionFicha } from "@celda/ui/panel/Ficha.tsx";
 import type { AlturaHoja } from "@celda/ui/panel/hoja.ts";
 import { PanelEmplazamiento } from "@celda/ui/panel/PanelEmplazamiento.tsx";
+import { recursoFijo } from "@celda/ui/recurso.ts";
 import { Termino } from "@celda/ui/termino/Termino.tsx";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  Match,
-  onSettled,
-  Show,
-  Switch,
-} from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { usarDatos } from "../datos.tsx";
 import { type BandasLeidas, bandasDeEmplazamiento, leerBandas } from "./bandas.ts";
@@ -125,7 +117,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
       );
     });
   };
-  onSettled(() => {
+  recursoFijo("ejercicio:poblacion", () => {
     cargar();
     return () => {
       lectura += 1;

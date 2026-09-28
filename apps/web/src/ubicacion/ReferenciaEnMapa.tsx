@@ -4,17 +4,9 @@ import {
   PuntoElegido,
   UbicacionGps,
 } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
+import { recurso } from "@celda/ui/recurso.ts";
 import type { Map as MapaMapLibre } from "maplibre-gl";
-import {
-  createMemo,
-  createSignal,
-  Match,
-  onSettled,
-  Show,
-  Switch,
-  untrack,
-  useContext,
-} from "solid-js";
+import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js";
 
 import { ServicioContexto } from "../servicio/enMapa.ts";
 import { lecturaDe } from "../servicio/servicio.ts";
@@ -47,26 +39,29 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
   const [fotograma, setFotograma] = createSignal(0);
 
   // El punto se recoloca en cada fotograma en que se mueve el mapa, como los marcadores.
-  onSettled(() => {
-    const mapa = untrack(() => props.mapa);
-    let pendiente = 0;
-    const alMover = () => {
-      if (pendiente === 0) {
-        pendiente = requestAnimationFrame(() => {
-          pendiente = 0;
-          setFotograma((n) => n + 1);
-        });
-      }
-    };
-    mapa.on("move", alMover);
-    // El mapa puede haberse movido entre el primer cálculo y ahora (al abrir con un emplazamiento
-    // en la dirección salta hasta él): se recoloca una vez.
-    alMover();
-    return () => {
-      mapa.off("move", alMover);
-      cancelAnimationFrame(pendiente);
-    };
-  });
+  recurso(
+    "referencia:movimiento",
+    () => props.mapa,
+    (mapa) => {
+      let pendiente = 0;
+      const alMover = () => {
+        if (pendiente === 0) {
+          pendiente = requestAnimationFrame(() => {
+            pendiente = 0;
+            setFotograma((n) => n + 1);
+          });
+        }
+      };
+      mapa.on("move", alMover);
+      // El mapa puede haberse movido entre el primer cálculo y ahora (al abrir con un emplazamiento
+      // en la dirección salta hasta él): se recoloca una vez.
+      alMover();
+      return () => {
+        mapa.off("move", alMover);
+        cancelAnimationFrame(pendiente);
+      };
+    },
+  );
 
   const enPantalla = createMemo(() => {
     const referencia = control.referencia();

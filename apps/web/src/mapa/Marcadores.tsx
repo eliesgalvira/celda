@@ -2,8 +2,9 @@ import type { Coordenada } from "@celda/dominio/area";
 import type { Barrio } from "@celda/dominio/barrio";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
+import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import type { Map as MapaMapLibre } from "maplibre-gl";
-import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
+import { createMemo, createSignal } from "solid-js";
 
 import {
   crearAgrupador,
@@ -50,24 +51,22 @@ export function Marcadores(props: MarcadoresProps) {
   const [vista, setVista] = createSignal<Vista>();
   const [reducido, setReducido] = createSignal(false);
 
-  onSettled(() => {
-    const dejarDeSeguir = seguirVista(
-      untrack(() => props.mapa),
-      {
+  recurso(
+    "marcadores:vista",
+    () => props.mapa,
+    (mapa) =>
+      seguirVista(mapa, {
         fotograma: () => setFotograma((n) => n + 1),
         vista: setVista,
-      },
-    );
+      }),
+  );
 
+  recursoFijo("marcadores:movimiento-reducido", () => {
     const preferencia = matchMedia(REDUCIR_MOVIMIENTO);
     const alCambiarPreferencia = () => setReducido(preferencia.matches);
     preferencia.addEventListener("change", alCambiarPreferencia);
     alCambiarPreferencia();
-
-    return () => {
-      dejarDeSeguir();
-      preferencia.removeEventListener("change", alCambiarPreferencia);
-    };
+    return () => preferencia.removeEventListener("change", alCambiarPreferencia);
   });
 
   const escena = createMemo(() => {
@@ -96,20 +95,26 @@ export function Marcadores(props: MarcadoresProps) {
       punto.y < lienzo.clientHeight + MEDIO_MARCADOR;
   });
 
-  createEffect(
+  // Precarga las fichas de los sueltos que se ven. La escena cambia también al seleccionar uno;
+  // si los que se ven son los mismos, no se vuelve a pedir nada.
+  recurso(
+    "fichas:precarga",
     () => {
       const ahora = escena();
       const proyectarAhora = proyectar();
       const seVeAhora = seVe();
-      return [...(ahora?.elementos.values() ?? [])].flatMap((elemento) =>
+      const claves = [...(ahora?.elementos.values() ?? [])].flatMap((elemento) =>
         elemento.tipo === "emplazamiento" && seVeAhora(proyectarAhora(elemento.posicion))
           ? [elemento.emplazamiento.clave]
           : [],
       );
+      return claves.length > 0 ? claves : undefined;
     },
     (claves) => {
-      if (claves.length > 0) props.alVer?.(claves);
+      props.alVer?.(claves);
+      return undefined;
     },
+    { iguales: mismasListas },
   );
 
   /**

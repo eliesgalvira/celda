@@ -2,8 +2,8 @@ import { ESQUEMA_AJUSTES } from "@celda/dominio/ajustes";
 import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
 import { simuladorDePrueba } from "@celda/sim/pruebas";
-import { afterEach, assert, describe, it } from "@effect/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { assert, describe, it } from "@effect/vitest";
+import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
@@ -96,9 +96,6 @@ const abrirFunciones = async (
 };
 
 describe("modo estudiante", () => {
-  // Cada prueba monta la app entera: la anterior se desmonta, con sus diálogos.
-  afterEach(cleanup);
-
   it("apagado, nadie ve el ejercicio, ni aunque lo pida la dirección", async () => {
     navegar("/?ejercicio=21", { reemplazar: true });
     const { findByRole, queryByRole, container } = montar(false);

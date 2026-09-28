@@ -11,21 +11,12 @@ import {
   NotaMejorar,
   TextoBrujula,
 } from "@celda/ui/mejorar/Mejorar.tsx";
+import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import { TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import * as Effect from "effect/Effect";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Stream from "effect/Stream";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  Match,
-  onSettled,
-  Show,
-  Switch,
-  useContext,
-} from "solid-js";
+import { createMemo, createSignal, For, Match, Show, Switch, useContext } from "solid-js";
 
 import { type ServiciosDeDatos, usarDatos } from "../datos.tsx";
 import { ServicioContexto } from "../servicio/enMapa.ts";
@@ -69,22 +60,27 @@ const crearBrujula = (
   const enviar = (evento: EventoBrujula) =>
     setSituacion((actual) => (actual === undefined ? actual : transicionBrujula(actual, evento)));
 
-  onSettled(() => {
+  recursoFijo("brujula:disponibilidad", () => {
+    let vigente = true;
     void datos
       .runPromise(Effect.map(Brujula, (brujula) => brujula.disponibilidad))
-      .then((disponibilidad) => setSituacion(inicialBrujula(disponibilidad)));
+      .then((disponibilidad) => {
+        if (vigente) setSituacion(inicialBrujula(disponibilidad));
+      });
+    return () => {
+      vigente = false;
+    };
   });
 
-  // Un efecto de Solid 2 vuelve a correr cada vez que cambia lo que lee, aunque dé el mismo
-  // valor: sin el memo, cada lectura dejaría de escuchar y volvería a empezar.
-  const encendida = createMemo(() => {
-    const actual = situacion();
-    return actual !== undefined && escuchando(actual.estado);
-  });
-  createEffect(
-    () => encendida(),
-    (encendida) => {
-      if (!encendida) return;
+  // Escucha mientras espera o lee. Cada lectura cambia la situación, pero la clave sigue siendo
+  // `true`: no deja de escuchar para volver a empezar.
+  recurso(
+    "brujula",
+    () => {
+      const actual = situacion();
+      return actual !== undefined && escuchando(actual.estado);
+    },
+    () => {
       const parar = new AbortController();
       void datos.runPromiseExit(
         Stream.runForEach(
