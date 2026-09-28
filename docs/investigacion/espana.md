@@ -26,6 +26,18 @@ Los guiones y el registro de las peticiones al ministerio están en [`muestras/e
 6. **antenasmoviles.es ya da toda España en una llamada**: 42.855 marcadores, 7.285 de ellos ER5. Leer el detalle de todos a una petición cada 5 s son 62 horas. Con el tope de 100 por noche, 429 noches.
 7. **Un mapa base propio de España ocupa 1,5 GB** hasta el zoom 14 (medido con `--dry-run`). Cabe en R2 pero no en Vercel, y R2 también está detrás de Cloudflare, así que no sirve de reserva ante los bloqueos de LaLiga.
 
+## Decisiones del usuario (28/09/2026)
+
+Tras leer esta investigación, el usuario decidió:
+
+1. **La ingesta y la publicación salen de Convex, pero no a GitHub Actions.** Corren cada noche en un portátil suyo con NixOS, siempre encendido. Celda exporta en su flake un paquete hermético de la ingesta y un módulo de NixOS genérico. La configuración personal vive en el repositorio de NixOS del usuario. El estado entre noches va en SQLite, con copia de seguridad. Convex queda solo para las aportaciones compartidas. Ver el ADR 0015.
+2. **Cataluña primero, con su listado en una sola noche**, y toda España después. Cataluña son unos 9.000 registros y 37 peticiones de listado (estimado con las posiciones de `showf` y las provincias del IGN). Las fichas van a **una cada 3 s** por defecto, configurable, empezando por Barcelona provincia: unas 5.500 fichas, una noche de 6 horas. Ver el ADR 0014.
+3. **Los correos al ministerio y a antenasmoviles.es no bloquean nada.** Se envían antes de publicar Celda.
+4. **Ausencias en un municipio solo con 10 emplazamientos o más.** Ver el ADR 0017.
+5. **El mapa base de reserva queda para más adelante.**
+
+Donde el texto de abajo recomienda otra cosa (GitHub Actions, una ficha cada 5 s, esperar al ministerio), manda esta lista.
+
 ## 1. Registro oficial en toda España
 
 ### Cuántos registros hay
@@ -202,7 +214,7 @@ Las llamadas no son problema. Una noche de España serían unas 5.000 (listados 
 | Riesgo | El más alto: un diseño incremental a mano sobre tablas, dentro de límites que se descubren al chocar | Pagar sin quitar el trabajo de la primera columna | Hay que rehacer el estado de la ingesta y dónde lo mira el mantenedor |
 | Aportaciones compartidas | En Convex, sin cambios | En Convex | En Convex: el trabajo nocturno lee las correcciones compartidas con una consulta interna por páginas |
 
-**Recomiendo el trabajo programado fuera de Convex** (ADR 0015, propuesta):
+**Recomendé el trabajo programado fuera de Convex**, en GitHub Actions. El usuario eligió sacarlo de Convex a un portátil suyo con NixOS (ADR 0015); lo que sigue es la propuesta original:
 
 - Un proceso de Node con el mismo código de `packages/ingesta` y `packages/dominio`, lanzado por un cron de GitHub Actions.
 - El estado de la ingesta son ficheros en R2: las observaciones de cada zona de barrido, las hojas de cada celda, las huellas de los puntos y el registro de ejecuciones. Unos 90 MB sin comprimir, unos 12 MB con gzip (estimado).
