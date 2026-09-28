@@ -75,11 +75,14 @@ const crearBrujula = (
       .then((disponibilidad) => setSituacion(inicialBrujula(disponibilidad)));
   });
 
+  // Un efecto de Solid 2 vuelve a correr cada vez que cambia lo que lee, aunque dé el mismo
+  // valor: sin el memo, cada lectura dejaría de escuchar y volvería a empezar.
+  const encendida = createMemo(() => {
+    const actual = situacion();
+    return actual !== undefined && escuchando(actual.estado);
+  });
   createEffect(
-    () => {
-      const actual = situacion();
-      return actual !== undefined && escuchando(actual.estado);
-    },
+    () => encendida(),
     (encendida) => {
       if (!encendida) return;
       const parar = new AbortController();
