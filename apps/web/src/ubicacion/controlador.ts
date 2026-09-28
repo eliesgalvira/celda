@@ -83,9 +83,12 @@ export const crearUbicacion = (
     return () => parar.abort();
   });
 
-  // El GPS se enciende al pedir la ubicación y se apaga en cuanto deja de ser la referencia.
+  // El GPS se enciende al pedir la ubicación y se apaga en cuanto deja de ser la referencia. En
+  // Solid 2 un efecto vuelve a correr cada vez que cambia lo que lee, aunque dé el mismo valor;
+  // el memo lo frena, porque sin él cada lectura cerraría el GPS y lo volvería a abrir.
+  const encendido = createMemo(() => gpsEncendido(ubicacion().estado));
   createEffect(
-    () => gpsEncendido(ubicacion().estado),
+    () => encendido(),
     (encendido) => {
       if (!encendido) return;
       const parar = new AbortController();

@@ -216,6 +216,27 @@ describe("punto de referencia: pedir la ubicación", () => {
     });
     assert.isNotNull(panel().getByRole("heading", { name: "¿Desde dónde lo miramos?" }));
   });
+
+  it("cada lectura pone al día la ubicación sin volver a pedirla", async () => {
+    const { panel, gps } = await abrir({ permiso: "concedido" });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    for (const precision of [80, 40, 12]) {
+      gps.responder({ ...LECTURA, precision });
+      flush();
+      await waitFor(() => {
+        assert.match(
+          panel().getByText(/^Desde:/u).textContent ?? "",
+          new RegExp(`±${precision} m`, "u"),
+        );
+      });
+    }
+    assert.strictEqual(gps.pedidas(), 1);
+    assert.strictEqual(gps.abiertas(), 1);
+  });
 });
 
 describe("punto de referencia: ubicación denegada", () => {
