@@ -17,6 +17,7 @@ import {
 } from "@celda/ingesta/pruebas/grabado";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
+import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -45,14 +46,17 @@ const conFichas = (fichas: Partial<OpcionesFichas>) => ({
 
 /**
  * El registro grabado, con cada ficha tardando `tarda.cuanto` en llegar, como el geoportal a su
- * ritmo, y con `tarda.esperando` a `true` mientras tanto. También apunta qué fichas se piden.
- * `falla` decide qué contestar en lugar de la ficha grabada.
+ * ritmo, y con la hora a la que llega en `tarda.hasta` mientras tanto. Apunta qué fichas se
+ * piden, y `falla` decide qué contestar en lugar de la ficha grabada.
  */
 const conFichasApuntadas = (
   grabada: FuenteGrabada,
   pedidas: Ref.Ref<ReadonlyArray<string>>,
   opciones: {
-    readonly tarda?: { readonly cuanto: Duration.Duration; readonly esperando: Ref.Ref<boolean> };
+    readonly tarda?: {
+      readonly cuanto: Duration.Duration;
+      readonly hasta: Ref.Ref<number | undefined>;
+    };
     readonly falla?: (
       registro: Registro,
       vez: number,
@@ -69,9 +73,14 @@ const conFichasApuntadas = (
             const antes = yield* Ref.getAndUpdate(pedidas, (p) => [...p, registro.clave]);
             const { tarda } = opciones;
             if (tarda !== undefined) {
-              yield* Ref.set(tarda.esperando, true);
-              yield* Effect.sleep(tarda.cuanto);
-              yield* Ref.set(tarda.esperando, false);
+              // Espera hasta una hora fija, aunque el reloj se adelante antes de dormirse.
+              const hasta = (yield* Clock.currentTimeMillis) + Duration.toMillis(tarda.cuanto);
+              yield* Ref.set(tarda.hasta, hasta);
+              for (let ahora = yield* Clock.currentTimeMillis; ahora < hasta;) {
+                yield* Effect.sleep(Duration.millis(hasta - ahora));
+                ahora = yield* Clock.currentTimeMillis;
+              }
+              yield* Ref.set(tarda.hasta, undefined);
             }
             const fallo = opciones.falla?.(registro, antes.length + 1);
             if (fallo !== undefined) return yield* fallo;
@@ -82,13 +91,16 @@ const conFichasApuntadas = (
   ).pipe(Layer.provide(capaGrabadaPorCajas("registro-oficial", grabada)));
 
 /**
- * Adelanta el reloj de segundo en segundo mientras una ficha espera, y si no, deja pasar tiempo
- * real, hasta que la fibra acaba. Así el reloj no corre mientras la noche publica en disco.
+ * Lleva el reloj justo a la hora en que despierta la ficha que espera, y si no espera ninguna,
+ * deja pasar tiempo real, hasta que la fibra acaba. Así el reloj solo avanza lo que tardan las
+ * fichas, y no mientras la noche barre, fusiona o publica en disco.
  */
-const hastaQueAcabe = <A, E>(fibra: Fiber.Fiber<A, E>, esperando: Ref.Ref<boolean>) =>
+const hastaQueAcabe = <A, E>(fibra: Fiber.Fiber<A, E>, hasta: Ref.Ref<number | undefined>) =>
   Effect.gen(function* () {
     for (let paso = 0; paso < 100_000 && fibra.pollUnsafe() === undefined; paso++) {
-      if (yield* Ref.get(esperando)) yield* TestClock.adjust("1 second");
+      const despierta = yield* Ref.get(hasta);
+      const ahora = yield* Clock.currentTimeMillis;
+      if (despierta !== undefined && despierta > ahora) yield* TestClock.adjust(despierta - ahora);
       else yield* TestClock.withLive(Effect.sleep("1 millis"));
     }
     return yield* Fiber.join(fibra);
@@ -145,16 +157,16 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
         Effect.gen(function* () {
           const grabada = yield* muestraCampusNord;
           const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
-          const esperando = yield* Ref.make(false);
+          const hasta = yield* Ref.make<number | undefined>(undefined);
           const extractor = conFichasApuntadas(grabada, pedidas, {
-            tarda: { cuanto: Duration.seconds(3), esperando },
+            tarda: { cuanto: Duration.seconds(3), hasta },
           });
           const opciones = conFichas({ ventana: Duration.minutes(1) });
 
           yield* TestClock.setTime(NOCHE);
           const primera = yield* hastaQueAcabe(
             yield* Effect.forkChild(unaNoche(entorno, extractor, opciones)),
-            esperando,
+            hasta,
           );
           const deLaPrimera = yield* Ref.getAndSet(pedidas, []);
           const trasLaPrimera = yield* leidasEn(entorno);
@@ -179,7 +191,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           yield* TestClock.setTime(NOCHE + DIA);
           yield* hastaQueAcabe(
             yield* Effect.forkChild(unaNoche(entorno, extractor, opciones)),
-            esperando,
+            hasta,
           );
           const deLaSegunda = yield* Ref.get(pedidas);
           assert.isAbove(deLaSegunda.length, 5);
