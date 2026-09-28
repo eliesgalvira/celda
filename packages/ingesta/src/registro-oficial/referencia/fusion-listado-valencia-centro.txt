@@ -1,0 +1,415 @@
+digi-4600001	digi:4600001 movistar:4600001
+digi-4600013	digi:4600013 movistar:4600013
+digi-4600031	digi:4600031 movistar:4600031
+digi-4600064	digi:4600064 movistar:4600064 orange:VALR3071T
+digi-4600093	digi:4600093 movistar:4600093 orange:VALR0758A vodafone:092208,92208
+digi-4600098	digi:4600098 movistar:4600098
+digi-4600101	digi:4600101 movistar:4600101
+digi-4600451	digi:4600451 movistar:4600451
+digi-4600474	digi:4600474 movistar:4600474 vodafone:066753,66753
+digi-4600476	digi:4600476 movistar:4600476 orange:VALR0730F vodafone:065364,65364
+digi-4600479	digi:4600479 movistar:4600479
+digi-4600484	digi:4600484 movistar:4600484 orange:VALR3106A vodafone:I176424
+digi-4600487	digi:4600487 movistar:4600487 vodafone:075325,75325
+digi-4600537	digi:4600537 movistar:4600537 orange:VALR1291A vodafone:073273,73273
+digi-4600577	digi:4600577 movistar:4600577
+digi-4600646	digi:4600646 movistar:4600646
+digi-4600648	digi:4600648 movistar:4600648 orange:VALR3103A vodafone:92703
+digi-4600652	digi:4600652 movistar:4600652 orange:VALR3037T
+digi-4600656	digi:4600656 movistar:4600656
+digi-4600754	digi:4600754 movistar:4600754
+digi-4600923	digi:4600923 movistar:4600923 vodafone:000933,933
+digi-4600938	digi:4600938 movistar:4600938 orange:VALR0084E vodafone:040793,40793
+digi-4600943	digi:4600943 movistar:4600943
+digi-4600954	digi:4600954 movistar:4600954 orange:VALR0942X vodafone:78367
+digi-4600978	digi:4600978 movistar:4600978
+digi-4600982	digi:4600982 movistar:4600982 orange:VALR0703B vodafone:077731
+digi-4601200	digi:4601200 movistar:4601200 vodafone:27697
+digi-4602111	digi:4602111 movistar:4602111
+digi-4602131	digi:4602131 movistar:4602131
+digi-4602319	digi:4602319 movistar:4602319
+digi-4603305	digi:4603305 movistar:4603305
+digi-4603359	digi:4603359 movistar:4603359 orange:VALR0781A vodafone:062732
+digi-4604223	digi:4604223 movistar:4604223
+movistar-4600008	movistar:4600008
+movistar-4600022	movistar:4600022 orange:VALR0051A
+movistar-4600033	movistar:4600033 orange:VALR3732T
+movistar-4600034	movistar:4600034 orange:VALR0064B vodafone:26968
+movistar-4600051	movistar:4600051 orange:VALR3926T
+movistar-4600077	movistar:4600077 orange:VALR3192A
+movistar-4600081	movistar:4600081
+movistar-4600086	movistar:4600086
+movistar-4600094	movistar:4600094
+movistar-4600095	movistar:4600095
+movistar-4600097	movistar:4600097
+movistar-4600099	movistar:4600099
+movistar-4600100	movistar:4600100
+movistar-4600127	movistar:4600127 orange:VALR1081A,VALR5311A
+movistar-4600134	movistar:4600134 orange:VALR3054T
+movistar-4600135	movistar:4600135,6123104YJ2762C orange:VALR1080A,VALR5310A
+movistar-4600146	movistar:4600146 orange:VALR5313A
+movistar-4600148	movistar:4600148
+movistar-4600169	movistar:4600169
+movistar-4600171	movistar:4600171
+movistar-4600175	movistar:4600175
+movistar-4600230	movistar:4600230,4601116
+movistar-4600231	movistar:4600231
+movistar-4600232	movistar:4600232
+movistar-4600241	movistar:4600241,4600485
+movistar-4600270	movistar:4600270
+movistar-4600294	movistar:4600294 orange:VALR3067A
+movistar-4600313	movistar:4600313
+movistar-4600316	movistar:4600316
+movistar-4600362	movistar:4600362
+movistar-4600364	movistar:4600364
+movistar-4600370	movistar:4600370 vodafone:71524
+movistar-4600406	movistar:4600406
+movistar-4600407	movistar:4600407
+movistar-4600409	movistar:4600409
+movistar-4600411	movistar:4600411
+movistar-4600417	movistar:4600417 vodafone:021794
+movistar-4600424	movistar:4600424
+movistar-4600426	movistar:4600426
+movistar-4600428	movistar:4600428
+movistar-4600432	movistar:4600432
+movistar-4600442	movistar:4600442,4602569
+movistar-4600452	movistar:4600452,4604387
+movistar-4600471	movistar:4600471
+movistar-4600473	movistar:4600473
+movistar-4600482	movistar:4600482 orange:VALR0096A,VALR0096H vodafone:184216
+movistar-4600483	movistar:4600483 orange:VALR0789A
+movistar-4600490	movistar:4600490 vodafone:049939
+movistar-4600512	movistar:4600512
+movistar-4600526	movistar:4600526
+movistar-4600530	movistar:4600530
+movistar-4600538	movistar:4600538
+movistar-4600576	movistar:4600576
+movistar-4600578	movistar:4600578
+movistar-4600585	movistar:4600585
+movistar-4600647	movistar:4600647
+movistar-4600649	movistar:4600649 orange:VALR0021A vodafone:179358
+movistar-4600650	movistar:4600650
+movistar-4600651	movistar:4600651 orange:VALR3023A
+movistar-4600653	movistar:4600653 orange:VALR0018B
+movistar-4600655	movistar:4600655
+movistar-4600657	movistar:4600657
+movistar-4600659	movistar:4600659
+movistar-4600660	movistar:4600660 orange:VALR0052A
+movistar-4600661	movistar:4600661
+movistar-4600735	movistar:4600735
+movistar-4600746	movistar:4600746
+movistar-4600748	movistar:4600748
+movistar-4600785	movistar:4600785 orange:VALR1079A
+movistar-4600822	movistar:4600822 orange:VALR1292A,VALR1292T
+movistar-4600930	movistar:4600930 vodafone:101079
+movistar-4600939	movistar:4600939 vodafone:142711
+movistar-4600957	movistar:4600957 orange:VALR0019A
+movistar-4600960	movistar:4600960 vodafone:24982
+movistar-4600961	movistar:4600961
+movistar-4600970	movistar:4600970
+movistar-4600979	movistar:4600979 orange:VALR0004A vodafone:064834
+movistar-4600980	movistar:4600980
+movistar-4601053	movistar:4601053
+movistar-4601102	movistar:4601102 orange:VALR0074A vodafone:012612,12612
+movistar-4601103	movistar:4601103
+movistar-4601104	movistar:4601104
+movistar-4601109	movistar:4601109
+movistar-4601136	movistar:4601136 orange:VALR5367A vodafone:66535
+movistar-4601138	movistar:4601138 orange:VALR5372A
+movistar-4601153	movistar:4601153
+movistar-4601154	movistar:4601154,4604403
+movistar-4601199	movistar:4601199
+movistar-4601203	movistar:4601203 vodafone:77414
+movistar-4601204	movistar:4601204
+movistar-4601224	movistar:4601224
+movistar-4601225	movistar:4601225,4604345 orange:VALR3890A vodafone:128966
+movistar-4601234	movistar:4601234
+movistar-4601245	movistar:4601245 vodafone:000936,936
+movistar-4601252	movistar:4601252 orange:VALR0044A vodafone:023312,23312
+movistar-4601253	movistar:4601253
+movistar-4601292	movistar:4601292
+movistar-4601297	movistar:4601297
+movistar-4601377	movistar:4601377
+movistar-4601387	movistar:4601387
+movistar-4601394	movistar:4601394
+movistar-4601396	movistar:4601396 orange:VALR0254A vodafone:26975
+movistar-4601401	movistar:4601401
+movistar-4601402	movistar:4601402 orange:VALR0951F vodafone:59375
+movistar-4601415	movistar:4601415
+movistar-4601419	movistar:4601419
+movistar-4601576	movistar:4601576 vodafone:52533
+movistar-4601578	movistar:4601578 orange:VALR0005B vodafone:062492,62492
+movistar-4601614	movistar:4601614 vodafone:056948,56948
+movistar-4601619	movistar:4601619 orange:VALR0031A
+movistar-4601621	movistar:4601621 orange:VALR3070X vodafone:033019,33019
+movistar-4601665	movistar:4601665 vodafone:28712,I028712
+movistar-4601725	movistar:4601725
+movistar-4601747	movistar:4601747 vodafone:076536,76536
+movistar-4601750	movistar:4601750 orange:VALR0033D vodafone:066304,66304
+movistar-4601767	movistar:4601767 vodafone:000930,00930,930
+movistar-4601769	movistar:4601769 orange:VALR1053A
+movistar-4601772	movistar:4601772 vodafone:059734,59734
+movistar-4601773	movistar:4601773 vodafone:000958,000985,958
+movistar-4601781	movistar:4601781 orange:VALR0012A
+movistar-4601788	movistar:4601788 orange:VALR0105A
+movistar-4601811	movistar:4601811 orange:VALR0024D
+movistar-4601916	movistar:4601916
+movistar-4601917	movistar:4601917
+movistar-4601918	movistar:4601918
+movistar-4601960	movistar:4601960
+movistar-4601985	movistar:4601985 orange:VALR1413A vodafone:104081
+movistar-4602045	movistar:4602045
+movistar-4602086	movistar:4602086
+movistar-4602089	movistar:4602089
+movistar-4602093	movistar:4602093
+movistar-4602110	movistar:4602110 vodafone:000902,00902
+movistar-4602115	movistar:4602115 orange:VALR0039C
+movistar-4602116	movistar:4602116 vodafone:023054,23054
+movistar-4602117	movistar:4602117
+movistar-4602119	movistar:4602119 vodafone:027889,27889
+movistar-4602120	movistar:4602120
+movistar-4602123	movistar:4602123
+movistar-4602127	movistar:4602127
+movistar-4602184	movistar:4602184
+movistar-4602212	movistar:4602212
+movistar-4602213	movistar:4602213
+movistar-4602231	movistar:4602231
+movistar-4602501	movistar:4602501
+movistar-4602530	movistar:4602530
+movistar-4602539	movistar:4602539
+movistar-4602544	movistar:4602544
+movistar-4602917	movistar:4602917
+movistar-4603265	movistar:4603265 orange:VALR3332C
+movistar-4603311	movistar:4603311
+movistar-4603357	movistar:4603357
+movistar-4603358	movistar:4603358 vodafone:000932,932
+movistar-4603398	movistar:4603398
+movistar-4603407	movistar:4603407
+movistar-4603465	movistar:4603465 vodafone:153157
+movistar-4603778	movistar:4603778
+movistar-4603783	movistar:4603783
+movistar-4603927	movistar:4603927 orange:VALR0075A,VALR0075B
+movistar-4604078	movistar:4604078
+movistar-4604082	movistar:4604082
+movistar-4604108	movistar:4604108
+movistar-4604245	movistar:4604245
+movistar-4604261	movistar:4604261
+movistar-4604316	movistar:4604316
+movistar-4604317	movistar:4604317
+movistar-4604347	movistar:4604347
+movistar-4604349	movistar:4604349
+movistar-4604351	movistar:4604351
+movistar-4604352	movistar:4604352
+movistar-4604353	movistar:4604353
+movistar-4604354	movistar:4604354
+movistar-4604355	movistar:4604355
+movistar-4604356	movistar:4604356
+movistar-4604358	movistar:4604358
+movistar-4604361	movistar:4604361
+movistar-4604362	movistar:4604362
+movistar-4604363	movistar:4604363
+movistar-4604365	movistar:4604365
+movistar-4604366	movistar:4604366
+movistar-4604368	movistar:4604368
+movistar-4604371	movistar:4604371
+movistar-4604372	movistar:4604372
+movistar-4604379	movistar:4604379
+movistar-4604380	movistar:4604380
+movistar-4604386	movistar:4604386
+movistar-4604388	movistar:4604388
+movistar-4604389	movistar:4604389
+movistar-4604390	movistar:4604390
+movistar-4604392	movistar:4604392
+movistar-4604394	movistar:4604394
+movistar-4604417	movistar:4604417
+orange-VALR0001B	orange:VALR0001B
+orange-VALR0002B	orange:VALR0002B
+orange-VALR0006C	orange:VALR0006C
+orange-VALR0007E	orange:VALR0007E
+orange-VALR0008D	orange:VALR0008D vodafone:000895,00895,895
+orange-VALR0009B	orange:VALR0009B vodafone:58694
+orange-VALR0010A	orange:VALR0010A
+orange-VALR0011C	orange:VALR0011C
+orange-VALR0013A	orange:VALR0013A
+orange-VALR0016E	orange:VALR0016E
+orange-VALR0017A	orange:VALR0017A
+orange-VALR0020A	orange:VALR0020A
+orange-VALR0023B	orange:VALR0023B
+orange-VALR0025A	orange:VALR0025A
+orange-VALR0026F	orange:VALR0026F vodafone:000900,00900,900
+orange-VALR0027F	orange:VALR0027F vodafone:074330
+orange-VALR0028E	orange:VALR0028E
+orange-VALR0029D	orange:VALR0029D
+orange-VALR0030E	orange:VALR0030E vodafone:061598,61598
+orange-VALR0032J	orange:VALR0032J
+orange-VALR0034A	orange:VALR0034A
+orange-VALR0035E	orange:VALR0035E
+orange-VALR0036A	orange:VALR0036A
+orange-VALR0038E	orange:VALR0038E
+orange-VALR0040B	orange:VALR0040B
+orange-VALR0043E	orange:VALR0043E vodafone:020072,20072
+orange-VALR0046A	orange:VALR0046A
+orange-VALR0047C	orange:VALR0047C
+orange-VALR0053A	orange:VALR0053A
+orange-VALR0055A	orange:VALR0055A
+orange-VALR0057A	orange:VALR0057A
+orange-VALR0059H	orange:VALR0059H
+orange-VALR0061A	orange:VALR0061A vodafone:140039
+orange-VALR0063F	orange:VALR0063F,VALR3063A
+orange-VALR0068C	orange:VALR0068C
+orange-VALR0070D	orange:VALR0070D
+orange-VALR0071B	orange:VALR0071B
+orange-VALR0073A	orange:VALR0073A vodafone:32362
+orange-VALR0087B	orange:VALR0087B
+orange-VALR0088E	orange:VALR0088E
+orange-VALR0089A	orange:VALR0089A vodafone:19782
+orange-VALR0090A	orange:VALR0090A vodafone:055139,55139
+orange-VALR0094F	orange:VALR0094F
+orange-VALR0101A	orange:VALR0101A vodafone:208538
+orange-VALR0103A	orange:VALR0103A
+orange-VALR0104A	orange:VALR0104A
+orange-VALR0106A	orange:VALR0106A
+orange-VALR0218E	orange:VALR0218E
+orange-VALR0221H	orange:VALR0221H
+orange-VALR0701D	orange:VALR0701D
+orange-VALR0702A	orange:VALR0702A
+orange-VALR0724A	orange:VALR0724A
+orange-VALR0731B	orange:VALR0731B
+orange-VALR0733D	orange:VALR0733D
+orange-VALR0734G	orange:VALR0734G
+orange-VALR0735A	orange:VALR0735A vodafone:064038,64038
+orange-VALR0757D	orange:VALR0757D
+orange-VALR0803Q	orange:VALR0803Q
+orange-VALR0943J	orange:VALR0943J vodafone:064617,64617
+orange-VALR0950H	orange:VALR0950H vodafone:083735
+orange-VALR1011A	orange:VALR1011A
+orange-VALR1012A	orange:VALR1012A vodafone:26897
+orange-VALR1082B	orange:VALR1082B
+orange-VALR1103A	orange:VALR1103A
+orange-VALR1105A	orange:VALR1105A vodafone:051321,51321
+orange-VALR1106A	orange:VALR1106A vodafone:027893,27893
+orange-VALR1135A	orange:VALR1135A vodafone:00892,892
+orange-VALR1150V	orange:VALR1150V vodafone:000960,960
+orange-VALR1172A	orange:VALR1172A
+orange-VALR1299A	orange:VALR1299A
+orange-VALR2104A	orange:VALR2104A vodafone:000901,032087,901
+orange-VALR2215A	orange:VALR2215A vodafone:012603,12603
+orange-VALR3003V	orange:VALR3003V vodafone:60820
+orange-VALR3015D	orange:VALR3015D
+orange-VALR3055A	orange:VALR3055A
+orange-VALR3056I	orange:VALR3056I,VALR3056J vodafone:000959,00959,959
+orange-VALR3059A	orange:VALR3059A
+orange-VALR3102C	orange:VALR3102C
+orange-VALR3111C	orange:VALR3111C vodafone:065373,65373
+orange-VALR3215A	orange:VALR3215A
+orange-VALR3250A	orange:VALR3250A
+orange-VALR3802T	orange:VALR3802T
+orange-VALR3872B	orange:VALR3872B
+orange-VALR5039A	orange:VALR5039A
+orange-VALR5064B	orange:VALR5064B
+orange-VALR5065U	orange:VALR5065U
+orange-VALR5077A	orange:VALR5077A
+orange-VALR5101D	orange:VALR5101D
+orange-VALR5304A	orange:VALR5304A
+orange-VALR5308A	orange:VALR5308A
+orange-VALR5309O	orange:VALR5309O
+orange-VALR5332A	orange:VALR5332A,VALR5352A
+orange-VALR5333A	orange:VALR5333A
+orange-VALR5335	orange:VALR5335 vodafone:091955
+orange-VALR5360A	orange:VALR5360A
+orange-VALR5385A	orange:VALR5385A
+orange-VALR5392A	orange:VALR5392A
+orange-VALR5397A	orange:VALR5397A
+orange-VALR5399A	orange:VALR5399A
+vodafone-000891	vodafone:000891,891
+vodafone-000892	vodafone:000892
+vodafone-000896	vodafone:000896,896
+vodafone-000929	vodafone:000929
+vodafone-000931	vodafone:000931,931
+vodafone-000934	vodafone:000934,00934,934
+vodafone-000935	vodafone:000935,935
+vodafone-000956	vodafone:000956,956
+vodafone-001108	vodafone:001108,01108,1108
+vodafone-001191	vodafone:001191,01191,1191
+vodafone-00891	vodafone:00891
+vodafone-00893	vodafone:00893
+vodafone-00931	vodafone:00931
+vodafone-00932	vodafone:00932
+vodafone-00933	vodafone:00933
+vodafone-00935	vodafone:00935
+vodafone-00936	vodafone:00936
+vodafone-00956	vodafone:00956
+vodafone-00960	vodafone:00960
+vodafone-018805	vodafone:018805,18805
+vodafone-019782	vodafone:019782
+vodafone-022852	vodafone:022852
+vodafone-023417	vodafone:023417,23417
+vodafone-024982	vodafone:024982
+vodafone-026614	vodafone:026614,26614
+vodafone-026897	vodafone:026897
+vodafone-026968	vodafone:026968
+vodafone-029720	vodafone:029720,29720
+vodafone-031925	vodafone:031925,31925
+vodafone-031968	vodafone:031968,31968
+vodafone-033059	vodafone:033059,33059
+vodafone-040017	vodafone:040017,40017
+vodafone-042905	vodafone:042905
+vodafone-044881	vodafone:044881,44881
+vodafone-045061	vodafone:045061,45061
+vodafone-045878	vodafone:045878
+vodafone-049927	vodafone:049927
+vodafone-049931	vodafone:049931
+vodafone-049932	vodafone:049932
+vodafone-049934	vodafone:049934
+vodafone-049941	vodafone:049941
+vodafone-051323	vodafone:051323
+vodafone-051970	vodafone:051970
+vodafone-051972	vodafone:051972
+vodafone-052087	vodafone:052087,52087
+vodafone-053591	vodafone:053591
+vodafone-053724	vodafone:053724
+vodafone-059375	vodafone:059375
+vodafone-059950	vodafone:059950,59950
+vodafone-059954	vodafone:059954
+vodafone-065946	vodafone:065946,65946
+vodafone-066535	vodafone:066535
+vodafone-066544	vodafone:066544
+vodafone-073306	vodafone:073306,73306
+vodafone-077414	vodafone:077414
+vodafone-124981	vodafone:124981
+vodafone-133409	vodafone:133409
+vodafone-134176	vodafone:134176
+vodafone-134587	vodafone:134587
+vodafone-134591	vodafone:134591
+vodafone-148693	vodafone:148693
+vodafone-153417	vodafone:153417
+vodafone-153419	vodafone:153419
+vodafone-157353	vodafone:157353
+vodafone-172290	vodafone:172290
+vodafone-181847	vodafone:181847
+vodafone-21794	vodafone:21794
+vodafone-22852	vodafone:22852
+vodafone-24571	vodafone:24571
+vodafone-28309	vodafone:28309
+vodafone-42905	vodafone:42905
+vodafone-51323	vodafone:51323
+vodafone-51970	vodafone:51970
+vodafone-51972	vodafone:51972
+vodafone-52160	vodafone:52160
+vodafone-52735	vodafone:52735
+vodafone-52887	vodafone:52887
+vodafone-62732	vodafone:62732
+vodafone-64834	vodafone:64834
+vodafone-66544	vodafone:66544
+vodafone-66614	vodafone:66614
+vodafone-70330	vodafone:70330
+vodafone-71912	vodafone:71912
+vodafone-73130	vodafone:73130
+vodafone-83556	vodafone:83556
+vodafone-83735	vodafone:83735
+vodafone-87840	vodafone:87840
+vodafone-89407	vodafone:89407
+vodafone-91955	vodafone:91955
+vodafone-929	vodafone:929
+vodafone-b-280	vodafone:b-280
+vodafone-d-322	vodafone:d-322

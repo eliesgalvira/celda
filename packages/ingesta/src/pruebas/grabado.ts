@@ -123,6 +123,22 @@ export const muestraCampusNord = Effect.gen(function* () {
   return grabada;
 });
 
+/**
+ * Listado del registro oficial grabado el 28/09/2026 en una ciudad (`muestras/espana/listado-*`).
+ * Junta las cajas de la ciudad sin repetir elementos y va en UTF-8, con el texto tal como llegó:
+ * el normalizador lo repara como en producción.
+ */
+export const listadoGrabado = (nombre: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const bytes = yield* fs.readFile(
+      path.join(yield* carpetaDeMuestras, "espana", `listado-${nombre}-2026-09-28.json`),
+    );
+    const respuesta = yield* decodificarListado(new TextDecoder().decode(bytes));
+    return listadoDeElementos("features" in respuesta ? respuesta.features : []);
+  });
+
 /** Bytes de una respuesta grabada, para las pruebas del extractor con un cliente HTTP falso. */
 export const leerMuestra = (nombre: string) =>
   Effect.gen(function* () {
