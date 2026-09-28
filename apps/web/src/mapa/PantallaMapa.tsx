@@ -99,6 +99,11 @@ export function PantallaMapa() {
   const [capa, setCapa] = createSignal<EstadoCapa>({ tipo: "cargando" });
   /** El mapa, cuando ya enseña el callejero. */
   const [mapaListo, setMapaListo] = createSignal<MapaMapLibre>();
+  /**
+   * El mapa, en cuanto existe. Los marcadores solo necesitan su proyección y salen ya, sobre el
+   * fondo, sin esperar a las teselas del callejero.
+   */
+  const [mapaCreado, setMapaCreado] = createSignal<MapaMapLibre>();
   const listo = createMemo(() => estado().tipo === "listo");
   /** Si el mapa está al zoom de las celdas o más cerca. */
   const [cerca, setCerca] = createSignal(false);
@@ -141,6 +146,7 @@ export function PantallaMapa() {
       nuevo.on("moveend", mirarEncuadre);
       nuevo.once("load", mirarEncuadre);
       mapa = nuevo;
+      setMapaCreado(nuevo);
     } catch (causa) {
       // MapLibre lanza un Error que nombra WebGL si no consigue el contexto.
       fallar(causa instanceof Error && /webgl/iu.test(causa.message) ? "sin-webgl" : "interno");
@@ -153,6 +159,7 @@ export function PantallaMapa() {
     mapa?.remove();
     mapa = undefined;
     setMapaListo(undefined);
+    setMapaCreado(undefined);
     if (!hayWebgl()) {
       fallar("sin-webgl");
       return;
@@ -510,7 +517,7 @@ export function PantallaMapa() {
             pinCentral={<PinCentral />}
             dialogo={<PasoPrevio />}
             marcadores={
-              <Show when={mapaListo()}>
+              <Show when={mapaCreado()}>
                 {(actual) => (
                   <>
                     <Marcadores
