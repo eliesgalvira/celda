@@ -47,11 +47,12 @@ import * as TestConfect from "./TestConfect";
 /**
  * La ingesta nocturna (#35) tiene que publicar lo mismo que Convex mientras las dos convivan
  * (ADR 0015). Cada noche, las dos leen las mismas respuestas grabadas a la misma hora, cada una
- * publica en su carpeta, y las carpetas tienen que ser iguales byte a byte: capas, lotes de
- * fichas y `vigente.json`. Las dos usan las mismas reglas, la misma fusión y la misma
- * publicación; lo que se compara es todo lo que cada una guarda por su cuenta. Convex lee la caja
- * de Barcelona entera y la nocturna barre Cataluña por cuadros (#40): la muestra cae en un solo
- * cuadro, así que las dos cuentan las mismas ausencias.
+ * publica en su carpeta, y las carpetas tienen que ser iguales byte a byte: el manifiesto, las
+ * capas de provincia, sus lotes de fichas y los datos del resumen nacional (formato 5, ADR 0016).
+ * Las dos usan las mismas reglas, la misma fusión y la misma publicación; lo que se compara es
+ * todo lo que cada una guarda por su cuenta. Convex lee la caja de Barcelona entera y la nocturna
+ * barre Cataluña por cuadros (#40): la muestra cae en un solo cuadro, así que las dos cuentan las
+ * mismas ausencias.
  *
  * Con antenasmoviles.es (#48), las dos leen el mismo listado. Convex se queda con la caja de
  * Barcelona y la nocturna con los cuadros de Cataluña, y la muestra cae en los dos. Convex lee el
@@ -181,7 +182,7 @@ const compararNoches = (
           assert.strictEqual(deNocturna.get(fichero), contenido, `noche ${i + 1}: ${fichero}`);
         }
         // Las dos ponen en las fichas el municipio del IGN, con los mismos límites.
-        const lotes = [...deConvex].filter(([fichero]) => fichero.startsWith("fichas@"));
+        const lotes = [...deConvex].filter(([fichero]) => fichero.startsWith("fichas/"));
         assert.isNotEmpty(lotes);
         for (const [fichero, contenido] of lotes) {
           assert.include(contenido, '"fuenteDeLugares"', fichero);

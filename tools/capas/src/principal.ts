@@ -18,7 +18,7 @@ import * as NodeHttp from "node:http";
 
 import { convexPorHttp } from "./convex.ts";
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
-import { descargarMunicipios, leerMunicipios } from "./descargaDeMunicipios.ts";
+import { descargarMunicipios, leerMunicipios, leerPadron } from "./descargaDeMunicipios.ts";
 
 /**
  * Generador de capas. Cinco órdenes:
@@ -85,8 +85,10 @@ const publicar = Effect.gen(function* () {
   const capas = yield* configCapas;
   const convex = yield* configConvex;
   const limites = yield* leerLimites(yield* configBarrios);
-  const municipios = yield* leerMunicipios((yield* configMunicipios).municipios);
-  const publicada = yield* publicarInstantanea({ barrios: limites, municipios }).pipe(
+  const rutas = yield* configMunicipios;
+  const municipios = yield* leerMunicipios(rutas.municipios);
+  const padron = yield* leerPadron(rutas.padron);
+  const publicada = yield* publicarInstantanea({ barrios: limites, municipios, padron }).pipe(
     // Punto de entrada de la orden: aquí se montan sus capas, una vez.
     // @effect-diagnostics-next-line strictEffectProvide:off
     Effect.provide(
@@ -99,7 +101,7 @@ const publicar = Effect.gen(function* () {
   yield* Effect.log(
     `${publicada.version} (${publicada.tipo}): ${publicada.emplazamientos} emplazamientos en ${publicada.lotes} lotes`,
     `${publicada.escritos} ficheros escritos`,
-    `capa de ${publicada.bytesCapa} bytes, fichas de ${publicada.bytesFichas} bytes`,
+    `resumen y capas de provincia de ${publicada.bytesCapa} bytes, fichas de ${publicada.bytesFichas} bytes`,
     `(el lote mayor, ${publicada.bytesLoteMayor})`,
   );
 });

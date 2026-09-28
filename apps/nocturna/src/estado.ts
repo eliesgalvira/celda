@@ -31,6 +31,8 @@ const describirPublicacion = (resultado: ResultadoPublicacion): string => {
       return `fallida: ${resultado.motivo}`;
     case "al-dia":
       return `${resultado.version} ya estaba publicada`;
+    case "barrido":
+      return `${resultado.version} ya estaba publicada; nuevo resumen con el último barrido`;
     case "publicada":
       return `${resultado.version} publicada, ${resultado.escritos} ficheros escritos`;
   }

@@ -35,6 +35,8 @@ import {
 } from "@celda/ingesta/guardado";
 import { PRIORIDAD } from "@celda/ingesta/antenasmoviles/normalizar";
 import { BaseDePuntos } from "@celda/ingesta/barridoDePuntos";
+import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
+import { coberturaCon, type ZonaDeBarrido, zonaDeLaCaja } from "@celda/publicacion/cobertura";
 import {
   DatosNoDisponibles,
   DatosPublicables,
@@ -55,6 +57,11 @@ export interface OpcionesBase {
   /** El fichero SQLite. Su carpeta se crea si no existe. */
   readonly fichero: string;
   readonly interruptores: Readonly<Record<Fuente, Interruptor>>;
+  /**
+   * Las zonas de barrido del registro oficial, para decir hasta dónde llegan los datos. Por
+   * defecto, la caja que recorre su extractor.
+   */
+  readonly zonas?: ReadonlyArray<ZonaDeBarrido>;
 }
 
 /**
@@ -1016,6 +1023,17 @@ export const baseNocturna = (opciones: OpcionesBase) =>
 
       const datos = DatosPublicables.of({
         version: versionDeLosDatos.pipe(Effect.mapError(noDisponible)),
+        // Como `consultas` en `datos:version` de Convex: la última ejecución completada.
+        cobertura: Effect.gen(function* () {
+          const [barrido] = yield* decodificar(Maximo)(
+            yield* sql`SELECT max(inicio) AS v FROM ejecuciones
+              WHERE fuente = 'registro-oficial' AND estado = 'completada'`,
+          );
+          return coberturaCon(
+            opciones.zonas ?? [zonaDeLaCaja(RegistroOficial.OPCIONES.zona)],
+            barrido?.v ?? null,
+          );
+        }).pipe(Effect.mapError(noDisponible)),
         emplazamientos: Effect.gen(function* () {
           const filas = yield* decodificar(FilaEmplazamiento)(
             yield* sql`SELECT clave, version, datos FROM emplazamientos ORDER BY clave`,
