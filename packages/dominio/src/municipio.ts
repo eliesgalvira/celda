@@ -375,7 +375,7 @@ export interface MunicipioConHabitantes {
  * INE, nunca por nombre: el IGN escribe «La Roda» y el INE, «Roda, La».
  */
 export const municipiosConHabitantes = (
-  limites: LimitesDeMunicipios,
+  limites: Pick<LimitesDeMunicipios, "territorios">,
   padron: PadronDeMunicipios,
 ): ReadonlyArray<MunicipioConHabitantes> => {
   const habitantes = new Map(padron.municipios.map((m) => [m.codigo, m.habitantes]));

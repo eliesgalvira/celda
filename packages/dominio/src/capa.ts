@@ -66,8 +66,15 @@ export const emplazamientoDeCapa = (
 export interface EmplazamientoLeido extends EmplazamientoDeCapa {
   /** Código del barrio, o `null` si el emplazamiento queda fuera de Barcelona. */
   readonly barrio: string | null;
-  /** El lote de fichas de su versión en el que está su ficha. Desde el formato 4. */
+  /**
+   * El lote de fichas de su versión en el que está su ficha. Desde el formato 4. En el 5 es la
+   * posición del fichero en la lista de lotes de su provincia.
+   */
   readonly lote?: number;
+  /** Código INE de la provincia en cuya capa va. Desde el formato 5. */
+  readonly provincia?: string;
+  /** Código INE del municipio, o `null` en un territorio compartido. Desde el formato 5. */
+  readonly municipio?: string | null;
 }
 
 /** La capa publicada que dice el backend: su versión, dónde está y cuántos emplazamientos lleva. */
@@ -93,6 +100,11 @@ export const Vigente = Schema.Struct({
   emplazamientos: Schema.Int,
   /** Cuántos lotes de fichas tiene la versión. */
   lotes: Schema.Int,
+  /**
+   * Desde el formato 5, el resumen nacional de la versión (`ficheroDeResumen`). Sin él, la
+   * versión es de una capa entera del formato 4 o anterior.
+   */
+  resumen: Schema.optionalKey(Schema.String),
 });
 export type Vigente = typeof Vigente.Type;
 
@@ -134,7 +146,7 @@ export const COMPANIAS_DE_CAPA: ReadonlyArray<Compania> = Compania.literals
  */
 const BANDAS_POR_COMPANIA = 2 ** Mhz.literals.length;
 
-const codigoDeBandas = (bandas: ReadonlyArray<BandasDeCapa>): number =>
+export const codigoDeBandas = (bandas: ReadonlyArray<BandasDeCapa>): number =>
   bandas.reduce(
     (codigo, { compania, mhz }) =>
       codigo +
@@ -143,7 +155,7 @@ const codigoDeBandas = (bandas: ReadonlyArray<BandasDeCapa>): number =>
     0,
   );
 
-const bandasDeCodigo = (codigo: number): Array<BandasDeCapa> =>
+export const bandasDeCodigo = (codigo: number): Array<BandasDeCapa> =>
   COMPANIAS_DE_CAPA.flatMap((compania, k) => {
     const bits = Math.floor(codigo / BANDAS_POR_COMPANIA ** k) % BANDAS_POR_COMPANIA;
     const mhz = Mhz.literals.filter((_, j) => (bits & (1 << j)) !== 0);
@@ -151,13 +163,13 @@ const bandasDeCodigo = (codigo: number): Array<BandasDeCapa> =>
   });
 
 /** Código de cada estado en la columna `estado`. */
-const ESTADOS_DE_CAPA = ["verificado", "corregido", "nuevo"] as const;
+export const ESTADOS_DE_CAPA = ["verificado", "corregido", "nuevo"] as const;
 
 /** Barrio de la columna `barrio` para un emplazamiento que no cae en ninguno. */
-const SIN_BARRIO = -1;
+export const SIN_BARRIO = -1;
 
 /** Los barrios de la capa, por columnas, con la fuente de sus límites. */
-const TablaDeBarrios = Schema.Struct({
+export const TablaDeBarrios = Schema.Struct({
   fuente: FuenteDeBarrios,
   codigo: Schema.Array(Schema.String),
   nombre: Schema.Array(Schema.String),
@@ -230,9 +242,10 @@ export const versionDeCabecera = (inicio: string): Option.Option<string> =>
   Option.fromNullishOr(/^\{"version":"([^"]+)"/u.exec(inicio)?.[1]);
 
 /** Seis decimales: unos 10 cm, más de lo que precisa cualquier fuente. */
-const redondear = (grados: number): number => Math.round(grados * 1e6) / 1e6;
+export const redondear = (grados: number): number => Math.round(grados * 1e6) / 1e6;
 
-const mascara = (companias: ReadonlyArray<Compania>): number =>
+/** La máscara de bits de unas compañías, como en la columna `companias`. */
+export const mascaraDeCompanias = (companias: ReadonlyArray<Compania>): number =>
   companias.reduce((bits, compania) => bits | BIT_COMPANIA[compania], 0);
 
 export interface CapaGenerada {
@@ -280,7 +293,7 @@ export const generarCapa = (
     clave: ordenados.map((e) => e.clave),
     lon: ordenados.map((e) => redondear(e.posicion.longitud)),
     lat: ordenados.map((e) => redondear(e.posicion.latitud)),
-    companias: ordenados.map((e) => mascara(e.companias)),
+    companias: ordenados.map((e) => mascaraDeCompanias(e.companias)),
     estado: ordenados.map((e) => ESTADOS_DE_CAPA.indexOf(e.estado)),
     barrio: ordenados.map(
       (e) => posicionDe.get(barrioDelPunto(e.posicion, barrios)?.codigo ?? "") ?? SIN_BARRIO,
@@ -319,10 +332,14 @@ export interface CapaLeida {
   readonly fuenteDeBarrios: FuenteDeBarrios;
 }
 
-const companiasDe = (bits: number): ReadonlyArray<Compania> =>
+/** Las compañías de una máscara de la columna `companias`, en el orden de `COMPANIAS_DE_CAPA`. */
+export const companiasDeMascara = (bits: number): ReadonlyArray<Compania> =>
   COMPANIAS_DE_CAPA.filter((compania) => (bits & BIT_COMPANIA[compania]) !== 0);
 
-const barriosDe = (t: typeof TablaDeBarrios.Type): Result.Result<Array<Barrio>, CapaIlegible> => {
+/** Los barrios de una tabla de la capa, con la tabla comprobada. */
+export const barriosDe = (
+  t: typeof TablaDeBarrios.Type,
+): Result.Result<Array<Barrio>, CapaIlegible> => {
   const n = t.codigo.length;
   if ([t.nombre, t.lon, t.lat].some((columna) => columna.length !== n)) {
     return Result.fail(new CapaIlegible({ motivo: "la tabla de barrios está descuadrada" }));
@@ -355,7 +372,7 @@ const fila = (
     clave: c.clave[i] ?? "",
     posicion: { longitud: c.lon[i] ?? 0, latitud: c.lat[i] ?? 0 },
     estado,
-    companias: companiasDe(c.companias[i] ?? 0),
+    companias: companiasDeMascara(c.companias[i] ?? 0),
     barrio: barrio?.codigo ?? null,
   };
   // Sin ninguna banda conocida, o en las capas sin lotes, el emplazamiento no lleva la clave.
