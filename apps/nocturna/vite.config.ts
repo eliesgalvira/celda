@@ -13,5 +13,8 @@ export default defineConfig({
   test: {
     environment: "node",
     sequence: { shuffle: true },
+    // Las noches con copias y las que esperan a la publicación leen y escriben en disco de
+    // verdad: con la máquina cargada pasan de los 5 s por defecto.
+    testTimeout: 30_000,
   },
 });

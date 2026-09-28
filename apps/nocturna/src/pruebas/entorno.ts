@@ -4,7 +4,7 @@ import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Fuente } from "@celda/dominio/observacion";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
 import type { Extractor } from "@celda/ingesta/extractor";
-import { OPCIONES_PROCESO } from "@celda/ingesta/proceso";
+import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import { limitesDeBarcelona } from "@celda/publicacion/barrios";
@@ -87,6 +87,7 @@ export interface Variante {
   readonly almacen?: Layer.Layer<AlmacenDeFicheros>;
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
   readonly reintento?: Duration.Duration;
+  readonly proceso?: OpcionesProceso;
 }
 
 /**
@@ -116,6 +117,7 @@ export const unaNoche = (
     return yield* noche({
       ...opcionesDe(entorno),
       reintento: variante.reintento ?? REINTENTO_DE_PUBLICACION,
+      proceso: variante.proceso ?? OPCIONES_PROCESO,
     }).pipe(Effect.provide(entornoDeLaNoche));
   });
 

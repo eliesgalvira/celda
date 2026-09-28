@@ -76,7 +76,7 @@ const registroDe = (entorno: Entorno) =>
 /** Espera, con el reloj de verdad, a que se cumpla una condición. */
 const hasta = <E>(condicion: Effect.Effect<boolean, E, FileSystem.FileSystem | Path.Path>) =>
   Effect.gen(function* () {
-    for (let intento = 0; intento < 500; intento++) {
+    for (let intento = 0; intento < 2000; intento++) {
       if (yield* Effect.orDie(condicion)) return;
       yield* TestClock.withLive(Effect.sleep("10 millis"));
     }

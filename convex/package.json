@@ -23,6 +23,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@celda/nocturna": "workspace:*",
     "@confect/cli": "catalog:",
     "@confect/test": "catalog:",
     "@effect/vitest": "catalog:",
