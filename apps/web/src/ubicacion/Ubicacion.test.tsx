@@ -113,7 +113,7 @@ const casillas = (region: ReturnType<typeof within>): ReadonlyArray<string> =>
 const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
   const fichas = fichasDePrueba();
   const ubicacion = ubicacionDePrueba(opciones);
-  navegar(ruta.emplazamiento(CAMPUS_NORD.clave), { reemplazar: true });
+  navegar(ruta.emplazamiento(CAMPUS_NORD.clave, "08"), { reemplazar: true });
   const pantalla = render(() => (
     <App
       servicios={Layer.mergeAll(

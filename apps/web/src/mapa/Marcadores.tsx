@@ -1,19 +1,25 @@
 import type { Coordenada } from "@celda/dominio/area";
-import type { Barrio } from "@celda/dominio/barrio";
-import type { EmplazamientoLeido } from "@celda/dominio/capa";
+import type { ResumenLeido } from "@celda/dominio/provincias";
 import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import type { Map as MapaMapLibre } from "maplibre-gl";
 import { createMemo, createSignal } from "solid-js";
 
 import {
-  crearAgrupador,
   type ElementoAbrible,
   type ElementoBarrio,
+  type ElementoProvincia,
   nivelDeZoom,
 } from "../capa/agrupacion.ts";
-import { formasDeBarrios } from "../capa/etiquetas.ts";
+import { formasDeEtiquetas } from "../capa/etiquetas.ts";
 import { cajaConMargen, combinacionesDe, type Vista } from "../capa/marcadores.ts";
+import {
+  crearAgrupadorNacional,
+  type EstadoProvincia,
+  NIVEL_DE_PROVINCIAS,
+} from "../capa/nacional.ts";
+import type { FichaPedida } from "../ficha/servicio.ts";
+import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
 import { seguirVista } from "./vista.ts";
 
@@ -22,31 +28,43 @@ const REDUCIR_MOVIMIENTO = "(prefers-reduced-motion: reduce)";
 /** Medio marcador, en píxeles: lo que asoma de uno cuyo punto está justo fuera de la pantalla. */
 const MEDIO_MARCADOR = 30;
 
+/** Hasta dónde acerca pulsar una provincia para verla entera: más cerca se ven sus calles. */
+const ZOOM_MAXIMO_DE_PROVINCIA = 12;
+
 export interface MarcadoresProps {
   readonly mapa: MapaMapLibre;
-  /** Todos los emplazamientos de la capa. Se agrupan aquí y se dibujan solo los de la vista. */
-  readonly emplazamientos: ReadonlyArray<EmplazamientoLeido>;
-  /** Los barrios de la misma capa: a su nivel, los emplazamientos se recogen por barrio. */
-  readonly barrios: ReadonlyArray<Barrio>;
+  /** El resumen nacional: un hexágono por provincia, y qué provincias tienen capa. */
+  readonly resumen: ResumenLeido;
+  /** Cómo va cada provincia pedida. Las listas se agrupan aquí y se dibujan las de la vista. */
+  readonly provincias: ReadonlyMap<string, EstadoProvincia>;
   /** Clave del emplazamiento con la ficha abierta. */
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento (con el ratón, el dedo o el teclado). */
-  readonly alSeleccionar: (clave: string) => void;
+  readonly alSeleccionar: (clave: string, provincia: string) => void;
   /**
    * Los emplazamientos sueltos que se ven al decidir qué se dibuja: sus fichas se pueden abrir
    * con un toque, así que conviene tenerlas ya.
    */
-  readonly alVer?: (claves: ReadonlyArray<string>) => void;
+  readonly alVer?: (pedidas: ReadonlyArray<FichaPedida>) => void;
+  /** Cada vez que se decide qué se dibuja, la vista: con ella se piden las provincias. */
+  readonly alCambiarVista?: (vista: Vista) => void;
 }
 
 /**
- * Los emplazamientos sobre el mapa, agrupados por zoom. Los marcadores se recolocan en cada
- * fotograma del movimiento, pero qué se dibuja se decide al asentarse el mapa (ver `seguirVista`):
- * crear y quitar nodos es lo caro.
+ * Los emplazamientos sobre el mapa, agrupados por zoom: el resumen por provincias de lejos y, de
+ * cerca, las provincias que han llegado (ADR 0016). Los marcadores se recolocan en cada fotograma
+ * del movimiento, pero qué se dibuja se decide al asentarse el mapa (ver `seguirVista`): crear y
+ * quitar nodos es lo caro.
  */
 export function Marcadores(props: MarcadoresProps) {
-  const agrupador = createMemo(() => crearAgrupador(props.emplazamientos, props.barrios));
-  const combinaciones = createMemo(() => combinacionesDe(props.emplazamientos));
+  const agrupador = createMemo(() => crearAgrupadorNacional(props.resumen, props.provincias));
+  const combinaciones = createMemo(() =>
+    combinacionesDe(
+      [...props.provincias.values()].flatMap((estado) =>
+        estado.tipo === "lista" ? estado.provincia.capa.emplazamientos : [],
+      ),
+    ),
+  );
   const [fotograma, setFotograma] = createSignal(0);
   const [vista, setVista] = createSignal<Vista>();
   const [reducido, setReducido] = createSignal(false);
@@ -57,7 +75,10 @@ export function Marcadores(props: MarcadoresProps) {
     (mapa) =>
       seguirVista(mapa, {
         fotograma: () => setFotograma((n) => n + 1),
-        vista: setVista,
+        vista: (nueva) => {
+          setVista(nueva);
+          props.alCambiarVista?.(nueva);
+        },
       }),
   );
 
@@ -103,35 +124,49 @@ export function Marcadores(props: MarcadoresProps) {
       const ahora = escena();
       const proyectarAhora = proyectar();
       const seVeAhora = seVe();
-      const claves = [...(ahora?.elementos.values() ?? [])].flatMap((elemento) =>
+      const pedidas = [...(ahora?.elementos.values() ?? [])].flatMap((elemento) =>
         elemento.tipo === "emplazamiento" && seVeAhora(proyectarAhora(elemento.posicion))
-          ? [elemento.emplazamiento.clave]
+          ? [
+              {
+                clave: elemento.emplazamiento.clave,
+                provincia: elemento.emplazamiento.provincia ?? PROVINCIA_DE_LOS_ENLACES_VIEJOS,
+              },
+            ]
           : [],
       );
-      return claves.length > 0 ? claves : undefined;
+      return pedidas.length > 0 ? pedidas : undefined;
     },
-    (claves) => {
-      props.alVer?.(claves);
+    (pedidas) => {
+      props.alVer?.(pedidas);
       return undefined;
     },
-    { iguales: mismasListas },
+    {
+      iguales: (a, b) =>
+        mismasListas(
+          a.map((p) => p.clave),
+          b.map((p) => p.clave),
+        ),
+    },
   );
 
   /**
-   * Las etiquetas de barrio que caben enteras en la pantalla y las que van compactas. Se decide
-   * con la escena, al pararse el mapa o al cambiar de nivel, como qué se dibuja.
+   * Las etiquetas de barrio y de provincia que caben enteras en la pantalla y las que van
+   * compactas. Se decide con la escena, al pararse el mapa o al cambiar de nivel, como qué se
+   * dibuja.
    */
   const formas = createMemo(() => {
-    const barrios = [...(escena()?.elementos.values() ?? [])].filter(
-      (elemento): elemento is ElementoBarrio => elemento.tipo === "barrio",
+    const etiquetas = [...(escena()?.elementos.values() ?? [])].filter(
+      (elemento): elemento is ElementoBarrio | ElementoProvincia =>
+        elemento.tipo === "barrio" || elemento.tipo === "provincia",
     );
     const proyectarAhora = proyectar();
-    return formasDeBarrios(barrios, (barrio) => proyectarAhora(barrio.posicion));
+    return formasDeEtiquetas(etiquetas, (etiqueta) => proyectarAhora(etiqueta.posicion));
   });
 
   /**
-   * Acerca el mapa hasta que la agrupación o el barrio se abre. Con el teclado, el foco vuelve al
-   * mapa. Con la preferencia de reducir movimiento, MapLibre salta sin animación.
+   * Acerca el mapa hasta que la agrupación, el barrio o la provincia se abre: una provincia con
+   * emplazamientos, hasta verlos todos. Con el teclado, el foco vuelve al mapa. Con la preferencia
+   * de reducir movimiento, MapLibre salta sin animación.
    */
   const abrir = (elemento: ElementoAbrible) => {
     const mapa = props.mapa;
@@ -139,10 +174,39 @@ export function Marcadores(props: MarcadoresProps) {
     if (mapa.getCanvasContainer().contains(document.activeElement)) {
       lienzo.focus({ preventScroll: true });
     }
+    const caja = elemento.tipo === "provincia" ? elemento.provincia.caja : undefined;
+    const encuadre =
+      caja === undefined
+        ? undefined
+        : mapa.cameraForBounds(
+            [
+              [caja.suroeste.longitud, caja.suroeste.latitud],
+              [caja.noreste.longitud, caja.noreste.latitud],
+            ],
+            { padding: 60, maxZoom: ZOOM_MAXIMO_DE_PROVINCIA },
+          );
+    if (encuadre?.center !== undefined && encuadre.zoom !== undefined) {
+      mapa.easeTo({
+        center: encuadre.center,
+        zoom: Math.max(encuadre.zoom, NIVEL_DE_PROVINCIAS),
+      });
+      return;
+    }
     mapa.easeTo({
       center: [elemento.posicion.longitud, elemento.posicion.latitud],
       zoom: Math.min(agrupador().zoomDeApertura(elemento), mapa.getMaxZoom()),
     });
+  };
+
+  /** La provincia en cuya capa va un emplazamiento que se ve. */
+  const provinciaDe = (clave: string): string => {
+    for (const estado of props.provincias.values()) {
+      if (estado.tipo !== "lista") continue;
+      if (estado.provincia.capa.emplazamientos.some((e) => e.clave === clave)) {
+        return estado.provincia.codigo;
+      }
+    }
+    return PROVINCIA_DE_LOS_ENLACES_VIEJOS;
   };
 
   return (
@@ -157,7 +221,7 @@ export function Marcadores(props: MarcadoresProps) {
       movimientoReducido={reducido()}
       formas={formas()}
       seleccionada={props.seleccionada}
-      alSeleccionar={(clave) => props.alSeleccionar(clave)}
+      alSeleccionar={(clave) => props.alSeleccionar(clave, provinciaDe(clave))}
       alAbrir={abrir}
     />
   );

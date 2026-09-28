@@ -35,6 +35,7 @@ import * as Exit from "effect/Exit";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { usarDatos } from "../datos.tsx";
+import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { type BandasLeidas, bandasDeEmplazamiento, leerBandas } from "./bandas.ts";
 import { cadenaDelRadio, cadenaDeUsuarios } from "./textos.ts";
 import {
@@ -241,10 +242,14 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
   const leer = () => {
     lectura += 1;
     const esta = lectura;
-    const claves = enZona().map((e) => e.clave);
+    // Los de la capa del formato 5 dicen su provincia; los del ejercicio son de Barcelona.
+    const pedidas = enZona().map((e) => ({
+      clave: e.clave,
+      provincia: e.provincia ?? PROVINCIA_DE_LOS_ENLACES_VIEJOS,
+    }));
     setBandas({ tipo: "leyendo" });
     void datos
-      .runPromiseExit(Effect.zip(leerBandas(claves), Clock.currentTimeMillis))
+      .runPromiseExit(Effect.zip(leerBandas(pedidas), Clock.currentTimeMillis))
       .then((salida) => {
         if (esta !== lectura) return;
         setBandas(

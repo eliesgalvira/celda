@@ -31,6 +31,15 @@ export const navegar = (href: string, opciones?: { readonly reemplazar?: boolean
 /** El parámetro de la URL con la clave del emplazamiento seleccionado. */
 const EMPLAZAMIENTO = "emplazamiento";
 
+/** El parámetro de la URL con la provincia en cuya capa va el emplazamiento seleccionado. */
+const PROVINCIA = "provincia";
+
+/**
+ * La provincia de un enlace a un emplazamiento sin ella: los de antes de la capa por provincias
+ * (ADR 0016), cuando Celda solo tenía Barcelona.
+ */
+export const PROVINCIA_DE_LOS_ENLACES_VIEJOS = "08";
+
 /** El parámetro de la URL que abre el paso de medir la señal. No lleva valor. */
 const MEDIR = "medir";
 
@@ -41,7 +50,8 @@ export const ruta = {
    * El mapa con la ficha de un emplazamiento abierta. Es la misma pantalla, así que abrir y
    * cerrar la ficha no mueve el mapa; la dirección se puede compartir y recargar.
    */
-  emplazamiento: (clave: string) => `/?${EMPLAZAMIENTO}=${encodeURIComponent(clave)}`,
+  emplazamiento: (clave: string, provincia: string) =>
+    `/?${EMPLAZAMIENTO}=${encodeURIComponent(clave)}&${PROVINCIA}=${encodeURIComponent(provincia)}`,
   /**
    * El mapa con el paso de medir abierto. Es la dirección del código QR que se enseña en un
    * ordenador: en el móvil se abre directamente en este paso.
@@ -85,6 +95,7 @@ export const ejercicioDe = (ubicacion: Ubicacion): string | null =>
 export const conEjercicio = (ubicacion: Ubicacion, barrio: string | null): string => {
   const parametros = new URLSearchParams(ubicacion.search);
   parametros.delete(EMPLAZAMIENTO);
+  parametros.delete(PROVINCIA);
   if (barrio === null) {
     parametros.delete(EJERCICIO);
   } else {
@@ -113,6 +124,15 @@ export const conAjustes = (ubicacion: Ubicacion, abiertos: boolean): string => {
 export const emplazamientoDe = (ubicacion: Ubicacion): string | null => {
   const clave = ubicacion.search.get(EMPLAZAMIENTO)?.trim() ?? "";
   return clave === "" ? null : clave;
+};
+
+/**
+ * La provincia del emplazamiento seleccionado en una ubicación. Un enlace sin ella es de antes de
+ * la capa por provincias, y entonces es de Barcelona.
+ */
+export const provinciaDe = (ubicacion: Ubicacion): string => {
+  const provincia = ubicacion.search.get(PROVINCIA)?.trim() ?? "";
+  return provincia === "" ? PROVINCIA_DE_LOS_ENLACES_VIEJOS : provincia;
 };
 
 /** Un clic normal con el botón principal y sin modificadores: el que navega dentro de la app. */

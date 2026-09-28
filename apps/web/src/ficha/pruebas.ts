@@ -1,5 +1,5 @@
 import type { Ficha } from "@celda/dominio/ficha";
-import { generarLote } from "@celda/dominio/loteDeFichas";
+import { generarLoteDeProvincia } from "@celda/dominio/provincias";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -7,6 +7,7 @@ import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
+import { FUENTE_DE_MUNICIPIOS } from "../capa/pruebas.ts";
 import { FichaNoLeida, FichasPublicadas } from "./servicio.ts";
 
 /** Lo que el servicio de prueba contesta: una ficha, que no existe o un fallo. */
@@ -36,7 +37,7 @@ export const fichasDePrueba = (): FichasDePrueba => {
     readonly reanudar: (efecto: Effect.Effect<Option.Option<Ficha>, FichaNoLeida>) => void;
   }> = [];
 
-  const leer = (clave: string) =>
+  const leer = ({ clave }: { readonly clave: string }) =>
     Effect.callback<Option.Option<Ficha>, FichaNoLeida>((reanudar) => {
       const lectura = { clave, reanudar };
       lecturas.push(lectura);
@@ -135,9 +136,8 @@ export const origenDePrueba = (): OrigenDePrueba => {
   };
 };
 
-/** El cuerpo del lote `lote` de la versión `version` con esas fichas, como lo publica Celda. */
-export const loteConFichas = (
-  version: string,
-  lote: number,
-  fichas: ReadonlyArray<Ficha>,
-): RespuestaHttp => ({ estado: 200, cuerpo: generarLote(version, lote, fichas).contenido });
+/** El cuerpo de un lote de fichas de Barcelona con esas fichas, como lo publica Celda. */
+export const loteConFichas = (fichas: ReadonlyArray<Ficha>): RespuestaHttp => ({
+  estado: 200,
+  cuerpo: generarLoteDeProvincia("08", fichas, new Map(), FUENTE_DE_MUNICIPIOS),
+});

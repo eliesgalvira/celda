@@ -1,4 +1,5 @@
 import type { Coordenada, Rectangulo } from "@celda/dominio/area";
+import type { ZonaBarrida } from "@celda/dominio/cobertura";
 import type { Credito } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
@@ -208,8 +209,8 @@ const TEXTO_ALMACEN = {
  */
 export function AvisosDeUbicacion(props: {
   readonly panelAbierto: boolean;
-  /** La caja de los emplazamientos de la capa vigente: hasta dónde llegan los datos. */
-  readonly cajaDeLosDatos: Rectangulo | undefined;
+  /** Las zonas barridas del resumen vigente: hasta dónde llegan los datos. */
+  readonly cobertura: ReadonlyArray<ZonaBarrida> | undefined;
 }) {
   const control = useContext(UbicacionContexto);
   /** El punto de referencia cuyo aviso de «sin datos» se ha cerrado: el GPS o un punto elegido. */
@@ -219,7 +220,7 @@ export function AvisosDeUbicacion(props: {
     if (referencia === undefined) return undefined;
     const clave = referencia.tipo === "gps" ? "gps" : referencia.punto.id;
     if (clave === sinDatosCerrado()) return undefined;
-    const metros = fueraDeLosDatos(referencia, props.cajaDeLosDatos);
+    const metros = fueraDeLosDatos(referencia, props.cobertura);
     return metros === undefined
       ? undefined
       : { clave, ...textosFueraDeLosDatos(referencia, metros) };

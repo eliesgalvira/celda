@@ -33,7 +33,7 @@ const CAPA: CapaLeida = {
 /** La app abierta en la ficha, que llega en cuanto su lectura está abierta. */
 const abrirCon = async (ficha: Ficha) => {
   const fichas = fichasDePrueba();
-  navegar(ruta.emplazamiento(ficha.clave), { reemplazar: true });
+  navegar(ruta.emplazamiento(ficha.clave, "08"), { reemplazar: true });
   const pantalla = render(() => (
     <App
       servicios={Layer.mergeAll(

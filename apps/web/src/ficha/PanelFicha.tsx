@@ -58,7 +58,9 @@ import {
 export interface PanelFichaProps {
   /** Clave del emplazamiento seleccionado. */
   readonly clave: string;
-  /** Fecha de la capa que dibuja el mapa, si ya ha llegado: su marca de agua. */
+  /** La provincia en cuya capa va (ADR 0016). */
+  readonly provincia: string;
+  /** Fecha de la capa de su provincia en el mapa, si ya ha llegado: su marca de agua. */
   readonly fechaCapa: number | undefined;
   readonly alCerrar: () => void;
 }
@@ -81,10 +83,10 @@ export function PanelFicha(props: PanelFichaProps) {
   );
 
   const ficha = createMemo(() => {
-    const clave = props.clave;
+    const pedida = { clave: props.clave, provincia: props.provincia };
     return leerEnSolid(
       datos,
-      Stream.fromEffect(Effect.flatMap(FichasPublicadas, (fichas) => fichas.leer(clave))),
+      Stream.fromEffect(Effect.flatMap(FichasPublicadas, (fichas) => fichas.leer(pedida))),
     );
   });
 

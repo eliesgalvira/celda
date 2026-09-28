@@ -1,14 +1,8 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
-import {
-  type CapaLeida,
-  codificarVigente,
-  type EmplazamientoDeCapa,
-  generarCapa,
-  leerCapa,
-  versionDeCapa,
-} from "@celda/dominio/capa";
+import { versionDeCapa } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
+import { generarLoteDeProvincia } from "@celda/dominio/provincias";
 import { assert, describe, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
@@ -16,11 +10,17 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Result from "effect/Result";
 
-import { capaDePrueba, LIMITES_DE_PRUEBA } from "../capa/pruebas.ts";
+import {
+  type CapaDePrueba,
+  capaDePrueba,
+  capaDePublicacion,
+  FUENTE_DE_MUNICIPIOS,
+  type PublicacionDePrueba,
+  publicacionDePrueba,
+} from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
-import { loteConFichas, type OrigenDePrueba, origenDePrueba } from "./pruebas.ts";
+import { type OrigenDePrueba, origenDePrueba } from "./pruebas.ts";
 import { fichasDelOrigen, FichasPublicadas, LOTES_PRECARGADOS } from "./servicio.ts";
 
 const ORIGEN = "http://capas.prueba";
@@ -47,35 +47,25 @@ const FICHAS = [
   ficha("digi-c", 2.19),
   ficha("vodafone-d", 2.1902),
 ];
-const deCapa = (f: Ficha): EmplazamientoDeCapa => ({
-  clave: f.clave,
-  posicion: f.posicion,
-  estado: f.estado,
-  companias: ["movistar"],
-});
 
-/** La capa publicada con esas fichas, en lotes de dos, tal como la lee la web. */
+/** La publicación de unas fichas, en lotes de dos, con la URL y el cuerpo del lote de cada una. */
 const publicada = (fecha: number, fichas: ReadonlyArray<Ficha>) => {
-  const generada = generarCapa(fecha, fichas.map(deCapa), LIMITES_DE_PRUEBA, 2);
-  const leida = leerCapa(generada.contenido, generada.version);
-  if (Result.isFailure(leida)) throw new Error(leida.failure.message);
-  const loteDe = (clave: string) => generada.lotes.findIndex((l) => l.includes(clave));
-  const urlDe = (clave: string) =>
-    `${ORIGEN}/fichas@${generada.version.slice("sitios@".length)}/${loteDe(clave)}.json`;
-  const respuestaDe = (clave: string) =>
-    loteConFichas(
-      generada.version,
-      loteDe(clave),
-      fichas.filter((f) => generada.lotes[loteDe(clave)]?.includes(f.clave)),
-    );
-  return { generada, capa: leida.success, loteDe, urlDe, respuestaDe };
+  const publicacion = publicacionDePrueba(versionDeCapa(fecha), fecha, fichas);
+  return {
+    publicacion,
+    capa: capaDePublicacion(publicacion),
+    urlDe: (clave: string) => `${ORIGEN}/${publicacion.loteDe(clave)}`,
+    cuerpoDe: (clave: string) => publicacion.ficheros.get(publicacion.loteDe(clave)) ?? "",
+  };
 };
 
 const HOY = publicada(NOCHE, FICHAS);
 
-/** El servicio real, con la capa dada y el origen de prueba. */
+const pedida = (clave: string) => ({ clave, provincia: "08" });
+
+/** El servicio real, con la capa de Barcelona dada y el origen de prueba. */
 const conFichas = <A, E>(
-  capa: Effect.Effect<CapaLeida, CapaNoDescargada>,
+  capa: Effect.Effect<CapaDePrueba, CapaNoDescargada>,
   origen: OrigenDePrueba,
   prueba: (fichas: FichasPublicadas["Service"]) => Effect.Effect<A, E>,
 ) =>
@@ -98,23 +88,29 @@ const contestar = (origen: OrigenDePrueba, url: string, estado: number, cuerpo: 
     origen.responder(url, { estado, cuerpo });
   });
 
+/** Contesta con un fichero de una publicación en cuanto se pida. */
+const servir = (origen: OrigenDePrueba, publicacion: PublicacionDePrueba, fichero: string) =>
+  contestar(origen, `${ORIGEN}/${fichero}`, 200, publicacion.ficheros.get(fichero) ?? "");
+
 describe("fichas publicadas en el origen estático", () => {
-  it.effect("lee la ficha del lote que dice la capa, y otra del mismo lote no pide nada", () => {
-    const origen = origenDePrueba();
-    return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
-      Effect.gen(function* () {
-        const [a, b] = FICHAS;
-        assert.strictEqual(HOY.loteDe(a?.clave ?? ""), HOY.loteDe(b?.clave ?? ""));
-        const lectura = yield* Effect.forkChild(fichas.leer(a?.clave ?? ""));
-        const url = HOY.urlDe(a?.clave ?? "");
-        const { cuerpo } = HOY.respuestaDe(a?.clave ?? "");
-        yield* contestar(origen, url, 200, cuerpo);
-        assert.deepStrictEqual(yield* Fiber.join(lectura), Option.some(a));
-        assert.deepStrictEqual(yield* fichas.leer(b?.clave ?? ""), Option.some(b));
-        assert.deepStrictEqual(origen.pedidas(), [url]);
-      }),
-    );
-  });
+  it.effect(
+    "lee la ficha del lote que dice su provincia, y otra del mismo lote no pide nada",
+    () => {
+      const origen = origenDePrueba();
+      return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
+        Effect.gen(function* () {
+          const [a, b] = FICHAS;
+          assert.strictEqual(HOY.urlDe(a?.clave ?? ""), HOY.urlDe(b?.clave ?? ""));
+          const lectura = yield* Effect.forkChild(fichas.leer(pedida(a?.clave ?? "")));
+          const url = HOY.urlDe(a?.clave ?? "");
+          yield* contestar(origen, url, 200, HOY.cuerpoDe(a?.clave ?? ""));
+          assert.deepStrictEqual(yield* Fiber.join(lectura), Option.some(a));
+          assert.deepStrictEqual(yield* fichas.leer(pedida(b?.clave ?? "")), Option.some(b));
+          assert.deepStrictEqual(origen.pedidas(), [url]);
+        }),
+      );
+    },
+  );
 
   it.effect("dos lecturas a la vez del mismo lote hacen una sola petición", () => {
     const origen = origenDePrueba();
@@ -122,34 +118,29 @@ describe("fichas publicadas en el origen estático", () => {
       Effect.gen(function* () {
         const [a, b] = FICHAS;
         const lecturas = yield* Effect.forkChild(
-          Effect.all([fichas.leer(a?.clave ?? ""), fichas.leer(b?.clave ?? "")], {
+          Effect.all([fichas.leer(pedida(a?.clave ?? "")), fichas.leer(pedida(b?.clave ?? ""))], {
             concurrency: 2,
           }),
         );
-        yield* contestar(
-          origen,
-          HOY.urlDe(a?.clave ?? ""),
-          200,
-          HOY.respuestaDe(a?.clave ?? "").cuerpo,
-        );
+        yield* contestar(origen, HOY.urlDe(a?.clave ?? ""), 200, HOY.cuerpoDe(a?.clave ?? ""));
         assert.deepStrictEqual(yield* Fiber.join(lecturas), [Option.some(a), Option.some(b)]);
         assert.lengthOf(origen.pedidas(), 1);
       }),
     );
   });
 
-  it.effect("una clave que la capa no tiene no existe, y no se pide nada", () => {
+  it.effect("una clave que la capa de su provincia no tiene no existe, y no se pide nada", () => {
     const origen = origenDePrueba();
     return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
       Effect.gen(function* () {
-        assert.deepStrictEqual(yield* fichas.leer("movistar-no-existe"), Option.none());
+        assert.deepStrictEqual(yield* fichas.leer(pedida("movistar-no-existe")), Option.none());
         assert.deepStrictEqual(origen.pedidas(), []);
       }),
     );
   });
 
   it.effect(
-    "un fallo del origen, o un lote de otra versión, llegan como FichaNoLeida y se reintenta",
+    "un fallo del origen, o un lote de otra provincia, llegan como FichaNoLeida y se reintenta",
     () => {
       const origen = origenDePrueba();
       return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
@@ -157,19 +148,17 @@ describe("fichas publicadas en el origen estático", () => {
           const [a] = FICHAS;
           const clave = a?.clave ?? "";
           const url = HOY.urlDe(clave);
-          const caida = yield* Effect.forkChild(Effect.exit(fichas.leer(clave)));
+          const caida = yield* Effect.forkChild(Effect.exit(fichas.leer(pedida(clave))));
           yield* contestar(origen, url, 503, "");
-          const primera = yield* Fiber.join(caida);
-          assert.isTrue(Exit.isFailure(primera));
+          assert.isTrue(Exit.isFailure(yield* Fiber.join(caida)));
 
-          const ayer = publicada(NOCHE - DIA, FICHAS);
-          const vieja = yield* Effect.forkChild(Effect.exit(fichas.leer(clave)));
-          yield* contestar(origen, url, 200, ayer.respuestaDe(clave).cuerpo);
-          const segunda = yield* Fiber.join(vieja);
-          assert.isTrue(Exit.isFailure(segunda));
+          const deGirona = generarLoteDeProvincia("17", FICHAS, new Map(), FUENTE_DE_MUNICIPIOS);
+          const otra = yield* Effect.forkChild(Effect.exit(fichas.leer(pedida(clave))));
+          yield* contestar(origen, url, 200, deGirona);
+          assert.isTrue(Exit.isFailure(yield* Fiber.join(otra)));
 
-          const buena = yield* Effect.forkChild(fichas.leer(clave));
-          yield* contestar(origen, url, 200, HOY.respuestaDe(clave).cuerpo);
+          const buena = yield* Effect.forkChild(fichas.leer(pedida(clave)));
+          yield* contestar(origen, url, 200, HOY.cuerpoDe(clave));
           assert.deepStrictEqual(yield* Fiber.join(buena), Option.some(a));
           assert.lengthOf(origen.pedidas(), 3);
         }),
@@ -177,14 +166,14 @@ describe("fichas publicadas en el origen estático", () => {
     },
   );
 
-  it.effect("sin la capa del mapa no hay ficha que leer", () => {
+  it.effect("sin la capa de su provincia no hay ficha que leer", () => {
     const origen = origenDePrueba();
     return conFichas(
       Effect.fail(new CapaNoDescargada({ url: `${ORIGEN}/x.json`, motivo: "503" })),
       origen,
       (fichas) =>
         Effect.gen(function* () {
-          const fallo = yield* Effect.flip(fichas.leer("movistar-a"));
+          const fallo = yield* Effect.flip(fichas.leer(pedida("movistar-a")));
           assert.strictEqual(fallo._tag, "FichaNoLeida");
         }),
     );
@@ -195,7 +184,7 @@ describe("fichas publicadas en el origen estático", () => {
     return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
       Effect.gen(function* () {
         const clave = FICHAS[2]?.clave ?? "";
-        const lectura = yield* Effect.forkChild(fichas.leer(clave));
+        const lectura = yield* Effect.forkChild(fichas.leer(pedida(clave)));
         while (origen.abiertas().length === 0) yield* Effect.yieldNow;
         yield* Fiber.interrupt(lectura);
         assert.deepStrictEqual(origen.canceladas(), [HOY.urlDe(clave)]);
@@ -206,36 +195,19 @@ describe("fichas publicadas en el origen estático", () => {
 
   it.effect("si el origen ya no tiene el lote del mapa, lee la ficha de la versión vigente", () => {
     const origen = origenDePrueba();
-    // La ficha cambió al día siguiente y se publicó otra versión; la de hoy ya no está.
+    // La ficha cambió al día siguiente y se publicó otra versión; el lote de hoy ya no está.
     const cambiada = ficha("movistar-a", 2.1134, NOCHE + DIA);
-    const MANANA = publicada(NOCHE + DIA, [cambiada, ...FICHAS.slice(1)]);
+    const MANANA = publicada(NOCHE + DIA, [cambiada, ...FICHAS.slice(1)]).publicacion;
+    const ficheroDe = (prefijo: string) =>
+      [...MANANA.ficheros.keys()].find((f) => f.startsWith(prefijo)) ?? "";
     return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
       Effect.gen(function* () {
-        const lectura = yield* Effect.forkChild(fichas.leer("movistar-a"));
+        const lectura = yield* Effect.forkChild(fichas.leer(pedida("movistar-a")));
         yield* contestar(origen, HOY.urlDe("movistar-a"), 404, "");
-        yield* contestar(
-          origen,
-          `${ORIGEN}/vigente.json`,
-          200,
-          codificarVigente({
-            version: versionDeCapa(NOCHE + DIA),
-            fecha: NOCHE + DIA,
-            emplazamientos: 4,
-            lotes: 2,
-          }),
-        );
-        yield* contestar(
-          origen,
-          `${ORIGEN}/${MANANA.generada.fichero}`,
-          200,
-          MANANA.generada.contenido,
-        );
-        yield* contestar(
-          origen,
-          MANANA.urlDe("movistar-a"),
-          200,
-          MANANA.respuestaDe("movistar-a").cuerpo,
-        );
+        yield* servir(origen, MANANA, "vigente.json");
+        yield* servir(origen, MANANA, ficheroDe("resumen@"));
+        yield* servir(origen, MANANA, ficheroDe("provincias/08/"));
+        yield* servir(origen, MANANA, MANANA.loteDe("movistar-a"));
         assert.deepStrictEqual(yield* Fiber.join(lectura), Option.some(cambiada));
       }),
     );
@@ -246,15 +218,12 @@ describe("fichas publicadas en el origen estático", () => {
       const origen = origenDePrueba();
       return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
         Effect.gen(function* () {
-          const precarga = yield* Effect.forkChild(fichas.precargar(["movistar-a", "orange-b"]));
-          yield* contestar(
-            origen,
-            HOY.urlDe("movistar-a"),
-            200,
-            HOY.respuestaDe("movistar-a").cuerpo,
+          const precarga = yield* Effect.forkChild(
+            fichas.precargar([pedida("movistar-a"), pedida("orange-b")]),
           );
+          yield* contestar(origen, HOY.urlDe("movistar-a"), 200, HOY.cuerpoDe("movistar-a"));
           yield* Fiber.join(precarga);
-          assert.deepStrictEqual(yield* fichas.leer("orange-b"), Option.some(FICHAS[1]));
+          assert.deepStrictEqual(yield* fichas.leer(pedida("orange-b")), Option.some(FICHAS[1]));
           assert.deepStrictEqual(origen.pedidas(), [HOY.urlDe("movistar-a")]);
         }),
       );
@@ -272,15 +241,10 @@ describe("fichas publicadas en el origen estático", () => {
         Effect.gen(function* () {
           assert.strictEqual(LOTES_PRECARGADOS, 2);
           const precarga = yield* Effect.forkChild(
-            fichas.precargar(["movistar-a", "digi-c", "vodafone-d", "movistar-e"]),
+            fichas.precargar(["movistar-a", "digi-c", "vodafone-d", "movistar-e"].map(pedida)),
           );
-          yield* contestar(origen, TRES.urlDe("digi-c"), 200, TRES.respuestaDe("digi-c").cuerpo);
-          yield* contestar(
-            origen,
-            TRES.urlDe("movistar-a"),
-            200,
-            TRES.respuestaDe("movistar-a").cuerpo,
-          );
+          yield* contestar(origen, TRES.urlDe("digi-c"), 200, TRES.cuerpoDe("digi-c"));
+          yield* contestar(origen, TRES.urlDe("movistar-a"), 200, TRES.cuerpoDe("movistar-a"));
           yield* Fiber.join(precarga);
           assert.sameMembers(
             [...origen.pedidas()],
@@ -294,11 +258,11 @@ describe("fichas publicadas en el origen estático", () => {
       const origen = origenDePrueba();
       return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
         Effect.gen(function* () {
-          const precarga = yield* Effect.forkChild(fichas.precargar(["digi-c"]));
+          const precarga = yield* Effect.forkChild(fichas.precargar([pedida("digi-c")]));
           yield* contestar(origen, HOY.urlDe("digi-c"), 503, "");
           assert.isTrue(Exit.isSuccess(yield* Fiber.await(precarga)));
-          const lectura = yield* Effect.forkChild(fichas.leer("digi-c"));
-          yield* contestar(origen, HOY.urlDe("digi-c"), 200, HOY.respuestaDe("digi-c").cuerpo);
+          const lectura = yield* Effect.forkChild(fichas.leer(pedida("digi-c")));
+          yield* contestar(origen, HOY.urlDe("digi-c"), 200, HOY.cuerpoDe("digi-c"));
           assert.deepStrictEqual(yield* Fiber.join(lectura), Option.some(FICHAS[2]));
           assert.lengthOf(origen.pedidas(), 2);
         }),

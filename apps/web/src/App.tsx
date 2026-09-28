@@ -17,7 +17,7 @@ interface Ruta {
 
 /** La tabla de rutas: dirección, título de la pestaña y vista. */
 const RUTAS: ReadonlyArray<Ruta> = [
-  { patron: ruta.mapa, titulo: "Mapa de Barcelona", vista: () => <PantallaMapa /> },
+  { patron: ruta.mapa, titulo: "Mapa de España", vista: () => <PantallaMapa /> },
 ];
 
 function NoEncontrada() {

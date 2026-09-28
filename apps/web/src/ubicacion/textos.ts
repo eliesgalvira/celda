@@ -1,10 +1,5 @@
-import {
-  type Coordenada,
-  distanciaAlRectangulo,
-  distanciaMetros,
-  type Rectangulo,
-  rumboGrados,
-} from "@celda/dominio/area";
+import { type Coordenada, distanciaMetros, rumboGrados } from "@celda/dominio/area";
+import { distanciaALoBarrido, type ZonaBarrida } from "@celda/dominio/cobertura";
 import { bloque, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
 import { type MotivoFalloGps, posicionDe, type Referencia } from "./estado.ts";
@@ -112,22 +107,23 @@ export const EXPLICACION_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
 };
 
 /**
- * Hasta dónde, pasado el borde de los emplazamientos de la capa, el punto de referencia aún cuenta
- * como dentro: a 3 km del borde siguen viéndose emplazamientos de la capa alrededor del punto.
+ * Hasta dónde, pasado el borde de lo barrido, el punto de referencia aún cuenta como dentro: a
+ * 3 km del borde siguen viéndose emplazamientos alrededor del punto.
  */
 export const MARGEN_DE_LOS_DATOS = 3000;
 
 /**
- * A cuántos metros queda el punto de referencia de la caja de los emplazamientos de la capa, si
- * queda fuera de ella y de su margen. Sin capa no se sabe, y no dice nada.
+ * A cuántos metros queda el punto de referencia de lo barrido, las cajas de las zonas de barrido
+ * del resumen (ADR 0016), si queda fuera de ellas y de su margen. Sin resumen, o sin ninguna zona
+ * barrida, no se sabe y no dice nada.
  */
 export const fueraDeLosDatos = (
   referencia: Referencia,
-  caja: Rectangulo | undefined,
+  cobertura: ReadonlyArray<ZonaBarrida> | undefined,
 ): number | undefined => {
-  if (caja === undefined) return undefined;
-  const metros = distanciaAlRectangulo(posicionDe(referencia), caja);
-  return metros > MARGEN_DE_LOS_DATOS ? metros : undefined;
+  const metros =
+    cobertura === undefined ? undefined : distanciaALoBarrido(posicionDe(referencia), cobertura);
+  return metros !== undefined && metros > MARGEN_DE_LOS_DATOS ? metros : undefined;
 };
 
 export interface TextosFueraDeLosDatos {
@@ -137,8 +133,8 @@ export interface TextosFueraDeLosDatos {
 
 /**
  * Qué decir cuando el punto de referencia queda lejos de los datos. Los kilómetros van con un
- * espacio que no parte la línea. No nombra la zona cubierta:
- * sale de la distancia a los emplazamientos de la capa, y sigue siendo verdad al ampliarla.
+ * espacio que no parte la línea. No nombra la zona cubierta: sale de la distancia a lo barrido, y
+ * sigue siendo verdad al ampliarlo.
  */
 export const textosFueraDeLosDatos = (
   referencia: Referencia,
