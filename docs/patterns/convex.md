@@ -10,8 +10,10 @@ convex/confect/*.spec.ts   la API de cada grupo (ingesta, datos)
 convex/confect/*.impl.ts   su implementación
 convex/confect/crons.ts    el cron nocturno de la ingesta
 convex/src/proceso.ts      el proceso de una ejecución, fuera de Convex (por fichas y por puntos)
-convex/src/capas.ts        la publicación de una capa, fuera de Convex
-tools/capas/               el generador de capas y el origen estático local
+convex/src/publicacion.ts  la publicación de la capa y las fichas
+convex/src/almacenes/      dónde se publica: una carpeta o R2
+convex/datos/barrios.json  los límites de barrio que usa la publicación
+tools/capas/               la publicación a mano y el origen estático local
 convex/convex/             generado por Confect y Convex; no se edita
 packages/ingesta/          extractores (registro-oficial/, antenasmoviles/), sin nada de Convex
 packages/dominio/          esquemas y la fusión, sin E/S
@@ -46,7 +48,7 @@ pnpm exec convex run ingesta:registroOficial          # una ejecución ahora, co
 pnpm exec convex run ingesta:estado                   # interruptores y últimas ejecuciones
 pnpm exec convex run datos:version                    # versión de los datos y «consultado el»
 pnpm exec convex run datos:ficha '{"clave":"movistar-0802532"}'
-pnpm exec convex run ingesta:recalcularFusion         # vuelve a fusionar sin descargar nada
+pnpm exec convex run ingesta:recalcularFusion         # vuelve a fusionar sin descargar nada, y publica
 pnpm exec convex export --path /tmp/celda.zip         # todas las tablas en JSONL
 ```
 
@@ -85,35 +87,56 @@ Cómo funciona:
 
 Recuento con la descarga del 26/09/2026 y el registro oficial de ese día, en la caja de Barcelona: 42 ER5, dos sin compañía (`er5` a secas) y 40 con ella. Con la fusión salen 1354 emplazamientos: 1317 verificados, 36 nuevos (tres compartidos por dos compañías) y uno corregido, Urquinaona, donde una ER5 de Orange queda a 7 m de Movistar. No hay conflictos. Las fotos «desmantelada» no se pueden contar sin leer los ~1300 detalles, y en los cinco detalles grabados no hay ninguna.
 
-## Capas
+## Publicación
 
-La web no lee los emplazamientos de Convex: descarga una capa estática (ADR 0004). `tools/capas` la genera así:
+La web no lee nada de Convex: descarga `vigente.json`, la capa y los lotes de fichas de un almacén de ficheros estático (ADR 0004, 0008 y 0010). Los escribe `publicar` (`convex/src/publicacion.ts`), así:
 
-1. Lee `datos:version` y la instantánea con `capas:instantanea`, por páginas de 250 emplazamientos con sus compañías y las bandas conocidas de cada una.
-2. Vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
-3. Pone a cada emplazamiento su barrio con los límites de `tools/capas/datos/barrios.json` y escribe `sitios@<fecha>.json` en la carpeta del origen. La fecha es la de la versión de los datos, al segundo. Si el fichero ya existe con el mismo contenido no hace nada; si existe con otro, falla (`CapaInmutable`) y no toca nada.
-4. Registra la versión y su URL con `capas:registrar`. La consulta pública `capas:vigente` devuelve la de la instantánea más reciente.
+1. Lee `datos:version`. Si `vigente.json` del almacén ya apunta a esa versión, termina sin escribir nada. Si apunta a una posterior, falla (`VigentePosterior`): no retrocede.
+2. Lee la instantánea con `capas:instantanea`, por páginas de 250 emplazamientos con sus compañías y las bandas conocidas de cada una, y vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
+3. Genera la capa, con el barrio de cada emplazamiento según `convex/datos/barrios.json` y su lote de fichas.
+4. Lee las fichas de cada lote con `capas:fichas` y escribe `fichas@<fecha>/<lote>.json`, cuatro lotes a la vez. Si falta alguna ficha, los datos han cambiado.
+5. Vuelve a comprobar la versión, escribe `sitios@<fecha>.json` y la registra con `capas:registrar`.
+6. Escribe `vigente.json`, el último.
 
-`capas:instantanea` y `capas:registrar` son internas: el generador las llama por la API HTTP de Convex con la clave de administración. En local, desde `tools/capas`:
+Ningún fichero se pisa con otro contenido: si existe distinto, falla con `FicheroInmutable` y `vigente.json` no cambia. La fecha es la de la versión de los datos, al segundo.
+
+La publicación es automática. `ejecutarIngesta` y `ejecutarIngestaDePuntos` llaman al servicio `Publicacion` al acabar cada ejecución completada (no las omitidas ni las fallidas), y `ingesta:recalcularFusion` también. En las acciones, ese servicio lanza `publicacion:publicar`, una acción de Node. Un fallo al publicar no deshace la ejecución: se apunta en el registro y la siguiente ingesta lo repite.
+
+Dónde escribe lo dicen las variables de entorno del despliegue:
 
 ```sh
-pnpm run publicar:local   # construye, lee la URL y la clave del backend local y publica
-pnpm run servir           # sirve la carpeta salida/ en http://127.0.0.1:8852, déjalo abierto
+pnpm exec convex env set CELDA_ALMACEN_CARPETA /ruta/absoluta/capas   # backend local: una carpeta
+pnpm exec convex env set CELDA_ALMACEN_ORIGEN http://127.0.0.1:8852    # URL pública de esa carpeta
+# producción: CELDA_R2_CUENTA, CELDA_R2_CUBO, CELDA_R2_ID_CLAVE y CELDA_R2_SECRETO (ADR 0010)
+pnpm exec convex run publicacion:publicar                             # publicar ahora, a mano
 ```
 
-Los límites de barrio se descargan de Open Data BCN con `pnpm run barrios`, también desde `tools/capas`. Son dos peticiones con 10 s entre ellas; hazlo solo cuando el Ayuntamiento publique límites nuevos y revisa el diff de `datos/barrios.json` antes del commit. `CELDA_BARRIOS` cambia la ruta del fichero. Por qué se guardan en git y no van en la ingesta: ADR 0004.
+Sin ninguna, `publicar` devuelve `sin-almacen` y no escribe nada. La carpeta solo tiene sentido con el backend local, porque la acción de Node corre en tu máquina.
 
-Para otro despliegue, `pnpm run publicar` con `CELDA_CONVEX_URL`, `CELDA_CONVEX_CLAVE_ADMIN`, `CELDA_CAPAS_ORIGEN` (la URL desde la que la web descargará los ficheros) y `CELDA_CAPAS_CARPETA`. `servir` escucha en el puerto de `CELDA_CAPAS_ORIGEN`. La web lee la URL de Convex de `VITE_CONVEX_URL`; `apps/web/.env.development` apunta al puerto 3240, y en otro puerto se pasa en el entorno: `VITE_CONVEX_URL=http://127.0.0.1:3250 pnpm run dev`.
+Para publicar desde un despliegue sin configurarle almacén, `tools/capas` hace lo mismo por la API HTTP de Convex con la clave de administración. En local, desde `tools/capas`:
 
-Publicar sin cambios en los datos no escribe nada, así que se puede lanzar tras cada ingesta. Lanzarlo solo tras la ingesta y subir el fichero a la CDN queda para el ticket del alojamiento.
+```sh
+pnpm run publicar:local   # construye, lee la URL y la clave del backend local y publica en salida/
+pnpm run servir           # sirve salida/ en http://127.0.0.1:8852, déjalo abierto
+```
+
+`servir` da a `vigente.json` una caché de cero segundos y al resto un año, como la CDN. La web en desarrollo lee de `VITE_CAPAS_ORIGEN`, que `apps/web/.env.development` pone en ese puerto; en la build, sin la variable, lee de `/capas` en su mismo origen.
+
+Para otro despliegue, `pnpm run publicar` con `CELDA_CONVEX_URL`, `CELDA_CONVEX_CLAVE_ADMIN`, `CELDA_CAPAS_ORIGEN` (la URL desde la que la web descargará los ficheros) y `CELDA_CAPAS_CARPETA`. `servir` escucha en el puerto de `CELDA_CAPAS_ORIGEN`.
+
+Los límites de barrio se descargan de Open Data BCN con `pnpm run barrios`, también desde `tools/capas`. Son dos peticiones con 10 s entre ellas; hazlo solo cuando el Ayuntamiento publique límites nuevos y revisa el diff de `convex/datos/barrios.json` antes del commit. `CELDA_BARRIOS` cambia la ruta del fichero. Por qué se guardan en git y no van en la ingesta: ADR 0004.
 
 `datos:version` es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la consulta también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
 
+### Vista previa
+
+`apps/web/scripts/sitio.sh <publicado> <destino>` construye la web y monta en `<destino>` el sitio entero: la web, lo publicado en `/capas` y `apps/web/vercel.json` con las cabeceras. Después, `npx vercel deploy <destino>` lo sube como vista previa. El primer despliegue de un proyecto nuevo de Vercel va a producción aunque no se pida; para una vista previa en un proyecto nuevo, despliega con `--target preview` desde el principio.
+
 ## Ficha
 
-`datos:ficha` es la consulta pública del panel. Devuelve la `Ficha` de `packages/dominio/src/ficha.ts`, o `null` si no hay emplazamiento con esa clave exacta. La ficha lleva la dirección y el municipio, cada estación base con sus bandas ordenadas por frecuencia y, por cada código, la observación de la que sale, con su fuente, su enlace y desde cuándo lo dice. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. La web la compara con la de la capa para decir si la ficha va por delante del mapa. No lleva los `_id` de Convex. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene.
+`datos:ficha` (interna) y `capas:fichas` dan la `Ficha` de `packages/dominio/src/ficha.ts`, que sale de `leerFicha` (`convex/src/lecturas.ts`). La ficha lleva la dirección y el municipio, cada estación base con sus bandas ordenadas por frecuencia y, por cada código, la observación de la que sale, con su fuente, su enlace y desde cuándo lo dice. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. No lleva los `_id` de Convex. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene.
 
-La web la lee con el servicio `FichasEnVivo` (`apps/web/src/ficha/servicio.ts`), que hoy es un `reactiveQuery` del cliente WebSocket de Confect. El cliente solo se conecta al abrir la primera ficha. Las referencias vienen de `@celda/convex/publica`, que solo incluye el grupo `datos` para no llevar al navegador la spec de la ingesta. Si la ficha pasa a leerse con una mutación limitada o desde la CDN (exploración 04), el cambio se queda dentro de ese servicio.
+La web la lee con el servicio `FichasPublicadas` (`apps/web/src/ficha/servicio.ts`): busca el lote en la capa del mapa, lo descarga una vez por visita y, si el origen ya no tiene esa versión, lee la vigente. Así la marca de agua solo es posterior al mapa en ese caso (ADR 0004).
 
 ## Pruebas
 
@@ -129,6 +152,6 @@ Tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
 
 El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8. `convex/test/TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
 
-`convex/test/capas.test.ts` publica con `publicarCapa` sobre el Convex en memoria y un almacén de prueba (una `Layer` con un `Ref` de ficheros) que, como el real, no pisa un fichero distinto.
+`convex/test/publicacion.test.ts` publica sobre el Convex en memoria y el almacén en una carpeta temporal, envuelto para apuntar cada fichero que escribe. Comprueba que cada clave de la capa tiene su ficha en su lote, que publicar sin cambios no escribe nada, que la ingesta publica sola tras cada ejecución completada y no tras una omitida, y que un fichero ocupado con otro contenido para la publicación sin tocar `vigente.json`. `almacenR2.test.ts` prueba la firma con un caso de la batería de AWS y el almacén de R2 contra un cubo S3 de prueba en memoria.
 
 La prueba de carga `convex/scripts/prueba-de-carga.sh` mete 2400 observaciones falsas en el backend local y fusiona dos veces. Deja basura: úsala en un backend que vayas a borrar.
