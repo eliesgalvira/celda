@@ -7,8 +7,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
-import { almacenEnCarpeta } from "../src/almacenes/carpeta";
-import { AlmacenDeFicheros } from "../src/publicacion";
+import { almacenEnCarpeta } from "./carpeta.ts";
+import { AlmacenDeFicheros } from "../almacen.ts";
 
 const FICHERO = "sitios@2026-09-26T02:15:00Z.json";
 const LOTE = "fichas@2026-09-26T02:15:00Z/0.json";

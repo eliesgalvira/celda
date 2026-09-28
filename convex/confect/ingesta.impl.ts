@@ -3,6 +3,7 @@ import { Banda } from "@celda/dominio/banda";
 import { Fuente, Observacion } from "@celda/dominio/observacion";
 import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
 import { ObservacionDePunto, Punto, Registro } from "@celda/ingesta/extractor";
+import type { ResultadoPublicacion } from "@celda/publicacion/publicar";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import { ActionRunner, ConvexConfigProvider, FunctionImpl, GroupImpl } from "@confect/server";
 import * as Cause from "effect/Cause";
@@ -26,7 +27,6 @@ import refs from "./_generated/refs";
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 import ingesta from "./ingesta.spec";
-import type { ResultadoPublicacion } from "./publicacion.spec";
 import { SIN_CAMBIOS } from "./tables/ejecuciones";
 import { INTERRUPTOR_POR_DEFECTO } from "./tables/interruptores";
 

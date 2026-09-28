@@ -3,9 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./publicacion": "./src/publicacion.ts",
-    "./almacenes/carpeta": "./src/almacenes/carpeta.ts",
-    "./almacenes/r2": "./src/almacenes/r2.ts"
+    "./publicacion": "./src/publicacion.ts"
   },
   "scripts": {
     "codegen": "./scripts/codegen.sh",
@@ -17,6 +15,7 @@
   "dependencies": {
     "@celda/dominio": "workspace:*",
     "@celda/ingesta": "workspace:*",
+    "@celda/publicacion": "workspace:*",
     "@confect/core": "catalog:",
     "@confect/server": "catalog:",
     "@effect/platform-node": "catalog:",

@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
-import { AlmacenDeFicheros, AlmacenNoDisponible, FicheroInmutable } from "../publicacion";
+import { AlmacenDeFicheros, AlmacenNoDisponible, FicheroInmutable } from "../almacen.ts";
 
 export interface OpcionesCarpeta {
   /** Carpeta que sirve el origen estático. */
