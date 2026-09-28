@@ -64,6 +64,7 @@ export default defineConfig({
       "anti-slop/no-widen-then-assert": "error",
       "anti-slop/require-safety-comment-for-type-assertion": "error",
       "anti-slop-effect/no-service-constructor-imports": "error",
+      "celda/abrir-con-recurso": "error",
       "celda/namespace-node-imports": "error",
       "celda/no-effect-error-swallow": "error",
       "celda/no-inline-schema-compile": "warn",

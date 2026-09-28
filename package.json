@@ -10,6 +10,7 @@
     "typecheck": "vp run -r typecheck",
     "lint": "vp lint --report-unused-disable-directives",
     "test": "vp run -r test",
+    "resistencia": "vp run --filter @celda/rendimiento resistencia",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check"
   },

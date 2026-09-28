@@ -1,5 +1,6 @@
 import { definePlugin } from "@oxlint/plugins";
 
+import abrirConRecurso from "./reglas/abrir-con-recurso.ts";
 import namespaceNodeImports from "./reglas/namespace-node-imports.ts";
 import noEffectErrorSwallow from "./reglas/no-effect-error-swallow.ts";
 import noInlineSchemaCompile from "./reglas/no-inline-schema-compile.ts";
@@ -11,6 +12,7 @@ export default definePlugin({
     name: "celda",
   },
   rules: {
+    "abrir-con-recurso": abrirConRecurso,
     "namespace-node-imports": namespaceNodeImports,
     "no-effect-error-swallow": noEffectErrorSwallow,
     "no-inline-schema-compile": noInlineSchemaCompile,

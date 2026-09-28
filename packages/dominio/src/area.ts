@@ -46,6 +46,14 @@ export const contiene = (rectangulo: Rectangulo, punto: Coordenada): boolean =>
   punto.latitud >= rectangulo.suroeste.latitud &&
   punto.latitud <= rectangulo.noreste.latitud;
 
+/**
+ * Si dos coordenadas son el mismo punto, o las dos faltan. Cada lectura del GPS trae un objeto
+ * nuevo aunque no se haya movido: esto dice si de verdad ha cambiado.
+ */
+export const mismaCoordenada = (a: Coordenada | undefined, b: Coordenada | undefined): boolean =>
+  a === b ||
+  (a !== undefined && b !== undefined && a.longitud === b.longitud && a.latitud === b.latitud);
+
 /** Radio medio de la Tierra en metros (IUGG). */
 export const RADIO_TIERRA_METROS = 6_371_008.8;
 

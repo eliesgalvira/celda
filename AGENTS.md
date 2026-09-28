@@ -30,12 +30,13 @@ Solid 2 es una RC con API nueva. Lee `apps/web/node_modules/solid-js/CHEATSHEET.
 
 - Pasa valores a los componentes (`<X valor={cuenta()} />`) y léelos como `props.valor`. Las props se leen sin desestructurar.
 - Escribe señales en manejadores de eventos, en `onSettled` o en la segunda función de `createEffect`. Los memos, la primera función de `createEffect` y el cuerpo de un componente solo leen.
+- Abre con `recurso()` (`@celda/ui/recurso.ts`) y una clave estable todo lo que haya que cerrar: GPS, brújula, escuchadores, temporizadores, fotogramas, peticiones, cálculos del Worker. Por qué y cómo: [docs/patterns/efectos.md](docs/patterns/efectos.md).
 - Crea una lectura asíncrona en el componente padre y espérala en el hijo, dentro de `<Loading>`.
 - En las pruebas, llama a `flush()` después de cambiar una señal y antes de comprobar.
 
 ## Pruebas
 
-Vitest en orden aleatorio, con `@effect/vitest` (`it.effect` para lo que devuelve un `Effect`). Los componentes se prueban con `@solidjs/testing-library` sobre happy-dom. Las dependencias reales se sustituyen por capas o funciones de prueba; la regla `no-module-mocking` rechaza los mocks de módulos.
+Vitest en orden aleatorio, con `@effect/vitest` (`it.effect` para lo que devuelve un `Effect`). Los componentes se prueban con `@solidjs/testing-library` sobre happy-dom. Las dependencias reales se sustituyen por capas o funciones de prueba; la regla `no-module-mocking` rechaza los mocks de módulos. Los dobles imitan la API real: entregan al abrirse lo que el navegador entregaría y contestan en otra tarea.
 
 El backend y la ingesta tienen su propia guía: [docs/patterns/convex.md](docs/patterns/convex.md). Explica cómo arrancar Convex en local, cómo se prueba la API en memoria y qué no hacer contra las fuentes reales.
 

@@ -109,6 +109,7 @@ Qué cuesta ahora el peor fotograma, en las trazas con ×4: el de reagrupar al a
 
 ## Garantías con prueba
 
+- `tools/rendimiento/src/resistencia.ts`, en la CI: con la web quieta 30 s no se abre nada ni se pide ningún fotograma. Ver [efectos.md](efectos.md).
 - `apps/web/src/mapa/vista.test.ts`: arrastrar o acercar varios niveles no vuelve a agrupar hasta que el mapa se asienta; al alejar, agrupa por el camino solo si cambia de nivel y la vista se ha salido de lo dibujado; se recoloca como mucho una vez por fotograma.
 - `apps/web/src/ficha/servicio.test.ts`: la precarga pide como mucho `LOTES_PRECARGADOS` lotes, los que más claves tienen; abrir después una ficha de ese lote no pide nada, y un fallo al precargar no falla y no se guarda.
 - `packages/ui/src/mapa/estilo.test.ts`: lo que se pide por adelantado (`RECURSOS_INICIALES_MAPA_BASE`) es el TileJSON del estilo y los glifos de los rótulos que se ven de lejos. Si alguien cambia la letra o la fuente del callejero, la precarga no se queda pidiendo lo que ya no se usa.

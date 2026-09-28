@@ -2,7 +2,7 @@ import type { PuntoElegido } from "@celda/dominio/aportacion";
 import { rumboGrados } from "@celda/dominio/area";
 import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
-import { simuladorEnHilo } from "@celda/sim/simulador";
+import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -86,7 +86,7 @@ const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
       servicios={Layer.mergeAll(
         capaDePrueba([Effect.succeed(CAPA)]),
         fichas.capa,
-        simuladorEnHilo(),
+        simuladorDePrueba,
         ubicacion.capa,
       )}
     />
@@ -185,6 +185,13 @@ describe("mejorar la señal: brújula", () => {
     assert.strictEqual(brujula.abiertas(), 0);
   });
 
+  it("con el emplazamiento justo al norte (rumbo 0°) también sale la brújula", async () => {
+    const alSur = { longitud: CAMPUS_NORD.posicion.longitud, latitud: CERCA.latitud };
+    const { seccion } = await abrir({ guardadas: [{ ...PUNTO, posicion: alSur }] });
+    await seccion().findByRole("slider", { name: "Simular el giro" });
+    assert.isNotNull(seccion().getByText("Emplazamiento: 0° (norte)"));
+  });
+
   it("en el iPhone explica antes de pedir permiso y, si se deniega, lo dice y deja la barra", async () => {
     const { seccion, pulsar, brujula } = await abrir({
       guardadas: [PUNTO],
@@ -272,6 +279,25 @@ describe("mejorar la señal: brújula", () => {
     });
     assert.strictEqual(brujula.escuchas(), 1);
     assert.strictEqual(brujula.abiertas(), 1);
+  });
+
+  it("con el móvil ya apuntando, lee al empezar y no vuelve a empezar a escuchar", async () => {
+    // El navegador lanza `deviceorientation` en cuanto se añade el escuchador.
+    const { seccion, pulsar, brujula } = await abrir({
+      guardadas: [PUNTO],
+      brujula: { disponibilidad: "sin-permiso", rumbo: { rumbo: OBJETIVO, margen: undefined } },
+    });
+    await seccion().findByRole("button", { name: "Usar la brújula del móvil" });
+    pulsar("Usar la brújula del móvil");
+    await waitFor(() => {
+      assert.strictEqual(guia(seccion()), "Apuntando al emplazamiento");
+    });
+    brujula.responder({ rumbo: OBJETIVO + 2, margen: undefined });
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(brujula.abiertas(), 1);
+    });
+    assert.strictEqual(brujula.escuchas(), 1);
   });
 
   it("si el móvil no da ninguna lectura, dice que no hay brújula", async () => {

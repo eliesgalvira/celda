@@ -1,12 +1,13 @@
-import type { Coordenada } from "@celda/dominio/area";
+import { type Coordenada, mismaCoordenada } from "@celda/dominio/area";
 import { type ResultadoSectorServicio, sectorServicio } from "@celda/sim/sectorServicio";
 import { Simulador } from "@celda/sim/simulador";
 import { FUENTE_SERVICIO, FUENTE_SERVICIO_LINEA } from "@celda/ui/mapa/servicio.ts";
+import { mismosCampos, recurso, SIGUE_UN_GESTO } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
-import { createContext, createEffect, createMemo, createSignal, onSettled } from "solid-js";
+import { createContext, createEffect, createMemo, createSignal, untrack } from "solid-js";
 
 import type { Orientacion } from "../ficha/diagrama.ts";
 import {
@@ -84,17 +85,20 @@ export function crearServicio(
   const [calculado, setCalculado] = createSignal<ServicioCalculado>();
   const [fallo, setFallo] = createSignal(false);
 
+  // Cada lectura del GPS trae un objeto nuevo aunque no se haya movido: solo cuentan las
+  // coordenadas.
+  const punto = createMemo(() => entrada.punto(), { equals: mismaCoordenada });
   const pedido = createMemo((): PedidoServicio | undefined => {
     const emplazamiento = entrada.emplazamiento();
     if (emplazamiento === undefined) return undefined;
-    const punto = entrada.punto();
+    const actual = punto();
     const celda = entrada.celda(emplazamiento.clave);
     // Sin punto ni celda no hay nada que enseñar.
-    if (punto === undefined && celda === undefined) return undefined;
+    if (actual === undefined && celda === undefined) return undefined;
     return {
       clave: emplazamiento.clave,
       emplazamiento: emplazamiento.posicion,
-      punto,
+      punto: actual,
       celda,
       orientacion: entrada.orientacion,
     };
@@ -133,23 +137,35 @@ export function crearServicio(
     siguiente = undefined;
   };
 
-  createEffect(pedido, (actual) => {
-    if (actual === undefined) {
-      cancelar();
+  // Un cálculo por pedido. Con el mismo emplazamiento, el que está en curso sigue y el nuevo
+  // espera a que acabe; al cerrar, solo se cancela si lo siguiente es otro emplazamiento o nada.
+  recurso(
+    "simulador:sector-servicio",
+    pedido,
+    (actual) => {
+      if (untrack(calculado)?.pedido.clave !== actual.clave) setCalculado(undefined);
+      if (enCurso?.clave === actual.clave) {
+        siguiente = actual;
+      } else {
+        cancelar();
+        calcular(actual);
+      }
+      return (despues) => {
+        if (despues?.clave !== actual.clave) cancelar();
+      };
+    },
+    { iguales: mismosCampos, maximoPorSegundo: SIGUE_UN_GESTO },
+  );
+
+  // Sin pedido no hay nada que enseñar.
+  createEffect(
+    () => pedido() === undefined,
+    (sinPedido) => {
+      if (!sinPedido) return;
       setCalculado(undefined);
       setFallo(false);
-      return;
-    }
-    if (calculado()?.pedido.clave !== actual.clave) setCalculado(undefined);
-    if (enCurso?.clave === actual.clave) {
-      siguiente = actual;
-      return;
-    }
-    cancelar();
-    calcular(actual);
-  });
-
-  onSettled(() => cancelar);
+    },
+  );
 
   createEffect(
     () => ({ lienzo: entrada.lienzo(), calculado: calculado() }),

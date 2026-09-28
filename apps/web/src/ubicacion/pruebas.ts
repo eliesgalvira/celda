@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import { criptoDePrueba } from "../lib/cripto.ts";
+import { enOtraTarea } from "../lib/pruebas.ts";
 import type { Brujula } from "../mejorar/brujula.ts";
 import {
   type BrujulaDePrueba,
@@ -27,7 +28,10 @@ export interface GeolocalizacionDePrueba {
   readonly pedidas: () => number;
   /** Cuántas peticiones siguen abiertas, con el GPS encendido. */
   readonly abiertas: () => number;
-  /** Entrega una lectura a las peticiones abiertas. */
+  /**
+   * Entrega una lectura a las peticiones abiertas. El navegador la guarda, y una petición nueva la
+   * recibe nada más abrirse.
+   */
   readonly responder: (lectura: LecturaGps) => void;
   /**
    * Entrega una lectura a las peticiones ya cerradas, como un navegador que llama tarde a la
@@ -36,18 +40,40 @@ export interface GeolocalizacionDePrueba {
   readonly responderTarde: (lectura: LecturaGps) => void;
   /** Hace fallar las peticiones abiertas, como si el navegador lo dijera. */
   readonly fallar: (motivo: MotivoFalloGps) => void;
+  /** El permiso cambia, como si la persona lo cambiara en el navegador. */
+  readonly cambiarPermiso: (permiso: Permiso) => void;
+  /**
+   * Si la app ya ha leído el permiso. Como en el navegador, la respuesta no está al montar: quien
+   * pulse «Usar mi ubicación» antes ve el paso previo aunque el permiso ya esté dado.
+   */
+  readonly permisoLeido: () => boolean;
 }
 
-/** Un GPS de prueba con el permiso dado, que no contesta hasta que la prueba se lo pide. */
-export const geolocalizacionDePrueba = (permiso: Permiso): GeolocalizacionDePrueba => {
+/**
+ * Un GPS de prueba con el permiso dado. Como el del navegador:
+ *
+ * - `permiso` da el estado cuando se empieza a leer y luego cada cambio, y no se acaba hasta que
+ *   se deja de escuchar.
+ * - Una petición nueva recibe al abrirse la última posición que tenga el navegador (`watchPosition`
+ *   con `maximumAge`), sin esperar al GPS. La primera, `enCache`; después, la última entregada.
+ * - Lo demás llega cuando la prueba lo pide.
+ */
+export const geolocalizacionDePrueba = (
+  permiso: Permiso,
+  enCache?: LecturaGps,
+): GeolocalizacionDePrueba => {
   let pedidas = 0;
+  let permisoActual = permiso;
+  let ultima = enCache;
   const colas: Array<Queue.Queue<LecturaGps, UbicacionNoDisponible | Cause.Done>> = [];
   const cerradas: Array<Queue.Queue<LecturaGps, UbicacionNoDisponible | Cause.Done>> = [];
+  const escuchasDePermiso: Array<Queue.Queue<Permiso, Cause.Done>> = [];
   const seguir = Stream.callback<LecturaGps, UbicacionNoDisponible>((cola) =>
     Effect.acquireRelease(
       Effect.sync(() => {
         pedidas += 1;
         colas.push(cola);
+        if (ultima !== undefined) Queue.offerUnsafe(cola, ultima);
       }),
       () =>
         Effect.sync(() => {
@@ -56,14 +82,30 @@ export const geolocalizacionDePrueba = (permiso: Permiso): GeolocalizacionDePrue
         }),
     ),
   );
-  return {
-    capa: Layer.succeed(
-      Geolocalizacion,
-      Geolocalizacion.of({ permiso: Stream.make(permiso), seguir }),
+  let permisoLeido = false;
+  // El estado de ahora cuando alguien empieza a leerlo, y luego cada cambio, sin acabarse nunca.
+  const permisos = Stream.concat(
+    Stream.fromEffect(
+      Effect.sync(() => {
+        permisoLeido = true;
+        return permisoActual;
+      }),
     ),
+    Stream.callback<Permiso>((cola) =>
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          escuchasDePermiso.push(cola);
+        }),
+        () => Effect.sync(() => escuchasDePermiso.splice(escuchasDePermiso.indexOf(cola), 1)),
+      ),
+    ),
+  );
+  return {
+    capa: Layer.succeed(Geolocalizacion, Geolocalizacion.of({ permiso: permisos, seguir })),
     pedidas: () => pedidas,
     abiertas: () => colas.length,
     responder: (lectura) => {
+      ultima = lectura;
       for (const cola of colas) Queue.offerUnsafe(cola, lectura);
     },
     responderTarde: (lectura) => {
@@ -73,6 +115,11 @@ export const geolocalizacionDePrueba = (permiso: Permiso): GeolocalizacionDePrue
       for (const cola of colas) {
         Queue.failCauseUnsafe(cola, Cause.fail(new UbicacionNoDisponible({ motivo })));
       }
+    },
+    permisoLeido: () => permisoLeido,
+    cambiarPermiso: (nuevo) => {
+      permisoActual = nuevo;
+      for (const cola of escuchasDePermiso) Queue.offerUnsafe(cola, nuevo);
     },
   };
 };
@@ -85,7 +132,10 @@ export interface AlmacenDePrueba {
   readonly ajustes: () => Ajustes;
 }
 
-/** Un almacén en memoria con las aportaciones que se le den. Con `roto`, todo falla. */
+/**
+ * Un almacén en memoria con las aportaciones que se le den. Con `roto`, todo falla. Como
+ * IndexedDB, contesta en otra tarea.
+ */
 export const almacenDePrueba = (
   iniciales: ReadonlyArray<Aportacion> = [],
   roto = false,
@@ -93,9 +143,10 @@ export const almacenDePrueba = (
 ): AlmacenDePrueba => {
   let guardadas = [...iniciales];
   let ajustes = ajustesIniciales;
-  const disponible: Effect.Effect<void, AlmacenNoDisponible> = roto
-    ? Effect.fail(new AlmacenNoDisponible({ motivo: "almacén de prueba roto" }))
-    : Effect.void;
+  const disponible: Effect.Effect<void, AlmacenNoDisponible> = Effect.andThen(
+    enOtraTarea,
+    roto ? Effect.fail(new AlmacenNoDisponible({ motivo: "almacén de prueba roto" })) : Effect.void,
+  );
   return {
     capa: Layer.succeed(
       AlmacenLocal,
@@ -129,7 +180,10 @@ export interface BuscadorDePrueba {
 
 const esFalloDeBusqueda = Schema.is(BusquedaFallida);
 
-/** Un buscador que contesta con lo que diga `respuestas` para cada consulta, o que no hay nada. */
+/**
+ * Un buscador que contesta con lo que diga `respuestas` para cada consulta, o que no hay nada. Como
+ * la red, contesta en otra tarea.
+ */
 export const buscadorDePrueba = (
   respuestas: ReadonlyMap<string, ReadonlyArray<Direccion> | BusquedaFallida>,
 ): BuscadorDePrueba => {
@@ -142,9 +196,10 @@ export const buscadorDePrueba = (
           Effect.suspend(() => {
             consultas.push(consulta);
             const respuesta = respuestas.get(consulta) ?? [];
-            return esFalloDeBusqueda(respuesta)
-              ? Effect.fail(respuesta)
-              : Effect.succeed(respuesta);
+            return Effect.andThen(
+              enOtraTarea,
+              esFalloDeBusqueda(respuesta) ? Effect.fail(respuesta) : Effect.succeed(respuesta),
+            );
           }),
         atribucion: { texto: "Buscador de prueba", enlace: "https://buscador.prueba" },
       }),
@@ -155,6 +210,8 @@ export const buscadorDePrueba = (
 
 export interface OpcionesDeUbicacion {
   readonly permiso?: Permiso;
+  /** La posición que el navegador ya tiene guardada: la recibe la primera petición al abrirse. */
+  readonly enCache?: LecturaGps;
   readonly guardadas?: ReadonlyArray<Aportacion>;
   readonly almacenRoto?: boolean;
   readonly ajustes?: Ajustes;
@@ -178,7 +235,7 @@ export interface UbicacionDePrueba {
  * preguntado por el permiso, no hay brújula, no hay nada guardado y el buscador no encuentra nada.
  */
 export const ubicacionDePrueba = (opciones: OpcionesDeUbicacion = {}): UbicacionDePrueba => {
-  const gps = geolocalizacionDePrueba(opciones.permiso ?? "preguntar");
+  const gps = geolocalizacionDePrueba(opciones.permiso ?? "preguntar", opciones.enCache);
   const almacen = almacenDePrueba(opciones.guardadas, opciones.almacenRoto, opciones.ajustes);
   const buscador = buscadorDePrueba(opciones.busquedas ?? new Map());
   const brujula = brujulaDePrueba(opciones.brujula);

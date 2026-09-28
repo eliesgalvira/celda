@@ -1,9 +1,10 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, onSettled, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 
 import { PliegueDeCreditos } from "./Atribucion.tsx";
 import { AspectoDeControl } from "./controles/aspecto.ts";
 import { MenuDeControles } from "./controles/MenuDeControles.tsx";
+import { recursoFijo } from "./recurso.ts";
 
 export interface DisposicionMapaProps {
   /** Recibe el elemento en el que se dibuja el mapa. */
@@ -93,7 +94,7 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
     plegarSolos = false;
     setPlegada(true);
   };
-  onSettled(() => {
+  recursoFijo("creditos:pliegue", () => {
     const espera = window.setTimeout(plegarAlTocar, PLIEGUE_CREDITOS_MS);
     return () => window.clearTimeout(espera);
   });

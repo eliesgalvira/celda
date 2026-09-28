@@ -1,0 +1,289 @@
+import { assert, describe, it } from "@effect/vitest";
+import {
+  createEffect,
+  createMemo,
+  createRoot,
+  createSignal,
+  flush,
+  onCleanup,
+  onSettled,
+} from "solid-js";
+
+import { mismasListas, mismosCampos, recurso, recursoFijo, vigilante } from "./recurso.ts";
+
+/**
+ * Monta `montar` en una raíz y devuelve cómo desmontarla. Las señales se crean fuera: Solid no
+ * deja escribirlas desde dentro de la raíz.
+ */
+const enRaiz = (montar: () => void): (() => void) =>
+  createRoot((desmontar) => {
+    montar();
+    return desmontar;
+  });
+
+/**
+ * Lo que hace Solid 2.0.0-rc.9 con los efectos y los memos, comprobado aquí para que una subida
+ * de versión que lo cambie se note. Es la razón de `recurso` (docs/patterns/efectos.md).
+ */
+describe("Solid 2: igualdad de efectos y memos", () => {
+  it("un efecto vuelve a correr, y limpia antes, aunque su primera función devuelva lo mismo", () => {
+    const registro: Array<string> = [];
+    const [estado, setEstado] = createSignal({ lecturas: 0, encendido: true });
+    const desmontar = enRaiz(() => {
+      createEffect(
+        () => estado().encendido,
+        (encendido) => {
+          registro.push(`abre ${encendido}`);
+          return () => registro.push("cierra");
+        },
+      );
+    });
+    flush();
+    setEstado({ lecturas: 1, encendido: true });
+    flush();
+    setEstado({ lecturas: 2, encendido: true });
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, [
+      "abre true",
+      "cierra",
+      "abre true",
+      "cierra",
+      "abre true",
+      "cierra",
+    ]);
+  });
+
+  it("también si devuelve el mismo objeto", () => {
+    let veces = 0;
+    const mismo = { a: 1 };
+    const [n, setN] = createSignal(0);
+    const desmontar = enRaiz(() => {
+      createEffect(
+        () => {
+          n();
+          return mismo;
+        },
+        () => {
+          veces += 1;
+        },
+      );
+    });
+    flush();
+    setN(1);
+    flush();
+    desmontar();
+    assert.strictEqual(veces, 2);
+  });
+
+  it("un memo compara con `===`: el mismo primitivo no avisa, un objeto nuevo igual sí", () => {
+    const registro: Array<string> = [];
+    const [estado, setEstado] = createSignal({ lecturas: 0, encendido: true });
+    const desmontar = enRaiz(() => {
+      const encendido = createMemo(() => estado().encendido);
+      const envuelto = createMemo(() => ({ encendido: estado().encendido }));
+      createEffect(encendido, () => {
+        registro.push("primitivo");
+      });
+      createEffect(envuelto, () => {
+        registro.push("objeto");
+      });
+    });
+    flush();
+    setEstado({ lecturas: 1, encendido: true });
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, ["primitivo", "objeto", "objeto"]);
+  });
+
+  it("un memo con `equals` compara con esa función", () => {
+    let veces = 0;
+    const [estado, setEstado] = createSignal({ lecturas: 0, encendido: true });
+    const desmontar = enRaiz(() => {
+      const envuelto = createMemo(() => ({ encendido: estado().encendido }), {
+        equals: (a, b) => a.encendido === b.encendido,
+      });
+      createEffect(envuelto, () => {
+        veces += 1;
+      });
+    });
+    flush();
+    setEstado({ lecturas: 1, encendido: true });
+    flush();
+    desmontar();
+    assert.strictEqual(veces, 1);
+  });
+
+  it("una señal a la que se escribe el mismo valor no avisa", () => {
+    let veces = 0;
+    const [n, setN] = createSignal(1);
+    const desmontar = enRaiz(() => {
+      createEffect(n, () => {
+        veces += 1;
+      });
+    });
+    flush();
+    setN(1);
+    flush();
+    desmontar();
+    assert.strictEqual(veces, 1);
+  });
+
+  it("`onCleanup` dentro de la segunda función de un efecto no se llama nunca", () => {
+    const registro: Array<string> = [];
+    const [n, setN] = createSignal(0);
+    const desmontar = enRaiz(() => {
+      createEffect(n, () => {
+        onCleanup(() => registro.push("onCleanup"));
+        return () => registro.push("devuelta");
+      });
+    });
+    flush();
+    setN(1);
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, ["devuelta", "devuelta"]);
+  });
+
+  it("`onSettled` corre una vez, no sigue lo que lee, y limpia al desmontar", () => {
+    const registro: Array<string> = [];
+    const [n, setN] = createSignal(0);
+    const desmontar = enRaiz(() => {
+      onSettled(() => {
+        registro.push(`abre ${n()}`);
+        return () => registro.push("cierra");
+      });
+    });
+    flush();
+    setN(1);
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, ["abre 0", "cierra"]);
+  });
+
+  it("`onCleanup` en el cuerpo del dueño se llama al desmontar", () => {
+    const registro: Array<string> = [];
+    const desmontar = enRaiz(() => {
+      onCleanup(() => registro.push("cierra"));
+    });
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, ["cierra"]);
+  });
+});
+
+describe("recurso", () => {
+  it("abre con la clave, no reabre con cambios que dan la misma clave y cierra al desmontar", () => {
+    vigilante.reiniciar();
+    const registro: Array<string> = [];
+    const [estado, setEstado] = createSignal({ lecturas: 0, encendido: true });
+    const desmontar = enRaiz(() => {
+      recurso(
+        "prueba:gps",
+        () => estado().encendido,
+        () => {
+          registro.push("abre");
+          return (siguiente) => registro.push(`cierra ${String(siguiente)}`);
+        },
+      );
+    });
+    flush();
+    // Cada lectura escribe el estado, como el GPS: la clave sigue siendo `true`.
+    for (let lecturas = 1; lecturas <= 50; lecturas += 1) {
+      setEstado({ lecturas, encendido: true });
+      flush();
+    }
+    assert.deepStrictEqual(registro, ["abre"]);
+    setEstado({ lecturas: 51, encendido: false });
+    flush();
+    setEstado({ lecturas: 52, encendido: true });
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, ["abre", "cierra undefined", "abre", "cierra undefined"]);
+    assert.strictEqual(vigilante.aperturas("prueba:gps"), 2);
+  });
+
+  it("al cambiar la clave cierra lo anterior pasándole la nueva y abre con ella", () => {
+    const registro: Array<string> = [];
+    const [clave, setClave] = createSignal<string | undefined>("a");
+    const desmontar = enRaiz(() => {
+      recurso("prueba:cambio", clave, (actual) => {
+        registro.push(`abre ${actual}`);
+        return (siguiente) => registro.push(`cierra ${actual} → ${String(siguiente)}`);
+      });
+    });
+    flush();
+    setClave("b");
+    flush();
+    setClave(undefined);
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, ["abre a", "cierra a → b", "abre b", "cierra b → undefined"]);
+  });
+
+  it("con un comparador, un objeto nuevo con los mismos campos no reabre", () => {
+    let abiertos = 0;
+    const lienzo = { nombre: "mapa" };
+    const [n, setN] = createSignal(0);
+    const [capa, setCapa] = createSignal<ReadonlyArray<number>>([1, 2]);
+    const desmontar = enRaiz(() => {
+      recurso(
+        "prueba:calculo",
+        () => ({ lienzo, capa: capa(), vuelta: n() > 5 }),
+        () => {
+          abiertos += 1;
+          return undefined;
+        },
+        { iguales: mismosCampos },
+      );
+    });
+    flush();
+    setN(1);
+    flush();
+    setN(2);
+    flush();
+    assert.strictEqual(abiertos, 1);
+    setCapa([1, 2]);
+    flush();
+    assert.strictEqual(abiertos, 2);
+    desmontar();
+  });
+
+  it("recursoFijo abre una vez y cierra al desmontar", () => {
+    const registro: Array<string> = [];
+    const desmontar = enRaiz(() => {
+      recursoFijo("prueba:fijo", () => {
+        registro.push("abre");
+        return () => registro.push("cierra");
+      });
+    });
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, ["abre", "cierra"]);
+  });
+
+  it("el vigilante apunta un exceso si un recurso se reabre más veces por segundo de las normales", () => {
+    vigilante.reiniciar();
+    const [n, setN] = createSignal(0);
+    const desmontar = enRaiz(() => {
+      recurso("prueba:bucle", n, () => undefined, { maximoPorSegundo: 3 });
+    });
+    flush();
+    for (let i = 1; i <= 4; i += 1) {
+      setN(i);
+      flush();
+    }
+    desmontar();
+    assert.deepStrictEqual(vigilante.excesos(), [{ nombre: "prueba:bucle", veces: 4, maximo: 3 }]);
+    vigilante.reiniciar();
+  });
+
+  it("compara listas y campos", () => {
+    const x = { a: 1 };
+    assert.isTrue(mismasListas([1, "a", x], [1, "a", x]));
+    assert.isFalse(mismasListas([1, 2], [1, 2, 3]));
+    assert.isFalse(mismasListas([{ a: 1 }], [{ a: 1 }]));
+    assert.isTrue(mismosCampos({ a: 1, b: x }, { a: 1, b: x }));
+    assert.isFalse(mismosCampos({ a: 1, b: x }, { a: 1, b: { a: 1 } }));
+  });
+});

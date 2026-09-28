@@ -6,8 +6,8 @@ import {
   versionDeCapa,
 } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
-import { workerDePrueba } from "@celda/sim/pruebas";
-import { type Simulador, simuladorEnHilo, simuladorEnWorker } from "@celda/sim/simulador";
+import { simuladorDePrueba, workerDePrueba } from "@celda/sim/pruebas";
+import { type Simulador, simuladorEnWorker } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -150,7 +150,7 @@ const urlDelLote = (clave: string) =>
  * contesta hasta que la prueba lo pide, abierta en `clave`. Las simulaciones se calculan en el
  * mismo hilo, salvo que la prueba traiga su simulador.
  */
-const abrir = (clave: string, simulador: Layer.Layer<Simulador> = simuladorEnHilo()) => {
+const abrir = (clave: string, simulador: Layer.Layer<Simulador> = simuladorDePrueba) => {
   const origen = origenDePrueba();
   navegar(ruta.emplazamiento(clave), { reemplazar: true });
   // Sin esperar, la app leería la dirección de la prueba anterior y pediría su ficha.

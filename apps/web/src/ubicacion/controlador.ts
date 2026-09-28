@@ -1,10 +1,11 @@
 import { ESQUEMA_PUNTO_ELEGIDO, type OrigenPunto } from "@celda/dominio/aportacion";
 import type { Coordenada } from "@celda/dominio/area";
+import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Stream from "effect/Stream";
-import { createContext, createEffect, createMemo, createSignal, onSettled } from "solid-js";
+import { createContext, createMemo, createSignal } from "solid-js";
 
 import type { ServiciosDeDatos } from "../datos.tsx";
 import { AlmacenLocal, nuevaAportacion } from "./almacen.ts";
@@ -60,7 +61,7 @@ export const crearUbicacion = (
   const enviar = (evento: EventoUbicacion) => setUbicacion((u) => transicion(u, evento));
   const referencia = createMemo(() => referenciaDe(ubicacion().estado));
 
-  onSettled(() => {
+  recursoFijo("geolocalizacion:permiso", () => {
     const parar = new AbortController();
     void runtime.runPromiseExit(
       Stream.runForEach(Stream.unwrap(Effect.map(Geolocalizacion, (g) => g.permiso)), (permiso) =>
@@ -68,12 +69,15 @@ export const crearUbicacion = (
       ),
       { signal: parar.signal },
     );
+    return () => parar.abort();
+  });
+
+  recursoFijo("almacen:punto-elegido", () => {
+    const parar = new AbortController();
     void runtime
       .runPromiseExit(
         Effect.flatMap(AlmacenLocal, (a) => a.leer("punto-elegido")),
-        {
-          signal: parar.signal,
-        },
+        { signal: parar.signal },
       )
       .then((salida) => {
         // Si no se puede leer, se empieza sin punto; al guardar uno, el aviso lo dirá.
@@ -83,14 +87,12 @@ export const crearUbicacion = (
     return () => parar.abort();
   });
 
-  // El GPS se enciende al pedir la ubicación y se apaga en cuanto deja de ser la referencia. En
-  // Solid 2 un efecto vuelve a correr cada vez que cambia lo que lee, aunque dé el mismo valor;
-  // el memo lo frena, porque sin él cada lectura cerraría el GPS y lo volvería a abrir.
-  const encendido = createMemo(() => gpsEncendido(ubicacion().estado));
-  createEffect(
-    () => encendido(),
-    (encendido) => {
-      if (!encendido) return;
+  // El GPS se enciende al pedir la ubicación y se apaga en cuanto deja de ser la referencia. Cada
+  // lectura cambia el estado, pero la clave es `true` mientras siga encendido: no lo reabre.
+  recurso(
+    "gps",
+    () => gpsEncendido(ubicacion().estado),
+    () => {
       const parar = new AbortController();
       void runtime.runPromiseExit(
         Stream.runForEach(Stream.unwrap(Effect.map(Geolocalizacion, (g) => g.seguir)), (lectura) =>

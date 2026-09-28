@@ -1,4 +1,18 @@
 import { GLOSARIO, type Termino } from "@celda/dominio/glosario";
+import * as Effect from "effect/Effect";
+
+/**
+ * Espera a la siguiente tarea del navegador, como una respuesta de IndexedDB, de la red o de un
+ * aviso de permiso: los servicios de prueba contestan así y no en el acto.
+ */
+export const otraTarea = (): Promise<void> =>
+  new Promise((resolver) => {
+    // @effect-diagnostics-next-line globalTimers:off
+    setTimeout(resolver, 0);
+  });
+
+/** `otraTarea` como efecto, para los servicios de prueba. */
+export const enOtraTarea: Effect.Effect<void> = Effect.promise(otraTarea);
 
 /**
  * Busca por el texto entero de un elemento aunque un término subrayado lo parta en varios

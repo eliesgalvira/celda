@@ -1,7 +1,8 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, createUniqueId, onSettled, Show } from "solid-js";
+import { createSignal, createUniqueId, Show } from "solid-js";
 
 import { ControlDelMapa } from "../ControlDelMapa.tsx";
+import { recursoFijo } from "../recurso.ts";
 import { AspectoDeControl } from "./aspecto.ts";
 
 export interface MenuDeControlesProps {
@@ -23,7 +24,7 @@ export function MenuDeControles(props: MenuDeControlesProps) {
   const [abierto, setAbierto] = createSignal(false);
   let caja: HTMLDivElement | undefined;
 
-  onSettled(() => {
+  recursoFijo("menu-de-controles:fuera", () => {
     const fuera = (evento: PointerEvent) => {
       if (evento.target instanceof Node && caja?.contains(evento.target) !== true) {
         setAbierto(false);

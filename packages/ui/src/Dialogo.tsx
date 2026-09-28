@@ -1,7 +1,8 @@
 import type { JSX } from "@solidjs/web";
-import { createEffect, createUniqueId, onSettled, Show } from "solid-js";
+import { createEffect, createUniqueId, Show } from "solid-js";
 
 import { Boton } from "./Boton.tsx";
+import { recursoFijo } from "./recurso.ts";
 
 /** Lo que puede recibir el foco dentro del diálogo. */
 const ENFOCABLES =
@@ -37,7 +38,8 @@ export function Dialogo(props: DialogoProps) {
   let titulo: HTMLHeadingElement | undefined;
   let cuerpo: HTMLDivElement | undefined;
 
-  onSettled(() => {
+  // Abrir un <dialog> modal es abrir algo: lo pone en la capa superior y bloquea el resto.
+  recursoFijo("dialogo", () => {
     const previo = document.activeElement;
     if (dialogo !== undefined && !dialogo.open) dialogo.showModal();
     titulo?.focus({ preventScroll: true });

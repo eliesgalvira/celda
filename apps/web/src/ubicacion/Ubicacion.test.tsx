@@ -1,7 +1,7 @@
 import type { PuntoElegido } from "@celda/dominio/aportacion";
 import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
-import { simuladorEnHilo } from "@celda/sim/simulador";
+import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -102,7 +102,7 @@ const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
       servicios={Layer.mergeAll(
         capaDePrueba([Effect.succeed(CAPA)]),
         fichas.capa,
-        simuladorEnHilo(),
+        simuladorDePrueba,
         ubicacion.capa,
       )}
     />
@@ -113,6 +113,11 @@ const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
   });
   fichas.responder(CAMPUS_NORD.clave, CAMPUS_NORD);
   await pantalla.findByRole("heading", { name: "CL JORDI GIRONA, 1" });
+  // Como en el navegador, el permiso llega un momento después de montar.
+  await waitFor(() => {
+    assert.isTrue(ubicacion.gps.permisoLeido());
+  });
+  flush();
   const panel = () => within(pantalla.getByRole("region", { name: "Punto de referencia" }));
   const pulsar = (nombre: string | RegExp) => {
     fireEvent.click(pantalla.getByRole("button", { name: nombre }));
@@ -339,6 +344,22 @@ describe("punto de referencia: volver a pedir la ubicación", () => {
     assert.match(aviso.textContent ?? "", /No es un fallo de Celda/u);
     assert.match(aviso.textContent ?? "", /busca una dirección/u);
     assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
+  });
+
+  it("con una posición ya guardada en el navegador, la usa al momento y no vuelve a pedirla", async () => {
+    // `watchPosition` entrega al abrirse la última posición que tenga el navegador.
+    const { panel, gps } = await abrir({ permiso: "concedido", enCache: LECTURA });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /tu ubicación/u);
+    });
+    gps.responder({ ...LECTURA, precision: 9 });
+    await waitFor(() => {
+      assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /±9 m/u);
+    });
+    assert.strictEqual(gps.pedidas(), 1);
+    assert.strictEqual(gps.abiertas(), 1);
   });
 });
 

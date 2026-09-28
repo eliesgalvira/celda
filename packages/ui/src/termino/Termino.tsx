@@ -5,18 +5,11 @@ import {
   type TextoMarcado,
 } from "@celda/dominio/glosario";
 import { type JSX, Portal } from "@solidjs/web";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  createUniqueId,
-  For,
-  onSettled,
-  Show,
-} from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
+import { recursoFijo } from "../recurso.ts";
 import { colocarExplicacion } from "./posicion.ts";
 
 export interface TerminoProps {
@@ -127,7 +120,7 @@ function Explicacion(props: ExplicacionProps) {
     caja.dataset["colocada"] = "";
   };
 
-  onSettled(() => {
+  recursoFijo("termino:explicacion", () => {
     colocar();
     titulo?.focus({ preventScroll: true });
 
