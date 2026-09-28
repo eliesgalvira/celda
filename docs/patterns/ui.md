@@ -34,6 +34,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Nada salta al cargar: `DisposicionMapa` reserva desde el principio el sitio de cada pieza, el fondo ya tiene el color del mapa y los avisos se superponen. Cada aviso nuevo se monta con clave, de modo que el navegador lo cuenta como elemento nuevo y no como uno que se mueve.
 - Lo que dura poco no se ve: el aviso de espera aparece tras medio segundo (`animate-aparecer`).
 - Un fallo se dice con `Aviso tono="fallo"`: qué ha pasado, por qué si se sabe y qué hacer.
+- Lo que Celda aún no tiene se dice con `Aviso tono="limite"`: qué falta y que no por eso deja de existir. Sin alarma y sin rol de alerta.
 
 ## Marcadores y logos
 
