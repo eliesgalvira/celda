@@ -19,8 +19,17 @@ export interface LecturaGps {
   readonly fecha: number;
 }
 
-/** Por qué no ha llegado la ubicación. */
-export type MotivoFalloGps = "denegado" | "sin-senal" | "tiempo-agotado" | "no-disponible";
+/**
+ * Por qué no ha llegado la ubicación. `sin-senal`: el móvil no ha podido calcularla (interiores,
+ * ubicación del sistema apagada). `sin-fuente`: el navegador de un ordenador no tiene de dónde
+ * sacarla. `no-disponible`: el navegador no deja pedirla (sin https o sin la API).
+ */
+export type MotivoFalloGps =
+  | "denegado"
+  | "sin-senal"
+  | "sin-fuente"
+  | "tiempo-agotado"
+  | "no-disponible";
 
 /** Los estados en que la ubicación se queda hasta que la persona hace algo. */
 export type EstadoAsentado =
@@ -185,7 +194,8 @@ const accion = (
         ? estado.anterior
         : estado;
     case "elegir-en-mapa":
-      return estado.tipo === "eligiendo" || estado.tipo === "pidiendo"
+      // Mientras se busca la ubicación también se puede ir al mapa: deja de buscarla.
+      return estado.tipo === "eligiendo"
         ? estado
         : { tipo: "eligiendo", anterior: asentado(estado) };
     case "elegido":
