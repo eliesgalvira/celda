@@ -37,6 +37,8 @@ export default defineConfig({
       "tools/oxlint-plugin-celda/anti-slop/**",
       "convex/convex/**",
       "convex/confect/_generated/**",
+      // Respuestas grabadas y guiones de un solo uso de las investigaciones: no son código de Celda.
+      "docs/investigacion/muestras/**",
     ],
     plugins: ["eslint", "oxc", "unicorn", "typescript", "jsx-a11y"],
     jsPlugins: [
