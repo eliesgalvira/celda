@@ -44,12 +44,12 @@ packages/ui/              componentes y tema: el único sitio con estilos
 tools/capas/              generador de la capa de emplazamientos y origen estático local
 tools/oxlint-plugin-celda reglas de lint propias
 docs/                     arquitectura, ADR y patrones
-nix/                      módulos del entorno Nix
+nix/                      módulos del flake: entorno, paquete y módulo de NixOS de la ingesta
 ```
 
 ## Integración continua
 
-`.github/workflows/celda.yml` comprueba tipos, lint, formato, pruebas y build con este mismo entorno Nix. Mientras Celda viva dentro de otro repositorio, ese fichero está en la raíz de aquel. Al mover Celda a su propio repositorio, se mueve con ella.
+`.github/workflows/celda.yml` comprueba tipos, lint, formato, pruebas y build con este mismo entorno Nix, y construye con Nix el paquete de la ingesta nocturna. Mientras Celda viva dentro de otro repositorio, ese fichero está en la raíz de aquel. Al mover Celda a su propio repositorio, se mueve con ella.
 
 ## Datos del mapa
 

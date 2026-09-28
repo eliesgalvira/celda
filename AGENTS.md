@@ -40,6 +40,8 @@ Vitest en orden aleatorio, con `@effect/vitest` (`it.effect` para lo que devuelv
 
 El backend y la ingesta tienen su propia guía: [docs/patterns/convex.md](docs/patterns/convex.md). Explica cómo arrancar Convex en local, cómo lanzar la ingesta nocturna (`pnpm run ingesta`), cómo se prueba cada una y qué no hacer contra las fuentes reales.
 
+La ingesta nocturna se empaqueta con Nix y corre con un módulo de NixOS: [docs/patterns/nixos.md](docs/patterns/nixos.md). Si tocas `nix/` o las dependencias de `apps/nocturna`, pasa también `nix flake check`.
+
 Las simulaciones también: [docs/patterns/simulaciones.md](docs/patterns/simulaciones.md). Explica la interfaz fija, cómo se añade una sin tocar el resto y cómo se generan sus ficheros de referencia.
 
 ## Rendimiento

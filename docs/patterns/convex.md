@@ -33,7 +33,7 @@ La acción `ingesta:registroOficial` es fina: lee la configuración, monta el ex
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de la caja de Barcelona, la publicación y una copia de la base. El paquete de Nix y el módulo de NixOS que lo lanzan cada noche son el #36; antenasmoviles.es llega con el #48 y el deploy hook de Vercel con el #46.
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de la caja de Barcelona, la publicación y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md). antenasmoviles.es llega con el #48 y el deploy hook de Vercel con el #46.
 
 ### Lanzarla en local
 
@@ -78,6 +78,8 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
 
 `robots.txt` se respeta siempre. El grupo que se aplica es el del primer producto del `User-Agent`, así que cambiarlo cambia también con qué nombre se busca a Celda en él. El almacén se elige como en Convex: `CELDA_ALMACEN_CARPETA` o las cuatro de R2, con `CELDA_ALMACEN_ORIGEN` (`almacenDesdeConfig` en `packages/publicacion`). Sin almacén, la noche ingiere y apunta `sin-almacen`.
+
+Las variables también pueden llegar como credenciales de systemd: el programa lee cada fichero de `$CREDENTIALS_DIRECTORY` en formato `.env`, detrás de las variables de entorno (`apps/nocturna/src/credenciales.ts`). Así pasa el módulo de NixOS los secretos de R2 sin ponerlos en el entorno.
 
 ### La base
 
