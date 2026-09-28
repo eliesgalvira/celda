@@ -42,6 +42,21 @@ export type TokenMapa = (typeof TOKENS_MAPA)[number];
 export type ColorDeToken = (token: TokenMapa) => string;
 
 const OPENFREEMAP = "https://tiles.openfreemap.org";
+const TILEJSON = `${OPENFREEMAP}/planet`;
+const GLIFOS = `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`;
+
+/** La letra de los rótulos del mapa base, salvo los nombres de calle. */
+const LETRA_ROTULOS = "Noto Sans Regular";
+
+/**
+ * Lo que el mapa base pide en cadena antes de pintar la vista inicial: el TileJSON del callejero
+ * y los glifos de sus rótulos (los municipios), del rango 0-255, que cubre el castellano y el
+ * catalán. La web los pide por adelantado para no esperarlos después (`apps/web/src/mapa/precarga.ts`).
+ */
+export const RECURSOS_INICIALES_MAPA_BASE: ReadonlyArray<string> = [
+  TILEJSON,
+  GLIFOS.replace("{fontstack}", encodeURIComponent(LETRA_ROTULOS)).replace("{range}", "0-255"),
+];
 
 /** El nombre de la fuente del callejero dentro del estilo. */
 export const FUENTE_MAPA_BASE = "openmaptiles";
@@ -78,9 +93,9 @@ const AVENIDAS = ["motorway", "trunk", "primary"];
  */
 export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
   version: 8,
-  glyphs: `${OPENFREEMAP}/fonts/{fontstack}/{range}.pbf`,
+  glyphs: GLIFOS,
   sources: {
-    [FUENTE_MAPA_BASE]: { type: "vector", url: `${OPENFREEMAP}/planet` },
+    [FUENTE_MAPA_BASE]: { type: "vector", url: TILEJSON },
     [FUENTE_CELDAS]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     [FUENTE_SERVICIO]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     [FUENTE_SERVICIO_LINEA]: {
@@ -223,7 +238,7 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       filter: deClase(["suburb", "quarter", "neighbourhood"]),
       layout: {
         "text-field": ["upcase", ["get", "name"]],
-        "text-font": ["Noto Sans Regular"],
+        "text-font": [LETRA_ROTULOS],
         "text-size": 11,
         "text-letter-spacing": 0.25,
       },
@@ -242,7 +257,7 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       filter: deClase(["city", "town"]),
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Noto Sans Regular"],
+        "text-font": [LETRA_ROTULOS],
         "text-size": 13,
         "text-letter-spacing": 0.08,
       },
