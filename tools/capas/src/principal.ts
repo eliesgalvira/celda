@@ -4,6 +4,7 @@ import { publicar as publicarInstantanea } from "@celda/convex/publicacion";
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import { NodeHttpServer, NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as Config from "effect/Config";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -17,9 +18,10 @@ import * as NodeHttp from "node:http";
 
 import { convexPorHttp } from "./convex.ts";
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
+import { descargarMunicipios } from "./descargaDeMunicipios.ts";
 
 /**
- * Generador de capas. Cuatro órdenes:
+ * Generador de capas. Cinco órdenes:
  *
  * - `publicar`: publica la instantánea de un despliegue de Convex en una carpeta, igual que la
  *   publicación automática tras cada ingesta: la capa, las fichas de la misma versión y
@@ -28,6 +30,8 @@ import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts
  * - `barrios`: descarga de Open Data BCN los límites de barrio y los guarda en el repositorio.
  * - `poblacion`: descarga de Open Data BCN el padrón más reciente y guarda los habitantes de
  *   cada barrio, con su área y su límite, donde los lee la web.
+ * - `municipios`: descarga los límites de municipios y provincias del IGN y el padrón del INE, y
+ *   los guarda en el repositorio junto a los barrios (ADR 0017).
  */
 
 /** Dónde se publican las capas. El origen es la URL con la que la web las descarga. */
@@ -48,6 +52,26 @@ const configBarrios = Config.String("CELDA_BARRIOS").pipe(
 const configPoblacion = Config.String("CELDA_POBLACION").pipe(
   Config.withDefault("../../apps/web/src/ejercicio/poblacion.json"),
 );
+
+/**
+ * Los límites de municipios y el padrón que escribe `municipios`, en el repositorio junto a los
+ * barrios, y la carpeta donde se guarda el ZIP del IGN para no volver a pedirlo.
+ */
+const configMunicipios = Config.all({
+  municipios: Config.String("CELDA_MUNICIPIOS").pipe(
+    Config.withDefault("../../convex/datos/municipios.json"),
+  ),
+  padron: Config.String("CELDA_PADRON").pipe(Config.withDefault("../../convex/datos/padron.json")),
+  cache: Config.String("CELDA_CACHE").pipe(
+    Config.orElse(() =>
+      Config.String("XDG_CACHE_HOME").pipe(Config.map((carpeta) => `${carpeta}/celda`)),
+    ),
+    Config.orElse(() => Config.String("HOME").pipe(Config.map((casa) => `${casa}/.cache/celda`))),
+  ),
+});
+
+/** Pausa entre dos peticiones al mismo sitio de la orden `municipios`. */
+const PAUSA_MUNICIPIOS = Duration.seconds(5);
 
 const configConvex = Config.all({
   url: Config.String("CELDA_CONVEX_URL"),
@@ -125,11 +149,32 @@ const poblacion = Effect.gen(function* () {
   );
 });
 
+const municipios = Effect.gen(function* () {
+  const opciones = yield* configMunicipios;
+  const { limites, padron } = yield* descargarMunicipios({
+    ...opciones,
+    pausa: PAUSA_MUNICIPIOS,
+  }).pipe(
+    // Punto de entrada de la orden: aquí se monta su cliente HTTP, una vez.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    Effect.provide(FetchHttpClient.layer),
+  );
+  const cuantos = limites.territorios.filter((t) => t.tipo === "municipio").length;
+  const habitantes = padron.municipios.reduce((suma, m) => suma + m.habitantes, 0);
+  yield* Effect.log(
+    `${cuantos} municipios, ${limites.territorios.length - cuantos} territorios sin municipio`,
+    `y ${limites.provincias.length} provincias del IGN del ${limites.fuente.fecha} en ${opciones.municipios}`,
+  );
+  yield* Effect.log(
+    `${habitantes} habitantes a ${padron.fuente.referencia} (INE, ${padron.fuente.publicada}) en ${opciones.padron}`,
+  );
+});
+
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «publicar», «servir», «barrios» o «poblacion».`;
+    return `Orden desconocida «${this.orden}». Usa «publicar», «servir», «barrios», «poblacion» o «municipios».`;
   }
 }
 
@@ -139,6 +184,7 @@ const principal = Effect.gen(function* () {
   if (orden === "servir") return yield* servir;
   if (orden === "barrios") return yield* barrios;
   if (orden === "poblacion") return yield* poblacion;
+  if (orden === "municipios") return yield* municipios;
   return yield* new OrdenDesconocida({ orden });
 });
 

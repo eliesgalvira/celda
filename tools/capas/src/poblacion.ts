@@ -21,8 +21,11 @@ export class PadronIlegible extends Schema.TaggedError<PadronIlegible>()("Padron
   motivo: Schema.String,
 }) {}
 
-/** Las filas de un CSV con comillas dobles, como lo escribe el portal. */
-export const leerCsv = (texto: string): ReadonlyArray<ReadonlyArray<string>> => {
+/**
+ * Las filas de un CSV con comillas dobles, como lo escribe el portal. El INE separa los campos
+ * con punto y coma.
+ */
+export const leerCsv = (texto: string, separador = ","): ReadonlyArray<ReadonlyArray<string>> => {
   const filas: Array<Array<string>> = [];
   let fila: Array<string> = [];
   let campo = "";
@@ -41,7 +44,7 @@ export const leerCsv = (texto: string): ReadonlyArray<ReadonlyArray<string>> => 
       }
     } else if (c === '"') {
       entreComillas = true;
-    } else if (c === ",") {
+    } else if (c === separador) {
       fila.push(campo);
       campo = "";
     } else if (c === "\n" || c === "\r") {
