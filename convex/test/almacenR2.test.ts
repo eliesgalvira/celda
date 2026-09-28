@@ -10,12 +10,13 @@ import { TestClock } from "effect/testing";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
-import { codificarRuta, firmarV4 } from "../src/almacenes/firma";
-import { almacenEnR2 } from "../src/almacenes/r2";
+import { codificarConsulta, codificarRuta, firmarV4 } from "../src/almacenes/firma";
+import { almacenEnR2, leerListado } from "../src/almacenes/r2";
 import { AlmacenDeFicheros } from "../src/publicacion";
 
 const PUNTO = "http://r2.prueba";
 const FICHERO = "sitios@2026-09-26T02:15:03Z.json";
+const CUBO = "celda-capas";
 
 interface Peticion {
   readonly metodo: string;
@@ -39,7 +40,33 @@ const cuboDePrueba = Effect.gen(function* () {
       const guardados = yield* Ref.get(objetos);
       const clave = url.pathname;
       const responder = (estado: number, cuerpo = "") =>
-        HttpClientResponse.fromWeb(request, new Response(cuerpo, { status: estado }));
+        HttpClientResponse.fromWeb(
+          request,
+          new Response(estado === 204 ? null : cuerpo, { status: estado }),
+        );
+      if (request.method === "GET" && clave === `/${CUBO}`) {
+        // ListObjectsV2 de dos en dos, para que haga falta pedir varias páginas.
+        const todas = [...guardados.keys()].map((k) =>
+          decodeURIComponent(k.slice(`/${CUBO}/`.length)),
+        );
+        const desde = Number(url.searchParams.get("continuation-token") ?? "0");
+        const pagina = todas.slice(desde, desde + 2);
+        const mas = desde + 2 < todas.length;
+        return responder(
+          200,
+          `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult><Name>${CUBO}</Name>` +
+            `<IsTruncated>${mas}</IsTruncated>` +
+            pagina
+              .map((k) => `<Contents><Key>${k.replace("&", "&amp;")}</Key></Contents>`)
+              .join("") +
+            (mas ? `<NextContinuationToken>${desde + 2}</NextContinuationToken>` : "") +
+            `</ListBucketResult>`,
+        );
+      }
+      if (request.method === "DELETE") {
+        yield* Ref.update(objetos, (o) => new Map([...o].filter(([k]) => k !== clave)));
+        return responder(204);
+      }
       if (request.method === "GET") {
         const guardado = guardados.get(clave);
         return guardado === undefined ? responder(404, "NoSuchKey") : responder(200, guardado);
@@ -55,7 +82,7 @@ const cuboDePrueba = Effect.gen(function* () {
   );
   const almacen = almacenEnR2({
     cuenta: "cuenta",
-    cubo: "celda-capas",
+    cubo: CUBO,
     idClave: "AKIDEXAMPLE",
     secreto: Redacted.make("secreto"),
     origen: "https://capas.celda.prueba",
@@ -89,6 +116,45 @@ describe("almacén de ficheros en R2", () => {
       );
     }),
   );
+
+  it.effect("firma la consulta ordenada (caso get-vanilla-query-order-key-case de AWS)", () =>
+    Effect.gen(function* () {
+      const consulta = codificarConsulta([
+        ["Param2", "value2"],
+        ["Param1", "value1"],
+      ]);
+      assert.strictEqual(consulta, "Param1=value1&Param2=value2");
+      const autorizacion = yield* firmarV4(
+        {
+          metodo: "GET",
+          ruta: "/",
+          consulta,
+          cabeceras: { Host: "example.amazonaws.com", "X-Amz-Date": "20150830T123600Z" },
+          hashCuerpo: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        },
+        {
+          idClave: "AKIDEXAMPLE",
+          secreto: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+          region: "us-east-1",
+          servicio: "service",
+        },
+      );
+      assert.match(
+        autorizacion,
+        /Signature=b97d918cfa904a5beff61c982a1b6f458b799221646efd99d3219ec94cdf2500$/u,
+      );
+    }),
+  );
+
+  it("codifica los valores de la consulta como AWS, también las barras", () => {
+    assert.strictEqual(
+      codificarConsulta([
+        ["list-type", "2"],
+        ["continuation-token", "1a/b+c="],
+      ]),
+      "continuation-token=1a%2Fb%2Bc%3D&list-type=2",
+    );
+  });
 
   it("codifica las claves como la petición canónica de S3", () => {
     assert.strictEqual(
@@ -143,4 +209,50 @@ describe("almacén de ficheros en R2", () => {
       );
     }),
   );
+
+  it.effect("lista el cubo página a página, con la consulta firmada, y borra", () =>
+    Effect.gen(function* () {
+      const cubo = yield* cuboDePrueba;
+      const almacen = yield* Effect.service(AlmacenDeFicheros).pipe(Effect.provide(cubo.almacen));
+      const lote = "fichas@2026-09-26T02:15:03Z/0.json";
+      yield* almacen.guardar(FICHERO, "{}");
+      yield* almacen.guardar(lote, "{}");
+      yield* almacen.guardar("fichas@2026-09-26T02:15:03Z/1.json", "{}");
+      yield* almacen.cambiarVigente("{}");
+      assert.sameMembers(
+        [...(yield* almacen.listar)],
+        [FICHERO, lote, "fichas@2026-09-26T02:15:03Z/1.json", "vigente.json"],
+      );
+      const listados = (yield* Ref.get(cubo.peticiones)).filter((p) => p.url.includes("?"));
+      assert.deepStrictEqual(
+        listados.map((p) => p.url),
+        [`${PUNTO}/${CUBO}?list-type=2`, `${PUNTO}/${CUBO}?continuation-token=2&list-type=2`],
+      );
+      assert.match(listados[1]?.cabeceras.authorization ?? "", /Signature=[0-9a-f]{64}$/u);
+
+      yield* almacen.borrar(lote);
+      yield* almacen.borrar(lote);
+      assert.sameMembers(
+        [...(yield* almacen.listar)],
+        [FICHERO, "fichas@2026-09-26T02:15:03Z/1.json", "vigente.json"],
+      );
+      const borrado = (yield* Ref.get(cubo.peticiones)).find((p) => p.metodo === "DELETE");
+      assert.strictEqual(borrado?.url, `${PUNTO}/${CUBO}/fichas%402026-09-26T02%3A15%3A03Z/0.json`);
+    }),
+  );
+
+  it("lee las claves y el testigo de ListObjectsV2", () => {
+    assert.deepStrictEqual(
+      leerListado(
+        "<ListBucketResult><IsTruncated>true</IsTruncated><Contents><Key>a&amp;b.json</Key>" +
+          "</Contents><Contents><Key>c.json</Key></Contents>" +
+          "<NextContinuationToken>1/x+y=</NextContinuationToken></ListBucketResult>",
+      ),
+      { claves: ["a&b.json", "c.json"], siguiente: "1/x+y=" },
+    );
+    assert.deepStrictEqual(
+      leerListado("<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>"),
+      { claves: [], siguiente: undefined },
+    );
+  });
 });

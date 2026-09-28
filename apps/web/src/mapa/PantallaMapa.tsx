@@ -36,6 +36,7 @@ import { SIN_ZONA, type ZonaEnMapa } from "../ejercicio/zona.ts";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
+import { FichasPublicadas } from "../ficha/servicio.ts";
 import {
   crearInterferencia,
   lienzoDelMapa as lienzoDeInterferencia,
@@ -99,6 +100,11 @@ export function PantallaMapa() {
   const [capa, setCapa] = createSignal<EstadoCapa>({ tipo: "cargando" });
   /** El mapa, cuando ya enseña el callejero. */
   const [mapaListo, setMapaListo] = createSignal<MapaMapLibre>();
+  /**
+   * El mapa, en cuanto existe. Los marcadores solo necesitan su proyección y salen ya, sobre el
+   * fondo, sin esperar a las teselas del callejero.
+   */
+  const [mapaCreado, setMapaCreado] = createSignal<MapaMapLibre>();
   const listo = createMemo(() => estado().tipo === "listo");
   /** Si el mapa está al zoom de las celdas o más cerca. */
   const [cerca, setCerca] = createSignal(false);
@@ -141,6 +147,7 @@ export function PantallaMapa() {
       nuevo.on("moveend", mirarEncuadre);
       nuevo.once("load", mirarEncuadre);
       mapa = nuevo;
+      setMapaCreado(nuevo);
     } catch (causa) {
       // MapLibre lanza un Error que nombra WebGL si no consigue el contexto.
       fallar(causa instanceof Error && /webgl/iu.test(causa.message) ? "sin-webgl" : "interno");
@@ -153,6 +160,7 @@ export function PantallaMapa() {
     mapa?.remove();
     mapa = undefined;
     setMapaListo(undefined);
+    setMapaCreado(undefined);
     if (!hayWebgl()) {
       fallar("sin-webgl");
       return;
@@ -427,6 +435,11 @@ export function PantallaMapa() {
     );
   });
 
+  /** Las fichas de lo que se ve de cerca se descargan antes de tocarlas (ver `FichasPublicadas`). */
+  const precargarFichas = (claves: ReadonlyArray<string>) => {
+    void datos.runPromise(Effect.flatMap(FichasPublicadas, (fichas) => fichas.precargar(claves)));
+  };
+
   /** Abre la ficha y, si el marcador queda debajo del panel, mueve el mapa lo justo. */
   const seleccionar = (clave: string) => {
     navegar(ruta.emplazamiento(clave));
@@ -510,7 +523,7 @@ export function PantallaMapa() {
             pinCentral={<PinCentral />}
             dialogo={<PasoPrevio />}
             marcadores={
-              <Show when={mapaListo()}>
+              <Show when={mapaCreado()}>
                 {(actual) => (
                   <>
                     <Marcadores
@@ -519,6 +532,7 @@ export function PantallaMapa() {
                       barrios={barrios()}
                       seleccionada={seleccionada()}
                       alSeleccionar={seleccionar}
+                      alVer={precargarFichas}
                     />
                     <ReferenciaEnMapa
                       mapa={actual()}

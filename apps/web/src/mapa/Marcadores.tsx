@@ -3,7 +3,7 @@ import type { Barrio } from "@celda/dominio/barrio";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import type { Map as MapaMapLibre } from "maplibre-gl";
-import { createMemo, createSignal, onSettled, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 
 import {
   crearAgrupador,
@@ -14,18 +14,7 @@ import {
 import { formasDeBarrios } from "../capa/etiquetas.ts";
 import { cajaConMargen, combinacionesDe, type Vista } from "../capa/marcadores.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
-
-/** La vista que enseña ahora el mapa. */
-const vistaDe = (mapa: MapaMapLibre): Vista => {
-  const caja = mapa.getBounds();
-  return {
-    caja: {
-      suroeste: { longitud: caja.getWest(), latitud: caja.getSouth() },
-      noreste: { longitud: caja.getEast(), latitud: caja.getNorth() },
-    },
-    zoom: mapa.getZoom(),
-  };
-};
+import { seguirVista } from "./vista.ts";
 
 const REDUCIR_MOVIMIENTO = "(prefers-reduced-motion: reduce)";
 
@@ -42,12 +31,17 @@ export interface MarcadoresProps {
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento (con el ratón, el dedo o el teclado). */
   readonly alSeleccionar: (clave: string) => void;
+  /**
+   * Los emplazamientos sueltos que se ven al decidir qué se dibuja: sus fichas se pueden abrir
+   * con un toque, así que conviene tenerlas ya.
+   */
+  readonly alVer?: (claves: ReadonlyArray<string>) => void;
 }
 
 /**
  * Los emplazamientos sobre el mapa, agrupados por zoom. Los marcadores se recolocan en cada
- * fotograma del movimiento, pero qué se dibuja solo se decide al pararse el mapa o al cambiar de
- * nivel de agrupación: crear y quitar nodos es lo caro.
+ * fotograma del movimiento, pero qué se dibuja se decide al asentarse el mapa (ver `seguirVista`):
+ * crear y quitar nodos es lo caro.
  */
 export function Marcadores(props: MarcadoresProps) {
   const agrupador = createMemo(() => crearAgrupador(props.emplazamientos, props.barrios));
@@ -57,25 +51,13 @@ export function Marcadores(props: MarcadoresProps) {
   const [reducido, setReducido] = createSignal(false);
 
   onSettled(() => {
-    const mapa = untrack(() => props.mapa);
-    let pendiente = 0;
-    let nivel = nivelDeZoom(mapa.getZoom());
-    const mirar = () => {
-      nivel = nivelDeZoom(mapa.getZoom());
-      setVista(vistaDe(mapa));
-    };
-    const mover = () => {
-      pendiente = 0;
-      setFotograma((n) => n + 1);
-      if (nivelDeZoom(mapa.getZoom()) !== nivel) mirar();
-    };
-    // Como mucho una vez por fotograma: el mapa emite varios `move` entre dos.
-    const alMover = () => {
-      if (pendiente === 0) pendiente = requestAnimationFrame(mover);
-    };
-    mapa.on("move", alMover);
-    mapa.on("moveend", mirar);
-    mirar();
+    const dejarDeSeguir = seguirVista(
+      untrack(() => props.mapa),
+      {
+        fotograma: () => setFotograma((n) => n + 1),
+        vista: setVista,
+      },
+    );
 
     const preferencia = matchMedia(REDUCIR_MOVIMIENTO);
     const alCambiarPreferencia = () => setReducido(preferencia.matches);
@@ -83,9 +65,7 @@ export function Marcadores(props: MarcadoresProps) {
     alCambiarPreferencia();
 
     return () => {
-      mapa.off("move", alMover);
-      mapa.off("moveend", mirar);
-      cancelAnimationFrame(pendiente);
+      dejarDeSeguir();
       preferencia.removeEventListener("change", alCambiarPreferencia);
     };
   });
@@ -115,6 +95,22 @@ export function Marcadores(props: MarcadoresProps) {
       punto.x < lienzo.clientWidth + MEDIO_MARCADOR &&
       punto.y < lienzo.clientHeight + MEDIO_MARCADOR;
   });
+
+  createEffect(
+    () => {
+      const ahora = escena();
+      const proyectarAhora = proyectar();
+      const seVeAhora = seVe();
+      return [...(ahora?.elementos.values() ?? [])].flatMap((elemento) =>
+        elemento.tipo === "emplazamiento" && seVeAhora(proyectarAhora(elemento.posicion))
+          ? [elemento.emplazamiento.clave]
+          : [],
+      );
+    },
+    (claves) => {
+      if (claves.length > 0) props.alVer?.(claves);
+    },
+  );
 
   /**
    * Las etiquetas de barrio que caben enteras en la pantalla y las que van compactas. Se decide

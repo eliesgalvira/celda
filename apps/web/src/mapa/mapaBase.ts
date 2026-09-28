@@ -1,6 +1,6 @@
 import type { Area } from "@celda/dominio/area";
 import { coloresDelTema, estiloMapa, FUENTE_MAPA_BASE } from "@celda/ui/mapa/estilo.ts";
-import { Map as MapaMapLibre, setWorkerUrl } from "maplibre-gl";
+import { Map as MapaMapLibre, prewarm, setWorkerUrl } from "maplibre-gl";
 import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
 import type { MotivoFallo } from "./estado.ts";
@@ -8,6 +8,9 @@ import type { MotivoFallo } from "./estado.ts";
 // MapLibre 6 busca su worker junto a su propio fichero, que el empaquetador
 // mueve; Vite empaqueta el worker aparte y le da su URL.
 setWorkerUrl(urlDelTrabajador);
+// Los workers descargan su código (medio mega) y arrancan ya, mientras se monta la pantalla: el
+// mapa pide las teselas a través de ellos (ver `precarga.ts`).
+prewarm();
 
 const TEXTOS_MAPLIBRE = {
   "Map.Title": "Mapa. Muévete con las flechas y acerca o aleja con + y −.",

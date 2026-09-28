@@ -9,8 +9,18 @@ export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), solid(), iconosDeCelda()],
   server: { port: 8840, strictPort: true },
   preview: { port: 8841, strictPort: true },
-  // MapLibre (casi 1 MB) va en su propio trozo, que se descarga después de pintar la pantalla.
-  build: { chunkSizeWarningLimit: 1100 },
+  build: {
+    // MapLibre (casi 1 MB) va en su propio trozo, que se pide al empezar a evaluar la web
+    // (`src/mapa/precarga.ts`) y se descarga mientras se monta la pantalla.
+    chunkSizeWarningLimit: 1100,
+    modulePreload: {
+      // Un `import()` pide su trozo al acabar la tarea que lo llama, y evaluar la web es una tarea
+      // larga. Con el propio trozo en la lista, el cargador de Vite lo pide en el acto con un
+      // `<link rel="modulepreload">`.
+      resolveDependencies: (trozo, dependencias, { hostType }) =>
+        hostType === "js" ? [trozo, ...dependencias] : dependencias,
+    },
+  },
   worker: { format: "es" },
   test: {
     environment: "happy-dom",

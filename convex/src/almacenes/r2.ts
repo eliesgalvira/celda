@@ -9,7 +9,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
 import { AlmacenDeFicheros, AlmacenNoDisponible, FicheroInmutable } from "../publicacion";
-import { codificarRuta, firmarV4, sha256 } from "./firma";
+import { codificarConsulta, codificarRuta, firmarV4, sha256 } from "./firma";
 
 export interface OpcionesR2 {
   /** Identificador de la cuenta de Cloudflare: el punto de entrada es `<cuenta>.r2.cloudflarestorage.com`. */
@@ -32,6 +32,39 @@ export const CACHE_VIGENTE = "public, max-age=0, must-revalidate";
 const fechaAmz = (milisegundos: number): string =>
   DateTime.formatIso(DateTime.makeUnsafe(milisegundos)).replace(/[-:]/gu, "").replace(/\.\d+/u, "");
 
+const ENTIDADES = new Map([
+  ["&amp;", "&"],
+  ["&lt;", "<"],
+  ["&gt;", ">"],
+  ["&quot;", '"'],
+  ["&apos;", "'"],
+]);
+const sinEntidades = (texto: string): string =>
+  texto.replace(/&(?:amp|lt|gt|quot|apos);/gu, (entidad) => ENTIDADES.get(entidad) ?? entidad);
+
+/** Una página del listado del cubo. */
+export interface PaginaDeListado {
+  readonly claves: ReadonlyArray<string>;
+  /** El testigo para pedir la página siguiente, o `undefined` si esta es la última. */
+  readonly siguiente: string | undefined;
+}
+
+/**
+ * Las claves de una página de ListObjectsV2 y, si hay más, el testigo para pedir la siguiente. El
+ * XML de S3 es plano y conocido: basta con sacar los elementos `Key` y `NextContinuationToken`.
+ */
+export const leerListado = (xml: string): PaginaDeListado => {
+  const claves = [...xml.matchAll(/<Key>([^<]*)<\/Key>/gu)].map(([, clave]) =>
+    sinEntidades(clave ?? ""),
+  );
+  const truncada = /<IsTruncated>true<\/IsTruncated>/u.test(xml);
+  const siguiente = /<NextContinuationToken>([^<]*)<\/NextContinuationToken>/u.exec(xml)?.[1];
+  return {
+    claves,
+    siguiente: truncada && siguiente !== undefined ? sinEntidades(siguiente) : undefined,
+  };
+};
+
 /**
  * El almacén de ficheros en un cubo de R2, por su API compatible con S3 y firmando cada petición.
  * Es el de producción (ADR 0010): la web lee el cubo a través de un Worker o una Pages Function.
@@ -52,14 +85,22 @@ export const almacenEnR2 = (opciones: OpcionesR2) =>
         servicio: "s3",
       };
 
+      /**
+       * Una petición firmada al cubo. `fichero` vacío es el propio cubo (para listarlo), y
+       * `consulta`, sus parámetros.
+       */
       const pedir = (
-        metodo: "GET" | "PUT",
+        metodo: "GET" | "PUT" | "DELETE",
         fichero: string,
         contenido: string,
         extra: Readonly<Record<string, string>>,
+        consulta: ReadonlyArray<readonly [string, string]> = [],
       ) =>
         Effect.gen(function* () {
-          const ruta = codificarRuta(`/${opciones.cubo}/${fichero}`);
+          const ruta = codificarRuta(
+            fichero === "" ? `/${opciones.cubo}` : `/${opciones.cubo}/${fichero}`,
+          );
+          const cadena = codificarConsulta(consulta);
           const hashCuerpo = yield* sha256(contenido);
           const firmadas = {
             host,
@@ -67,19 +108,21 @@ export const almacenEnR2 = (opciones: OpcionesR2) =>
             "x-amz-date": fechaAmz(yield* Clock.currentTimeMillis),
           };
           const autorizacion = yield* firmarV4(
-            { metodo, ruta, cabeceras: firmadas, hashCuerpo },
+            { metodo, ruta, consulta: cadena, cabeceras: firmadas, hashCuerpo },
             credenciales,
           );
           const cabeceras = { ...firmadas, ...extra, authorization: autorizacion };
+          const url = `${base}${ruta}${cadena === "" ? "" : `?${cadena}`}`;
           const peticion =
             metodo === "PUT"
-              ? HttpClientRequest.put(`${base}${ruta}`).pipe(
+              ? HttpClientRequest.put(url).pipe(
                   HttpClientRequest.setHeaders(cabeceras),
                   HttpClientRequest.bodyText(contenido, "application/json"),
                 )
-              : HttpClientRequest.get(`${base}${ruta}`).pipe(
-                  HttpClientRequest.setHeaders(cabeceras),
-                );
+              : (metodo === "GET"
+                  ? HttpClientRequest.get(url)
+                  : HttpClientRequest.delete(url)
+                ).pipe(HttpClientRequest.setHeaders(cabeceras));
           const respuesta = yield* http.execute(peticion);
           return { estado: respuesta.status, texto: yield* respuesta.text };
         }).pipe(
@@ -124,10 +167,36 @@ export const almacenEnR2 = (opciones: OpcionesR2) =>
         if (estado !== 200) return yield* fallo("PUT", FICHERO_VIGENTE, estado, texto);
       });
 
+      /** ListObjectsV2, de mil en mil claves, hasta que el cubo dice que no hay más. */
+      const listar = Effect.gen(function* () {
+        const claves: Array<string> = [];
+        let siguiente: string | undefined;
+        do {
+          const consulta: Array<readonly [string, string]> = [["list-type", "2"]];
+          if (siguiente !== undefined) consulta.push(["continuation-token", siguiente]);
+          const { estado, texto } = yield* pedir("GET", "", "", {}, consulta);
+          if (estado !== 200) return yield* fallo("LIST", opciones.cubo, estado, texto);
+          const pagina = leerListado(texto);
+          claves.push(...pagina.claves);
+          siguiente = pagina.siguiente;
+        } while (siguiente !== undefined);
+        return claves;
+      }).pipe(Effect.withSpan("AlmacenEnR2.listar"));
+
+      const borrar = Effect.fn("AlmacenEnR2.borrar")(function* (fichero: string) {
+        const { estado, texto } = yield* pedir("DELETE", fichero, "", {});
+        // S3 contesta 204 aunque la clave no exista.
+        if (estado !== 204 && estado !== 200 && estado !== 404) {
+          return yield* fallo("DELETE", fichero, estado, texto);
+        }
+      });
+
       return AlmacenDeFicheros.of({
         guardar,
         leer,
         cambiarVigente,
+        listar,
+        borrar,
         url: (fichero) => `${opciones.origen}/${fichero}`,
       });
     }),

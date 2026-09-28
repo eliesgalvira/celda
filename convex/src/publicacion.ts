@@ -4,6 +4,7 @@ import {
   decodificarVigente,
   type EmplazamientoDeCapa,
   FICHERO_VIGENTE,
+  ficheroDeCapa,
   generarCapa,
   versionDeCapa,
   type Vigente,
@@ -44,6 +45,10 @@ export class AlmacenDeFicheros extends Context.Service<
     readonly leer: (fichero: string) => Effect.Effect<Option.Option<string>, AlmacenNoDisponible>;
     /** Sustituye `vigente.json`, el único fichero que cambia. */
     readonly cambiarVigente: (contenido: string) => Effect.Effect<void, AlmacenNoDisponible>;
+    /** Todos los ficheros guardados, con su ruta dentro del almacén (`fichas@…/0.json`). */
+    readonly listar: Effect.Effect<ReadonlyArray<string>, AlmacenNoDisponible>;
+    /** Borra un fichero de una versión retirada. Si ya no está, no hace nada. */
+    readonly borrar: (fichero: string) => Effect.Effect<void, AlmacenNoDisponible>;
     /** URL pública de un fichero. */
     readonly url: (fichero: string) => string;
   }
@@ -116,6 +121,61 @@ const vigenteDelAlmacen = Effect.gen(function* () {
 });
 
 /**
+ * Cuántas versiones anteriores a la vigente se quedan en el almacén (issue #14). Una pestaña que
+ * lleva días abierta sigue leyendo las fichas de su versión; si ya no están, lee las de la
+ * vigente y lo dice (ADR 0004).
+ */
+export const VERSIONES_ANTERIORES = 7;
+
+/** El sello de la versión de un fichero publicado (`2026-09-26T02:15:03Z`), o `undefined`. */
+const selloDe = (fichero: string): string | undefined =>
+  /^(?:sitios|fichas)@([^/]+?)(?:\.json|\/\d+\.json)$/u.exec(fichero)?.[1];
+
+/**
+ * Borra del almacén las versiones que sobran: se quedan la vigente, las `VERSIONES_ANTERIORES`
+ * anteriores y cualquier versión posterior a la vigente, que puede ser otra publicación a medias.
+ * De cada versión retirada se borra primero la capa, para que nadie empiece a leerla, y luego
+ * sus lotes. Devuelve las versiones retiradas.
+ */
+export const retirarVersionesViejas = Effect.fn("Publicacion.retirarVersionesViejas")(function* (
+  vigente: string,
+) {
+  const almacen = yield* AlmacenDeFicheros;
+  const sello = selloDe(ficheroDeCapa(vigente));
+  if (sello === undefined) return [];
+  const ficheros = yield* almacen.listar;
+  const anteriores = [
+    ...new Set(ficheros.flatMap((f) => selloDe(f) ?? []).filter((s) => s < sello)),
+  ].sort((a, b) => (a < b ? 1 : -1));
+  const viejas = new Set(anteriores.slice(VERSIONES_ANTERIORES));
+  const deViejas = ficheros.filter((f) => viejas.has(selloDe(f) ?? ""));
+  const capas = deViejas.filter((f) => f.startsWith("sitios@"));
+  yield* Effect.forEach(capas, almacen.borrar, { concurrency: A_LA_VEZ, discard: true });
+  yield* Effect.forEach(
+    deViejas.filter((f) => !f.startsWith("sitios@")),
+    almacen.borrar,
+    { concurrency: A_LA_VEZ, discard: true },
+  );
+  return [...viejas].map((s) => `sitios@${s}`);
+});
+
+/**
+ * La retirada tras publicar. Si falla, la publicación sigue siendo buena: se apunta en el
+ * registro y la siguiente lo vuelve a intentar.
+ */
+const retirarTrasPublicar = (vigente: string) =>
+  retirarVersionesViejas(vigente).pipe(
+    Effect.tap((retiradas) =>
+      retiradas.length === 0
+        ? Effect.void
+        : Effect.logInfo(`Versiones retiradas del almacén: ${retiradas.join(", ")}`),
+    ),
+    Effect.catch((fallo) =>
+      Effect.logWarning(`No se han podido retirar las versiones viejas: ${fallo.motivo}`),
+    ),
+  );
+
+/**
  * Publica la instantánea actual: la capa y las fichas de todos sus emplazamientos, de la misma
  * versión, y después `vigente.json` apuntando a ella.
  *
@@ -125,6 +185,7 @@ const vigenteDelAlmacen = Effect.gen(function* () {
  * 4. Lee las fichas de cada lote y guarda el lote. Si falta alguna, los datos han cambiado.
  * 5. Vuelve a comprobar la versión, guarda la capa y la registra en Convex.
  * 6. Cambia `vigente.json`, salvo que otra publicación haya dejado ya una versión posterior.
+ * 7. Retira las versiones que sobran (`retirarVersionesViejas`), también si estaba al día.
  *
  * Ningún fichero se pisa con otro contenido, y la web no ve la versión nueva hasta el paso 6,
  * cuando todo lo que necesita ya está en el almacén. Repetirla sin cambios no escribe nada.
@@ -145,6 +206,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
   const previa = yield* vigenteDelAlmacen;
   if (Option.isSome(previa)) {
     if (previa.value.version === version) {
+      yield* retirarTrasPublicar(version);
       return {
         version,
         tipo: "al-dia",
@@ -228,6 +290,10 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
     );
     yield* Ref.update(escritos, (n) => n + 1);
   }
+  // La vigente es esta o una posterior que ha dejado otra publicación.
+  yield* retirarTrasPublicar(
+    Option.isSome(antes) && antes.value.fecha > fecha ? antes.value.version : version,
+  );
 
   return {
     version,

@@ -21,7 +21,7 @@ import * as Result from "effect/Result";
 import { capaDePrueba, LIMITES_DE_PRUEBA } from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
 import { loteConFichas, type OrigenDePrueba, origenDePrueba } from "./pruebas.ts";
-import { fichasDelOrigen, FichasPublicadas } from "./servicio.ts";
+import { fichasDelOrigen, FichasPublicadas, LOTES_PRECARGADOS } from "./servicio.ts";
 
 const ORIGEN = "http://capas.prueba";
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15, 3);
@@ -239,5 +239,70 @@ describe("fichas publicadas en el origen estático", () => {
         assert.deepStrictEqual(yield* Fiber.join(lectura), Option.some(cambiada));
       }),
     );
+  });
+
+  describe("precargar", () => {
+    it.effect("descarga el lote de lo que se ve, y abrir después su ficha no pide nada", () => {
+      const origen = origenDePrueba();
+      return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
+        Effect.gen(function* () {
+          const precarga = yield* Effect.forkChild(fichas.precargar(["movistar-a", "orange-b"]));
+          yield* contestar(
+            origen,
+            HOY.urlDe("movistar-a"),
+            200,
+            HOY.respuestaDe("movistar-a").cuerpo,
+          );
+          yield* Fiber.join(precarga);
+          assert.deepStrictEqual(yield* fichas.leer("orange-b"), Option.some(FICHAS[1]));
+          assert.deepStrictEqual(origen.pedidas(), [HOY.urlDe("movistar-a")]);
+        }),
+      );
+    });
+
+    it.effect("pide como mucho LOTES_PRECARGADOS lotes, los que más claves tienen", () => {
+      const origen = origenDePrueba();
+      // Una tercera pareja en el Besòs: tres lotes de dos.
+      const TRES = publicada(NOCHE, [
+        ...FICHAS,
+        ficha("movistar-e", 2.22),
+        ficha("digi-f", 2.2202),
+      ]);
+      return conFichas(Effect.succeed(TRES.capa), origen, (fichas) =>
+        Effect.gen(function* () {
+          assert.strictEqual(LOTES_PRECARGADOS, 2);
+          const precarga = yield* Effect.forkChild(
+            fichas.precargar(["movistar-a", "digi-c", "vodafone-d", "movistar-e"]),
+          );
+          yield* contestar(origen, TRES.urlDe("digi-c"), 200, TRES.respuestaDe("digi-c").cuerpo);
+          yield* contestar(
+            origen,
+            TRES.urlDe("movistar-a"),
+            200,
+            TRES.respuestaDe("movistar-a").cuerpo,
+          );
+          yield* Fiber.join(precarga);
+          assert.sameMembers(
+            [...origen.pedidas()],
+            [TRES.urlDe("digi-c"), TRES.urlDe("movistar-a")],
+          );
+        }),
+      );
+    });
+
+    it.effect("no falla si el lote no llega, y abrir la ficha lo vuelve a pedir", () => {
+      const origen = origenDePrueba();
+      return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
+        Effect.gen(function* () {
+          const precarga = yield* Effect.forkChild(fichas.precargar(["digi-c"]));
+          yield* contestar(origen, HOY.urlDe("digi-c"), 503, "");
+          assert.isTrue(Exit.isSuccess(yield* Fiber.await(precarga)));
+          const lectura = yield* Effect.forkChild(fichas.leer("digi-c"));
+          yield* contestar(origen, HOY.urlDe("digi-c"), 200, HOY.respuestaDe("digi-c").cuerpo);
+          assert.deepStrictEqual(yield* Fiber.join(lectura), Option.some(FICHAS[2]));
+          assert.lengthOf(origen.pedidas(), 2);
+        }),
+      );
+    });
   });
 });

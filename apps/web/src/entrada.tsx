@@ -1,3 +1,5 @@
+// Lo primero: pone en marcha la descarga del mapa base antes de evaluar el resto.
+import "./mapa/precarga.ts";
 import "@celda/ui/tema.css";
 
 import { render } from "@solidjs/web";

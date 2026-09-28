@@ -53,10 +53,30 @@ export const codificarRuta = (ruta: string): string =>
     )
     .join("/");
 
+/** Un valor de la consulta como lo codifica AWS: todo menos las letras, los dígitos y `-_.~`. */
+const codificarValor = (valor: string): string =>
+  encodeURIComponent(valor).replace(
+    /[!'()*]/gu,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+
+/**
+ * La consulta canónica de AWS: cada parámetro codificado, ordenados por nombre y luego por valor.
+ * La URL de la petición tiene que llevar exactamente esta cadena.
+ */
+export const codificarConsulta = (consulta: ReadonlyArray<readonly [string, string]>): string =>
+  consulta
+    .map(([nombre, valor]) => [codificarValor(nombre), codificarValor(valor)] as const)
+    .sort(([a, x], [b, y]) => (a < b ? -1 : a > b ? 1 : x < y ? -1 : x > y ? 1 : 0))
+    .map(([nombre, valor]) => `${nombre}=${valor}`)
+    .join("&");
+
 export interface PeticionAFirmar {
   readonly metodo: string;
   /** Ruta ya codificada con `codificarRuta`. */
   readonly ruta: string;
+  /** Consulta ya codificada con `codificarConsulta`; vacía si no hay. */
+  readonly consulta?: string;
   /** Cabeceras que entran en la firma, con `host` y `x-amz-date`. */
   readonly cabeceras: Readonly<Record<string, string>>;
   /** SHA-256 del cuerpo en hexadecimal. */
@@ -71,8 +91,8 @@ export interface Credenciales {
 }
 
 /**
- * La cabecera `Authorization` de AWS Signature Version 4 para una petición sin parámetros de
- * consulta, que es lo único que pide el almacén. La fecha sale de la cabecera `x-amz-date`.
+ * La cabecera `Authorization` de AWS Signature Version 4. La fecha sale de la cabecera
+ * `x-amz-date`.
  */
 export const firmarV4 = Effect.fn("Firma.v4")(function* (
   peticion: PeticionAFirmar,
@@ -88,7 +108,7 @@ export const firmarV4 = Effect.fn("Firma.v4")(function* (
   const canonica = [
     peticion.metodo,
     peticion.ruta,
-    "",
+    peticion.consulta ?? "",
     ...cabeceras.map(([nombre, valor]) => `${nombre}:${valor}`),
     "",
     firmadas,

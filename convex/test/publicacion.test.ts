@@ -29,6 +29,8 @@ import {
   Publicacion,
   publicacionDirecta,
   publicar as publicarInstantanea,
+  retirarVersionesViejas,
+  VERSIONES_ANTERIORES,
 } from "../src/publicacion";
 import { convexEnMemoria, ejecutar, ejecutarDePuntos } from "./ayudas";
 import * as TestConfect from "./TestConfect";
@@ -430,4 +432,109 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
       }),
     ),
   );
+
+  describe("retención", () => {
+    /** Escribe a mano en el almacén una versión con su capa y dos lotes, como si se hubiera publicado. */
+    const versionEscrita = (entorno: Entorno, fecha: number) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const version = versionDeCapa(fecha);
+        yield* fs.makeDirectory(path.join(entorno.carpeta, carpetaDeFichas(version)), {
+          recursive: true,
+        });
+        yield* fs.writeFileString(path.join(entorno.carpeta, `${version}.json`), "{}");
+        for (const lote of [0, 1]) {
+          yield* fs.writeFileString(
+            path.join(entorno.carpeta, `${carpetaDeFichas(version)}/${lote}.json`),
+            "{}",
+          );
+        }
+        return version;
+      });
+
+    /** Las versiones que tienen su capa en el almacén, de la más nueva a la más vieja. */
+    const capasEnElAlmacen = (entorno: Entorno) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        return (yield* fs.readDirectory(entorno.carpeta))
+          .filter((f) => f.startsWith("sitios@"))
+          .map((f) => f.slice(0, -".json".length))
+          .sort()
+          .toReversed();
+      });
+
+    it.effect(
+      "deja la vigente, sus 7 anteriores y las posteriores, y borra el resto con sus lotes",
+      () =>
+        conEntorno((entorno) =>
+          Effect.gen(function* () {
+            const viejas: Array<string> = [];
+            for (let dias = 1; dias <= 10; dias += 1) {
+              viejas.push(yield* versionEscrita(entorno, NOCHE - dias * DIA));
+            }
+            const vigente = yield* versionEscrita(entorno, NOCHE);
+            // Otra publicación a medias, que aún no ha cambiado vigente.json.
+            const aMedias = yield* versionEscrita(entorno, NOCHE + DIA);
+            const fs = yield* FileSystem.FileSystem;
+            const path = yield* Path.Path;
+            const contenidoVigente = `{"version":"${vigente}","fecha":${NOCHE},"emplazamientos":1,"lotes":2}`;
+            yield* fs.writeFileString(
+              path.join(entorno.carpeta, FICHERO_VIGENTE),
+              contenidoVigente,
+            );
+
+            assert.strictEqual(VERSIONES_ANTERIORES, 7);
+            const retiradas = yield* retirarVersionesViejas(vigente).pipe(
+              Effect.provide(entorno.almacen),
+            );
+            assert.sameMembers([...retiradas], viejas.slice(7));
+            assert.deepStrictEqual(yield* capasEnElAlmacen(entorno), [
+              aMedias,
+              vigente,
+              ...viejas.slice(0, 7),
+            ]);
+            for (const retirada of viejas.slice(7)) {
+              assert.isFalse(
+                yield* fs.exists(path.join(entorno.carpeta, carpetaDeFichas(retirada))),
+              );
+            }
+            for (const guardada of [aMedias, vigente, ...viejas.slice(0, 7)]) {
+              assert.isDefined(yield* entorno.leer(`${carpetaDeFichas(guardada)}/1.json`));
+            }
+            assert.strictEqual(yield* entorno.leer(FICHERO_VIGENTE), contenidoVigente);
+
+            // Otra vez no hay nada que retirar.
+            assert.deepStrictEqual(
+              yield* retirarVersionesViejas(vigente).pipe(Effect.provide(entorno.almacen)),
+              [],
+            );
+          }),
+        ),
+    );
+
+    it.effect("publicar retira la más vieja cuando la nueva deja ocho anteriores", () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const viejas: Array<string> = [];
+          for (let dias = 1; dias <= 8; dias += 1) {
+            viejas.push(yield* versionEscrita(entorno, NOCHE - dias * DIA));
+          }
+          yield* TestClock.setTime(NOCHE);
+          yield* ejecutar(capaGrabada("registro-oficial", yield* muestraCampusNord));
+          const publicada = yield* publicar(entorno);
+          assert.strictEqual(publicada.tipo, "publicada");
+          assert.deepStrictEqual(yield* capasEnElAlmacen(entorno), [
+            publicada.version,
+            ...viejas.slice(0, 7),
+          ]);
+
+          // Al día, tampoco borra nada más.
+          yield* TestClock.adjust(DIA);
+          assert.strictEqual((yield* publicar(entorno)).tipo, "al-dia");
+          assert.lengthOf(yield* capasEnElAlmacen(entorno), 8);
+        }),
+      ),
+    );
+  });
 });

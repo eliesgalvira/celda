@@ -4,7 +4,12 @@ import type { StyleSpecification } from "maplibre-gl";
 
 import { tokensDelTema } from "../pruebas/tema.ts";
 import { leerOklch } from "./color.ts";
-import { estiloMapa, TOKENS_MAPA } from "./estilo.ts";
+import {
+  estiloMapa,
+  FUENTE_MAPA_BASE,
+  RECURSOS_INICIALES_MAPA_BASE,
+  TOKENS_MAPA,
+} from "./estilo.ts";
 
 const MARCA = "token:";
 
@@ -51,6 +56,25 @@ describe("estiloMapa", () => {
         assert.isDefined(valor, `falta --${token} en el tema ${tema}`);
         assert.isNotNull(leerOklch(valor ?? ""), `--${token} no es OKLCH en el tema ${tema}`);
       }
+    }
+  });
+
+  it("pide por adelantado el TileJSON y los glifos que usa la vista inicial", () => {
+    const estilo = estiloMapa(() => "#000");
+    const fuente = estilo.sources[FUENTE_MAPA_BASE];
+    assert.isTrue(
+      fuente?.type === "vector" && RECURSOS_INICIALES_MAPA_BASE.includes(fuente.url ?? ""),
+    );
+    // Los rótulos que se ven lejos, antes del zoom 13: sus glifos no pueden esperar a la tesela.
+    const letras = estilo.layers.flatMap((capa) =>
+      capa.type === "symbol" && (capa.minzoom ?? 0) < 13 ? (capa.layout?.["text-font"] ?? []) : [],
+    );
+    assert.isAbove(letras.length, 0);
+    for (const letra of letras) {
+      const glifos = (estilo.glyphs ?? "")
+        .replace("{fontstack}", encodeURIComponent(String(letra)))
+        .replace("{range}", "0-255");
+      assert.include(RECURSOS_INICIALES_MAPA_BASE, glifos);
     }
   });
 });

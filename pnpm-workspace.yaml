@@ -30,6 +30,7 @@ catalog:
   happy-dom: 20.14.5
   maplibre-gl: 6.11.2
   oxlint: 1.85.0
+  playwright-core: 1.63.0
   solid-js: 2.0.0-rc.9
   supercluster: 9.1.0
   tailwind-merge: 3.7.0

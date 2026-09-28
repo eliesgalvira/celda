@@ -1,0 +1,13 @@
+{
+  "name": "@celda/rendimiento",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "medir": "node src/medir.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "playwright-core": "catalog:"
+  }
+}

@@ -88,10 +88,14 @@ export interface SeccionFichaProps {
   readonly children: JSX.Element;
 }
 
-/** Una sección del cuerpo de la ficha, con su título en versalitas. */
+/**
+ * Una sección del cuerpo de la ficha, con su título en versalitas. Mientras queda fuera de la
+ * vista, el navegador no la maqueta ni la pinta (`content-visibility: auto`): al abrir la ficha
+ * en el móvil solo se ve el resumen, y así la ficha sale antes.
+ */
 export function SeccionFicha(props: SeccionFichaProps) {
   return (
-    <section class="flex flex-col gap-2 px-5 py-4 md:px-6">
+    <section class="flex flex-col gap-2 px-5 py-4 [content-visibility:auto] [contain-intrinsic-size:auto_10rem] md:px-6">
       <h3 class="font-mono text-[10.5px] tracking-[0.14em] text-tinta-suave uppercase">
         {props.titulo}
       </h3>

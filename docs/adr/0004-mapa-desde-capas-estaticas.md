@@ -46,7 +46,7 @@ La granularidad sale de medir las 1318 fichas reales de Barcelona, con la export
 
 El JSON de las fichas se comprime muy bien (las claves y los enlaces se repiten), así que agrupar sale casi gratis en bytes y ahorra mucho en ficheros y peticiones. Un fichero por emplazamiento no cabe: toda España son unos 100.000 por versión, y la copia de Vercel admite 15.000 ficheros por subida (ADR 0010). Además cada ficha abierta sería una petición a la función de R2, que tiene una cuota diaria. Se eligen lotes de 128 porque el mayor, con bandas, se queda por debajo de la ventana inicial de TCP (unos 14 KB) y llega en un solo viaje; con 256 ya no. Con toda España son unos 800 ficheros y 190 MB sin comprimir por versión.
 
-La web encuentra el lote de una ficha en la columna `lote` de la capa que dibuja el mapa, así que siempre lee la ficha de la misma versión. Un enlace directo a una ficha espera a esa capa. Cada lote leído se guarda durante la visita, y dos lecturas a la vez del mismo lote hacen una sola petición.
+La web encuentra el lote de una ficha en la columna `lote` de la capa que dibuja el mapa, así que siempre lee la ficha de la misma versión. Un enlace directo a una ficha espera a esa capa. Cada lote leído se guarda durante la visita, y dos lecturas a la vez del mismo lote hacen una sola petición. Cuando el mapa se asienta con marcadores de emplazamiento sueltos a la vista, la web descarga ya sus lotes, como mucho dos (`LOTES_PRECARGADOS`, los que más marcadores tienen), para que tocar uno no espere a la red. De cerca, lo que se ve cae en uno o dos lotes; en Barcelona son once en total, así que una visita pide como mucho esos once (docs/patterns/rendimiento.md).
 
 ## Qué versión se carga
 

@@ -135,7 +135,7 @@ describe("modo estudiante", () => {
 
   it("encendido, resuelve el ejercicio de un barrio con sus fuentes y lee las bandas", async () => {
     navegar(ruta.mapa, { reemplazar: true });
-    const { findByRole, findByText, fichas } = montar(true);
+    const { findByRole, findByText, queryByRole, fichas } = montar(true);
     await abrirFunciones(findByRole);
     fireEvent.click(await findByRole("button", { name: "Ejercicio" }));
     flush();
@@ -183,6 +183,8 @@ describe("modo estudiante", () => {
     fichas.responder("movistar-1", ficha("movistar-1", 800));
     fichas.responder("movistar-2", ficha("movistar-2", 3500));
     await findByText("Leídas 2 de 2 fichas.");
+    // Leídas, no hay botón para volver a leerlas: son de la misma versión que la capa.
+    assert.isNull(queryByRole("button", { name: /Leer las fichas|Volver a leer/u, hidden: true }));
     await waitFor(() => assert.strictEqual(celdas("5G")[0], "probable"));
     assert.strictEqual(celdas("800 MHz")[0], "sí");
     assert.strictEqual(celdas("900 MHz")[0], "no");
