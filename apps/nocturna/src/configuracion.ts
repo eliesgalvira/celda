@@ -4,7 +4,7 @@ import { opcionesZonasDesdeConfig, zonasDesdeConfig } from "@celda/ingesta/barri
 import { OPCIONES_PUNTOS } from "@celda/ingesta/barridoDePuntos";
 import type { OpcionesCliente } from "@celda/ingesta/cliente";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
-import { opcionesProcesoDesdeConfig } from "@celda/ingesta/proceso";
+import { opcionesClienteDeFichas, opcionesFichasDesdeConfig } from "@celda/ingesta/fichas";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
@@ -20,6 +20,8 @@ export interface Configuracion {
   readonly registroOficial: OpcionesCliente;
   /** El cliente de antenasmoviles.es. Qué puntos guarda lo dicen sus zonas, en `noche.puntos`. */
   readonly antenasMoviles: OpcionesCliente;
+  /** Las del cliente de las fichas del registro oficial: su pausa es el ritmo de las fichas. */
+  readonly fichasDelRegistro: OpcionesCliente;
   readonly interruptores: Readonly<Record<Fuente, Interruptor>>;
 }
 
@@ -35,13 +37,16 @@ export const COPIAS_CONSERVADAS = 14;
  * - `CELDA_INGESTA_BASE`: el fichero SQLite (`datos/ingesta.sqlite`).
  * - `CELDA_INGESTA_COPIAS` y `CELDA_INGESTA_COPIAS_CONSERVADAS`: la carpeta de copias
  *   (`datos/copias`) y cuántas se conservan (14).
- * - `CELDA_INGESTA_MAX_FICHAS`: fichas por noche (250).
  * - `CELDA_PUBLICAR_REINTENTO_MINUTOS`: espera antes de repetir una publicación fallida (60).
  * - `CELDA_REGISTRO_ACTIVO` y `CELDA_REGISTRO_MOTIVO`: el interruptor del registro oficial
  *   (encendido) y el motivo que se apunta si está apagado.
  * - Las zonas de barrido del registro oficial: `CELDA_REGISTRO_ZONAS` (`cataluna`),
  *   `CELDA_REGISTRO_ZONAS_EN_TURNO` (ninguna) y `CELDA_REGISTRO_ZONAS_POR_NOCHE` (1)
  *   (`opcionesZonasDesdeConfig`).
+ * - Las de las fichas del registro oficial: `CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS` (3),
+ *   `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS` (360), `CELDA_REGISTRO_FICHAS_RELECTURA_DIAS` (30),
+ *   `CELDA_REGISTRO_FICHAS_PRIORIDAD` (`08`) y `CELDA_INGESTA_MAX_FICHAS` (sin tope)
+ *   (`opcionesFichasDesdeConfig`).
  * - Las del extractor del registro oficial: `CELDA_REGISTRO_PAUSA_SEGUNDOS`,
  *   `CELDA_REGISTRO_MAX_PETICIONES`, `CELDA_REGISTRO_USER_AGENT`, `CELDA_REGISTRO_REINTENTOS` y
  *   `CELDA_REGISTRO_ESPERA_SEGUNDOS` (`RegistroOficial.opcionesClienteDesdeConfig`).
@@ -63,7 +68,7 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
   conservar: Config.Int("CELDA_INGESTA_COPIAS_CONSERVADAS").pipe(
     Config.withDefault(COPIAS_CONSERVADAS),
   ),
-  proceso: opcionesProcesoDesdeConfig,
+  fichas: opcionesFichasDesdeConfig,
   zonas: opcionesZonasDesdeConfig,
   reintentoMinutos: Config.Int("CELDA_PUBLICAR_REINTENTO_MINUTOS").pipe(
     Config.withDefault(Duration.toMinutes(REINTENTO_DE_PUBLICACION)),
@@ -94,7 +99,7 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
   Config.map((c): Configuracion => ({
     base: c.base,
     noche: {
-      proceso: { ...c.proceso, zonas: c.zonas },
+      proceso: { zonas: c.zonas, fichas: c.fichas },
       puntos: {
         ...OPCIONES_PUNTOS,
         // Sin zonas propias, las del registro oficial: el listado es de toda España y se pide
@@ -118,6 +123,7 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
         () => Math.max(c.antenasMaxDetalles, 0) + 10,
       ),
     },
+    fichasDelRegistro: opcionesClienteDeFichas(c.registroOficial, c.fichas),
     interruptores: {
       ...INTERRUPTOR_POR_DEFECTO,
       "registro-oficial": c.registroActivo

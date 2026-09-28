@@ -313,4 +313,5 @@ _Evitar_: clientes, carga
 - El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. Queda por decidir si los textos de primer uso lo aceptan como palabra de entrada.
 - Los ADR 0014 y 0015 y la investigación 08 llaman «celdas de 1°» a los cuadros y «grupos» a las zonas de barrido. Se escribieron antes de fijar estas palabras; «celda» ya era la de un emplazamiento.
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.
+- La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer. En la interfaz, ficha es solo la del panel.
 - Falta decidir si una marca que usa la red de otra empresa aparece como compañía.

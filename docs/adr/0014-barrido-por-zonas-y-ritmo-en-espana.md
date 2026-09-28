@@ -54,3 +54,14 @@ La ingesta nocturna lee antenasmoviles.es con las mismas zonas de barrido. Sigue
 - Detalle solo de las ER5 nuevas o cambiadas en el listado, primero las que no dicen su compañía, 100 por noche y a una petición cada 5 s. No hay repaso de las leídas ni se lee el detalle de los marcadores que copian el registro, así que la nocturna no ve las fotos de desmontaje. Convex sí las lee mientras siga (#51).
 - La zona de un marcador es la del cuadro en que cae. Uno que falta en dos barridos seguidos de su zona se retira con sus observaciones, y una zona que vuelve vacía cuando tenía marcadores falla sin contar ausencias.
 - El interruptor sigue apagado por defecto, en el programa y en el módulo de NixOS.
+
+## Cómo quedaron las fichas (ticket 41, 29/09/2026)
+
+- La ventana cuenta desde que empieza la noche, no desde la primera ficha. Así una noche nunca dura más que la ventana, la publicación y la copia, y el tiempo máximo del servicio se deduce de ella: ventana, la hora de espera antes de repetir una publicación y una hora más.
+- El ritmo es la pausa entre el final de una ficha y la petición de la siguiente, como la del listado. Con 3 s y un geoportal que tarda casi un segundo salen unas 5.500 fichas en 6 horas; una prueba con respuestas de 0,9 s lo comprueba.
+- La prioridad es una lista de provincias por código INE (`08` por defecto), sacada de los límites del IGN. Detrás van las zonas de barrido en el orden de la configuración y al final lo que no cae en ninguna. Así Barcelona provincia va primero sin crear una zona de barrido solo para ella.
+- La relectura pasa de 14 a 30 días.
+- La cola no es una tabla aparte: sale de las observaciones cada noche, y cada ficha se guarda al leerla. Una ficha ilegible espera un día, el doble con cada fallo seguido, hasta 30. Así no bloquea la cabeza de la cola noche tras noche.
+- Un 401 o un 403, o una página que no es una ficha del geoportal, paran las fichas en el acto, sin reintentos. Tres fallos seguidos también.
+- A mitad de la ventana se fusiona y se publica una vez. Una noche con fichas publica dos versiones, y las ocho que se conservan cubren unas cuatro noches.
+- La pasada real de comprobación, el 29/09/2026, leyó 20 fichas de la provincia de Barcelona en 62 s, al ritmo por defecto y con el `User-Agent` de la ingesta, sin ningún error. Dieron 40 bandas, dos por ficha: las primeras de la cola eran de Digi (1800 y 2100 MHz). El listado salió de la muestra grabada del 28/09, así que no hubo más peticiones.

@@ -44,6 +44,16 @@ export class ProhibidoPorRobots extends Schema.TaggedError<ProhibidoPorRobots>()
   { url: Schema.String },
 ) {}
 
+/**
+ * La fuente está bloqueando a Celda: responde 401 o 403, o devuelve una página que no es lo que
+ * se ha pedido, como un aviso de un cortafuegos. No se insiste: se deja de pedir hasta la noche
+ * siguiente.
+ */
+export class FuenteBloqueada extends Schema.TaggedError<FuenteBloqueada>()("FuenteBloqueada", {
+  url: Schema.String,
+  motivo: Schema.String,
+}) {}
+
 /** La ejecución ha gastado todas las peticiones que tiene permitidas hacia la fuente. */
 export class LimiteDePeticiones extends Schema.TaggedError<LimiteDePeticiones>()(
   "LimiteDePeticiones",
@@ -52,6 +62,7 @@ export class LimiteDePeticiones extends Schema.TaggedError<LimiteDePeticiones>()
 
 export type ErrorDeExtractor =
   | FuenteNoDisponible
+  | FuenteBloqueada
   | RespuestaInesperada
   | ProhibidoPorRobots
   | LimiteDePeticiones;
@@ -60,6 +71,7 @@ export type ErrorDeExtractor =
 export const describirError = (error: ErrorDeExtractor): string => {
   switch (error._tag) {
     case "FuenteNoDisponible":
+    case "FuenteBloqueada":
     case "RespuestaInesperada":
       return `${error._tag}: ${error.motivo} (${error.url})`;
     case "ProhibidoPorRobots":

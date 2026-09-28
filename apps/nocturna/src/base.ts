@@ -18,6 +18,8 @@ import {
   type Interruptor,
   SIN_CAMBIOS,
 } from "@celda/ingesta/ejecucion";
+import type { FichaEnCola } from "@celda/ingesta/fichas";
+import { Registro } from "@celda/ingesta/extractor";
 import {
   BARRIDOS_PARA_RETIRAR,
   ObservacionGuardada,
@@ -78,6 +80,9 @@ export interface OpcionesBase {
  * La versión 3 trae antenasmoviles.es (#48): `puntos`, los marcadores de su listado
  * (`PuntoGuardado` en `datos`), con su cuadro, cuándo se leyó su detalle, cuándo lo vio un listado
  * por última vez y si está retirado. Sus barridos van en `barridos`, como los del registro.
+ *
+ * La versión 4 trae la cola de fichas en la ventana (ticket 41): en `observaciones`, los fallos
+ * seguidos de la ficha, hasta cuándo espera antes de volver a pedirla y el último error.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -184,6 +189,11 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
     `CREATE INDEX puntos_por_detalle ON puntos (fuente, detalle_leido_en, prioridad, id)`,
     `CREATE INDEX puntos_por_cuadro ON puntos (fuente, cuadro, retirado_en)`,
   ],
+  [
+    `ALTER TABLE observaciones ADD COLUMN ficha_fallos INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE observaciones ADD COLUMN ficha_espera_hasta INTEGER`,
+    `ALTER TABLE observaciones ADD COLUMN ficha_error TEXT`,
+  ],
 ];
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
@@ -193,6 +203,15 @@ const EmplazamientoEnJson = Schema.fromJsonString(Emplazamiento);
 
 const FilaObservacion = Schema.Struct({ id: Schema.Int, datos: ObservacionEnJson });
 const FilaPunto = Schema.Struct({ id: Schema.Int, datos: PuntoEnJson });
+/** Una ficha de la cola: solo lo que dice el listado de su observación, sin las bandas. */
+const FilaDeCola = Schema.Struct({
+  id: Schema.Int,
+  cuadro: Schema.NullOr(Schema.String),
+  ficha_leida_en: Schema.NullOr(Schema.Finite),
+  ficha_fallos: Schema.Int,
+  ficha_espera_hasta: Schema.NullOr(Schema.Finite),
+  datos: Schema.fromJsonString(Registro),
+});
 const FilaEmplazamiento = Schema.Struct({
   clave: Schema.String,
   version: Schema.Finite,
@@ -372,9 +391,14 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         return new Map(filas.map((fila) => [fila.datos.clave, fila]));
       });
 
+      /**
+       * Guarda una observación. Con `sinFallos`, su ficha vuelve a la cola sin espera: se acaba de
+       * leer, o el listado ha cambiado y hay que leerla otra vez.
+       */
       const guardarObservacion = Effect.fn("BaseNocturna.guardarObservacion")(function* (
         id: number | undefined,
         o: ObservacionGuardada,
+        sinFallos: boolean = false,
       ) {
         const datos = yield* codificarObservacion(o);
         if (id === undefined) {
@@ -386,6 +410,14 @@ export const baseNocturna = (opciones: OpcionesBase) =>
             cuadro: cuadroDe(o.posicion),
             datos,
           })}`;
+          return;
+        }
+        if (sinFallos) {
+          yield* sql`UPDATE observaciones
+            SET ficha_leida_en = ${o.fichaLeidaEn}, retirada_en = ${o.retiradaEn},
+              cuadro = ${cuadroDe(o.posicion)}, datos = ${datos},
+              ficha_fallos = 0, ficha_espera_hasta = NULL, ficha_error = NULL
+            WHERE id = ${id}`;
           return;
         }
         yield* sql`UPDATE observaciones
@@ -539,7 +571,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                     fecha,
                   );
                   if (guardar !== undefined) {
-                    yield* guardarObservacion(previa?.id, guardar);
+                    yield* guardarObservacion(previa?.id, guardar, cuenta !== undefined);
                   }
                   creados += cuenta === "creada" ? 1 : 0;
                   cambiados += cuenta === "cambiada" ? 1 : 0;
@@ -598,21 +630,22 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               WHERE id = ${Number(barrido)} AND estado = 'en curso'`;
         }, Effect.orDie),
 
-        pendientesDeFicha: Effect.fn("BaseNocturna.pendientesDeFicha")(function* (
-          fuente,
-          leidasAntesDe,
-          limite,
-        ) {
-          // Las pendientes (nulas) van primero, en el orden en que se crearon, como en el
-          // índice `por_ficha` de Convex.
-          const filas = yield* decodificar(FilaObservacion)(
-            yield* sql`SELECT id, datos FROM observaciones
+        colaDeFichas: Effect.fn("BaseNocturna.colaDeFichas")(function* (fuente, leidasAntesDe) {
+          const filas = yield* decodificar(FilaDeCola)(
+            yield* sql`SELECT id, cuadro, ficha_leida_en, ficha_fallos, ficha_espera_hasta,
+                json_remove(datos, '$.bandas') AS datos
+                FROM observaciones
                 WHERE fuente = ${fuente} AND retirada_en IS NULL
-                  AND (ficha_leida_en IS NULL OR ficha_leida_en < ${leidasAntesDe})
-                ORDER BY ficha_leida_en ASC, id ASC
-                LIMIT ${limite}`,
+                  AND (ficha_leida_en IS NULL OR ficha_leida_en < ${leidasAntesDe})`,
           );
-          return filas.map((fila) => registroDe(fila.datos));
+          return filas.map((fila): FichaEnCola => ({
+            registro: registroDe(fila.datos),
+            orden: fila.id,
+            cuadro: fila.cuadro ?? "",
+            leidaEn: fila.ficha_leida_en,
+            fallos: fila.ficha_fallos,
+            esperaHasta: fila.ficha_espera_hasta,
+          }));
         }, Effect.orDie),
 
         aplicarFicha: Effect.fn("BaseNocturna.aplicarFicha")(function* (
@@ -624,8 +657,14 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           const previa = (yield* observacionesDe(fuente, [clave])).get(clave);
           if (previa === undefined) return false;
           const { guardada, cambiada } = trasFicha(previa.datos, bandas, fecha);
-          yield* guardarObservacion(previa.id, guardada);
+          yield* guardarObservacion(previa.id, guardada, true);
           return cambiada;
+        }, Effect.orDie),
+
+        fallarFicha: Effect.fn("BaseNocturna.fallarFicha")(function* (fuente, clave, fallo) {
+          yield* sql`UPDATE observaciones SET ficha_fallos = ${fallo.fallos},
+              ficha_espera_hasta = ${fallo.esperaHasta}, ficha_error = ${fallo.motivo}
+              WHERE fuente = ${fuente} AND clave = ${clave}`;
         }, Effect.orDie),
 
         fusionar: Effect.fn("BaseNocturna.fusionar")(function* (fecha) {

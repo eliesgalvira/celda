@@ -27,9 +27,10 @@ Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias
 4. lanza `celda-nocturna estado` como el usuario del servicio;
 5. comprueba que la noche barrió Cataluña cada noche y `centro`, la primera de las zonas que se turnan, con una petición por cuadro;
 6. comprueba que antenasmoviles.es recibió un solo `showf` y cuatro detalles, los de las dos ER5 sin compañía de Barcelona primero, ninguno de Madrid ni de una copia del registro, y que la ER5 de Urquinaona se publicó con su enlace a antenasmoviles.es;
-7. busca la clave y el secreto en todo el almacén de Nix de la máquina y no los encuentra.
+7. comprueba que las fichas llegaron a una cada 4 s como mínimo, que pararon al cerrarse su ventana de 2 minutos con las demás en la cola, y que se publicó a mitad de la ventana y al cerrarla;
+8. busca la clave y el secreto en todo el almacén de Nix de la máquina y no los encuentra.
 
-Con todo construido, la máquina virtual tarda unos 30 s en arrancar y pasar la prueba.
+Con todo construido, la máquina virtual tarda unos 2 min 30 s en arrancar y pasar la prueba. Casi todo es la ventana de fichas.
 
 ## El hash de las dependencias de pnpm
 
@@ -121,7 +122,7 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `package` | el paquete del flake de Celda | El programa |
 | `horario` | `*-*-* 02:15:00 UTC` | Cuándo empieza la noche, en formato `OnCalendar=` |
 | `recuperarNochesPerdidas` | `true` | Si la máquina estaba apagada, lanza la noche al encenderse (`Persistent=`) |
-| `tiempoMaximo` | `8h` | Lo más que dura una noche (`TimeoutStartSec=`) |
+| `tiempoMaximo` | `fichas.ventana` + `reintentoDePublicacion` + 60 minutos, 8 h con los valores por defecto | Lo más que dura una noche (`TimeoutStartSec=`) |
 | `directorioDeEstado` | `celda-nocturna` | Directorio de la base dentro de `/var/lib` |
 | `copias.directorio` | `/var/lib/celda-nocturna/copias` | Dónde van las copias de la base |
 | `copias.conservar` | 14 | Copias que se conservan |
@@ -131,9 +132,13 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `reintentoDePublicacion` | 60 | Minutos antes de repetir una publicación fallida |
 | `registroOficial.enable` | `true` | Interruptor del registro oficial |
 | `registroOficial.motivo` | `apagado en la configuración de la ingesta` | Lo que se apunta si está apagado |
-| `registroOficial.pausa` | 3 | Segundos entre peticiones, entre 3 y 3600 |
-| `registroOficial.maxPeticiones` | 300 | Tope de peticiones por noche |
-| `registroOficial.maxFichas` | 250 | Fichas por noche |
+| `registroOficial.pausa` | 3 | Segundos entre peticiones del listado, entre 3 y 3600 |
+| `registroOficial.maxPeticiones` | 300 | Tope de peticiones del listado por noche |
+| `registroOficial.fichas.ritmo` | 3 | Segundos entre una ficha y la siguiente, entre 3 y 3600 |
+| `registroOficial.fichas.ventana` | 360 | Minutos de fichas desde que empieza la noche |
+| `registroOficial.fichas.relectura` | 30 | Días tras los que se vuelve a leer una ficha |
+| `registroOficial.fichas.prioridad` | `[ "08" ]` | Provincias, por código INE, cuyas fichas van primero |
+| `registroOficial.fichas.maximo` | `null` | Tope de fichas por noche; sin él, las que quepan en la ventana. Antes se llamaba `maxFichas` |
 | `registroOficial.reintentos` | 3 | Reintentos de un fallo pasajero |
 | `registroOficial.espera` | 10 | Segundos que se espera una respuesta |
 | `registroOficial.zonas` | `[ "cataluna" ]` | Zonas de barrido de todas las noches |
@@ -159,7 +164,18 @@ services.celda-nocturna.registroOficial = {
 
 El listado de antenasmoviles.es es de toda España y se pide una vez por noche, así que sus zonas se barren todas cada noche, también las que el registro turna. Qué hace cada noche está en [convex.md](convex.md#antenasmovileses-en-la-noche).
 
-La ventana de fichas (#41) aún no existe en el programa. Tendrá su opción cuando llegue. Mientras tanto, cualquier variable del programa se puede poner a mano, sin secretos:
+Las fichas se leen a una cada `fichas.ritmo` segundos hasta que pasan `fichas.ventana` minutos desde que empezó la noche: con los valores por defecto, unas 5.500. Primero van las de las provincias de `fichas.prioridad`, luego las de cada zona de barrido en el orden de `zonas` y `zonasEnTurno`, y al final las demás. Cómo funciona la cola está en [convex.md](convex.md#las-fichas). Si el ministerio pide menos peticiones, basta con subir el ritmo:
+
+```nix
+services.celda-nocturna.registroOficial.fichas = {
+  ritmo = 10;
+  prioridad = [ "08" "17" "25" "43" ];
+};
+```
+
+`tiempoMaximo` sigue a la ventana. Si lo pones a mano, que cubra la ventana, la hora de espera antes de repetir una publicación y la copia.
+
+Cualquier variable del programa se puede poner también a mano, sin secretos:
 
 ```nix
 systemd.services.celda-nocturna.environment.CELDA_REGISTRO_MAX_PETICIONES = "100";

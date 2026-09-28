@@ -1,11 +1,14 @@
+import { type IndiceDeMunicipios, municipioDelPunto } from "@celda/dominio/municipio";
 import type { Fuente } from "@celda/dominio/observacion";
 import {
+  BaseDeBarrido,
   ejecutarBarrido,
   type OpcionesBarrido,
   type ZonaEnLaEjecucion,
 } from "@celda/ingesta/barrido";
 import { ejecutarBarridoDePuntos, type OpcionesPuntos } from "@celda/ingesta/barridoDePuntos";
 import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
+import { Provincias, PublicacionAMitad, resumirCola } from "@celda/ingesta/fichas";
 import type { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import {
   DatosPublicables,
@@ -183,6 +186,13 @@ const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<
     ),
   );
 
+/** Las provincias de los límites del IGN, para ordenar la cola de fichas y nombrarlas. */
+export const provinciasDe = (municipios: IndiceDeMunicipios) =>
+  Provincias.of({
+    provinciaDe: (posicion) => municipioDelPunto(posicion, municipios).provincia?.codigo,
+    nombreDe: (codigo) => municipios.provincias.get(codigo)?.nombre,
+  });
+
 const describirZona = (z: ZonaEnLaEjecucion): string =>
   `Zona ${z.zona}: ${z.estado}, ${z.cuadros} cuadros, ${z.peticiones} peticiones, ` +
   `${Math.round(z.bytes / 1000)} kB, ${z.registros} registros, observaciones ` +
@@ -193,9 +203,9 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
  * La noche entera:
  *
  * 1. Una ejecución de ingesta por fuente, con su interruptor. El registro oficial barre sus zonas
- *    de barrido, lee las fichas pendientes y fusiona (`ejecutarBarrido`). antenasmoviles.es lee
- *    su listado una vez, guarda los puntos de sus zonas, lee el detalle de las ER5 pendientes y
- *    fusiona (`ejecutarBarridoDePuntos`).
+ *    de barrido, lee las fichas de la cola hasta cerrar su ventana, publicando a mitad, y fusiona
+ *    (`ejecutarBarrido`). antenasmoviles.es lee su listado una vez, guarda los puntos de sus
+ *    zonas, lee el detalle de las ER5 pendientes y fusiona (`ejecutarBarridoDePuntos`).
  * 2. Publica la capa y las fichas. Sin cambios no escribe nada, y si la noche anterior no pudo
  *    publicar, lo hace ahora. Si falla por algo pasajero, lo apunta, espera `reintento` y lo
  *    intenta otra vez; si vuelve a fallar, queda para la noche siguiente. Los datos ya están en
@@ -208,9 +218,15 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
  */
 export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNoche) {
   const extractores = yield* Extractores;
+  // A mitad de la ventana de fichas se publica lo que haya, sin esperar ni repetir si falla: al
+  // final de la noche se vuelve a publicar.
+  const contexto = yield* Effect.context<Publicador | BaseNocturna>();
+  const aMitad = PublicacionAMitad.of({
+    publicar: publicarYApuntar([]).pipe(Effect.asVoid, Effect.provideContext(contexto)),
+  });
   const registro = yield* ejecutarCon(
     extractores.registroOficial,
-    ejecutarBarrido(opciones.proceso),
+    ejecutarBarrido(opciones.proceso).pipe(Effect.provideService(PublicacionAMitad, aMitad)),
   );
   const puntos = yield* ejecutarCon(
     extractores.antenasMoviles,
@@ -248,11 +264,26 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
 /** Publica a mano, sin ingerir nada, y lo apunta en la base. */
 export const publicarAMano = Effect.map(publicarYApuntar([]), (intento) => intento.resultado);
 
-/** Escribe el estado de la base: cada fuente, lo publicado y el último intento de publicar. */
-export const estado = Effect.fn("Nocturna.estado")(function* (rotacion: Duration.Duration) {
+/**
+ * Escribe el estado de la base: cada fuente, las fichas que quedan en cada parte de su cola, lo
+ * publicado y el último intento de publicar.
+ */
+export const estado = Effect.fn("Nocturna.estado")(function* (opciones: OpcionesBarrido) {
   const base = yield* BaseNocturna;
+  const barrido = yield* BaseDeBarrido;
+  const provincias = yield* Provincias;
   const ahora = yield* Clock.currentTimeMillis;
-  const resumen = yield* base.resumen(ahora - Duration.toMillis(rotacion));
-  yield* Console.log(describirResumen(base.fichero, resumen));
-  return resumen;
+  const leidasAntesDe = ahora - Duration.toMillis(opciones.fichas.relectura);
+  const resumen = yield* base.resumen(leidasAntesDe);
+  const cola = resumirCola(
+    yield* barrido.colaDeFichas("registro-oficial", leidasAntesDe),
+    {
+      provincias: opciones.fichas.prioridad,
+      zonas: [...opciones.zonas.cadaNoche, ...opciones.zonas.enTurno],
+      provinciaDe: provincias.provinciaDe,
+    },
+    ahora,
+  );
+  yield* Console.log(describirResumen(base.fichero, resumen, cola, provincias.nombreDe));
+  return { resumen, cola };
 });

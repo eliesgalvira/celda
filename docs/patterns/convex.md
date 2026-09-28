@@ -41,14 +41,14 @@ Desde la raíz de Celda, dentro de `nix develop`:
 
 ```sh
 pnpm run ingesta noche      # ingesta, publicación y copia de seguridad
-pnpm run ingesta estado     # última ejecución de cada fuente, fichas pendientes, errores y lo publicado
+pnpm run ingesta estado     # última ejecución de cada fuente, fichas en cola, errores y lo publicado
 pnpm run ingesta publicar   # publica lo que haya en la base, sin pedir nada a las fuentes
 pnpm run ingesta copia      # copia la base a la carpeta de copias
 ```
 
 Cada orden construye `apps/nocturna/dist/nocturna.js`, un solo fichero, y lo ejecuta en `apps/nocturna`. Las rutas relativas de la configuración cuentan desde ahí: sin tocar nada, la base es `apps/nocturna/datos/ingesta.sqlite` y las copias van a `apps/nocturna/datos/copias/`, las dos fuera de git.
 
-`noche` hace peticiones reales. Para probar contra el geoportal sin leer fichas, que son la mayor parte de las peticiones:
+`noche` hace peticiones reales y, con los valores por defecto, dura seis horas de fichas. Para probar contra el geoportal sin leer fichas, que son la mayor parte de las peticiones:
 
 ```sh
 CELDA_INGESTA_MAX_FICHAS=0 \
@@ -67,15 +67,19 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_INGESTA_BASE` | `datos/ingesta.sqlite` | La base SQLite |
 | `CELDA_INGESTA_COPIAS` | `datos/copias` | Carpeta de las copias de seguridad |
 | `CELDA_INGESTA_COPIAS_CONSERVADAS` | 14 | Copias que se conservan |
-| `CELDA_INGESTA_MAX_FICHAS` | 250 | Fichas por noche |
+| `CELDA_INGESTA_MAX_FICHAS` | sin tope | Tope de fichas por noche; con 0 no se lee ninguna |
 | `CELDA_PUBLICAR_REINTENTO_MINUTOS` | 60 | Espera antes de repetir una publicación fallida |
 | `CELDA_REGISTRO_ACTIVO` | `true` | Interruptor del registro oficial |
 | `CELDA_REGISTRO_MOTIVO` | | Lo que se apunta si está apagado |
 | `CELDA_REGISTRO_ZONAS` | `cataluna` | Zonas de barrido de cada noche, separadas por comas, o `ninguna` |
 | `CELDA_REGISTRO_ZONAS_EN_TURNO` | `ninguna` | Zonas que se turnan |
 | `CELDA_REGISTRO_ZONAS_POR_NOCHE` | 1 | Cuántas de las que se turnan se barren cada noche |
-| `CELDA_REGISTRO_PAUSA_SEGUNDOS` | 3 | Pausa entre peticiones; nunca baja de 3 |
-| `CELDA_REGISTRO_MAX_PETICIONES` | 300 | Tope de peticiones por noche, `robots.txt` y reintentos incluidos |
+| `CELDA_REGISTRO_PAUSA_SEGUNDOS` | 3 | Pausa entre peticiones del listado; nunca baja de 3 |
+| `CELDA_REGISTRO_MAX_PETICIONES` | 300 | Tope de peticiones del listado por noche, `robots.txt` y reintentos incluidos |
+| `CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS` | 3 | Pausa entre el final de una ficha y la siguiente; nunca baja de 3 |
+| `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS` | 360 | Minutos de fichas, desde que empieza la noche |
+| `CELDA_REGISTRO_FICHAS_RELECTURA_DIAS` | 30 | Días tras los que se vuelve a leer una ficha |
+| `CELDA_REGISTRO_FICHAS_PRIORIDAD` | `08` | Provincias cuyas fichas van primero, por código INE y separadas por comas, o `ninguna` |
 | `CELDA_REGISTRO_REINTENTOS` | 3 | Reintentos de un fallo pasajero |
 | `CELDA_REGISTRO_ESPERA_SEGUNDOS` | 10 | Tiempo máximo de una respuesta |
 | `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
@@ -103,7 +107,7 @@ Las variables también pueden llegar como credenciales de systemd: el programa l
 
 La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sql-sqlite-node`, que en Effect 4 usa ese módulo y no trae extensiones nativas. Tablas (`apps/nocturna/src/base.ts`):
 
-- `observaciones`: lo último que dice cada fuente de cada estación base, cuándo se leyó su ficha, si está retirada, su cuadro y cuándo la trajo un listado por última vez;
+- `observaciones`: lo último que dice cada fuente de cada estación base, cuándo se leyó su ficha, si está retirada, su cuadro, cuándo la trajo un listado por última vez y, si su ficha falló, cuántas veces seguidas, hasta cuándo espera y el último error;
 - `cuadros`: las cajas en que se dividió cada cuadro la última vez;
 - `barridos` y `cuadros_barridos`: cada barrido de una zona, con sus cuadros, y los cuadros que ya ha guardado;
 - `emplazamientos`: los de la última fusión, con la fecha en que cambió cada uno;
@@ -120,7 +124,30 @@ Cada zona de barrido tiene sus cuadros de 1° (ADR 0014). En cada cuadro la noch
 
 Cada cuadro se guarda en una transacción, con sus registros, sus cajas y la marca de hecho. Si la noche se corta a mitad de una zona, el barrido queda a medias y la noche siguiente sigue por el primer cuadro sin guardar. Cuando todas las zonas de la noche han acabado, se cierran sus barridos. Cerrar cuenta una ausencia a las observaciones vigentes de sus cuadros que ningún listado ha traído desde que empezó el barrido. Por eso una estación que se mueve a un cuadro de otra zona no se retira: el listado de la otra zona la trae, y su cuadro pasa a ser el nuevo.
 
-Un barrido falla, y no cuenta ausencias, si un cuadro falla o si vuelve vacío cuando la base tiene estaciones en él. Las demás zonas siguen. El tope de peticiones, `robots.txt` o una fuente que no responde ni tras los reintentos paran las zonas que quedan y las fichas. La ejecución queda completada si alguna zona se ha barrido.
+Un barrido falla, y no cuenta ausencias, si un cuadro falla o si vuelve vacío cuando la base tiene estaciones en él. Las demás zonas siguen. El tope de peticiones, `robots.txt`, una fuente que no responde ni tras los reintentos o una que bloquea a Celda paran las zonas que quedan y las fichas. La ejecución queda completada si alguna zona se ha barrido.
+
+### Las fichas
+
+Las fichas del registro dan las bandas. Tras el barrido, la noche las lee una a una hasta que se acaba la cola o se cierra su ventana (ADR 0014, ticket 41). Con los valores por defecto son una cada 3 s durante las 6 primeras horas de la noche. El geoportal tarda casi un segundo en contestar cada una, así que salen unas 5.500. La última empieza antes del cierre; las que no caben esperan a la noche siguiente.
+
+La cola no es una tabla aparte. Sale de `observaciones` cada noche con `ordenarFichas` (`packages/ingesta/src/fichas.ts`), una función pura:
+
+1. las de las provincias de `CELDA_REGISTRO_FICHAS_PRIORIDAD`, en su orden (Barcelona, 08, por defecto). La provincia sale de los límites del IGN, como en la publicación;
+2. las de cada zona de barrido, en el orden de `CELDA_REGISTRO_ZONAS` y `CELDA_REGISTRO_ZONAS_EN_TURNO`;
+3. las de fuera de esas zonas.
+
+Dentro de cada grupo van primero las nuevas y las de listado cambiado, en el orden en que llegaron, y luego las leídas hace más de 30 días, de la más vieja a la más nueva. Cada ficha se guarda en cuanto llega. Una noche cortada no pierde nada, y la siguiente sigue por la misma cola.
+
+Las fichas usan su propio cliente sobre la misma conexión que el listado: su pausa es el ritmo, y su tope, las peticiones que caben en la ventana a una cada 3 s. Comparten `robots.txt` y la hora de la última respuesta, así que la primera ficha también espera su pausa desde la última caja. Cuando algo falla:
+
+- una ficha que no se puede leer, como la del aviso «Código de emplazamiento no válido», apunta el fallo y espera un día antes de volver a la cola; dos días si falla otra vez, luego cuatro, y así hasta 30;
+- un fallo pasajero (red, 5xx, 429) se reintenta tres veces con espera exponencial. Si sigue, cuenta como fallo pero no hace esperar a la ficha;
+- tres fallos seguidos paran las fichas de la noche;
+- un 401 o un 403, una página que no es una ficha del geoportal (todas llevan la tabla `tablaDetalleEstacion`) o un listado en HTML son la fuente bloqueando a Celda (`FuenteBloqueada`). Se deja de pedir en el acto, sin reintentos.
+
+Lo que para las fichas queda en los errores de la ejecución («Fichas paradas hasta la próxima noche: …»). El diario dice cuántas se leyeron, cuántas quedan y por qué pararon. La orden `estado` dice cuántas quedan en cada parte de la cola: sin leer, por releer y esperando tras fallar.
+
+Al pasar la mitad de la ventana con alguna ficha leída, la noche fusiona y publica, sin esperar ni repetir si falla. Si la noche se corta después, lo leído hasta entonces ya está publicado. La primera fusión lleva la fecha de inicio de la ejecución, como todos sus datos; la del cierre lleva la hora a la que se hace, para que la versión de los datos avance. Así una noche con fichas publica dos versiones, y las ocho que se conservan cubren unas cuatro noches.
 
 ### antenasmoviles.es en la noche
 
@@ -140,7 +167,7 @@ Para una prueba en local, `CELDA_ANTENASMOVILES_ACTIVO=true CELDA_ANTENASMOVILES
 
 ### Publicar y copias
 
-Al final de la noche se publica siempre: sin cambios no se escribe nada, y si la noche anterior no pudo publicar, esta lo hace. Si falla porque el almacén o la base no responden, o porque los datos se movieron a mitad, se apunta en `publicaciones` y en las ejecuciones de la noche, se espera una hora y se intenta otra vez. Si vuelve a fallar, queda para la noche siguiente. Los datos ya están en la base.
+Al final de la noche se publica siempre, además de a mitad de la ventana de fichas: sin cambios no se escribe nada, y si la noche anterior no pudo publicar, esta lo hace. Si falla porque el almacén o la base no responden, o porque los datos se movieron a mitad, se apunta en `publicaciones` y en las ejecuciones de la noche, se espera una hora y se intenta otra vez. Si vuelve a fallar, queda para la noche siguiente. Los datos ya están en la base.
 
 Después, `VACUUM INTO` copia la base a `ingesta-<fecha>.sqlite` en la carpeta de copias, y se borran las más viejas hasta dejar catorce. Para restaurar, para la ingesta y copia una de ellas encima de la base:
 
@@ -153,7 +180,7 @@ rm -f datos/ingesta.sqlite-wal datos/ingesta.sqlite-shm
 
 `apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord, que contesta cada caja como el geoportal (`capaGrabadaPorCajas`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
 
-`apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la simulación de `muestras/espana/teselas.mjs`.
+`apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/fichas.test.ts` prueba el orden de la cola y la lectura en la ventana con el extractor real, fichas grabadas y el reloj de prueba: el ritmo, el cierre de la ventana con el resto pendiente, la publicación a mitad, unas 5.500 fichas con los valores por defecto y respuestas de 0,9 s, el bloqueo, los tres fallos seguidos, la espera tras un fallo y el tope. `apps/nocturna/src/fichas.test.ts` hace lo mismo con la base SQLite: una noche que cierra la ventana y la siguiente que sigue por donde iba, la provincia con prioridad, un bloqueo que queda en la ejecución, una ficha que espera un día tras fallar y una base de la versión 3 del esquema que se pone al día sin perder sus puntos ni su cola. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la simulación de `muestras/espana/teselas.mjs`.
 
 `apps/nocturna/src/antenasmoviles.test.ts` lanza noches con el extractor real de antenasmoviles.es sobre un cliente HTTP de prueba que apunta cada petición. Comprueba que apagado no pide nada, que con Cataluña solo guarda sus marcadores y nunca lee más de 100 detalles ni el de una copia del registro, que sin cambios solo pide `robots.txt` y `showf`, que un 403 o una página HTML no retiran nada, que retirar pide dos barridos de la zona, que una ER5 cambiada se relee, que una noche cortada en los detalles se retoma igual, el estado y la configuración.
 

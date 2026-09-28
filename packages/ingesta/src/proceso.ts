@@ -142,7 +142,8 @@ export interface FichasLeidas {
 
 /**
  * Lee las fichas pendientes una a una y guarda sus bandas. Tras `fallosSeguidos` fallos
- * seguidos, o al gastar el tope de peticiones, deja las demás para la próxima ejecución.
+ * seguidos, al gastar el tope de peticiones o si la fuente bloquea a Celda, deja las demás para
+ * la próxima ejecución.
  */
 export const leerFichas = Effect.fn("Ingesta.leerFichas")(function* (lectura: LecturaDeFichas) {
   const errores: Array<string> = [];
@@ -154,7 +155,11 @@ export const leerFichas = Effect.fn("Ingesta.leerFichas")(function* (lectura: Le
     if (Result.isFailure(bandas)) {
       errores.push(describirError(bandas.failure));
       fallos++;
-      if (fallos >= lectura.fallosSeguidos || bandas.failure._tag === "LimiteDePeticiones") {
+      if (
+        fallos >= lectura.fallosSeguidos ||
+        bandas.failure._tag === "LimiteDePeticiones" ||
+        bandas.failure._tag === "FuenteBloqueada"
+      ) {
         errores.push("Fichas pendientes para la próxima ejecución");
         break;
       }

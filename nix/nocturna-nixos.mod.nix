@@ -13,7 +13,7 @@
       inherit (lib.attrsets) filterAttrs;
       inherit (lib.lists) optional singleton unique;
       inherit (lib.meta) getExe;
-      inherit (lib.modules) mkIf;
+      inherit (lib.modules) mkIf mkRenamedOptionModule;
       inherit (lib.options) literalExpression mkEnableOption mkOption;
       inherit (lib.strings) concatStringsSep hasPrefix;
       inherit (lib.trivial) boolToString;
@@ -41,10 +41,17 @@
         "oeste-y-canarias"
       ];
 
-      # La lista de zonas como la lee el programa: separadas por comas, o `ninguna`.
-      listaDeZonas = zonas: if zonas == [ ] then "ninguna" else concatStringsSep "," zonas;
+      # Una lista como la lee el programa: separada por comas, o `ninguna`.
+      listaDelPrograma = zonas: if zonas == [ ] then "ninguna" else concatStringsSep "," zonas;
     in
     {
+      imports =
+        singleton
+        <|
+          mkRenamedOptionModule
+            [ "services" "celda-nocturna" "registroOficial" "maxFichas" ]
+            [ "services" "celda-nocturna" "registroOficial" "fichas" "maximo" ];
+
       options.services.celda-nocturna = {
         enable = mkEnableOption "la ingesta nocturna de Celda: el registro oficial, antenasmoviles.es si se enciende, la publicación y la copia de la base, una vez por noche";
 
@@ -70,8 +77,15 @@
 
         tiempoMaximo = mkOption {
           type = str;
-          default = "8h";
-          description = "Lo más que puede durar una noche (`TimeoutStartSec=`). Cubre la ventana de fichas de 6 horas y la hora de espera antes de repetir una publicación fallida.";
+          default = "${
+            toString (
+              config.services.celda-nocturna.registroOficial.fichas.ventana
+              + config.services.celda-nocturna.reintentoDePublicacion
+              + 60
+            )
+          }min";
+          defaultText = literalExpression ''"''${toString (registroOficial.fichas.ventana + reintentoDePublicacion + 60)}min"'';
+          description = "Lo más que puede durar una noche (`TimeoutStartSec=`). Por defecto cubre la ventana de fichas, la espera antes de repetir una publicación fallida y una hora más; con los valores por defecto, 8 horas.";
         };
 
         directorioDeEstado = mkOption {
@@ -141,19 +155,55 @@
         registroOficial.pausa = mkOption {
           type = ints.between 3 3600;
           default = 3;
-          description = "Segundos entre el final de una respuesta y la petición siguiente. Nunca menos de 3.";
+          description = "Segundos entre el final de una respuesta del listado y la petición siguiente. Nunca menos de 3. Las fichas van a su ritmo, `fichas.ritmo`.";
         };
 
         registroOficial.maxPeticiones = mkOption {
           type = ints.positive;
           default = 300;
-          description = "Tope de peticiones por noche, `robots.txt` y reintentos incluidos.";
+          description = "Tope de peticiones del listado por noche, `robots.txt` y reintentos incluidos. Las fichas tienen el suyo: las que caben en su ventana.";
         };
 
-        registroOficial.maxFichas = mkOption {
-          type = ints.unsigned;
-          default = 250;
-          description = "Fichas que se leen cada noche. Con 0 solo se lee el listado.";
+        registroOficial.fichas.ritmo = mkOption {
+          type = ints.between 3 3600;
+          default = 3;
+          description = "Segundos entre el final de una ficha y la petición de la siguiente (ADR 0014). Nunca menos de 3. Si el ministerio pide menos peticiones, se sube aquí.";
+        };
+
+        registroOficial.fichas.ventana = mkOption {
+          type = ints.positive;
+          default = 360;
+          example = 120;
+          description = "Minutos durante los que se leen fichas, desde que empieza la noche. Al cerrarse, las que quedan esperan a la noche siguiente. A una cada 3 s, 6 horas son unas 5.500 fichas.";
+        };
+
+        registroOficial.fichas.relectura = mkOption {
+          type = ints.positive;
+          default = 30;
+          description = "Días tras los que se vuelve a leer una ficha ya leída.";
+        };
+
+        registroOficial.fichas.prioridad = mkOption {
+          type = listOf <| strMatching "[0-9]{2}";
+          default = singleton "08";
+          example = [
+            "08"
+            "17"
+            "25"
+            "43"
+          ];
+          description = ''
+            Provincias, por su código INE de dos cifras, cuyas fichas se leen antes que las de
+            ninguna zona de barrido, en este orden. Después van las de cada zona de barrido, en el
+            orden de `zonas` y `zonasEnTurno`, y al final las demás. Barcelona es 08.
+          '';
+        };
+
+        registroOficial.fichas.maximo = mkOption {
+          type = nullOr ints.unsigned;
+          default = null;
+          example = 250;
+          description = "Tope de fichas por noche. Sin él, se leen hasta cerrar la ventana; con 0 solo se lee el listado.";
         };
 
         registroOficial.reintentos = mkOption {
@@ -327,21 +377,27 @@
             CELDA_ANTENASMOVILES_MOTIVO = config.services.celda-nocturna.antenasmoviles.motivo;
             CELDA_ANTENASMOVILES_PAUSA_SEGUNDOS = toString config.services.celda-nocturna.antenasmoviles.pausa;
             CELDA_ANTENASMOVILES_USER_AGENT = config.services.celda-nocturna.antenasmoviles.userAgent;
-            CELDA_ANTENASMOVILES_ZONAS = listaDeZonas config.services.celda-nocturna.antenasmoviles.zonas;
+            CELDA_ANTENASMOVILES_ZONAS = listaDelPrograma config.services.celda-nocturna.antenasmoviles.zonas;
             CELDA_INGESTA_BASE = "/var/lib/${config.services.celda-nocturna.directorioDeEstado}/ingesta.sqlite";
             CELDA_INGESTA_COPIAS = config.services.celda-nocturna.copias.directorio;
             CELDA_INGESTA_COPIAS_CONSERVADAS = toString config.services.celda-nocturna.copias.conservar;
-            CELDA_INGESTA_MAX_FICHAS = toString config.services.celda-nocturna.registroOficial.maxFichas;
+            CELDA_INGESTA_MAX_FICHAS =
+              mkIf (config.services.celda-nocturna.registroOficial.fichas.maximo != null)
+              <| toString config.services.celda-nocturna.registroOficial.fichas.maximo;
             CELDA_PUBLICAR_REINTENTO_MINUTOS = toString config.services.celda-nocturna.reintentoDePublicacion;
             CELDA_REGISTRO_ACTIVO = boolToString config.services.celda-nocturna.registroOficial.enable;
             CELDA_REGISTRO_ESPERA_SEGUNDOS = toString config.services.celda-nocturna.registroOficial.espera;
+            CELDA_REGISTRO_FICHAS_PRIORIDAD = listaDelPrograma config.services.celda-nocturna.registroOficial.fichas.prioridad;
+            CELDA_REGISTRO_FICHAS_RELECTURA_DIAS = toString config.services.celda-nocturna.registroOficial.fichas.relectura;
+            CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS = toString config.services.celda-nocturna.registroOficial.fichas.ritmo;
+            CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS = toString config.services.celda-nocturna.registroOficial.fichas.ventana;
             CELDA_REGISTRO_MAX_PETICIONES = toString config.services.celda-nocturna.registroOficial.maxPeticiones;
             CELDA_REGISTRO_MOTIVO = config.services.celda-nocturna.registroOficial.motivo;
             CELDA_REGISTRO_PAUSA_SEGUNDOS = toString config.services.celda-nocturna.registroOficial.pausa;
             CELDA_REGISTRO_REINTENTOS = toString config.services.celda-nocturna.registroOficial.reintentos;
             CELDA_REGISTRO_USER_AGENT = config.services.celda-nocturna.registroOficial.userAgent;
-            CELDA_REGISTRO_ZONAS = listaDeZonas config.services.celda-nocturna.registroOficial.zonas;
-            CELDA_REGISTRO_ZONAS_EN_TURNO = listaDeZonas config.services.celda-nocturna.registroOficial.zonasEnTurno;
+            CELDA_REGISTRO_ZONAS = listaDelPrograma config.services.celda-nocturna.registroOficial.zonas;
+            CELDA_REGISTRO_ZONAS_EN_TURNO = listaDelPrograma config.services.celda-nocturna.registroOficial.zonasEnTurno;
             CELDA_REGISTRO_ZONAS_POR_NOCHE = toString config.services.celda-nocturna.registroOficial.zonasPorNoche;
           };
 
