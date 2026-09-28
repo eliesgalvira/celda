@@ -6,6 +6,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 puerto="${CELDA_CONVEX_PUERTO:-3240}"
-pnpm exec confect codegen
+./scripts/codegen.sh
 CONVEX_AGENT_MODE=anonymous exec pnpm exec convex dev \
   --local-cloud-port "$puerto" --local-site-port "$((puerto + 1))" --typecheck disable "$@"

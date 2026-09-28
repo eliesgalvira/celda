@@ -1,6 +1,15 @@
 import { defineConfig } from "vite-plus";
 
-const IGNORADOS = ["dist", "**/dist/**", "node_modules", "pnpm-lock.yaml", "*.tsbuildinfo"];
+const IGNORADOS = [
+  "dist",
+  "**/dist/**",
+  "node_modules",
+  "pnpm-lock.yaml",
+  "*.tsbuildinfo",
+  // Bundles de `confect codegen` junto a cada fuente de convex/confect/. Los borra al acabar, pero
+  // uno matado de golpe los deja, y llevan código de todo el monorepo (convex/scripts/codegen.sh).
+  "**/*.bundled_*",
+];
 
 export default defineConfig({
   fmt: {
