@@ -10,7 +10,6 @@ packages:
 catalog:
   "@confect/cli": 10.0.0-next.24
   "@confect/core": 10.0.0-next.24
-  "@confect/js": 10.0.0-next.24
   "@confect/server": 10.0.0-next.24
   "@confect/test": 10.0.0-next.24
   "@effect/platform-node": 4.0.0-rc.117

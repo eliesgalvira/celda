@@ -10,12 +10,9 @@
     "test": "vp test run"
   },
   "dependencies": {
-    "@celda/convex": "workspace:*",
     "@celda/dominio": "workspace:*",
     "@celda/sim": "workspace:*",
     "@celda/ui": "workspace:*",
-    "@confect/core": "catalog:",
-    "@confect/js": "catalog:",
     "@solidjs/web": "catalog:",
     "effect": "catalog:",
     "maplibre-gl": "catalog:",

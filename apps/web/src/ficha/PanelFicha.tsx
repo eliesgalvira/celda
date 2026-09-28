@@ -27,7 +27,7 @@ import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 import { createEffect, createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
 
-import { enVivo, usarDatos } from "../datos.tsx";
+import { leerEnSolid, usarDatos } from "../datos.tsx";
 import { MejorarSenal } from "../mejorar/MejorarSenal.tsx";
 import { TITULO_MEJORAR } from "../mejorar/textos.ts";
 import { ReferenciaEnFicha } from "../ubicacion/Ubicacion.tsx";
@@ -43,7 +43,7 @@ import {
   NOTA_TECNICA,
   TITULO_EJE,
 } from "./resumen.ts";
-import { FichasEnVivo } from "./servicio.ts";
+import { FichasPublicadas } from "./servicio.ts";
 import {
   antetituloDe,
   lugarDe,
@@ -63,8 +63,8 @@ export interface PanelFichaProps {
 }
 
 /**
- * El panel del emplazamiento seleccionado, con su ficha en vivo. Cambiar de emplazamiento es un
- * límite duro (historia 20): la ficha anterior desaparece en el acto y su lectura se libera, y
+ * El panel del emplazamiento seleccionado, con su ficha publicada. Cambiar de emplazamiento es un
+ * límite duro (historia 20): la ficha anterior desaparece en el acto y su lectura se cancela, y
  * una respuesta suya que llegue tarde ya no se enseña.
  */
 export function PanelFicha(props: PanelFichaProps) {
@@ -81,7 +81,10 @@ export function PanelFicha(props: PanelFichaProps) {
 
   const ficha = createMemo(() => {
     const clave = props.clave;
-    return enVivo(datos, Stream.unwrap(Effect.map(FichasEnVivo, (fichas) => fichas.seguir(clave))));
+    return leerEnSolid(
+      datos,
+      Stream.fromEffect(Effect.flatMap(FichasPublicadas, (fichas) => fichas.leer(clave))),
+    );
   });
 
   return (

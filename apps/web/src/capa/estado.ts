@@ -9,12 +9,7 @@ import * as Option from "effect/Option";
 import type { FalloCapa } from "./servicio.ts";
 
 /** Por qué no se ha podido cargar la capa de emplazamientos. */
-export type MotivoFalloCapa =
-  | "sin-publicar"
-  | "sin-backend"
-  | "sin-descarga"
-  | "danada"
-  | "interno";
+export type MotivoFalloCapa = "sin-publicar" | "sin-origen" | "sin-descarga" | "danada" | "interno";
 
 export type EstadoCapa =
   | { readonly tipo: "cargando" }
@@ -23,7 +18,7 @@ export type EstadoCapa =
 
 const MOTIVO: Readonly<Record<FalloCapa["_tag"], MotivoFalloCapa>> = {
   SinCapaPublicada: "sin-publicar",
-  BackendNoResponde: "sin-backend",
+  OrigenNoResponde: "sin-origen",
   CapaNoDescargada: "sin-descarga",
   CapaIlegible: "danada",
   VersionDistinta: "danada",

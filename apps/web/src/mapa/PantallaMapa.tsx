@@ -679,7 +679,7 @@ export function EstadoDeLaCapa(props: {
 
 const EXPLICACION_FALLO_CAPA = {
   "sin-publicar": "Todavía no hay ninguna capa de emplazamientos publicada.",
-  "sin-backend":
+  "sin-origen":
     "El servidor de Celda no ha dicho qué datos cargar. Puede fallar la conexión o estar bloqueado el servidor.",
   "sin-descarga":
     "El fichero con los emplazamientos no ha llegado. Puede fallar la conexión o estar bloqueado el servidor.",

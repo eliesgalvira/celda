@@ -8,7 +8,7 @@ import * as Stream from "effect/Stream";
 import { createContext, onSettled, untrack, useContext } from "solid-js";
 
 import type { CapaEmplazamientos } from "./capa/servicio.ts";
-import type { FichasEnVivo } from "./ficha/servicio.ts";
+import type { FichasPublicadas } from "./ficha/servicio.ts";
 import type { Brujula } from "./mejorar/brujula.ts";
 import type { AlmacenLocal } from "./ubicacion/almacen.ts";
 import type { BuscadorDeDirecciones } from "./ubicacion/buscador.ts";
@@ -21,7 +21,7 @@ import type { Geolocalizacion } from "./ubicacion/geolocalizacion.ts";
  */
 export type ServiciosDeDatos =
   | CapaEmplazamientos
-  | FichasEnVivo
+  | FichasPublicadas
   | Simulador
   | Geolocalizacion
   | Brujula
@@ -50,12 +50,12 @@ export function ProveedorDeDatos(props: {
 export const usarDatos = () => useContext(Datos);
 
 /**
- * Una lectura en vivo como la consume Solid (ADR 0003): devuelta desde `createMemo`, cada valor
+ * Un flujo de Effect como lo consume Solid (ADR 0003): devuelto desde `createMemo`, cada valor
  * del flujo es el nuevo valor del memo y sus fallos llegan a `<Errored>`. Cuando el memo se
  * recalcula o se desmonta, Solid cierra el iterable y el flujo se interrumpe, así que su lectura
- * se libera y una respuesta tardía ya no llega a nadie.
+ * se cancela y una respuesta tardía ya no llega a nadie.
  */
-export const enVivo = <A, E>(
+export const leerEnSolid = <A, E>(
   runtime: ManagedRuntime.ManagedRuntime<ServiciosDeDatos, never>,
   lectura: Stream.Stream<A, E, ServiciosDeDatos>,
 ): AsyncIterable<A> =>
