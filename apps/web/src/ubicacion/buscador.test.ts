@@ -192,7 +192,7 @@ describe("búsqueda de direcciones con Nominatim", () => {
     return Effect.gen(function* () {
       const girona = yield* buscarConTurno("Plaça de la Independència Girona");
       const coruna = yield* buscarConTurno("Rúa Real A Coruña");
-      assert.notMatch(JSON.stringify([girona, coruna]), /Gerona|La Coruña/u);
+      assert.notMatch([...girona, ...coruna].flat().join(" | "), /Gerona|La Coruña/u);
       // En Galicia el municipio es el concello (`municipality`), y el núcleo va en el detalle.
       assert.deepStrictEqual(coruna, [
         ["Rúa Real", "Zalaeta, A Pescaría", "A Coruña (A Coruña)"],
