@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "medir": "node src/medir.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "resistencia": "node src/resistencia.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",
