@@ -1,7 +1,7 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import type { Emplazamiento } from "@celda/dominio/emplazamiento";
-import { fusionar } from "@celda/dominio/fusion";
+import { fusionar, REGLA_FUSION } from "@celda/dominio/fusion";
 import type { Observacion } from "@celda/dominio/observacion";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, expect, it } from "@effect/vitest";
@@ -102,4 +102,52 @@ describe("fusión de los listados grabados el 28/09/2026", () => {
       }).pipe(Effect.provide(NodeServices.layer)),
     );
   }
+
+  it.effect(
+    "Madrid: cada registro trae sus coordenadas, y la azotea y la estación siguen juntas",
+    () =>
+      Effect.gen(function* () {
+        const emplazamientos = yield* fusionDelListado("madrid-centro");
+        const con = (compania: string, codigo: string) =>
+          emplazamientos
+            .filter((e) =>
+              e.estaciones.some((s) => s.compania === compania && s.codigos.includes(codigo)),
+            )
+            .map((e) => e.estaciones.map((s) => `${s.compania}:${s.codigos.join(",")}`));
+        // La misma estación de Vodafone con otros ceros, a 15,4 m y en la misma dirección.
+        assert.deepStrictEqual(con("vodafone", "17803"), [["vodafone:017803,17803"]]);
+        // Orange y Vodafone en CL COMANDANTE FORTEA, 3, a 16,9 m.
+        assert.deepStrictEqual(con("orange", "MADR3818O"), [
+          ["orange:MADR3818O", "vodafone:058469,58469"],
+        ]);
+        // Vodafone 00073 está a 55 m de 000073 y 73, en CL LIGULA, 4-6.
+        assert.deepStrictEqual(con("vodafone", "00073"), [
+          ["movistar:2802294", "orange:MADR0375A", "vodafone:000073,00073,73"],
+        ]);
+        // Con 15 m salían 1418.
+        assert.strictEqual(emplazamientos.length, 1331);
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "Barcelona: 24 emplazamientos juntan dos de los de solo 15 m y los demás no cambian",
+    () =>
+      Effect.gen(function* () {
+        const observaciones = (yield* listadoGrabado("barcelona")).registros.map(sinFicha);
+        const soloDistancia = fusionar(observaciones, {
+          ...REGLA_FUSION,
+          radioMismaDireccionMetros: 0,
+          radioMismoCodigoMetros: 0,
+        });
+        const ahora = fusionar(observaciones);
+        const firma = (e: Emplazamiento) =>
+          e.estaciones.flatMap((s) => s.codigos.map((c) => `${s.compania}:${c}`)).join(" ");
+        const antes = new Set(soloDistancia.map(firma));
+        const cambian = ahora.filter((e) => !antes.has(firma(e)));
+        assert.strictEqual(soloDistancia.length, 1318);
+        assert.strictEqual(ahora.length, 1294);
+        // La regla solo añade uniones: 1318 − 1294 = 24 emplazamientos nuevos que juntan dos cada uno.
+        assert.strictEqual(cambian.length, 24);
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
 });

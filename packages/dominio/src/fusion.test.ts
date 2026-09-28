@@ -34,6 +34,7 @@ interface Datos {
   readonly afirma?: Afirmacion;
   readonly bandas?: ReadonlyArray<Banda>;
   readonly fecha?: number;
+  readonly direccion?: string;
 }
 
 const observacion = (datos: Datos): Observacion => {
@@ -44,7 +45,7 @@ const observacion = (datos: Datos): Observacion => {
     compania: datos.compania,
     codigo: datos.codigo,
     posicion: datos.posicion ?? PIUS_XII,
-    direccion: "PZ PIUS XII, 4. BARCELONA, BARCELONA",
+    direccion: datos.direccion ?? "PZ PIUS XII, 4. BARCELONA, BARCELONA",
     municipio: "BARCELONA",
     bandas: datos.bandas ?? [],
     url: `https://${fuente}.example/${datos.codigo}`,
@@ -66,21 +67,21 @@ describe("fusionar", () => {
 
   it("junta compañías distintas justo dentro del radio y las separa justo fuera", async () => {
     const radio = REGLA_FUSION.radioMetros;
-    const dentro = fusionar([
-      observacion({ compania: "orange", codigo: "CATR6158A" }),
+    // Con direcciones distintas, para que solo cuente la distancia.
+    const vecina = (metros: number) =>
       observacion({
         compania: "movistar",
         codigo: "0800307",
-        posicion: alEste(PIUS_XII, radio - 0.5),
-      }),
+        posicion: alEste(PIUS_XII, metros),
+        direccion: "AV PEDRALBES, 1. BARCELONA, BARCELONA",
+      });
+    const dentro = fusionar([
+      observacion({ compania: "orange", codigo: "CATR6158A" }),
+      vecina(radio - 0.5),
     ]);
     const fuera = fusionar([
       observacion({ compania: "orange", codigo: "CATR6158A" }),
-      observacion({
-        compania: "movistar",
-        codigo: "0800307",
-        posicion: alEste(PIUS_XII, radio + 0.5),
-      }),
+      vecina(radio + 0.5),
     ]);
     assert.strictEqual(dentro.length, 1);
     assert.strictEqual(fuera.length, 2);
@@ -99,6 +100,58 @@ describe("fusionar", () => {
       emplazamientos[0]?.estaciones.map((e) => e.compania),
       ["movistar", "orange", "vodafone"],
     );
+  });
+
+  it("junta la misma dirección hasta su radio: la azotea de Madrid con cada compañía en su esquina", () => {
+    // CL COMANDANTE FORTEA, 3: Orange y Vodafone a 16,9 m en el listado del 28/09/2026.
+    const radio = REGLA_FUSION.radioMismaDireccionMetros;
+    const azotea = (metros: number, direccion: string) =>
+      fusionar([
+        observacion({
+          compania: "orange",
+          codigo: "MADR3818O",
+          direccion: "CL COMANDANTE FORTEA, 3. MADRID, MADRID",
+        }),
+        observacion({
+          compania: "vodafone",
+          codigo: "058469",
+          posicion: alEste(PIUS_XII, metros),
+          direccion,
+        }),
+      ]).length;
+    assert.strictEqual(azotea(radio - 0.5, "CL COMANDANTE FORTEA, 3. MADRID, MADRID"), 1);
+    assert.strictEqual(azotea(radio - 0.5, "CL DE COMANDANTE FORTEA, 3. MADRID, MADRID"), 1);
+    assert.strictEqual(azotea(radio + 0.5, "CL COMANDANTE FORTEA, 3. MADRID, MADRID"), 2);
+    assert.strictEqual(azotea(radio - 0.5, "CL COMANDANTE FORTEA, 5. MADRID, MADRID"), 2);
+    // Sin número no se sabe si es el mismo edificio.
+    assert.strictEqual(azotea(radio - 0.5, "CL COMANDANTE FORTEA, S/N. MADRID, MADRID"), 2);
+  });
+
+  it("junta la misma estación base con otros ceros hasta su radio, aunque cambie la dirección", async () => {
+    // Vodafone 017803 y 17803, CL ALBERTO AGUILERA, 3, a 15,4 m en el listado del 28/09/2026.
+    // Aquí a 50 m y con otra dirección, para que solo cuente el código.
+    const radio = REGLA_FUSION.radioMismoCodigoMetros;
+    const estacion = (metros: number, compania: Compania = "vodafone") =>
+      fusionar([
+        observacion({ compania: "vodafone", codigo: "017803" }),
+        observacion({
+          compania,
+          codigo: "17803",
+          posicion: alEste(PIUS_XII, metros),
+          direccion: "CL ALBERTO AGUILERA, 5. MADRID, MADRID",
+        }),
+      ]);
+    const juntas = estacion(50);
+    assert.deepStrictEqual(
+      juntas.map((e) => e.estaciones.map((s) => [s.compania, s.codigos])),
+      [[["vodafone", ["017803", "17803"]]]],
+    );
+    assert.deepStrictEqual(juntas[0]?.conflictos, []);
+    assert.strictEqual(estacion(radio - 0.5).length, 1);
+    assert.strictEqual(estacion(radio + 0.5).length, 2);
+    // El mismo número de otra compañía es otra estación base.
+    assert.strictEqual(estacion(50, "movistar").length, 2);
+    await expect(json(juntas)).toMatchFileSnapshot(referencia("misma-estacion"));
   });
 
   it("tres compañías en el mismo punto son un emplazamiento con tres estaciones base", async () => {

@@ -12,8 +12,8 @@ digi-2800199	digi:2800199 movistar:2800199
 digi-2800210	digi:2800210 movistar:2800210 orange:MADR0107B
 digi-2800219	digi:2800219 movistar:2800219 vodafone:87369
 digi-2800245	digi:2800245 movistar:2800245
-digi-2800278	digi:2800278 movistar:2800278 orange:MADR6130A vodafone:050877
-digi-2800304	digi:2800304 movistar:2800304 orange:MADR0403Q vodafone:11331,74397
+digi-2800278	digi:2800278 movistar:2800278 orange:MADR6130A vodafone:050877,11333,50877
+digi-2800304	digi:2800304 movistar:2800304 orange:MADR0403Q vodafone:074397,11331,74397
 digi-2800313	digi:2800313 movistar:2800313 vodafone:078443,78443
 digi-2800356	digi:2800356 movistar:2800356
 digi-2800367	digi:2800367 movistar:2800367 vodafone:48796
@@ -53,7 +53,7 @@ digi-2802184	digi:2802184 movistar:2802184 orange:MADR0345Q
 digi-2802194	digi:2802194 movistar:2802194 vodafone:79742
 digi-2802200	digi:2802200 movistar:2802200,2803090
 digi-2802212	digi:2802212 movistar:2802212 orange:MADR0522H vodafone:011658,11658
-digi-2802291	digi:2802291 movistar:2802291 vodafone:71290
+digi-2802291	digi:2802291 movistar:2802291 orange:MADR0372M vodafone:071290,71290
 digi-2802312	digi:2802312 movistar:2802312
 digi-2802342	digi:2802342 movistar:2802342 orange:MADR0336C,MADR0336D
 digi-2802370	digi:2802370 movistar:2802370 orange:MADR4109A vodafone:59048
@@ -65,7 +65,7 @@ digi-2802450	digi:2802450 movistar:2802450
 digi-2802483	digi:2802483 movistar:2802483
 digi-2802776	digi:2802776 movistar:2802776
 digi-2802778	digi:2802778 movistar:2802778 orange:MADR0186A vodafone:055500,55500
-digi-2802786	digi:2802786 movistar:2802786 vodafone:34147
+digi-2802786	digi:2802786 movistar:2802786 vodafone:034147,34147
 digi-2802885	digi:2802885 movistar:2802885
 digi-2802887	digi:2802887 movistar:2802887 orange:MADR2130A vodafone:182841
 digi-2802933	digi:2802933 movistar:2802933
@@ -82,7 +82,7 @@ digi-2804449	digi:2804449 movistar:2804449
 digi-2804718	digi:2804718 movistar:2804718
 digi-2805244	digi:2805244 movistar:2805244 orange:MADR0003A vodafone:014027,14027
 digi-2805425	digi:2805425 movistar:2805425
-digi-2805870	digi:2805870 movistar:2805870 vodafone:27
+digi-2805870	digi:2805870 movistar:2805870 vodafone:000027,00027,27
 digi-2805935	digi:2805935 movistar:2805935 vodafone:048914,48914
 digi-2806002	digi:2806002 movistar:2806002 orange:MADR0228M vodafone:058164
 digi-2806035	digi:2806035 movistar:2806035,2812180 orange:MADR0330P vodafone:024674,24674
@@ -120,7 +120,7 @@ movistar-2800146	movistar:2800146
 movistar-2800160	movistar:2800160 orange:MADR0384A vodafone:073382,73382
 movistar-2800163	movistar:2800163
 movistar-2800169	movistar:2800169 vodafone:27778
-movistar-2800172	movistar:2800172 orange:MADR3965A
+movistar-2800172	movistar:2800172 orange:MADR3965A vodafone:144376
 movistar-2800180	movistar:2800180
 movistar-2800190	movistar:2800190 orange:MADR0302A
 movistar-2800202	movistar:2800202 orange:MADR3823A
@@ -137,14 +137,14 @@ movistar-2800246	movistar:2800246
 movistar-2800249	movistar:2800249 orange:MADR0164E
 movistar-2800256	movistar:2800256 orange:MADR3525C vodafone:015732,15732
 movistar-2800276	movistar:2800276
-movistar-2800279	movistar:2800279 orange:MADR0366I,MADR6138A,MADR6281A vodafone:2708
+movistar-2800279	movistar:2800279 orange:MADR0366I,MADR6138A,MADR6281A vodafone:002708,02708,2708
 movistar-2800291	movistar:2800291
-movistar-2800306	movistar:2800306
+movistar-2800306	movistar:2800306 vodafone:79997
 movistar-2800307	movistar:2800307 orange:c vodafone:000006,6,c
-movistar-2800352	movistar:2800352 orange:MADR0069A,MADR6279A vodafone:027885
+movistar-2800352	movistar:2800352 orange:MADR0069A,MADR6279A vodafone:023467,027885,23467
 movistar-2800353	movistar:2800353
-movistar-2800354	movistar:2800354 vodafone:59824
-movistar-2800355	movistar:2800355 vodafone:10362
+movistar-2800354	movistar:2800354 vodafone:059824,59824
+movistar-2800355	movistar:2800355 vodafone:010362,10362
 movistar-2800357	movistar:2800357
 movistar-2800360	movistar:2800360 orange:MADR0544A vodafone:017962,17962
 movistar-2800364	movistar:2800364
@@ -183,7 +183,7 @@ movistar-2800731	movistar:2800731
 movistar-2800743	movistar:2800743
 movistar-2800745	movistar:2800745
 movistar-2800756	movistar:2800756
-movistar-2800757	movistar:2800757 orange:MADR0270A vodafone:85289
+movistar-2800757	movistar:2800757 orange:MADR0270A vodafone:085289,85289
 movistar-2800765	movistar:2800765
 movistar-2800766	movistar:2800766
 movistar-2800777	movistar:2800777
@@ -203,10 +203,10 @@ movistar-2800926	movistar:2800926
 movistar-2800927	movistar:2800927 orange:MADR2406A vodafone:176825
 movistar-2800928	movistar:2800928 orange:MADR6147A
 movistar-2800930	movistar:2800930 vodafone:183386
-movistar-2800931	movistar:2800931
+movistar-2800931	movistar:2800931 orange:MADR0531A vodafone:58628
 movistar-2800934	movistar:2800934
 movistar-2800939	movistar:2800939 orange:MADR2450A vodafone:176824
-movistar-2800942	movistar:2800942 orange:MADR6158A vodafone:27029
+movistar-2800942	movistar:2800942 orange:MADR0961A,MADR6158A vodafone:27029
 movistar-2800945	movistar:2800945
 movistar-2800948	movistar:2800948
 movistar-2800950	movistar:2800950
@@ -228,11 +228,11 @@ movistar-2801353	movistar:2801353
 movistar-2801463	movistar:2801463 orange:MADR0921G vodafone:000181,00181,181
 movistar-2801467	movistar:2801467
 movistar-2801497	movistar:2801497 orange:MADR3955A vodafone:003396,03396,3396
-movistar-2801506	movistar:2801506
+movistar-2801506	movistar:2801506 orange:MADR0074N vodafone:067628,67628
 movistar-2801516	movistar:2801516 orange:MADR0512L vodafone:056998,56998
 movistar-2801517	movistar:2801517
-movistar-2801519	movistar:2801519
-movistar-2801520	movistar:2801520 vodafone:71382
+movistar-2801519	movistar:2801519 orange:MADR0513A vodafone:073250,73250
+movistar-2801520	movistar:2801520 vodafone:071382,71382
 movistar-2801538	movistar:2801538
 movistar-2801539	movistar:2801539
 movistar-2801543	movistar:2801543 orange:MADR3966A vodafone:50880
@@ -246,8 +246,8 @@ movistar-2801644	movistar:2801644
 movistar-2801647	movistar:2801647
 movistar-2801654	movistar:2801654
 movistar-2801657	movistar:2801657
-movistar-2801663	movistar:2801663
-movistar-2801664	movistar:2801664 vodafone:051047
+movistar-2801663	movistar:2801663,2802154
+movistar-2801664	movistar:2801664 vodafone:051047,51047
 movistar-2801687	movistar:2801687
 movistar-2801690	movistar:2801690 vodafone:010105,10105
 movistar-2801692	movistar:2801692 orange:MADR0461A vodafone:62805
@@ -259,7 +259,7 @@ movistar-2801700	movistar:2801700 orange:MADR0397C vodafone:73550
 movistar-2801705	movistar:2801705 orange:MADR3552K vodafone:0025395,25395
 movistar-2801714	movistar:2801714
 movistar-2801769	movistar:2801769 orange:MADR0971A vodafone:091878
-movistar-2801888	movistar:2801888 vodafone:071210
+movistar-2801888	movistar:2801888 vodafone:071210,71210
 movistar-2801938	movistar:2801938 vodafone:031841,31841
 movistar-2801947	movistar:2801947 orange:MADR0300A vodafone:061304,61304
 movistar-2801948	movistar:2801948 orange:MADR0076I vodafone:67384
@@ -283,12 +283,11 @@ movistar-2802135	movistar:2802135
 movistar-2802139	movistar:2802139 vodafone:000207,207
 movistar-2802140	movistar:2802140
 movistar-2802141	movistar:2802141,2802362 orange:MADR3969A vodafone:000194,00194,194
-movistar-2802142	movistar:2802142 orange:MADR4393F
+movistar-2802142	movistar:2802142 orange:MADR4393F vodafone:66403
 movistar-2802143	movistar:2802143
 movistar-2802146	movistar:2802146
 movistar-2802147	movistar:2802147
 movistar-2802152	movistar:2802152
-movistar-2802154	movistar:2802154
 movistar-2802156	movistar:2802156 orange:MADR2445A vodafone:205300
 movistar-2802157	movistar:2802157
 movistar-2802163	movistar:2802163
@@ -318,7 +317,7 @@ movistar-2802268	movistar:2802268
 movistar-2802279	movistar:2802279
 movistar-2802281	movistar:2802281
 movistar-2802290	movistar:2802290 orange:MADR0941A vodafone:55538
-movistar-2802294	movistar:2802294 vodafone:000073,73
+movistar-2802294	movistar:2802294 orange:MADR0375A vodafone:000073,00073,73
 movistar-2802295	movistar:2802295
 movistar-2802298	movistar:2802298
 movistar-2802299	movistar:2802299
@@ -343,7 +342,7 @@ movistar-2802367	movistar:2802367
 movistar-2802372	movistar:2802372
 movistar-2802376	movistar:2802376 orange:MADR0156D vodafone:076944,76944
 movistar-2802378	movistar:2802378
-movistar-2802382	movistar:2802382
+movistar-2802382	movistar:2802382 orange:MADR6131A,MADR6132A
 movistar-2802385	movistar:2802385 orange:MADR0377D vodafone:0000198,000198,198
 movistar-2802388	movistar:2802388
 movistar-2802392	movistar:2802392 vodafone:196603
@@ -375,18 +374,18 @@ movistar-2802948	movistar:2802948,2808417
 movistar-2802959	movistar:2802959
 movistar-2802971	movistar:2802971 orange:MADR0455A
 movistar-2802975	movistar:2802975
-movistar-2802976	movistar:2802976 orange:MADR6243A
+movistar-2802976	movistar:2802976 orange:MADR4006A,MADR6243A vodafone:142275
 movistar-2802977	movistar:2802977 vodafone:0192855,192855
 movistar-2802994	movistar:2802994
 movistar-2803002	movistar:2803002
 movistar-2803003	movistar:2803003
 movistar-2803014	movistar:2803014
 movistar-2803015	movistar:2803015 vodafone:59325
-movistar-2803018	movistar:2803018
-movistar-2803019	movistar:2803019
+movistar-2803018	movistar:2803018 vodafone:058976,58976
+movistar-2803019	movistar:2803019,2809560
 movistar-2803022	movistar:2803022
 movistar-2803027	movistar:2803027 orange:MADR0957A vodafone:051058,51058
-movistar-2803029	movistar:2803029
+movistar-2803029	movistar:2803029 orange:MADR6435A vodafone:48640
 movistar-2803031	movistar:2803031
 movistar-2803035	movistar:2803035
 movistar-2803036	movistar:2803036
@@ -400,7 +399,7 @@ movistar-2803062	movistar:2803062
 movistar-2803064	movistar:2803064
 movistar-2803065	movistar:2803065
 movistar-2803066	movistar:2803066
-movistar-2803067	movistar:2803067
+movistar-2803067	movistar:2803067 orange:MADR2526M vodafone:094907,94907
 movistar-2803071	movistar:2803071 orange:MADR0200B
 movistar-2803074	movistar:2803074
 movistar-2803078	movistar:2803078
@@ -418,8 +417,8 @@ movistar-2803208	movistar:2803208
 movistar-2803214	movistar:2803214 orange:MADE0363B,MADR0363B vodafone:013838,13838
 movistar-2803216	movistar:2803216
 movistar-2803217	movistar:2803217
-movistar-2803221	movistar:2803221
-movistar-2803223	movistar:2803223 vodafone:078699
+movistar-2803221	movistar:2803221 vodafone:17815
+movistar-2803223	movistar:2803223 vodafone:078699,78699
 movistar-2803224	movistar:2803224
 movistar-2803225	movistar:2803225 orange:MADR0056A vodafone:87310
 movistar-2803229	movistar:2803229 orange:MADR2469A vodafone:67667
@@ -433,14 +432,14 @@ movistar-2803259	movistar:2803259
 movistar-2803265	movistar:2803265
 movistar-2803269	movistar:2803269
 movistar-2803273	movistar:2803273
-movistar-2803282	movistar:2803282 orange:MADR6747A
+movistar-2803282	movistar:2803282 orange:MADR6747A,MADR6748A
 movistar-2803288	movistar:2803288 orange:MADR0127F vodafone:0024555,024555,24555
 movistar-2803289	movistar:2803289
 movistar-2803290	movistar:2803290
 movistar-2803303	movistar:2803303 orange:MADR6148A
 movistar-2803310	movistar:2803310
 movistar-2803317	movistar:2803317
-movistar-2803323	movistar:2803323 orange:MADR0251A
+movistar-2803323	movistar:2803323 orange:MADR0251A vodafone:51108,I051108
 movistar-2803324	movistar:2803324 orange:MADR0905G vodafone:051048,51048
 movistar-2803331	movistar:2803331
 movistar-2803375	movistar:2803375
@@ -453,10 +452,9 @@ movistar-2803503	movistar:2803503 orange:MADR0327A vodafone:0027284,027284,27284
 movistar-2803504	movistar:2803504
 movistar-2803505	movistar:2803505
 movistar-2803515	movistar:2803515
-movistar-2803534	movistar:2803534
+movistar-2803534	movistar:2803534 orange:MADR3891A
 movistar-2803556	movistar:2803556
-movistar-2803557	movistar:2803557
-movistar-2803558	movistar:2803558
+movistar-2803557	movistar:2803557,2803558
 movistar-2803567	movistar:2803567
 movistar-2803584	movistar:2803584
 movistar-2803600	movistar:2803600
@@ -469,7 +467,7 @@ movistar-2803746	movistar:2803746
 movistar-2803801	movistar:2803801
 movistar-2803833	movistar:2803833 orange:MADR6262A vodafone:051437
 movistar-2803869	movistar:2803869
-movistar-2803874	movistar:2803874 vodafone:060925
+movistar-2803874	movistar:2803874 orange:MADR0360B vodafone:060925
 movistar-2803888	movistar:2803888 vodafone:079347,79347
 movistar-2803903	movistar:2803903
 movistar-2803907	movistar:2803907
@@ -477,7 +475,7 @@ movistar-2803911	movistar:2803911 orange:MADR0819K vodafone:091450,91450
 movistar-2803915	movistar:2803915
 movistar-2803924	movistar:2803924
 movistar-2803934	movistar:2803934
-movistar-2803937	movistar:2803937 orange:MADR0914A vodafone:000003
+movistar-2803937	movistar:2803937 orange:MADR0914A vodafone:000003,00003
 movistar-2803944	movistar:2803944
 movistar-2803962	movistar:2803962 vodafone:062934,62934
 movistar-2803967	movistar:2803967
@@ -487,7 +485,7 @@ movistar-2803984	movistar:2803984
 movistar-2803989	movistar:2803989
 movistar-2804113	movistar:2804113
 movistar-2804266	movistar:2804266
-movistar-2804363	movistar:2804363 orange:MADR2401A vodafone:56995
+movistar-2804363	movistar:2804363 orange:MADR2401A vodafone:056995,56995
 movistar-2804427	movistar:2804427
 movistar-2804439	movistar:2804439
 movistar-2804459	movistar:2804459
@@ -527,7 +525,7 @@ movistar-2804826	movistar:2804826
 movistar-2804847	movistar:2804847
 movistar-2804856	movistar:2804856
 movistar-2804937	movistar:2804937
-movistar-2804989	movistar:2804989 orange:MADR0817A vodafone:017777
+movistar-2804989	movistar:2804989 orange:MADR0817A vodafone:017777,17777
 movistar-2804999	movistar:2804999
 movistar-2805022	movistar:2805022
 movistar-2805025	movistar:2805025
@@ -551,7 +549,7 @@ movistar-2805317	movistar:2805317 orange:MADR6362A311
 movistar-2805321	movistar:2805321
 movistar-2805367	movistar:2805367
 movistar-2805368	movistar:2805368
-movistar-2805394	movistar:2805394 vodafone:00007
+movistar-2805394	movistar:2805394 vodafone:000007,00007
 movistar-2805395	movistar:2805395
 movistar-2805439	movistar:2805439 orange:MADR4514A vodafone:064098,64098
 movistar-2805449	movistar:2805449,2810915
@@ -562,7 +560,7 @@ movistar-2805490	movistar:2805490 orange:MADR3868A vodafone:90863
 movistar-2805499	movistar:2805499 orange:MADR0020B
 movistar-2805517	movistar:2805517 orange:MADR0102L vodafone:67887
 movistar-2805531	movistar:2805531
-movistar-2805532	movistar:2805532 vodafone:00197,197
+movistar-2805532	movistar:2805532 vodafone:000197,00197,197
 movistar-2805561	movistar:2805561 orange:MADR0027A vodafone:73890
 movistar-2805577	movistar:2805577 vodafone:055527,55527
 movistar-2805578	movistar:2805578
@@ -571,7 +569,7 @@ movistar-2805599	movistar:2805599
 movistar-2805628	movistar:2805628
 movistar-2805629	movistar:2805629
 movistar-2805665	movistar:2805665 vodafone:071777,71777
-movistar-2805666	movistar:2805666 orange:MADR0405F vodafone:70448
+movistar-2805666	movistar:2805666 orange:MADR0405F vodafone:070448,70448
 movistar-2805705	movistar:2805705
 movistar-2805714	movistar:2805714
 movistar-2805715	movistar:2805715
@@ -585,9 +583,9 @@ movistar-2805840	movistar:2805840 orange:MADR0334D vodafone:067614
 movistar-2805866	movistar:2805866 vodafone:000004,00004,4
 movistar-2805868	movistar:2805868 vodafone:000189,00189
 movistar-2805873	movistar:2805873 vodafone:27743
-movistar-2805874	movistar:2805874
+movistar-2805874	movistar:2805874 vodafone:070717
 movistar-2805882	movistar:2805882
-movistar-2805883	movistar:2805883 vodafone:70716
+movistar-2805883	movistar:2805883 vodafone:070716,70716
 movistar-2805884	movistar:2805884 vodafone:67867
 movistar-2805885	movistar:2805885 vodafone:030946,30946
 movistar-2805891	movistar:2805891 vodafone:027084,27084
@@ -601,15 +599,15 @@ movistar-2805975	movistar:2805975 orange:MADR0678E vodafone:000183,00183,183
 movistar-2805979	movistar:2805979 vodafone:073121
 movistar-2805980	movistar:2805980 vodafone:061665,61665
 movistar-2805987	movistar:2805987
-movistar-2805988	movistar:2805988 vodafone:002518,2518
+movistar-2805988	movistar:2805988 vodafone:002518,02518,2518
 movistar-2805999	movistar:2805999
 movistar-2806001	movistar:2806001 vodafone:040264,40264
 movistar-2806007	movistar:2806007 vodafone:72538
 movistar-2806009	movistar:2806009 vodafone:072285
 movistar-2806010	movistar:2806010
-movistar-2806013	movistar:2806013
+movistar-2806013	movistar:2806013 vodafone:73162
 movistar-2806016	movistar:2806016
-movistar-2806017	movistar:2806017 vodafone:003392,3392
+movistar-2806017	movistar:2806017 vodafone:003392,03392,3392
 movistar-2806129	movistar:2806129
 movistar-2806150	movistar:2806150 orange:MADR3551A,MADR3551M
 movistar-2806151	movistar:2806151 vodafone:062116,62116
@@ -619,7 +617,7 @@ movistar-2806173	movistar:2806173 orange:MADR2407A vodafone:013665,13665
 movistar-2806216	movistar:2806216
 movistar-2806223	movistar:2806223 vodafone:10773
 movistar-2806226	movistar:2806226 orange:MADR0048A vodafone:067632,67632
-movistar-2806234	movistar:2806234 orange:MADR3901B,MADR3901J vodafone:66348
+movistar-2806234	movistar:2806234 orange:MADR3901B,MADR3901J vodafone:066348,66348
 movistar-2806335	movistar:2806335
 movistar-2806376	movistar:2806376
 movistar-2806426	movistar:2806426
@@ -644,7 +642,7 @@ movistar-2806707	movistar:2806707 orange:MADR0507A
 movistar-2806772	movistar:2806772
 movistar-2806800	movistar:2806800 orange:MADR0178K vodafone:066982,66982
 movistar-2806823	movistar:2806823 orange:MADR0311Ñ vodafone:82
-movistar-2806824	movistar:2806824
+movistar-2806824	movistar:2806824 orange:MADR0223B vodafone:059643,59643
 movistar-2806834	movistar:2806834
 movistar-2806849	movistar:2806849
 movistar-2806856	movistar:2806856
@@ -692,7 +690,7 @@ movistar-2808755	movistar:2808755
 movistar-2808842	movistar:2808842 orange:MADR8035M
 movistar-2808879	movistar:2808879
 movistar-2809004	movistar:2809004
-movistar-2809056	movistar:2809056 vodafone:128568
+movistar-2809056	movistar:2809056 orange:MADR0344C vodafone:128568
 movistar-2809409	movistar:2809409 vodafone:010414,10414
 movistar-2809415	movistar:2809415 vodafone:000166,00166,166
 movistar-2809469	movistar:2809469
@@ -700,7 +698,6 @@ movistar-2809544	movistar:2809544
 movistar-2809548	movistar:2809548 vodafone:57024
 movistar-2809555	movistar:2809555 orange:MADR0385D vodafone:67868
 movistar-2809556	movistar:2809556 orange:MADR0421L vodafone:057169,57169
-movistar-2809560	movistar:2809560
 movistar-2809594	movistar:2809594
 movistar-2809595	movistar:2809595 orange:MADR0468A vodafone:067961,67961
 movistar-2809683	movistar:2809683
@@ -780,7 +777,7 @@ movistar-2811127	movistar:2811127 orange:MADR6357A104
 movistar-2811128	movistar:2811128 orange:MADR6357A906 vodafone:64441
 movistar-2811129	movistar:2811129 orange:MADR6357A1006
 movistar-2811130	movistar:2811130
-movistar-2811132	movistar:2811132 orange:MADR6367A1014
+movistar-2811132	movistar:2811132 orange:MADR6367A1014 vodafone:006417,06417,6417
 movistar-2811134	movistar:2811134 orange:MADR6367A1013
 movistar-2811135	movistar:2811135 orange:MADR6367A211
 movistar-2811137	movistar:2811137 orange:MADR6367A210
@@ -810,7 +807,7 @@ movistar-2811479	movistar:2811479
 movistar-2811612	movistar:2811612 vodafone:114208
 movistar-2811656	movistar:2811656
 movistar-2811664	movistar:2811664 orange:MADR2171A vodafone:207703
-movistar-2811671	movistar:2811671
+movistar-2811671	movistar:2811671 vodafone:010108,10108
 movistar-2811687	movistar:2811687
 movistar-2811698	movistar:2811698
 movistar-2811711	movistar:2811711
@@ -870,7 +867,7 @@ orange-MADR0036A	orange:MADR0036A,MADR0036O
 orange-MADR0041H	orange:MADR0041H
 orange-MADR0042E	orange:MADR0042E
 orange-MADR0044E	orange:MADR0044E
-orange-MADR0047A	orange:MADR0047A vodafone:041657
+orange-MADR0047A	orange:MADR0047A vodafone:041657,41657
 orange-MADR0051F	orange:MADR0051F
 orange-MADR0054E	orange:MADR0054E
 orange-MADR0055F	orange:MADR0055F
@@ -881,13 +878,12 @@ orange-MADR0062G	orange:MADR0062G vodafone:072462,72462
 orange-MADR0065D	orange:MADR0065D
 orange-MADR0066D	orange:MADR0066D
 orange-MADR0072C	orange:MADR0072C
-orange-MADR0074N	orange:MADR0074N vodafone:067628,67628
 orange-MADR0075F	orange:MADR0075F vodafone:067276
 orange-MADR0078C	orange:MADR0078C
 orange-MADR0079G	orange:MADR0079G
 orange-MADR0081M	orange:MADR0081M
 orange-MADR0093N	orange:MADR0093N
-orange-MADR0096C	orange:MADR0096C
+orange-MADR0096C	orange:MADR0096C vodafone:74851
 orange-MADR0099K	orange:MADR0099K
 orange-MADR0100C	orange:MADR0100C vodafone:085356
 orange-MADR0103C	orange:MADR0103C
@@ -926,13 +922,12 @@ orange-MADR0196A	orange:MADR0196A vodafone:054507,54507
 orange-MADR0197X	orange:MADR0197X vodafone:83046
 orange-MADR0216M	orange:MADR0216M vodafone:91941
 orange-MADR0218A	orange:MADR0218A vodafone:083245,83245
-orange-MADR0223B	orange:MADR0223B vodafone:059643,59643
 orange-MADR0234Q	orange:MADR0234Q vodafone:063744,63744
 orange-MADR0250A	orange:MADR0250A
 orange-MADR0263A	orange:MADR0263A vodafone:073749,73749
 orange-MADR0264E	orange:MADR0264E
 orange-MADR0292A	orange:MADR0292A vodafone:078272,78272
-orange-MADR0293A	orange:MADR0293A
+orange-MADR0293A	orange:MADR0293A vodafone:055163,55163
 orange-MADR0301E	orange:MADR0301E
 orange-MADR0303B	orange:MADR0303B
 orange-MADR0304A	orange:MADR0304A
@@ -942,15 +937,13 @@ orange-MADR0314B	orange:MADR0314B vodafone:014305,14305
 orange-MADR0315C	orange:MADR0315C
 orange-MADR0321A	orange:MADR0321A vodafone:73787
 orange-MADR0322A	orange:MADR0322A vodafone:038119,38119
-orange-MADR0325A	orange:MADR0325A
+orange-MADR0325A	orange:MADR0325A vodafone:010343,10343
 orange-MADR0343A	orange:MADR0343A
-orange-MADR0344C	orange:MADR0344C
 orange-MADR0348F	orange:MADR0348F
 orange-MADR0350A	orange:MADR0350A
 orange-MADR0354J	orange:MADR0354J
 orange-MADR0355E	orange:MADR0355E
 orange-MADR0357B	orange:MADR0357B vodafone:027855,27855
-orange-MADR0360B	orange:MADR0360B
 orange-MADR0361Z	orange:MADR0361Z
 orange-MADR0362B	orange:MADR0362B
 orange-MADR0364B	orange:MADR0364B vodafone:143556
@@ -959,9 +952,7 @@ orange-MADR0368A	orange:MADR0368A
 orange-MADR0369K	orange:MADR0369K vodafone:059681,59681
 orange-MADR0370E	orange:MADR0370E vodafone:010168,10168
 orange-MADR0371G	orange:MADR0371G
-orange-MADR0372M	orange:MADR0372M
 orange-MADR0373F	orange:MADR0373F
-orange-MADR0375A	orange:MADR0375A
 orange-MADR0376E	orange:MADR0376E
 orange-MADR0380A	orange:MADR0380A,MADR3380A vodafone:202878
 orange-MADR0381O	orange:MADR0381O
@@ -973,7 +964,7 @@ orange-MADR0389A	orange:MADR0389A
 orange-MADR0390C	orange:MADR0390C vodafone:128567
 orange-MADR0391A	orange:MADR0391A
 orange-MADR0392A	orange:MADR0392A vodafone:15667
-orange-MADR0395B	orange:MADR0395B vodafone:000160,160
+orange-MADR0395B	orange:MADR0395B vodafone:000160,00160,160
 orange-MADR0398C	orange:MADR0398C
 orange-MADR0400A	orange:MADR0400A
 orange-MADR0401A	orange:MADR0401A vodafone:184636
@@ -990,18 +981,16 @@ orange-MADR0452E	orange:MADR0452E
 orange-MADR0453E	orange:MADR0453E,MADR0453R vodafone:67626
 orange-MADR0457A	orange:MADR0457A vodafone:000185,00185,185
 orange-MADR0498A	orange:MADR0498A
-orange-MADR0499A	orange:MADR0499A vodafone:83174
+orange-MADR0499A	orange:MADR0499A vodafone:083174,83174
 orange-MADR0501H	orange:MADR0501H
 orange-MADR0505A	orange:MADR0505A
 orange-MADR0508G	orange:MADR0508G
 orange-MADR0510K	orange:MADR0510K vodafone:59847
 orange-MADR0511B	orange:MADR0511B
-orange-MADR0513A	orange:MADR0513A vodafone:73250
 orange-MADR0514A	orange:MADR0514A
 orange-MADR0518A	orange:MADR0518A,MADR0518L
 orange-MADR0520M	orange:MADR0520M
 orange-MADR0523B	orange:MADR0523B
-orange-MADR0531A	orange:MADR0531A vodafone:58628
 orange-MADR0543H	orange:MADR0543H,MADR0543L vodafone:000163,00163,163
 orange-MADR0554B	orange:MADR0554B
 orange-MADR0555A	orange:MADR0555A vodafone:025322,25322
@@ -1024,7 +1013,6 @@ orange-MADR0940A	orange:MADR0940A
 orange-MADR0943A	orange:MADR0943A
 orange-MADR0947C	orange:MADR0947C vodafone:027959,27959
 orange-MADR0960A	orange:MADR0960A,MADR6327A
-orange-MADR0961A	orange:MADR0961A
 orange-MADR0962A	orange:MADR0962A vodafone:76961
 orange-MADR0969A	orange:MADR0969A
 orange-MADR1359A	orange:MADR1359A
@@ -1042,29 +1030,26 @@ orange-MADR2420A	orange:MADR2420A vodafone:000205,00205,205
 orange-MADR2449A	orange:MADR2449A
 orange-MADR2484A	orange:MADR2484A vodafone:064003,64003
 orange-MADR2498A	orange:MADR2498A
-orange-MADR2526M	orange:MADR2526M vodafone:094907,94907
 orange-MADR2691A	orange:MADR2691A
 orange-MADR3264A	orange:MADR3264A vodafone:66391
 orange-MADR3272A	orange:MADR3272A vodafone:198206
 orange-MADR3274A	orange:MADR3274A
 orange-MADR3318B	orange:MADR3318B
-orange-MADR3818O	orange:MADR3818O
-orange-MADR3827B	orange:MADR3827B vodafone:58904
-orange-MADR3844A	orange:MADR3844A vodafone:54102
-orange-MADR3891A	orange:MADR3891A
+orange-MADR3818O	orange:MADR3818O vodafone:058469,58469
+orange-MADR3827B	orange:MADR3827B,MADR6282A vodafone:58904
+orange-MADR3844A	orange:MADR3844A vodafone:054102,54102
 orange-MADR3897A	orange:MADR3897A
 orange-MADR3902E	orange:MADR3902E
 orange-MADR3944A	orange:MADR3944A vodafone:017460,17460
 orange-MADR3954A	orange:MADR3954A vodafone:014122,14122
-orange-MADR3956A	orange:MADR3956A vodafone:000190,190
+orange-MADR3956A	orange:MADR3956A vodafone:000190,00190,190
 orange-MADR3962B	orange:MADR3962B vodafone:64249
 orange-MADR3963A	orange:MADR3963A,MADR3963B vodafone:139091
 orange-MADR3967A	orange:MADR3967A,MADR3967B
 orange-MADR3982A	orange:MADR3982A
 orange-MADR3985A	orange:MADR3985A
-orange-MADR4006A	orange:MADR4006A vodafone:142275
 orange-MADR4029A	orange:MADR4029A vodafone:9
-orange-MADR4049A	orange:MADR4049A vodafone:011332
+orange-MADR4049A	orange:MADR4049A,MADR6239A vodafone:011332,11332,130478
 orange-MADR4051A	orange:MADR4051A
 orange-MADR4082A	orange:MADR4082A
 orange-MADR4088A	orange:MADR4088A vodafone:000155,00155,155
@@ -1075,7 +1060,7 @@ orange-MADR4337C	orange:MADR4337C vodafone:028607,28607
 orange-MADR4339A	orange:MADR4339A
 orange-MADR4374F	orange:MADR4374F
 orange-MADR4389A	orange:MADR4389A
-orange-MADR4418A	orange:MADR4418A vodafone:8
+orange-MADR4418A	orange:MADR4418A vodafone:000008,8
 orange-MADR4441A	orange:MADR4441A vodafone:000022,22
 orange-MADR5006B	orange:MADR5006B
 orange-MADR6005A	orange:MADR6005A
@@ -1091,7 +1076,6 @@ orange-MADR6104A	orange:MADR6104A
 orange-MADR6105A	orange:MADR6105A
 orange-MADR6106A	orange:MADR6106A
 orange-MADR6107A	orange:MADR6107A
-orange-MADR6131A	orange:MADR6131A,MADR6132A
 orange-MADR6136A	orange:MADR6136A
 orange-MADR6149A	orange:MADR6149A
 orange-MADR6150A	orange:MADR6150A
@@ -1099,13 +1083,11 @@ orange-MADR6156A	orange:MADR6156A
 orange-MADR6164A	orange:MADR6164A
 orange-MADR6177A	orange:MADR6177A
 orange-MADR6180A	orange:MADR6180A
-orange-MADR6228A	orange:MADR6228A
+orange-MADR6228A	orange:MADR6228A vodafone:057521
 orange-MADR6229A	orange:MADR6229A vodafone:125023
-orange-MADR6239A	orange:MADR6239A
 orange-MADR6244A	orange:MADR6244A vodafone:051425
 orange-MADR6261A	orange:MADR6261A
 orange-MADR6274A	orange:MADR6274A
-orange-MADR6282A	orange:MADR6282A
 orange-MADR6299A	orange:MADR6299A
 orange-MADR6307A119	orange:MADR6307A119
 orange-MADR6329A903	orange:MADR6329A903
@@ -1126,7 +1108,7 @@ orange-MADR6364A202	orange:MADR6364A202
 orange-MADR6365A613	orange:MADR6365A613
 orange-MADR6367A308	orange:MADR6367A308 vodafone:186834
 orange-MADR6368A304	orange:MADR6368A304
-orange-MADR6369A	orange:MADR6369A,MADR6372A
+orange-MADR6369A	orange:MADR6369A,MADR6372A vodafone:080058,080059,080060
 orange-MADR6375A504	orange:MADR6375A504
 orange-MADR6376A	orange:MADR6376A
 orange-MADR6377A213	orange:MADR6377A213
@@ -1138,11 +1120,9 @@ orange-MADR6379A703	orange:MADR6379A703
 orange-MADR6415A	orange:MADR6415A
 orange-MADR6422A	orange:MADR6422A,MADR6423A vodafone:070920,080049,080052
 orange-MADR6425A	orange:MADR6425A,MADR6432A
-orange-MADR6435A	orange:MADR6435A vodafone:48640
 orange-MADR6438A	orange:MADR6438A
 orange-MADR6520A	orange:MADR6520A
 orange-MADR6687A	orange:MADR6687A
-orange-MADR6748A	orange:MADR6748A
 orange-MADR6773R	orange:MADR6773R
 orange-MADR6840A	orange:MADR6840A
 orange-MADR8040A	orange:MADR8040A vodafone:010176,10176
@@ -1152,75 +1132,55 @@ orange-MADR8072A	orange:MADR8072A
 orange-MADR8130N	orange:MADR8130N vodafone:000156,156
 orange-MADR8173J	orange:MADR8173J
 vodafone-000005	vodafone:000005,5
-vodafone-000007	vodafone:000007
-vodafone-000008	vodafone:000008
 vodafone-000009	vodafone:000009
-vodafone-000013	vodafone:000013
+vodafone-000013	vodafone:000013,00013
 vodafone-000014	vodafone:000014,00014,14
 vodafone-000017	vodafone:000017,17
 vodafone-000025	vodafone:000025,00025,25
 vodafone-000026	vodafone:000026,26
-vodafone-000027	vodafone:000027
-vodafone-00003	vodafone:00003
 vodafone-00005	vodafone:00005
 vodafone-000071	vodafone:000071,00071,71
-vodafone-000072	vodafone:000072,72
+vodafone-000072	vodafone:000072,00072,72
 vodafone-000084	vodafone:000084,00084,84
-vodafone-00013	vodafone:00013
 vodafone-000158	vodafone:000158
 vodafone-000162	vodafone:000162,00162,162
 vodafone-000167	vodafone:000167,00167,167
-vodafone-000171	vodafone:000171,171
+vodafone-000171	vodafone:000171,00171,171
 vodafone-000176	vodafone:000176,176
 vodafone-000186	vodafone:000186,186
 vodafone-000187	vodafone:000187,187
-vodafone-000197	vodafone:000197
 vodafone-000201	vodafone:000201,00201,201
-vodafone-00027	vodafone:00027
-vodafone-000289	vodafone:000289,289
-vodafone-00072	vodafone:00072
-vodafone-00073	vodafone:00073
+vodafone-000289	vodafone:000289,00289,289
 vodafone-00082	vodafone:00082
 vodafone-00158	vodafone:00158
-vodafone-00160	vodafone:00160
-vodafone-00171	vodafone:00171
 vodafone-00186	vodafone:00186
-vodafone-00190	vodafone:00190
 vodafone-0023707	vodafone:0023707,023707,23707
-vodafone-002708	vodafone:002708,02708
 vodafone-0027583	vodafone:0027583,027583,27583
-vodafone-00289	vodafone:00289
 vodafone-0035649	vodafone:0035649,035649,35649
-vodafone-006417	vodafone:006417,06417,6417
-vodafone-010108	vodafone:010108,10108
 vodafone-010156	vodafone:010156,10156
-vodafone-010343	vodafone:010343,10343
-vodafone-010362	vodafone:010362
 vodafone-011507	vodafone:011507,11507
 vodafone-011879	vodafone:011879,11879
 vodafone-012034	vodafone:012034,12034
 vodafone-012041	vodafone:012041
 vodafone-013644	vodafone:013644,13644
 vodafone-014084	vodafone:014084,14084
-vodafone-014090	vodafone:014090
+vodafone-014090	vodafone:014090,14090
 vodafone-014192	vodafone:014192,14192
 vodafone-014855	vodafone:014855
 vodafone-015139	vodafone:015139,15139
 vodafone-015965	vodafone:015965
 vodafone-017511	vodafone:017511,17511
 vodafone-017779	vodafone:017779,17779
-vodafone-017803	vodafone:017803
+vodafone-017803	vodafone:017803,17803
 vodafone-017958	vodafone:017958,17958
 vodafone-018043	vodafone:018043,18043
-vodafone-018756	vodafone:018756
+vodafone-018756	vodafone:018756,18756
 vodafone-0190768	vodafone:0190768,190768
 vodafone-020993	vodafone:020993
 vodafone-021837	vodafone:021837
-vodafone-023194	vodafone:023194
-vodafone-023467	vodafone:023467,23467
+vodafone-023194	vodafone:023194,23194
 vodafone-024764	vodafone:024764,24764
 vodafone-025146	vodafone:025146,25146
-vodafone-02518	vodafone:02518
 vodafone-025461	vodafone:025461,25461
 vodafone-02559	vodafone:02559
 vodafone-026474	vodafone:026474,26474
@@ -1228,45 +1188,35 @@ vodafone-028850	vodafone:028850,28850
 vodafone-029099	vodafone:029099,29099
 vodafone-029379	vodafone:029379,29379
 vodafone-029523	vodafone:029523
-vodafone-031505	vodafone:031505
+vodafone-031505	vodafone:031505,31505
 vodafone-031580	vodafone:031580,31580
 vodafone-031864	vodafone:031864,31864
-vodafone-03392	vodafone:03392
-vodafone-034147	vodafone:034147
 vodafone-034445	vodafone:034445,34445
 vodafone-048721	vodafone:048721
 vodafone-048832	vodafone:048832,48832
-vodafone-048871	vodafone:048871
+vodafone-048871	vodafone:048871,48871
 vodafone-050878	vodafone:050878,50878
 vodafone-050880	vodafone:050880
 vodafone-051038	vodafone:051038,51038
-vodafone-051374	vodafone:051374
+vodafone-051374	vodafone:051374,51374
 vodafone-051380	vodafone:051380
 vodafone-051381	vodafone:051381,51381
 vodafone-051402	vodafone:051402
 vodafone-051444	vodafone:051444
-vodafone-051746	vodafone:051746
-vodafone-053131	vodafone:053131
+vodafone-051746	vodafone:051746,51746
+vodafone-053131	vodafone:053131,53131
 vodafone-053336	vodafone:053336
-vodafone-054102	vodafone:054102
-vodafone-055163	vodafone:055163,55163
-vodafone-056995	vodafone:056995
 vodafone-057147	vodafone:057147,57147
-vodafone-057521	vodafone:057521
-vodafone-058469	vodafone:058469,58469
-vodafone-058976	vodafone:058976
 vodafone-059203	vodafone:059203,59203
-vodafone-059824	vodafone:059824
 vodafone-060119	vodafone:060119,60119
 vodafone-061071	vodafone:061071,61071
 vodafone-061250	vodafone:061250,61250
 vodafone-061254	vodafone:061254,61254
-vodafone-061780	vodafone:061780
+vodafone-061780	vodafone:061780,61780
 vodafone-062151	vodafone:062151,62151
 vodafone-062660	vodafone:062660
 vodafone-062714	vodafone:062714
 vodafone-065153	vodafone:065153,65153
-vodafone-066348	vodafone:066348
 vodafone-067309	vodafone:067309
 vodafone-067640	vodafone:067640,67640
 vodafone-067863	vodafone:067863,67863
@@ -1276,27 +1226,15 @@ vodafone-068555	vodafone:068555,68555
 vodafone-068741	vodafone:068741,68741
 vodafone-069081	vodafone:069081
 vodafone-070158	vodafone:070158,70158
-vodafone-070448	vodafone:070448
-vodafone-070716	vodafone:070716
-vodafone-070717	vodafone:070717
-vodafone-071290	vodafone:071290
-vodafone-071382	vodafone:071382
 vodafone-071651	vodafone:071651,71651
 vodafone-072810	vodafone:072810,69100,72810
-vodafone-073250	vodafone:073250
 vodafone-073850	vodafone:073850
 vodafone-074165	vodafone:074165
-vodafone-074397	vodafone:074397
 vodafone-078838	vodafone:078838,78838
 vodafone-078840	vodafone:078840,78840
 vodafone-079805	vodafone:079805
-vodafone-080058	vodafone:080058,080059,080060
-vodafone-083174	vodafone:083174
-vodafone-085289	vodafone:085289
 vodafone-10140	vodafone:10140
 vodafone-112639	vodafone:112639
-vodafone-11332	vodafone:11332
-vodafone-11333	vodafone:11333
 vodafone-11854	vodafone:11854
 vodafone-12074	vodafone:12074
 vodafone-122136	vodafone:122136
@@ -1304,13 +1242,10 @@ vodafone-125951	vodafone:125951
 vodafone-127820	vodafone:127820
 vodafone-130128	vodafone:130128
 vodafone-130129	vodafone:130129
-vodafone-130478	vodafone:130478
 vodafone-13266	vodafone:13266
 vodafone-14086	vodafone:14086
-vodafone-14090	vodafone:14090
 vodafone-141341	vodafone:141341
 vodafone-143907	vodafone:143907
-vodafone-144376	vodafone:144376
 vodafone-147857	vodafone:147857
 vodafone-148116	vodafone:148116
 vodafone-148121	vodafone:148121
@@ -1331,14 +1266,10 @@ vodafone-17420	vodafone:17420
 vodafone-17510	vodafone:17510
 vodafone-177495	vodafone:177495
 vodafone-17757	vodafone:17757
-vodafone-17777	vodafone:17777
 vodafone-17791	vodafone:17791
-vodafone-17803	vodafone:17803
-vodafone-17815	vodafone:17815
 vodafone-178258	vodafone:178258
 vodafone-182827	vodafone:182827
 vodafone-184321	vodafone:184321
-vodafone-18756	vodafone:18756
 vodafone-192528	vodafone:192528
 vodafone-192589	vodafone:192589
 vodafone-196739	vodafone:196739
@@ -1346,7 +1277,6 @@ vodafone-202685	vodafone:202685
 vodafone-203093	vodafone:203093
 vodafone-209491	vodafone:209491
 vodafone-209844	vodafone:209844
-vodafone-23194	vodafone:23194
 vodafone-24328	vodafone:24328
 vodafone-25028	vodafone:25028
 vodafone-27134	vodafone:27134
@@ -1355,17 +1285,8 @@ vodafone-28312	vodafone:28312
 vodafone-28754	vodafone:28754
 vodafone-29246	vodafone:29246
 vodafone-30185	vodafone:30185
-vodafone-31505	vodafone:31505
 vodafone-37544	vodafone:37544
-vodafone-41657	vodafone:41657
 vodafone-43731	vodafone:43731
-vodafone-48871	vodafone:48871
-vodafone-50877	vodafone:50877
-vodafone-51047	vodafone:51047
-vodafone-51108	vodafone:51108,I051108
-vodafone-51374	vodafone:51374
-vodafone-51746	vodafone:51746
-vodafone-53131	vodafone:53131
 vodafone-54691	vodafone:54691
 vodafone-55171	vodafone:55171
 vodafone-55628	vodafone:55628
@@ -1373,18 +1294,15 @@ vodafone-57159	vodafone:57159
 vodafone-57970	vodafone:57970
 vodafone-58788	vodafone:58788
 vodafone-58906	vodafone:58906
-vodafone-58976	vodafone:58976
 vodafone-60443	vodafone:60443
 vodafone-60722	vodafone:60722
 vodafone-61242	vodafone:61242
 vodafone-61474	vodafone:61474
-vodafone-61780	vodafone:61780
 vodafone-62714	vodafone:62714
 vodafone-64481	vodafone:64481
 vodafone-64483	vodafone:64483
 vodafone-64492	vodafone:64492
 vodafone-66166	vodafone:66166
-vodafone-66403	vodafone:66403
 vodafone-67307	vodafone:67307
 vodafone-67591	vodafone:67591
 vodafone-67647	vodafone:67647
@@ -1392,20 +1310,15 @@ vodafone-67870	vodafone:67870
 vodafone-67957	vodafone:67957
 vodafone-69081	vodafone:69081
 vodafone-70922	vodafone:70922
-vodafone-71210	vodafone:71210
 vodafone-71410	vodafone:71410
 vodafone-72252	vodafone:72252
 vodafone-72551	vodafone:72551
-vodafone-73162	vodafone:73162
 vodafone-73549	vodafone:73549
 vodafone-74268	vodafone:74268
-vodafone-74851	vodafone:74851
 vodafone-75278	vodafone:75278
 vodafone-75952	vodafone:75952
 vodafone-76480	vodafone:76480
-vodafone-78699	vodafone:78699
 vodafone-78839	vodafone:78839
-vodafone-79997	vodafone:79997
 vodafone-80054	vodafone:80054,80055
 vodafone-80058	vodafone:80058,80059,80060
 vodafone-80451	vodafone:80451
