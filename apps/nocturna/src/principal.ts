@@ -1,3 +1,5 @@
+import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
+import { enLosCuadros } from "@celda/ingesta/antenasmoviles/normalizar";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { almacenDesdeConfig } from "@celda/publicacion/configuracion";
@@ -59,6 +61,10 @@ const principal = Effect.gen(function* () {
       registroOficial: RegistroOficial.capaPorCajas(c.registroOficial).pipe(
         Layer.provide(FetchHttpClient.layer),
       ),
+      antenasMoviles: AntenasMoviles.capa({
+        ...c.antenasMoviles,
+        dentro: enLosCuadros(c.noche.puntos.zonas.flatMap((zona) => zona.cuadros)),
+      }).pipe(Layer.provide(FetchHttpClient.layer)),
     }),
   );
   const entorno = Layer.mergeAll(publicador, extractores).pipe(Layer.provideMerge(base));

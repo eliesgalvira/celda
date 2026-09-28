@@ -10,10 +10,15 @@ import type { EjecucionGuardada, Resumen, ResumenDeFuente, ResumenDeZona } from 
 const fecha = (milisegundos: number): string =>
   `${DateTime.formatIso(DateTime.makeUnsafe(milisegundos)).slice(0, 19).replace("T", " ")} UTC`;
 
-const describirCambios = ({ observaciones, fichas, emplazamientos }: Cambios): string =>
+const describirCambios = ({ observaciones, fichas, emplazamientos, puntos }: Cambios): string =>
   [
+    ...(puntos === undefined
+      ? []
+      : [`puntos +${puntos.creados} ~${puntos.cambiados} -${puntos.retirados}`]),
     `observaciones +${observaciones.creados} ~${observaciones.cambiados} -${observaciones.retirados}`,
-    `fichas ${fichas.leidas} leídas (${fichas.cambiadas} cambiadas)`,
+    puntos === undefined
+      ? `fichas ${fichas.leidas} leídas (${fichas.cambiadas} cambiadas)`
+      : `detalles ${fichas.leidas} leídos (${fichas.cambiadas} cambiados)`,
     `emplazamientos +${emplazamientos.creados} ~${emplazamientos.cambiados} -${emplazamientos.retirados}`,
   ].join(", ");
 
@@ -61,12 +66,17 @@ const describirEjecucion = (e: EjecucionGuardada): ReadonlyArray<string> => [
 const describirFuente = (f: ResumenDeFuente): ReadonlyArray<string> => [
   `${f.fuente}: ${f.interruptor.activo ? "encendida" : `apagada (${f.interruptor.motivo})`}`,
   ...(f.ultima === undefined ? ["  Ninguna ejecución todavía"] : describirEjecucion(f.ultima)),
-  ...(f.vigentes === 0
-    ? []
-    : [
-        `  Observaciones vigentes: ${f.vigentes}; fichas pendientes: ${f.sinLeer} sin leer y ` +
-          `${f.porReleer} por releer`,
-      ]),
+  ...(f.puntos > 0
+    ? [
+        `  Puntos vigentes: ${f.puntos}; detalles de ER5 pendientes: ${f.detallesPendientes}; ` +
+          `observaciones vigentes: ${f.vigentes}`,
+      ]
+    : f.vigentes === 0
+      ? []
+      : [
+          `  Observaciones vigentes: ${f.vigentes}; fichas pendientes: ${f.sinLeer} sin leer y ` +
+            `${f.porReleer} por releer`,
+        ]),
   ...(f.zonas.length === 0 ? [] : ["  Zonas de barrido:", ...f.zonas.map(describirZona)]),
 ];
 

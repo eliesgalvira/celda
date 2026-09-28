@@ -4,7 +4,9 @@ import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Fuente } from "@celda/dominio/observacion";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
 import { OPCIONES_ZONAS, type OpcionesBarrido } from "@celda/ingesta/barrido";
-import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
+import { OPCIONES_PUNTOS, type OpcionesPuntos } from "@celda/ingesta/barridoDePuntos";
+import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
+import { capaDePuntosGrabada } from "@celda/ingesta/pruebas/antenasmoviles";
 import { OPCIONES_PROCESO } from "@celda/ingesta/proceso";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
@@ -76,12 +78,13 @@ export const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<
     });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
-/** Las opciones de la noche por defecto, con las carpetas del entorno. */
 /** Las del proceso por defecto, con Cataluña cada noche. */
 export const OPCIONES_BARRIDO: OpcionesBarrido = { ...OPCIONES_PROCESO, zonas: OPCIONES_ZONAS };
 
+/** Las opciones de la noche por defecto, con las carpetas del entorno. */
 export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
   proceso: OPCIONES_BARRIDO,
+  puntos: OPCIONES_PUNTOS,
   reintento: REINTENTO_DE_PUBLICACION,
   copias: { carpeta: entorno.copias, conservar: COPIAS_CONSERVADAS },
 });
@@ -92,7 +95,16 @@ export interface Variante {
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
   readonly reintento?: Duration.Duration;
   readonly proceso?: OpcionesBarrido;
+  /** antenasmoviles.es, que por defecto no tiene ningún punto. Empieza apagado. */
+  readonly antenasMoviles?: Layer.Layer<ExtractorDePuntos>;
+  readonly puntos?: OpcionesPuntos;
 }
+
+/** antenasmoviles.es sin ningún punto, para las noches que no lo usan. */
+const SIN_PUNTOS = capaDePuntosGrabada({
+  listado: { puntos: [], avisos: [] },
+  detalles: new Map(),
+});
 
 /**
  * Una noche como la lanza el programa, con el extractor que se le pase, la base del entorno, los
@@ -109,7 +121,13 @@ export const unaNoche = (
       publicadorEn(zonas, POR_LOTE).pipe(
         Layer.provide(variante.almacen ?? entorno.almacenVigilado),
       ),
-      Layer.succeed(Extractores, Extractores.of({ registroOficial: extractor })),
+      Layer.succeed(
+        Extractores,
+        Extractores.of({
+          registroOficial: extractor,
+          antenasMoviles: variante.antenasMoviles ?? SIN_PUNTOS,
+        }),
+      ),
     ).pipe(
       Layer.provideMerge(
         baseNocturna({
@@ -122,6 +140,7 @@ export const unaNoche = (
       ...opcionesDe(entorno),
       reintento: variante.reintento ?? REINTENTO_DE_PUBLICACION,
       proceso: variante.proceso ?? OPCIONES_BARRIDO,
+      puntos: variante.puntos ?? OPCIONES_PUNTOS,
     }).pipe(Effect.provide(entornoDeLaNoche));
   });
 
