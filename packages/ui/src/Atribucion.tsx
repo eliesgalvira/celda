@@ -59,6 +59,8 @@ export function Atribucion(props: AtribucionProps) {
         id={id}
         class={cn(
           "cinta flex flex-wrap items-center gap-x-2 bg-superficie/90 px-3 py-0.5 font-mono text-[10.5px] text-tinta [--pico:6px]",
+          // En el móvil, abiertos, pueden quedar sobre la pista o la vista: fondo opaco.
+          plegable() && "max-md:bg-superficie",
           plegada() && "max-md:hidden",
         )}
       >
