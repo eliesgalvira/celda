@@ -179,6 +179,13 @@ const celdas = (fila: string): ReadonlyArray<string> =>
   [...fila.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/giu)].map((celda) => textoDeHtml(celda[1] ?? ""));
 
 /**
+ * Si una página es una ficha del geoportal, aunque sea la del aviso de código no válido: todas
+ * llevan la tabla `tablaDetalleEstacion`. Una página sin ella, con HTTP 200, no la ha escrito el
+ * visor de fichas: un cortafuegos, una página de mantenimiento o un cambio de formato.
+ */
+export const esFichaDelGeoportal = (html: string): boolean => html.includes("tablaDetalleEstacion");
+
+/**
  * Filas de «Características técnicas» de la ficha en HTML. Una ficha sin esa tabla, o con el
  * aviso de código no válido (que llega con HTTP 200), es un error de la fuente y no una
  * estación sin bandas.

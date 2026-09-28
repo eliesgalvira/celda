@@ -59,42 +59,38 @@ export interface ClienteDeFuente {
    * pasajeros y devuelve la respuesta con su estado, sea cual sea.
    */
   readonly pedir: (url: string) => Effect.Effect<Respuesta, ErrorDeExtractor>;
-  /** Peticiones hechas hasta ahora, con `robots.txt` y los reintentos. */
+  /** Peticiones hechas hasta ahora por este cliente, con `robots.txt` y los reintentos. */
   readonly peticiones: Effect.Effect<number>;
+  /**
+   * Otro cliente de la misma fuente con otras opciones, como otra pausa u otro tope. Comparte el
+   * turno, `robots.txt` y la hora de la última respuesta, así que su primera petición también
+   * espera su pausa desde la última de este. Cuenta sus peticiones aparte.
+   */
+  readonly conOpciones: (opciones: OpcionesCliente) => Effect.Effect<ClienteDeFuente>;
 }
 
-/**
- * Cliente de una fuente para lo que dura una ejecución: una petición cada vez, `pausa` entre el
- * final de una respuesta y la siguiente, no más de `maxPeticiones` y reintentos con espera
- * exponencial. Lee `robots.txt` de `origen` antes de la primera petición.
- */
-export const clienteDeFuente = Effect.fn("ClienteDeFuente.crear")(function* (
-  origen: string,
-  opciones: OpcionesCliente,
-) {
-  const cliente = yield* HttpClient.HttpClient;
-  const turno = yield* Semaphore.make(1);
-  const cuenta = yield* Ref.make<{
-    readonly hechas: number;
-    readonly ultima: Option.Option<number>;
-  }>({
-    hechas: 0,
-    ultima: Option.none(),
-  });
+/** Lo que comparten los clientes de una fuente: una petición cada vez y la última respuesta. */
+interface Conexion {
+  readonly cliente: HttpClient.HttpClient;
+  readonly turno: Semaphore.Semaphore;
+  /** Cuándo acabó la última respuesta de la fuente. */
+  readonly ultima: Ref.Ref<Option.Option<number>>;
+}
 
-  /** Espera su turno y hace una sola petición. */
-  const unaPeticion = Effect.fn("ClienteDeFuente.peticion")(function* (url: string) {
-    const { hechas, ultima } = yield* Ref.get(cuenta);
-    if (hechas >= opciones.maxPeticiones) {
+/** Espera su turno y hace una sola petición, sin pasar de `maxPeticiones` en `hechas`. */
+const unaPeticion = (conexion: Conexion, opciones: OpcionesCliente, hechas: Ref.Ref<number>) =>
+  Effect.fn("ClienteDeFuente.peticion")(function* (url: string) {
+    if ((yield* Ref.get(hechas)) >= opciones.maxPeticiones) {
       return yield* new LimiteDePeticiones({ maximo: opciones.maxPeticiones });
     }
+    const ultima = yield* Ref.get(conexion.ultima);
     const ahora = yield* Clock.currentTimeMillis;
     const libre = Option.getOrElse(ultima, () => ahora) + Duration.toMillis(opciones.pausa);
     if (Option.isSome(ultima) && libre > ahora) {
       yield* Effect.sleep(Duration.millis(libre - ahora));
     }
-    yield* Ref.update(cuenta, (c) => ({ ...c, hechas: c.hechas + 1 }));
-    return yield* cliente.get(url, { headers: { "user-agent": opciones.userAgent } }).pipe(
+    yield* Ref.update(hechas, (n) => n + 1);
+    return yield* conexion.cliente.get(url, { headers: { "user-agent": opciones.userAgent } }).pipe(
       Effect.flatMap((respuesta) =>
         Effect.map(respuesta.arrayBuffer, (cuerpo): Respuesta => ({
           estado: respuesta.status,
@@ -118,14 +114,18 @@ export const clienteDeFuente = Effect.fn("ClienteDeFuente.crear")(function* (
       Effect.provideService(HttpClient.TracerPropagationEnabled, false),
       Effect.ensuring(
         Effect.flatMap(Clock.currentTimeMillis, (fin) =>
-          Ref.update(cuenta, (c) => ({ ...c, ultima: Option.some(fin) })),
+          Ref.set(conexion.ultima, Option.some(fin)),
         ),
       ),
     );
-  }, turno.withPermits(1));
+  }, conexion.turno.withPermits(1));
 
-  const conReintentos = (url: string) =>
-    unaPeticion(url).pipe(
+/** Reintenta los fallos pasajeros con espera exponencial desde la pausa. */
+const conReintentos =
+  (peticion: (url: string) => Effect.Effect<Respuesta, ErrorDeExtractor | FalloPasajero>) =>
+  (opciones: OpcionesCliente) =>
+  (url: string) =>
+    peticion(url).pipe(
       Effect.retry({
         schedule: Schedule.exponential(opciones.pausa),
         times: opciones.reintentos,
@@ -136,25 +136,60 @@ export const clienteDeFuente = Effect.fn("ClienteDeFuente.crear")(function* (
       ),
     );
 
+/**
+ * Un cliente sobre la conexión, con sus opciones y su cuenta de peticiones, que mira
+ * `robots.txt` antes de cada una.
+ */
+const clienteSobre = (
+  conexion: Conexion,
+  robots: Effect.Effect<Robots, ErrorDeExtractor>,
+  opciones: OpcionesCliente,
+  hechas: Ref.Ref<number>,
+): ClienteDeFuente => {
+  const pedirConReintentos = conReintentos(unaPeticion(conexion, opciones, hechas))(opciones);
+  return {
+    pedir: Effect.fn("ClienteDeFuente.pedir")(function* (url: string) {
+      if (!permitido(yield* robots, rutaDe(url))) {
+        return yield* new ProhibidoPorRobots({ url });
+      }
+      return yield* pedirConReintentos(url);
+    }),
+    peticiones: Ref.get(hechas),
+    conOpciones: (otras) =>
+      Effect.map(Ref.make(0), (suyas) => clienteSobre(conexion, robots, otras, suyas)),
+  };
+};
+
+/**
+ * Cliente de una fuente para lo que dura una ejecución: una petición cada vez, `pausa` entre el
+ * final de una respuesta y la siguiente, no más de `maxPeticiones` y reintentos con espera
+ * exponencial. Lee `robots.txt` de `origen` antes de la primera petición, y esa lectura cuenta
+ * como una petición de este cliente.
+ */
+export const clienteDeFuente = Effect.fn("ClienteDeFuente.crear")(function* (
+  origen: string,
+  opciones: OpcionesCliente,
+) {
+  const conexion: Conexion = {
+    cliente: yield* HttpClient.HttpClient,
+    turno: yield* Semaphore.make(1),
+    ultima: yield* Ref.make(Option.none<number>()),
+  };
+  const hechas = yield* Ref.make(0);
+
   /** RFC 9309: sin fichero (4xx) todo está permitido; un 5xx persistente para la ejecución. */
   const robots = yield* Effect.cached(
-    Effect.map(conReintentos(`${origen}/robots.txt`), ({ estado, cuerpo }): Robots =>
-      estado >= 200 && estado < 300
-        ? leerRobots(new TextDecoder().decode(cuerpo), opciones.userAgent.split(/[\s/]/u)[0] ?? "")
-        : SIN_RESTRICCIONES,
+    Effect.map(
+      conReintentos(unaPeticion(conexion, opciones, hechas))(opciones)(`${origen}/robots.txt`),
+      ({ estado, cuerpo }): Robots =>
+        estado >= 200 && estado < 300
+          ? leerRobots(
+              new TextDecoder().decode(cuerpo),
+              opciones.userAgent.split(/[\s/]/u)[0] ?? "",
+            )
+          : SIN_RESTRICCIONES,
     ),
   );
 
-  const pedir = Effect.fn("ClienteDeFuente.pedir")(function* (url: string) {
-    if (!permitido(yield* robots, rutaDe(url))) {
-      return yield* new ProhibidoPorRobots({ url });
-    }
-    return yield* conReintentos(url);
-  });
-
-  const resultado: ClienteDeFuente = {
-    pedir,
-    peticiones: Effect.map(Ref.get(cuenta), (c) => c.hechas),
-  };
-  return resultado;
+  return clienteSobre(conexion, robots, opciones, hechas);
 });

@@ -8,7 +8,13 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
-import { Extractor, RespuestaInesperada } from "../extractor.ts";
+import {
+  Extractor,
+  ExtractorPorCajas,
+  FuenteBloqueada,
+  type Registro,
+  RespuestaInesperada,
+} from "../extractor.ts";
 import { leerMuestra } from "../pruebas/grabado.ts";
 import {
   clienteDePrueba,
@@ -17,7 +23,7 @@ import {
   type Respondedor,
 } from "../pruebas/http.ts";
 import { esperarConReloj } from "../pruebas/reloj.ts";
-import { capa, OPCIONES, type Opciones } from "./extractor.ts";
+import { capa, capaPorCajas, OPCIONES, type Opciones } from "./extractor.ts";
 import type { Caja } from "../zona.ts";
 
 const CAJA: Caja = [2.105, 41.382, 2.125, 41.392];
@@ -245,5 +251,140 @@ describe("extractor del registro oficial", () => {
         ),
       );
     }).pipe(Effect.provide(NodeServices.layer)),
+  );
+});
+
+const FICHA: Registro = {
+  clave: "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800942",
+  compania: "movistar",
+  codigo: "0800942",
+  posicion: { longitud: 2.113886, latitud: 41.390648 },
+  direccion: "VP Eusebi Güell, 6. BARCELONA, BARCELONA",
+  municipio: "BARCELONA",
+  url: "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0800942",
+};
+
+/**
+ * Ejecuta `programa` con el extractor por cajas real sobre el cliente de prueba, con las fichas
+ * a otro ritmo que el listado si se le da `fichas`.
+ */
+const conExtractorPorCajas = <A, E>(
+  responder: Respondedor,
+  programa: (extractor: typeof ExtractorPorCajas.Service) => Effect.Effect<A, E>,
+  fichas?: Partial<Opciones>,
+) =>
+  Effect.gen(function* () {
+    const peticiones = yield* Ref.make<ReadonlyArray<Peticion>>([]);
+    const fibra = yield* Effect.gen(function* () {
+      return yield* programa(yield* ExtractorPorCajas);
+    }).pipe(
+      Effect.provide(
+        capaPorCajas(OPCIONES, fichas === undefined ? undefined : { ...OPCIONES, ...fichas }).pipe(
+          Layer.provide(clienteDePrueba(peticiones, responder)),
+        ),
+      ),
+      Effect.exit,
+      Effect.forkChild,
+    );
+    const salida = yield* esperarConReloj(fibra);
+    return { salida, peticiones: yield* Ref.get(peticiones) };
+  });
+
+describe("fichas del registro oficial y bloqueos del geoportal", () => {
+  it.effect("las fichas van a su pausa sobre la misma conexión que el listado", () =>
+    Effect.gen(function* () {
+      const html = new Uint8Array(yield* leerMuestra("detalle-telefonica-0800942.iso-8859-1.html"));
+      const { salida, peticiones } = yield* conExtractorPorCajas(
+        (url) => {
+          if (url.pathname === "/robots.txt") return NO_HAY_ROBOTS;
+          if (url.pathname === "/VCTEL/detalleEstacion.do") return { estado: 200, cuerpo: html };
+          return { estado: 200, cuerpo: elementos(1, "A", CAJA) };
+        },
+        (extractor) =>
+          Effect.gen(function* () {
+            yield* extractor.caja(CAJA);
+            yield* extractor.ficha(FICHA);
+            yield* extractor.ficha(FICHA);
+            return yield* extractor.peticiones;
+          }),
+        { pausa: Duration.seconds(5), maxPeticiones: 2 },
+      );
+      assert.deepStrictEqual(salida, Exit.succeed(4));
+      // robots.txt una sola vez; la primera ficha espera sus 5 s desde la caja.
+      assert.deepStrictEqual(
+        peticiones.map((p) => [p.ruta.split("?")[0], p.en]),
+        [
+          ["/robots.txt", 0],
+          ["/VCTEL/infoantenasGeoJSON.do", 3000],
+          ["/VCTEL/detalleEstacion.do", 8000],
+          ["/VCTEL/detalleEstacion.do", 13000],
+        ],
+      );
+      assert.isTrue(peticiones.every((p) => p.userAgent === OPCIONES.userAgent));
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("las fichas tienen su propio tope, aparte del del listado", () =>
+    Effect.gen(function* () {
+      const html = new Uint8Array(yield* leerMuestra("detalle-telefonica-0800942.iso-8859-1.html"));
+      const { salida } = yield* conExtractorPorCajas(
+        (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 200, cuerpo: html }),
+        (extractor) => Effect.flip(Effect.andThen(extractor.ficha(FICHA), extractor.ficha(FICHA))),
+        { maxPeticiones: 1 },
+      );
+      assert.include(String(salida), "LimiteDePeticiones");
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("un 403 en una ficha es la fuente bloqueando a Celda: no se reintenta", () =>
+    Effect.gen(function* () {
+      const { salida, peticiones } = yield* conExtractorPorCajas(
+        (url) =>
+          url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 403, cuerpo: "Forbidden" },
+        (extractor) => Effect.flip(extractor.ficha(FICHA)),
+      );
+      assert.deepStrictEqual(
+        salida,
+        Exit.succeed(new FuenteBloqueada({ url: FICHA.url, motivo: "HTTP 403" })),
+      );
+      assert.strictEqual(peticiones.length, 2);
+    }),
+  );
+
+  it.effect("una página que no es una ficha del geoportal es la fuente bloqueando a Celda", () =>
+    Effect.gen(function* () {
+      const { salida } = yield* conExtractorPorCajas(
+        (url) =>
+          url.pathname === "/robots.txt"
+            ? NO_HAY_ROBOTS
+            : { estado: 200, cuerpo: "<html><body>Request rejected</body></html>" },
+        (extractor) => Effect.flip(extractor.ficha(FICHA)),
+      );
+      assert.deepStrictEqual(
+        salida,
+        Exit.succeed(
+          new FuenteBloqueada({
+            url: FICHA.url,
+            motivo: "una página que no es una ficha del geoportal",
+          }),
+        ),
+      );
+    }),
+  );
+
+  it.effect("un listado que llega en HTML es la fuente bloqueando a Celda", () =>
+    Effect.gen(function* () {
+      const { salida } = yield* conExtractorPorCajas(
+        (url) =>
+          url.pathname === "/robots.txt"
+            ? NO_HAY_ROBOTS
+            : { estado: 200, cuerpo: "\n<!DOCTYPE html><html>Mantenimiento</html>" },
+        (extractor) => Effect.flip(extractor.caja(CAJA)),
+      );
+      assert.strictEqual(salida._tag, "Success");
+      if (salida._tag === "Success") {
+        assert.strictEqual(salida.value._tag, "FuenteBloqueada");
+      }
+    }),
   );
 });

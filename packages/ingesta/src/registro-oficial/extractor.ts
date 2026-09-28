@@ -7,11 +7,12 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
 
-import { clienteDeFuente, type OpcionesCliente } from "../cliente.ts";
+import { type ClienteDeFuente, clienteDeFuente, type OpcionesCliente } from "../cliente.ts";
 import {
   type ErrorDeExtractor,
   Extractor,
   ExtractorPorCajas,
+  FuenteBloqueada,
   type ListadoDeCaja,
   type Registro,
   RespuestaInesperada,
@@ -20,6 +21,7 @@ import { decodificarLatin1 } from "../texto.ts";
 import { type Caja, ZONA_BARCELONA } from "../zona.ts";
 import {
   bandasDeFicha,
+  esFichaDelGeoportal,
   listadoDeElementos,
   ORIGEN,
   RespuestaListado,
@@ -78,16 +80,25 @@ export const opcionesDesdeConfig: Config.Config<Opciones> = Config.map(
 /** Profundidad máxima al dividir cajas. A 6 niveles la caja de Barcelona mide unos 300 m. */
 const PROFUNDIDAD_MAXIMA = 6;
 
+/** Estados con los que el geoportal estaría negando el paso a Celda. */
+const ESTADOS_DE_BLOQUEO: ReadonlySet<number> = new Set([401, 403]);
+
 /**
  * El geoportal del ministerio visto por el extractor: el listado de una caja en una petición y la
- * ficha de un registro, con el cliente de la fuente, que respeta `robots.txt`, deja `pausa` entre
- * peticiones, no pasa de `maxPeticiones` y reintenta los fallos pasajeros con espera exponencial.
+ * ficha de un registro, cada uno con su cliente de la fuente, que respeta `robots.txt`, deja su
+ * pausa entre peticiones, no pasa de su tope y reintenta los fallos pasajeros con espera
+ * exponencial. Un 401 o un 403, un listado en HTML o una página que no es una ficha son la fuente
+ * bloqueando a Celda (`FuenteBloqueada`).
  */
-const geoportal = Effect.fn("RegistroOficial.geoportal")(function* (opciones: OpcionesCliente) {
-  const cliente = yield* clienteDeFuente(ORIGEN, opciones);
-
-  const obtener = Effect.fn("RegistroOficial.obtener")(function* (url: string) {
+const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
+  const obtener = Effect.fn("RegistroOficial.obtener")(function* (
+    cliente: ClienteDeFuente,
+    url: string,
+  ) {
     const respuesta = yield* cliente.pedir(url);
+    if (ESTADOS_DE_BLOQUEO.has(respuesta.estado)) {
+      return yield* new FuenteBloqueada({ url, motivo: `HTTP ${respuesta.estado}` });
+    }
     if (respuesta.estado !== 200) {
       return yield* new RespuestaInesperada({ url, motivo: `HTTP ${respuesta.estado}` });
     }
@@ -99,7 +110,10 @@ const geoportal = Effect.fn("RegistroOficial.geoportal")(function* (opciones: Op
   /** Los elementos de una caja tal como llegan. Una caja sin estaciones llega como `{}`. */
   const elementos = Effect.fn("RegistroOficial.elementos")(function* (caja: Caja) {
     const url = urlDeListado(caja);
-    const { texto, bytes } = yield* obtener(url);
+    const { texto, bytes } = yield* obtener(listado, url);
+    if (texto.trimStart().startsWith("<")) {
+      return yield* new FuenteBloqueada({ url, motivo: "una página HTML en lugar del listado" });
+    }
     const respuesta = yield* decodificarListado(texto).pipe(
       Effect.mapError((error) => new RespuestaInesperada({ url, motivo: error.message })),
     );
@@ -108,24 +122,39 @@ const geoportal = Effect.fn("RegistroOficial.geoportal")(function* (opciones: Op
 
   const listadoDeCaja = Effect.fn("RegistroOficial.caja")(function* (caja: Caja) {
     const respuesta = yield* elementos(caja);
-    const listado: ListadoDeCaja = {
+    const leido: ListadoDeCaja = {
       ...listadoDeElementos(respuesta.elementos),
       enElTope: respuesta.elementos.length >= TOPE_LISTADO,
       bytes: respuesta.bytes,
     };
-    return listado;
+    return leido;
   });
 
   const ficha = Effect.fn("RegistroOficial.ficha")(function* (registro: Registro) {
-    const bandas = bandasDeFicha((yield* obtener(registro.url)).texto);
+    const { texto } = yield* obtener(fichas, registro.url);
+    if (!esFichaDelGeoportal(texto)) {
+      return yield* new FuenteBloqueada({
+        url: registro.url,
+        motivo: "una página que no es una ficha del geoportal",
+      });
+    }
+    const bandas = bandasDeFicha(texto);
     if (Result.isFailure(bandas)) {
       return yield* new RespuestaInesperada({ url: registro.url, motivo: bandas.failure });
     }
     return bandas.success;
   });
 
-  return { elementos, listadoDeCaja, ficha, peticiones: cliente.peticiones };
-});
+  const peticiones =
+    listado === fichas
+      ? listado.peticiones
+      : Effect.map(
+          Effect.all([listado.peticiones, fichas.peticiones]),
+          ([deListado, deFichas]) => deListado + deFichas,
+        );
+
+  return { elementos, listadoDeCaja, ficha, peticiones };
+};
 
 /**
  * Extractor del registro oficial (Infoantenas) para la ingesta de Convex: recorre el listado de
@@ -135,7 +164,8 @@ export const capa = (opciones: Opciones): Layer.Layer<Extractor, never, HttpClie
   Layer.effect(
     Extractor,
     Effect.gen(function* () {
-      const fuente = yield* geoportal(opciones);
+      const cliente = yield* clienteDeFuente(ORIGEN, opciones);
+      const fuente = geoportal(cliente, cliente);
 
       const elementosDeCaja = (
         caja: Caja,
@@ -180,19 +210,27 @@ export const capa = (opciones: Opciones): Layer.Layer<Extractor, never, HttpClie
 /**
  * Extractor del registro oficial para el barrido por zonas de la ingesta nocturna: pide el
  * listado de cada caja tal cual y dice si ha llegado al tope. Qué cajas se piden y cuándo se
- * dividen lo decide `recorrerCuadro` (`barrido.ts`).
+ * dividen lo decide `recorrerCuadro` (`barrido.ts`). Las fichas se piden con `fichas`, otra pausa
+ * y otro tope sobre la misma conexión (`opcionesClienteDeFichas` en `fichas.ts`); sin ellas, con
+ * las del listado.
  */
 export const capaPorCajas = (
   opciones: OpcionesCliente,
+  fichas?: OpcionesCliente,
 ): Layer.Layer<ExtractorPorCajas, never, HttpClient.HttpClient> =>
   Layer.effect(
     ExtractorPorCajas,
-    Effect.map(geoportal(opciones), (fuente) =>
-      ExtractorPorCajas.of({
+    Effect.gen(function* () {
+      const listado = yield* clienteDeFuente(ORIGEN, opciones);
+      const fuente = geoportal(
+        listado,
+        fichas === undefined ? listado : yield* listado.conOpciones(fichas),
+      );
+      return ExtractorPorCajas.of({
         fuente: "registro-oficial",
         caja: fuente.listadoDeCaja,
         ficha: fuente.ficha,
         peticiones: fuente.peticiones,
-      }),
-    ),
+      });
+    }),
   );
