@@ -9,7 +9,7 @@ Consultas y medidas del 28/09/2026. Cada cifra lleva una de dos marcas:
 
 Peticiones hechas a las fuentes, todas con el `User-Agent` «Celda (investigación; contacto en celda.elies.site)»:
 
-- Registro oficial: 61 peticiones, `robots.txt` (sigue dando 404) y 60 de listado, de 19:25 a 19:30 hora de Madrid, con 4 s entre el final de una respuesta y la siguiente. Ninguna ficha de detalle. Para la revisión de Madrid (ticket 49), 11 más de 23:13 a 23:14: `robots.txt` y 10 de listado.
+- Registro oficial: 61 peticiones, `robots.txt` (sigue dando 404) y 60 de listado, de 19:25 a 19:30 hora de Madrid, con 4 s entre el final de una respuesta y la siguiente. Ninguna ficha de detalle. Para la revisión de Madrid (ticket 49), 11 más de 23:13 a 23:14: `robots.txt` y 10 de listado. Para la primera pasada real de Cataluña (ticket 40), 38 más de 00:13:40 a 00:16:00 del 29/09: `robots.txt` y 37 de listado, con el `User-Agent` de la ingesta, «Celda (ingesta; contacto en celda.elies.site)», y 3 s entre una respuesta y la siguiente petición.
 - antenasmoviles.es: una sola, `GET /v1/showf?er5`, la misma que hace cualquier visitante al abrir su mapa. Ningún `markers`.
 - IGN, CNIG e INE: unas 25 peticiones a sus servicios de descarga (ATOM, WFS y la API de INEbase).
 - Protomaps y OpenFreeMap: `pmtiles extract --dry-run`, que solo lee los directorios del archivo.
@@ -110,6 +110,50 @@ Hacer la pasada completa cada noche son 1,3 GB al mes sacados del geoportal en 1
 - Cada noche se barre un grupo: unas 31 peticiones, unos 6 MB y 2 minutos, con una petición cada 3 s como hoy.
 - **El barrido pasa a ser por zona.** Hoy una observación que falta en dos barridos seguidos se retira, y un barrido es el listado entero. Con el reparto, el barrido de una zona solo cuenta ausencias a las observaciones de esa zona. La zona de una observación es la celda en la que cae. Si una estación se mueve de celda, la ve el barrido de la otra y la ausencia en la vieja no llega a contar. Retirar pasa a tardar dos semanas en lugar de dos noches.
 - Las altas también tardan hasta una semana en verse. Si se quiere antes, las celdas de las ciudades grandes pueden ir en todos los grupos: Madrid y Barcelona juntas son unas 30 peticiones más por noche.
+
+### Primera pasada real de Cataluña (ticket 40)
+
+La ingesta nocturna barrió la zona de Cataluña una vez, el 29/09/2026 de 00:13:40 a 00:16:00 hora de Madrid, con su configuración por defecto: los 9 cuadros de 1°, una petición cada 3 s y el `User-Agent` de la ingesta. Sin fichas de detalle (`CELDA_INGESTA_MAX_FICHAS=0`) y con antenasmoviles.es apagado. Todo medido.
+
+- **Peticiones:** 38, `robots.txt` (404) y 37 de listado. La estimación era de 37.
+- **Tiempo:** 140 s la ejecución y 2 min 24 s el programa entero, con la publicación y la copia de la base.
+- **Datos:** 10,6 MB sin comprimir. La estimación de 6 MB contaba solo las hojas. La primera pasada pide también las cajas que llegan al tope, 7 de 1000 elementos.
+- **Registros:** 10.305 en los 9 cuadros, de ellos 9.523 en Cataluña. La estimación daba 9.859 en los cuadros; salen un 4,5 % más. Ninguna respuesta con formato desconocido ni titular desconocido.
+- **Cajas guardadas:** 30. El cuadro `2,41` (Barcelona) necesitó 19, con cinco divisiones como mucho, y el `1,41`, 4; los otros siete van en una sola caja. La pasada siguiente son 30 peticiones de listado más `robots.txt`, unos 6,4 MB.
+
+Por cuadro:
+
+| Cuadro | Registros | Cajas guardadas |
+|---|---|---|
+| `0,40` | 707 | 1 |
+| `0,41` | 881 | 1 |
+| `1,41` | 2.247 | 4 |
+| `2,41` | 5.098 | 19 |
+| `3,41` | 210 | 1 |
+| `0,42` | 250 | 1 |
+| `1,42` | 221 | 1 |
+| `2,42` | 458 | 1 |
+| `3,42` | 233 | 1 |
+
+Por provincia, con la provincia del IGN que la publicación pone en cada ficha (ADR 0017). Estaciones base y emplazamientos salen de la fusión de hoy (ADR 0012):
+
+| Provincia | Registros | Estaciones base | Emplazamientos |
+|---|---|---|---|
+| Barcelona | 5.917 | 4.917 | 2.904 |
+| Girona | 1.307 | 1.123 | 631 |
+| Lleida | 877 | 776 | 477 |
+| Tarragona | 1.422 | 1.213 | 654 |
+| **Cataluña** | **9.523** | **8.029** | **4.666** |
+| Castelló (norte) | 399 | 342 | 171 |
+| Huesca (este) | 333 | 296 | 184 |
+| Teruel y Zaragoza (bordes) | 50 | 45 | 28 |
+| **Los 9 cuadros** | **10.305** | **8.712** | **5.049** |
+
+La provincia de la dirección del registro da las mismas cifras, salvo un registro con dirección de Tarragona que el IGN sitúa en Barcelona. Por titular, en los 9 cuadros: Vodafone 3.958, Movistar 3.339, Orange 2.781, Digi 224 y Yoigo 3. Las estaciones base de Cataluña son Movistar 3.038, Orange 2.398, Vodafone 2.397, Digi 193 y Yoigo 3.
+
+Barcelona provincia tiene 5.917 registros, frente a los unos 5.500 estimados. Son las fichas que el #41 tiene que leer la primera noche.
+
+**La publicación de hoy aguanta Cataluña.** Con la capa única del formato 4 la noche publicó 5.049 emplazamientos en 42 ficheros: la capa, 252 KB y 63 KB con gzip, 40 lotes de fichas, 5,5 MB y 403 KB con gzip, y `vigente.json`. Publicar tardó unos 4 s. El límite está en la web: el mapa se abre con el área de Barcelona (`BARCELONA` en `packages/dominio/src/area.ts`), que no deja salir de la caja de 1,85° a 2,45° de longitud y 41,2° a 41,6° de latitud. Los emplazamientos de Girona, Lleida, Tarragona y los bordes de Aragón y Castelló están en la capa, pero no se llega a ellos hasta que la web cambie de área o llegue la capa por provincias (#43).
 
 ### Fichas de detalle
 
