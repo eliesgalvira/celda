@@ -12,6 +12,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import { BuscadorDeDirecciones, buscadorNominatim, type Direccion } from "./buscador.ts";
+import A_CORUNA from "./referencia/nominatim-a-coruna.json";
 import CALLE_MAYOR from "./referencia/nominatim-calle-mayor.json";
 import GIRONA from "./referencia/nominatim-girona.json";
 import CON_NUMERO from "./referencia/nominatim-numero.json";
@@ -87,7 +88,7 @@ const buscarConTurno = (consulta: string) =>
 
 describe("búsqueda de direcciones con Nominatim", () => {
   it.effect(
-    "pide a Nominatim en toda España y en castellano, y da nombres cortos sin repetir",
+    "pide a Nominatim en toda España, con los nombres oficiales, y da nombres cortos sin repetir",
     () => {
       const { capa, peticiones } = montar(
         new Map([["sagrada familia", [JSON_DE(SAGRADA_FAMILIA)]]]),
@@ -125,7 +126,8 @@ describe("búsqueda de direcciones con Nominatim", () => {
           addressdetails: "1",
           limit: "10",
           countrycodes: "es",
-          "accept-language": "es",
+          // Ningún idioma: Nominatim da el nombre local de cada lugar, no el del navegador.
+          "accept-language": "und",
         });
         // Sin cabeceras propias: el navegador no manda una petición previa de CORS por cada búsqueda.
         assert.deepStrictEqual(peticion?.cabeceras, []);
@@ -154,8 +156,8 @@ describe("búsqueda de direcciones con Nominatim", () => {
     return Effect.gen(function* () {
       // Nominatim da cinco veces la misma plaza, por tramos: se leen como dos.
       assert.deepStrictEqual(yield* buscarConTurno("Plaça de la Independència Girona"), [
-        ["Plaça de la Independència", "el Mercadal", "Gerona (Gerona)"],
-        ["Plaça de la Independència", "Eixample", "Gerona (Gerona)"],
+        ["Plaça de la Independència", "el Mercadal", "Girona (Girona)"],
+        ["Plaça de la Independència", "Eixample", "Girona (Girona)"],
       ]);
       // Ocho plazas mayores de ocho sitios de Soria: el lugar dice de qué municipio es cada una, y
       // el detalle, el núcleo si no es el del municipio.
@@ -176,6 +178,32 @@ describe("búsqueda de direcciones con Nominatim", () => {
           "Urbanización Montalmar, Bajamar",
           "San Cristóbal de La Laguna (Santa Cruz de Tenerife)",
         ],
+      ]);
+    }).pipe(Effect.provide(capa));
+  });
+
+  it.effect("da los topónimos oficiales: Girona y A Coruña, no Gerona ni La Coruña", () => {
+    const { capa } = montar(
+      new Map([
+        ["plaça de la independència girona", [JSON_DE(GIRONA)]],
+        ["rúa real a coruña", [JSON_DE(A_CORUNA)]],
+      ]),
+    );
+    return Effect.gen(function* () {
+      const girona = yield* buscarConTurno("Plaça de la Independència Girona");
+      const coruna = yield* buscarConTurno("Rúa Real A Coruña");
+      assert.notMatch(JSON.stringify([girona, coruna]), /Gerona|La Coruña/u);
+      // En Galicia el municipio es el concello (`municipality`), y el núcleo va en el detalle.
+      assert.deepStrictEqual(coruna, [
+        ["Rúa Real", "Zalaeta, A Pescaría", "A Coruña (A Coruña)"],
+        ["Rúa Real", "A Madalena", "Ferrol (A Coruña)"],
+        ["Rúa Real", "A Insua", "Fisterra (A Coruña)"],
+        ["Rúa Real", "O Souto", "Padrón (A Coruña)"],
+        ["Rúa Real", "A Cochera, A Trabanca", "Padrón (A Coruña)"],
+        ["Rúa Real", "A Trabanca", "Padrón (A Coruña)"],
+        ["Rúa Real", "Souto da Vila", "Pontedeume (A Coruña)"],
+        ["Rúa Real", "As Saíñas", "Cedeira (A Coruña)"],
+        ["Rúa Real", "A Ribeira", "Muxía (A Coruña)"],
       ]);
     }).pipe(Effect.provide(capa));
   });

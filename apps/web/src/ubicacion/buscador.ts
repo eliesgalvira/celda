@@ -131,10 +131,11 @@ const lugarDe = (
  * De un resultado de Nominatim a una dirección con un nombre corto, dónde queda y en qué
  * municipio y provincia.
  *
- * En España, Nominatim da el municipio en `city`, `town` o `village`, por ese orden: en un núcleo
- * de un municipio mayor, `village` o `hamlet` es el núcleo y `town`, el municipio (Bajamar, en San
- * Cristóbal de La Laguna). La provincia llega en `state_district`; en las comunidades de una sola
- * provincia no llega, y se da la comunidad (Comunidad de Madrid).
+ * En España, Nominatim da el municipio en `municipality` cuando el límite municipal no está unido
+ * a un núcleo (los concellos de Galicia) y si no, en `city`, `town` o `village`, por ese orden. En
+ * un núcleo de un municipio mayor, `village` o `hamlet` es el núcleo y `town`, el municipio
+ * (Bajamar, en San Cristóbal de La Laguna). La provincia llega en `state_district`; en las
+ * comunidades de una sola provincia no llega, y se da la comunidad (Comunidad de Madrid).
  */
 export const direccionDe = (resultado: Resultado): Direccion | undefined => {
   const direccion = resultado.address ?? {};
@@ -145,7 +146,7 @@ export const direccionDe = (resultado: Resultado): Direccion | undefined => {
       : [calle, direccion.house_number].filter((parte) => parte !== undefined).join(", ");
   const nombre = resultado.name !== undefined && resultado.name !== "" ? resultado.name : conNumero;
   if (nombre === undefined) return undefined;
-  const municipio = direccion.city ?? direccion.town ?? direccion.village ?? direccion.municipality;
+  const municipio = direccion.municipality ?? direccion.city ?? direccion.town ?? direccion.village;
   const provincia = direccion.province ?? direccion.state_district;
   const detalle = partes(
     [
@@ -237,7 +238,11 @@ export const buscadorNominatim: Layer.Layer<BuscadorDeDirecciones, never, HttpCl
             addressdetails: "1",
             limit: String(RESULTADOS),
             countrycodes: "es",
-            "accept-language": "es",
+            // Los topónimos, en su nombre oficial: Girona, A Coruña, Donostia / San Sebastián.
+            // Sin este parámetro, Nominatim usa el idioma del navegador y daría «Gerona» o «La
+            // Coruña». Con un idioma que ningún lugar tiene (`und`, «sin determinar»), usa la
+            // etiqueta `name` de OpenStreetMap, que es el nombre local.
+            "accept-language": "und",
           },
         });
 
