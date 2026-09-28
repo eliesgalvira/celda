@@ -1,6 +1,7 @@
 import { type Coordenada, distanciaMetros } from "./area.ts";
 import { type Banda, compararBandas, compararTexto } from "./banda.ts";
 import type { Compania } from "./compania.ts";
+import { claveDeDireccion } from "./direccion.ts";
 import type {
   Confianza,
   Conflicto,
@@ -15,9 +16,20 @@ import { type Fuente, normalizarCodigo, type Observacion } from "./observacion.t
 export interface ReglaFusion {
   /** Dos observaciones a esta distancia o menos están en el mismo emplazamiento. */
   readonly radioMetros: number;
+  /** Hasta esta distancia, también dos observaciones con la misma dirección (vía, número y municipio). */
+  readonly radioMismaDireccionMetros: number;
+  /**
+   * Hasta esta distancia, también dos observaciones de la misma compañía con el mismo código
+   * salvo ceros a la izquierda: son la misma estación base.
+   */
+  readonly radioMismoCodigoMetros: number;
 }
 
-export const REGLA_FUSION: ReglaFusion = { radioMetros: 15 };
+export const REGLA_FUSION: ReglaFusion = {
+  radioMetros: 15,
+  radioMismaDireccionMetros: 30,
+  radioMismoCodigoMetros: 60,
+};
 
 const METROS_POR_GRADO = 111_320;
 
@@ -43,13 +55,13 @@ const conjuntosDisjuntos = (tamano: number) => {
 };
 
 /**
- * Pares de puntos a `radio` metros o menos. Reparte los puntos en una rejilla de celdas algo
- * mayores que el radio y solo compara cada punto con los de su celda y las vecinas.
+ * Pares de puntos a `radio` metros o menos, con su distancia. Reparte los puntos en una rejilla de
+ * celdas algo mayores que el radio y solo compara cada punto con los de su celda y las vecinas.
  */
 const paresCercanos = (
   posiciones: ReadonlyArray<Coordenada>,
   radioMetros: number,
-): ReadonlyArray<readonly [number, number]> => {
+): ReadonlyArray<readonly [number, number, number]> => {
   const alto = radioMetros / METROS_POR_GRADO;
   // A 60° de latitud un grado de longitud mide la mitad; más al sur la celda sobra.
   const ancho = alto / Math.cos(Math.PI / 3);
@@ -61,19 +73,16 @@ const paresCercanos = (
     const clave = `${x}:${y}`;
     celdas.set(clave, [...(celdas.get(clave) ?? []), indice]);
   });
-  const pares: Array<readonly [number, number]> = [];
+  const pares: Array<readonly [number, number, number]> = [];
   posiciones.forEach((posicion, indice) => {
     const [x, y] = celdaDe(posicion);
     for (const dx of [-1, 0, 1]) {
       for (const dy of [-1, 0, 1]) {
         for (const otro of celdas.get(`${x + dx}:${y + dy}`) ?? []) {
           const vecina = posiciones[otro];
-          if (
-            otro > indice &&
-            vecina !== undefined &&
-            distanciaMetros(posicion, vecina) <= radioMetros
-          ) {
-            pares.push([indice, otro]);
+          const metros = vecina === undefined ? Infinity : distanciaMetros(posicion, vecina);
+          if (otro > indice && metros <= radioMetros) {
+            pares.push([indice, otro, metros]);
           }
         }
       }
@@ -92,6 +101,32 @@ const claveDeEstacion = (observacion: Observacion): string =>
   `${observacion.compania}-${observacion.codigo.trim()}`;
 
 const esOficial = (observacion: Observacion): boolean => observacion.fuente === "registro-oficial";
+
+interface ObservacionConDireccion {
+  readonly observacion: Observacion;
+  /** `claveDeDireccion` de su dirección, calculada una vez. */
+  readonly direccion: string | undefined;
+}
+
+/**
+ * Si dos observaciones `presente` a `metros` una de otra van al mismo emplazamiento: por cercanía,
+ * por tener la misma dirección o por ser la misma estación base con el código escrito con otros
+ * ceros a la izquierda. En Madrid cada registro trae sus propias coordenadas, aunque sea de la
+ * misma azotea o de la misma estación (ADR 0012).
+ */
+const vanJuntas = (
+  regla: ReglaFusion,
+  a: ObservacionConDireccion,
+  b: ObservacionConDireccion,
+  metros: number,
+): boolean =>
+  metros <= regla.radioMetros ||
+  (metros <= regla.radioMismoCodigoMetros &&
+    a.observacion.compania === b.observacion.compania &&
+    normalizarCodigo(a.observacion.codigo) === normalizarCodigo(b.observacion.codigo)) ||
+  (metros <= regla.radioMismaDireccionMetros &&
+    a.direccion !== undefined &&
+    a.direccion === b.direccion);
 
 /** El valor más repetido y, si empatan, el primero en orden. */
 const masFrecuente = (valores: ReadonlyArray<string>): string => {
@@ -237,7 +272,9 @@ const emplazamientoDe = (
  * Junta las observaciones de todas las fuentes en emplazamientos.
  *
  * - Las observaciones `presente` a `radioMetros` o menos, de cualquier compañía, van al mismo
- *   emplazamiento. La cercanía se encadena: si A está cerca de B y B de C, van juntas.
+ *   emplazamiento. También las que tienen la misma dirección hasta `radioMismaDireccionMetros`, y
+ *   las de una compañía con el mismo código salvo ceros a la izquierda hasta
+ *   `radioMismoCodigoMetros`. La unión se encadena: si A va con B y B con C, van juntas.
  * - Una observación de otra fuente con la compañía y el código exacto de una del registro
  *   oficial va con ella, esté donde esté. Si está a más del radio, es un conflicto de posición.
  * - En cada emplazamiento hay una estación base por compañía, con la unión de las bandas.
@@ -256,11 +293,27 @@ export const fusionar = (
   const ordenadas = [...observaciones].sort(compararObservaciones);
   const presentes = ordenadas.filter((o) => o.afirma === "presente");
   const conjuntos = conjuntosDisjuntos(presentes.length);
-  for (const [a, b] of paresCercanos(
-    presentes.map((o) => o.posicion),
+  const alcance = Math.max(
     regla.radioMetros,
+    regla.radioMismaDireccionMetros,
+    regla.radioMismoCodigoMetros,
+  );
+  const conDireccion = presentes.map((observacion): ObservacionConDireccion => ({
+    observacion,
+    direccion: claveDeDireccion(observacion.direccion),
+  }));
+  for (const [a, b, metros] of paresCercanos(
+    presentes.map((o) => o.posicion),
+    alcance,
   )) {
-    conjuntos.unir(a, b);
+    const [primera, segunda] = [conDireccion[a], conDireccion[b]];
+    if (
+      primera !== undefined &&
+      segunda !== undefined &&
+      vanJuntas(regla, primera, segunda, metros)
+    ) {
+      conjuntos.unir(a, b);
+    }
   }
   // Una observación de otra fuente con el código exacto de una del registro oficial es la misma
   // estación base, esté donde esté: va a su emplazamiento.

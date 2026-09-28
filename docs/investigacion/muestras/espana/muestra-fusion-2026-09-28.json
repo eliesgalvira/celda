@@ -1,0 +1,150 @@
+{
+ "inicio": "2026-09-28T21:13:33.924Z",
+ "fin": "2026-09-28T21:14:19.372Z",
+ "userAgent": "Celda (investigación; contacto en celda.elies.site)",
+ "pausaMs": 4000,
+ "robots": 404,
+ "listados": 10,
+ "registro": [
+  {
+   "ciudad": "barcelona",
+   "caja": [
+    2.052,
+    41.317,
+    2.1405,
+    41.3925
+   ],
+   "estado": 200,
+   "n": 709,
+   "bytes": 438242,
+   "s": 0.71,
+   "fichero": "barcelona-0.iso-8859-1.json"
+  },
+  {
+   "ciudad": "barcelona",
+   "caja": [
+    2.1405,
+    41.317,
+    2.229,
+    41.3925
+   ],
+   "estado": 200,
+   "n": 607,
+   "bytes": 371910,
+   "s": 0.568,
+   "fichero": "barcelona-1.iso-8859-1.json"
+  },
+  {
+   "ciudad": "barcelona",
+   "caja": [
+    2.052,
+    41.3925,
+    2.1405,
+    41.468
+   ],
+   "estado": 200,
+   "n": 195,
+   "bytes": 119675,
+   "s": 0.41,
+   "fichero": "barcelona-2.iso-8859-1.json"
+  },
+  {
+   "ciudad": "barcelona",
+   "caja": [
+    2.1405,
+    41.3925,
+    2.229,
+    41.468
+   ],
+   "estado": 200,
+   "n": 870,
+   "bytes": 530251,
+   "s": 0.79,
+   "fichero": "barcelona-3.iso-8859-1.json"
+  },
+  {
+   "ciudad": "madrid",
+   "caja": [
+    -3.7975,
+    40.395,
+    -3.705,
+    40.48
+   ],
+   "estado": 200,
+   "n": 711,
+   "bytes": 432089,
+   "s": 0.488,
+   "fichero": "madrid-0.iso-8859-1.json"
+  },
+  {
+   "ciudad": "madrid",
+   "caja": [
+    -3.705,
+    40.395,
+    -3.65875,
+    40.4375
+   ],
+   "estado": 200,
+   "n": 708,
+   "bytes": 429556,
+   "s": 0.496,
+   "fichero": "madrid-1.iso-8859-1.json"
+  },
+  {
+   "ciudad": "madrid",
+   "caja": [
+    -3.65875,
+    40.395,
+    -3.6125,
+    40.4375
+   ],
+   "estado": 200,
+   "n": 182,
+   "bytes": 110478,
+   "s": 0.354,
+   "fichero": "madrid-2.iso-8859-1.json"
+  },
+  {
+   "ciudad": "madrid",
+   "caja": [
+    -3.705,
+    40.4375,
+    -3.65875,
+    40.48
+   ],
+   "estado": 200,
+   "n": 543,
+   "bytes": 329461,
+   "s": 0.45,
+   "fichero": "madrid-3.iso-8859-1.json"
+  },
+  {
+   "ciudad": "madrid",
+   "caja": [
+    -3.65875,
+    40.4375,
+    -3.6125,
+    40.48
+   ],
+   "estado": 200,
+   "n": 253,
+   "bytes": 153603,
+   "s": 0.317,
+   "fichero": "madrid-4.iso-8859-1.json"
+  },
+  {
+   "ciudad": "valencia",
+   "caja": [
+    -0.405,
+    39.445,
+    -0.335,
+    39.495
+   ],
+   "estado": 200,
+   "n": 654,
+   "bytes": 405150,
+   "s": 0.568,
+   "fichero": "valencia-0.iso-8859-1.json"
+  }
+ ]
+}

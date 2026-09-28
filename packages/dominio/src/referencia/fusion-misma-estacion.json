@@ -1,0 +1,38 @@
+[
+  {
+    "clave": "vodafone-017803",
+    "posicion": {
+      "longitud": 2.123267,
+      "latitud": 41.386032
+    },
+    "direccion": "CL ALBERTO AGUILERA, 5. MADRID, MADRID",
+    "municipio": "BARCELONA",
+    "estado": "verificado",
+    "confianza": "media",
+    "conflictos": [],
+    "estaciones": [
+      {
+        "compania": "vodafone",
+        "codigos": [
+          "017803",
+          "17803"
+        ],
+        "bandas": [],
+        "observaciones": [
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE - 017803"
+          },
+          {
+            "fuente": "registro-oficial",
+            "clave": "VODAFONE - 17803"
+          }
+        ]
+      }
+    ],
+    "fuentes": [
+      "registro-oficial"
+    ],
+    "datosDel": 1790380800000
+  }
+]
