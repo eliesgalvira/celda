@@ -528,7 +528,11 @@ export function PantallaMapa() {
               <>
                 <AvisosDeUbicacion panelAbierto={panelAbierto()} />
                 <Show when={eligiendo()}>
-                  <EleccionConBuscador alUsarCentro={usarCentro} alIrA={irA} />
+                  <EleccionConBuscador
+                    alUsarCentro={usarCentro}
+                    alIrA={irA}
+                    encuadre={encuadre()}
+                  />
                 </Show>
               </>
             }

@@ -13,7 +13,7 @@ import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
-import type { Direccion } from "./buscador.ts";
+import { BusquedaFallida, type Direccion } from "./buscador.ts";
 import type { LecturaGps } from "./estado.ts";
 import { type OpcionesDeUbicacion, ubicacionDePrueba } from "./pruebas.ts";
 
@@ -79,9 +79,26 @@ const PUNTO: PuntoElegido = {
 
 const SAGRADA_FAMILIA: Direccion = {
   nombre: "Basílica de la Sagrada Familia",
-  detalle: "Carrer de Provença, la Sagrada Família, l'Eixample, Barcelona",
+  detalle: "Carrer de Provença, la Sagrada Família, l'Eixample",
+  lugar: "Barcelona (Barcelona)",
   posicion: { longitud: 2.1744283, latitud: 41.4035046 },
 };
+
+/** Dos plazas mayores de Soria que solo se distinguen por el municipio. */
+const PLAZAS_MAYORES: ReadonlyArray<Direccion> = [
+  {
+    nombre: "Plaza Mayor",
+    detalle: "",
+    lugar: "Medinaceli (Soria)",
+    posicion: { longitud: 2.4344, latitud: 41.1722 },
+  },
+  {
+    nombre: "Plaza Mayor",
+    detalle: "",
+    lugar: "Ágreda (Soria)",
+    posicion: { longitud: -1.9224, latitud: 41.8545 },
+  },
+];
 
 /** Las casillas del sector que da servicio: «valor · qué es». */
 const casillas = (region: ReturnType<typeof within>): ReadonlyArray<string> =>
@@ -481,5 +498,69 @@ describe("punto de referencia: punto elegido", () => {
     );
     // El punto se usa igual, aunque no se haya guardado.
     assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /el punto elegido/u);
+  });
+});
+
+describe("punto de referencia: buscar una dirección en toda España", () => {
+  /** Abre la elección de un punto y busca `consulta`. */
+  const buscarEnLaEleccion = async (
+    consulta: string,
+    busquedas: ReadonlyMap<string, ReadonlyArray<Direccion> | BusquedaFallida>,
+  ) => {
+    const app = await abrir({ busquedas });
+    fireEvent.click(await app.panel().findByRole("button", { name: "Elegir en el mapa" }));
+    flush();
+    const eleccion = within(await app.findByRole("region", { name: "Elige un punto" }));
+    fireEvent.input(app.getByLabelText("Dirección"), { target: { value: consulta } });
+    flush();
+    fireEvent.click(eleccion.getByRole("button", { name: "Buscar" }));
+    flush();
+    return { ...app, eleccion };
+  };
+
+  it("con dos sitios que se llaman igual, cada resultado dice su municipio y su provincia", async () => {
+    const { eleccion, almacen } = await buscarEnLaEleccion(
+      "Plaza Mayor",
+      new Map([["Plaza Mayor", PLAZAS_MAYORES]]),
+    );
+    const lista = await eleccion.findByRole("list", { name: "Direcciones encontradas" });
+    const botones = within(lista).getAllByRole("button");
+    assert.deepStrictEqual(
+      botones.map((boton) => boton.textContent),
+      ["Plaza MayorMedinaceli (Soria)", "Plaza MayorÁgreda (Soria)"],
+    );
+
+    fireEvent.click(within(lista).getByRole("button", { name: /Ágreda/u }));
+    flush();
+    await waitFor(() => {
+      assert.lengthOf(almacen.guardadas(), 1);
+    });
+    assert.deepStrictEqual(almacen.guardadas()[0]?.posicion, PLAZAS_MAYORES[1]?.posicion);
+  });
+
+  it("sin resultados, dice que no hay nada así en España y cómo afinar", async () => {
+    const { eleccion } = await buscarEnLaEleccion("Calle Inventada 99", new Map());
+    const aviso = await eleccion.findByText(/No hay ninguna dirección así en España/u);
+    assert.match(aviso.textContent ?? "", /el municipio/u);
+    assert.isNull(eleccion.queryByRole("list", { name: "Direcciones encontradas" }));
+  });
+
+  it("si el buscador no responde, lo dice y deja elegir el punto en el mapa", async () => {
+    const { eleccion } = await buscarEnLaEleccion(
+      "Plaza Mayor",
+      new Map([
+        ["Plaza Mayor", new BusquedaFallida({ motivo: "sin-respuesta", detalle: "sin conexión" })],
+      ]),
+    );
+    const aviso = await eleccion.findByText(/El buscador no responde/u);
+    assert.match(aviso.textContent ?? "", /elegir el punto en el mapa/u);
+  });
+
+  it("si el buscador pide esperar, lo dice como una espera y no como un fallo de Celda", async () => {
+    const { eleccion } = await buscarEnLaEleccion(
+      "Plaza Mayor",
+      new Map([["Plaza Mayor", new BusquedaFallida({ motivo: "limite", detalle: "429" })]]),
+    );
+    assert.isNotNull(await eleccion.findByText(/pide que esperemos/u));
   });
 });

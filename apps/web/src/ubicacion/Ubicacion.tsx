@@ -1,4 +1,4 @@
-import type { Coordenada } from "@celda/dominio/area";
+import type { Coordenada, Rectangulo } from "@celda/dominio/area";
 import type { Credito } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
@@ -8,7 +8,7 @@ import {
   EleccionDePunto,
   type EstadoBusqueda,
 } from "@celda/ui/ubicacion/EleccionDePunto.tsx";
-import { recursoFijo } from "@celda/ui/recurso.ts";
+import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { MenuUbicacion, OpcionUbicacion } from "@celda/ui/ubicacion/MenuUbicacion.tsx";
 import { LecturaServicio } from "@celda/ui/ubicacion/LecturaServicio.tsx";
@@ -282,6 +282,9 @@ export function AvisosDeUbicacion(props: { readonly panelAbierto: boolean }) {
   );
 }
 
+const SIN_RESULTADOS =
+  "No hay ninguna dirección así en España. Prueba con la calle, el número y el municipio.";
+
 const TEXTO_FALLO_BUSQUEDA: Readonly<Record<BusquedaFallida["motivo"], string>> = {
   apagada: "La búsqueda de direcciones está apagada ahora. Elige el punto en el mapa.",
   limite: "El buscador pide que esperemos un poco. Vuelve a probar en unos segundos.",
@@ -294,9 +297,17 @@ export interface EleccionConBuscadorProps {
   readonly alUsarCentro: () => void;
   /** Llevar el mapa hasta una dirección elegida. */
   readonly alIrA: (posicion: Coordenada) => void;
+  /** Lo que se ve del mapa: lo que cae dentro sale primero en los resultados. */
+  readonly encuadre: Rectangulo | undefined;
 }
 
-/** La elección de un punto, con el buscador de direcciones (historias 26 y 27). */
+/** Una búsqueda que la persona ha lanzado. Cada envío crea una nueva, aunque repita la consulta. */
+interface BusquedaPedida {
+  readonly consulta: string;
+  readonly encuadre: Rectangulo | undefined;
+}
+
+/** La elección de un punto, con el buscador de direcciones (historias 9, 26 y 27). */
 export function EleccionConBuscador(props: EleccionConBuscadorProps) {
   const control = useContext(UbicacionContexto);
   const datos = usarDatos();
@@ -304,8 +315,7 @@ export function EleccionConBuscador(props: EleccionConBuscadorProps) {
   const [estado, setEstado] = createSignal<EstadoBusqueda>({ tipo: "inicial" });
   const [direcciones, setDirecciones] = createSignal<ReadonlyArray<Direccion>>([]);
   const [atribucion, setAtribucion] = createSignal<Credito>();
-  // Solo cuenta la respuesta de la última búsqueda.
-  let busqueda = 0;
+  const [pedida, setPedida] = createSignal<BusquedaPedida>();
 
   recursoFijo("buscador:atribucion", () => {
     let vigente = true;
@@ -317,18 +327,19 @@ export function EleccionConBuscador(props: EleccionConBuscadorProps) {
     };
   });
 
-  const buscar = () => {
-    if (normalizarConsulta(consulta()).length < LETRAS_MINIMAS) {
-      setEstado({ tipo: "aviso", texto: "Escribe al menos tres letras de la dirección." });
-      return;
-    }
-    busqueda += 1;
-    const esta = busqueda;
-    setEstado({ tipo: "buscando" });
+  // La búsqueda se abre con cada envío y se cierra con el siguiente o al cerrar la elección: solo
+  // cuenta la respuesta de la última.
+  recurso("buscador:busqueda", pedida, (busqueda) => {
+    const parar = new AbortController();
     void datos
-      .runPromiseExit(Effect.flatMap(BuscadorDeDirecciones, (b) => b.buscar(consulta())))
+      .runPromiseExit(
+        Effect.flatMap(BuscadorDeDirecciones, (b) =>
+          b.buscar(busqueda.consulta, busqueda.encuadre),
+        ),
+        { signal: parar.signal },
+      )
       .then((salida) => {
-        if (esta !== busqueda) return;
+        if (parar.signal.aborted) return;
         if (Exit.isFailure(salida)) {
           const error = Option.getOrUndefined(Cause.findErrorOption(salida.cause));
           setEstado({
@@ -340,14 +351,20 @@ export function EleccionConBuscador(props: EleccionConBuscadorProps) {
         setDirecciones(salida.value);
         setEstado(
           salida.value.length === 0
-            ? {
-                tipo: "aviso",
-                texto:
-                  "No hay ninguna dirección así en la zona de Barcelona. Prueba con la calle y el número.",
-              }
+            ? { tipo: "aviso", texto: SIN_RESULTADOS }
             : { tipo: "resultados", direcciones: salida.value },
         );
       });
+    return () => parar.abort();
+  });
+
+  const buscar = () => {
+    if (normalizarConsulta(consulta()).length < LETRAS_MINIMAS) {
+      setEstado({ tipo: "aviso", texto: "Escribe al menos tres letras de la dirección." });
+      return;
+    }
+    setEstado({ tipo: "buscando" });
+    setPedida({ consulta: consulta(), encuadre: props.encuadre });
   };
 
   return (

@@ -70,7 +70,13 @@ export type EstadoBusqueda =
   | { readonly tipo: "buscando" }
   | {
       readonly tipo: "resultados";
-      readonly direcciones: ReadonlyArray<{ readonly nombre: string; readonly detalle: string }>;
+      readonly direcciones: ReadonlyArray<{
+        readonly nombre: string;
+        /** Dónde queda dentro del municipio. */
+        readonly detalle: string;
+        /** El municipio y su provincia: distingue los sitios que se llaman igual. */
+        readonly lugar: string;
+      }>;
     }
   /** Un aviso en lugar de resultados: que no hay ninguno, que la consulta es corta o un fallo. */
   | { readonly tipo: "aviso"; readonly texto: string };
@@ -142,6 +148,9 @@ export function BuscadorDeDirecciones(props: BuscadorDeDireccionesProps) {
                           <span class="font-mono text-[11px] text-tinta-suave">
                             {direccion.detalle}
                           </span>
+                        </Show>
+                        <Show when={direccion.lugar !== ""}>
+                          <span class="text-xs text-tinta">{direccion.lugar}</span>
                         </Show>
                       </button>
                     </li>
