@@ -65,7 +65,11 @@ La decisión y sus motivos están en el [ADR 0013](../adr/0013-busqueda-de-direc
 | Atribución | «Búsqueda: Nominatim · datos de OpenStreetMap (ODbL)», con enlace, bajo el buscador. |
 | Poder cambiar de servicio | `VITE_BUSCADOR_URL`. `apagado` lo apaga y la interfaz lo dice. |
 
-La consulta va limitada a los límites del mapa (`viewbox` y `bounded=1`), con `countrycodes=es` y `accept-language=es`. Las direcciones fuera de la zona o repetidas se descartan. Las pruebas usan respuestas grabadas en `referencia/`. Si pruebas contra el servidor real, haz pocas búsquedas y a mano.
+La consulta busca en toda España, con `countrycodes=es`, `accept-language=es` y 10 resultados, y sin `viewbox`: con él, Nominatim descarta lo que queda fuera de la caja en cuanto encuentra algo dentro (ADR 0013). `buscar(consulta, encuadre)` recibe lo que se ve del mapa y pone primero lo que cae dentro (`ordenarPorEncuadre`); la caché guarda la respuesta por consulta y el orden se decide en cada búsqueda. Las direcciones que se leen igual se descartan.
+
+Cada `Direccion` tiene `nombre`, `detalle` (calle, barrio, distrito o núcleo dentro del municipio) y `lugar`, «Municipio (Provincia)». El municipio sale de `city`, `town` o `village`, en ese orden: en Bajamar, `village` es el núcleo y `town`, San Cristóbal de La Laguna. La provincia, de `state_district`. En Madrid, Asturias y el resto de comunidades de una sola provincia no llega y se pone la comunidad.
+
+Las pruebas usan respuestas grabadas en `referencia/`: Barcelona, Girona, Soria (ocho plazas mayores de ocho municipios), Tenerife y «Calle Mayor 1» (Madrid y Zaragoza). Si pruebas contra el servidor real, haz pocas búsquedas, a mano y con un segundo como mínimo entre ellas.
 
 ## Interfaz
 
@@ -101,7 +105,7 @@ Con un punto de referencia, la sección «Mejorar la señal» de la ficha dice h
 
 ## Pruebas de componente
 
-`Ubicacion.test.tsx` monta la app con `ubicacionDePrueba()`: un GPS que contesta cuando la prueba llama a `responder` o `fallar`, un almacén en memoria y un buscador con respuestas fijas. Como el navegador, el GPS entrega al abrirse la última posición que tenga (`enCache` la primera vez), el permiso llega un momento después de montar y el almacén y el buscador contestan en otra tarea (ver [efectos.md](efectos.md)). Cuenta cuántas veces se pidió la ubicación, así que se puede comprobar que el paso previo va antes de pedirla y que una lectura nueva no vuelve a pedirla. `responderTarde` entrega una lectura a vigilancias ya quitadas, como un navegador que llama tarde.
+`Ubicacion.test.tsx` monta la app con `ubicacionDePrueba()`: un GPS que contesta cuando la prueba llama a `responder` o `fallar`, un almacén en memoria y un buscador con respuestas fijas, que ordena por encuadre como el de verdad. Como el navegador, el GPS entrega al abrirse la última posición que tenga (`enCache` la primera vez), el permiso llega un momento después de montar y el almacén y el buscador contestan en otra tarea (ver [efectos.md](efectos.md)). Cuenta cuántas veces se pidió la ubicación, así que se puede comprobar que el paso previo va antes de pedirla y que una lectura nueva no vuelve a pedirla. `responderTarde` entrega una lectura a vigilancias ya quitadas, como un navegador que llama tarde.
 
 `geolocalizacion.test.ts` prueba la capa real con un `Geolocation` y un permiso de prueba (objetos, no mocks de módulos) y `TestClock`: la espera propia de 20 s, que no corre mientras el aviso del navegador está abierto, los códigos de error en el móvil y en el ordenador, y apagar y volver a encender.
 

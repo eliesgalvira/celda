@@ -132,6 +132,7 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 | `ubicacion/ReferenciaEnMapa.tsx` | `map.on("move")` y un fotograma por movimiento | el mapa | `onSettled` | seguro | `recurso` |
 | `ejercicio/PanelEjercicio.tsx`, población | lectura de la población | fija | `onSettled` | seguro | `recursoFijo` |
 | `ubicacion/Ubicacion.tsx`, atribución del buscador | lectura del servicio | fija | `onSettled` | seguro | `recursoFijo` |
+| `ubicacion/Ubicacion.tsx`, búsqueda de direcciones | petición al buscador | cada envío del formulario | desde el manejador; una respuesta vieja se descartaba con un contador y la petición seguía al cerrar la elección | seguro | `recurso("buscador:busqueda")`, la cierra la búsqueda siguiente o cerrar la elección |
 | `ui/controles/MenuDeControles.tsx` | `pointerdown` del documento | fija | `onSettled` | seguro | `recursoFijo` |
 | `ui/ubicacion/MenuUbicacion.tsx` | `pointerdown` del documento | fija | `onSettled` | seguro | `recursoFijo` |
 | `ui/termino/Termino.tsx` | `pointerdown`, `keydown`, `resize`, `scroll` y fotogramas | fija | `onSettled` | seguro | `recursoFijo` |
@@ -167,6 +168,6 @@ Se abre una vez por lo que lo crea, no por una reejecución:
 - Una vez por Worker: `simulacion/navegador.ts` (`new Worker` y sus escuchadores). El simulador arranca uno con la primera simulación y lo termina si se interrumpe un cálculo a medias. Por eso los cálculos que se cancelan de más cuestan tanto.
 - Los servicios de Effect (`geolocalizacion.ts`, `brujula.ts`, `almacen.ts`, las lecturas de red de `capa/`, `ficha/` y `buscador.ts`) abren con `acquireRelease` y cierran al interrumpirse. Los abre el sitio de Solid de la primera tabla.
 - Escuchadores en el propio nodo desde un `ref` (`Dialogo`, `MenuDeControles`, `MenuUbicacion`, `PanelEmplazamiento`, `MarcadorReferencia`): uno por nodo, y mueren con él.
-- Manejadores de eventos (usar la ubicación, elegir, quitar, buscar, pedir permiso a la brújula): los abre la persona.
+- Manejadores de eventos (usar la ubicación, elegir, quitar, pedir permiso a la brújula): los abre la persona. Buscar una dirección solo escribe la búsqueda pedida, y la abre `recurso("buscador:busqueda")`.
 
-Resumen: 28 sitios abren algo desde Solid; el resto de efectos y memos, en la segunda tabla, no abren nada. Cuatro tenían el fallo: el GPS y la brújula (ya arreglados en 480e670 y 119001f) y la vista de interferencia y el sector que da servicio, que recalculaban con cada lectura del GPS en el mismo sitio. La precarga de fichas era un riesgo sin fallo visible. Todos abren ahora con `recurso()` o `recursoFijo()`.
+Resumen: 29 sitios abren algo desde Solid; el resto de efectos y memos, en la segunda tabla, no abren nada. Cuatro tenían el fallo: el GPS y la brújula (ya arreglados en 480e670 y 119001f) y la vista de interferencia y el sector que da servicio, que recalculaban con cada lectura del GPS en el mismo sitio. La precarga de fichas era un riesgo sin fallo visible. Todos abren ahora con `recurso()` o `recursoFijo()`.
