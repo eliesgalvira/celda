@@ -25,6 +25,8 @@ export default defineConfig(({ mode }) => ({
   test: {
     environment: "happy-dom",
     sequence: { shuffle: true },
+    // Una prueba falla si algún recurso se abre en bucle (ver `@celda/ui/recurso.ts`).
+    setupFiles: ["@celda/ui/pruebas/vigilante.ts"],
     // Solid 2 resuelve a la build de servidor con la condición "node"; las
     // pruebas usan la build de navegador en desarrollo.
     server: { deps: { inline: [/solid-js/, /@solidjs/] } },
