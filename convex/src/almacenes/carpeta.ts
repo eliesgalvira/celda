@@ -67,10 +67,41 @@ export const almacenEnCarpeta = (opciones: OpcionesCarpeta) =>
         Effect.catchTag("PlatformError", (error) => Effect.fail(noDisponible(error))),
       );
 
+      const listar = Effect.gen(function* () {
+        if (!(yield* fs.exists(opciones.carpeta))) return [];
+        const entradas = yield* fs.readDirectory(opciones.carpeta, { recursive: true });
+        // Las carpetas de lotes y los temporales de una escritura a medias no son ficheros publicados.
+        return entradas
+          .map((entrada) => entrada.split(path.sep).join("/"))
+          .filter((entrada) => entrada.endsWith(".json"));
+      }).pipe(
+        Effect.catchTag("PlatformError", (error) => Effect.fail(noDisponible(error))),
+        Effect.withSpan("AlmacenEnCarpeta.listar"),
+      );
+
+      const borrar = Effect.fn("AlmacenEnCarpeta.borrar")(
+        function* (fichero: string) {
+          const destino = path.join(opciones.carpeta, fichero);
+          yield* fs.remove(destino, { force: true });
+          // La carpeta de lotes de una versión se va con su último lote.
+          const carpeta = path.dirname(destino);
+          if (
+            fichero.includes("/") &&
+            (yield* fs.exists(carpeta)) &&
+            (yield* fs.readDirectory(carpeta)).length === 0
+          ) {
+            yield* fs.remove(carpeta, { recursive: true });
+          }
+        },
+        Effect.catchTag("PlatformError", (error) => Effect.fail(noDisponible(error))),
+      );
+
       return AlmacenDeFicheros.of({
         guardar,
         leer,
         cambiarVigente,
+        listar,
+        borrar,
         url: (fichero) => `${opciones.origen}/${fichero}`,
       });
     }),

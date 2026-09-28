@@ -79,4 +79,31 @@ describe("almacén de ficheros en una carpeta", () => {
       }),
     ),
   );
+
+  it.effect("lista los ficheros con su ruta y borra la carpeta de lotes con el último", () =>
+    conCarpeta((carpeta) =>
+      Effect.gen(function* () {
+        const almacen = yield* AlmacenDeFicheros;
+        const fs = yield* FileSystem.FileSystem;
+        assert.deepStrictEqual(yield* almacen.listar, []);
+        const otroLote = "fichas@2026-09-26T02:15:00Z/1.json";
+        yield* almacen.guardar(FICHERO, "{}");
+        yield* almacen.guardar(LOTE, "{}");
+        yield* almacen.guardar(otroLote, "{}");
+        yield* almacen.cambiarVigente("{}");
+        assert.sameMembers([...(yield* almacen.listar)], [FICHERO, LOTE, otroLote, "vigente.json"]);
+
+        yield* almacen.borrar(LOTE);
+        assert.sameMembers(yield* fs.readDirectory(carpeta), [
+          FICHERO,
+          "fichas@2026-09-26T02:15:00Z",
+          "vigente.json",
+        ]);
+        yield* almacen.borrar(otroLote);
+        yield* almacen.borrar(otroLote);
+        yield* almacen.borrar(FICHERO);
+        assert.deepStrictEqual(yield* fs.readDirectory(carpeta), ["vigente.json"]);
+      }),
+    ),
+  );
 });

@@ -97,8 +97,11 @@ La web no lee nada de Convex: descarga `vigente.json`, la capa y los lotes de fi
 4. Lee las fichas de cada lote con `capas:fichas` y escribe `fichas@<fecha>/<lote>.json`, cuatro lotes a la vez. Si falta alguna ficha, los datos han cambiado.
 5. Vuelve a comprobar la versión, escribe `sitios@<fecha>.json` y la registra con `capas:registrar`.
 6. Escribe `vigente.json`, el último.
+7. Borra las versiones que sobran: se quedan la vigente y las 7 anteriores (`VERSIONES_ANTERIORES`). Lo hace también cuando no había nada que publicar, así que un borrado fallido se repite la noche siguiente sin más.
 
 Ningún fichero se pisa con otro contenido: si existe distinto, falla con `FicheroInmutable` y `vigente.json` no cambia. La fecha es la de la versión de los datos, al segundo.
+
+El paso 7 (`retirarVersionesViejas`) lista el almacén entero y mira el sello de cada fichero (`sitios@<fecha>.json`, `fichas@<fecha>/<lote>.json`). Nunca borra la vigente ni una versión posterior, que puede ser otra publicación a medias. De cada versión retirada va primero la capa y después los lotes. Un fallo al borrar no hace fallar la publicación: sale como aviso en el registro. Por qué siete, en el ADR 0010.
 
 La publicación es automática. `ejecutarIngesta` y `ejecutarIngestaDePuntos` llaman al servicio `Publicacion` al acabar cada ejecución completada (no las omitidas ni las fallidas), y `ingesta:recalcularFusion` también. En las acciones, ese servicio lanza `publicacion:publicar`, una acción de Node. Un fallo al publicar no deshace la ejecución: se apunta en el registro y la siguiente ingesta lo repite.
 
@@ -152,6 +155,6 @@ Tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
 
 El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8. `convex/test/TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
 
-`convex/test/publicacion.test.ts` publica sobre el Convex en memoria y el almacén en una carpeta temporal, envuelto para apuntar cada fichero que escribe. Comprueba que cada clave de la capa tiene su ficha en su lote, que publicar sin cambios no escribe nada, que la ingesta publica sola tras cada ejecución completada y no tras una omitida, y que un fichero ocupado con otro contenido para la publicación sin tocar `vigente.json`. `almacenR2.test.ts` prueba la firma con un caso de la batería de AWS y el almacén de R2 contra un cubo S3 de prueba en memoria.
+`convex/test/publicacion.test.ts` publica sobre el Convex en memoria y el almacén en una carpeta temporal, envuelto para apuntar cada fichero que escribe. Comprueba que cada clave de la capa tiene su ficha en su lote, que publicar sin cambios no escribe nada, que la ingesta publica sola tras cada ejecución completada y no tras una omitida, que un fichero ocupado con otro contenido para la publicación sin tocar `vigente.json`, y que la retención deja la vigente, sus siete anteriores y las posteriores. Las versiones viejas de esa prueba se escriben a mano en la carpeta, sin publicarlas. `almacenR2.test.ts` prueba la firma con dos casos de la batería de AWS (uno con consulta) y el almacén de R2 contra un cubo S3 de prueba en memoria, que lista de dos en dos claves para obligar a pedir varias páginas.
 
 La prueba de carga `convex/scripts/prueba-de-carga.sh` mete 2400 observaciones falsas en el backend local y fusiona dos veces. Deja basura: úsala en un backend que vayas a borrar.
