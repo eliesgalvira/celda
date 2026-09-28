@@ -9,7 +9,7 @@ Consultas y medidas del 28/09/2026. Cada cifra lleva una de dos marcas:
 
 Peticiones hechas a las fuentes, todas con el `User-Agent` «Celda (investigación; contacto en celda.elies.site)»:
 
-- Registro oficial: 61 peticiones, `robots.txt` (sigue dando 404) y 60 de listado, de 19:25 a 19:30 hora de Madrid, con 4 s entre el final de una respuesta y la siguiente. Ninguna ficha de detalle.
+- Registro oficial: 61 peticiones, `robots.txt` (sigue dando 404) y 60 de listado, de 19:25 a 19:30 hora de Madrid, con 4 s entre el final de una respuesta y la siguiente. Ninguna ficha de detalle. Para la revisión de Madrid (ticket 49), 11 más de 23:13 a 23:14: `robots.txt` y 10 de listado.
 - antenasmoviles.es: una sola, `GET /v1/showf?er5`, la misma que hace cualquier visitante al abrir su mapa. Ningún `markers`.
 - IGN, CNIG e INE: unas 25 peticiones a sus servicios de descarga (ATOM, WFS y la API de INEbase).
 - Protomaps y OpenFreeMap: `pmtiles extract --dry-run`, que solo lee los directorios del archivo.
@@ -144,7 +144,122 @@ El ADR 0012 pedía repetir el análisis del radio de 15 m si Celda salía de Bar
 | Málaga | 2.940 | 67 % | 1.512 | 23 m | 1.369 (107 m) |
 | Madrid (municipio) | 5.086 | **16 %** | 2.893 | **28 m** | 2.366 (170 m) |
 
-Fuera de las ciudades la regla funciona como en Barcelona: los emplazamientos compartidos casi siempre llevan las mismas coordenadas y a 15 m los grupos no pasan de 17 m. Madrid es distinto. Solo el 16 % de sus registros comparte punto exacto con otra compañía, 1.136 tienen la más cercana a entre 1 y 5 m y 609 a entre 5 y 10 m. A 15 m se juntan, pero el encadenado llega a grupos de 28 m. Parece que en Madrid cada compañía da sus propias coordenadas de la misma azotea. Hay que revisar a mano una muestra de Madrid antes de dar la regla por buena en toda España. Queda como ticket.
+Fuera de las ciudades la regla funciona como en Barcelona: los emplazamientos compartidos casi siempre llevan las mismas coordenadas y a 15 m los grupos no pasan de 17 m. Madrid es distinto. Solo el 16 % de sus registros comparte punto exacto con otra compañía, 1.136 tienen la más cercana a entre 1 y 5 m y 609 a entre 5 y 10 m. A 15 m se juntan, pero el encadenado llega a grupos de 28 m. Parece que en Madrid cada compañía da sus propias coordenadas de la misma azotea. Hay que revisar a mano una muestra de Madrid antes de dar la regla por buena en toda España. Queda como ticket; la revisión está en el apartado siguiente.
+
+### Revisión de la fusión en Madrid (ticket 49)
+
+La revisé el mismo 28/09 con listados nuevos, de 23:13 a 23:14 hora de Madrid: `robots.txt` (404) y 10 peticiones de listado, con 4 s como poco entre una y otra y el mismo `User-Agent`. Los registros del muestreo de la tarde no se guardaron, así que pedí directamente las hojas del teselado ya conocidas, sin la caja madre, que llega al tope. Cada respuesta pesa los mismos bytes que su hoja en el muestreo de la tarde (Madrid) o en la descarga del 26/09 (Barcelona). Quedan en `muestras/espana/listado-*-2026-09-28.json`, con `muestra-fusion.mjs` y su registro de peticiones.
+
+- **Centro de Madrid.** Las cinco hojas contiguas más densas del muestreo, de Moncloa a Ciudad Lineal y de Arganzuela a Chamartín (longitud -3,7975 a -3,6125, latitud 40,395 a 40,48). 2.397 registros, medido.
+- **Caja de Barcelona** del ADR 0012, en sus cuatro hojas. 2.380 registros, los mismos que el 26/09.
+- **Centro de Valencia**, una caja de 6 × 5,6 km. 654 registros.
+
+El centro de Madrid se porta como el municipio entero. Solo 304 de los 2.397 registros tienen otra compañía en el mismo punto exacto, 469 la tienen a entre 1 y 5 m y 339 a entre 5 y 10 m. En Barcelona son 1.318 de 2.380 en el mismo punto, y en Valencia 289 de 654.
+
+**En Madrid no es que cada compañía dé sus coordenadas: cada registro da las suyas.** Vodafone publica la misma estación con varios códigos que solo cambian en los ceros (`194`, `00194`, `000194`). En Barcelona esos registros caen casi siempre en el mismo punto. En Madrid no. De los 352 pares de un mismo código salvo ceros a 60 m o menos, 40 están a 0,5 m o menos, 103 entre 0,5 y 5 m, 141 entre 5 y 15 m, 47 entre 15 y 30 m y 21 entre 30 y 60 m (medido). Si la misma estación se mueve hasta 60 m de un registro a otro, dos compañías de la misma azotea también pueden salir a 20 o 30 m.
+
+Hay dos errores posibles, y en Madrid pesa más el segundo:
+
+- **Unir sitios distintos.** Con 15 m salen 37 grupos de más de 15 m de diámetro, el mayor de 28 m. Los revisé uno a uno (tabla al final de este apartado): 29 llevan la misma dirección o el mismo código en todos sus registros, 5 son portales contiguos o una esquina y 3 quedan dudosos. Ninguno es a las claras la unión de dos edificios.
+- **Partir un sitio.** Con 15 m quedan 49 pares de emplazamientos con la misma estación (misma compañía y mismo código salvo ceros, a 60 m o menos) y 50 pares con compañías distintas en la misma dirección a 30 m o menos. Vodafone `017803` y `17803`, en CL ALBERTO AGUILERA, 3, salen como dos emplazamientos a 15,4 m.
+
+Las direcciones tampoco son del todo fiables. La estación `25` de Vodafone aparece en AV CIUDAD DE BARCELONA, 220 y en el 224, y `48832` en CL FERNANDO REY, 2 y 8, en el mismo punto. Por eso la dirección solo sirve para juntar. Nunca separa lo que la distancia ya ha juntado.
+
+#### Reglas comparadas
+
+`fusion-madrid.mjs` agrupa los tres listados con cada regla y cuenta tres señales de error:
+
+- *Estación partida*: pares de emplazamientos con la misma compañía y el mismo código salvo ceros a 60 m o menos.
+- *Azotea partida*: pares de emplazamientos con compañías distintas y la misma dirección (vía, número y municipio) a 30 m o menos.
+- *Dos estaciones*: emplazamientos con dos códigos de una compañía, distintos aun sin ceros, en direcciones distintas. Pueden ser dos sitios unidos.
+
+Las reglas que juntan por código o por dirección ponen a cero las dos primeras señales por construcción. La tercera es la que dice si esas reglas unen de más.
+
+Centro de Madrid, 2.397 registros (medido):
+
+| Regla | Emplazamientos | Cambian | Diámetro máx. | Grupos > 40 m | Estación partida | Azotea partida | Dos estaciones |
+|---|---|---|---|---|---|---|---|
+| 15 m (antes) | 1418 | 0 | 28 m | 0 | 49 | 50 | 15 |
+| 10 m | 1538 | 233 | 18 m | 0 | 86 | 126 | 11 |
+| 20 m | 1362 | 54 | 37 m | 0 | 33 | 30 | 18 |
+| 25 m | 1313 | 100 | 41 m | 1 | 16 | 10 | 23 |
+| 30 m | 1283 | 125 | 52 m | 5 | 15 | 0 | 27 |
+| 15 m, diámetro ≤ 20 m | 1425 | 14 | 19 m | 0 | 52 | 54 | 14 |
+| 25 m, diámetro ≤ 30 m | 1329 | 88 | 30 m | 0 | 21 | 16 | 20 |
+| 15 m + dirección ≤ 30 m | 1350 | 63 | 46 m | 4 | 19 | 0 | 15 |
+| 15 m + estación ≤ 60 m | 1370 | 47 | 60 m | 12 | 0 | 34 | 15 |
+| **15 m + estación ≤ 60 m + dirección ≤ 30 m** | **1331** | **79** | **60 m** | **16** | **0** | **0** | **15** |
+| 15 m + estación ≤ 60 m + dirección ≤ 40 m | 1318 | 90 | 60 m | 18 | 0 | 0 | 15 |
+
+Caja de Barcelona (2.380 registros) y centro de Valencia (654), medido:
+
+| Regla | Barcelona | Cambian | Estación partida | Azotea partida | Dos estaciones | Valencia | Cambian | Estación partida | Azotea partida |
+|---|---|---|---|---|---|---|---|---|---|
+| 15 m (antes) | 1318 | 0 | 13 | 13 | 20 | 415 | 0 | 21 | 8 |
+| 20 m | 1302 | 16 | 7 | 10 | 21 | 401 | 14 | 14 | 4 |
+| 25 m | 1292 | 25 | 5 | 4 | 21 | 392 | 23 | 10 | 1 |
+| 25 m, diámetro ≤ 30 m | 1294 | 24 | 6 | 5 | 21 | 392 | 23 | 10 | 1 |
+| **15 m + estación ≤ 60 m + dirección ≤ 30 m** | **1294** | **24** | **0** | **0** | **21** | **389** | **26** | **0** | **0** |
+
+Lo que dicen las tablas:
+
+- **Subir el radio no arregla Madrid.** A 25 m aún quedan 16 estaciones partidas, y los emplazamientos con dos estaciones de una compañía pasan de 15 a 23: empieza a juntar edificios. A 30 m son 27.
+- **Limitar el diámetro lo empeora.** Con 15 m y 20 m de diámetro como mucho salen 1.425 emplazamientos, porque parte los 7 grupos de más de 20 m: cuatro con la misma dirección en todos sus registros (3, 4, 5 y 7 en la tabla del final), uno de portales contiguos y dos de los tres dudosos. Las estaciones partidas suben de 49 a 52.
+- **Juntar la misma estación y la misma dirección** deja a cero las dos señales de partir, y los emplazamientos con dos estaciones se quedan en 15 en Madrid y en 8 en Valencia. En Barcelona pasan de 20 a 21. El nuevo es la Fira de Montjuïc: Orange `CATR0817A` en CL LLEIDA, 2 y `CATR2803A` en AV REINA MARIA CRISTINA, que se juntan a través de Movistar `0803166`, en VP LLEIDA, 2 y a 29 m del primero. Es un recinto de un solo dueño y lo doy por bueno.
+- **30 m para la dirección, no 40.** Entre 30 y 40 m, las parejas de registros con la misma dirección aún son 3,5 veces las de la misma calle con otro número (45 frente a 13 en Madrid). De 40 a 60 m ya son menos (53 frente a 83). Con 40 m solo se juntan 13 emplazamientos más en Madrid, y los grupos se alargan. 30 m cubren el 94 % de los pares de una misma estación.
+- **60 m para la misma estación.** Los pares de un mismo código salvo ceros casi se acaban a los 60 m: entre 60 y 100 m hay 5 en Madrid, ninguno en Barcelona y 3 en Valencia. Más lejos vuelve a haberlos, como `3248` y `003248` a 4 km en Barcelona, que el ADR 0012 ya daba por sitios distintos.
+
+Con la regla nueva, los grupos de más de 40 m tienen todos la misma dirección o la misma estación. Los mayores son CL LIGULA, 4 (60 m, con Vodafone `000073`, `00073` y `73`), CL CARTAGENA, 37 (57 m) y CL CARMEN, 28 con PZ CALLAO (52 m, cuatro emplazamientos de antes en el mismo edificio). `node fusion-madrid.mjs cambios madrid-centro` los lista todos.
+
+En Barcelona cambian 24 emplazamientos, y cada uno junta dos de los de antes. La caja pasa de 1.318 a 1.294 y los otros 1.270 no cambian. Los revisé: en los 24, lo que se junta lleva la misma dirección o el mismo código de estación, y solo la Fira junta dos estaciones de una compañía en direcciones distintas. La muestra de Campus Nord no cambia.
+
+La regla elegida queda en el ADR 0012, en `REGLA_FUSION` y en las pruebas con los tres listados (`packages/ingesta/src/registro-oficial/referencia/fusion-listado-*.txt`).
+
+#### Grupos de más de 15 m con la regla de 15 m, centro de Madrid
+
+«Mismo» si todos los registros llevan la misma dirección o el mismo código; «probable» si son portales contiguos o una esquina; «dudoso» si no se puede decir sin ir a verlo. Salen de `node fusion-madrid.mjs grupos`.
+
+| # | Diámetro | Registros | Direcciones | Decisión |
+|---|---|---|---|---|
+| 1 | 27,8 m | Orange, Movistar `2802141`, Vodafone `194` ×3; Movistar `2802362` | CL JOSE ORTEGA Y GASSET, 91; `2802362` en CL FRANCISCO SILVELA, 13, a 25 m | Dudoso: otra estación de Movistar en otra calle, quizá la esquina |
+| 2 | 24,7 m | Movistar `2807802`; Vodafone `75921` ×2 | CL ALCALA, 27 y CL ALCALA, 28 | Dudoso: números de aceras opuestas, pero a 13 m |
+| 3 | 24,7 m | Digi, Orange, Movistar, Vodafone | CL TEMBLEQUE, 52 | Mismo |
+| 4 | 21,8 m | Digi, Movistar, Vodafone ×2 | PZ ESPAÑA, 12 | Mismo |
+| 5 | 21,5 m | Digi, Orange, Movistar, Vodafone ×2 | CL RAMON PEREZ DE AYALA, 92 | Mismo |
+| 6 | 20,8 m | Digi, Movistar; Orange, Vodafone ×2 | CAMINO DE LOS VINATEROS, 85 y 87 | Probable: portales contiguos |
+| 7 | 20,5 m | Orange, Movistar, Vodafone | AV HELLIN, 13 | Mismo |
+| 8 | 19,5 m | Orange, Vodafone ×2 | AV PORTUGAL, 159 | Mismo |
+| 9 | 18,3 m | Orange ×2, Movistar, Vodafone | CL PRECIADOS, 3 | Mismo |
+| 10 | 18,2 m | Orange, Vodafone ×2 | CL TACONA, 87 | Mismo |
+| 11 | 17,9 m | Orange, Vodafone ×2; Movistar | CL JERICO, 1 y CL DOCTOR ESQUERDO, 96 | Probable: esquina |
+| 12 | 17,9 m | Orange, Movistar, Vodafone ×2 | CL JUAN ALVAREZ MENDIZABAL, 17 | Mismo |
+| 13 | 17,9 m | Orange; Movistar, Vodafone ×3 | PS CASTELLANA, 117 y 115 | Probable: portales contiguos |
+| 14 | 17,7 m | Orange, Movistar, Vodafone ×2 | CL FERRAZ, 33 | Mismo |
+| 15 | 17,4 m | Orange, Movistar, Vodafone | PZ ALONSO MARTINEZ, 6 | Mismo |
+| 16 | 17,2 m | Orange, Vodafone ×2 | CL MENDEZ ALVARO, 30 | Mismo |
+| 17 | 17,1 m | Orange, Movistar, Vodafone | CL ALCALA, 11 | Mismo |
+| 18 | 17,1 m | Orange, Vodafone ×2 | CL GOYA, 5 | Mismo |
+| 19 | 17,0 m | Orange, Vodafone; Movistar | AV PUERTA DE HIERRO, 1 B y PS SENDA DEL REY, 16 | Dudoso: dos calles, Movistar a 17 m |
+| 20 | 16,7 m | Orange, Movistar; Vodafone ×3 | CL ALBERTO AGUILERA, 50 y 48 | Probable: portales contiguos |
+| 21 | 16,6 m | Orange, Vodafone ×3 | AV VALLADOLID, 71 | Mismo |
+| 22 | 16,5 m | Orange, Vodafone ×3 | CL FRAY LUIS DE LEON, 11 | Mismo |
+| 23 | 16,5 m | Orange, Movistar, Vodafone | CL BURGOS, 2 | Mismo |
+| 24 | 16,4 m | Orange, Movistar, Vodafone | AV DE LOS ANDES, 50 | Mismo |
+| 25 | 16,4 m | Vodafone ×3, un código | CL JOSE MARTINEZ DE VELASCO, 2 | Mismo |
+| 26 | 16,2 m | Orange, Movistar, Vodafone | RD SEGOVIA, 59 | Mismo |
+| 27 | 16,0 m | Movistar, Vodafone ×3 | PZ OLAVIDE, 10 | Mismo |
+| 28 | 15,5 m | Movistar, Vodafone ×2 | CL REYES MAGOS, 4; un Vodafone dice 2 | Mismo: el mismo código |
+| 29 | 15,5 m | Vodafone ×3, un código | AV CIUDAD DE BARCELONA, 224 y 220 | Mismo: el mismo código |
+| 30 | 15,4 m | Movistar, Vodafone ×2 | CL AÑASTRO, 33 | Mismo |
+| 31 | 15,4 m | Digi, Orange ×2, Movistar | PS YESERIAS, 3 | Mismo |
+| 32 | 15,4 m | Orange, Movistar, Vodafone ×2 | CL SANTA MARTA, 23 | Mismo |
+| 33 | 15,4 m | Movistar, Vodafone ×2 | AV ALFONSO XIII, 109 | Mismo |
+| 34 | 15,3 m | Digi, Movistar, Vodafone; Orange | CL GOYA, 76 y AV FELIPE II, 11 | Probable: esquina |
+| 35 | 15,1 m | Orange, Movistar, Vodafone ×2 | CL ELVIRA, 26 | Mismo |
+| 36 | 15,1 m | Digi, Orange, Movistar, Vodafone ×2 | CL TREFACIO, 2 | Mismo |
+| 37 | 15,0 m | Orange ×2, Vodafone ×3 | PS CASTELLANA, 259 D | Mismo |
+
+Quedan 29 «mismo», 5 «probable» y 3 «dudoso». Los tres dudosos siguen juntos con la regla nueva, igual que con la de 15 m. Separarlos pediría vetar uniones cuando la dirección no coincide, y la misma estación no siempre lleva la misma dirección (arriba).
 
 Con la proporción del muestreo, 0,54 emplazamientos por registro, el registro da unos 37.600 emplazamientos en España. Con las ER5 que no se juntan con ninguno salen unos 42.000 (estimado), casi lo mismo que los 42.855 marcadores de antenasmoviles.es.
 
