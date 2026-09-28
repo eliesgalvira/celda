@@ -99,7 +99,7 @@ describe("ingesta de antenasmoviles.es (API de Convex en memoria)", () => {
           assert.strictEqual(yield* Ref.get(llamadas), 0);
           assert.deepStrictEqual(yield* instantanea, antes);
 
-          const estados = yield* convex.query(refs.public.ingesta.estado);
+          const estados = yield* convex.query(refs.internal.ingesta.estado);
           assert.deepStrictEqual(
             estados.map((e) => [e.fuente, e.activo]),
             [
@@ -145,7 +145,7 @@ describe("ingesta de antenasmoviles.es (API de Convex en memoria)", () => {
             retirados: 0,
           });
 
-          const campus = yield* convex.query(refs.public.datos.ficha, {
+          const campus = yield* convex.query(refs.internal.datos.ficha, {
             clave: "movistar-0802532",
           });
           assert.isTrue(Option.isSome(campus));
@@ -162,14 +162,14 @@ describe("ingesta de antenasmoviles.es (API de Convex en memoria)", () => {
               ],
             );
           }
-          const tarragona = yield* convex.query(refs.public.datos.ficha, {
+          const tarragona = yield* convex.query(refs.internal.datos.ficha, {
             clave: "movistar-MV-BCN-82383",
           });
           assert.strictEqual(
             Option.map(tarragona, (f) => f.estado).pipe(Option.getOrNull),
             "nuevo",
           );
-          assert.deepStrictEqual((yield* convex.query(refs.public.datos.version)).consultas, [
+          assert.deepStrictEqual((yield* convex.query(refs.internal.datos.version)).consultas, [
             { fuente: "registro-oficial", consultadoEl: NOCHE },
             { fuente: "antenasmoviles", consultadoEl: NOCHE + HORA },
           ]);
@@ -214,7 +214,7 @@ describe("ingesta de antenasmoviles.es (API de Convex en memoria)", () => {
           cambiados: 0,
           retirados: 1,
         });
-        const campus = yield* convex.query(refs.public.datos.ficha, {
+        const campus = yield* convex.query(refs.internal.datos.ficha, {
           clave: "movistar-0802532",
         });
         assert.deepStrictEqual(
@@ -248,7 +248,7 @@ describe("ingesta de antenasmoviles.es (API de Convex en memoria)", () => {
         assert.deepStrictEqual(segunda.cambios.observaciones.retirados, 0);
         assert.isTrue(
           Option.isSome(
-            yield* convex.query(refs.public.datos.ficha, { clave: "movistar-MV-BCN-82383" }),
+            yield* convex.query(refs.internal.datos.ficha, { clave: "movistar-MV-BCN-82383" }),
           ),
         );
 
@@ -263,7 +263,7 @@ describe("ingesta de antenasmoviles.es (API de Convex en memoria)", () => {
         assert.strictEqual(tercera.cambios.emplazamientos.retirados, 1);
         assert.isTrue(
           Option.isNone(
-            yield* convex.query(refs.public.datos.ficha, { clave: "movistar-MV-BCN-82383" }),
+            yield* convex.query(refs.internal.datos.ficha, { clave: "movistar-MV-BCN-82383" }),
           ),
         );
       }),

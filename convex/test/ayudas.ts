@@ -11,6 +11,7 @@ import emplazamientos from "../confect/_generated/tables/emplazamientos";
 import estacionesBase from "../confect/_generated/tables/estacionesBase";
 import observaciones from "../confect/_generated/tables/observaciones";
 import puntos from "../confect/_generated/tables/puntos";
+import { Publicacion } from "../src/publicacion";
 import {
   ejecutarIngesta,
   ejecutarIngestaDePuntos,
@@ -21,24 +22,33 @@ import {
 } from "../src/proceso";
 import * as TestConfect from "./TestConfect";
 
+/** Una publicación que no publica, como la de un despliegue sin almacén de ficheros. */
+export const sinAlmacen = Layer.succeed(
+  Publicacion,
+  Publicacion.of({ publicar: Effect.succeed({ tipo: "sin-almacen" }) }),
+);
+
+/** Las consultas y mutaciones del Convex en memoria, como las da Confect a una acción. */
+export const convexEnMemoria = Effect.map(TestConfect.TestConfect, (convex) =>
+  Layer.merge(
+    Layer.succeed(MutationRunner.MutationRunner, convex.mutation),
+    Layer.succeed(QueryRunner.QueryRunner, convex.query),
+  ),
+);
+
 /**
  * Una ejecución del proceso de ingesta contra el Convex en memoria: las mutaciones y consultas
- * van por la API interna de Convex, como en la acción real, y el extractor es el que se pase.
+ * van por la API interna de Convex, como en la acción real, y el extractor y la publicación son
+ * los que se pasen. Sin publicación, no publica nada.
  */
 export const ejecutar = (
   extractor: Layer.Layer<Extractor>,
   opciones: OpcionesProceso = OPCIONES_PROCESO,
+  publicacion: Layer.Layer<Publicacion> = sinAlmacen,
 ) =>
   Effect.gen(function* () {
-    const convex = yield* TestConfect.TestConfect;
     return yield* ejecutarIngesta(opciones).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          extractor,
-          Layer.succeed(MutationRunner.MutationRunner, convex.mutation),
-          Layer.succeed(QueryRunner.QueryRunner, convex.query),
-        ),
-      ),
+      Effect.provide(Layer.mergeAll(extractor, yield* convexEnMemoria, publicacion)),
     );
   });
 
@@ -46,17 +56,11 @@ export const ejecutar = (
 export const ejecutarDePuntos = (
   extractor: Layer.Layer<ExtractorDePuntos>,
   opciones: OpcionesProcesoDePuntos = OPCIONES_PROCESO_DE_PUNTOS,
+  publicacion: Layer.Layer<Publicacion> = sinAlmacen,
 ) =>
   Effect.gen(function* () {
-    const convex = yield* TestConfect.TestConfect;
     return yield* ejecutarIngestaDePuntos(opciones).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          extractor,
-          Layer.succeed(MutationRunner.MutationRunner, convex.mutation),
-          Layer.succeed(QueryRunner.QueryRunner, convex.query),
-        ),
-      ),
+      Effect.provide(Layer.mergeAll(extractor, yield* convexEnMemoria, publicacion)),
     );
   });
 

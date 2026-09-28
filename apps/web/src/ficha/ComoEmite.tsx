@@ -13,7 +13,7 @@ import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import { createMemo, Errored, Loading, Show, useContext } from "solid-js";
 
-import { enVivo, usarDatos } from "../datos.tsx";
+import { leerEnSolid, usarDatos } from "../datos.tsx";
 import { ServicioContexto } from "../servicio/enMapa.ts";
 import { lecturaDe } from "../servicio/servicio.ts";
 import { UbicacionContexto } from "../ubicacion/controlador.ts";
@@ -57,7 +57,7 @@ export function ComoEmite(props: { readonly clave: string }) {
   const diagrama = createMemo(() => {
     // Un cálculo por emplazamiento: al cambiar la clave se abandona el anterior.
     const _clave = props.clave;
-    return enVivo(
+    return leerEnSolid(
       datos,
       Stream.fromEffect(
         Effect.gen(function* () {

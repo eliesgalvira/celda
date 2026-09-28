@@ -2,8 +2,9 @@ import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 /**
- * Capas publicadas. Cada versión es un fichero inmutable en el origen estático; esta tabla dice
- * cuál es y dónde está. La vigente es la de la instantánea más reciente.
+ * Capas publicadas. Cada versión es un fichero inmutable en el almacén de ficheros, con sus lotes
+ * de fichas al lado; esta tabla dice cuál es y dónde está. Es un historial: lo que carga la web
+ * lo dice `vigente.json` en el almacén.
  */
 export default Table.make(() =>
   Schema.Struct({

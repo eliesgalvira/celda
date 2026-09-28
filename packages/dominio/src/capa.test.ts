@@ -4,8 +4,12 @@ import * as Result from "effect/Result";
 
 import type { LimiteDeBarrio, LimitesDeBarrios } from "./barrio.ts";
 import {
+  carpetaDeFichas,
+  codificarVigente,
+  decodificarVigente,
   type EmplazamientoDeCapa,
   fechaDeVersion,
+  ficheroDeLote,
   generarCapa,
   leerCapa,
   versionDeCabecera,
@@ -94,7 +98,7 @@ describe("capa de emplazamientos", () => {
     assert.strictEqual(capa.fichero, "sitios@2026-09-26T02:15:03Z.json");
     assert.strictEqual(capa.emplazamientos, 3);
     assert.isTrue(
-      capa.contenido.startsWith('{"version":"sitios@2026-09-26T02:15:03Z","formato":3,'),
+      capa.contenido.startsWith('{"version":"sitios@2026-09-26T02:15:03Z","formato":4,'),
     );
     await expect(`${capa.contenido}\n`).toMatchFileSnapshot("./referencia/capa-tres.json");
   });
@@ -112,7 +116,7 @@ describe("capa de emplazamientos", () => {
     assert.notStrictEqual(siguiente.fichero, una.fichero);
   });
 
-  it("se lee de vuelta con las compañías de un emplazamiento compartido, sus bandas y su barrio", () => {
+  it("se lee de vuelta con las compañías de un emplazamiento compartido, sus bandas, su barrio y su lote", () => {
     const capa = generarCapa(NOCHE, [PLAZA_PIUS_XII, CAMPUS_NORD, NUEVO], LIMITES);
     const leida = leerCapa(capa.contenido, capa.version);
     assert.isTrue(Result.isSuccess(leida));
@@ -127,6 +131,7 @@ describe("capa de emplazamientos", () => {
           { compania: "yoigo", mhz: [700, 800, 900, 1800, 2100, 2600, 3500] },
         ],
         barrio: null,
+        lote: 0,
       },
       {
         ...PLAZA_PIUS_XII,
@@ -137,8 +142,9 @@ describe("capa de emplazamientos", () => {
           { compania: "vodafone", mhz: [2600] },
         ],
         barrio: "19",
+        lote: 0,
       },
-      { ...CAMPUS_NORD, barrio: "21" },
+      { ...CAMPUS_NORD, barrio: "21", lote: 0 },
     ]);
     assert.deepStrictEqual(leida.success.barrios, [
       { codigo: "19", nombre: "les Corts", etiqueta: { longitud: 2.125, latitud: 41.385 } },
@@ -156,12 +162,62 @@ describe("capa de emplazamientos", () => {
     assert.strictEqual(otra.contenido, una.contenido);
   });
 
+  it("reparte las fichas en lotes de emplazamientos vecinos, y cada uno sabe el suyo", () => {
+    // En lotes de dos: los dos de Les Corts y Pedralbes van juntos y NUEVO, más lejos, aparte.
+    const capa = generarCapa(NOCHE, [NUEVO, PLAZA_PIUS_XII, CAMPUS_NORD], LIMITES, 2);
+    assert.lengthOf(capa.lotes, 2);
+    assert.sameMembers(capa.lotes.flat(), [NUEVO.clave, PLAZA_PIUS_XII.clave, CAMPUS_NORD.clave]);
+    assert.deepStrictEqual(
+      capa.lotes.find((lote) => lote.includes(NUEVO.clave)),
+      [NUEVO.clave],
+    );
+    const leida = leerCapa(capa.contenido, capa.version);
+    assert.isTrue(Result.isSuccess(leida));
+    if (Result.isFailure(leida)) return;
+    for (const e of leida.success.emplazamientos) {
+      assert.include(capa.lotes[e.lote ?? -1] ?? [], e.clave, e.clave);
+    }
+  });
+
+  it("las fichas de una versión van en su carpeta, al lado de la capa", () => {
+    const version = versionDeCapa(NOCHE);
+    assert.strictEqual(carpetaDeFichas(version), "fichas@2026-09-26T02:15:03Z");
+    assert.strictEqual(ficheroDeLote(version, 7), "fichas@2026-09-26T02:15:03Z/7.json");
+  });
+
+  it("vigente.json dice la versión que hay que cargar y se lee de vuelta", () => {
+    const vigente = { version: versionDeCapa(NOCHE), fecha: NOCHE, emplazamientos: 3, lotes: 1 };
+    const contenido = codificarVigente(vigente);
+    assert.deepStrictEqual(decodificarVigente(contenido), Result.succeed(vigente));
+    assert.isTrue(Result.isFailure(decodificarVigente('{"version":3}')));
+    assert.isTrue(Result.isFailure(decodificarVigente("<!doctype html>")));
+  });
+
+  it("lee una capa del formato 3, sin lotes", () => {
+    const capa = generarCapa(NOCHE, [PLAZA_PIUS_XII, CAMPUS_NORD], LIMITES);
+    const formato3 = capa.contenido
+      .replace('"formato":4', '"formato":3')
+      .replace(/,"lote":\[[\d,]*\]\}$/u, "}");
+    assert.notInclude(formato3, '"lote"');
+    const leida = leerCapa(formato3, capa.version);
+    assert.isTrue(Result.isSuccess(leida));
+    if (Result.isFailure(leida)) return;
+    assert.deepStrictEqual(
+      leida.success.emplazamientos.map((e) => [e.clave, e.lote, e.bandas?.length]),
+      [
+        ["movistar-0802532", undefined, 2],
+        ["orange-CATR0228A", undefined, undefined],
+      ],
+    );
+  });
+
   it("lee una capa del formato 2 sin ninguna banda conocida", () => {
     const capa = generarCapa(NOCHE, [PLAZA_PIUS_XII, CAMPUS_NORD], LIMITES);
-    // La misma capa sin la columna de bandas, que va al final, y con el número del formato 2.
+    // La misma capa sin las columnas de bandas y lotes, que van al final, y con el número del
+    // formato 2.
     const formato2 = capa.contenido
-      .replace('"formato":3', '"formato":2')
-      .replace(/,"bandas":\[[\d,]*\]\}$/u, "}");
+      .replace('"formato":4', '"formato":2')
+      .replace(/,"bandas":\[[\d,]*\],"lote":\[[\d,]*\]\}$/u, "}");
     assert.notInclude(formato2, '"bandas"');
     const leida = leerCapa(formato2, capa.version);
     assert.isTrue(Result.isSuccess(leida));

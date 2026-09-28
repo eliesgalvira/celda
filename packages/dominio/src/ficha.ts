@@ -29,8 +29,9 @@ export const EstacionDeFicha = Schema.Struct({
 export type EstacionDeFicha = typeof EstacionDeFicha.Type;
 
 /**
- * Lo que el panel cuenta de un emplazamiento al seleccionarlo. Se lee en vivo, así que puede ser
- * más reciente que la capa del mapa: `version` es su marca de agua.
+ * Lo que el panel cuenta de un emplazamiento al seleccionarlo. Se publica con la capa, en un lote
+ * de fichas de la misma versión. `version` es su marca de agua: nunca es posterior a la capa de
+ * la que sale, pero la web puede acabar leyendo la de una capa más reciente que la del mapa.
  */
 export const Ficha = Schema.Struct({
   clave: Schema.String,

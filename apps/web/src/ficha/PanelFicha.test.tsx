@@ -1,19 +1,26 @@
-import type { CapaLeida } from "@celda/dominio/capa";
+import {
+  type CapaLeida,
+  codificarVigente,
+  ficheroDeLote,
+  generarCapa,
+  versionDeCapa,
+} from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
 import { workerDePrueba } from "@celda/sim/pruebas";
 import { type Simulador, simuladorEnHilo, simuladorEnWorker } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
-import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
+import { capaDePrueba, FUENTE_DE_BARRIOS, LIMITES_DE_PRUEBA } from "../capa/pruebas.ts";
 import { estaEnElGlosario, terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta, ubicacion } from "../lib/rutas.ts";
-import { type FichasDePrueba, fichasDePrueba } from "./pruebas.ts";
-import { FichaNoLeida } from "./servicio.ts";
+import { loteConFichas, type OrigenDePrueba, origenDePrueba } from "./pruebas.ts";
+import { fichasDelOrigen } from "./servicio.ts";
 import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 
 const NOCHE = Date.UTC(2026, 8, 26, 0, 15, 3);
@@ -101,6 +108,9 @@ const PEDRALBES: Ficha = {
   ],
 };
 
+const ORIGEN = "http://capas.prueba";
+
+/** La capa del mapa: cada emplazamiento en su lote, para ver las peticiones por separado. */
 const CAPA: CapaLeida = {
   version: "sitios@2026-09-26T00:15:03Z",
   fecha: NOCHE,
@@ -111,6 +121,7 @@ const CAPA: CapaLeida = {
       estado: "verificado",
       companias: ["movistar", "vodafone"],
       barrio: null,
+      lote: 0,
     },
     {
       clave: PEDRALBES.clave,
@@ -118,46 +129,67 @@ const CAPA: CapaLeida = {
       estado: "verificado",
       companias: ["orange"],
       barrio: null,
+      lote: 1,
     },
   ],
   barrios: [],
   fuenteDeBarrios: FUENTE_DE_BARRIOS,
 };
 
+/** El lote de la capa del mapa en el que va cada ficha. */
+const LOTE = new Map([
+  [CAMPUS_NORD.clave, 0],
+  [PEDRALBES.clave, 1],
+]);
+
+const urlDelLote = (clave: string) =>
+  `${ORIGEN}/${ficheroDeLote(CAPA.version, LOTE.get(clave) ?? -1)}`;
+
 /**
- * La app con la capa de prueba y las fichas en manos de la prueba, abierta en `clave`. Las
- * simulaciones se calculan en el mismo hilo, salvo que la prueba traiga su simulador.
+ * La app con la capa de prueba y las fichas del servicio real, sobre un origen estático que no
+ * contesta hasta que la prueba lo pide, abierta en `clave`. Las simulaciones se calculan en el
+ * mismo hilo, salvo que la prueba traiga su simulador.
  */
 const abrir = (clave: string, simulador: Layer.Layer<Simulador> = simuladorEnHilo()) => {
-  const fichas: FichasDePrueba = fichasDePrueba();
+  const origen = origenDePrueba();
   navegar(ruta.emplazamiento(clave), { reemplazar: true });
+  // Sin esperar, la app leería la dirección de la prueba anterior y pediría su ficha.
+  flush();
   const pantalla = render(() => (
     <App
       servicios={Layer.mergeAll(
-        capaDePrueba([Effect.succeed(CAPA)]),
-        fichas.capa,
+        fichasDelOrigen.pipe(
+          Layer.provideMerge(capaDePrueba([Effect.succeed(CAPA)])),
+          Layer.provide(origen.capa),
+          Layer.provide(
+            ConfigProvider.layer(ConfigProvider.fromUnknown({ VITE_CAPAS_ORIGEN: ORIGEN })),
+          ),
+        ),
         simulador,
         ubicacionDePrueba().capa,
       )}
     />
   ));
   flush();
-  return { ...pantalla, fichas };
+  return { ...pantalla, origen };
 };
 
 /**
- * Responde en cuanto la lectura de `clave` esté abierta: el runtime de los servicios se monta
- * después de pintar, y una respuesta sin lectura abierta no llega a nadie.
+ * Contesta a la petición de `url` en cuanto esté abierta: el runtime de los servicios se monta
+ * después de pintar, y una respuesta sin petición abierta no llega a nadie.
  */
-const responder = async (
-  fichas: FichasDePrueba,
-  clave: string,
-  respuesta: Parameters<FichasDePrueba["responder"]>[1],
-) => {
+const contestar = async (origen: OrigenDePrueba, url: string, estado: number, cuerpo: string) => {
   await waitFor(() => {
-    assert.include(fichas.abiertas(), clave);
+    assert.include(origen.abiertas(), url);
   });
-  fichas.responder(clave, respuesta);
+  origen.responder(url, { estado, cuerpo });
+};
+
+/** Contesta a la petición del lote de `ficha` con su ficha, como lo publica Celda. */
+const responder = (origen: OrigenDePrueba, ficha: Ficha) => {
+  const lote = LOTE.get(ficha.clave) ?? -1;
+  const { estado, cuerpo } = loteConFichas(CAPA.version, lote, [ficha]);
+  return contestar(origen, urlDelLote(ficha.clave), estado, cuerpo);
 };
 
 /**
@@ -184,10 +216,10 @@ const TITULO_PEDRALBES = "PZ EUSEBI GÜELL, 1";
 
 describe("panel del emplazamiento", () => {
   it("enseña la dirección, cada compañía con sus bandas y de dónde sale cada dato", async () => {
-    const { findByRole, getByRole, getByText, getAllByText, getAllByRole, fichas } = abrir(
+    const { findByRole, getByRole, getByText, getAllByText, getAllByRole, origen } = abrir(
       CAMPUS_NORD.clave,
     );
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    await responder(origen, CAMPUS_NORD);
 
     const titulo = await findByRole("heading", { name: TITULO_CAMPUS_NORD });
     assert.isNotNull(titulo);
@@ -211,8 +243,8 @@ describe("panel del emplazamiento", () => {
   });
 
   it("abre con una frase llana, el eje de frecuencias y los datos técnicos plegados", async () => {
-    const { findByRole, getByRole, getByText, queryByRole, fichas } = abrir(CAMPUS_NORD.clave);
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    const { findByRole, getByRole, getByText, queryByRole, origen } = abrir(CAMPUS_NORD.clave);
+    await responder(origen, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
 
     // La tecnología no la publica nadie: se deduce de la banda y se dice «probablemente».
@@ -248,8 +280,8 @@ describe("panel del emplazamiento", () => {
   });
 
   it("dibuja cómo emite: un diagrama de modelo, con su versión y la orientación supuesta", async () => {
-    const { findByRole, getByText, fichas } = abrir(CAMPUS_NORD.clave);
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
+    await responder(origen, CAMPUS_NORD);
     const diagrama = await findByRole("img", { name: "Diagrama de radiación de los sectores" });
     await waitFor(() => {
       assert.lengthOf(diagrama.querySelectorAll("path"), 3);
@@ -268,11 +300,11 @@ describe("panel del emplazamiento", () => {
 
   it("al cambiar de emplazamiento a medio calcular, cancela el diagrama anterior", async () => {
     const worker = workerDePrueba();
-    const { findByRole, getByText, fichas } = abrir(
+    const { findByRole, getByText, origen } = abrir(
       CAMPUS_NORD.clave,
       simuladorEnWorker(worker.crear),
     );
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    await responder(origen, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
     await waitFor(() => {
       assert.lengthOf(worker.pendientes(), 1);
@@ -287,7 +319,7 @@ describe("panel del emplazamiento", () => {
     await waitFor(() => {
       assert.strictEqual(worker.terminados(), 1);
     });
-    await responder(fichas, PEDRALBES.clave, PEDRALBES);
+    await responder(origen, PEDRALBES);
     await findByRole("heading", { name: TITULO_PEDRALBES });
     await waitFor(() => {
       assert.lengthOf(worker.pendientes(), 1);
@@ -301,8 +333,8 @@ describe("panel del emplazamiento", () => {
   });
 
   it("los términos técnicos salen subrayados una vez por bloque, y todos están en el glosario", async () => {
-    const { findByRole, getByRole, fichas } = abrir(CAMPUS_NORD.clave);
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    const { findByRole, getByRole, origen } = abrir(CAMPUS_NORD.clave);
+    await responder(origen, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
     fireEvent.click(getByRole("button", { name: "Datos técnicos" }));
     flush();
@@ -335,8 +367,8 @@ describe("panel del emplazamiento", () => {
   });
 
   it("un término se abre en el panel y Escape lo cierra sin cerrar el panel", async () => {
-    const { findByRole, getByRole, fichas } = abrir(CAMPUS_NORD.clave);
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    const { findByRole, getByRole, origen } = abrir(CAMPUS_NORD.clave);
+    await responder(origen, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
 
     const termino = getByRole("button", { name: "bandas" });
@@ -354,47 +386,46 @@ describe("panel del emplazamiento", () => {
   });
 
   it("al cambiar de emplazamiento con la respuesta lenta, nunca enseña el anterior", async () => {
-    const { findByRole, queryByText, getByText, fichas } = abrir(CAMPUS_NORD.clave);
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    const { findByRole, queryByText, getByText, origen } = abrir(CAMPUS_NORD.clave);
+    await responder(origen, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
 
     const grabacion = grabarPanel();
     navegar(ruta.emplazamiento(PEDRALBES.clave));
     flush();
-    // La ficha anterior desaparece en el acto y su lectura se libera.
+    // La ficha anterior desaparece en el acto, con su espacio reservado mientras llega la nueva.
     assert.isNull(queryByText(TITULO_CAMPUS_NORD));
     assert.isNull(queryByText(/Movistar/u));
     assert.isNotNull(getByText("Cargando la ficha…"));
     await waitFor(() => {
-      assert.deepStrictEqual(fichas.abiertas(), [PEDRALBES.clave]);
+      assert.deepStrictEqual(origen.abiertas(), [urlDelLote(PEDRALBES.clave)]);
     });
 
-    await responder(fichas, PEDRALBES.clave, PEDRALBES);
+    await responder(origen, PEDRALBES);
     await findByRole("heading", { name: TITULO_PEDRALBES });
     assert.isNull(queryByText(TITULO_CAMPUS_NORD));
     assert.isFalse(grabacion.estados().some((texto) => texto.includes(TITULO_CAMPUS_NORD)));
   });
 
   it("una respuesta del anterior que llega después no se enseña bajo el nuevo", async () => {
-    const { findByRole, findByText, queryByText, fichas } = abrir(CAMPUS_NORD.clave);
+    const { findByRole, queryByText, origen } = abrir(CAMPUS_NORD.clave);
     await waitFor(() => {
-      assert.deepStrictEqual(fichas.abiertas(), [CAMPUS_NORD.clave]);
+      assert.deepStrictEqual(origen.abiertas(), [urlDelLote(CAMPUS_NORD.clave)]);
     });
-    // Se cambia antes de que llegue la primera: su lectura se cierra.
+    // Se cambia antes de que llegue la primera: su petición se cancela.
     const grabacion = grabarPanel();
     navegar(ruta.emplazamiento(PEDRALBES.clave));
     flush();
     await waitFor(() => {
-      assert.deepStrictEqual(fichas.abiertas(), [PEDRALBES.clave]);
+      assert.deepStrictEqual(origen.abiertas(), [urlDelLote(PEDRALBES.clave)]);
     });
-    // La respuesta de la primera llega tarde, antes que la de la segunda.
-    fichas.responder(CAMPUS_NORD.clave, CAMPUS_NORD);
-    fichas.responder(PEDRALBES.clave, PEDRALBES);
+    assert.deepStrictEqual(origen.canceladas(), [urlDelLote(CAMPUS_NORD.clave)]);
+
+    // La respuesta de la primera llega tarde, antes que la de la segunda: ya no la espera nadie.
+    const { cuerpo } = loteConFichas(CAPA.version, 0, [CAMPUS_NORD]);
+    origen.responder(urlDelLote(CAMPUS_NORD.clave), { estado: 200, cuerpo });
+    await responder(origen, PEDRALBES);
     await findByRole("heading", { name: TITULO_PEDRALBES });
-    // Y otra más tardía, con la segunda ya a la vista, seguida de un cambio de la segunda.
-    fichas.responder(CAMPUS_NORD.clave, CAMPUS_NORD);
-    fichas.responder(PEDRALBES.clave, { ...PEDRALBES, estado: "nuevo" });
-    await findByText("Nuevo");
 
     assert.isNull(queryByText(TITULO_CAMPUS_NORD));
     const estados = grabacion.estados();
@@ -405,34 +436,80 @@ describe("panel del emplazamiento", () => {
     );
   });
 
-  it("en vivo: si la ficha cambia mientras se ve, se actualiza", async () => {
-    const { findByText, findByRole, fichas } = abrir(CAMPUS_NORD.clave);
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+  it("volver a una ficha ya leída no pide nada: su lote no cambia", async () => {
+    const { findByRole, origen } = abrir(CAMPUS_NORD.clave);
+    await responder(origen, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
-    await responder(fichas, CAMPUS_NORD.clave, { ...CAMPUS_NORD, estado: "corregido" });
-    const etiqueta = await findByText("Corregido");
-    assert.strictEqual(etiqueta.closest("[data-tono]")?.getAttribute("data-tono"), "corregido");
+    navegar(ruta.emplazamiento(PEDRALBES.clave));
+    flush();
+    await responder(origen, PEDRALBES);
+    await findByRole("heading", { name: TITULO_PEDRALBES });
+
+    navegar(ruta.emplazamiento(CAMPUS_NORD.clave));
+    flush();
+    await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+    assert.deepStrictEqual(origen.pedidas(), [
+      urlDelLote(CAMPUS_NORD.clave),
+      urlDelLote(PEDRALBES.clave),
+    ]);
   });
 
-  it("si la ficha es más reciente que el mapa, lo dice; si no, da su fecha", async () => {
-    const { findByText, findByRole, queryByText, fichas } = abrir(CAMPUS_NORD.clave);
+  it("la ficha de la misma versión que el mapa da su fecha, sin avisos", async () => {
+    const { findByText, findByRole, queryByText, origen } = abrir(CAMPUS_NORD.clave);
     // Misma ejecución que la capa: la ficha va al milisegundo y la capa al segundo.
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    await responder(origen, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
     assert.isNotNull(await findByText(textoEntero("Datos de la ficha: 26 sept 2026")));
     assert.isNull(queryByText(/Actualizado después del mapa/u));
+  });
 
-    await responder(fichas, CAMPUS_NORD.clave, { ...CAMPUS_NORD, version: NOCHE + DIA });
+  it("si el origen ya no tiene la versión del mapa, enseña la vigente y dice que es posterior", async () => {
+    const { findByText, origen } = abrir(CAMPUS_NORD.clave);
+    // Una publicación posterior ha cambiado la ficha y el origen ya no guarda la del mapa.
+    const cambiada: Ficha = { ...CAMPUS_NORD, version: NOCHE + DIA };
+    const manana = generarCapa(
+      NOCHE + DIA,
+      CAPA.emplazamientos.map(({ clave, posicion, estado, companias }) => ({
+        clave,
+        posicion,
+        estado,
+        companias,
+      })),
+      LIMITES_DE_PRUEBA,
+      1,
+    );
+    const lote = manana.lotes.findIndex((l) => l.includes(CAMPUS_NORD.clave));
+    await contestar(origen, urlDelLote(CAMPUS_NORD.clave), 404, "");
+    await contestar(
+      origen,
+      `${ORIGEN}/vigente.json`,
+      200,
+      codificarVigente({
+        version: versionDeCapa(NOCHE + DIA),
+        fecha: NOCHE + DIA,
+        emplazamientos: 2,
+        lotes: 2,
+      }),
+    );
+    await contestar(origen, `${ORIGEN}/${manana.fichero}`, 200, manana.contenido);
+    await contestar(
+      origen,
+      `${ORIGEN}/${ficheroDeLote(manana.version, lote)}`,
+      200,
+      loteConFichas(manana.version, lote, [cambiada]).cuerpo,
+    );
+
     const aviso = await findByText("Actualizado después del mapa");
     const marca = aviso.closest("[data-tono]");
     assert.strictEqual(marca?.getAttribute("data-tono"), "posterior");
     assert.match(marca?.textContent ?? "", /es del 27 sept 2026 y el mapa, del 26 sept 2026/u);
   });
 
-  it("un emplazamiento que no existe lo dice, y volver al mapa cierra el panel", async () => {
-    const { findByText, getByRole, queryByLabelText, fichas } = abrir("movistar-no-existe");
-    await responder(fichas, "movistar-no-existe", "no-existe");
+  it("un emplazamiento que no está en el mapa no existe, y volver al mapa cierra el panel", async () => {
+    const { findByText, getByRole, queryByLabelText, origen } = abrir("movistar-no-existe");
     assert.isNotNull(await findByText("Este emplazamiento no existe"));
+    // No hace falta pedir nada: la capa del mapa dice qué emplazamientos hay.
+    assert.deepStrictEqual(origen.pedidas(), []);
     const mapa = getByRole("main");
 
     fireEvent.click(getByRole("button", { name: "Volver al mapa" }));
@@ -443,18 +520,19 @@ describe("panel del emplazamiento", () => {
     assert.strictEqual(getByRole("main"), mapa);
   });
 
-  it("si la ficha no llega, lo dice con un reintento que vuelve a leerla", async () => {
-    const { findByText, findByRole, getByRole, fichas } = abrir(CAMPUS_NORD.clave);
-    await responder(fichas, CAMPUS_NORD.clave, new FichaNoLeida({ motivo: "sin conexión" }));
+  it("si la ficha no llega, lo dice con un reintento que vuelve a pedirla", async () => {
+    const { findByText, findByRole, getByRole, origen } = abrir(CAMPUS_NORD.clave);
+    await contestar(origen, urlDelLote(CAMPUS_NORD.clave), 503, "");
     assert.isNotNull(await findByText("No se ha podido leer la ficha"));
 
     fireEvent.click(getByRole("button", { name: "Reintentar" }));
     flush();
-    await waitFor(() => {
-      assert.deepStrictEqual(fichas.abiertas(), [CAMPUS_NORD.clave]);
-    });
-    await responder(fichas, CAMPUS_NORD.clave, CAMPUS_NORD);
+    await responder(origen, CAMPUS_NORD);
     assert.isNotNull(await findByRole("heading", { name: TITULO_CAMPUS_NORD }));
+    assert.deepStrictEqual(origen.pedidas(), [
+      urlDelLote(CAMPUS_NORD.clave),
+      urlDelLote(CAMPUS_NORD.clave),
+    ]);
   });
 
   it("la dirección con el emplazamiento se puede compartir: al cargarla abre su ficha", () => {

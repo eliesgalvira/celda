@@ -27,7 +27,7 @@ describe("ficha de un emplazamiento (API de Convex en memoria)", () => {
           yield* TestClock.setTime(NOCHE);
           yield* ejecutar(capaGrabada("registro-oficial", yield* muestraCampusNord));
 
-          const leida = yield* convex.query(refs.public.datos.ficha, {
+          const leida = yield* convex.query(refs.internal.datos.ficha, {
             clave: "movistar-0802532",
           });
           assert.isTrue(Option.isSome(leida));
@@ -81,14 +81,16 @@ describe("ficha de un emplazamiento (API de Convex en memoria)", () => {
         const convex = yield* TestConfect.TestConfect;
         assert.isTrue(
           Option.isNone(
-            yield* convex.query(refs.public.datos.ficha, { clave: "movistar-0802532" }),
+            yield* convex.query(refs.internal.datos.ficha, { clave: "movistar-0802532" }),
           ),
         );
         yield* TestClock.setTime(NOCHE);
         yield* ejecutar(capaGrabada("registro-oficial", yield* muestraCampusNord));
         // Sin el cero no es la misma clave (ADR 0012).
         assert.isTrue(
-          Option.isNone(yield* convex.query(refs.public.datos.ficha, { clave: "movistar-802532" })),
+          Option.isNone(
+            yield* convex.query(refs.internal.datos.ficha, { clave: "movistar-802532" }),
+          ),
         );
       }),
     ),

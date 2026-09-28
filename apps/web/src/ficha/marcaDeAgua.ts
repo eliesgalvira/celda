@@ -1,7 +1,7 @@
 /**
- * Cómo está la ficha respecto al mapa (ADR 0004). La capa se publica de una instantánea y la
- * ficha se lee en vivo, así que la ficha puede ser más reciente. Si lo es, el panel lo dice y el
- * marcador se queda como está hasta la siguiente capa.
+ * Cómo está la ficha respecto al mapa (ADR 0004). La ficha se publica con la capa, pero si el
+ * origen ya no tiene la versión del mapa se lee la vigente, y entonces puede ser más reciente. Si
+ * lo es, el panel lo dice y el marcador se queda como está hasta recargar.
  */
 export type ComparacionConCapa =
   /** No hay capa cargada con la que comparar. */

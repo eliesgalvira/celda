@@ -1,6 +1,6 @@
 # Convex como fuente canónica, con funciones Effect mediante Confect v10
 
-Estado: aceptada (26/09/2026), tras la exploración técnica 02.
+Estado: aceptada (26/09/2026), tras la exploración técnica 02. Revisada el 28/09/2026 con el ADR 0008: Convex deja de estar expuesto al público y la web ya no tiene cliente de Convex.
 
 ## Contexto
 
@@ -17,29 +17,33 @@ contra un backend local real (código en `spikes/confect/`).
   declaran en la spec (`Schema.TaggedError`) y llegan tipados a cada cliente.
 - `convex/` y `confect/_generated/` son código generado (`confect codegen`/`confect dev`) y no se
   editan a mano.
-- En el cliente, el `WebSocketClient` de `@confect/js` vive en un `ManagedRuntime`. Cada lectura en
-  vivo es su `reactiveQuery` (un `Stream`) convertido con `Stream.toAsyncIterable` y devuelto desde
-  `createMemo`. Solid libera la suscripción al cambiar los argumentos o al desmontar. No hay
-  adaptador `vivo()` propio.
-- Todo cambio de identidad (`idEmplazamiento`) va bajo `<Loading on={id}>`. Un error de dominio en
-  una lectura en vivo cae en `<Errored>`.
+- Todas las funciones son internas. Las llaman los crons de la ingesta, la publicación (que corre
+  en una acción de Node al final de cada ingesta) y quien administra el despliegue con la clave de
+  administración. El público lee la capa y las fichas publicadas en la CDN (ADR 0004 y 0008).
+- La web no tiene cliente de Convex. Hasta el 28/09/2026 leía la ficha con el `WebSocketClient` de
+  `@confect/js`; lo que queda de aquel diseño es el puente entre Effect y Solid: una lectura es un
+  `Stream` convertido con `Stream.toAsyncIterable` (`leerEnSolid`) y devuelto desde `createMemo`.
+  Solid la cancela al cambiar los argumentos o al desmontar.
+- Todo cambio de identidad (la clave del emplazamiento) va bajo `<Loading on={clave}>`. Un error en
+  una lectura cae en `<Errored>`.
 - Las funciones se prueban por su API pública con `@confect/test` (convex-test en memoria) y
   `@effect/vitest`, sin mocks de módulos. Las pruebas que dependan del runtime real se ejecutan
   contra un backend local sin cuenta.
-- Versiones exactas: @confect/* 10.0.0-next.24, effect 4.0.0-rc.117, convex 1.46.0,
+- Versiones exactas: @confect/core, cli, server y test 10.0.0-next.24, effect 4.0.0-rc.117, convex 1.46.0,
   convex-test 0.0.60. Cada subida va en un commit aparte, después de leer el changelog.
 
 ## Consecuencias
 
 - Un único lenguaje de esquemas (Effect Schema) de la tabla al componente, con los checks
   aplicados también en el servidor.
-- Coste en el cliente: unos 5 kB gzip sobre el Effect que ya lleva la app (76,6 kB gzip en total
-  con Solid, Convex y Effect).
+- Coste en el cliente: ninguno desde el ADR 0008. El paquete de la web ya no lleva ni Convex ni
+  Confect.
 - Dependemos de una prerelease que mantiene una sola persona y que cambia a menudo, con 15
   cambios incompatibles en 25 versiones `next`. Si se estanca o se abandona, el plan B es Effect
   en acciones `"use node"` con funciones de Convex sencillas, y las specs se reaprovechan como
   esquemas.
 - Hay que ejecutar `confect dev` junto a `convex dev`, y excluir `*.spec.ts` de Vitest.
-- La consola del navegador mostrará los errores de dominio como «Server Error». Es ruido conocido.
+- Los errores de dominio llegan tipados a quien llama por la API interna; al público no le llega
+  ninguno, porque no llama a Convex.
 
 Veredicto completo y evidencias: rama `spike/celda-confect` y el issue de la exploración 02.

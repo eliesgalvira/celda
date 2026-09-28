@@ -56,7 +56,7 @@ export interface ContextoDeTabla {
   readonly fechaCapa: number;
   readonly parametros: ParametrosDelEjercicio;
   /**
-   * De dónde salen las bandas: de la capa del mapa, con su fecha, o de las fichas leídas en vivo,
+   * De dónde salen las bandas: de la capa del mapa, con su fecha, o de las fichas publicadas,
    * con la fecha de la lectura.
    */
   readonly bandas: { readonly de: "capa" | "fichas"; readonly fecha: number };
@@ -64,7 +64,7 @@ export interface ContextoDeTabla {
 
 const ORIGEN_BANDAS = {
   capa: { nombre: "Capa del mapa", en: "de la capa del mapa" },
-  fichas: { nombre: "Fichas leídas en vivo", en: "de las fichas leídas en vivo" },
+  fichas: { nombre: "Fichas publicadas", en: "de las fichas publicadas" },
 } as const;
 
 const ENTERO = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });

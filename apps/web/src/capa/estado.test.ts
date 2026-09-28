@@ -6,7 +6,7 @@ import * as Exit from "effect/Exit";
 import { creditoDeBarrios, estadoDeCarga, textoDatosDelMapa } from "./estado.ts";
 import { FUENTE_DE_BARRIOS } from "./pruebas.ts";
 import {
-  BackendNoResponde,
+  OrigenNoResponde,
   CapaNoDescargada,
   type FalloCapa,
   SinCapaPublicada,
@@ -28,7 +28,7 @@ describe("estado de la capa", () => {
     };
     assert.strictEqual(motivo(Exit.succeed(CAPA)), "lista");
     assert.strictEqual(motivo(Exit.fail(new SinCapaPublicada())), "sin-publicar");
-    assert.strictEqual(motivo(Exit.fail(new BackendNoResponde({ motivo: "503" }))), "sin-backend");
+    assert.strictEqual(motivo(Exit.fail(new OrigenNoResponde({ motivo: "503" }))), "sin-origen");
     assert.strictEqual(
       motivo(Exit.fail(new CapaNoDescargada({ url: "u", motivo: "404" }))),
       "sin-descarga",

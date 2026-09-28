@@ -3,11 +3,10 @@ import type { BandasPorCompania } from "@celda/dominio/ejercicio";
 import type { Ficha } from "@celda/dominio/ficha";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Stream from "effect/Stream";
 
-import { FichasEnVivo } from "../ficha/servicio.ts";
+import { FichasPublicadas } from "../ficha/servicio.ts";
 
-/** Cuántas fichas se leen a la vez: pocas, para no cargar el backend. */
+/** Cuántas fichas se leen a la vez. Las vecinas van en el mismo lote, que se pide una vez. */
 const A_LA_VEZ = 3;
 
 /** Lo que tarda como mucho una ficha; si no llega, cuenta como no leída. */
@@ -35,15 +34,15 @@ export interface BandasLeidas {
  */
 export const leerBandas = (
   claves: ReadonlyArray<string>,
-): Effect.Effect<BandasLeidas, never, FichasEnVivo> =>
+): Effect.Effect<BandasLeidas, never, FichasPublicadas> =>
   Effect.gen(function* () {
-    const fichas = yield* FichasEnVivo;
+    const fichas = yield* FichasPublicadas;
     const leidas = yield* Effect.forEach(
       claves,
       (clave) =>
-        Stream.runHead(fichas.seguir(clave)).pipe(
+        fichas.leer(clave).pipe(
           Effect.timeoutOption(ESPERA),
-          Effect.map((salida) => ({ clave, ficha: Option.flatten(Option.flatten(salida)) })),
+          Effect.map((salida) => ({ clave, ficha: Option.flatten(salida) })),
           Effect.catchTag("FichaNoLeida", () =>
             Effect.succeed({ clave, ficha: Option.none<Ficha>() }),
           ),

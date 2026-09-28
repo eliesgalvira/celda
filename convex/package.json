@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./capas": "./src/capas.ts",
-    "./publica": "./src/publica.ts"
+    "./publicacion": "./src/publicacion.ts",
+    "./almacenes/carpeta": "./src/almacenes/carpeta.ts",
+    "./almacenes/r2": "./src/almacenes/r2.ts"
   },
   "scripts": {
     "codegen": "confect codegen",
@@ -17,13 +18,13 @@
     "@celda/ingesta": "workspace:*",
     "@confect/core": "catalog:",
     "@confect/server": "catalog:",
+    "@effect/platform-node": "catalog:",
     "convex": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@confect/cli": "catalog:",
     "@confect/test": "catalog:",
-    "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
     "convex-test": "catalog:",
     "vite": "catalog:",

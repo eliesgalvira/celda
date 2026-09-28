@@ -6,8 +6,8 @@ import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { App } from "./App.tsx";
-import { capaEnVivo } from "./capa/servicio.ts";
-import { fichasEnVivo } from "./ficha/servicio.ts";
+import { capaDelOrigen } from "./capa/servicio.ts";
+import { fichasDelOrigen } from "./ficha/servicio.ts";
 import { criptoDelNavegador } from "./lib/cripto.ts";
 import { brujulaDelNavegador } from "./mejorar/brujula.ts";
 import { detectarDispositivo } from "./medir/dispositivo.ts";
@@ -19,8 +19,9 @@ import { geolocalizacionDelNavegador } from "./ubicacion/geolocalizacion.ts";
 
 /** Los servicios reales, con la configuración de las variables `VITE_*` del build. */
 const servicios = Layer.mergeAll(
-  Layer.merge(capaEnVivo, buscadorNominatim).pipe(Layer.provide(FetchHttpClient.layer)),
-  fichasEnVivo,
+  Layer.mergeAll(fichasDelOrigen.pipe(Layer.provideMerge(capaDelOrigen)), buscadorNominatim).pipe(
+    Layer.provide(FetchHttpClient.layer),
+  ),
   simuladorDelNavegador,
   geolocalizacionDelNavegador(navigator),
   brujulaDelNavegador(window, detectarDispositivo(leerNavegador()).tipo),

@@ -4,7 +4,8 @@ import { Fuente, Observacion } from "@celda/dominio/observacion";
 import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
 import { ObservacionDePunto, Punto, Registro } from "@celda/ingesta/extractor";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
-import { ConvexConfigProvider, FunctionImpl, GroupImpl } from "@confect/server";
+import { ActionRunner, ConvexConfigProvider, FunctionImpl, GroupImpl } from "@confect/server";
+import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -20,9 +21,12 @@ import {
   opcionesProcesoDePuntosDesdeConfig,
   opcionesProcesoDesdeConfig,
 } from "../src/proceso";
+import { Publicacion, publicarTrasLaIngesta } from "../src/publicacion";
+import refs from "./_generated/refs";
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 import ingesta from "./ingesta.spec";
+import type { ResultadoPublicacion } from "./publicacion.spec";
 import { SIN_CAMBIOS } from "./tables/ejecuciones";
 import { INTERRUPTOR_POR_DEFECTO } from "./tables/interruptores";
 
@@ -661,14 +665,32 @@ const estado = FunctionImpl.make(databaseSchema, ingesta, "estado", () =>
 );
 
 /**
- * El extractor real sobre `fetch`, con las opciones de las variables de entorno de Convex, y el
- * lector de esas variables para el resto del proceso.
+ * La publicación con la acción `publicacion:publicar`, que va en el runtime de Node. Si la acción
+ * misma falla, se cuenta como publicación fallida: la ejecución de ingesta ya está completada.
  */
-const capaDeLaAccion = Layer.merge(
+const publicacionPorAccion = Layer.effect(
+  Publicacion,
+  Effect.map(ActionRunner.ActionRunner, (correr) =>
+    Publicacion.of({
+      publicar: correr(refs.internal.publicacion.publicar).pipe(
+        Effect.catchCause((causa) =>
+          Effect.succeed<ResultadoPublicacion>({ tipo: "fallida", motivo: Cause.pretty(causa) }),
+        ),
+      ),
+    }),
+  ),
+);
+
+/**
+ * El extractor real sobre `fetch`, con las opciones de las variables de entorno de Convex, el
+ * lector de esas variables para el resto del proceso y la publicación.
+ */
+const capaDeLaAccion = Layer.mergeAll(
   Layer.unwrap(Effect.map(RegistroOficial.opcionesDesdeConfig, RegistroOficial.capa)).pipe(
     Layer.provide(FetchHttpClient.layer),
   ),
   ConvexConfigProvider.layer,
+  publicacionPorAccion,
 ).pipe(Layer.provide(ConvexConfigProvider.layer));
 
 /** La ingesta del registro oficial que lanza el cron, con el extractor real. */
@@ -682,11 +704,12 @@ const registroOficial = FunctionImpl.make(databaseSchema, ingesta, "registroOfic
 );
 
 /** El extractor real de antenasmoviles.es sobre `fetch`, con sus opciones de Convex. */
-const capaDeAntenasMoviles = Layer.merge(
+const capaDeAntenasMoviles = Layer.mergeAll(
   Layer.unwrap(Effect.map(AntenasMoviles.opcionesDesdeConfig, AntenasMoviles.capa)).pipe(
     Layer.provide(FetchHttpClient.layer),
   ),
   ConvexConfigProvider.layer,
+  publicacionPorAccion,
 ).pipe(Layer.provide(ConvexConfigProvider.layer));
 
 /**
@@ -702,9 +725,17 @@ const antenasMoviles = FunctionImpl.make(databaseSchema, ingesta, "antenasMovile
   ),
 );
 
-/** Vuelve a fusionar sin pedir nada a las fuentes, por ejemplo tras cambiar la regla. */
+/**
+ * Vuelve a fusionar sin pedir nada a las fuentes, por ejemplo tras cambiar la regla, y publica
+ * lo que salga.
+ */
 const recalcularFusion = FunctionImpl.make(databaseSchema, ingesta, "recalcularFusion", () =>
-  Effect.flatMap(Clock.currentTimeMillis, fusionarTodo),
+  Effect.flatMap(Clock.currentTimeMillis, fusionarTodo).pipe(
+    Effect.tap(() => publicarTrasLaIngesta),
+    // Como en las ingestas, la acción monta sus capas una vez.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    Effect.provide(publicacionPorAccion),
+  ),
 );
 
 export default GroupImpl.make(databaseSchema, ingesta).pipe(

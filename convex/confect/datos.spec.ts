@@ -14,9 +14,13 @@ export const Version = Schema.Struct({
   consultas: Schema.Array(Schema.Struct({ fuente: Fuente, consultadoEl: Schema.Finite })),
 });
 
+/**
+ * Lecturas de los datos para la publicación y para quien administra el despliegue. Son internas:
+ * la web no habla con Convex, lee la capa y las fichas publicadas (ADR 0008).
+ */
 export default GroupSpec.make()
   .addFunction(
-    FunctionSpec.publicQuery({
+    FunctionSpec.internalQuery({
       name: "version",
       returns: () => Version,
     }),
@@ -26,7 +30,7 @@ export default GroupSpec.make()
      * La ficha de un emplazamiento para el panel, con la marca de agua de sus datos. Nula si no
      * hay ningún emplazamiento con esa clave, por ejemplo porque se retiró después de la capa.
      */
-    FunctionSpec.publicQuery({
+    FunctionSpec.internalQuery({
       name: "ficha",
       args: () => ({ clave: Schema.String }),
       returns: () => Schema.OptionFromNullOr(Ficha),

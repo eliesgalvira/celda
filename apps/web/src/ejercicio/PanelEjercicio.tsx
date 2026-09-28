@@ -453,9 +453,10 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     <SeccionFicha titulo="4 · Tecnologías y bandas">
                       <TextoEjercicio>
                         Las <Termino termino="banda">bandas</Termino> salen del registro oficial,
-                        tal como las recoge la capa del mapa. Para las más recientes, lee las fichas
-                        en vivo. El registro no publica la tecnología: se deduce de la banda y por
-                        eso la tabla dice «probable» o «posible».
+                        tal como las recoge la capa del mapa. Las fichas, publicadas con la misma
+                        versión, las dan expediente a expediente. El registro no publica la
+                        tecnología: se deduce de la banda y por eso la tabla dice «probable» o
+                        «posible».
                       </TextoEjercicio>
                       <AccionesEjercicio>
                         <Boton

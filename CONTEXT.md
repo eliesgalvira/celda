@@ -106,6 +106,10 @@ _Evitar_: scan, rastreo, crawl
 Copia fija de todos los emplazamientos y agrupaciones, publicada de una vez para dibujar el mapa.
 _Evitar_: tiles, teselas, mapa
 
+**Publicación**:
+Paso que, al acabar cada ingesta, escribe la capa y las fichas de la instantánea en una misma versión y después cambia la versión vigente. Sin cambios en los datos no escribe nada.
+_Evitar_: despliegue, exportación, subida
+
 **Mapa base**:
 Callejero de fondo sobre el que se dibujan las capas. No lo produce Celda.
 _Evitar_: capa base, fondo
@@ -115,11 +119,11 @@ Fecha de la instantánea de emplazamientos de la que sale una capa.
 _Evitar_: build, release
 
 **Ficha**:
-Lo que el panel del emplazamiento cuenta de él al seleccionarlo. Se lee en vivo, así que puede ser más reciente que la capa.
+Lo que el panel del emplazamiento cuenta de él al seleccionarlo. Se publica con la capa, en su misma versión, y la web la lee de ahí, no de un backend.
 _Evitar_: detalle, tarjeta, popup
 
 **Marca de agua**:
-Versión de los datos que conoce cada vista. Si la ficha y la capa tienen marcas distintas, la interfaz lo dice.
+Versión de los datos que conoce cada vista. La ficha sale de la misma versión que la capa del mapa, salvo que esa versión ya no esté publicada y se lea la vigente; entonces la ficha es posterior y la interfaz lo dice.
 _Evitar_: timestamp, sello, fecha de actualización
 
 ### Ubicación
@@ -272,7 +276,7 @@ _Evitar_: clientes, carga
 - Cada **emplazamiento** tiene una **celda**. Con un **punto de referencia**, la celda se divide en sectores y uno de ellos es el **sector que da servicio**.
 - Una **fuente** produce **observaciones** en cada **ejecución de ingesta**. Una **corrección** es una observación.
 - La **fusión** convierte observaciones en **emplazamientos**, con su **confianza**, sus **conflictos** y su **estado**.
-- Una **capa** sale de una instantánea de emplazamientos y tiene una **versión de capa**. La **ficha** tiene su propia versión. La **marca de agua** de cada vista deja ver cuál es más reciente.
+- Una **capa** sale de una instantánea de emplazamientos y tiene una **versión de capa**. La **publicación** escribe con ella la **ficha** de cada uno de sus emplazamientos. La ficha lleva además la fecha en que cambió su emplazamiento, y la **marca de agua** de cada vista deja ver si es más reciente que el mapa.
 - Una **medida propia** queda unida al emplazamiento y al sector que daban servicio donde se tomó.
 - Las **aportaciones** viven en el dispositivo. Una **corrección propuesta** solo pasaría a ser **corrección** si se compartiera.
 - Una **simulación** nunca es una **observación** ni una **medida**.

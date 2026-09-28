@@ -12,9 +12,6 @@ catalogs:
     '@confect/core':
       specifier: 10.0.0-next.24
       version: 10.0.0-next.24
-    '@confect/js':
-      specifier: 10.0.0-next.24
-      version: 10.0.0-next.24
     '@confect/server':
       specifier: 10.0.0-next.24
       version: 10.0.0-next.24
@@ -119,9 +116,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@celda/convex':
-        specifier: workspace:*
-        version: link:../../convex
       '@celda/dominio':
         specifier: workspace:*
         version: link:../../packages/dominio
@@ -131,12 +125,6 @@ importers:
       '@celda/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@confect/core':
-        specifier: 'catalog:'
-        version: 10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)
-      '@confect/js':
-        specifier: 'catalog:'
-        version: 10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(convex@1.46.0)(effect@4.0.0-rc.117)
       '@solidjs/web':
         specifier: 'catalog:'
         version: 2.0.0-rc.9(solid-js@2.0.0-rc.9)
@@ -195,6 +183,9 @@ importers:
       '@confect/server':
         specifier: 'catalog:'
         version: 10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(@effect/platform-node@4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1))(convex@1.46.0)(effect@4.0.0-rc.117)
+      '@effect/platform-node':
+        specifier: 'catalog:'
+        version: 4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1)
       convex:
         specifier: 'catalog:'
         version: 1.46.0
@@ -208,9 +199,6 @@ importers:
       '@confect/test':
         specifier: 'catalog:'
         version: 10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(@confect/server@10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(@effect/platform-node@4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1))(convex@1.46.0)(effect@4.0.0-rc.117))(convex-test@0.0.60(convex@1.46.0))(convex@1.46.0)(effect@4.0.0-rc.117)
-      '@effect/platform-node':
-        specifier: 'catalog:'
-        version: 4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1)
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.0-rc.117(effect@4.0.0-rc.117)(vitest@5.0.1)
@@ -496,14 +484,6 @@ packages:
     resolution: {integrity: sha512-0uinz21sJrekRbSjqanqDbqDdOGd4RdLoeasfnp+HsvyETOAOi1smqtEBCHo2LTb6nuwSyxDnAuqcTSXg0qiOQ==}
     engines: {node: '>=24'}
     peerDependencies:
-      convex: ^1.32.0
-      effect: ^4.0.0-rc.117
-
-  '@confect/js@10.0.0-next.24':
-    resolution: {integrity: sha512-TbCCXHiqa8lii7z2/OV8eXoguZhYT6Uxh9+lKVnp9cltAJ9Hx3XcWm0Su81SPGT6C+VkGYcfJRYzDeDUF+tmVg==}
-    engines: {node: '>=24'}
-    peerDependencies:
-      '@confect/core': ^10.0.0-next.24
       convex: ^1.32.0
       effect: ^4.0.0-rc.117
 
@@ -2769,12 +2749,6 @@ snapshots:
 
   '@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)':
     dependencies:
-      convex: 1.46.0
-      effect: 4.0.0-rc.117
-
-  '@confect/js@10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(convex@1.46.0)(effect@4.0.0-rc.117)':
-    dependencies:
-      '@confect/core': 10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)
       convex: 1.46.0
       effect: 4.0.0-rc.117
 

@@ -8,6 +8,7 @@ import { Mhz } from "./banda.ts";
 import { type Barrio, barrioDelPunto, FuenteDeBarrios, type LimitesDeBarrios } from "./barrio.ts";
 import { Compania } from "./compania.ts";
 import { Estado } from "./emplazamiento.ts";
+import { EMPLAZAMIENTOS_POR_LOTE, repartirEnLotes } from "./lotes.ts";
 
 /** Las bandas en que emite la estación base de una compañía, de menor a mayor frecuencia. */
 export const BandasDeCapa = Schema.Struct({
@@ -18,7 +19,7 @@ export type BandasDeCapa = typeof BandasDeCapa.Type;
 
 /**
  * Lo que la capa guarda de cada emplazamiento: lo justo para dibujar su marcador y la vista de
- * interferencia. El resto se lee en vivo en la ficha.
+ * interferencia. El resto va en su ficha, que se publica con la capa.
  */
 export const EmplazamientoDeCapa = Schema.Struct({
   clave: Schema.String,
@@ -39,6 +40,8 @@ export type EmplazamientoDeCapa = typeof EmplazamientoDeCapa.Type;
 export interface EmplazamientoLeido extends EmplazamientoDeCapa {
   /** Código del barrio, o `null` si el emplazamiento queda fuera de Barcelona. */
   readonly barrio: string | null;
+  /** El lote de fichas de su versión en el que está su ficha. Desde el formato 4. */
+  readonly lote?: number;
 }
 
 /** La capa publicada que dice el backend: su versión, dónde está y cuántos emplazamientos lleva. */
@@ -52,11 +55,37 @@ export const CapaPublicada = Schema.Struct({
 export type CapaPublicada = typeof CapaPublicada.Type;
 
 /**
+ * La publicación vigente: el único fichero del almacén que cambia. Dice qué versión tiene que
+ * cargar la web; la capa y las fichas de esa versión están en `ficheroDeCapa(version)` y
+ * `carpetaDeFichas(version)`, que no cambian nunca. Se escribe el último, cuando ya están todos
+ * los demás.
+ */
+export const Vigente = Schema.Struct({
+  version: Schema.String,
+  /** Fecha de la instantánea, en milisegundos. */
+  fecha: Schema.Finite,
+  emplazamientos: Schema.Int,
+  /** Cuántos lotes de fichas tiene la versión. */
+  lotes: Schema.Int,
+});
+export type Vigente = typeof Vigente.Type;
+
+/** El nombre del fichero de la publicación vigente, en la raíz del almacén. */
+export const FICHERO_VIGENTE = "vigente.json";
+
+const VigenteEnJson = Schema.fromJsonString(Vigente);
+/** El contenido de `vigente.json`. */
+export const codificarVigente = Schema.encodeSync(VigenteEnJson);
+/** Lee `vigente.json`; falla si no tiene la forma esperada. */
+export const decodificarVigente = Schema.decodeUnknownResult(VigenteEnJson);
+
+/**
  * Formato del fichero. Cambiar las columnas o sus códigos es un formato nuevo. El 2 añade los
  * barrios: su tabla en la cabecera y la columna `barrio`. El 3 añade al final la columna
- * `bandas`. La web lee el 2 y el 3; en el 2 no se conoce ninguna banda.
+ * `bandas`, y el 4, detrás, la columna `lote`: dónde está la ficha de cada emplazamiento. La web
+ * lee del 2 al 4; en el 2 no se conoce ninguna banda, y sin el 4 no encuentra las fichas.
  */
-export const FORMATO_CAPA = 3;
+export const FORMATO_CAPA = 4;
 
 /** Bit de cada compañía en la columna `companias`. */
 const BIT_COMPANIA: Readonly<Record<Compania, number>> = {
@@ -114,7 +143,7 @@ const TablaDeBarrios = Schema.Struct({
 const Columnas = Schema.Struct({
   /** La primera clave: se puede leer con los primeros bytes, antes de analizar el resto. */
   version: Schema.String,
-  formato: Schema.Literals([2, FORMATO_CAPA]),
+  formato: Schema.Literals([2, 3, FORMATO_CAPA]),
   barrios: TablaDeBarrios,
   clave: Schema.Array(Schema.String),
   lon: Schema.Array(Schema.Finite),
@@ -125,6 +154,8 @@ const Columnas = Schema.Struct({
   barrio: Schema.Array(Schema.Int),
   /** Las bandas conocidas de cada emplazamiento (`codigoDeBandas`). Desde el formato 3. */
   bandas: Schema.optionalKey(Schema.Array(Schema.Int)),
+  /** El lote de fichas de cada emplazamiento. Desde el formato 4. */
+  lote: Schema.optionalKey(Schema.Array(Schema.Int)),
 });
 type Columnas = typeof Columnas.Type;
 
@@ -153,6 +184,19 @@ export const fechaDeVersion = (version: string): Option.Option<number> =>
 export const ficheroDeCapa = (version: string): string => `${version}.json`;
 
 /**
+ * La carpeta con los lotes de fichas de una versión: `fichas@2026-09-26T02:15:03Z` para la capa
+ * `sitios@2026-09-26T02:15:03Z`.
+ */
+export const carpetaDeFichas = (version: string): string =>
+  version.startsWith(PREFIJO_VERSION)
+    ? `fichas@${version.slice(PREFIJO_VERSION.length)}`
+    : `fichas@${version}`;
+
+/** El fichero de un lote de fichas: `fichas@2026-09-26T02:15:03Z/12.json`. */
+export const ficheroDeLote = (version: string, lote: number): string =>
+  `${carpetaDeFichas(version)}/${lote}.json`;
+
+/**
  * La versión de la capa a partir de los primeros bytes del fichero, sin esperar al resto: la
  * cabecera empieza por `{"version":"…"`.
  */
@@ -170,6 +214,8 @@ export interface CapaGenerada {
   readonly fichero: string;
   readonly contenido: string;
   readonly emplazamientos: number;
+  /** Las claves de cada lote de fichas, en el orden de sus números. */
+  readonly lotes: ReadonlyArray<ReadonlyArray<string>>;
 }
 
 const porCodigo = <A extends { readonly codigo: string }>(a: A, b: A): number =>
@@ -177,13 +223,15 @@ const porCodigo = <A extends { readonly codigo: string }>(a: A, b: A): number =>
 
 /**
  * La capa de una instantánea de emplazamientos con fecha `fecha`, con el barrio de cada uno según
- * `limites`. Es una función pura: la misma instantánea con los mismos límites da siempre los
- * mismos bytes, sea cual sea el orden en que llegue.
+ * `limites` y el lote en que irá su ficha (`repartirEnLotes`). Es una función pura: la misma
+ * instantánea con los mismos límites da siempre los mismos bytes, sea cual sea el orden en que
+ * llegue.
  */
 export const generarCapa = (
   fecha: number,
   emplazamientos: ReadonlyArray<EmplazamientoDeCapa>,
   limites: LimitesDeBarrios,
+  porLote: number = EMPLAZAMIENTOS_POR_LOTE,
 ): CapaGenerada => {
   const ordenados = emplazamientos
     .slice()
@@ -191,6 +239,8 @@ export const generarCapa = (
   const barrios = limites.barrios.slice().sort(porCodigo);
   const posicionDe = new Map(barrios.map((b, i) => [b.codigo, i]));
   const version = versionDeCapa(fecha);
+  const lotes = repartirEnLotes(ordenados, porLote);
+  const loteDe = new Map(lotes.flatMap((claves, lote) => claves.map((clave) => [clave, lote])));
   const columnas: Columnas = {
     version,
     formato: FORMATO_CAPA,
@@ -210,12 +260,14 @@ export const generarCapa = (
       (e) => posicionDe.get(barrioDelPunto(e.posicion, barrios)?.codigo ?? "") ?? SIN_BARRIO,
     ),
     bandas: ordenados.map((e) => codigoDeBandas(e.bandas ?? [])),
+    lote: ordenados.map((e) => loteDe.get(e.clave) ?? 0),
   };
   return {
     version,
     fichero: ficheroDeCapa(version),
     contenido: codificarColumnas(columnas),
     emplazamientos: ordenados.length,
+    lotes,
   };
 };
 
@@ -258,6 +310,36 @@ const barriosDe = (t: typeof TablaDeBarrios.Type): Result.Result<Array<Barrio>, 
   );
 };
 
+/** La fila `i` de la capa, con su barrio de la tabla `barrios`. */
+const fila = (
+  c: Columnas,
+  i: number,
+  barrios: ReadonlyArray<Barrio>,
+): Result.Result<EmplazamientoLeido, CapaIlegible> => {
+  const estado = ESTADOS_DE_CAPA[c.estado[i] ?? -1];
+  if (estado === undefined) {
+    return Result.fail(new CapaIlegible({ motivo: `estado desconocido en la fila ${i}` }));
+  }
+  const posicionBarrio = c.barrio[i] ?? SIN_BARRIO;
+  const barrio = barrios[posicionBarrio];
+  if (posicionBarrio !== SIN_BARRIO && barrio === undefined) {
+    return Result.fail(new CapaIlegible({ motivo: `barrio desconocido en la fila ${i}` }));
+  }
+  let leido: EmplazamientoLeido = {
+    clave: c.clave[i] ?? "",
+    posicion: { longitud: c.lon[i] ?? 0, latitud: c.lat[i] ?? 0 },
+    estado,
+    companias: companiasDe(c.companias[i] ?? 0),
+    barrio: barrio?.codigo ?? null,
+  };
+  // Sin ninguna banda conocida, o en las capas sin lotes, el emplazamiento no lleva la clave.
+  const bandas = bandasDeCodigo(c.bandas?.[i] ?? 0);
+  if (bandas.length > 0) leido = { ...leido, bandas };
+  const lote = c.lote?.[i];
+  if (lote !== undefined) leido = { ...leido, lote };
+  return Result.succeed(leido);
+};
+
 const filas = (
   c: Columnas,
 ): Result.Result<Pick<CapaLeida, "emplazamientos" | "barrios">, CapaIlegible> => {
@@ -269,6 +351,7 @@ const filas = (
     c.estado,
     c.barrio,
     ...(c.bandas === undefined ? [] : [c.bandas]),
+    ...(c.lote === undefined ? [] : [c.lote]),
   ];
   if (columnas.some((columna) => columna.length !== n)) {
     return Result.fail(new CapaIlegible({ motivo: "las columnas no tienen la misma longitud" }));
@@ -277,25 +360,9 @@ const filas = (
   if (Result.isFailure(barrios)) return Result.fail(barrios.failure);
   const emplazamientos: Array<EmplazamientoLeido> = [];
   for (let i = 0; i < n; i++) {
-    const estado = ESTADOS_DE_CAPA[c.estado[i] ?? -1];
-    if (estado === undefined) {
-      return Result.fail(new CapaIlegible({ motivo: `estado desconocido en la fila ${i}` }));
-    }
-    const posicionBarrio = c.barrio[i] ?? SIN_BARRIO;
-    const barrio = barrios.success[posicionBarrio];
-    if (posicionBarrio !== SIN_BARRIO && barrio === undefined) {
-      return Result.fail(new CapaIlegible({ motivo: `barrio desconocido en la fila ${i}` }));
-    }
-    const leido: EmplazamientoLeido = {
-      clave: c.clave[i] ?? "",
-      posicion: { longitud: c.lon[i] ?? 0, latitud: c.lat[i] ?? 0 },
-      estado,
-      companias: companiasDe(c.companias[i] ?? 0),
-      barrio: barrio?.codigo ?? null,
-    };
-    // Sin ninguna banda conocida, el emplazamiento no lleva la clave.
-    const bandas = bandasDeCodigo(c.bandas?.[i] ?? 0);
-    emplazamientos.push(bandas.length === 0 ? leido : { ...leido, bandas });
+    const leido = fila(c, i, barrios.success);
+    if (Result.isFailure(leido)) return Result.fail(leido.failure);
+    emplazamientos.push(leido.success);
   }
   return Result.succeed({ emplazamientos, barrios: barrios.success });
 };

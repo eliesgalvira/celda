@@ -11,6 +11,7 @@ import * as Result from "effect/Result";
 
 import refs from "../confect/_generated/refs";
 import { SIN_CAMBIOS } from "../confect/tables/ejecuciones";
+import { publicarTrasLaIngesta } from "./publicacion";
 
 /** Cuánto hace cada ejecución, aparte del extractor. */
 export interface OpcionesProceso {
@@ -123,6 +124,8 @@ export const fusionarTodo = Effect.fn("Ingesta.fusionarTodo")(function* (fecha: 
  * 4. Lee las fichas pendientes (nuevas, cambiadas o de hace más de `rotacion`).
  * 5. Cierra el barrido: cuenta una ausencia a lo que no ha traído el listado.
  * 6. Vuelve a fusionar y apunta los cambios y los errores.
+ * 7. Publica la capa y las fichas de la instantánea nueva. Sin cambios no escribe nada, y un
+ *    fallo al publicar no deshace la ejecución: la siguiente lo vuelve a intentar.
  *
  * Los pasos son idempotentes, así que repetir una ejecución cortada deja lo mismo que una
  * completa. Todos los datos llevan la fecha de inicio de la ejecución.
@@ -205,6 +208,7 @@ export const ejecutarIngesta = Effect.fn("Ingesta.ejecutar")(function* (opciones
     cambios: { observaciones: { ...observaciones, retirados }, fichas, emplazamientos },
     errores,
   });
+  yield* publicarTrasLaIngesta;
   return yield* consulta(refs.internal.ingesta.ejecucion, { id: ejecucion });
 }, Effect.orDie);
 
@@ -257,6 +261,7 @@ const PARAN_LOS_DETALLES: ReadonlySet<string> = new Set([
  *    parte y dejan el resto para la próxima ejecución.
  * 5. Cierra el barrido: un punto que falta dos veces seguidas se retira con sus observaciones.
  * 6. Vuelve a fusionar y apunta los cambios y los errores.
+ * 7. Publica, como `ejecutarIngesta`.
  *
  * Como en `ejecutarIngesta`, cada paso es idempotente y los datos llevan la fecha de inicio.
  */
@@ -346,5 +351,6 @@ export const ejecutarIngestaDePuntos = Effect.fn("Ingesta.ejecutarDePuntos")(fun
     cambios: { observaciones, fichas: detalles, emplazamientos, puntos: cuentasPuntos },
     errores,
   });
+  yield* publicarTrasLaIngesta;
   return yield* consulta(refs.internal.ingesta.ejecucion, { id: ejecucion });
 }, Effect.orDie);
