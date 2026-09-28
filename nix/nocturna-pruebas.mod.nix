@@ -329,7 +329,7 @@
                   assert f"- provincia 08 (Barcelona): {40 - len(fichas)} sin leer, 0 por releer" in estado, estado
                   assert "ventana cerrada" in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
                   # Se publica a mitad de la ventana y otra vez al cerrarla.
-                  capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^sitios@'").strip()
+                  capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^ficheros@'").strip()
                   assert capas == "2", capas
 
               with subtest("el servicio corre endurecido"):
