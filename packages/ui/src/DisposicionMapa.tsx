@@ -113,6 +113,9 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
       // vuelven abajo.
       data-hoja={props.panelAbierto === true && props.eligiendo !== true ? "" : undefined}
       data-eligiendo={props.eligiendo === true ? "" : undefined}
+      // En el móvil, los créditos abiertos tapan la pista y el pie de la vista: la pista se esconde
+      // mientras tanto y los créditos van por encima, con fondo opaco.
+      data-creditos={plegada() ? undefined : ""}
       // En el móvil la vista solo se ve sin hoja: entonces los controles suben por encima de ella.
       data-vista={
         props.vista !== undefined && props.panelAbierto !== true && props.eligiendo !== true
@@ -150,7 +153,7 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         10rem. En escritorio, centrada en lo que deja libre el panel.
       */}
       <Show when={props.pista} keyed>
-        <div class="pointer-events-none absolute inset-x-0 bottom-[4.5rem] z-10 flex justify-start pr-40 pl-3 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] md:bottom-16 md:justify-center md:px-16 md:group-data-panel/mapa:pl-[calc(27rem+1rem)] md:group-data-panel-ancho/mapa:pl-[calc(min(46rem,100vw-8rem)+1rem)]">
+        <div class="pointer-events-none absolute inset-x-0 bottom-[4.5rem] z-10 flex justify-start pr-40 pl-3 max-md:group-data-creditos/mapa:hidden max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+4rem)] md:bottom-16 md:justify-center md:px-16 md:group-data-panel/mapa:pl-[calc(27rem+1rem)] md:group-data-panel-ancho/mapa:pl-[calc(min(46rem,100vw-8rem)+1rem)]">
           {props.pista}
         </div>
       </Show>
@@ -196,7 +199,7 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
       </div>
 
       {/* Mientras se elige en el móvil, los créditos quedan por encima de la hoja, en su pie. */}
-      <div class="absolute bottom-[max(0.25rem,env(safe-area-inset-bottom))] left-1 z-10 max-w-[calc(100%-1rem)] max-md:max-w-[calc(100%-10.5rem)] max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.5rem)] max-md:group-data-eligiendo/mapa:z-30 md:group-data-panel/mapa:left-[calc(27rem+0.5rem)] md:group-data-panel-ancho/mapa:left-[calc(min(46rem,100vw-8rem)+0.5rem)]">
+      <div class="absolute bottom-[max(0.25rem,env(safe-area-inset-bottom))] left-1 z-10 max-w-[calc(100%-1rem)] max-md:max-w-[calc(100%-10.5rem)] max-md:group-data-creditos/mapa:z-20 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.5rem)] max-md:group-data-eligiendo/mapa:z-30 md:group-data-panel/mapa:left-[calc(27rem+0.5rem)] md:group-data-panel-ancho/mapa:left-[calc(min(46rem,100vw-8rem)+0.5rem)]">
         <PliegueDeCreditos value={pliegue}>{props.atribucion}</PliegueDeCreditos>
       </div>
 

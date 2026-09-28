@@ -29,6 +29,15 @@ const montar = () => {
 };
 
 describe("DisposicionMapa", () => {
+  it("con los créditos abiertos, la disposición lo marca para apartar la pista en el móvil", () => {
+    const { getByRole } = montar();
+    const disposicion = getByRole("main", { name: "Mapa de Barcelona" }).parentElement;
+    assert.isTrue(disposicion?.hasAttribute("data-creditos"));
+    fireEvent.pointerDown(getByRole("main", { name: "Mapa de Barcelona" }));
+    flush();
+    assert.isFalse(disposicion?.hasAttribute("data-creditos"));
+  });
+
   it("los créditos se ven al cargar y se pliegan al tocar el mapa", () => {
     const { getByRole } = montar();
     const boton = getByRole("button", { name: "Créditos del mapa" });

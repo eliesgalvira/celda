@@ -183,7 +183,7 @@ Los controles eran hexágonos oscuros como las agrupaciones, en una columna de s
 - En escritorio, Acercar y Alejar van a la vista en dos losas pequeñas sobre «Ubicación». En el móvil van dentro de «Funciones», porque el mapa se amplía con dos dedos; así quien no puede hacer el gesto sigue teniendo un botón.
 - `ControlDelMapa` es el botón. Su aspecto lo pone `DisposicionMapa` con el contexto `AspectoDeControl`: `pastilla`, `zoom` o `fila`. Una pantalla solo pasa los controles en `zoom`, `controles`, `botonUbicacion` y `controlesSecundarios`.
 - Son claros (`--control`, `--control-tinta` y `--control-borde`) para no confundirse con las agrupaciones, que son los datos. `mapa/color.test.ts` exige 3:1 (WCAG 1.4.11) entre el borde y cada fondo del mapa, y entre el relleno y una agrupación.
-- En el móvil los créditos se pliegan tras un botón «i». Se ven al cargar y se pliegan al primer toque en el mapa o a los 5 s, como permiten las [pautas de atribución de la OSMF](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines). En escritorio se ven siempre.
+- En el móvil los créditos se pliegan tras un botón «i». Se ven al cargar y se pliegan al primer toque en el mapa o a los 5 s, como permiten las [pautas de atribución de la OSMF](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines). En escritorio se ven siempre. Abiertos en el móvil ocupan varias líneas: mientras tanto la pista se esconde (`data-creditos`) y ellos van por encima de la vista, con fondo opaco.
 
 ## Marca
 
