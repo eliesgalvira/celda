@@ -15,8 +15,6 @@ import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
-import { MARCAS, VARIANTES_MARCA } from "@celda/ui/marca/geometria.ts";
-import { BarraDePrototipo } from "@celda/ui/prototipo/BarraDePrototipo.tsx";
 import * as Effect from "effect/Effect";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
@@ -67,8 +65,6 @@ import {
 } from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
-import { ponerIconos } from "../prototipo/iconos.ts";
-import { conLogo, hayPrototipo, logoDe } from "../prototipo/variantes.ts";
 import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
 import { posicionDe } from "../ubicacion/estado.ts";
 import { ReferenciaEnMapa } from "../ubicacion/ReferenciaEnMapa.tsx";
@@ -483,14 +479,6 @@ export function PantallaMapa() {
   });
   const midiendo = createMemo(() => medirAbierto(ubicacion()));
 
-  // PROTOTIPO (logo): la versión que pide la URL.
-  const logo = createMemo(() => logoDe(ubicacion().search));
-  const conPrototipo = createMemo(() => hayPrototipo(ubicacion().search));
-  createEffect(
-    () => logo(),
-    (variante) => ponerIconos(document, variante),
-  );
-
   const aviso = createMemo(() => {
     const actual = estado();
     return actual.tipo === "listo" ? undefined : (
@@ -508,7 +496,7 @@ export function PantallaMapa() {
             lienzo={(elemento) => {
               contenedor = elemento;
             }}
-            cabecera={<Cabecera lugar={BARCELONA.nombre} marca={logo()} />}
+            cabecera={<Cabecera lugar={BARCELONA.nombre} />}
             datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
             ubicacion={
               <>
@@ -649,26 +637,6 @@ export function PantallaMapa() {
           <Show when={ajustesAbiertos(ubicacion())}>
             <DialogoAjustes
               alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
-            />
-          </Show>
-          <Show when={conPrototipo()}>
-            <BarraDePrototipo
-              filas={[
-                {
-                  titulo: "Logo",
-                  opciones: VARIANTES_MARCA.map((clave) => ({
-                    clave,
-                    nombre: `${clave} · ${MARCAS[clave].nombre}`,
-                  })),
-                  actual: logo(),
-                  alElegir: (clave) => {
-                    const elegida = VARIANTES_MARCA.find((variante) => variante === clave);
-                    if (elegida !== undefined) {
-                      navegar(conLogo(ubicacion(), elegida), { reemplazar: true });
-                    }
-                  },
-                },
-              ]}
             />
           </Show>
         </ServicioContexto>

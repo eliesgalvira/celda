@@ -4,7 +4,7 @@
  * sueltos ni ficheros binarios que se desfasen del tema: cambiar un token cambia los iconos.
  *
  * `iconosDeCelda()` es un plugin de Vite: en desarrollo sirve los ficheros y en la build los
- * escribe en `dist/iconos/`. También pone en el HTML los enlaces a los de la marca vigente.
+ * escribe en `dist/iconos/`. También pone en el HTML los enlaces a ellos.
  */
 // El plugin corre en Node al construir, fuera de cualquier programa de Effect.
 // @effect-diagnostics-next-line nodeBuiltinImport:off
@@ -17,15 +17,12 @@ import { leerOklch } from "../mapa/color.ts";
 import { leerTokens } from "../tokens.ts";
 import {
   CAJA_MARCA,
-  carpetaDeIconos,
+  CARPETA_ICONOS,
   ICONOS,
-  MARCA_VIGENTE,
-  MARCAS,
+  MARCA,
   type Punto,
   type Tono,
   trayecto,
-  type VarianteMarca,
-  VARIANTES_MARCA,
 } from "./geometria.ts";
 import { type Capa, rasterizar, type Rgb } from "./raster.ts";
 
@@ -97,9 +94,9 @@ const escalar = (punto: Punto, escala: number): Punto => [
 ];
 
 /** El SVG del favicon: la misma figura que la cabecera, con los colores del icono. */
-export const svgDeIcono = (variante: VarianteMarca, colores: ColoresIcono): string => {
+export const svgDeIcono = (colores: ColoresIcono): string => {
   const tonos = tonosDeIcono(colores);
-  const piezas = MARCAS[variante].piezas.map(
+  const piezas = MARCA.map(
     (pieza) =>
       `<path fill-rule="evenodd" fill="${comoHex(tonos[pieza.tono])}" d="${trayecto(pieza.contornos)}"/>`,
   );
@@ -114,7 +111,6 @@ export const svgDeIcono = (variante: VarianteMarca, colores: ColoresIcono): stri
 
 /** Los píxeles RGBA de un icono cuadrado de `tamano` px. */
 export const pixelesDeIcono = (
-  variante: VarianteMarca,
   destino: Destino,
   tamano: number,
   colores: ColoresIcono,
@@ -127,7 +123,7 @@ export const pixelesDeIcono = (
   ];
   const capas: Array<Capa> = [];
   if (fondo !== undefined) capas.push({ contornos: [fondo.map(aPixeles)], color: colores.fondo });
-  for (const pieza of MARCAS[variante].piezas) {
+  for (const pieza of MARCA) {
     capas.push({
       contornos: pieza.contornos.map((contorno) =>
         contorno.map((punto) => aPixeles(escalar(punto, escala))),
@@ -168,8 +164,8 @@ export const codificarPng = (tamano: number, pixeles: Uint8Array): Uint8Array =>
   ]);
 };
 
-const manifiesto = (variante: VarianteMarca, colores: ColoresIcono): string => {
-  const carpeta = carpetaDeIconos(variante);
+const manifiesto = (colores: ColoresIcono): string => {
+  const carpeta = CARPETA_ICONOS;
   return `${JSON.stringify(
     {
       name: "Celda",
@@ -196,17 +192,15 @@ const manifiesto = (variante: VarianteMarca, colores: ColoresIcono): string => {
 export const ficherosDeIconos = (css: string): ReadonlyMap<string, string | Uint8Array> => {
   const colores = coloresDeIconos(css);
   const ficheros = new Map<string, string | Uint8Array>();
-  for (const variante of VARIANTES_MARCA) {
-    const carpeta = carpetaDeIconos(variante).slice(1);
-    const png = (destino: Destino, tamano: number) =>
-      codificarPng(tamano, pixelesDeIcono(variante, destino, tamano, colores));
-    ficheros.set(`${carpeta}/${ICONOS.svg}`, svgDeIcono(variante, colores));
-    ficheros.set(`${carpeta}/${ICONOS.png32}`, png("favicon", 32));
-    ficheros.set(`${carpeta}/${ICONOS.toque}`, png("tapiz", 180));
-    ficheros.set(`${carpeta}/${ICONOS.png192}`, png("tapiz", 192));
-    ficheros.set(`${carpeta}/${ICONOS.png512}`, png("tapiz", 512));
-    ficheros.set(`${carpeta}/${ICONOS.manifiesto}`, manifiesto(variante, colores));
-  }
+  const carpeta = CARPETA_ICONOS.slice(1);
+  const png = (destino: Destino, tamano: number) =>
+    codificarPng(tamano, pixelesDeIcono(destino, tamano, colores));
+  ficheros.set(`${carpeta}/${ICONOS.svg}`, svgDeIcono(colores));
+  ficheros.set(`${carpeta}/${ICONOS.png32}`, png("favicon", 32));
+  ficheros.set(`${carpeta}/${ICONOS.toque}`, png("tapiz", 180));
+  ficheros.set(`${carpeta}/${ICONOS.png192}`, png("tapiz", 192));
+  ficheros.set(`${carpeta}/${ICONOS.png512}`, png("tapiz", 512));
+  ficheros.set(`${carpeta}/${ICONOS.manifiesto}`, manifiesto(colores));
   return ficheros;
 };
 
@@ -222,7 +216,7 @@ const tipoDe = (ruta: string): string =>
 export const iconosDeCelda = (): Plugin => {
   const leer = () =>
     ficherosDeIconos(NodeFS.readFileSync(new URL("../tema.css", import.meta.url), "utf8"));
-  const carpeta = carpetaDeIconos(MARCA_VIGENTE);
+  const carpeta = CARPETA_ICONOS;
   return {
     name: "celda-iconos",
     configureServer(servidor) {

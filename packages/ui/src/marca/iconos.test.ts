@@ -1,7 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import tema from "../tema.css?raw";
-import { VARIANTES_MARCA } from "./geometria.ts";
 import { ficherosDeIconos, pixelesDeIcono, coloresDeIconos } from "./iconos.ts";
 
 const ficheros = ficherosDeIconos(tema);
@@ -11,34 +10,23 @@ const alfa = (pixeles: Uint8Array, tamano: number, x: number, y: number) =>
   pixeles[(y * tamano + x) * 4 + 3] ?? 0;
 
 describe("iconos de la marca", () => {
-  it("cada variante tiene su favicon, sus PNG y su manifiesto", () => {
-    for (const carpeta of [
-      "iconos",
-      "iconos/prototipo-b1",
-      "iconos/prototipo-b2",
-      "iconos/prototipo-b3",
-    ]) {
-      for (const fichero of [
-        "favicon.svg",
-        "favicon-32.png",
-        "apple-touch-icon.png",
-        "icono-192.png",
-        "icono-512.png",
-        "manifest.webmanifest",
-      ]) {
-        assert.isTrue(ficheros.has(`${carpeta}/${fichero}`), `falta ${carpeta}/${fichero}`);
-      }
-    }
+  it("hay favicon, PNG y manifiesto, y nada más", () => {
+    assert.deepStrictEqual([...ficheros.keys()].toSorted(), [
+      "iconos/apple-touch-icon.png",
+      "iconos/favicon-32.png",
+      "iconos/favicon.svg",
+      "iconos/icono-192.png",
+      "iconos/icono-512.png",
+      "iconos/manifest.webmanifest",
+    ]);
   });
 
   it("los colores salen de los tokens, en hexadecimal, sin oklch", () => {
-    const svg = ficheros.get("iconos/prototipo-b1/favicon.svg");
+    const svg = ficheros.get("iconos/favicon.svg");
     assert.isString(svg);
     assert.notInclude(String(svg), "oklch");
     assert.match(String(svg), /fill="#[\da-f]{6}"/u);
-    const manifiesto: unknown = JSON.parse(
-      String(ficheros.get("iconos/prototipo-b2/manifest.webmanifest")),
-    );
+    const manifiesto: unknown = JSON.parse(String(ficheros.get("iconos/manifest.webmanifest")));
     assert.deepInclude(manifiesto, { name: "Celda", lang: "es", start_url: "/" });
   });
 
@@ -54,13 +42,10 @@ describe("iconos de la marca", () => {
 
   it("el icono de inicio va a sangre y el favicon deja ver la pestaña fuera del hexágono", () => {
     const colores = coloresDeIconos(tema);
-    for (const variante of VARIANTES_MARCA) {
-      const tapiz = pixelesDeIcono(variante, "tapiz", 64, colores);
-      assert.strictEqual(alfa(tapiz, 64, 0, 0), 255, `${variante}: esquina del tapiz`);
-      const favicon = pixelesDeIcono(variante, "favicon", 32, colores);
-      assert.strictEqual(alfa(favicon, 32, 0, 0), 0, `${variante}: esquina del favicon`);
-      // La parte de arriba de la figura siempre tiene algo pintado.
-      assert.strictEqual(alfa(favicon, 32, 16, 10), 255, `${variante}: figura del favicon`);
-    }
+    const tapiz = pixelesDeIcono("tapiz", 64, colores);
+    assert.strictEqual(alfa(tapiz, 64, 0, 0), 255, "esquina del tapiz");
+    const favicon = pixelesDeIcono("favicon", 32, colores);
+    assert.strictEqual(alfa(favicon, 32, 0, 0), 0, "esquina del favicon");
+    assert.strictEqual(alfa(favicon, 32, 16, 10), 255, "figura del favicon");
   });
 });

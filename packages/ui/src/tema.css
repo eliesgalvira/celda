@@ -92,10 +92,6 @@
   --control-tinta: oklch(29.9% 0.005 121.8);
   --control-borde: oklch(29.9% 0.005 121.8);
 
-  /* PROTOTIPO: la barra que cambia de versión del logo. Un color que no usa nada más de la web. */
-  --prototipo: oklch(42% 0.17 330);
-  --prototipo-fg: oklch(98.5% 0.004 90);
-
   /* MAPA BASE */
   --mapa-fondo: oklch(86.7% 0.011 89.7);
   --mapa-parque: oklch(83.9% 0.021 116);
@@ -187,9 +183,6 @@
   --control-hover: oklch(36% 0.008 100);
   --control-tinta: oklch(93% 0.008 87.5);
   --control-borde: oklch(93% 0.008 87.5);
-
-  --prototipo: oklch(75% 0.14 330);
-  --prototipo-fg: oklch(22% 0.03 330);
 
   --eje-lejos: oklch(70% 0.09 78);
 
@@ -285,8 +278,6 @@
   --color-control-hover: var(--control-hover);
   --color-control-tinta: var(--control-tinta);
   --color-control-borde: var(--control-borde);
-  --color-prototipo: var(--prototipo);
-  --color-prototipo-fg: var(--prototipo-fg);
 
   --font-texto: var(--fuente-texto);
   --font-titulo: var(--fuente-titulo);

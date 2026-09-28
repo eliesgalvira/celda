@@ -53,7 +53,6 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   // Las etiquetas y los iconos de los controles claros.
   ["control-tinta", "control"],
   ["control-tinta", "control-hover"],
-  ["prototipo-fg", "prototipo"],
 ];
 
 /** Los fondos del mapa base sobre los que puede quedar un control. */
