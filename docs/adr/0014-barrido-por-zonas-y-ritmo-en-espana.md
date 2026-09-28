@@ -35,3 +35,13 @@ El usuario decidió que los correos al ministerio (`emisionesysalud@economia.gob
 - **Provincias como unidad de petición.** Sus cajas se solapan, así que el borde se pediría dos veces. Las provincias se usan para agrupar celdas, no para pedir.
 - **Fichas a una cada 5 s**, la propuesta de la investigación. El usuario prefirió 3 s, el mínimo que ya impone el extractor.
 - **Esperar la respuesta del ministerio antes de subir el ritmo.** El usuario la deja para antes de publicar.
+
+## Cómo quedó el listado (ticket 40, 29/09/2026)
+
+- Los cuadros de 1° con datos son 94, no 87: los que tienen algún marcador de antenasmoviles.es el 28/09. El glosario los llama cuadros, porque «celda» ya es la de un emplazamiento, y a los grupos, zonas de barrido.
+- Hay siete zonas de barrido por comunidades (`ZONAS_DE_BARRIDO` en `packages/dominio/src/barrido.ts`). Un cuadro va a la comunidad con más registros previstos en él, salvo los que tocan Cataluña, que van a Cataluña para barrerla entera. Por eso la zona de Cataluña trae también el norte de Castelló y el este de Aragón.
+- La configuración dice las zonas de cada noche (`CELDA_REGISTRO_ZONAS`, Cataluña por defecto) y las que se turnan (`CELDA_REGISTRO_ZONAS_EN_TURNO` y `CELDA_REGISTRO_ZONAS_POR_NOCHE`).
+- Un cuadro se divide como mucho ocho veces. Si una caja sigue en el tope, el barrido de su zona falla.
+- La protección contra un listado vacío pasa a ser por cuadro: un cuadro que vuelve vacío con estaciones vigentes hace fallar el barrido de su zona.
+- Las ausencias se cuentan al cerrar el barrido, a las observaciones de sus cuadros que ningún listado ha traído desde que empezó. Los barridos de una noche se cierran cuando han acabado todos.
+- La primera pasada real de Cataluña hizo 37 peticiones de listado y trajo 10.305 registros (investigación 08).

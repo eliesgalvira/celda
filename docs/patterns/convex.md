@@ -33,7 +33,7 @@ La acción `ingesta:registroOficial` es fina: lee la configuración, monta el ex
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de la caja de Barcelona, la publicación y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md). antenasmoviles.es llega con el #48 y el deploy hook de Vercel con el #46.
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (Cataluña, por defecto), la publicación y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md). antenasmoviles.es llega con el #48 y el deploy hook de Vercel con el #46.
 
 ### Lanzarla en local
 
@@ -56,7 +56,7 @@ CELDA_ALMACEN_CARPETA=$PWD/tools/capas/salida \
 pnpm run ingesta noche
 ```
 
-Son seis peticiones, `robots.txt` y cinco de listado, unos 20 s. La del 28/09/2026 trajo 2380 registros y publicó 1294 emplazamientos en 11 lotes. Con `pnpm run servir` en `tools/capas`, la web en desarrollo lee esa carpeta.
+Con la zona de Cataluña por defecto, la primera noche son 38 peticiones, `robots.txt` y 37 de listado, y unos 2 min 30 s. La del 29/09/2026 trajo 10.305 registros de los 9 cuadros y publicó 5.049 emplazamientos en 40 lotes (investigación 08, «Primera pasada real de Cataluña»). Las noches siguientes piden solo las 30 cajas guardadas. Con `pnpm run servir` en `tools/capas`, la web en desarrollo lee esa carpeta.
 
 ### Configuración
 
@@ -71,11 +71,22 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_PUBLICAR_REINTENTO_MINUTOS` | 60 | Espera antes de repetir una publicación fallida |
 | `CELDA_REGISTRO_ACTIVO` | `true` | Interruptor del registro oficial |
 | `CELDA_REGISTRO_MOTIVO` | | Lo que se apunta si está apagado |
+| `CELDA_REGISTRO_ZONAS` | `cataluna` | Zonas de barrido de cada noche, separadas por comas, o `ninguna` |
+| `CELDA_REGISTRO_ZONAS_EN_TURNO` | `ninguna` | Zonas que se turnan |
+| `CELDA_REGISTRO_ZONAS_POR_NOCHE` | 1 | Cuántas de las que se turnan se barren cada noche |
 | `CELDA_REGISTRO_PAUSA_SEGUNDOS` | 3 | Pausa entre peticiones; nunca baja de 3 |
 | `CELDA_REGISTRO_MAX_PETICIONES` | 300 | Tope de peticiones por noche, `robots.txt` y reintentos incluidos |
 | `CELDA_REGISTRO_REINTENTOS` | 3 | Reintentos de un fallo pasajero |
 | `CELDA_REGISTRO_ESPERA_SEGUNDOS` | 10 | Tiempo máximo de una respuesta |
 | `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
+
+Las zonas son `cataluna`, `centro` (Madrid y Castilla-La Mancha), `andalucia` (con Ceuta y Melilla), `levante` (Comunitat Valenciana, Murcia e Illes Balears), `norte` (Galicia, Asturias, Cantabria y País Vasco), `ebro-y-duero` (Castilla y León, Aragón, Navarra y La Rioja) y `oeste-y-canarias` (Extremadura y Canarias), con sus cuadros en `ZONAS_DE_BARRIDO` (`packages/dominio/src/barrido.ts`). Un nombre que no está ahí para el programa al arrancar. De las que se turnan va primero la que quedó a medias, luego las que nunca se han completado y luego las que llevan más tiempo sin completarse. Toda España en siete noches y Cataluña todas:
+
+```sh
+CELDA_REGISTRO_ZONAS=cataluna \
+CELDA_REGISTRO_ZONAS_EN_TURNO=centro,andalucia,levante,norte,ebro-y-duero,oeste-y-canarias \
+pnpm run ingesta noche
+```
 
 `robots.txt` se respeta siempre. El grupo que se aplica es el del primer producto del `User-Agent`, así que cambiarlo cambia también con qué nombre se busca a Celda en él. El almacén se elige como en Convex: `CELDA_ALMACEN_CARPETA` o las cuatro de R2, con `CELDA_ALMACEN_ORIGEN` (`almacenDesdeConfig` en `packages/publicacion`). Sin almacén, la noche ingiere y apunta `sin-almacen`.
 
@@ -85,13 +96,23 @@ Las variables también pueden llegar como credenciales de systemd: el programa l
 
 La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sql-sqlite-node`, que en Effect 4 usa ese módulo y no trae extensiones nativas. Tablas (`apps/nocturna/src/base.ts`):
 
-- `observaciones`: lo último que dice cada fuente de cada estación base, cuándo se leyó su ficha y si está retirada;
+- `observaciones`: lo último que dice cada fuente de cada estación base, cuándo se leyó su ficha, si está retirada, su cuadro y cuándo la trajo un listado por última vez;
+- `cuadros`: las cajas en que se dividió cada cuadro la última vez;
+- `barridos` y `cuadros_barridos`: cada barrido de una zona, con sus cuadros, y los cuadros que ya ha guardado;
 - `emplazamientos`: los de la última fusión, con la fecha en que cambió cada uno;
-- `ejecuciones`: cada pasada de un extractor, con sus cambios, sus errores y cómo acabó la publicación de su noche;
+- `ejecuciones`: cada pasada de un extractor, con sus cambios, sus errores, lo que hizo cada zona (cuadros, peticiones, bytes, registros y cambios) y cómo acabó la publicación de su noche;
 - `publicaciones`: cada intento de publicar;
 - `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero.
 
 El esquema lleva su versión en `PRAGMA user_version`, y una base vieja se pone al día al abrirla. Cada paso de la noche escribe en su propia transacción. Si la noche se corta, su ejecución queda en curso; la siguiente la da por interrumpida y rehace el trabajo, y acaba igual que si no se hubiera cortado.
+
+### El barrido por zonas
+
+Cada zona de barrido tiene sus cuadros de 1° (ADR 0014). En cada cuadro la noche pide las cajas guardadas de la vez anterior, o el cuadro entero la primera vez. Una caja que llega a los 1000 registros no se guarda ni se usa: se piden sus cuatro cuartos, hasta ocho divisiones (cajas de unos 400 m). Si aún llega al tope, el cuadro falla, porque le faltarían registros sin que nadie lo supiera.
+
+Cada cuadro se guarda en una transacción, con sus registros, sus cajas y la marca de hecho. Si la noche se corta a mitad de una zona, el barrido queda a medias y la noche siguiente sigue por el primer cuadro sin guardar. Cuando todas las zonas de la noche han acabado, se cierran sus barridos. Cerrar cuenta una ausencia a las observaciones vigentes de sus cuadros que ningún listado ha traído desde que empezó el barrido. Por eso una estación que se mueve a un cuadro de otra zona no se retira: el listado de la otra zona la trae, y su cuadro pasa a ser el nuevo.
+
+Un barrido falla, y no cuenta ausencias, si un cuadro falla o si vuelve vacío cuando la base tiene estaciones en él. Las demás zonas siguen. El tope de peticiones, `robots.txt` o una fuente que no responde ni tras los reintentos paran las zonas que quedan y las fichas. La ejecución queda completada si alguna zona se ha barrido.
 
 `node:sqlite` es síncrono. Si una conexión espera el cerrojo de otra del mismo proceso, bloquea el bucle de eventos y la otra no puede soltarlo. Por eso abrir una base al día no toma el cerrojo de escritura, y `estado` se puede lanzar en mitad de una noche desde otro proceso.
 
@@ -108,7 +129,9 @@ rm -f datos/ingesta.sqlite-wal datos/ingesta.sqlite-shm
 
 ### Pruebas
 
-`apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord (`capaGrabada`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
+`apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord, que contesta cada caja como el geoportal (`capaGrabadaPorCajas`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
+
+`apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la simulación de `muestras/espana/teselas.mjs`.
 
 `convex/test/nocturna.test.ts` comprueba que las dos ingestas publican lo mismo. Hace las mismas noches en Convex en memoria y en la nocturna, con las mismas respuestas grabadas y a la misma hora, y compara byte a byte las dos carpetas tras cada noche: con cambios, una baja, una alta y las fichas repartidas en varias noches. Se borra con la ingesta de Convex (#51).
 

@@ -109,8 +109,16 @@ Lo que apaga un extractor. Con él apagado, la ejecución queda omitida sin pedi
 _Evitar_: flag, kill switch
 
 **Barrido**:
-Lectura completa del listado de una fuente en una ejecución. Una observación que falta en dos barridos seguidos se da por retirada; con uno solo no, por si la fuente falló.
+Lectura completa del listado de una fuente en una zona de barrido. Una observación que falta en dos barridos seguidos de su zona se da por retirada; con uno solo no, por si la fuente falló. Un barrido que falla no cuenta ausencias, y tampoco uno en el que un cuadro con estaciones vuelve vacío. Un barrido cortado se retoma la noche siguiente por el primer cuadro que no llegó a guardarse.
 _Evitar_: scan, rastreo, crawl
+
+**Zona de barrido**:
+Grupo con nombre de cuadros que la ingesta barre en una misma ejecución, como Cataluña. Hay siete, que juntan comunidades autónomas. La configuración dice cuáles se barren cada noche y cuáles se turnan. La zona de barrido de una observación es la del cuadro en que cae.
+_Evitar_: zona a secas (esa es la del ejercicio), región, grupo, provincia
+
+**Cuadro**:
+Cuadrado de 1° de longitud por 1° de latitud de la rejilla fija con que se recorre el listado del registro oficial. Se escribe con la esquina suroeste en grados enteros: `2,41` es el de Barcelona. Como el listado corta en 1000 registros sin avisar, un cuadro se pide por cajas que se dividen en cuatro al llegar al tope, y guarda las de la última vez.
+_Evitar_: celda (esa es la de un emplazamiento), tesela, casilla
 
 ### Mapa publicado
 
@@ -289,6 +297,7 @@ _Evitar_: clientes, carga
 - Cada **emplazamiento** tiene una **celda**. Con un **punto de referencia**, la celda se divide en sectores y uno de ellos es el **sector que da servicio**.
 - Una **fuente** produce **observaciones** en cada **ejecución de ingesta**. Una **corrección** es una observación.
 - La **fusión** convierte observaciones en **emplazamientos**, con su **confianza**, sus **conflictos** y su **estado**.
+- Una **zona de barrido** tiene uno o varios **cuadros**, y cada cuadro es de una sola zona. Un **barrido** recorre los cuadros de una zona y solo cuenta ausencias a las **observaciones** que caen en ellos.
 - Una **capa** sale de una instantánea de emplazamientos y tiene una **versión de capa**. La **publicación** escribe con ella la **ficha** de cada uno de sus emplazamientos. La ficha lleva además la fecha en que cambió su emplazamiento, y la **marca de agua** de cada vista deja ver si es más reciente que el mapa.
 - Una **medida propia** queda unida al emplazamiento y al sector que daban servicio donde se tomó.
 - Las **aportaciones** viven en el dispositivo. Una **corrección propuesta** solo pasaría a ser **corrección** si se compartiera.
@@ -302,5 +311,6 @@ _Evitar_: clientes, carga
 - La celda se calcula entre todos los emplazamientos, no por compañía (decidido el 26/09/2026). El mapa dibuja un marcador por emplazamiento, y con celdas por compañía saldrían cinco teselados superpuestos que se cruzan, justo las capas que se descartaron en los prototipos. Un móvil se conecta a las estaciones base de su compañía, así que la celda no es la zona a la que da servicio: esa pregunta, por compañía y banda, la contesta la vista de interferencia.
 - En un emplazamiento compartido cada compañía puede orientar sus sectores de otra forma. Falta decidir de qué estación base salen los tres sectores en que se divide la celda.
 - El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. Queda por decidir si los textos de primer uso lo aceptan como palabra de entrada.
+- Los ADR 0014 y 0015 y la investigación 08 llaman «celdas de 1°» a los cuadros y «grupos» a las zonas de barrido. Se escribieron antes de fijar estas palabras; «celda» ya era la de un emplazamiento.
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.
 - Falta decidir si una marca que usa la red de otra empresa aparece como compañía.
