@@ -44,14 +44,15 @@ const conFichas = (fichas: Partial<OpcionesFichas>) => ({
 });
 
 /**
- * El registro grabado, con cada ficha tardando `tarda` en llegar, como el geoportal a su ritmo, y
- * apuntando qué fichas se piden. `falla` decide qué contestar en lugar de la ficha grabada.
+ * El registro grabado, con cada ficha tardando `tarda.cuanto` en llegar, como el geoportal a su
+ * ritmo, y con `tarda.esperando` a `true` mientras tanto. También apunta qué fichas se piden.
+ * `falla` decide qué contestar en lugar de la ficha grabada.
  */
 const conFichasApuntadas = (
   grabada: FuenteGrabada,
   pedidas: Ref.Ref<ReadonlyArray<string>>,
   opciones: {
-    readonly tarda?: Duration.Duration;
+    readonly tarda?: { readonly cuanto: Duration.Duration; readonly esperando: Ref.Ref<boolean> };
     readonly falla?: (
       registro: Registro,
       vez: number,
@@ -66,7 +67,12 @@ const conFichasApuntadas = (
         ficha: (registro) =>
           Effect.gen(function* () {
             const antes = yield* Ref.getAndUpdate(pedidas, (p) => [...p, registro.clave]);
-            if (opciones.tarda !== undefined) yield* Effect.sleep(opciones.tarda);
+            const { tarda } = opciones;
+            if (tarda !== undefined) {
+              yield* Ref.set(tarda.esperando, true);
+              yield* Effect.sleep(tarda.cuanto);
+              yield* Ref.set(tarda.esperando, false);
+            }
             const fallo = opciones.falla?.(registro, antes.length + 1);
             if (fallo !== undefined) return yield* fallo;
             return yield* real.ficha(registro);
@@ -75,12 +81,15 @@ const conFichasApuntadas = (
     ),
   ).pipe(Layer.provide(capaGrabadaPorCajas("registro-oficial", grabada)));
 
-/** Adelanta el reloj de segundo en segundo, con pausas reales, hasta que la fibra acaba. */
-const hastaQueAcabe = <A, E>(fibra: Fiber.Fiber<A, E>) =>
+/**
+ * Adelanta el reloj de segundo en segundo mientras una ficha espera, y si no, deja pasar tiempo
+ * real, hasta que la fibra acaba. Así el reloj no corre mientras la noche publica en disco.
+ */
+const hastaQueAcabe = <A, E>(fibra: Fiber.Fiber<A, E>, esperando: Ref.Ref<boolean>) =>
   Effect.gen(function* () {
-    for (let paso = 0; paso < 3 * 3600 && fibra.pollUnsafe() === undefined; paso++) {
-      yield* TestClock.adjust("1 second");
-      if (paso % 20 === 0) yield* TestClock.withLive(Effect.sleep("1 millis"));
+    for (let paso = 0; paso < 100_000 && fibra.pollUnsafe() === undefined; paso++) {
+      if (yield* Ref.get(esperando)) yield* TestClock.adjust("1 second");
+      else yield* TestClock.withLive(Effect.sleep("1 millis"));
     }
     return yield* Fiber.join(fibra);
   });
@@ -136,12 +145,16 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
         Effect.gen(function* () {
           const grabada = yield* muestraCampusNord;
           const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
-          const extractor = conFichasApuntadas(grabada, pedidas, { tarda: Duration.seconds(3) });
+          const esperando = yield* Ref.make(false);
+          const extractor = conFichasApuntadas(grabada, pedidas, {
+            tarda: { cuanto: Duration.seconds(3), esperando },
+          });
           const opciones = conFichas({ ventana: Duration.minutes(1) });
 
           yield* TestClock.setTime(NOCHE);
           const primera = yield* hastaQueAcabe(
             yield* Effect.forkChild(unaNoche(entorno, extractor, opciones)),
+            esperando,
           );
           const deLaPrimera = yield* Ref.getAndSet(pedidas, []);
           const trasLaPrimera = yield* leidasEn(entorno);
@@ -164,7 +177,10 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
 
           // La noche siguiente no repite ninguna y sigue por la cola.
           yield* TestClock.setTime(NOCHE + DIA);
-          yield* hastaQueAcabe(yield* Effect.forkChild(unaNoche(entorno, extractor, opciones)));
+          yield* hastaQueAcabe(
+            yield* Effect.forkChild(unaNoche(entorno, extractor, opciones)),
+            esperando,
+          );
           const deLaSegunda = yield* Ref.get(pedidas);
           assert.isAbove(deLaSegunda.length, 5);
           assert.isFalse(deLaSegunda.some((clave) => deLaPrimera.includes(clave)));
