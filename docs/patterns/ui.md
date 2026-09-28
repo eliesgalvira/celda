@@ -185,21 +185,19 @@ Los controles eran hexágonos oscuros como las agrupaciones, en una columna de s
 - Son claros (`--control`, `--control-tinta` y `--control-borde`) para no confundirse con las agrupaciones, que son los datos. `mapa/color.test.ts` exige 3:1 (WCAG 1.4.11) entre el borde y cada fondo del mapa, y entre el relleno y una agrupación.
 - En el móvil los créditos se pliegan tras un botón «i». Se ven al cargar y se pliegan al primer toque en el mapa o a los 5 s, como permiten las [pautas de atribución de la OSMF](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines). En escritorio se ven siempre.
 
-## Marca y prototipo del logo
+## Marca
 
-La marca es una Trifuerza reinterpretada, no la de Nintendo: tres triángulos que, en un mapa de celdas, son emplazamientos y sus sectores. Sale de `marca/geometria.ts`, y la cabecera (`MarcaCelda`) y los iconos dibujan la misma figura. La vigente es `B`: el hexágono de las agrupaciones con la Trifuerza recortada.
+La marca es la celda de un emplazamiento con sus tres sectores. Sale de `marca/geometria.ts`, y la cabecera (`MarcaCelda`) y los iconos dibujan la misma figura.
 
-Hay un PROTOTIPO con tres versiones mejoradas, en la web de verdad, para compararlas en el móvil. Se eligen con `?logo=B1|B2|B3`; `?logo=B` es la vigente con la barra a la vista. Sin el parámetro no sale la barra.
-
-- B1 «Emplazamiento en su celda»: una celda clara con borde grueso y la Trifuerza oscura en medio, como el triángulo que marca un emplazamiento en los esquemas de celdas.
-- B2 «Tres celdas vecinas»: tres hexágonos que se tocan en un punto, cada uno con su emplazamiento. El triángulo inscrito en un hexágono llega a sus vértices alternos, así que los tres juntos forman la Trifuerza.
-- B3 «Tres sectores»: el hexágono de B partido en tres sectores por líneas que salen del hueco de la Trifuerza, con un triángulo en cada sector.
-- `apps/web/src/prototipo/variantes.ts` lee el parámetro, y `navegar` lo copia a la dirección nueva para que abrir una ficha no lo pierda. `prototipo/BarraDePrototipo.tsx` es la barra magenta con borde discontinuo, arriba a la izquierda; se encoge con «‹», y con el foco fuera de los controles ← y → cambian de versión.
-- Cuando se elija, la elegida pasa a ser `MARCA_VIGENTE` y se borran las otras, la barra y `variantes.ts`.
+- El hexágono oscuro con borde de color es la celda, el mismo que el de las agrupaciones del mapa.
+- Tres líneas claras salen del centro hacia tres vértices alternos y la parten en los tres sectores de 120° de un emplazamiento.
+- En cada sector hay un triángulo claro, el símbolo con que se dibuja un emplazamiento en los esquemas de celdas. Juntos forman una Trifuerza reinterpretada, no la de Nintendo: tiene hueco en el centro y las líneas de los sectores salen de sus vértices.
+- Las líneas se afilan y no llegan al borde. Si lo tocaran, los tres rombos se leerían como un cubo.
+- Se lee a 16 px y sin color: la figura es oscura y lo recortado, claro. Se eligió el 28/09/2026 entre cuatro versiones (la rama `celda/diseno-logo-controles` las conserva en su historia).
 
 ## Favicon, iconos y manifiesto
 
-No hay ficheros de iconos en el repositorio: el plugin `iconosDeCelda` (`marca/iconos.ts`, en `apps/web/vite.config.ts`) los genera desde la geometría de la marca y los tokens `--icono-*` de `tema.css`. En desarrollo los sirve y en la build los escribe en `dist/iconos/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180 px), `icono-192.png`, `icono-512.png` y `manifest.webmanifest`, más una carpeta `prototipo-b1`, `-b2` y `-b3` por versión. Pone en el HTML los enlaces de la marca vigente, y con `?logo=` la web los cambia (`apps/web/src/prototipo/iconos.ts`).
+No hay ficheros de iconos en el repositorio: el plugin `iconosDeCelda` (`marca/iconos.ts`, en `apps/web/vite.config.ts`) los genera desde la geometría de la marca y los tokens `--icono-*` de `tema.css`. En desarrollo los sirve y en la build los escribe en `dist/iconos/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180 px), `icono-192.png`, `icono-512.png` y `manifest.webmanifest`, y pone en el HTML sus enlaces.
 
 - Los PNG salen de `marca/raster.ts`, un rasterizador de polígonos par-impar con suavizado, sin dependencias, y se codifican con `node:zlib`.
 - El favicon es la figura sin fondo: su parte oscura lleva `--icono-fondo` y lo recortado `--icono-figura`, así que se ve en pestañas claras y oscuras. El icono de la pantalla de inicio va a sangre sobre un cuadrado oscuro, porque el sistema lo recorta a su forma.
