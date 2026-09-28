@@ -203,7 +203,7 @@ describe("estado de la ubicación: permiso denegado", () => {
 
 describe("estado de la ubicación: fallos y lecturas tardías", () => {
   it("sin señal o sin respuesta a tiempo lo dice, y se puede volver a intentar", () => {
-    for (const motivo of ["sin-senal", "tiempo-agotado", "no-disponible"] as const) {
+    for (const motivo of ["sin-senal", "sin-fuente", "tiempo-agotado", "no-disponible"] as const) {
       const fallo = tras(
         con("preguntar"),
         { tipo: "usar-ubicacion" },
@@ -244,6 +244,74 @@ describe("estado de la ubicación: fallos y lecturas tardías", () => {
     );
     assert.isUndefined(transicion(fallo, { tipo: "cerrar-aviso" }).aviso);
     assert.isUndefined(transicion(fallo, { tipo: "elegir-en-mapa" }).aviso);
+  });
+});
+
+describe("estado de la ubicación: encender, quitar y volver a encender", () => {
+  it("tras quitar la ubicación GPS se puede volver a pedir, y la nueva lectura vale", () => {
+    const primera = tras(
+      con("preguntar"),
+      { tipo: "usar-ubicacion" },
+      { tipo: "continuar" },
+      { tipo: "permiso", permiso: "concedido" },
+      { tipo: "lectura", lectura: LECTURA },
+    );
+    assert.strictEqual(primera.estado.tipo, "gps");
+    const apagada = transicion(primera, { tipo: "quitar" });
+    assert.deepStrictEqual(apagada.estado, { tipo: "ninguna" });
+    assert.isFalse(gpsEncendido(apagada.estado));
+
+    // El permiso ya está dado: vuelve a pedirla sin el paso previo.
+    const otraVez = transicion(apagada, { tipo: "usar-ubicacion" });
+    assert.deepStrictEqual(otraVez.estado, { tipo: "pidiendo", anterior: { tipo: "ninguna" } });
+    assert.isTrue(gpsEncendido(otraVez.estado));
+    const mejor = { ...LECTURA, precision: 9 };
+    assert.deepStrictEqual(transicion(otraVez, { tipo: "lectura", lectura: mejor }).estado, {
+      tipo: "gps",
+      lectura: mejor,
+    });
+  });
+
+  it("al recargar con el permiso ya concedido, pedirla enciende el GPS sin paso previo", () => {
+    const recargada = transicion(INICIAL, { tipo: "permiso", permiso: "concedido" });
+    assert.deepStrictEqual(recargada.estado, { tipo: "ninguna" });
+    const pidiendo = transicion(recargada, { tipo: "usar-ubicacion" });
+    assert.strictEqual(pidiendo.estado.tipo, "pidiendo");
+    assert.isTrue(gpsEncendido(pidiendo.estado));
+  });
+
+  it("al recargar, si se pide antes de saber el permiso, pasa por el paso previo", () => {
+    const explicando = transicion(INICIAL, { tipo: "usar-ubicacion" });
+    assert.strictEqual(explicando.estado.tipo, "explicando");
+    // El permiso llega mientras tanto: el paso previo sigue y continuar enciende el GPS.
+    const pidiendo = tras(
+      explicando,
+      { tipo: "permiso", permiso: "concedido" },
+      { tipo: "continuar" },
+    );
+    assert.strictEqual(pidiendo.estado.tipo, "pidiendo");
+  });
+
+  it("mientras se busca la ubicación se puede ir a elegir en el mapa, y deja de buscarla", () => {
+    const pidiendo = tras(con("concedido"), { tipo: "usar-ubicacion" });
+    const eligiendo = transicion(pidiendo, { tipo: "elegir-en-mapa" });
+    assert.deepStrictEqual(eligiendo.estado, { tipo: "eligiendo", anterior: { tipo: "ninguna" } });
+    assert.isFalse(gpsEncendido(eligiendo.estado));
+  });
+
+  it("si la ubicación no llega, se puede volver a intentar sin recargar", () => {
+    for (const motivo of ["sin-senal", "sin-fuente", "tiempo-agotado"] as const) {
+      const fallo = tras(
+        con("concedido"),
+        { tipo: "usar-ubicacion" },
+        { tipo: "fallo-gps", motivo },
+      );
+      assert.deepStrictEqual(fallo.estado, { tipo: "fallo", motivo });
+      assert.isFalse(gpsEncendido(fallo.estado));
+      const otraVez = transicion(fallo, { tipo: "usar-ubicacion" });
+      assert.strictEqual(otraVez.estado.tipo, "pidiendo", motivo);
+      assert.isUndefined(otraVez.aviso);
+    }
   });
 });
 
@@ -325,7 +393,7 @@ const EVENTOS: ReadonlyArray<EventoUbicacion> = [
   { tipo: "cancelar" },
   { tipo: "elegir-en-mapa" },
   { tipo: "lectura", lectura: LECTURA },
-  ...(["denegado", "sin-senal", "tiempo-agotado", "no-disponible"] as const).map(
+  ...(["denegado", "sin-senal", "sin-fuente", "tiempo-agotado", "no-disponible"] as const).map(
     (motivo) => ({ tipo: "fallo-gps", motivo }) as const,
   ),
   { tipo: "elegido", punto: OTRO_PUNTO },
@@ -404,6 +472,46 @@ describe("estado de la ubicación: reglas para cualquier estado y evento", () =>
             describir(antes, evento),
           );
         }
+      }
+    }
+  });
+
+  it("quitar nunca impide volver a encender el GPS, salvo con el permiso bloqueado", () => {
+    for (const antes of TODAS) {
+      const apagada = transicion(antes, { tipo: "quitar" });
+      const pedida = transicion(apagada, { tipo: "usar-ubicacion" });
+      const encendida =
+        pedida.estado.tipo === "explicando" ? transicion(pedida, { tipo: "continuar" }) : pedida;
+      assert.strictEqual(
+        gpsEncendido(encendida.estado),
+        antes.permiso !== "denegado",
+        describir(antes, { tipo: "quitar" }),
+      );
+      if (antes.permiso === "concedido") {
+        assert.strictEqual(pedida.estado.tipo, "pidiendo", "con el permiso dado no se explica");
+      }
+    }
+  });
+
+  it("de buscar la ubicación siempre se sale: cancelar, elegir en el mapa, quitar, leer o fallar", () => {
+    const salidas: ReadonlyArray<EventoUbicacion> = [
+      { tipo: "cancelar" },
+      { tipo: "elegir-en-mapa" },
+      { tipo: "quitar" },
+      { tipo: "lectura", lectura: LECTURA },
+      ...(["denegado", "sin-senal", "sin-fuente", "tiempo-agotado", "no-disponible"] as const).map(
+        (motivo) => ({ tipo: "fallo-gps", motivo }) as const,
+      ),
+    ];
+    const pidiendo = TODAS.filter((u) => u.estado.tipo === "pidiendo");
+    assert.isNotEmpty(pidiendo);
+    for (const antes of pidiendo) {
+      for (const evento of salidas) {
+        assert.notStrictEqual(
+          transicion(antes, evento).estado.tipo,
+          "pidiendo",
+          describir(antes, evento),
+        );
       }
     }
   });

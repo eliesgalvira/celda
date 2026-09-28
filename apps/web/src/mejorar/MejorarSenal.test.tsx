@@ -253,6 +253,27 @@ describe("mejorar la señal: brújula", () => {
     assert.isNotNull(seccion().getByRole("slider", { name: "Simular el giro" }));
   });
 
+  it("cada lectura de la brújula mueve la flecha sin volver a empezar a escuchar", async () => {
+    const { seccion, pulsar, brujula } = await abrir({
+      guardadas: [PUNTO],
+      brujula: { disponibilidad: "sin-permiso" },
+    });
+    await seccion().findByRole("button", { name: "Usar la brújula del móvil" });
+    pulsar("Usar la brújula del móvil");
+    await waitFor(() => {
+      assert.strictEqual(brujula.abiertas(), 1);
+    });
+    for (const giro of [40, 3, -2]) {
+      brujula.responder({ rumbo: OBJETIVO + giro, margen: undefined });
+      flush();
+    }
+    await waitFor(() => {
+      assert.strictEqual(guia(seccion()), "Apuntando al emplazamiento");
+    });
+    assert.strictEqual(brujula.escuchas(), 1);
+    assert.strictEqual(brujula.abiertas(), 1);
+  });
+
   it("si el móvil no da ninguna lectura, dice que no hay brújula", async () => {
     const { seccion, pulsar, brujula } = await abrir({
       guardadas: [PUNTO],

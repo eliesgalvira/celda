@@ -17,6 +17,8 @@ export interface BrujulaDePrueba {
   readonly capa: Layer.Layer<Brujula>;
   /** Cuántas veces se ha pedido permiso: cada una sería un aviso del navegador. */
   readonly permisosPedidos: () => number;
+  /** Cuántas veces se ha empezado a escuchar. */
+  readonly escuchas: () => number;
   /** Cuántas escuchas siguen abiertas. */
   readonly abiertas: () => number;
   /** Entrega una lectura a las escuchas abiertas. */
@@ -31,10 +33,12 @@ export interface BrujulaDePrueba {
  */
 export const brujulaDePrueba = (opciones: OpcionesDeBrujula = {}): BrujulaDePrueba => {
   let permisosPedidos = 0;
+  let escuchas = 0;
   const colas: Array<Queue.Queue<LecturaBrujula, BrujulaSinLecturas | Cause.Done>> = [];
   const seguir = Stream.callback<LecturaBrujula, BrujulaSinLecturas>((cola) =>
     Effect.acquireRelease(
       Effect.sync(() => {
+        escuchas += 1;
         colas.push(cola);
       }),
       () =>
@@ -56,6 +60,7 @@ export const brujulaDePrueba = (opciones: OpcionesDeBrujula = {}): BrujulaDePrue
       }),
     ),
     permisosPedidos: () => permisosPedidos,
+    escuchas: () => escuchas,
     abiertas: () => colas.length,
     responder: (lectura) => {
       for (const cola of colas) Queue.offerUnsafe(cola, lectura);

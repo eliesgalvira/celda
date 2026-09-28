@@ -19,14 +19,16 @@ import { almacenEnIndexedDb } from "./ubicacion/almacen.ts";
 import { buscadorNominatim } from "./ubicacion/buscador.ts";
 import { geolocalizacionDelNavegador } from "./ubicacion/geolocalizacion.ts";
 
+const dispositivo = detectarDispositivo(leerNavegador()).tipo;
+
 /** Los servicios reales, con la configuración de las variables `VITE_*` del build. */
 const servicios = Layer.mergeAll(
   Layer.mergeAll(fichasDelOrigen.pipe(Layer.provideMerge(capaDelOrigen)), buscadorNominatim).pipe(
     Layer.provide(FetchHttpClient.layer),
   ),
   simuladorDelNavegador,
-  geolocalizacionDelNavegador(navigator),
-  brujulaDelNavegador(window, detectarDispositivo(leerNavegador()).tipo),
+  geolocalizacionDelNavegador(navigator, dispositivo),
+  brujulaDelNavegador(window, dispositivo),
   almacenEnIndexedDb(globalThis.indexedDB),
   criptoDelNavegador,
 ).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(import.meta.env))));

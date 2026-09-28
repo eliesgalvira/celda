@@ -88,6 +88,7 @@ export const COMO_REACTIVAR =
 export const TITULO_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
   denegado: "La ubicación está bloqueada",
   "sin-senal": "Tu dispositivo no sabe dónde está",
+  "sin-fuente": "Este ordenador no sabe dónde está",
   "tiempo-agotado": "La ubicación no ha llegado a tiempo",
   "no-disponible": "Este navegador no da la ubicación",
 };
@@ -96,8 +97,10 @@ export const EXPLICACION_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
   denegado: COMO_REACTIVAR,
   "sin-senal":
     "No ha podido calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo apagada. Puedes volver a intentarlo o elegir el punto en el mapa.",
+  "sin-fuente":
+    "Los ordenadores no tienen GPS. El navegador saca la posición de un servicio que la calcula con las redes wifi cercanas, y el de este ordenador no tiene ninguno o no le ha contestado. Pasa a menudo con Chromium en Linux. No es un fallo de Celda: elige el punto en el mapa o busca una dirección. En el móvil sí puedes usar tu ubicación.",
   "tiempo-agotado":
-    "Tu dispositivo ha tardado demasiado en calcular tu posición. Puedes volver a intentarlo o elegir el punto en el mapa.",
+    "Tu dispositivo ha tardado demasiado en calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo apagada. Puedes volver a intentarlo o elegir el punto en el mapa.",
   "no-disponible":
     "El navegador no deja que la web pida la ubicación. Suele pasar si la página no va por https o si el navegador no lo admite. Puedes elegir el punto en el mapa.",
 };

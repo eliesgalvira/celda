@@ -48,6 +48,10 @@ import {
 /** El navegador no puede dar la ubicación: pedirla otra vez no serviría. */
 const sinGeolocalizacion = (motivo: MotivoFalloGps | undefined) => motivo === "no-disponible";
 
+/** La ubicación no ha llegado, pero puede llegar si se vuelve a pedir. */
+const sePuedeReintentar = (motivo: MotivoFalloGps) =>
+  motivo === "sin-senal" || motivo === "sin-fuente" || motivo === "tiempo-agotado";
+
 /**
  * Si tiene sentido ofrecer «Usar mi ubicación» sin punto de referencia: no con el permiso
  * bloqueado ni en un navegador que no la da.
@@ -82,12 +86,17 @@ export function MenuDeUbicacion(props: MenuDeUbicacionProps) {
     if (estado.tipo === "fallo" && sinGeolocalizacion(estado.motivo)) {
       return "Este navegador no da la ubicación.";
     }
+    if (control.ubicacion().estado.tipo === "pidiendo") return "La estamos buscando.";
+    if (estado.tipo === "fallo" && estado.motivo === "sin-fuente") {
+      return "Este ordenador no sabe dónde está. Puedes volver a intentarlo.";
+    }
     return "Te explicamos antes para qué sirve. No se guarda.";
   });
   const puedeUsar = createMemo(() => {
     const estado = actual();
     return (
       referencia()?.tipo !== "gps" &&
+      control.ubicacion().estado.tipo !== "pidiendo" &&
       control.ubicacion().permiso !== "denegado" &&
       !(estado.tipo === "fallo" && sinGeolocalizacion(estado.motivo))
     );
@@ -214,6 +223,11 @@ export function AvisosDeUbicacion(props: { readonly panelAbierto: boolean }) {
             acciones={
               <>
                 <Boton onClick={() => control.elegirEnMapa()}>Elegir en el mapa</Boton>
+                <Show when={sePuedeReintentar(motivo)}>
+                  <Boton variante="secundario" onClick={() => control.usarUbicacion()}>
+                    Volver a intentarlo
+                  </Boton>
+                </Show>
                 <Boton variante="secundario" onClick={() => control.cerrarAviso()}>
                   Cerrar
                 </Boton>
@@ -229,12 +243,18 @@ export function AvisosDeUbicacion(props: { readonly panelAbierto: boolean }) {
           tono="espera"
           titulo="Buscando tu ubicación"
           acciones={
-            <Boton variante="secundario" onClick={() => control.cancelar()}>
-              Cancelar
-            </Boton>
+            <>
+              <Boton variante="secundario" onClick={() => control.elegirEnMapa()}>
+                Elegir en el mapa
+              </Boton>
+              <Boton variante="secundario" onClick={() => control.cancelar()}>
+                Cancelar
+              </Boton>
+            </>
           }
         >
-          Si tu navegador te pregunta, elige si la compartes con Celda.
+          Si tu navegador te pregunta, elige si la compartes con Celda. Si no llega, te lo diremos y
+          podrás elegir el punto en el mapa.
         </Aviso>
       </Show>
       <Show when={control.avisoAlmacen()} keyed>
@@ -362,14 +382,21 @@ export function ReferenciaEnFicha(props: {
   const estado = () => control.ubicacion().estado;
   const sinPunto = createMemo(() => {
     const actual = asentado(estado());
-    if (actual.tipo === "denegada") return { aviso: COMO_REACTIVAR, puedeUsar: false };
+    if (actual.tipo === "denegada") {
+      return { aviso: COMO_REACTIVAR, puedeUsar: false, usar: "Usar mi ubicación" };
+    }
     if (actual.tipo === "fallo") {
       return {
         aviso: EXPLICACION_FALLO[actual.motivo],
         puedeUsar: !sinGeolocalizacion(actual.motivo),
+        usar: "Volver a intentarlo",
       };
     }
-    return { aviso: undefined, puedeUsar: control.ubicacion().permiso !== "denegado" };
+    return {
+      aviso: undefined,
+      puedeUsar: control.ubicacion().permiso !== "denegado",
+      usar: "Usar mi ubicación",
+    };
   });
 
   const cancelar = () => (
@@ -389,7 +416,7 @@ export function ReferenciaEnFicha(props: {
             acciones={
               <>
                 <Show when={sinPunto().puedeUsar}>
-                  <Boton onClick={() => control.usarUbicacion()}>Usar mi ubicación</Boton>
+                  <Boton onClick={() => control.usarUbicacion()}>{sinPunto().usar}</Boton>
                 </Show>
                 <Boton variante="secundario" onClick={() => control.elegirEnMapa()}>
                   Elegir en el mapa
@@ -400,7 +427,17 @@ export function ReferenciaEnFicha(props: {
         }
       >
         <Match when={estado().tipo === "pidiendo"}>
-          <EsperandoReferencia texto="Buscando tu ubicación…" acciones={cancelar()} />
+          <EsperandoReferencia
+            texto="Buscando tu ubicación…"
+            acciones={
+              <>
+                <Boton variante="enlace" onClick={() => control.elegirEnMapa()}>
+                  Elegir en el mapa
+                </Boton>
+                {cancelar()}
+              </>
+            }
+          />
         </Match>
         <Match when={estado().tipo === "eligiendo"}>
           <EsperandoReferencia
