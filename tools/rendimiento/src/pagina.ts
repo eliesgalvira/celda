@@ -9,6 +9,8 @@ export interface CargaEnPagina {
   /** Cuándo se pinta el primer marcador. */
   readonly marcadores: number | undefined;
   readonly lcp: number | undefined;
+  /** Qué elemento es el LCP: su etiqueta y el principio de su texto. */
+  readonly elementoLcp: string;
   /** Las tareas largas (más de 50 ms) del hilo principal hasta ahora: inicio y duración. */
   readonly tareasLargas: ReadonlyArray<{ readonly inicio: number; readonly duracion: number }>;
 }
@@ -60,6 +62,7 @@ export const instalar = (): void => {
   let mapaBase: number | undefined;
   let marcadores: number | undefined;
   let lcp: number | undefined;
+  let elementoLcp = "";
   let avisoVisto = false;
   const tareasLargas: Array<{ inicio: number; duracion: number }> = [];
 
@@ -92,7 +95,12 @@ export const instalar = (): void => {
   requestAnimationFrame(mirarCarga);
 
   new PerformanceObserver((lista) => {
-    for (const entrada of lista.getEntries()) lcp = entrada.startTime;
+    for (const entrada of lista.getEntries()) {
+      lcp = entrada.startTime;
+      // SAFETY: un observador de tipo `largest-contentful-paint` solo recibe esas entradas.
+      const elemento = (entrada as PerformanceEntry & { readonly element: Element | null }).element;
+      elementoLcp = `${elemento?.tagName ?? ""} «${(elemento?.textContent ?? "").slice(0, 40)}»`;
+    }
   }).observe({ type: "largest-contentful-paint", buffered: true });
   new PerformanceObserver((lista) => {
     for (const entrada of lista.getEntries()) {
@@ -177,6 +185,7 @@ export const instalar = (): void => {
       mapaBase: mapaBase === -1 ? undefined : mapaBase,
       marcadores: marcadores === -1 ? undefined : marcadores,
       lcp,
+      elementoLcp,
       tareasLargas: [...tareasLargas],
     }),
     empezar: () => {

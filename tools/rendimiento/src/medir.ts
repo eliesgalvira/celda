@@ -310,9 +310,18 @@ const rueda = async (cdp: CDPSession) => {
   }
 };
 
+/**
+ * Pulsa un control del mapa. En el móvil, Acercar y Alejar van dentro del menú «Funciones», que se
+ * cierra tras cada pulsación: si el control no se ve, abre antes el menú, como haría una persona.
+ */
 const pulsar = async (pagina: Page, etiqueta: string, veces: number) => {
   const boton = pagina.getByRole("button", { name: etiqueta, exact: true });
+  const menu = pagina.getByRole("button", { name: "Funciones", exact: true });
   for (let i = 0; i < veces; i += 1) {
+    if (!(await boton.isVisible()) && (await menu.count()) > 0) {
+      await menu.tap();
+      await esperar(150);
+    }
     await boton.tap();
     await esperar(700);
   }
@@ -462,7 +471,7 @@ const ronda = async (
       );
     }
     process.stderr.write(
-      `mapa base ${carga.mapaBase?.toFixed(0)}, marcadores ${carga.marcadores?.toFixed(0)}\n`,
+      `mapa base ${carga.mapaBase?.toFixed(0)}, marcadores ${carga.marcadores?.toFixed(0)}, LCP ${carga.lcp?.toFixed(0)} en ${carga.elementoLcp}\n`,
     );
   }
   const porOrigen: Record<string, { bytes: number; peticiones: number }> = {};
