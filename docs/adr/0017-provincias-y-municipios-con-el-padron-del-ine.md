@@ -1,6 +1,6 @@
 # Provincias y municipios del IGN como zonas, con el padrón del INE
 
-Estado: propuesta (28/09/2026), con el umbral de ausencias decidido por el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
+Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
 
 ## Contexto
 
@@ -20,6 +20,16 @@ Las fuentes, medidas el 28/09/2026:
 - **Ausencias solo donde dicen algo.** Un municipio con muy pocos emplazamientos «no tiene» casi todas las compañías, y eso no es un hueco de cobertura. Las ausencias se enseñan en los municipios con 10 emplazamientos o más; en el resto, solo el número. El umbral lo decidió el usuario el 28/09/2026.
 - **Ejercicio de emplazamientos:** la zona es un barrio en Barcelona y un municipio en el resto, con la población del padrón del INE. El área va en la tabla. El contorno de la zona, si se dibuja, se descarga al abrir el ejercicio: el de su provincia a 200 m, de 36 a 54 KB con gzip.
 - El glosario cambia: **Zona** pasa a ser un barrio, un municipio o una provincia, y **Ausencia** se define por zona en lugar de por barrio.
+
+## Cómo quedó (#37)
+
+- **La orden** es `pnpm run municipios` en `tools/capas`, y escribe `convex/datos/municipios.json` y `convex/datos/padron.json`. Lee el `robots.txt` de cada sitio y hace siete peticiones como mucho. Del IGN pide el canal ATOM, del que toma el nombre del producto, los derechos y la fecha, y después el ZIP, que guarda en `~/.cache/celda` con la fecha en el nombre para no volver a pedirlo. Del INE pide el aviso legal, para comprobar que sigue en CC BY 4.0, y el CSV de la tabla 29005, cuya cabecera `Last-Modified` da la fecha de publicación. Si algo no cuadra, no escribe nada.
+- **El padrón sale del CSV de `www.ine.es`**, no de la API. `servicios.ine.es` corta la conexión al pedir su `robots.txt`, así que no se pueden leer sus reglas, y el `robots.txt` de `www.ine.es` deja pedir `/jaxiT3/`.
+- **Límites y padrón se cruzan por código INE** y la orden falla si un municipio de un lado no está en el otro. Un municipio nuevo con límites y sin padrón para la orden: los ficheros del repositorio se quedan como estaban hasta que el INE publique el padrón con él.
+- **Simplificación.** Los recintos se parten en arcos por los vértices donde se juntan tres o más, así el límite entre dos vecinos es un solo arco. Cada arco se simplifica con Douglas-Peucker a 50 m y se guarda en cienmilésimas de grado. Son 31.048 arcos y 368.943 vértices: 5,2 MB en git, 1,8 MB con gzip, con un recinto o un arco por línea. Con 20.000 puntos al azar, el municipio sale distinto del de los límites completos en el 0,37 % de la provincia de Barcelona y en el 0,25 % de la península, siempre a menos de 50 m de un límite.
+- **Territorios compartidos y sin provincia.** Un emplazamiento en un territorio compartido va sin municipio pero con la provincia que da el código del IGN. La capa por provincias del ADR 0016 necesita una provincia para cada emplazamiento. En uno de los siete territorios sin provincia (Gibraltar, las plazas de soberanía, la isla de los Faisanes) no lleva ninguna de las dos cosas, y el mar junto a ellos tampoco.
+- **Dónde llega.** La ficha tiene un campo opcional `lugar` con el municipio y la provincia. El lote de fichas cita la fuente una vez (`fuenteDeLugares`), y la web la pone al final de «De dónde salen los datos» con la forma que piden las condiciones del IGN. La capa no cambia de formato: la columna del municipio, las tablas por provincia y el crédito del IGN a pie de mapa llegan con el #43. Para ellos están `municipioDelPunto` y `municipiosConHabitantes` en `packages/dominio/src/municipio.ts`.
+- **El producto** se cita con el título del canal, «Base de Datos de Límites Jurisdiccionales de España», porque sigue sin estar claro que «BDLJE» sea su identificador oficial.
 
 ## Consecuencias
 

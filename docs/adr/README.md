@@ -20,4 +20,4 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 | [0014](0014-barrido-por-zonas-y-ritmo-en-espana.md) | Propuesta: barrido del registro oficial por zonas, Cataluña primero y luego toda España, y fichas a una cada 3 s |
 | [0015](0015-ingesta-y-publicacion-fuera-de-convex.md) | Propuesta: la ingesta y la publicación, fuera de Convex, como servicio de NixOS con su estado en SQLite |
 | [0016](0016-capa-por-provincias-con-resumen-nacional.md) | Propuesta: capa por provincias con resumen nacional, indexada en un Worker |
-| [0017](0017-provincias-y-municipios-con-el-padron-del-ine.md) | Propuesta: provincias y municipios del IGN como zonas, con el padrón del INE |
+| [0017](0017-provincias-y-municipios-con-el-padron-del-ine.md) | Provincias y municipios del IGN como zonas, con el padrón del INE |

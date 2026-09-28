@@ -42,6 +42,18 @@ _Evitar_: cluster, grupo, hexágono
 Uno de los 73 barrios de Barcelona, con los límites que publica el Ayuntamiento. En el nivel de barrios del mapa, cada uno recoge sus emplazamientos con su número y sus ausencias. Los municipios de alrededor no tienen barrios.
 _Evitar_: zona, vecindario, distrito
 
+**Municipio**:
+Uno de los 8.132 municipios de España, con los límites del IGN y los habitantes del padrón del INE. Se identifica por su código INE de cinco cifras, nunca por su nombre. Cada emplazamiento cae en uno, salvo en un territorio compartido.
+_Evitar_: localidad, pueblo, ciudad, término municipal
+
+**Provincia**:
+Una de las 50 provincias, o Ceuta o Melilla. Su código son las dos primeras cifras del código INE de sus municipios.
+_Evitar_: región, comarca
+
+**Territorio compartido**:
+Terreno que el IGN no asigna a ningún municipio porque lo comparten varios, como las Bardenas Reales. Tiene provincia pero no municipio.
+_Evitar_: mancomunidad, comunidad (son solo parte del nombre de algunos)
+
 **Ausencia**:
 Compañía que no tiene ningún emplazamiento en un barrio. Solo cuenta si la compañía tiene algún emplazamiento en la capa: de una que no aparece en ninguna parte no se dice que falte en un barrio.
 _Evitar_: hueco, falta de cobertura
@@ -273,6 +285,7 @@ _Evitar_: clientes, carga
 - Un **emplazamiento** tiene una o varias **estaciones base**, como mucho una por **compañía**.
 - Una **estación base** emite en una o varias **bandas** y reparte su señal en **sectores**, normalmente tres.
 - Un **emplazamiento** de Barcelona cae en un solo **barrio**; uno de otro municipio, en ninguno.
+- Un **emplazamiento** cae en un **municipio** y en su **provincia**, o solo en una **provincia** si está en un **territorio compartido**.
 - Cada **emplazamiento** tiene una **celda**. Con un **punto de referencia**, la celda se divide en sectores y uno de ellos es el **sector que da servicio**.
 - Una **fuente** produce **observaciones** en cada **ejecución de ingesta**. Una **corrección** es una observación.
 - La **fusión** convierte observaciones en **emplazamientos**, con su **confianza**, sus **conflictos** y su **estado**.
