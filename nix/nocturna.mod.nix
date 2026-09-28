@@ -49,7 +49,12 @@
           pnpmInstallFlags = [ "--prod" ];
 
           pnpmDeps = fetchPnpmDeps {
-            inherit (finalAttrs) pname pnpmInstallFlags pnpmWorkspaces src;
+            inherit (finalAttrs)
+              pname
+              pnpmInstallFlags
+              pnpmWorkspaces
+              src
+              ;
             pnpm = pnpm_10;
             fetcherVersion = 4;
             hash = "sha256-Na529J1xfs4JIQvuwIB7cj4mo7udcKwrHnvD87377z8=";
