@@ -8,10 +8,11 @@
     "./almacenes/r2": "./src/almacenes/r2.ts"
   },
   "scripts": {
-    "codegen": "confect codegen",
+    "codegen": "./scripts/codegen.sh",
     "backend": "./scripts/backend.sh",
-    "typecheck": "confect codegen && tsc --noEmit",
-    "test": "vp test run"
+    "typecheck": "./scripts/codegen.sh && tsc --noEmit",
+    "test": "vp test run",
+    "test:repetido": "./scripts/pruebas-repetidas.sh"
   },
   "dependencies": {
     "@celda/dominio": "workspace:*",

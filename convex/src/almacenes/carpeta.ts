@@ -83,15 +83,15 @@ export const almacenEnCarpeta = (opciones: OpcionesCarpeta) =>
         function* (fichero: string) {
           const destino = path.join(opciones.carpeta, fichero);
           yield* fs.remove(destino, { force: true });
-          // La carpeta de lotes de una versión se va con su último lote.
+          if (!fichero.includes("/")) return;
+          // La carpeta de lotes de una versión se va con su último lote. La retención borra varios
+          // lotes a la vez: los dos últimos pueden verla vacía a la vez, y el segundo ya no la
+          // encuentra al leerla o al quitarla. Que ya no esté es justo lo que se quería.
           const carpeta = path.dirname(destino);
-          if (
-            fichero.includes("/") &&
-            (yield* fs.exists(carpeta)) &&
-            (yield* fs.readDirectory(carpeta)).length === 0
-          ) {
-            yield* fs.remove(carpeta, { recursive: true });
-          }
+          const quedan = yield* fs
+            .readDirectory(carpeta)
+            .pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed([])));
+          if (quedan.length === 0) yield* fs.remove(carpeta, { recursive: true, force: true });
         },
         Effect.catchTag("PlatformError", (error) => Effect.fail(noDisponible(error))),
       );

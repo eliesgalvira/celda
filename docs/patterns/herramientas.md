@@ -22,6 +22,7 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 - **`tema.css?raw` en Vitest.** Vitest devuelve vacías las hojas de estilo; `packages/ui/vite.config.ts` incluye `tema.css` en `test.css` para que las pruebas lean los tokens.
 - **`maplibre-gl.css` en una capa.** Se importa con `layer(base)` para que las utilidades de Tailwind ganen a sus reglas.
 - **oxfmt no toca la prosa.** Markdown y HTML quedan fuera del formateador.
+- **`convex/scripts/codegen.sh` en vez de `confect codegen`.** Un codegen matado de golpe dejaba `confect/*.bundled_*.mjs`, y el lint fallaba en ellos. El script los borra; el lint, el formateador y `.gitignore` los ignoran. Detalles en [convex.md](convex.md).
 
 ## Medida
 

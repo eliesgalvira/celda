@@ -21,6 +21,8 @@ packages/dominio/          esquemas y la fusión, sin E/S
 
 `convex/convex/` y `convex/confect/_generated/` se guardan en git: las pruebas en memoria los necesitan. `pnpm run typecheck` ejecuta `confect codegen` antes de `tsc`, así que un cambio en una spec sin regenerar sale en los tipos.
 
+Codegen se lanza siempre con `convex/scripts/codegen.sh` (`pnpm run codegen`, `typecheck` y `backend` lo usan). Confect importa cada fichero de `confect/` escribiendo antes su bundle al lado, `<fichero>.bundled_<id>.mjs`, y lo borra al acabar. Un codegen matado con SIGKILL justo entonces lo deja, casi siempre el de `publicacion.impl.ts` (2,3 MB, la importación más lenta). El script borra los restos, y `.gitignore`, el lint y el formateador no los miran.
+
 La acción `ingesta:registroOficial` es fina: lee la configuración, monta el extractor real sobre `FetchHttpClient` y llama a `ejecutarIngesta`. Todo lo que hace el proceso pasa por funciones internas de Convex (`MutationRunner` y `QueryRunner` de Confect), y así se prueba igual en memoria que en el backend real.
 
 ## Backend local
@@ -28,7 +30,7 @@ La acción `ingesta:registroOficial` es fina: lee la configuración, monta el ex
 Sin cuenta, con el modo anónimo de Convex, en los puertos 3240 (API) y 3241 (acciones HTTP). Desde `convex/`, dentro de `nix develop`:
 
 ```sh
-pnpm run backend        # confect codegen + convex dev; déjalo en otra terminal
+pnpm run backend        # codegen + convex dev; déjalo en otra terminal
 CELDA_CONVEX_PUERTO=3250 pnpm run backend   # en 3250 y 3251, si 3240 está ocupado
 ```
 
@@ -156,5 +158,7 @@ Tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
 El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8. `convex/test/TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
 
 `convex/test/publicacion.test.ts` publica sobre el Convex en memoria y el almacén en una carpeta temporal, envuelto para apuntar cada fichero que escribe. Comprueba que cada clave de la capa tiene su ficha en su lote, que publicar sin cambios no escribe nada, que la ingesta publica sola tras cada ejecución completada y no tras una omitida, que un fichero ocupado con otro contenido para la publicación sin tocar `vigente.json`, y que la retención deja la vigente, sus siete anteriores y las posteriores. Las versiones viejas de esa prueba se escriben a mano en la carpeta, sin publicarlas. `almacenR2.test.ts` prueba la firma con dos casos de la batería de AWS (uno con consulta) y el almacén de R2 contra un cubo S3 de prueba en memoria, que lista de dos en dos claves para obligar a pedir varias páginas.
+
+Las pruebas de Convex corren en orden aleatorio. `pnpm run test:repetido` (desde `convex/`) las pasa cinco veces con semillas seguidas a partir de una al azar, y la CI lo hace en cada push. Si falla, el registro dice la semilla; `pnpm exec vp test run --sequence.seed=<semilla>` repite ese orden. Una carrera no siempre sale con la misma semilla: la de la retención (dos borrados que quitaban a la vez la carpeta de lotes, septiembre de 2026) necesitaba carga, y salió con cuatro bucles de la suite a la vez y `--pool=threads` o `--no-file-parallelism`. Si una prueba falla una vez y luego pasa, búscala así antes de repetirla.
 
 La prueba de carga `convex/scripts/prueba-de-carga.sh` mete 2400 observaciones falsas en el backend local y fusiona dos veces. Deja basura: úsala en un backend que vayas a borrar.
