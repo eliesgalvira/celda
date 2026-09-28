@@ -1,8 +1,9 @@
 import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
-import { createUniqueId, onSettled, Show } from "solid-js";
+import { createUniqueId, onSettled, Show, useContext } from "solid-js";
 
 import { BotonHexagonal } from "../BotonHexagonal.tsx";
+import { AspectoDeControl } from "../controles/aspecto.ts";
 import { IconoMirilla } from "./MarcadorReferencia.tsx";
 
 export interface MenuUbicacionProps {
@@ -21,6 +22,8 @@ export interface MenuUbicacionProps {
  */
 export function MenuUbicacion(props: MenuUbicacionProps) {
   const id = createUniqueId();
+  // PROTOTIPO (controles): en la barra y con las pastillas, el menú sale hacia arriba.
+  const aspecto = useContext(AspectoDeControl);
   let caja: HTMLDivElement | undefined;
 
   onSettled(() => {
@@ -51,7 +54,7 @@ export function MenuUbicacion(props: MenuUbicacionProps) {
           }
         });
       }}
-      class="relative"
+      class={aspecto === "barra" ? "relative flex max-md:flex-1 md:w-full" : "relative"}
     >
       <BotonHexagonal
         etiqueta="Ubicación"
@@ -69,7 +72,10 @@ export function MenuUbicacion(props: MenuUbicacionProps) {
               elemento.querySelector<HTMLButtonElement>("button:enabled")?.focus(),
             );
           }}
-          class="chaflan absolute right-full bottom-0 mr-2 flex w-72 flex-col bg-superficie p-1.5 drop-shadow-panel [--corte:10px]"
+          class={variantesMenuUbicacion({
+            posicion:
+              aspecto === "barra" ? "barra" : aspecto === "pastilla" ? "arriba" : "izquierda",
+          })}
         >
           <legend class="sr-only">Punto de referencia</legend>
           {props.children}
@@ -78,6 +84,19 @@ export function MenuUbicacion(props: MenuUbicacionProps) {
     </div>
   );
 }
+
+const variantesMenuUbicacion = cva(
+  "chaflan absolute z-20 flex w-72 flex-col bg-superficie p-1.5 drop-shadow-panel [--corte:10px]",
+  {
+    variants: {
+      posicion: {
+        izquierda: "right-full bottom-0 mr-2",
+        arriba: "right-0 bottom-full mb-2",
+        barra: "right-0 bottom-full mb-2 md:right-full md:bottom-0 md:mr-2 md:mb-0",
+      },
+    },
+  },
+);
 
 const variantesIconoOpcion = cva("hexagono mt-0.5 h-5 w-[18px] shrink-0", {
   variants: {
