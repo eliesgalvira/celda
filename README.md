@@ -34,9 +34,11 @@ El entorno trae Node 24, pnpm 10, tippecanoe y pmtiles.
 
 ```
 apps/web/                 la web, una SPA de Solid 2
+apps/nocturna/            la ingesta nocturna fuera de Convex, con su estado en SQLite
 convex/                   backend de Convex con Confect: tablas, ingesta y API pública
 packages/dominio/         tipos y esquemas del dominio y la fusión, sin E/S
-packages/ingesta/         extractores de las fuentes, como servicios Effect
+packages/ingesta/         extractores de las fuentes y el proceso de una ejecución
+packages/publicacion/     publicación de la capa y las fichas en una carpeta o en R2
 packages/sim/             simulaciones puras con su versión y sus resultados de referencia
 packages/ui/              componentes y tema: el único sitio con estilos
 tools/capas/              generador de la capa de emplazamientos y origen estático local

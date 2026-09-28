@@ -72,7 +72,7 @@ const principal = Effect.gen(function* () {
         yield* publicarAMano;
         return;
       case "copia":
-        yield* copiarBase(c.noche.copias);
+        yield* Effect.logInfo(`Copia de la base en ${yield* copiarBase(c.noche.copias)}`);
         return;
       default:
         return yield* new OrdenDesconocida({ orden });
