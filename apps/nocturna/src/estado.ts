@@ -1,6 +1,7 @@
 import { versionDeCapa } from "@celda/dominio/capa";
 import type { ZonaEnLaEjecucion } from "@celda/ingesta/barrido";
 import type { Cambios } from "@celda/ingesta/ejecucion";
+import type { GrupoDeCola, GrupoPendiente } from "@celda/ingesta/fichas";
 import type { ResultadoPublicacion } from "@celda/publicacion/publicar";
 import * as DateTime from "effect/DateTime";
 
@@ -63,6 +64,29 @@ const describirEjecucion = (e: EjecucionGuardada): ReadonlyArray<string> => [
     : [`  Errores (${e.errores.length}):`, ...e.errores.map((error) => `    - ${error}`)]),
 ];
 
+const describirGrupo = (
+  grupo: GrupoDeCola,
+  nombreDe: (codigo: string) => string | undefined,
+): string => {
+  switch (grupo.tipo) {
+    case "provincia": {
+      const nombre = nombreDe(grupo.provincia);
+      return `provincia ${grupo.provincia}` + (nombre === undefined ? "" : ` (${nombre})`);
+    }
+    case "zona":
+      return `resto de la zona ${grupo.zona}`;
+    case "fuera":
+      return "fuera de las zonas de barrido";
+  }
+};
+
+const describirPendiente = (
+  { grupo, nuevas, porReleer, enEspera }: GrupoPendiente,
+  nombreDe: (codigo: string) => string | undefined,
+): string =>
+  `    - ${describirGrupo(grupo, nombreDe)}: ${nuevas} sin leer, ${porReleer} por releer` +
+  (enEspera === 0 ? "" : `, ${enEspera} esperando tras fallar`);
+
 const describirFuente = (f: ResumenDeFuente): ReadonlyArray<string> => [
   `${f.fuente}: ${f.interruptor.activo ? "encendida" : `apagada (${f.interruptor.motivo})`}`,
   ...(f.ultima === undefined ? ["  Ninguna ejecución todavía"] : describirEjecucion(f.ultima)),
@@ -80,11 +104,27 @@ const describirFuente = (f: ResumenDeFuente): ReadonlyArray<string> => [
   ...(f.zonas.length === 0 ? [] : ["  Zonas de barrido:", ...f.zonas.map(describirZona)]),
 ];
 
-/** El estado de la base en texto, para la orden `estado`. */
-export const describirResumen = (fichero: string, resumen: Resumen): string =>
+/**
+ * El estado de la base en texto, para la orden `estado`. `cola` son las fichas que quedan del
+ * registro oficial en cada parte de su cola, en el orden en que se leen.
+ */
+export const describirResumen = (
+  fichero: string,
+  resumen: Resumen,
+  cola: ReadonlyArray<GrupoPendiente> = [],
+  nombreDe: (codigo: string) => string | undefined = () => undefined,
+): string =>
   [
     `Base: ${fichero}`,
-    ...resumen.fuentes.flatMap(describirFuente),
+    ...resumen.fuentes.flatMap((f) => [
+      ...describirFuente(f),
+      ...(f.fuente !== "registro-oficial" || cola.length === 0
+        ? []
+        : [
+            "  Fichas por leer, en el orden de la cola:",
+            ...cola.map((grupo) => describirPendiente(grupo, nombreDe)),
+          ]),
+    ]),
     `Emplazamientos: ${resumen.emplazamientos}` +
       (resumen.version === null ? "" : `; versión de los datos ${versionDeCapa(resumen.version)}`),
     `Última versión publicada: ${resumen.publicada ?? "ninguna"}`,

@@ -3,11 +3,11 @@
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Fuente } from "@celda/dominio/observacion";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
-import { OPCIONES_ZONAS, type OpcionesBarrido } from "@celda/ingesta/barrido";
+import { OPCIONES_BARRIDO, type OpcionesBarrido } from "@celda/ingesta/barrido";
 import { OPCIONES_PUNTOS, type OpcionesPuntos } from "@celda/ingesta/barridoDePuntos";
 import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
+import { Provincias } from "@celda/ingesta/fichas";
 import { capaDePuntosGrabada } from "@celda/ingesta/pruebas/antenasmoviles";
-import { OPCIONES_PROCESO } from "@celda/ingesta/proceso";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
@@ -23,7 +23,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { baseNocturna } from "../base.ts";
 import { COPIAS_CONSERVADAS, REINTENTO_DE_PUBLICACION } from "../configuracion.ts";
-import { Extractores, noche, type OpcionesNoche, publicadorEn } from "../programa.ts";
+import { Extractores, noche, type OpcionesNoche, provinciasDe, publicadorEn } from "../programa.ts";
 
 /** Lotes pequeños, para que la muestra del Campus Nord ocupe varios. */
 export const POR_LOTE = 8;
@@ -78,8 +78,7 @@ export const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<
     });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
-/** Las del proceso por defecto, con Cataluña cada noche. */
-export const OPCIONES_BARRIDO: OpcionesBarrido = { ...OPCIONES_PROCESO, zonas: OPCIONES_ZONAS };
+export { OPCIONES_BARRIDO };
 
 /** Las opciones de la noche por defecto, con las carpetas del entorno. */
 export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
@@ -128,6 +127,7 @@ export const unaNoche = (
           antenasMoviles: variante.antenasMoviles ?? SIN_PUNTOS,
         }),
       ),
+      Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
     ).pipe(
       Layer.provideMerge(
         baseNocturna({

@@ -27,7 +27,17 @@ import {
   ExtractorPorCajas,
   type Registro,
 } from "./extractor.ts";
-import { type BaseDeIngesta, type Cierre, leerFichas, type OpcionesProceso } from "./proceso.ts";
+import {
+  type FalloDeFicha,
+  type FichaEnCola,
+  leerFichasEnLaVentana,
+  OPCIONES_FICHAS,
+  type OpcionesFichas,
+  ordenarFichas,
+  Provincias,
+  PublicacionAMitad,
+} from "./fichas.ts";
+import type { BaseDeIngesta, Cierre } from "./proceso.ts";
 
 /**
  * Veces que se puede dividir un cuadro. Tras 8 divisiones una caja mide 1/256° de lado, unos
@@ -68,9 +78,11 @@ const describirFallo = (fallo: FalloDeZona): string =>
 
 /**
  * Fallos tras los que no tiene sentido pedir nada más a la fuente esta noche: el tope de
- * peticiones, `robots.txt` o una fuente que no responde ni tras los reintentos.
+ * peticiones, `robots.txt`, una fuente que no responde ni tras los reintentos o una que bloquea
+ * a Celda.
  */
 const PARAN_LA_NOCHE: ReadonlySet<FalloDeZona["_tag"]> = new Set([
+  "FuenteBloqueada",
   "LimiteDePeticiones",
   "ProhibidoPorRobots",
   "FuenteNoDisponible",
@@ -214,8 +226,23 @@ export class BaseDeBarrido extends Context.Service<
     ) => Effect.Effect<{ readonly retirados: number }>;
     /** Da un barrido por fallido: no cuenta ausencias y la próxima vez empieza otro. */
     readonly fallarBarrido: (barrido: string, fin: number, motivo: string) => Effect.Effect<void>;
-    readonly pendientesDeFicha: Base["pendientesDeFicha"];
+    /**
+     * La cola de fichas de la fuente, sin ordenar: las observaciones vigentes que no se han leído
+     * nunca, o que cambiaron en el listado, y las leídas antes de `leidasAntesDe`, con las que
+     * esperan tras un fallo.
+     */
+    readonly colaDeFichas: (
+      fuente: Fuente,
+      leidasAntesDe: number,
+    ) => Effect.Effect<ReadonlyArray<FichaEnCola>>;
+    /** Guarda las bandas de una ficha (`trasFicha`) y borra sus fallos; `true` si han cambiado. */
     readonly aplicarFicha: Base["aplicarFicha"];
+    /** Apunta el fallo de una ficha: cuántos van seguidos y hasta cuándo espera. */
+    readonly fallarFicha: (
+      fuente: Fuente,
+      clave: string,
+      fallo: FalloDeFicha,
+    ) => Effect.Effect<void>;
     readonly fusionar: Base["fusionar"];
     readonly completar: (
       ejecucion: string,
@@ -329,9 +356,13 @@ export const opcionesZonasDesdeConfig: Config.Config<OpcionesZonas> = Config.all
 });
 
 /** Lo que hace una ejecución del barrido por zonas, aparte del extractor. */
-export interface OpcionesBarrido extends OpcionesProceso {
+export interface OpcionesBarrido {
   readonly zonas: OpcionesZonas;
+  readonly fichas: OpcionesFichas;
 }
+
+/** Por defecto: Cataluña cada noche y las fichas a una cada 3 s durante 6 horas. */
+export const OPCIONES_BARRIDO: OpcionesBarrido = { zonas: OPCIONES_ZONAS, fichas: OPCIONES_FICHAS };
 
 /** Cómo ha acabado una ejecución del barrido por zonas. */
 export interface Barrida {
@@ -488,17 +519,24 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
  *    uno (`recorrerCuadro`). Cada cuadro se guarda en su propia transacción con sus registros,
  *    sus cajas y la marca de hecho, así que un corte no repite los cuadros ya guardados. Si un
  *    cuadro falla, o vuelve vacío cuando tenía estaciones, el barrido de la zona falla y no
- *    cuenta ausencias; las demás zonas siguen. El tope de peticiones, `robots.txt` o una fuente
- *    caída paran todas las zonas que quedan y las fichas.
+ *    cuenta ausencias; las demás zonas siguen. El tope de peticiones, `robots.txt`, una fuente
+ *    caída o una que bloquea a Celda paran todas las zonas que quedan y las fichas.
  * 4. Cierra los barridos que han acabado bien (`barrerZonas`).
- * 5. Lee las fichas pendientes, fusiona y apunta los cambios, los errores y lo que ha hecho cada
- *    zona: peticiones, bytes, registros y cambios.
+ * 5. Lee las fichas de la cola en su orden (`ordenarFichas`, con las provincias de `Provincias`)
+ *    hasta cerrar la ventana (`leerFichasEnLaVentana`). A mitad de la ventana fusiona y lanza
+ *    `PublicacionAMitad`.
+ * 6. Fusiona y apunta los cambios, los errores y lo que ha hecho cada zona: peticiones, bytes,
+ *    registros y cambios.
  *
+ * La primera fusión lleva la fecha de inicio, como todos los datos de la ejecución; la de cierre,
+ * si hubo otra a mitad, la hora a la que se hace, para que la versión de los datos avance.
  * Queda completada si alguna zona se ha barrido, y fallida si ninguna.
  */
 export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones: OpcionesBarrido) {
   const extractor = yield* ExtractorPorCajas;
   const base = yield* BaseDeBarrido;
+  const provincias = yield* Provincias;
+  const aMitad = yield* PublicacionAMitad;
   const { fuente } = extractor;
   const inicio = yield* Clock.currentTimeMillis;
 
@@ -512,17 +550,36 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
   const zonas = zonasDeLaNoche(opciones.zonas, yield* base.estadoDeZonas(fuente));
   const { hechas, vistos, errores, parada } = yield* barrerZonas(ejecucion, zonas, inicio);
 
+  const emplazamientos = { creados: 0, cambiados: 0, retirados: 0 };
+  let fusiones = 0;
+  const fusionar = Effect.gen(function* () {
+    const fecha = fusiones === 0 ? inicio : yield* Clock.currentTimeMillis;
+    fusiones++;
+    const cuentas = yield* base.fusionar(fecha);
+    emplazamientos.creados += cuentas.creados;
+    emplazamientos.cambiados += cuentas.cambiados;
+    emplazamientos.retirados += cuentas.retirados;
+  });
+
   const fichas = { leidas: 0, cambiadas: 0 };
   if (parada === undefined) {
-    const leidas = yield* leerFichas({
-      pendientes: yield* base.pendientesDeFicha(
-        fuente,
-        inicio - Duration.toMillis(opciones.rotacion),
-        opciones.maxFichas,
-      ),
+    const cola = ordenarFichas(
+      yield* base.colaDeFichas(fuente, inicio - Duration.toMillis(opciones.fichas.relectura)),
+      {
+        provincias: opciones.fichas.prioridad,
+        zonas: [...opciones.zonas.cadaNoche, ...opciones.zonas.enTurno],
+        provinciaDe: provincias.provinciaDe,
+      },
+      yield* Clock.currentTimeMillis,
+    );
+    const leidas = yield* leerFichasEnLaVentana({
+      cola,
+      opciones: opciones.fichas,
+      inicio,
       ficha: extractor.ficha,
       aplicar: (clave, bandas) => base.aplicarFicha(fuente, clave, inicio, bandas),
-      fallosSeguidos: opciones.fallosSeguidos,
+      fallar: (clave, fallo) => base.fallarFicha(fuente, clave, fallo),
+      aMitad: Effect.andThen(fusionar, aMitad.publicar),
     });
     fichas.leidas = leidas.leidas;
     fichas.cambiadas = leidas.cambiadas;
@@ -531,7 +588,7 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
     errores.push("Fichas pendientes para la próxima ejecución");
   }
 
-  const emplazamientos = yield* base.fusionar(inicio);
+  yield* fusionar;
   const sumar = (campo: keyof Cuentas) =>
     hechas.reduce((suma, zona) => suma + zona.observaciones[campo], 0);
   const cierre = {

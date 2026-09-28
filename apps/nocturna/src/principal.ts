@@ -1,5 +1,6 @@
 import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
 import { enLosCuadros } from "@celda/ingesta/antenasmoviles/normalizar";
+import { Provincias } from "@celda/ingesta/fichas";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { almacenDesdeConfig } from "@celda/publicacion/configuracion";
@@ -19,6 +20,7 @@ import {
   estado,
   Extractores,
   noche,
+  provinciasDe,
   publicadorEn,
   publicarAMano,
   sinAlmacen,
@@ -58,7 +60,7 @@ const principal = Effect.gen(function* () {
   const extractores = Layer.succeed(
     Extractores,
     Extractores.of({
-      registroOficial: RegistroOficial.capaPorCajas(c.registroOficial).pipe(
+      registroOficial: RegistroOficial.capaPorCajas(c.registroOficial, c.fichasDelRegistro).pipe(
         Layer.provide(FetchHttpClient.layer),
       ),
       antenasMoviles: AntenasMoviles.capa({
@@ -67,7 +69,11 @@ const principal = Effect.gen(function* () {
       }).pipe(Layer.provide(FetchHttpClient.layer)),
     }),
   );
-  const entorno = Layer.mergeAll(publicador, extractores).pipe(Layer.provideMerge(base));
+  const entorno = Layer.mergeAll(
+    publicador,
+    extractores,
+    Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
+  ).pipe(Layer.provideMerge(base));
 
   const efecto = Effect.gen(function* () {
     switch (orden) {
@@ -75,7 +81,7 @@ const principal = Effect.gen(function* () {
         yield* noche(c.noche);
         return;
       case "estado":
-        yield* estado(c.noche.proceso.rotacion);
+        yield* estado(c.noche.proceso);
         return;
       case "publicar":
         yield* publicarAMano;

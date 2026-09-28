@@ -13,6 +13,7 @@ import {
 } from "@celda/ingesta/pruebas/antenasmoviles";
 import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
 import { OPCIONES_ZONAS } from "@celda/ingesta/barrido";
+import { OPCIONES_FICHAS } from "@celda/ingesta/fichas";
 import {
   capaGrabada,
   capaGrabadaPorCajas,
@@ -146,11 +147,15 @@ const compararNoches = (
           assert.strictEqual(puntos.estado, "completada");
         }
         // La nocturna barre Cataluña por cuadros; Campus Nord cae entero en el de Barcelona.
+        const barrido = {
+          zonas: OPCIONES_ZONAS,
+          fichas: { ...OPCIONES_FICHAS, maximo: proceso.maxFichas, relectura: proceso.rotacion },
+        };
         const variante: Variante =
           antenasMoviles === undefined
-            ? { proceso: { ...proceso, zonas: OPCIONES_ZONAS } }
+            ? { proceso: barrido }
             : {
-                proceso: { ...proceso, zonas: OPCIONES_ZONAS },
+                proceso: barrido,
                 interruptores: {
                   ...INTERRUPTOR_POR_DEFECTO,
                   antenasmoviles: { activo: true, motivo: "" },

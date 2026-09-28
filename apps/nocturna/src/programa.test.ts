@@ -10,12 +10,14 @@ import {
 import { leerLote } from "@celda/dominio/loteDeFichas";
 import { INTERRUPTOR_POR_DEFECTO, SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
 import { ExtractorPorCajas } from "@celda/ingesta/extractor";
+import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
 import {
   capaGrabadaPorCajas,
   type FuenteGrabada,
   muestraCampusNord,
 } from "@celda/ingesta/pruebas/grabado";
 import { AlmacenDeFicheros, AlmacenNoDisponible } from "@celda/publicacion/almacen";
+import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -33,12 +35,13 @@ import { TestClock } from "effect/testing";
 import { BaseNocturna } from "./base.ts";
 import { configuracion, COPIAS_CONSERVADAS } from "./configuracion.ts";
 import { describirResumen } from "./estado.ts";
-import { estado } from "./programa.ts";
+import { estado, provinciasDe } from "./programa.ts";
 import {
   conBase,
   conEntorno,
   contenidoDe,
   type Entorno,
+  OPCIONES_BARRIDO,
   tablasDe,
   unaNoche,
 } from "./pruebas/entorno.ts";
@@ -47,7 +50,6 @@ const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
 const HORA = 3_600_000;
 const VERSION = versionDeCapa(NOCHE);
-const OPCIONES_ROTACION = Duration.days(14);
 
 const registroOficial = (grabada: FuenteGrabada) =>
   capaGrabadaPorCajas("registro-oficial", grabada);
@@ -429,44 +431,68 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
     ),
   );
 
-  it.effect("el estado dice la última ejecución, las fichas pendientes y los errores", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const grabada = yield* muestraCampusNord;
-        // Tres fichas que la fuente no da: tres errores seguidos y las demás, pendientes.
-        const sinFichas: FuenteGrabada = {
-          ...grabada,
-          fichas: new Map(
-            [...grabada.fichas].filter(
-              ([clave]) =>
-                !grabada.listado.registros.slice(0, 3).some((registro) => registro.clave === clave),
+  it.effect(
+    "el estado dice la última ejecución, las fichas que quedan en la cola y los errores",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          // Tres fichas que la fuente no da: tres errores seguidos y las demás, pendientes.
+          const sinFichas: FuenteGrabada = {
+            ...grabada,
+            fichas: new Map(
+              [...grabada.fichas].filter(
+                ([clave]) =>
+                  !grabada.listado.registros
+                    .slice(0, 3)
+                    .some((registro) => registro.clave === clave),
+              ),
             ),
-          ),
-        };
-        yield* TestClock.setTime(NOCHE);
-        yield* unaNoche(entorno, registroOficial(sinFichas));
+          };
+          yield* TestClock.setTime(NOCHE);
+          yield* unaNoche(entorno, registroOficial(sinFichas));
 
-        const resumen = yield* conBase(entorno.base, estado(OPCIONES_ROTACION));
-        const fuente = resumen.fuentes.find((f) => f.fuente === "registro-oficial");
-        assert.strictEqual(fuente?.sinLeer, 40);
-        assert.strictEqual(fuente?.ultima?.errores.length, 4);
-        const texto = describirResumen(entorno.base, resumen);
-        assert.include(texto, "registro-oficial: encendida");
-        assert.include(texto, "2026-09-26 02:15:00 UTC, completada, 40 registros en el listado");
-        assert.include(texto, "fichas pendientes: 40 sin leer");
-        assert.include(texto, "Errores (4):");
-        assert.include(texto, "Fichas pendientes para la próxima ejecución");
-        assert.include(texto, `Última versión publicada: ${VERSION}`);
-        assert.include(texto, "antenasmoviles: apagada");
-      }),
-    ),
+          const provincias = provinciasDe((yield* zonasDePublicacion).municipios);
+          const { resumen, cola } = yield* conBase(
+            entorno.base,
+            estado(OPCIONES_BARRIDO).pipe(Effect.provideService(Provincias, provincias)),
+          );
+          const fuente = resumen.fuentes.find((f) => f.fuente === "registro-oficial");
+          assert.strictEqual(fuente?.sinLeer, 40);
+          assert.strictEqual(fuente?.ultima?.errores.length, 4);
+          // Las tres que han fallado esperan un día; las demás siguen en la cola.
+          assert.deepStrictEqual(cola, [
+            {
+              grupo: { tipo: "provincia", provincia: "08" },
+              nuevas: 37,
+              porReleer: 0,
+              enEspera: 3,
+            },
+          ]);
+          const texto = describirResumen(entorno.base, resumen, cola, provincias.nombreDe);
+          assert.include(texto, "registro-oficial: encendida");
+          assert.include(texto, "2026-09-26 02:15:00 UTC, completada, 40 registros en el listado");
+          assert.include(texto, "fichas pendientes: 40 sin leer");
+          assert.include(
+            texto,
+            "provincia 08 (Barcelona): 37 sin leer, 0 por releer, 3 esperando tras fallar",
+          );
+          assert.include(texto, "Errores (4):");
+          assert.include(texto, "Fichas paradas hasta la próxima noche: 3 fallos seguidos");
+          assert.include(texto, `Última versión publicada: ${VERSION}`);
+          assert.include(texto, "antenasmoviles: apagada");
+        }),
+      ),
   );
 
   it.effect("la configuración trae los valores de hoy y se cambia desde fuera", () =>
     Effect.gen(function* () {
       const porDefecto = yield* configuracion.parse(ConfigProvider.fromEnv({ env: {} }));
       assert.strictEqual(porDefecto.base, "datos/ingesta.sqlite");
-      assert.strictEqual(porDefecto.noche.proceso.maxFichas, 250);
+      assert.deepStrictEqual(porDefecto.noche.proceso.fichas, OPCIONES_FICHAS);
+      // Las fichas van a su ritmo, con un tope que nunca corta antes que la ventana.
+      assert.strictEqual(Duration.toSeconds(porDefecto.fichasDelRegistro.pausa), 3);
+      assert.strictEqual(porDefecto.fichasDelRegistro.maxPeticiones, 7200);
       assert.strictEqual(Duration.toMinutes(porDefecto.noche.reintento), 60);
       assert.deepStrictEqual(porDefecto.noche.copias, { carpeta: "datos/copias", conservar: 14 });
       assert.strictEqual(Duration.toSeconds(porDefecto.registroOficial.pausa), 3);
@@ -489,6 +515,10 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           env: {
             CELDA_INGESTA_BASE: "/var/lib/celda/ingesta.sqlite",
             CELDA_INGESTA_MAX_FICHAS: "5",
+            CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS: "5",
+            CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS: "120",
+            CELDA_REGISTRO_FICHAS_RELECTURA_DIAS: "14",
+            CELDA_REGISTRO_FICHAS_PRIORIDAD: "08, 17",
             CELDA_PUBLICAR_REINTENTO_MINUTOS: "30",
             CELDA_REGISTRO_PAUSA_SEGUNDOS: "1",
             CELDA_REGISTRO_USER_AGENT: "Celda (pruebas)",
@@ -500,7 +530,13 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
         }),
       );
       assert.strictEqual(cambiada.base, "/var/lib/celda/ingesta.sqlite");
-      assert.strictEqual(cambiada.noche.proceso.maxFichas, 5);
+      assert.strictEqual(cambiada.noche.proceso.fichas.maximo, 5);
+      assert.strictEqual(Duration.toSeconds(cambiada.noche.proceso.fichas.ritmo), 5);
+      assert.strictEqual(Duration.toMinutes(cambiada.noche.proceso.fichas.ventana), 120);
+      assert.strictEqual(Duration.toDays(cambiada.noche.proceso.fichas.relectura), 14);
+      assert.deepStrictEqual(cambiada.noche.proceso.fichas.prioridad, ["08", "17"]);
+      assert.strictEqual(Duration.toSeconds(cambiada.fichasDelRegistro.pausa), 5);
+      assert.strictEqual(cambiada.fichasDelRegistro.maxPeticiones, 2400);
       assert.strictEqual(Duration.toMinutes(cambiada.noche.reintento), 30);
       // Nunca por debajo de 3 s entre peticiones.
       assert.strictEqual(Duration.toSeconds(cambiada.registroOficial.pausa), 3);
@@ -518,6 +554,19 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
         configuracion.parse(ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_ZONAS: "catalunya" } })),
       );
       assert.include(mal.message, "zonas de barrido desconocidas: catalunya");
+
+      // El mínimo de 3 s entre fichas se mantiene, y una provincia se escribe con su código INE.
+      const deprisa = yield* configuracion.parse(
+        ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS: "1" } }),
+      );
+      assert.strictEqual(Duration.toSeconds(deprisa.noche.proceso.fichas.ritmo), 3);
+      assert.strictEqual(Duration.toSeconds(deprisa.fichasDelRegistro.pausa), 3);
+      const provincia = yield* Effect.flip(
+        configuracion.parse(
+          ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_PRIORIDAD: "Barcelona" } }),
+        ),
+      );
+      assert.include(provincia.message, "códigos de provincia que no son dos cifras del INE");
     }),
   );
 });
