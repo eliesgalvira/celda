@@ -1,5 +1,7 @@
 import { createSignal } from "solid-js";
 
+import { conservarVariantes } from "../prototipo/variantes.ts";
+
 /**
  * El enrutador de Celda: la ubicación como señal y `navegar` sobre la
  * historia del navegador. `@solidjs/router@2` sigue en `next` (ADR 0002).
@@ -19,7 +21,9 @@ window.addEventListener("popstate", () => setUbicacion(leerUbicacion()));
 
 export { ubicacion };
 
-export const navegar = (href: string, opciones?: { readonly reemplazar?: boolean }): void => {
+export const navegar = (destino: string, opciones?: { readonly reemplazar?: boolean }): void => {
+  // PROTOTIPO (logo y controles): las variantes elegidas siguen al navegar.
+  const href = conservarVariantes(new URLSearchParams(window.location.search), destino);
   if (opciones?.reemplazar === true) {
     window.history.replaceState(null, "", href);
   } else {

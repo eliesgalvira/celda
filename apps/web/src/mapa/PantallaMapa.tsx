@@ -15,6 +15,8 @@ import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
+import { MARCAS } from "@celda/ui/marca/geometria.ts";
+import { BarraDePrototipo } from "@celda/ui/prototipo/BarraDePrototipo.tsx";
 import * as Effect from "effect/Effect";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal, Match, onSettled, Show, Switch } from "solid-js";
@@ -65,6 +67,14 @@ import {
 } from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
+import { ponerIconos } from "../prototipo/iconos.ts";
+import {
+  controlesDe,
+  conVariantes,
+  hayPrototipo,
+  logoDe,
+  VARIANTES,
+} from "../prototipo/variantes.ts";
 import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
 import { posicionDe } from "../ubicacion/estado.ts";
 import { ReferenciaEnMapa } from "../ubicacion/ReferenciaEnMapa.tsx";
@@ -78,6 +88,14 @@ import { CREDITOS_MAPA_BASE, type EstadoMapa, hayWebgl, type MotivoFallo } from 
 import { Marcadores } from "./Marcadores.tsx";
 
 type ModuloMapaBase = typeof import("./mapaBase.ts");
+
+/** PROTOTIPO (controles): el nombre corto de cada disposición en la barra del prototipo. */
+const NOMBRES_CONTROLES = {
+  actual: "Hoy",
+  A: "A · Losas",
+  B: "B · Barra",
+  C: "C · Un menú",
+} as const;
 
 /** Solo para los tipos: el panel de la vista no se monta sin elección. */
 const ELECCION_VACIA: EleccionVista = { compania: "movistar", mhz: 1800, ocupacion: 0.5 };
@@ -479,6 +497,15 @@ export function PantallaMapa() {
   });
   const midiendo = createMemo(() => medirAbierto(ubicacion()));
 
+  // PROTOTIPO (logo y controles): las variantes que pide la URL.
+  const logo = createMemo(() => logoDe(ubicacion().search));
+  const disposicion = createMemo(() => controlesDe(ubicacion().search));
+  const conPrototipo = createMemo(() => hayPrototipo(ubicacion().search));
+  createEffect(
+    () => logo(),
+    (variante) => ponerIconos(document, variante),
+  );
+
   const aviso = createMemo(() => {
     const actual = estado();
     return actual.tipo === "listo" ? undefined : (
@@ -496,7 +523,8 @@ export function PantallaMapa() {
             lienzo={(elemento) => {
               contenedor = elemento;
             }}
-            cabecera={<Cabecera lugar={BARCELONA.nombre} />}
+            cabecera={<Cabecera lugar={BARCELONA.nombre} marca={logo()} />}
+            disposicion={disposicion()}
             datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
             ubicacion={
               <>
@@ -530,7 +558,7 @@ export function PantallaMapa() {
               </Show>
             }
             pista={pista()}
-            controles={
+            zoom={
               <>
                 <BotonHexagonal
                   etiqueta="Acercar"
@@ -544,8 +572,13 @@ export function PantallaMapa() {
                   disabled={!listo()}
                   onClick={() => mapa?.zoomOut()}
                 />
+              </>
+            }
+            controles={
+              <>
                 <BotonHexagonal
                   etiqueta="Interferencia"
+                  detalle="Simula dónde se pisan las señales de una compañía."
                   icono={<IconoOndas />}
                   activo={vistaActiva()}
                   disabled={!listo() || emplazamientos().length === 0}
@@ -553,24 +586,28 @@ export function PantallaMapa() {
                 />
                 <BotonHexagonal
                   etiqueta="Medir mi señal"
+                  detalle="Cómo leer en el móvil la señal que te llega."
                   icono={<IconoSenal />}
                   aria-haspopup="dialog"
                   onClick={() => navegar(conMedir(ubicacion(), true))}
                 />
-                <MenuDeUbicacion
-                  puedeCentrar={listo()}
-                  alCentrar={() => {
-                    const referencia = puntoDeReferencia.referencia();
-                    if (referencia !== undefined) irA(posicionDe(referencia));
-                  }}
-                />
               </>
+            }
+            botonUbicacion={
+              <MenuDeUbicacion
+                puedeCentrar={listo()}
+                alCentrar={() => {
+                  const referencia = puntoDeReferencia.referencia();
+                  if (referencia !== undefined) irA(posicionDe(referencia));
+                }}
+              />
             }
             controlesSecundarios={
               <>
                 <Show when={ajustes.ajustes().modoEstudiante}>
                   <BotonHexagonal
                     etiqueta="Ejercicio"
+                    detalle="Los cálculos de un barrio paso a paso, con sus fuentes."
                     icono={<IconoEjercicio />}
                     activo={ejercicio() !== null}
                     onClick={() =>
@@ -580,6 +617,7 @@ export function PantallaMapa() {
                 </Show>
                 <BotonHexagonal
                   etiqueta="Ajustes"
+                  detalle="Activa o apaga el modo estudiante."
                   icono={<IconoAjustes />}
                   aria-haspopup="dialog"
                   onClick={() => navegar(conAjustes(ubicacion(), true))}
@@ -627,6 +665,48 @@ export function PantallaMapa() {
           <Show when={ajustesAbiertos(ubicacion())}>
             <DialogoAjustes
               alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
+            />
+          </Show>
+          <Show when={conPrototipo()}>
+            <BarraDePrototipo
+              filas={[
+                {
+                  titulo: "Logo",
+                  opciones: [
+                    { clave: "actual", nombre: "Hoy" },
+                    ...VARIANTES.map((clave) => ({
+                      clave,
+                      nombre: `${clave} · ${MARCAS[clave].nombre}`,
+                    })),
+                  ],
+                  actual: logo(),
+                  alElegir: (clave) =>
+                    navegar(
+                      conVariantes(ubicacion(), {
+                        logo: clave === "A" || clave === "B" || clave === "C" ? clave : "actual",
+                        controles: disposicion(),
+                      }),
+                      { reemplazar: true },
+                    ),
+                },
+                {
+                  titulo: "Controles",
+                  opciones: [
+                    { clave: "actual", nombre: NOMBRES_CONTROLES.actual },
+                    ...VARIANTES.map((clave) => ({ clave, nombre: NOMBRES_CONTROLES[clave] })),
+                  ],
+                  actual: disposicion(),
+                  alElegir: (clave) =>
+                    navegar(
+                      conVariantes(ubicacion(), {
+                        logo: logo(),
+                        controles:
+                          clave === "A" || clave === "B" || clave === "C" ? clave : "actual",
+                      }),
+                      { reemplazar: true },
+                    ),
+                },
+              ]}
             />
           </Show>
         </ServicioContexto>
