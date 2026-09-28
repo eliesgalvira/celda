@@ -1,8 +1,16 @@
+import { Caja as CajaEsquema, Cuadro, cuadroDe } from "@celda/dominio/barrido";
+import { compararTexto } from "@celda/dominio/banda";
 import { emplazamientoDeCapa } from "@celda/dominio/capa";
 import { Emplazamiento } from "@celda/dominio/emplazamiento";
 import { fichaDe } from "@celda/dominio/ficha";
 import { fusionar } from "@celda/dominio/fusion";
 import { Fuente } from "@celda/dominio/observacion";
+import {
+  type BarridoAbierto,
+  BaseDeBarrido,
+  type EstadoDeZona,
+  ZonaEnLaEjecucion,
+} from "@celda/ingesta/barrido";
 import {
   Cambios,
   erroresDeOmitida,
@@ -18,7 +26,6 @@ import {
   trasFicha,
   trasListado,
 } from "@celda/ingesta/guardado";
-import { BaseDeIngesta } from "@celda/ingesta/proceso";
 import {
   DatosNoDisponibles,
   DatosPublicables,
@@ -52,8 +59,26 @@ export interface OpcionesBase {
  *   publicación de su noche.
  * - `publicaciones`: cada intento de publicar, con su resultado.
  * - `versiones` y `ficheros_publicados`: lo publicado, con la huella de cada fichero.
+ *
+ * La versión 2 trae el barrido por zonas (ADR 0014):
+ *
+ * - en `observaciones`, el cuadro en que cae cada una y cuándo la vio un listado por última vez;
+ * - `cuadros`: las cajas en que se dividió cada cuadro la última vez, para pedirlas directamente;
+ * - `barridos`: cada barrido de una zona, con sus cuadros, y `cuadros_barridos`, los que ya se han
+ *   recorrido, para retomar uno cortado;
+ * - en `ejecuciones`, lo que hizo cada zona.
  */
-const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
+/**
+ * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
+ * el cero, así que a los negativos con decimales hay que restarles uno. Da su cuadro, como
+ * `cuadroDe`.
+ */
+const sueloDe = (eje: "longitud" | "latitud") => {
+  const valor = `json_extract(datos, '$.posicion.${eje}')`;
+  return `(CAST(${valor} AS INTEGER) - (${valor} < CAST(${valor} AS INTEGER)))`;
+};
+
+export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
   [
     `CREATE TABLE observaciones (
       id INTEGER PRIMARY KEY,
@@ -102,9 +127,40 @@ const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
       bytes INTEGER NOT NULL
     )`,
   ],
+  [
+    `ALTER TABLE observaciones ADD COLUMN cuadro TEXT`,
+    `ALTER TABLE observaciones ADD COLUMN vista_en INTEGER`,
+    `UPDATE observaciones SET cuadro = ${sueloDe("longitud")} || ',' || ${sueloDe("latitud")}`,
+    `CREATE INDEX observaciones_por_cuadro ON observaciones (fuente, cuadro, retirada_en)`,
+    `CREATE TABLE cuadros (
+      cuadro TEXT PRIMARY KEY,
+      cajas TEXT NOT NULL,
+      actualizado INTEGER NOT NULL
+    )`,
+    `CREATE TABLE barridos (
+      id INTEGER PRIMARY KEY,
+      fuente TEXT NOT NULL,
+      zona TEXT NOT NULL,
+      cuadros TEXT NOT NULL,
+      inicio INTEGER NOT NULL,
+      fin INTEGER,
+      estado TEXT NOT NULL,
+      ejecucion INTEGER NOT NULL,
+      error TEXT
+    )`,
+    `CREATE INDEX barridos_por_zona ON barridos (fuente, zona, estado)`,
+    `CREATE TABLE cuadros_barridos (
+      barrido INTEGER NOT NULL,
+      cuadro TEXT NOT NULL,
+      registros INTEGER NOT NULL,
+      PRIMARY KEY (barrido, cuadro)
+    )`,
+    `ALTER TABLE ejecuciones ADD COLUMN zonas TEXT`,
+  ],
 ];
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
+const ZonasEnJson = Schema.fromJsonString(Schema.Array(ZonaEnLaEjecucion));
 const EmplazamientoEnJson = Schema.fromJsonString(Emplazamiento);
 
 const FilaObservacion = Schema.Struct({ id: Schema.Int, datos: ObservacionEnJson });
@@ -126,8 +182,26 @@ export const EjecucionGuardada = Schema.Struct({
   errores: Schema.fromJsonString(Schema.Array(Schema.String)),
   /** Cómo acabó la publicación de su noche, si era una ejecución completada. */
   publicacion: Schema.NullOr(Schema.fromJsonString(ResultadoPublicacion)),
+  /** Lo que hizo cada zona de barrido. Nulo en las ejecuciones de antes del barrido por zonas. */
+  zonas: Schema.NullOr(ZonasEnJson),
 });
 export type EjecucionGuardada = typeof EjecucionGuardada.Type;
+
+const FilaBarrido = Schema.Struct({
+  id: Schema.Int,
+  fuente: Fuente,
+  inicio: Schema.Finite,
+  cuadros: Schema.fromJsonString(Schema.Array(Cuadro)),
+});
+const FilaCajas = Schema.Struct({
+  cuadro: Cuadro,
+  cajas: Schema.fromJsonString(Schema.Array(CajaEsquema)),
+});
+const FilaZona = Schema.Struct({
+  zona: Schema.String,
+  completado: Schema.NullOr(Schema.Finite),
+  aMedias: Schema.Int,
+});
 
 const FilaPublicacion = Schema.Struct({
   fecha: Schema.Finite,
@@ -143,8 +217,19 @@ const codificarEmplazamiento = Schema.encodeEffect(EmplazamientoEnJson);
 const codificarCambios = Schema.encodeEffect(Schema.fromJsonString(Cambios));
 const codificarErrores = Schema.encodeEffect(Schema.fromJsonString(Schema.Array(Schema.String)));
 const codificarResultado = Schema.encodeEffect(Schema.fromJsonString(ResultadoPublicacion));
+const codificarZonas = Schema.encodeEffect(ZonasEnJson);
+const codificarCuadros = Schema.encodeEffect(Schema.fromJsonString(Schema.Array(Cuadro)));
+const codificarCajas = Schema.encodeEffect(Schema.fromJsonString(Schema.Array(CajaEsquema)));
 
 const mismoEmplazamiento = Schema.toEquivalence(Emplazamiento);
+
+/** Registros por consulta al guardar el listado de un cuadro. */
+const LOTE = 200;
+
+const trozos = <A>(elementos: ReadonlyArray<A>, tamano: number): ReadonlyArray<ReadonlyArray<A>> =>
+  Array.from({ length: Math.ceil(elementos.length / tamano) }, (_, i) =>
+    elementos.slice(i * tamano, (i + 1) * tamano),
+  );
 
 /** El último intento de publicar. */
 export interface IntentoDePublicacion {
@@ -163,6 +248,13 @@ export interface ResumenDeFuente {
   readonly sinLeer: number;
   /** Fichas leídas antes de la fecha de rotación, que se vuelven a leer. */
   readonly porReleer: number;
+  /** Las zonas que ha barrido alguna vez, por nombre. */
+  readonly zonas: ReadonlyArray<ResumenDeZona>;
+}
+
+/** Lo que el mantenedor quiere saber de una zona de barrido. */
+export interface ResumenDeZona extends EstadoDeZona {
+  readonly zona: string;
 }
 
 /** El estado de la base para la orden `estado`. */
@@ -223,7 +315,7 @@ const migrar = Effect.gen(function* () {
 
 /**
  * La base SQLite de la ingesta nocturna (ADR 0015), con el módulo `node:sqlite` de Node 24 a
- * través del adaptador de Effect. Da la `BaseDeIngesta` del proceso, los `DatosPublicables` de
+ * través del adaptador de Effect. Da la `BaseDeBarrido` del proceso, los `DatosPublicables` de
  * la publicación y la `BaseNocturna`. Toda escritura de un paso va en una transacción, así que un
  * corte a mitad deja el paso entero o nada.
  */
@@ -257,12 +349,14 @@ export const baseNocturna = (opciones: OpcionesBase) =>
             clave: o.clave,
             ficha_leida_en: o.fichaLeidaEn,
             retirada_en: o.retiradaEn,
+            cuadro: cuadroDe(o.posicion),
             datos,
           })}`;
           return;
         }
         yield* sql`UPDATE observaciones
-          SET ficha_leida_en = ${o.fichaLeidaEn}, retirada_en = ${o.retiradaEn}, datos = ${datos}
+          SET ficha_leida_en = ${o.fichaLeidaEn}, retirada_en = ${o.retiradaEn},
+            cuadro = ${cuadroDe(o.posicion)}, datos = ${datos}
           WHERE id = ${id}`;
       });
 
@@ -280,7 +374,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         return fechas.length === 0 ? null : Math.max(...fechas);
       });
 
-      const base = BaseDeIngesta.of({
+      const base = BaseDeBarrido.of({
         iniciar: Effect.fn("BaseNocturna.iniciar")(function* (fuente, fecha) {
           const interruptor = opciones.interruptores[fuente];
           return yield* sql.withTransaction(
@@ -308,31 +402,166 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           );
         }, Effect.orDie),
 
-        aplicarListado: Effect.fn("BaseNocturna.aplicarListado")(function* (
+        estadoDeZonas: Effect.fn("BaseNocturna.estadoDeZonas")(function* (fuente) {
+          const filas = yield* decodificar(FilaZona)(
+            yield* sql`SELECT zona,
+                max(CASE WHEN estado = 'completado' THEN inicio END) AS completado,
+                max(estado = 'en curso') AS aMedias
+              FROM barridos WHERE fuente = ${fuente} GROUP BY zona`,
+          );
+          return new Map(
+            filas.map((fila): [string, EstadoDeZona] => [
+              fila.zona,
+              { completado: fila.completado, aMedias: fila.aMedias > 0 },
+            ]),
+          );
+        }, Effect.orDie),
+
+        abrirBarrido: Effect.fn("BaseNocturna.abrirBarrido")(function* (
+          ejecucion,
           fuente,
+          zona,
           fecha,
-          registros,
         ) {
           return yield* sql.withTransaction(
             Effect.gen(function* () {
-              const previas = yield* observacionesDe(
-                fuente,
-                registros.map((r) => r.clave),
+              const [aMedias] = yield* decodificar(FilaBarrido)(
+                yield* sql`SELECT id, fuente, inicio, cuadros FROM barridos
+                    WHERE fuente = ${fuente} AND zona = ${zona.nombre} AND estado = 'en curso'
+                    ORDER BY id DESC LIMIT 1`,
+              );
+              let barrido: typeof FilaBarrido.Type;
+              if (aMedias === undefined) {
+                const [fila] = yield* sql<{ readonly id: number }>`INSERT INTO barridos
+                    ${sql.insert({
+                      fuente,
+                      zona: zona.nombre,
+                      cuadros: yield* codificarCuadros(zona.cuadros),
+                      inicio: fecha,
+                      fin: null,
+                      estado: "en curso",
+                      ejecucion: Number(ejecucion),
+                      error: null,
+                    })} RETURNING id`;
+                barrido = { id: fila?.id ?? 0, fuente, inicio: fecha, cuadros: zona.cuadros };
+              } else {
+                yield* sql`UPDATE barridos SET ejecucion = ${Number(ejecucion)}
+                    WHERE id = ${aMedias.id}`;
+                barrido = aMedias;
+              }
+              const hechos = yield* sql<{ readonly cuadro: string }>`SELECT cuadro
+                  FROM cuadros_barridos WHERE barrido = ${barrido.id}`;
+              const cajas =
+                barrido.cuadros.length === 0
+                  ? []
+                  : yield* decodificar(FilaCajas)(
+                      yield* sql`SELECT cuadro, cajas FROM cuadros
+                          WHERE cuadro IN ${sql.in(barrido.cuadros)}`,
+                    );
+              const abierto: BarridoAbierto = {
+                barrido: String(barrido.id),
+                inicio: barrido.inicio,
+                cuadros: barrido.cuadros,
+                hechos: new Set(hechos.map((fila) => fila.cuadro)),
+                cajas: new Map(cajas.map((fila) => [fila.cuadro, fila.cajas])),
+              };
+              return abierto;
+            }),
+          );
+        }, Effect.orDie),
+
+        vigentesEn: Effect.fn("BaseNocturna.vigentesEn")(function* (fuente, cuadro) {
+          const [fila] = yield* decodificar(Cuenta)(
+            yield* sql`SELECT count(*) AS n FROM observaciones
+                WHERE fuente = ${fuente} AND cuadro = ${cuadro} AND retirada_en IS NULL`,
+          );
+          return fila?.n ?? 0;
+        }, Effect.orDie),
+
+        aplicarCuadro: Effect.fn("BaseNocturna.aplicarCuadro")(function* (
+          barrido,
+          cuadro,
+          fecha,
+          recorrido,
+        ) {
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const [fila] = yield* decodificar(FilaBarrido)(
+                yield* sql`SELECT id, fuente, inicio, cuadros FROM barridos
+                    WHERE id = ${Number(barrido)}`,
               );
               let creados = 0;
               let cambiados = 0;
-              for (const registro of registros) {
-                const previa = previas.get(registro.clave);
-                const { guardar, cuenta } = trasListado(previa?.datos, registro, fuente, fecha);
-                if (guardar !== undefined) {
-                  yield* guardarObservacion(previa?.id, guardar);
+              if (fila === undefined) return { creados, cambiados };
+              for (const lote of trozos(recorrido.registros, LOTE)) {
+                const claves = lote.map((registro) => registro.clave);
+                const previas = yield* observacionesDe(fila.fuente, claves);
+                for (const registro of lote) {
+                  const previa = previas.get(registro.clave);
+                  const { guardar, cuenta } = trasListado(
+                    previa?.datos,
+                    registro,
+                    fila.fuente,
+                    fecha,
+                  );
+                  if (guardar !== undefined) {
+                    yield* guardarObservacion(previa?.id, guardar);
+                  }
+                  creados += cuenta === "creada" ? 1 : 0;
+                  cambiados += cuenta === "cambiada" ? 1 : 0;
                 }
-                creados += cuenta === "creada" ? 1 : 0;
-                cambiados += cuenta === "cambiada" ? 1 : 0;
+                yield* sql`UPDATE observaciones SET vista_en = ${fecha}
+                    WHERE fuente = ${fila.fuente} AND clave IN ${sql.in(claves)}`;
               }
+              yield* sql`INSERT INTO cuadros ${sql.insert({
+                cuadro,
+                cajas: yield* codificarCajas(recorrido.cajas),
+                actualizado: fecha,
+              })} ON CONFLICT (cuadro) DO UPDATE SET cajas = excluded.cajas,
+                  actualizado = excluded.actualizado`;
+              yield* sql`INSERT INTO cuadros_barridos ${sql.insert({
+                barrido: fila.id,
+                cuadro,
+                registros: recorrido.registros.length,
+              })} ON CONFLICT DO NOTHING`;
               return { creados, cambiados };
             }),
           );
+        }, Effect.orDie),
+
+        cerrarBarrido: Effect.fn("BaseNocturna.cerrarBarrido")(function* (barrido, fecha, fin) {
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const [fila] = yield* decodificar(FilaBarrido)(
+                yield* sql`SELECT id, fuente, inicio, cuadros FROM barridos
+                    WHERE id = ${Number(barrido)} AND estado = 'en curso'`,
+              );
+              if (fila === undefined) return { retirados: 0 };
+              const ausentes =
+                fila.cuadros.length === 0
+                  ? []
+                  : yield* decodificar(FilaObservacion)(
+                      yield* sql`SELECT id, datos FROM observaciones
+                          WHERE fuente = ${fila.fuente} AND retirada_en IS NULL
+                            AND cuadro IN ${sql.in(fila.cuadros)}
+                            AND (vista_en IS NULL OR vista_en < ${fila.inicio})`,
+                    );
+              let retirados = 0;
+              for (const { id, datos } of ausentes) {
+                const { guardada, retirada } = trasAusencia(datos, fecha);
+                yield* guardarObservacion(id, guardada);
+                retirados += retirada ? 1 : 0;
+              }
+              yield* sql`UPDATE barridos SET estado = 'completado', fin = ${fin}
+                  WHERE id = ${fila.id}`;
+              return { retirados };
+            }),
+          );
+        }, Effect.orDie),
+
+        fallarBarrido: Effect.fn("BaseNocturna.fallarBarrido")(function* (barrido, fin, motivo) {
+          yield* sql`UPDATE barridos SET estado = 'fallido', fin = ${fin}, error = ${motivo}
+              WHERE id = ${Number(barrido)} AND estado = 'en curso'`;
         }, Effect.orDie),
 
         pendientesDeFicha: Effect.fn("BaseNocturna.pendientesDeFicha")(function* (
@@ -363,32 +592,6 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           const { guardada, cambiada } = trasFicha(previa.datos, bandas, fecha);
           yield* guardarObservacion(previa.id, guardada);
           return cambiada;
-        }, Effect.orDie),
-
-        cerrarBarrido: Effect.fn("BaseNocturna.cerrarBarrido")(function* (ejecucion, vistas) {
-          return yield* sql.withTransaction(
-            Effect.gen(function* () {
-              const [actual] = yield* sql<{
-                readonly fuente: string;
-                readonly inicio: number;
-              }>`SELECT fuente, inicio FROM ejecuciones
-                  WHERE id = ${Number(ejecucion)} AND estado = 'en curso'`;
-              if (actual === undefined) return { retirados: 0 };
-              const vistasEnListado = new Set(vistas);
-              const guardadas = yield* decodificar(FilaObservacion)(
-                yield* sql`SELECT id, datos FROM observaciones
-                    WHERE fuente = ${actual.fuente} AND retirada_en IS NULL`,
-              );
-              let retirados = 0;
-              for (const { id, datos } of guardadas) {
-                if (vistasEnListado.has(datos.clave)) continue;
-                const { guardada, retirada } = trasAusencia(datos, actual.inicio);
-                yield* guardarObservacion(id, guardada);
-                retirados += retirada ? 1 : 0;
-              }
-              return { retirados };
-            }),
-          );
         }, Effect.orDie),
 
         fusionar: Effect.fn("BaseNocturna.fusionar")(function* (fecha) {
@@ -430,18 +633,21 @@ export const baseNocturna = (opciones: OpcionesBase) =>
 
         completar: Effect.fn("BaseNocturna.completar")(function* (
           ejecucion,
-          { fin, registros, cambios, errores },
+          { fin, registros, cambios, errores, zonas },
         ) {
           yield* sql`UPDATE ejecuciones SET estado = 'completada', fin = ${fin},
               registros = ${registros}, cambios = ${yield* codificarCambios(cambios)},
-              errores = ${yield* codificarErrores(errores)}
+              errores = ${yield* codificarErrores(errores)}, zonas = ${yield* codificarZonas(zonas)}
               WHERE id = ${Number(ejecucion)}`;
         }, Effect.orDie),
 
-        fallar: Effect.fn("BaseNocturna.fallar")(function* (ejecucion, { fin, cambios, errores }) {
+        fallar: Effect.fn("BaseNocturna.fallar")(function* (
+          ejecucion,
+          { fin, cambios, errores, zonas },
+        ) {
           yield* sql`UPDATE ejecuciones SET estado = 'fallida', fin = ${fin},
               cambios = ${yield* codificarCambios(cambios)},
-              errores = ${yield* codificarErrores(errores)}
+              errores = ${yield* codificarErrores(errores)}, zonas = ${yield* codificarZonas(zonas)}
               WHERE id = ${Number(ejecucion)}`;
         }, Effect.orDie),
       });
@@ -547,6 +753,9 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 porReleer: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
                     WHERE fuente = ${fuente} AND retirada_en IS NULL
                       AND ficha_leida_en < ${leidasAntesDe}`),
+                zonas: [...(yield* base.estadoDeZonas(fuente))]
+                  .map(([zona, estado]) => ({ zona, ...estado }))
+                  .sort((a, b) => compararTexto(a.zona, b.zona)),
               };
               return resumen;
             }),
@@ -572,7 +781,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         }, Effect.orDie),
       });
 
-      return Context.make(BaseDeIngesta, base).pipe(
+      return Context.make(BaseDeBarrido, base).pipe(
         Context.add(DatosPublicables, datos),
         Context.add(BaseNocturna, nocturna),
       );

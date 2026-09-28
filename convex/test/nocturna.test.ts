@@ -2,7 +2,13 @@
 // @effect-diagnostics strictEffectProvide:off
 import type { Registro } from "@celda/ingesta/extractor";
 import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
-import { capaGrabada, type FuenteGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
+import { OPCIONES_ZONAS } from "@celda/ingesta/barrido";
+import {
+  capaGrabada,
+  capaGrabadaPorCajas,
+  type FuenteGrabada,
+  muestraCampusNord,
+} from "@celda/ingesta/pruebas/grabado";
 import {
   conEntorno,
   contenidoDe,
@@ -28,8 +34,10 @@ import * as TestConfect from "./TestConfect";
  * La ingesta nocturna (#35) tiene que publicar lo mismo que Convex mientras las dos convivan
  * (ADR 0015). Cada noche, las dos leen las mismas respuestas grabadas a la misma hora, cada una
  * publica en su carpeta, y las carpetas tienen que ser iguales byte a byte: capas, lotes de
- * fichas y `vigente.json`. Las dos usan el mismo proceso, las mismas reglas, la misma fusión y
- * la misma publicación; lo que se compara es todo lo que cada una guarda por su cuenta.
+ * fichas y `vigente.json`. Las dos usan las mismas reglas, la misma fusión y la misma
+ * publicación; lo que se compara es todo lo que cada una guarda por su cuenta. Convex lee la caja
+ * de Barcelona entera y la nocturna barre Cataluña por cuadros (#40): la muestra cae en un solo
+ * cuadro, así que las dos cuentan las mismas ausencias.
  */
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
@@ -96,8 +104,9 @@ const compararNoches = (
           proceso,
           publicacion,
         );
-        const fuera = yield* unaNoche(nocturna, capaGrabada("registro-oficial", grabada), {
-          proceso,
+        // La nocturna barre Cataluña por cuadros; Campus Nord cae entero en el de Barcelona.
+        const fuera = yield* unaNoche(nocturna, capaGrabadaPorCajas("registro-oficial", grabada), {
+          proceso: { ...proceso, zonas: OPCIONES_ZONAS },
         });
         assert.strictEqual(enConvex.estado, "completada");
         assert.deepStrictEqual(

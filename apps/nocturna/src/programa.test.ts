@@ -9,8 +9,12 @@ import {
 } from "@celda/dominio/capa";
 import { leerLote } from "@celda/dominio/loteDeFichas";
 import { INTERRUPTOR_POR_DEFECTO, SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
-import { Extractor } from "@celda/ingesta/extractor";
-import { capaGrabada, type FuenteGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
+import { ExtractorPorCajas } from "@celda/ingesta/extractor";
+import {
+  capaGrabadaPorCajas,
+  type FuenteGrabada,
+  muestraCampusNord,
+} from "@celda/ingesta/pruebas/grabado";
 import { AlmacenDeFicheros, AlmacenNoDisponible } from "@celda/publicacion/almacen";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
@@ -45,7 +49,8 @@ const HORA = 3_600_000;
 const VERSION = versionDeCapa(NOCHE);
 const OPCIONES_ROTACION = Duration.days(14);
 
-const registroOficial = (grabada: FuenteGrabada) => capaGrabada("registro-oficial", grabada);
+const registroOficial = (grabada: FuenteGrabada) =>
+  capaGrabadaPorCajas("registro-oficial", grabada);
 
 /** Una estación de Vodafone de la muestra que deja de salir en el listado. */
 const QUITADO = "VODAFONE ESPAÑA, S.A.U. - 079808";
@@ -187,11 +192,11 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       const grabada = yield* muestraCampusNord.pipe(Effect.provide(NodeServices.layer));
       // Se corta en la quinta ficha, con el listado guardado y cuatro fichas leídas.
       const cortado = Layer.effect(
-        Extractor,
+        ExtractorPorCajas,
         Effect.gen(function* () {
           const leidas = yield* Ref.make(0);
-          const real = yield* Extractor;
-          return Extractor.of({
+          const real = yield* ExtractorPorCajas;
+          return ExtractorPorCajas.of({
             ...real,
             ficha: (registro) =>
               Effect.flatMap(
@@ -378,14 +383,15 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
 
         const llamadas = yield* Ref.make(0);
         const vigilado = Layer.effect(
-          Extractor,
-          Effect.map(Extractor, (real) =>
-            Extractor.of({
+          ExtractorPorCajas,
+          Effect.map(ExtractorPorCajas, (real) =>
+            ExtractorPorCajas.of({
               ...real,
-              listado: Effect.andThen(
-                Ref.update(llamadas, (n) => n + 1),
-                real.listado,
-              ),
+              caja: (caja) =>
+                Effect.andThen(
+                  Ref.update(llamadas, (n) => n + 1),
+                  real.caja(caja),
+                ),
               ficha: (registro) =>
                 Effect.andThen(
                   Ref.update(llamadas, (n) => n + 1),
@@ -467,6 +473,12 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
         "Celda (ingesta; contacto en celda.elies.site)",
       );
       assert.deepStrictEqual(porDefecto.interruptores, INTERRUPTOR_POR_DEFECTO);
+      assert.deepStrictEqual(
+        porDefecto.noche.proceso.zonas.cadaNoche.map((zona) => zona.nombre),
+        ["cataluna"],
+      );
+      assert.deepStrictEqual(porDefecto.noche.proceso.zonas.enTurno, []);
+      assert.strictEqual(porDefecto.noche.proceso.zonas.porNoche, 1);
 
       const cambiada = yield* configuracion.parse(
         ConfigProvider.fromEnv({
@@ -477,6 +489,9 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
             CELDA_REGISTRO_PAUSA_SEGUNDOS: "1",
             CELDA_REGISTRO_USER_AGENT: "Celda (pruebas)",
             CELDA_REGISTRO_ACTIVO: "false",
+            CELDA_REGISTRO_ZONAS: "ninguna",
+            CELDA_REGISTRO_ZONAS_EN_TURNO: "cataluna, centro,andalucia",
+            CELDA_REGISTRO_ZONAS_POR_NOCHE: "2",
           },
         }),
       );
@@ -487,6 +502,18 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       assert.strictEqual(Duration.toSeconds(cambiada.registroOficial.pausa), 3);
       assert.strictEqual(cambiada.registroOficial.userAgent, "Celda (pruebas)");
       assert.isFalse(cambiada.interruptores["registro-oficial"].activo);
+      assert.deepStrictEqual(cambiada.noche.proceso.zonas.cadaNoche, []);
+      assert.deepStrictEqual(
+        cambiada.noche.proceso.zonas.enTurno.map((zona) => zona.nombre),
+        ["cataluna", "centro", "andalucia"],
+      );
+      assert.strictEqual(cambiada.noche.proceso.zonas.porNoche, 2);
+
+      // Una zona que no existe es un error de configuración, no una zona vacía.
+      const mal = yield* Effect.flip(
+        configuracion.parse(ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_ZONAS: "catalunya" } })),
+      );
+      assert.include(mal.message, "zonas de barrido desconocidas: catalunya");
     }),
   );
 });

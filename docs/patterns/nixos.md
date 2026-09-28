@@ -19,13 +19,14 @@ nix flake check
 
 Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias/` del directorio desde el que se lanza, como `pnpm run ingesta`. La configuración y sus variables están en [convex.md](convex.md#configuración).
 
-`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal y un R2 de mentira que contestan por HTTPS con el listado y una ficha grabados en el Campus Nord. La prueba:
+`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal y un R2 de mentira que contestan por HTTPS. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. La prueba:
 
 1. crea el fichero de credenciales de R2 con valores al azar;
 2. adelanta el reloj hasta la hora del temporizador y espera a que la noche acabe bien;
 3. comprueba que la base está en `/var/lib/celda-nocturna`, que la copia está en el directorio de copias y que `vigente.json` y la capa llegaron al cubo, firmados con la clave del fichero;
 4. lanza `celda-nocturna estado` como el usuario del servicio;
-5. busca la clave y el secreto en todo el almacén de Nix de la máquina y no los encuentra.
+5. comprueba que la noche barrió Cataluña cada noche y `centro`, la primera de las zonas que se turnan, con una petición por cuadro;
+6. busca la clave y el secreto en todo el almacén de Nix de la máquina y no los encuentra.
 
 Con todo construido, la máquina virtual tarda unos 30 s en arrancar y pasar la prueba.
 
@@ -134,9 +135,21 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `registroOficial.maxFichas` | 250 | Fichas por noche |
 | `registroOficial.reintentos` | 3 | Reintentos de un fallo pasajero |
 | `registroOficial.espera` | 10 | Segundos que se espera una respuesta |
+| `registroOficial.zonas` | `[ "cataluna" ]` | Zonas de barrido de todas las noches |
+| `registroOficial.zonasEnTurno` | `[ ]` | Zonas de barrido que se turnan |
+| `registroOficial.zonasPorNoche` | 1 | Cuántas de las que se turnan se barren cada noche |
 | `registroOficial.userAgent` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición. Si montas tu propia ingesta, pon tu contacto |
 
-Las zonas de barrido (#40), la ventana de fichas (#41) y antenasmoviles.es (#48) aún no existen en el programa. Tendrán su opción cuando lleguen. Mientras tanto, cualquier variable del programa se puede poner a mano, sin secretos:
+Las zonas de barrido son `cataluna`, `centro`, `andalucia`, `levante`, `norte`, `ebro-y-duero` y `oeste-y-canarias` (la guía de la ingesta, en [convex.md](convex.md), dice qué comunidades lleva cada una). Toda España en siete noches, con Cataluña todas:
+
+```nix
+services.celda-nocturna.registroOficial = {
+  zonas = [ "cataluna" ];
+  zonasEnTurno = [ "centro" "andalucia" "levante" "norte" "ebro-y-duero" "oeste-y-canarias" ];
+};
+```
+
+La ventana de fichas (#41) y antenasmoviles.es (#48) aún no existen en el programa. Tendrán su opción cuando lleguen. Mientras tanto, cualquier variable del programa se puede poner a mano, sin secretos:
 
 ```nix
 systemd.services.celda-nocturna.environment.CELDA_REGISTRO_MAX_PETICIONES = "100";

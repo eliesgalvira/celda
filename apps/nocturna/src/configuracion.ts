@@ -1,4 +1,6 @@
 import type { Fuente } from "@celda/dominio/observacion";
+import { opcionesZonasDesdeConfig } from "@celda/ingesta/barrido";
+import type { OpcionesCliente } from "@celda/ingesta/cliente";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
 import { opcionesProcesoDesdeConfig } from "@celda/ingesta/proceso";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
@@ -12,7 +14,7 @@ export interface Configuracion {
   /** El fichero SQLite con el estado entre noches. */
   readonly base: string;
   readonly noche: OpcionesNoche;
-  readonly registroOficial: RegistroOficial.Opciones;
+  readonly registroOficial: OpcionesCliente;
   readonly interruptores: Readonly<Record<Fuente, Interruptor>>;
 }
 
@@ -32,9 +34,12 @@ export const COPIAS_CONSERVADAS = 14;
  * - `CELDA_PUBLICAR_REINTENTO_MINUTOS`: espera antes de repetir una publicación fallida (60).
  * - `CELDA_REGISTRO_ACTIVO` y `CELDA_REGISTRO_MOTIVO`: el interruptor del registro oficial
  *   (encendido) y el motivo que se apunta si está apagado.
+ * - Las zonas de barrido del registro oficial: `CELDA_REGISTRO_ZONAS` (`cataluna`),
+ *   `CELDA_REGISTRO_ZONAS_EN_TURNO` (ninguna) y `CELDA_REGISTRO_ZONAS_POR_NOCHE` (1)
+ *   (`opcionesZonasDesdeConfig`).
  * - Las del extractor del registro oficial: `CELDA_REGISTRO_PAUSA_SEGUNDOS`,
  *   `CELDA_REGISTRO_MAX_PETICIONES`, `CELDA_REGISTRO_USER_AGENT`, `CELDA_REGISTRO_REINTENTOS` y
- *   `CELDA_REGISTRO_ESPERA_SEGUNDOS` (`RegistroOficial.opcionesDesdeConfig`).
+ *   `CELDA_REGISTRO_ESPERA_SEGUNDOS` (`RegistroOficial.opcionesClienteDesdeConfig`).
  *
  * antenasmoviles.es y OpenCelliD no tienen extractor en la ingesta nocturna todavía: quedan
  * apagados. Dónde se publica lo dice `almacenDesdeConfig` (`@celda/publicacion`).
@@ -46,10 +51,11 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
     Config.withDefault(COPIAS_CONSERVADAS),
   ),
   proceso: opcionesProcesoDesdeConfig,
+  zonas: opcionesZonasDesdeConfig,
   reintentoMinutos: Config.Int("CELDA_PUBLICAR_REINTENTO_MINUTOS").pipe(
     Config.withDefault(Duration.toMinutes(REINTENTO_DE_PUBLICACION)),
   ),
-  registroOficial: RegistroOficial.opcionesDesdeConfig,
+  registroOficial: RegistroOficial.opcionesClienteDesdeConfig,
   registroActivo: Config.Boolean("CELDA_REGISTRO_ACTIVO").pipe(
     Config.withDefault(INTERRUPTOR_POR_DEFECTO["registro-oficial"].activo),
   ),
@@ -60,7 +66,7 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
   Config.map((c): Configuracion => ({
     base: c.base,
     noche: {
-      proceso: c.proceso,
+      proceso: { ...c.proceso, zonas: c.zonas },
       reintento: Duration.minutes(Math.max(c.reintentoMinutos, 0)),
       copias: { carpeta: c.carpetaDeCopias, conservar: Math.max(c.conservar, 1) },
     },

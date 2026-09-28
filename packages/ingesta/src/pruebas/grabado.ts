@@ -1,20 +1,31 @@
-import type { Banda } from "@celda/dominio/banda";
+import { type Banda, compararTexto } from "@celda/dominio/banda";
 import type { Fuente } from "@celda/dominio/observacion";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
+import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import { Extractor, type Listado, type Registro, RespuestaInesperada } from "../extractor.ts";
+import {
+  Extractor,
+  ExtractorPorCajas,
+  type Listado,
+  type ListadoDeCaja,
+  type Registro,
+  RespuestaInesperada,
+} from "../extractor.ts";
 import {
   bandasDeFicha,
   bandasDeFilas,
   listadoDeElementos,
   RespuestaListado,
+  TOPE_LISTADO,
 } from "../registro-oficial/normalizar.ts";
+import type { Respondedor } from "./http.ts";
 import { decodificarLatin1 } from "../texto.ts";
+import { type Caja, enCaja } from "../zona.ts";
 
 /** Lo que devolvería una fuente: su listado y las bandas de cada ficha, por clave. */
 export interface FuenteGrabada {
@@ -33,14 +44,69 @@ export const capaGrabada = (fuente: Fuente, grabada: FuenteGrabada): Layer.Layer
     Extractor.of({
       fuente,
       listado: Effect.succeed(grabada.listado),
-      ficha: (registro: Registro) => {
-        const bandas = grabada.fichas.get(registro.clave);
-        return bandas === undefined
-          ? Effect.fail(new RespuestaInesperada({ url: registro.url, motivo: "ficha no grabada" }))
-          : Effect.succeed(bandas);
-      },
+      ficha: fichaGrabada(grabada),
     }),
   );
+
+const fichaGrabada = (grabada: FuenteGrabada) => (registro: Registro) => {
+  const bandas = grabada.fichas.get(registro.clave);
+  return bandas === undefined
+    ? Effect.fail(new RespuestaInesperada({ url: registro.url, motivo: "ficha no grabada" }))
+    : Effect.succeed(bandas);
+};
+
+/** Bytes por registro en el listado del registro oficial (investigación 08). */
+const BYTES_POR_REGISTRO = 617;
+
+/**
+ * `ExtractorPorCajas` de prueba que contesta como el geoportal a partir de una fuente grabada:
+ * los registros que caen en la caja, bordes incluidos, ordenados por clave y cortados en `tope`
+ * sin avisar más que con `enElTope`. Cada caja y cada ficha cuentan como una petición.
+ */
+export const capaGrabadaPorCajas = (
+  fuente: Fuente,
+  grabada: FuenteGrabada,
+  tope: number = TOPE_LISTADO,
+): Layer.Layer<ExtractorPorCajas> =>
+  Layer.effect(
+    ExtractorPorCajas,
+    Effect.gen(function* () {
+      const hechas = yield* Ref.make(0);
+      const registros = grabada.listado.registros.toSorted((a, b) =>
+        compararTexto(a.clave, b.clave),
+      );
+      return ExtractorPorCajas.of({
+        fuente,
+        caja: (caja: Caja) =>
+          Effect.as(
+            Ref.update(hechas, (n) => n + 1),
+            listadoEnCaja(registros, caja, tope),
+          ),
+        ficha: (registro) =>
+          Effect.andThen(
+            Ref.update(hechas, (n) => n + 1),
+            fichaGrabada(grabada)(registro),
+          ),
+        peticiones: Ref.get(hechas),
+      });
+    }),
+  );
+
+/** Lo que daría el geoportal para una caja con estos registros, ordenados por clave. */
+const listadoEnCaja = (
+  registros: ReadonlyArray<Registro>,
+  caja: Caja,
+  tope: number,
+): ListadoDeCaja => {
+  const dentro = registros.filter((r) => enCaja(caja, r.posicion.longitud, r.posicion.latitud));
+  const devueltos = dentro.slice(0, tope);
+  return {
+    registros: devueltos,
+    avisos: [],
+    enElTope: devueltos.length >= tope,
+    bytes: devueltos.length === 0 ? 2 : devueltos.length * BYTES_POR_REGISTRO,
+  };
+};
 
 /** Carpeta de las respuestas grabadas en la investigación del registro oficial. */
 const carpetaDeMuestras = Effect.gen(function* () {
@@ -145,4 +211,67 @@ export const leerMuestra = (nombre: string) =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     return yield* fs.readFile(path.join(yield* carpetaDeMuestras, nombre));
+  });
+
+const ListadoCrudo = Schema.fromJsonString(
+  Schema.Struct({ features: Schema.Array(Schema.Unknown) }),
+);
+const ElementoConPosicion = Schema.Struct({
+  id: Schema.String,
+  geometry: Schema.Struct({ coordinates: Schema.Tuple([Schema.Finite, Schema.Finite]) }),
+});
+const decodificarListadoCrudo = Schema.decodeEffect(ListadoCrudo);
+const decodificarElemento = Schema.decodeUnknownEffect(ElementoConPosicion);
+
+/** Un elemento de un listado grabado, tal como llegó, con su `id` y su posición. */
+export interface ElementoGrabado {
+  readonly crudo: unknown;
+  readonly id: string;
+  readonly longitud: number;
+  readonly latitud: number;
+}
+
+/** Bytes en ISO-8859-1, como los manda el geoportal. */
+const latin1 = (texto: string): Uint8Array<ArrayBuffer> =>
+  Uint8Array.from(texto, (caracter) => caracter.charCodeAt(0));
+
+/**
+ * El geoportal con un listado grabado (`muestras/espana/listado-*`), para el cliente HTTP de
+ * prueba: contesta el listado de cualquier caja con los elementos grabados que caen en ella,
+ * bordes incluidos, ordenados por `id` y cortados en 1000 sin avisar, como el de verdad. Una caja
+ * sin elementos da `{}`, y `robots.txt` no existe.
+ */
+export const geoportalGrabado = (nombre: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const bytes = yield* fs.readFile(
+      path.join(yield* carpetaDeMuestras, "espana", `listado-${nombre}-2026-09-28.json`),
+    );
+    const { features } = yield* decodificarListadoCrudo(new TextDecoder().decode(bytes));
+    const leidos = yield* Effect.forEach(features, (crudo) =>
+      Effect.map(decodificarElemento(crudo), ({ id, geometry }): ElementoGrabado => ({
+        crudo,
+        id,
+        longitud: geometry.coordinates[0],
+        latitud: geometry.coordinates[1],
+      })),
+    );
+    const elementos = leidos.toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const responder: Respondedor = (url) => {
+      if (url.pathname === "/robots.txt") return { estado: 404, cuerpo: "" };
+      const [oeste = 0, sur = 0, este = 0, norte = 0] = (url.searchParams.get("bbox") ?? "")
+        .split(",")
+        .map(Number);
+      const dentro = elementos
+        .filter((e) => enCaja([oeste, sur, este, norte], e.longitud, e.latitud))
+        .slice(0, TOPE_LISTADO)
+        .map((e) => e.crudo);
+      const cuerpo =
+        dentro.length === 0
+          ? "{}"
+          : JSON.stringify({ type: "FeatureCollection", features: dentro });
+      return { estado: 200, cuerpo: latin1(cuerpo) };
+    };
+    return { responder, elementos };
   });
