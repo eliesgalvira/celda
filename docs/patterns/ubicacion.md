@@ -6,8 +6,8 @@ Cómo sabe Celda desde dónde mirar un emplazamiento. El punto de referencia es 
 
 `estado.ts` es una función pura, `transicion(ubicacion, evento)`, sin E/S. La interfaz solo le manda eventos y enseña lo que devuelve.
 
-- Estados asentados: `ninguna`, `denegada`, `gps` (con posición, precisión y fecha), `elegida` (con el `PuntoElegido`) y `fallo` (`sin-senal`, `tiempo-agotado` o `no-disponible`).
-- Estados de paso: `explicando` (el paso previo), `pidiendo` (esperando al navegador o a la primera lectura) y `eligiendo`. Guardan el asentado del que vienen. Cancelar vuelve a él, y mientras tanto su punto sigue siendo la referencia (`referenciaDe`).
+- Estados asentados: `ninguna`, `denegada`, `gps` (con posición, precisión y fecha), `elegida` (con el `PuntoElegido`) y `fallo` (`sin-senal`, `sin-fuente`, `tiempo-agotado` o `no-disponible`).
+- Estados de paso: `explicando` (el paso previo), `pidiendo` (esperando al navegador o a la primera lectura) y `eligiendo`. Guardan el asentado del que vienen. Cancelar vuelve a él, y mientras tanto su punto sigue siendo la referencia (`referenciaDe`). Desde `pidiendo` también se puede ir a elegir en el mapa, que deja de buscar la ubicación.
 - `permiso` va aparte (`concedido`, `preguntar`, `denegado`, `desconocido`), porque un punto elegido no depende de él y el menú tiene que saber si la ubicación está bloqueada aunque haya un punto.
 - `aviso` dice por qué acaba de fallar una petición, aunque el estado vuelva a un punto que ya había. Lo borra lo siguiente que haga la persona.
 
@@ -18,14 +18,16 @@ Reglas que comprueban las pruebas sobre todos los estados alcanzables y todos lo
 - Con el permiso bloqueado no hay ubicación GPS, ni se pide ni se explica.
 - Quitar deja siempre sin punto y con el GPS apagado.
 - Si se deniega el permiso teniendo un punto elegido, el punto se queda y el aviso dice qué ha pasado.
+- Quitar nunca impide volver a encender el GPS, salvo con el permiso bloqueado, y de `pidiendo` siempre se sale con cancelar, elegir en el mapa, quitar, una lectura o un fallo.
 
-`gpsEncendido(estado)` dice cuándo tiene que estar abierto el GPS: mientras se pide y mientras la ubicación GPS sea la referencia. `controlador.ts` abre la lectura con esa señal y la cierra al cambiar, así que quitar la ubicación o elegir un punto apaga el GPS.
+`gpsEncendido(estado)` dice cuándo tiene que estar abierto el GPS: mientras se pide y mientras la ubicación GPS sea la referencia. `controlador.ts` abre la lectura con esa señal y la cierra al cambiar, así que quitar la ubicación o elegir un punto apaga el GPS. La señal pasa por un `createMemo`: un efecto de Solid 2 vuelve a correr con cada cambio del estado aunque la señal no cambie, y sin el memo cada lectura cerraba el GPS y lo volvía a abrir (ver [herramientas.md](herramientas.md)).
 
 ## Servicios
 
 Tres servicios Effect, en `ServiciosDeDatos` (`datos.tsx`), con su capa real en `entrada.tsx` y la de prueba en `pruebas.ts`:
 
-- `Geolocalizacion` (`geolocalizacion.ts`). `permiso` es un flujo con el estado del permiso ahora y cada vez que cambia (API Permissions); leerlo no hace preguntar nada. `seguir` pide la ubicación con `watchPosition` y da cada lectura. Falla si la primera no llega en 20 s o si se bloquea el permiso; los fallos pasajeros posteriores no cortan el flujo. Sin API de geolocalización o sin https falla con `no-disponible`. La posición no sale de este servicio: no se guarda ni se envía.
+- `Geolocalizacion` (`geolocalizacion.ts`). `permiso` es un flujo con el estado del permiso ahora y cada vez que cambia (API Permissions); leerlo no hace preguntar nada. `seguir` pide la ubicación con `watchPosition` y da cada lectura. Falla si se bloquea el permiso o si la primera lectura no llega en 20 s desde que hay permiso (60 s como mucho desde que se pide, por si el navegador no avisa del permiso); los fallos pasajeros posteriores no cortan el flujo. La espera es propia, con el reloj de Effect: la opción `timeout` de `watchPosition` no basta, porque hay navegadores que no llaman a nada si no encuentran la posición, y entonces «Buscando tu ubicación» no acababa nunca. Sin API de geolocalización o sin https falla con `no-disponible`.
+  - En un ordenador, los códigos 2 (sin posición) y 3 (tiempo agotado) y la espera propia dan `sin-fuente`: el navegador no tiene de dónde sacar la posición. Un ordenador no tiene GPS y depende de un servicio que la calcula con las redes wifi cercanas. El Chromium de Arch Linux, con el permiso concedido, no contesta y a los 20 s da el código 3; el Firefox de la misma máquina da la posición con ±13 m. En el móvil, 2 es `sin-senal` y 3, `tiempo-agotado`. El tipo de dispositivo sale de `detectarDispositivo`, como en la brújula. La posición no sale de este servicio: no se guarda ni se envía.
 - `AlmacenLocal` (`almacen.ts`). Las aportaciones en IndexedDB, en la base `celda`, almacén `aportaciones`, con índice por `tipo`. `leer(tipo)`, `sustituir(aportacion)` (borra las de su tipo y guarda la nueva en una sola transacción) y `borrar(tipo)`. Las filas con un formato que no conoce (otra versión del esquema) se dejan estar y se avisa en el registro. La capa real recibe la `IDBFactory`: las pruebas le pasan la de `fake-indexeddb`, una IndexedDB en memoria, y así prueban el código real y no un sustituto.
 - `BuscadorDeDirecciones` (`buscador.ts`), sobre Nominatim. Ver abajo.
 
@@ -67,7 +69,7 @@ La consulta va limitada a los límites del mapa (`viewbox` y `bounded=1`), con `
 
 ## Interfaz
 
-- En el panel (`ReferenciaEnFicha`): sin punto, «¿Desde dónde lo miramos?» con lo que se gana y dos botones. Con el permiso bloqueado explica cómo reactivarlo y solo ofrece elegir en el mapa. Con punto, «Desde: tu ubicación (±25 m)» o «Desde: el punto elegido», «Cambiar» y «Quitar», y la distancia y el rumbo al emplazamiento. Con un punto elegido los textos hablan de «el punto», nunca de «ti» (`textos.ts`, con pruebas).
+- En el panel (`ReferenciaEnFicha`): sin punto, «¿Desde dónde lo miramos?» con lo que se gana y dos botones. Con el permiso bloqueado explica cómo reactivarlo y solo ofrece elegir en el mapa. Si la ubicación no ha llegado, dice por qué y ofrece «Volver a intentarlo» y «Elegir en el mapa»; el aviso de la cabecera, lo mismo. Mientras se busca, «Elegir en el mapa» y «Cancelar». Con punto, «Desde: tu ubicación (±25 m)» o «Desde: el punto elegido», «Cambiar» y «Quitar», y la distancia y el rumbo al emplazamiento. Con un punto elegido los textos hablan de «el punto», nunca de «ti» (`textos.ts`, con pruebas).
 - El paso previo es un `Dialogo` que se abre con «Usar mi ubicación». Solo «Continuar» pide el permiso; «Mejor elijo en el mapa», «Cerrar» o Escape no piden nada.
 - El botón «Ubicación» de los controles abre el menú: usar mi ubicación, elegir un punto, centrar y quitar. Lo que no se puede hacer queda a la vista, desactivado y con el motivo.
 - Elegir un punto: en escritorio, un clic en el mapa o buscar; el punto se arrastra con el ratón y se mueve con las flechas. En el móvil, un pin fijo en el centro, mover el mapa y «Usar este punto», o buscar. La hoja de la ficha se aparta mientras tanto.
@@ -99,4 +101,8 @@ Con un punto de referencia, la sección «Mejorar la señal» de la ficha dice h
 
 ## Pruebas de componente
 
-`Ubicacion.test.tsx` monta la app con `ubicacionDePrueba()`: un GPS que no contesta hasta que la prueba llama a `responder` o `fallar`, un almacén en memoria y un buscador con respuestas fijas. Cuenta cuántas veces se pidió la ubicación, así que se puede comprobar que el paso previo va antes de pedirla. Para probar en Chromium, el contexto de Playwright concede el permiso con `permissions: ["geolocation"]` y `geolocation`; sin concederlo, Chromium sin interfaz lo deniega.
+`Ubicacion.test.tsx` monta la app con `ubicacionDePrueba()`: un GPS que no contesta hasta que la prueba llama a `responder` o `fallar`, un almacén en memoria y un buscador con respuestas fijas. Cuenta cuántas veces se pidió la ubicación, así que se puede comprobar que el paso previo va antes de pedirla y que una lectura nueva no vuelve a pedirla. `responderTarde` entrega una lectura a vigilancias ya quitadas, como un navegador que llama tarde.
+
+`geolocalizacion.test.ts` prueba la capa real con un `Geolocation` y un permiso de prueba (objetos, no mocks de módulos) y `TestClock`: la espera propia de 20 s, que no corre mientras el aviso del navegador está abierto, los códigos de error en el móvil y en el ordenador, y apagar y volver a encender.
+
+Para probar en Chromium, el contexto de Playwright concede el permiso con `permissions: ["geolocation"]` y `geolocation`; sin concederlo, Chromium sin interfaz lo deniega.
