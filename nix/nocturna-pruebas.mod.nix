@@ -12,7 +12,7 @@
       inherit (lib.meta) getExe;
       inherit (lib.modules) mkIf;
 
-      # Una autoridad y un certificado para el geoportal y el R2 de mentira. Son de la prueba: no
+      # Una autoridad y un certificado para el geoportal, antenasmoviles.es y el R2 de mentira. Son de la prueba: no
       # protegen nada.
       certificados =
         pkgs.runCommand "celda-nocturna-certificados-de-prueba"
@@ -23,14 +23,16 @@
               -days 36500 -subj "/CN=Autoridad de prueba" -keyout ca.key -out "$out/ca.pem"
             openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
               -subj "/CN=Fuentes de prueba" -keyout "$out/servidor.key" -out servidor.csr
-            printf "subjectAltName=DNS:geoportal.minetur.gob.es,DNS:cuenta.r2.cloudflarestorage.com" > san
+            printf "subjectAltName=DNS:geoportal.minetur.gob.es,DNS:antenasmoviles.es,DNS:cuenta.r2.cloudflarestorage.com" > san
             openssl x509 -req -in servidor.csr -CA "$out/ca.pem" -CAkey ca.key -CAcreateserial \
               -days 36500 -extfile san -out "$out/servidor.pem"
           '';
 
       # El geoportal contesta el listado de cada caja con los elementos grabados en el Campus Nord
-      # que caen en ella, y cada ficha con una grabada. R2 guarda lo que le llega en una carpeta y
-      # apunta la firma de cada petición.
+      # que caen en ella, y cada ficha con una grabada. antenasmoviles.es da como listado los
+      # marcadores grabados en el Campus Nord, las ER5 grabadas de Barcelona y una ER5 de Madrid, y
+      # el detalle grabado de cada marcador que lo tiene. R2 guarda lo que le llega en una carpeta
+      # y apunta la firma de cada petición.
       fuentesDePrueba =
         pkgs.writers.writePython3Bin "fuentes-de-prueba" { flakeIgnore = singleton "E501"; }
           /* python */ ''
@@ -42,7 +44,7 @@
             import urllib.parse
             from xml.sax.saxutils import escape
 
-            LISTADO, FICHA, CERTIFICADO, CLAVE, CARPETA = sys.argv[1:6]
+            LISTADO, FICHA, ANTENAS, CERTIFICADO, CLAVE, CARPETA = sys.argv[1:7]
             CUBOS = os.path.join(CARPETA, "r2")
             PETICIONES = os.path.join(CARPETA, "peticiones.log")
 
@@ -63,6 +65,21 @@
                 if not dentro:
                     return b"{}"
                 return json.dumps({"type": "FeatureCollection", "features": dentro}, ensure_ascii=False).encode("latin-1")
+
+
+            def showf():
+                marcadores = []
+                for nombre in ("v1-showf-er5_extracto-campus-nord.json", "v1-showf-er5_extracto-er5-barcelona.json"):
+                    marcadores.extend(json.loads(leer(os.path.join(ANTENAS, nombre))))
+                # Una ER5 sin compañía fuera de Cataluña: nunca se pide su detalle.
+                marcadores.append([40.4168, -3.7038, ["MV-MADRID-PRUEBA"], "er5", ""])
+                # Sin espacios, como la respuesta real.
+                return json.dumps(marcadores, ensure_ascii=False, separators=(",", ":")).encode()
+
+
+            def detalle(consulta):
+                ruta = os.path.join(ANTENAS, f"v1-markers_{consulta['id'][0]}.json")
+                return leer(ruta) if os.path.isfile(ruta) else b"[]"
 
 
             class Fuentes(http.server.BaseHTTPRequestHandler):
@@ -93,6 +110,15 @@
                             return self.responder(200, listado(consulta), "application/json")
                         if ruta == "/VCTEL/detalleEstacion.do":
                             return self.responder(200, leer(FICHA), "text/html")
+                        return self.responder(404)
+                    if host == "antenasmoviles.es":
+                        if ruta == "/robots.txt":
+                            return self.responder(200, leer(os.path.join(ANTENAS, "robots.txt")))
+                        if ruta == "/v1/showf":
+                            return self.responder(200, showf(), "application/json")
+                        if ruta == "/v1/markers":
+                            consulta = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                            return self.responder(200, detalle(consulta), "application/json")
                         return self.responder(404)
                     if firma == "":
                         return self.responder(403)
@@ -168,6 +194,9 @@
                 "centro"
                 "andalucia"
               ];
+              antenasmoviles.enable = true;
+              antenasmoviles.maxDetalles = 4;
+              antenasmoviles.zonas = singleton "cataluna";
             };
 
             # La prueba mueve el reloj para disparar el temporizador.
@@ -175,6 +204,7 @@
 
             networking.hosts."127.0.0.1" = [
               "geoportal.minetur.gob.es"
+              "antenasmoviles.es"
               "cuenta.r2.cloudflarestorage.com"
             ];
 
@@ -184,7 +214,7 @@
               wantedBy = singleton "multi-user.target";
 
               serviceConfig = {
-                ExecStart = "${getExe fuentesDePrueba} ${../docs/investigacion/muestras/geojson-campus-nord.iso-8859-1.json} ${../docs/investigacion/muestras/detalle-telefonica-0800942.iso-8859-1.html} ${certificados}/servidor.pem ${certificados}/servidor.key /var/lib/fuentes-de-prueba";
+                ExecStart = "${getExe fuentesDePrueba} ${../docs/investigacion/muestras/geojson-campus-nord.iso-8859-1.json} ${../docs/investigacion/muestras/detalle-telefonica-0800942.iso-8859-1.html} ${../docs/investigacion/muestras/antenasmoviles} ${certificados}/servidor.pem ${certificados}/servidor.key /var/lib/fuentes-de-prueba";
                 StateDirectory = "fuentes-de-prueba";
               };
             };
@@ -247,6 +277,21 @@
                   # Los 19 cuadros de las dos zonas, una petición cada uno: ninguno llega al tope.
                   listados = maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log").strip()
                   assert listados == "19", listados
+
+              with subtest("antenasmoviles.es: un listado y el detalle de las ER5 pendientes de Cataluña, hasta el tope"):
+                  assert "antenasmoviles: encendida" in estado, estado
+                  assert "- cataluna: completado, 9 cuadros, 4 peticiones, 0 kB, 83 registros" in estado, estado
+                  listados = maquina.succeed("grep --count 'GET antenasmoviles.es /v1/showf' /var/lib/fuentes-de-prueba/peticiones.log").strip()
+                  assert listados == "1", listados
+                  detalles = [
+                      linea.split()[2].removeprefix("/v1/markers?id=")
+                      for linea in maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
+                      if linea.startswith("GET antenasmoviles.es /v1/markers?")
+                  ]
+                  # Primero las dos ER5 sin compañía de Barcelona; nunca la de Madrid ni las copias del registro.
+                  assert detalles == ["ER5-08033-1", "MIC-08902-1", "CATR2888X", "CATR6031A"], detalles
+                  # La ER5 de Orange de Urquinaona se publica citando antenasmoviles.es con su enlace.
+                  maquina.succeed("grep --recursive --fixed-strings --quiet 'https://antenasmoviles.es/#19/41.389648/2.173639' /var/lib/fuentes-de-prueba/r2/celda")
 
               with subtest("el servicio corre endurecido"):
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))
