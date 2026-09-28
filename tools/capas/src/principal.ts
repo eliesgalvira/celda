@@ -1,6 +1,7 @@
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import { CACHE_INMUTABLE, CACHE_VIGENTE } from "@celda/publicacion/almacenes/r2";
-import { conCuadros } from "@celda/publicacion/zonas";
+import { publicar as publicarDatos } from "@celda/publicacion/publicar";
+import { conCuadros, zonasDePublicacion } from "@celda/publicacion/zonas";
 import { publicar as publicarInstantanea } from "@celda/convex/publicacion";
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import { NodeHttpServer, NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -20,20 +21,23 @@ import * as NodeHttp from "node:http";
 import { convexPorHttp } from "./convex.ts";
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
 import { descargarMunicipios, leerMunicipios, leerPadron } from "./descargaDeMunicipios.ts";
+import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
 
 /**
- * Generador de capas. Cinco órdenes:
+ * Generador de capas. Seis órdenes:
  *
  * - `publicar`: publica la instantánea de un despliegue de Convex en una carpeta, igual que la
- *   publicación automática tras cada ingesta: la capa, las fichas de la misma versión, con el
- *   municipio y la provincia de cada emplazamiento, y `vigente.json`. Sirve para publicar desde
- *   otro despliegue sin configurarle un almacén.
+ *   publicación automática tras cada ingesta: el resumen nacional, la capa y las fichas de cada
+ *   provincia y `vigente.json`. Sirve para publicar desde otro despliegue sin configurarle un
+ *   almacén.
  * - `servir`: sirve esa carpeta como origen estático local, con las cabeceras de la CDN.
  * - `barrios`: descarga de Open Data BCN los límites de barrio y los guarda en el repositorio.
  * - `poblacion`: descarga de Open Data BCN el padrón más reciente y guarda los habitantes de
  *   cada barrio, con su área y su límite, donde los lee la web.
  * - `municipios`: descarga los límites de municipios y provincias del IGN y el padrón del INE, y
  *   los guarda en el repositorio junto a los barrios (ADR 0017).
+ * - `sintetica`: publica en la carpeta una España sintética de `CELDA_SINTETICOS` emplazamientos
+ *   (100.000 por defecto), con la publicación de verdad, para medir el mapa (ADR 0016).
  */
 
 /** Dónde se publican las capas. El origen es la URL con la que la web las descarga. */
@@ -106,6 +110,25 @@ const publicar = Effect.gen(function* () {
     `${publicada.escritos} ficheros escritos`,
     `resumen y capas de provincia de ${publicada.bytesCapa} bytes, fichas de ${publicada.bytesFichas} bytes`,
     `(el lote mayor, ${publicada.bytesLoteMayor})`,
+  );
+});
+
+const sintetica = Effect.gen(function* () {
+  const capas = yield* configCapas;
+  const cuantos = yield* Config.Int("CELDA_SINTETICOS").pipe(Config.withDefault(100_000));
+  const publicada = yield* publicarDatos(yield* zonasDePublicacion).pipe(
+    // Punto de entrada de la orden: aquí se montan sus capas, una vez.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    Effect.provide(
+      Layer.merge(
+        almacenEnCarpeta({ carpeta: capas.carpeta, origen: capas.origen.replace(/\/$/u, "") }),
+        datosSinteticos(cuantos, FECHA_SINTETICA),
+      ),
+    ),
+  );
+  yield* Effect.log(
+    `${publicada.version}: ${publicada.emplazamientos} emplazamientos sintéticos en ${publicada.lotes} lotes`,
+    `resumen y capas de provincia de ${publicada.bytesCapa} bytes`,
   );
 });
 
@@ -183,7 +206,7 @@ class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesc
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «publicar», «servir», «barrios», «poblacion» o «municipios».`;
+    return `Orden desconocida «${this.orden}». Usa «publicar», «servir», «barrios», «poblacion», «municipios» o «sintetica».`;
   }
 }
 
@@ -194,6 +217,7 @@ const principal = Effect.gen(function* () {
   if (orden === "barrios") return yield* barrios;
   if (orden === "poblacion") return yield* poblacion;
   if (orden === "municipios") return yield* municipios;
+  if (orden === "sintetica") return yield* sintetica;
   return yield* new OrdenDesconocida({ orden });
 });
 
