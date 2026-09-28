@@ -41,6 +41,10 @@ El backend y la ingesta tienen su propia guía: [docs/patterns/convex.md](docs/p
 
 Las simulaciones también: [docs/patterns/simulaciones.md](docs/patterns/simulaciones.md). Explica la interfaz fija, cómo se añade una sin tocar el resto y cómo se generan sus ficheros de referencia.
 
+## Rendimiento
+
+Antes de tocar algo que afecte a la carga o a la fluidez del mapa, lee [docs/patterns/rendimiento.md](docs/patterns/rendimiento.md): qué se midió, qué se descartó y cómo repetir la medida con `tools/rendimiento`.
+
 ## Herramientas
 
 Qué hace cada herramienta y qué hubo que ajustar para las RC: [docs/patterns/herramientas.md](docs/patterns/herramientas.md). Las versiones se fijan exactas en el catálogo de `pnpm-workspace.yaml` y se suben en commits propios.
