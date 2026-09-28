@@ -1,7 +1,7 @@
 import { EmplazamientoSinEstaciones, EstacionBase } from "@celda/dominio/emplazamiento";
 import { Fuente } from "@celda/dominio/observacion";
 import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
-import { SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
+import { erroresDeOmitida, INTERRUPTOR_POR_DEFECTO, SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
 import { ObservacionDePunto, Punto } from "@celda/ingesta/extractor";
 import {
   observacionDe,
@@ -34,7 +34,6 @@ import refs from "./_generated/refs";
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 import ingesta from "./ingesta.spec";
-import { INTERRUPTOR_POR_DEFECTO } from "./tables/interruptores";
 
 const mismoEmplazamiento = Schema.toEquivalence(EmplazamientoSinEstaciones);
 const mismaEstacion = Schema.toEquivalence(EstacionBase);
@@ -91,7 +90,7 @@ const iniciar = FunctionImpl.make(databaseSchema, ingesta, "iniciar", ({ fuente,
       cambios: SIN_CAMBIOS,
       errores: Option.match(apagado, {
         onNone: () => [],
-        onSome: (i) => [`Interruptor apagado: ${i.motivo}`],
+        onSome: erroresDeOmitida,
       }),
     });
     return {

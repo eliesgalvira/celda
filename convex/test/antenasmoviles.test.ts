@@ -26,7 +26,7 @@ import { TestClock } from "effect/testing";
 import refs from "../confect/_generated/refs";
 import crons from "../confect/crons";
 import { SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
-import { INTERRUPTOR_POR_DEFECTO } from "../confect/tables/interruptores";
+import { INTERRUPTOR_POR_DEFECTO } from "@celda/ingesta/ejecucion";
 import { OPCIONES_PROCESO_DE_PUNTOS } from "../src/proceso";
 import { ejecutar, ejecutarDePuntos, instantanea } from "./ayudas";
 import * as TestConfect from "./TestConfect";

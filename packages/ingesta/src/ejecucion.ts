@@ -1,4 +1,30 @@
+import type { Fuente } from "@celda/dominio/observacion";
 import * as Schema from "effect/Schema";
+
+/** Cómo está el interruptor de un extractor. */
+export interface Interruptor {
+  readonly activo: boolean;
+  readonly motivo: string;
+}
+
+/**
+ * Interruptor de cada fuente mientras nadie lo cambie. antenasmoviles.es empieza apagado: antes
+ * de publicar sus datos hay que escribir a su administrador (investigación de fuentes
+ * comunitarias).
+ */
+export const INTERRUPTOR_POR_DEFECTO: Readonly<Record<Fuente, Interruptor>> = {
+  "registro-oficial": { activo: true, motivo: "" },
+  antenasmoviles: {
+    activo: false,
+    motivo: "apagado por defecto hasta escribir a su administrador antes de publicar sus datos",
+  },
+  opencellid: { activo: false, motivo: "apagado por defecto: aún no tiene extractor" },
+};
+
+/** Lo que apunta una ejecución omitida por su interruptor. */
+export const erroresDeOmitida = (interruptor: Interruptor): ReadonlyArray<string> => [
+  `Interruptor apagado: ${interruptor.motivo}`,
+];
 
 /**
  * Cómo queda una ejecución de ingesta: omitida con el interruptor apagado, fallida si no se pudo
