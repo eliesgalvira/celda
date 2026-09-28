@@ -100,7 +100,8 @@ const Nombrado = Schema.Struct({ codigo: Schema.String, nombre: Schema.String })
 
 /**
  * El municipio y la provincia de un emplazamiento, tal como los cuenta su ficha. En el lote de
- * fichas la fuente va una sola vez, en `fuenteDeLugares`, y `leerLote` la copia en cada ficha.
+ * fichas la fuente va una sola vez, en `fuenteDeLugares`, y `leerLoteDeProvincia` la copia en
+ * cada ficha.
  */
 export const Lugar = Schema.Struct({
   /** `null` en un territorio compartido, fuera de España o en el mar lejos de la costa. */

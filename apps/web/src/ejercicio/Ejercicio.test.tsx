@@ -1,5 +1,4 @@
 import { ESQUEMA_AJUSTES } from "@celda/dominio/ajustes";
-import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
 import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
@@ -9,7 +8,7 @@ import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
-import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
+import { type CapaDePrueba, capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
@@ -17,7 +16,7 @@ import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 const NOCHE = Date.UTC(2026, 8, 26, 0, 15, 3);
 
 // Dos emplazamientos en Pedralbes, a unos 300 m, y uno fuera de Barcelona.
-const CAPA: CapaLeida = {
+const CAPA: CapaDePrueba = {
   version: "sitios@2026-09-25T23:44:53Z",
   fecha: Date.UTC(2026, 8, 25, 23, 44, 53),
   emplazamientos: [

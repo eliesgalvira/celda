@@ -1,4 +1,3 @@
-import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
 import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
@@ -8,7 +7,7 @@ import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
-import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
+import { type CapaDePrueba, capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { terminosSubrayados } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
 import { FICHA_COMPANIA_ANADIDA, FICHA_CORREGIDA, FICHA_NUEVA } from "./fichasCorregidas.ts";
@@ -16,7 +15,7 @@ import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 import { fichasDePrueba } from "./pruebas.ts";
 
 /** La capa de la misma instantánea que las fichas, con sus estados. */
-const CAPA: CapaLeida = {
+const CAPA: CapaDePrueba = {
   version: "sitios@2026-09-27T03:15:00Z",
   fecha: FICHA_CORREGIDA.version,
   emplazamientos: [FICHA_CORREGIDA, FICHA_NUEVA, FICHA_COMPANIA_ANADIDA].map((f) => ({

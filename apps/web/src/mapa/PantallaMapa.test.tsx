@@ -1,4 +1,3 @@
-import type { CapaLeida } from "@celda/dominio/capa";
 import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
@@ -8,13 +7,13 @@ import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
-import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
+import { type CapaDePrueba, capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
 import { textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
 import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 
-const CAPA: CapaLeida = {
+const CAPA: CapaDePrueba = {
   version: "sitios@2026-09-25T23:44:53Z",
   fecha: Date.UTC(2026, 8, 25, 23, 44, 53),
   emplazamientos: [
