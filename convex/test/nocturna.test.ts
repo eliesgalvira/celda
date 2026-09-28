@@ -11,7 +11,7 @@ import {
   unaNoche,
 } from "@celda/nocturna/pruebas/entorno";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
-import { limitesDeBarcelona } from "@celda/publicacion/barrios";
+import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -78,7 +78,7 @@ const compararNoches = (
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const carpetaDeConvex = path.join(yield* fs.makeTempDirectoryScoped(), "almacen");
-      const publicacion = publicacionDirecta(yield* limitesDeBarcelona, POR_LOTE).pipe(
+      const publicacion = publicacionDirecta(yield* zonasDePublicacion, POR_LOTE).pipe(
         Layer.provide(
           Layer.merge(
             almacenEnCarpeta({ carpeta: carpetaDeConvex, origen: "http://capas.prueba" }).pipe(

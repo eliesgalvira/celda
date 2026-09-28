@@ -7,7 +7,7 @@ import type { Extractor } from "@celda/ingesta/extractor";
 import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
-import { limitesDeBarcelona } from "@celda/publicacion/barrios";
+import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import * as Duration from "effect/Duration";
@@ -100,9 +100,9 @@ export const unaNoche = (
   variante: Variante = {},
 ) =>
   Effect.gen(function* () {
-    const limites = yield* limitesDeBarcelona;
+    const zonas = yield* zonasDePublicacion;
     const entornoDeLaNoche = Layer.mergeAll(
-      publicadorEn(limites, POR_LOTE).pipe(
+      publicadorEn(zonas, POR_LOTE).pipe(
         Layer.provide(variante.almacen ?? entorno.almacenVigilado),
       ),
       Layer.succeed(Extractores, Extractores.of({ registroOficial: extractor })),

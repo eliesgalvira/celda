@@ -17,8 +17,8 @@ import { leerMunicipios } from "./descargaDeMunicipios.ts";
 import { cruzarConElPadron, ficheroDeMunicipios, ficheroDePadron } from "./municipios.ts";
 
 /** Los ficheros que escribe `pnpm run municipios`, tal como están en el repositorio. */
-const MUNICIPIOS = "../../convex/datos/municipios.json";
-const PADRON = "../../convex/datos/padron.json";
+const MUNICIPIOS = "../../packages/publicacion/datos/municipios.json";
+const PADRON = "../../packages/publicacion/datos/padron.json";
 
 const decodificarLimites = Schema.decodeEffect(Schema.fromJsonString(LimitesDeMunicipios));
 const decodificarPadron = Schema.decodeEffect(Schema.fromJsonString(PadronDeMunicipios));

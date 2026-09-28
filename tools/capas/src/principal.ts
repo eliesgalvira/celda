@@ -18,14 +18,15 @@ import * as NodeHttp from "node:http";
 
 import { convexPorHttp } from "./convex.ts";
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
-import { descargarMunicipios } from "./descargaDeMunicipios.ts";
+import { descargarMunicipios, leerMunicipios } from "./descargaDeMunicipios.ts";
 
 /**
  * Generador de capas. Cinco órdenes:
  *
  * - `publicar`: publica la instantánea de un despliegue de Convex en una carpeta, igual que la
- *   publicación automática tras cada ingesta: la capa, las fichas de la misma versión y
- *   `vigente.json`. Sirve para publicar desde otro despliegue sin configurarle un almacén.
+ *   publicación automática tras cada ingesta: la capa, las fichas de la misma versión, con el
+ *   municipio y la provincia de cada emplazamiento, y `vigente.json`. Sirve para publicar desde
+ *   otro despliegue sin configurarle un almacén.
  * - `servir`: sirve esa carpeta como origen estático local, con las cabeceras de la CDN.
  * - `barrios`: descarga de Open Data BCN los límites de barrio y los guarda en el repositorio.
  * - `poblacion`: descarga de Open Data BCN el padrón más reciente y guarda los habitantes de
@@ -59,9 +60,9 @@ const configPoblacion = Config.String("CELDA_POBLACION").pipe(
  */
 const configMunicipios = Config.all({
   municipios: Config.String("CELDA_MUNICIPIOS").pipe(
-    Config.withDefault("../../convex/datos/municipios.json"),
+    Config.withDefault("../../packages/publicacion/datos/municipios.json"),
   ),
-  padron: Config.String("CELDA_PADRON").pipe(Config.withDefault("../../convex/datos/padron.json")),
+  padron: Config.String("CELDA_PADRON").pipe(Config.withDefault("../../packages/publicacion/datos/padron.json")),
   cache: Config.String("CELDA_CACHE").pipe(
     Config.orElse(() =>
       Config.String("XDG_CACHE_HOME").pipe(Config.map((carpeta) => `${carpeta}/celda`)),
@@ -82,7 +83,8 @@ const publicar = Effect.gen(function* () {
   const capas = yield* configCapas;
   const convex = yield* configConvex;
   const limites = yield* leerLimites(yield* configBarrios);
-  const publicada = yield* publicarInstantanea(limites).pipe(
+  const municipios = yield* leerMunicipios((yield* configMunicipios).municipios);
+  const publicada = yield* publicarInstantanea({ barrios: limites, municipios }).pipe(
     // Punto de entrada de la orden: aquí se montan sus capas, una vez.
     // @effect-diagnostics-next-line strictEffectProvide:off
     Effect.provide(

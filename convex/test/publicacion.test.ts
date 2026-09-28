@@ -9,6 +9,7 @@ import {
   versionDeCapa,
 } from "@celda/dominio/capa";
 import { leerLote } from "@celda/dominio/loteDeFichas";
+import { indexarMunicipios, type LimitesDeMunicipios } from "@celda/dominio/municipio";
 import { capaDePuntosGrabada, muestraAntenasMoviles } from "@celda/ingesta/pruebas/antenasmoviles";
 import { capaGrabada, type FuenteGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
@@ -67,6 +68,53 @@ const LIMITES: LimitesDeBarrios = {
   ],
 };
 
+/** Un vértice en cien milésimas de grado, como en los arcos de los límites de municipios. */
+const v = (grados: number) => Math.round(grados * 100_000);
+
+/**
+ * Dos municipios que parten la muestra por el mismo meridiano que el barrio: al oeste,
+ * L'Hospitalet; al este, Barcelona. El arco 0 es el límite que comparten.
+ */
+const MUNICIPIOS: LimitesDeMunicipios = {
+  fuente: {
+    atribucion: "Instituto Geográfico Nacional",
+    producto: "Base de Datos de Límites Jurisdiccionales de España",
+    licencia: "CC BY 4.0",
+    enlace: "https://www.ign.es/atom/dataset_feeds/lin_lim_mun.es.xml",
+    fecha: "2026-08-10",
+    huella: "sha256:prueba",
+  },
+  toleranciaMetros: 50,
+  unidadesPorGrado: 100_000,
+  provincias: [{ codigo: "08", nombre: "Barcelona", etiqueta: { longitud: 2.1, latitud: 41.5 } }],
+  territorios: [
+    {
+      codigo: "08019",
+      tipo: "municipio",
+      nombre: "Barcelona",
+      provincia: "08",
+      etiqueta: { longitud: 2.5, latitud: 41.5 },
+      areaKm2: 101,
+      poligonos: [[[~0, 2]]],
+    },
+    {
+      codigo: "08101",
+      tipo: "municipio",
+      nombre: "L'Hospitalet de Llobregat",
+      provincia: "08",
+      etiqueta: { longitud: 2.05, latitud: 41.5 },
+      areaKm2: 12,
+      poligonos: [[[0, 1]]],
+    },
+  ],
+  arcos: [
+    [v(2.115), v(41), 0, v(1)],
+    [v(2.115), v(42), -v(0.115), 0, 0, -v(1), v(0.115), 0],
+    [v(2.115), v(41), v(0.885), 0, 0, v(1), -v(0.885), 0],
+  ],
+};
+const ZONAS = { barrios: LIMITES, municipios: indexarMunicipios(MUNICIPIOS) };
+
 interface Escrituras {
   /** Ficheros escritos de nuevo, en orden, con `vigente.json` cada vez que cambia. */
   readonly escritos: ReadonlyArray<string>;
@@ -124,7 +172,7 @@ const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<A, E, R
 /** Publica a mano, con el Convex en memoria y el almacén de la prueba. */
 const publicar = (entorno: Entorno) =>
   Effect.gen(function* () {
-    return yield* publicarInstantanea(LIMITES, POR_LOTE).pipe(
+    return yield* publicarInstantanea(ZONAS, POR_LOTE).pipe(
       Effect.provide(Layer.merge(entorno.almacen, yield* convexEnMemoria)),
     );
   });
@@ -134,7 +182,7 @@ const publicacionContada = (entorno: Entorno, llamadas: Ref.Ref<number>) =>
   Effect.gen(function* () {
     const directa = yield* Effect.service(Publicacion).pipe(
       Effect.provide(
-        publicacionDirecta(LIMITES, POR_LOTE).pipe(
+        publicacionDirecta(ZONAS, POR_LOTE).pipe(
           Layer.provide(Layer.merge(entorno.almacen, yield* convexEnMemoria)),
         ),
       ),
@@ -210,7 +258,8 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
           assert.strictEqual(e.barrio, e.posicion.longitud < 2.115 ? "21" : null, e.clave);
         }
 
-        // Cada clave de la capa tiene su ficha en su lote, igual que la da Convex.
+        // Cada clave de la capa tiene su ficha en su lote, igual que la da Convex y con el
+        // municipio y la provincia en que cae.
         for (const e of capa.success.emplazamientos) {
           const lote = e.lote ?? -1;
           const leido = leerLote(
@@ -222,9 +271,17 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
           if (Result.isFailure(leido)) return;
           const ficha = leido.success.fichas.find((f) => f.clave === e.clave);
           const deConvex = yield* convex.query(refs.internal.datos.ficha, { clave: e.clave });
+          const lugar = {
+            municipio:
+              e.posicion.longitud < 2.115
+                ? { codigo: "08101", nombre: "L'Hospitalet de Llobregat" }
+                : { codigo: "08019", nombre: "Barcelona" },
+            provincia: { codigo: "08", nombre: "Barcelona" },
+            fuente: MUNICIPIOS.fuente,
+          };
           assert.deepStrictEqual(
             Option.some(ficha),
-            Option.map(deConvex, (f) => f),
+            Option.map(deConvex, (f) => ({ ...f, lugar })),
             e.clave,
           );
           assert.isAtMost(ficha?.version ?? Infinity, NOCHE, e.clave);

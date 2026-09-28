@@ -25,9 +25,9 @@ export default defineConfig({
       "**/referencia/**",
       // Límites de barrio que escribe `pnpm run barrios`, con un barrio por línea.
       "tools/capas/datos/**",
-      // Límites de barrio y de municipios y padrón que escriben las órdenes de `tools/capas`, con
-      // un elemento por línea.
-      "convex/datos/**",
+      // Límites de municipios y padrón que escribe `pnpm run municipios`, con un elemento por línea.
+      "packages/publicacion/datos/municipios.json",
+      "packages/publicacion/datos/padron.json",
       // Código que generan Confect y Convex.
       "convex/convex/**",
       "convex/confect/_generated/**",

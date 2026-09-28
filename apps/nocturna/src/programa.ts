@@ -1,4 +1,3 @@
-import type { LimitesDeBarrios } from "@celda/dominio/barrio";
 import type { Fuente } from "@celda/dominio/observacion";
 import type { Extractor } from "@celda/ingesta/extractor";
 import { ejecutarIngesta, type OpcionesProceso } from "@celda/ingesta/proceso";
@@ -10,6 +9,7 @@ import {
   publicar,
   type ResultadoPublicacion,
 } from "@celda/publicacion/publicar";
+import type { ZonasDePublicacion } from "@celda/publicacion/zonas";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
 import * as Context from "effect/Context";
@@ -55,12 +55,12 @@ const PASAJEROS: ReadonlySet<FalloPublicacion["_tag"]> = new Set([
 ]);
 
 /** El publicador sobre los `DatosPublicables` de la base y el almacén del contexto. */
-export const publicadorEn = (limites: LimitesDeBarrios, porLote?: number) =>
+export const publicadorEn = (zonas: ZonasDePublicacion, porLote?: number) =>
   Layer.effect(
     Publicador,
     Effect.map(Effect.context<DatosPublicables | AlmacenDeFicheros>(), (contexto) =>
       Publicador.of({
-        publicar: publicar(limites, porLote).pipe(
+        publicar: publicar(zonas, porLote).pipe(
           Effect.map((publicada): Intento => ({ resultado: publicada, reintentar: false })),
           Effect.catch((fallo) =>
             Effect.succeed<Intento>({
