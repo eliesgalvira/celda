@@ -17,12 +17,15 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 - **El worker de MapLibre 6.** MapLibre busca `maplibre-gl-worker.mjs` junto a su propio fichero, y el empaquetador lo mueve. `apps/web/src/mapa/mapaBase.ts` lo importa con `?worker&url` y llama a `setWorkerUrl`.
 - **`modulePreload.resolveDependencies` en `apps/web/vite.config.ts`.** Un `import()` pide su trozo cuando acaba la tarea que lo llama, y evaluar la web es una tarea larga. Con el propio trozo en la lista, el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Así MapLibre empieza a bajar desde `src/mapa/precarga.ts` mientras se evalúa el resto (ver [rendimiento.md](rendimiento.md)).
 - **Solid de desarrollo solo en las pruebas.** `apps/web/vite.config.ts` pide la condición `development` solo con `mode === "test"`. Antes la pedía siempre y la build publicada llevaba el Solid de desarrollo, con sus avisos en la consola y comprobaciones en cada lectura.
-- **Un memo delante de los efectos que abren algo.** En Solid 2 (RC 9) los efectos no comparan valores: la segunda función de `createEffect` corre, y antes limpia la vez anterior, cada vez que cambia algo que lee la primera, aunque esta devuelva lo mismo. Si el efecto abre el GPS o la brújula según un `true`/`false` calculado del estado, cada lectura lo cerraba y lo volvía a abrir (3135 veces `watchPosition` en 7 s). La primera función lee un `createMemo`, que sí compara, y el efecto solo corre al encender o apagar (`ubicacion/controlador.ts`, `mejorar/MejorarSenal.tsx`).
+- **`recurso()` para abrir cualquier cosa desde Solid.** En Solid 2 (RC 9) los efectos no comparan valores: la segunda función de `createEffect` corre otra vez cada vez que cambia algo que lee la primera, aunque devuelva lo mismo. Así el GPS se abrió 3135 veces en 7 s. `recurso()` pasa la clave por un memo que compara. Ver [efectos.md](efectos.md).
+- **Las pruebas desmontan lo que montan.** `@solidjs/testing-library` solo lo hace sola con los globales de Vitest, que están apagados. Lo hace `packages/ui/src/pruebas/vigilante.ts`, que se carga en todas las pruebas de `apps/web` y `packages/ui`.
 - **`tema.css?raw` en Vitest.** Vitest devuelve vacías las hojas de estilo; `packages/ui/vite.config.ts` incluye `tema.css` en `test.css` para que las pruebas lean los tokens.
 - **`maplibre-gl.css` en una capa.** Se importa con `layer(base)` para que las utilidades de Tailwind ganen a sus reglas.
 - **oxfmt no toca la prosa.** Markdown y HTML quedan fuera del formateador.
 
 ## Medida
+
+`tools/rendimiento` también tiene la prueba de resistencia (`pnpm run resistencia`), que sí corre en la CI, en su propio trabajo y con el Chromium de `nix develop .#resistencia`. Ver [efectos.md](efectos.md).
 
 `tools/rendimiento` mide la carga y la fluidez con Chromium sin interfaz y `playwright-core`, que no descarga navegadores: usa el Chromium del sistema (`--chromium` o `CELDA_CHROMIUM`). Cómo se usa y qué salió: [rendimiento.md](rendimiento.md). No tiene pruebas ni corre en la CI, porque necesita GPU y conexión con OpenFreeMap. Sus ficheros llevan `@effect-diagnostics` apagados para `node:*` y `setTimeout`: el script no usa Effect.
 
@@ -30,7 +33,7 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 
 `vite.config.ts` de la raíz configura oxlint: categorías de corrección, sospechosos y rendimiento como errores, `jsx-a11y`, y tres plugins locales de `tools/oxlint-plugin-celda`:
 
-- `celda`: la regla de estilos (ver [ui.md](ui.md)) y cuatro reglas genéricas de Effect copiadas de un proyecto anterior del autor.
+- `celda`: la regla de estilos (ver [ui.md](ui.md)), `abrir-con-recurso` (ver [efectos.md](efectos.md)) y cuatro reglas genéricas de Effect copiadas de un proyecto anterior del autor.
 - `anti-slop` y `anti-slop-effect`: copia de `dmmulroy/anti-slop` (MIT), con su licencia en la carpeta.
 
 El modo con tipos de oxlint está apagado: los diagnósticos de Effect los da `typecheck`.
