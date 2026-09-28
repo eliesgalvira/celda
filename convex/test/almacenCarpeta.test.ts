@@ -106,4 +106,24 @@ describe("almacén de ficheros en una carpeta", () => {
       }),
     ),
   );
+
+  // La retención borra los lotes de una versión varios a la vez. Los dos últimos pueden ver la
+  // carpeta vacía a la vez y querer borrarla los dos.
+  it.effect("borra a la vez los lotes de una versión sin fallar al quitar su carpeta", () =>
+    conCarpeta((carpeta) =>
+      Effect.gen(function* () {
+        const almacen = yield* AlmacenDeFicheros;
+        const fs = yield* FileSystem.FileSystem;
+        for (let vuelta = 0; vuelta < 20; vuelta += 1) {
+          const lotes = Array.from(
+            { length: 8 },
+            (_, lote) => `fichas@2026-09-26T02:15:00Z/${lote}.json`,
+          );
+          yield* Effect.forEach(lotes, (lote) => almacen.guardar(lote, "{}"), { discard: true });
+          yield* Effect.forEach(lotes, almacen.borrar, { concurrency: "unbounded", discard: true });
+          assert.deepStrictEqual(yield* fs.readDirectory(carpeta), []);
+        }
+      }),
+    ),
+  );
 });
