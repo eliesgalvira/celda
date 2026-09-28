@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { leerFicha } from "../src/lecturas";
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 import capas from "./capas.spec";
@@ -61,6 +62,17 @@ const instantanea = FunctionImpl.make(
 );
 
 /**
+ * Las fichas de un lote. Con 64 emplazamientos lee unos 500 documentos, lejos del límite de 4096
+ * lecturas por función.
+ */
+const fichas = FunctionImpl.make(databaseSchema, capas, "fichas", ({ claves }) =>
+  Effect.forEach(claves, leerFicha).pipe(
+    Effect.map((leidas) => leidas.flatMap(Option.toArray)),
+    Effect.orDie,
+  ),
+);
+
+/**
  * Apunta una capa publicada. Registrar otra vez la misma versión solo actualiza su URL: el
  * fichero es el mismo y puede haber cambiado de origen.
  */
@@ -83,7 +95,7 @@ const registrar = FunctionImpl.make(databaseSchema, capas, "registrar", (capa) =
   }).pipe(Effect.orDie),
 );
 
-/** La capa que debe cargar el mapa: la de la instantánea más reciente. */
+/** La última capa registrada: la de la instantánea más reciente. */
 const vigente = FunctionImpl.make(databaseSchema, capas, "vigente", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
@@ -99,6 +111,7 @@ const vigente = FunctionImpl.make(databaseSchema, capas, "vigente", () =>
 
 export default GroupImpl.make(databaseSchema, capas).pipe(
   Layer.provide(instantanea),
+  Layer.provide(fichas),
   Layer.provide(registrar),
   Layer.provide(vigente),
   GroupImpl.finalize,

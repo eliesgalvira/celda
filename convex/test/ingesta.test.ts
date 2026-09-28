@@ -176,7 +176,7 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
         assert.strictEqual(yield* Ref.get(llamadas), 0);
         assert.deepStrictEqual(yield* instantanea, antes);
 
-        const [estado] = yield* convex.query(refs.public.ingesta.estado);
+        const [estado] = yield* convex.query(refs.internal.ingesta.estado);
         assert.strictEqual(estado?.activo, false);
         assert.deepStrictEqual(
           estado?.ejecuciones.map((e) => e.estado),
@@ -213,7 +213,7 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
         assert.strictEqual(salida._tag, "Failure");
         const final = yield* ejecutar(registroOficial(grabada));
         const convex = yield* TestConfect.TestConfect;
-        const [estado] = yield* convex.query(refs.public.ingesta.estado);
+        const [estado] = yield* convex.query(refs.internal.ingesta.estado);
         assert.deepStrictEqual(
           estado?.ejecuciones.map((e) => e.estado),
           ["completada", "interrumpida"],
@@ -271,7 +271,7 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
           assert.strictEqual(fallida.fin, NOCHE + DIA);
           assert.deepStrictEqual(yield* instantanea, antes);
 
-          const [estado] = yield* convex.query(refs.public.ingesta.estado);
+          const [estado] = yield* convex.query(refs.internal.ingesta.estado);
           assert.deepStrictEqual(
             estado?.ejecuciones.map((e) => [e.estado, e.inicio]),
             [
@@ -288,21 +288,21 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
       Effect.gen(function* () {
         const convex = yield* TestConfect.TestConfect;
         const grabada = yield* muestraCampusNord;
-        assert.deepStrictEqual(yield* convex.query(refs.public.datos.version), {
+        assert.deepStrictEqual(yield* convex.query(refs.internal.datos.version), {
           version: null,
           consultas: [],
         });
 
         yield* TestClock.setTime(NOCHE);
         yield* ejecutar(registroOficial(grabada));
-        assert.deepStrictEqual(yield* convex.query(refs.public.datos.version), {
+        assert.deepStrictEqual(yield* convex.query(refs.internal.datos.version), {
           version: NOCHE,
           consultas: [{ fuente: "registro-oficial", consultadoEl: NOCHE }],
         });
 
         yield* TestClock.adjust(DIA);
         yield* ejecutar(registroOficial(unDiaDespues(grabada)));
-        assert.deepStrictEqual(yield* convex.query(refs.public.datos.version), {
+        assert.deepStrictEqual(yield* convex.query(refs.internal.datos.version), {
           version: NOCHE + DIA,
           consultas: [{ fuente: "registro-oficial", consultadoEl: NOCHE + DIA }],
         });
@@ -317,12 +317,12 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
           retirados: 1,
         });
         assert.strictEqual(
-          (yield* convex.query(refs.public.datos.version)).version,
+          (yield* convex.query(refs.internal.datos.version)).version,
           NOCHE + 2 * DIA,
         );
 
         // Campus Nord no ha cambiado: su ficha sigue con la versión y la fecha de la primera noche.
-        const campusNord = yield* convex.query(refs.public.datos.ficha, {
+        const campusNord = yield* convex.query(refs.internal.datos.ficha, {
           clave: "movistar-0802532",
         });
         assert.isTrue(Option.isSome(campusNord));
@@ -343,10 +343,10 @@ describe("ingesta del registro oficial (API de Convex en memoria)", () => {
           );
         }
         // La de Digi es nueva: su versión es la de la segunda noche.
-        const digi = yield* convex.query(refs.public.datos.ficha, { clave: "digi-0800143" });
+        const digi = yield* convex.query(refs.internal.datos.ficha, { clave: "digi-0800143" });
         assert.strictEqual(Option.map(digi, (f) => f.version).pipe(Option.getOrNull), NOCHE + DIA);
         assert.isTrue(
-          Option.isNone(yield* convex.query(refs.public.datos.ficha, { clave: "no-existe" })),
+          Option.isNone(yield* convex.query(refs.internal.datos.ficha, { clave: "no-existe" })),
         );
       }),
     ),

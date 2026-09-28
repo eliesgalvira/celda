@@ -32,7 +32,7 @@ const argumentosDePagina = { despuesDe: Schema.NullOr(Schema.String), limite: Sc
 
 /**
  * Ingesta: las funciones internas que usa el proceso de cada extractor, el interruptor y el
- * estado público de las ejecuciones. Las fechas llegan como argumento desde el proceso, que las
+ * estado de las ejecuciones, también interno. Las fechas llegan como argumento desde el proceso, que las
  * toma de su reloj. Cada función lee pocos documentos: Convex corta una función que lee más de
  * 4096, así que la fusión se lee y se escribe por páginas.
  */
@@ -216,7 +216,7 @@ export default GroupSpec.make()
     }),
   )
   .addFunction(
-    FunctionSpec.publicQuery({
+    FunctionSpec.internalQuery({
       name: "estado",
       returns: () => Schema.Array(EstadoFuente),
     }),

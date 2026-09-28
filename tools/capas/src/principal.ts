@@ -1,4 +1,7 @@
-import { publicarCapa } from "@celda/convex/capas";
+import { almacenEnCarpeta } from "@celda/convex/almacenes/carpeta";
+import { CACHE_INMUTABLE, CACHE_VIGENTE } from "@celda/convex/almacenes/r2";
+import { publicar as publicarInstantanea } from "@celda/convex/publicacion";
+import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import { NodeHttpServer, NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
@@ -6,21 +9,21 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import * as HttpStaticServer from "effect/unstable/http/HttpStaticServer";
 // NodeHttpServer necesita el constructor de servidores de Node.
 // @effect-diagnostics-next-line nodeBuiltinImport:off
 import * as NodeHttp from "node:http";
 
-import { almacenEnCarpeta } from "./almacen.ts";
 import { convexPorHttp } from "./convex.ts";
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
 
 /**
- * Generador de capas. Tres órdenes:
+ * Generador de capas. Cuatro órdenes:
  *
- * - `publicar`: lee la instantánea de Convex, le pone a cada emplazamiento su barrio con los
- *   límites guardados, escribe la capa en la carpeta del origen y la registra en Convex como
- *   vigente.
+ * - `publicar`: publica la instantánea de un despliegue de Convex en una carpeta, igual que la
+ *   publicación automática tras cada ingesta: la capa, las fichas de la misma versión y
+ *   `vigente.json`. Sirve para publicar desde otro despliegue sin configurarle un almacén.
  * - `servir`: sirve esa carpeta como origen estático local, con las cabeceras de la CDN.
  * - `barrios`: descarga de Open Data BCN los límites de barrio y los guarda en el repositorio.
  * - `poblacion`: descarga de Open Data BCN el padrón más reciente y guarda los habitantes de
@@ -33,8 +36,13 @@ const configCapas = Config.all({
   carpeta: Config.String("CELDA_CAPAS_CARPETA").pipe(Config.withDefault("salida")),
 });
 
-/** Los límites de barrio que usa `publicar` y que escribe `barrios`, guardados en git. */
-const configBarrios = Config.String("CELDA_BARRIOS").pipe(Config.withDefault("datos/barrios.json"));
+/**
+ * Los límites de barrio que usa `publicar` y que escribe `barrios`, guardados en git junto a la
+ * publicación de Convex, que también los lee.
+ */
+const configBarrios = Config.String("CELDA_BARRIOS").pipe(
+  Config.withDefault("../../convex/datos/barrios.json"),
+);
 
 /** Los habitantes por barrio que escribe `poblacion`: la web los lee de su carpeta. */
 const configPoblacion = Config.String("CELDA_POBLACION").pipe(
@@ -50,7 +58,7 @@ const publicar = Effect.gen(function* () {
   const capas = yield* configCapas;
   const convex = yield* configConvex;
   const limites = yield* leerLimites(yield* configBarrios);
-  const publicada = yield* publicarCapa(limites).pipe(
+  const publicada = yield* publicarInstantanea(limites).pipe(
     // Punto de entrada de la orden: aquí se montan sus capas, una vez.
     // @effect-diagnostics-next-line strictEffectProvide:off
     Effect.provide(
@@ -61,23 +69,29 @@ const publicar = Effect.gen(function* () {
     ),
   );
   yield* Effect.log(
-    `${publicada.version}: ${publicada.emplazamientos} emplazamientos, ${publicada.bytes} bytes`,
-    publicada.ficheroNuevo ? "fichero nuevo" : "el fichero ya estaba",
-    publicada.versionNueva ? "versión registrada" : "la versión ya estaba registrada",
-    publicada.url,
+    `${publicada.version} (${publicada.tipo}): ${publicada.emplazamientos} emplazamientos en ${publicada.lotes} lotes`,
+    `${publicada.escritos} ficheros escritos`,
+    `capa de ${publicada.bytesCapa} bytes, fichas de ${publicada.bytesFichas} bytes`,
+    `(el lote mayor, ${publicada.bytesLoteMayor})`,
   );
 });
-
-/** Un año e inmutable: cada versión es un fichero distinto que no cambia nunca (ADR 0004). */
-const CACHE_INMUTABLE = "public, max-age=31536000, immutable";
 
 const servir = Effect.gen(function* () {
   const { origen, carpeta } = yield* configCapas;
   const puerto = Number(new URL(origen).port);
   yield* Effect.log(`Origen estático de capas en ${origen}, desde la carpeta ${carpeta}`);
+  // `vigente.json` cambia en cada publicación: se sirve aparte, sin caché larga.
+  const vigente = HttpRouter.add(
+    "GET",
+    `/${FICHERO_VIGENTE}`,
+    HttpServerResponse.file(`${carpeta}/${FICHERO_VIGENTE}`, {
+      headers: { "cache-control": CACHE_VIGENTE, "content-type": "application/json" },
+    }).pipe(Effect.orElseSucceed(() => HttpServerResponse.empty({ status: 404 }))),
+  );
   return yield* Layer.launch(
     HttpRouter.serve(
       Layer.mergeAll(
+        vigente,
         HttpStaticServer.layer({ root: carpeta, cacheControl: CACHE_INMUTABLE }),
         HttpRouter.cors({ allowedMethods: ["GET", "HEAD"] }),
       ),
