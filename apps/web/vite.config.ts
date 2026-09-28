@@ -1,10 +1,12 @@
 import "vite-plus/test/config";
+import { iconosDeCelda } from "@celda/ui/marca/iconos.ts";
 import solid from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig(({ mode }) => ({
-  plugins: [tailwindcss(), solid()],
+  // El favicon, los iconos y el manifiesto salen de la marca y los tokens de @celda/ui.
+  plugins: [tailwindcss(), solid(), iconosDeCelda()],
   server: { port: 8840, strictPort: true },
   preview: { port: 8841, strictPort: true },
   // MapLibre (casi 1 MB) va en su propio trozo, que se descarga después de pintar la pantalla.
