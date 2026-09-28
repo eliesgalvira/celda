@@ -1,5 +1,6 @@
 import type { Coordenada } from "@celda/dominio/area";
 import { compararTexto } from "@celda/dominio/banda";
+import { type Cuadro, cuadroDe } from "@celda/dominio/barrido";
 import type { Compania } from "@celda/dominio/compania";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -10,6 +11,21 @@ import { huella } from "../huella.ts";
 import { companiaDeTitular, municipioDeDireccion } from "../registro-oficial/normalizar.ts";
 import { repararTexto } from "../texto.ts";
 import { type Caja, enCaja } from "../zona.ts";
+
+/** Qué puntos del listado de toda España se quedan, según su posición. */
+export type Filtro = (posicion: Coordenada) => boolean;
+
+/** Los puntos de una caja, bordes incluidos, como la de Barcelona que usa Convex. */
+export const enLaCaja =
+  (caja: Caja): Filtro =>
+  ({ longitud, latitud }) =>
+    enCaja(caja, longitud, latitud);
+
+/** Los puntos de unos cuadros de 1°, como los de las zonas de barrido de la noche. */
+export const enLosCuadros = (cuadros: ReadonlyArray<Cuadro>): Filtro => {
+  const dentro = new Set(cuadros);
+  return (posicion) => dentro.has(cuadroDe(posicion));
+};
 
 export const ORIGEN = "https://antenasmoviles.es";
 
@@ -45,6 +61,21 @@ export const companiaDeOperador = (operador: string): Compania | undefined =>
 /** Una ER5 es una estación que el registro oficial no publica y han añadido los usuarios. */
 const esEr5 = (operador: string): boolean => operador.trim().startsWith("er5");
 
+/**
+ * Orden de lectura del detalle de un punto (`Punto.prioridad`). Primero las ER5 que no dicen su
+ * compañía en el listado, que sin el detalle no se pueden poner en el mapa; luego las demás ER5, y
+ * al final los puntos que copian el registro oficial.
+ */
+export const PRIORIDAD = { er5SinCompania: 0, er5: 1, registro: 2 } as const;
+
+const prioridadDe = (operador: string): number => {
+  if (!esEr5(operador)) return PRIORIDAD.registro;
+  return companiaDeOperador(operador) === undefined ? PRIORIDAD.er5SinCompania : PRIORIDAD.er5;
+};
+
+/** Si el punto es una ER5, según su fila del listado. */
+export const esPuntoEr5 = (punto: Punto): boolean => punto.prioridad < PRIORIDAD.registro;
+
 const NUMERO = String.raw`-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?`;
 
 /**
@@ -70,14 +101,14 @@ const decodificarFila = Schema.decodeUnknownOption(FilaEnJson);
 export const esHtml = (texto: string): boolean => texto.trimStart().startsWith("<");
 
 /**
- * Los puntos de `zona` en el listado de toda España. Solo analiza las filas de la zona: el
+ * Los puntos del listado de toda España que deja pasar `dentro`. Solo analiza esas filas: el
  * listado ocupa unos 4 MB y el runtime de Convex tiene poca memoria. La huella de cada punto
  * es la de su fila tal como llega, así que cualquier cambio en sus códigos, compañías o bandas
  * la cambia. Salen ordenados por clave.
  */
 export const puntosDeListado = (
   texto: string,
-  zona: Caja,
+  dentro: Filtro,
 ): Result.Result<ListadoDePuntos & { readonly filas: number }, string> => {
   if (esHtml(texto)) {
     return Result.fail("la fuente ha devuelto una página HTML en lugar del listado");
@@ -91,7 +122,7 @@ export const puntosDeListado = (
   inicios.forEach((inicio, i) => {
     const latitud = Number(inicio[1]);
     const longitud = Number(inicio[2]);
-    if (!enCaja(zona, longitud, latitud)) {
+    if (!dentro({ longitud, latitud })) {
       return;
     }
     // La fila acaba justo antes de la coma que la separa de la siguiente, o del `]` final.
@@ -116,8 +147,7 @@ export const puntosDeListado = (
       codigos,
       posicion: { longitud, latitud },
       huella: huella(trozo),
-      // Las ER5 primero: son las correcciones que más se ven en el mapa.
-      prioridad: esEr5(operadores) ? 0 : 1,
+      prioridad: prioridadDe(operadores),
     });
   });
   return Result.succeed({

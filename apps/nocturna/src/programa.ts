@@ -4,7 +4,8 @@ import {
   type OpcionesBarrido,
   type ZonaEnLaEjecucion,
 } from "@celda/ingesta/barrido";
-import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
+import { ejecutarBarridoDePuntos, type OpcionesPuntos } from "@celda/ingesta/barridoDePuntos";
+import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
 import type { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import {
   DatosPublicables,
@@ -33,7 +34,10 @@ import { describirResumen } from "./estado.ts";
  */
 export class Extractores extends Context.Service<
   Extractores,
-  { readonly registroOficial: Layer.Layer<ExtractorPorCajas> }
+  {
+    readonly registroOficial: Layer.Layer<ExtractorPorCajas>;
+    readonly antenasMoviles: Layer.Layer<ExtractorDePuntos>;
+  }
 >()("@celda/nocturna/programa/Extractores") {}
 
 /** Un intento de publicar, y si merece la pena repetirlo al cabo de un rato. */
@@ -95,6 +99,8 @@ export interface OpcionesCopias {
 /** Lo que hace la noche, aparte de los extractores. */
 export interface OpcionesNoche {
   readonly proceso: OpcionesBarrido;
+  /** Lo que hace antenasmoviles.es: sus zonas y cuántos detalles lee. */
+  readonly puntos: OpcionesPuntos;
   /** Si publicar falla por algo pasajero, cuánto se espera para repetirlo una vez. */
   readonly reintento: Duration.Duration;
   readonly copias: OpcionesCopias;
@@ -169,11 +175,11 @@ const publicarYApuntar = Effect.fn("Nocturna.publicar")(function* (
   return intento;
 });
 
-/** Una ejecución del barrido por zonas con el extractor que da `capa`, construido para ella sola. */
-const ejecutarCon = (opciones: OpcionesBarrido, capa: Layer.Layer<ExtractorPorCajas>) =>
+/** Una ejecución con el extractor que da `capa`, construido para ella sola. */
+const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<A, E, R>) =>
   Effect.scoped(
     Effect.flatMap(Layer.build(capa), (extractor) =>
-      ejecutarBarrido(opciones).pipe(Effect.provideContext(extractor)),
+      ejecucion.pipe(Effect.provideContext(extractor)),
     ),
   );
 
@@ -186,8 +192,10 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
 /**
  * La noche entera:
  *
- * 1. Una ejecución de ingesta por fuente, con su interruptor: barre sus zonas de barrido, lee
- *    las fichas pendientes y fusiona (`ejecutarBarrido`).
+ * 1. Una ejecución de ingesta por fuente, con su interruptor. El registro oficial barre sus zonas
+ *    de barrido, lee las fichas pendientes y fusiona (`ejecutarBarrido`). antenasmoviles.es lee
+ *    su listado una vez, guarda los puntos de sus zonas, lee el detalle de las ER5 pendientes y
+ *    fusiona (`ejecutarBarridoDePuntos`).
  * 2. Publica la capa y las fichas. Sin cambios no escribe nada, y si la noche anterior no pudo
  *    publicar, lo hace ahora. Si falla por algo pasajero, lo apunta, espera `reintento` y lo
  *    intenta otra vez; si vuelve a fallar, queda para la noche siguiente. Los datos ya están en
@@ -200,9 +208,17 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
  */
 export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNoche) {
   const extractores = yield* Extractores;
-  const registro = yield* ejecutarCon(opciones.proceso, extractores.registroOficial);
+  const registro = yield* ejecutarCon(
+    extractores.registroOficial,
+    ejecutarBarrido(opciones.proceso),
+  );
+  const puntos = yield* ejecutarCon(
+    extractores.antenasMoviles,
+    ejecutarBarridoDePuntos(opciones.puntos),
+  );
   const ejecuciones: ReadonlyArray<EjecucionDeLaNoche> = [
     { fuente: "registro-oficial", ...registro },
+    { fuente: "antenasmoviles", ...puntos },
   ];
   for (const { fuente, estado, zonas } of ejecuciones) {
     yield* Effect.logInfo(`Ejecución de ${fuente}: ${estado}`);

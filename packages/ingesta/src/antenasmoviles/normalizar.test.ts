@@ -10,9 +10,13 @@ import { leerMuestra } from "../pruebas/grabado.ts";
 import { ZONA_BARCELONA } from "../zona.ts";
 import {
   companiaDeOperador,
+  enLaCaja,
   enlaceDelMapa,
+  enLosCuadros,
+  esPuntoEr5,
   municipioDeLaFuente,
   observacionesDeDetalle,
+  PRIORIDAD,
   puntosDeListado,
   urlDeDetalle,
 } from "./normalizar.ts";
@@ -27,7 +31,7 @@ describe("listado de antenasmoviles.es", () => {
     Effect.gen(function* () {
       const listado = puntosDeListado(
         yield* texto("v1-showf-er5_extracto-campus-nord.json"),
-        ZONA_BARCELONA,
+        enLaCaja(ZONA_BARCELONA),
       );
       assert.isTrue(Result.isSuccess(listado));
       if (Result.isSuccess(listado)) {
@@ -39,7 +43,7 @@ describe("listado de antenasmoviles.es", () => {
         assert.deepStrictEqual(campus?.codigos, ["0802532", "086040", "86040", "CATR0228A"]);
         assert.strictEqual(campus?.clave, "0802532,086040,86040,CATR0228A");
         assert.deepStrictEqual(campus?.posicion, { longitud: 2.113628, latitud: 41.388342 });
-        assert.strictEqual(campus?.prioridad, 1);
+        assert.strictEqual(campus?.prioridad, PRIORIDAD.registro);
         assert.strictEqual(new Set(puntos.map((p) => p.huella)).size, puntos.length);
       }
     }).pipe(conMuestras),
@@ -49,24 +53,55 @@ describe("listado de antenasmoviles.es", () => {
     Effect.gen(function* () {
       const listado = puntosDeListado(
         yield* texto("v1-showf-er5_extracto-er5-barcelona.json"),
-        [2.1, 41.35, 2.2, 41.4],
+        enLaCaja([2.1, 41.35, 2.2, 41.4]),
       );
       assert.isTrue(Result.isSuccess(listado));
       if (Result.isSuccess(listado)) {
         assert.strictEqual(listado.success.filas, 42);
         assert.isAbove(listado.success.puntos.length, 10);
         assert.isBelow(listado.success.puntos.length, 42);
-        assert.isTrue(listado.success.puntos.every((p) => p.prioridad === 0));
+        assert.isTrue(listado.success.puntos.every(esPuntoEr5));
       }
     }).pipe(conMuestras),
   );
+
+  it.effect("las ER5 que no dicen su compañía se leen antes que las demás", () =>
+    Effect.gen(function* () {
+      const listado = puntosDeListado(
+        yield* texto("v1-showf-er5_extracto-er5-barcelona.json"),
+        enLaCaja(ZONA_BARCELONA),
+      );
+      if (Result.isFailure(listado)) return assert.fail(listado.failure);
+      const sinCompania = listado.success.puntos
+        .filter((p) => p.prioridad === PRIORIDAD.er5SinCompania)
+        .map((p) => p.clave);
+      assert.deepStrictEqual(sinCompania, ["ER5-08033-1", "MIC-08902-1"]);
+      const urquinaona = listado.success.puntos.find((p) => p.clave === "CATR6031A");
+      assert.strictEqual(urquinaona?.prioridad, PRIORIDAD.er5);
+    }).pipe(conMuestras),
+  );
+
+  it("filtra por cuadros de 1°: se queda con los de Barcelona y deja fuera los de Madrid", () => {
+    const filas = [
+      '[41.389648,2.173639,["CATR6031A"],"er5_3",""]',
+      '[40.4168,-3.7038,["MV-MAD-1"],"er5_7",""]',
+      '[41.99,0.5,["CATR0001A"],"3",{"OR":["B3"]}]',
+    ];
+    const listado = puntosDeListado(`[${filas.join(",")}]`, enLosCuadros(["2,41", "0,41"]));
+    if (Result.isFailure(listado)) return assert.fail(listado.failure);
+    assert.strictEqual(listado.success.filas, 3);
+    assert.deepStrictEqual(
+      listado.success.puntos.map((p) => p.clave),
+      ["CATR0001A", "CATR6031A"],
+    );
+  });
 
   it("lee las coordenadas con exponente y la huella cambia con cualquier cambio de la fila", () => {
     const fila =
       '[39.938817,-2.2e-5,["056566","56566","VALR9474A"],"31",{"VF":["B7"],"OR":["B3"]}]';
     const otra =
       '[39.938817,-2.2e-5,["056566","56566","VALR9474A"],"31",{"VF":["B7"],"OR":["N78"]}]';
-    const zona = [-1, 39, 1, 40] as const;
+    const zona = enLaCaja([-1, 39, 1, 40]);
     const uno = puntosDeListado(`[${fila}]`, zona);
     const dos = puntosDeListado(`[${otra}]`, zona);
     assert.isTrue(Result.isSuccess(uno) && Result.isSuccess(dos));
@@ -82,7 +117,7 @@ describe("listado de antenasmoviles.es", () => {
   it("una página HTML no es un listado vacío sino un fallo", () => {
     const listado = puntosDeListado(
       "<!DOCTYPE html><title>Just a moment...</title>",
-      [-180, -90, 180, 90],
+      enLaCaja([-180, -90, 180, 90]),
     );
     assert.isTrue(Result.isFailure(listado));
   });
@@ -90,7 +125,7 @@ describe("listado de antenasmoviles.es", () => {
   it("una fila que no entiende es un aviso y no para el resto", () => {
     const listado = puntosDeListado(
       '[[41.38,2.11,["A1"],"7",{"MS":["B3"]}],[41.39,2.12,["B2"],7,{"MS":["B3"]}]]',
-      ZONA_BARCELONA,
+      enLaCaja(ZONA_BARCELONA),
     );
     assert.isTrue(Result.isSuccess(listado));
     if (Result.isSuccess(listado)) {

@@ -33,7 +33,7 @@ La acción `ingesta:registroOficial` es fina: lee la configuración, monta el ex
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (Cataluña, por defecto), la publicación y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md). antenasmoviles.es llega con el #48 y el deploy hook de Vercel con el #46.
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (Cataluña, por defecto), antenasmoviles.es si está encendido, la publicación y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md). El deploy hook de Vercel llega con el #46.
 
 ### Lanzarla en local
 
@@ -79,6 +79,13 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_REGISTRO_REINTENTOS` | 3 | Reintentos de un fallo pasajero |
 | `CELDA_REGISTRO_ESPERA_SEGUNDOS` | 10 | Tiempo máximo de una respuesta |
 | `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
+| `CELDA_ANTENASMOVILES_ACTIVO` | `false` | Interruptor de antenasmoviles.es |
+| `CELDA_ANTENASMOVILES_MOTIVO` | `apagado por defecto hasta escribir…` | Lo que se apunta si está apagado |
+| `CELDA_ANTENASMOVILES_ZONAS` | las del registro | Zonas cuyos marcadores se guardan, o `ninguna`. Sin poner, las de `CELDA_REGISTRO_ZONAS` y `CELDA_REGISTRO_ZONAS_EN_TURNO` |
+| `CELDA_ANTENASMOVILES_MAX_DETALLES` | 100 | Detalles de ER5 por noche |
+| `CELDA_ANTENASMOVILES_PAUSA_SEGUNDOS` | 5 | Pausa entre peticiones; nunca baja de 5 |
+| `CELDA_ANTENASMOVILES_MAX_PETICIONES` | los detalles más 10 | Tope de peticiones por noche |
+| `CELDA_ANTENASMOVILES_USER_AGENT` | el del registro | Se envía en cada petición |
 
 Las zonas son `cataluna`, `centro` (Madrid y Castilla-La Mancha), `andalucia` (con Ceuta y Melilla), `levante` (Comunitat Valenciana, Murcia e Illes Balears), `norte` (Galicia, Asturias, Cantabria y País Vasco), `ebro-y-duero` (Castilla y León, Aragón, Navarra y La Rioja) y `oeste-y-canarias` (Extremadura y Canarias), con sus cuadros en `ZONAS_DE_BARRIDO` (`packages/dominio/src/barrido.ts`). Un nombre que no está ahí para el programa al arrancar. De las que se turnan va primero la que quedó a medias, luego las que nunca se han completado y luego las que llevan más tiempo sin completarse. Toda España en siete noches y Cataluña todas:
 
@@ -102,7 +109,8 @@ La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sq
 - `emplazamientos`: los de la última fusión, con la fecha en que cambió cada uno;
 - `ejecuciones`: cada pasada de un extractor, con sus cambios, sus errores, lo que hizo cada zona (cuadros, peticiones, bytes, registros y cambios) y cómo acabó la publicación de su noche;
 - `publicaciones`: cada intento de publicar;
-- `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero.
+- `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero;
+- `puntos`: los marcadores de antenasmoviles.es, con su huella, su cuadro, cuándo se leyó su detalle y cuándo los vio el listado por última vez. Sus barridos van en `barridos`, con la fuente `antenasmoviles`.
 
 El esquema lleva su versión en `PRAGMA user_version`, y una base vieja se pone al día al abrirla. Cada paso de la noche escribe en su propia transacción. Si la noche se corta, su ejecución queda en curso; la siguiente la da por interrumpida y rehace el trabajo, y acaba igual que si no se hubiera cortado.
 
@@ -113,6 +121,20 @@ Cada zona de barrido tiene sus cuadros de 1° (ADR 0014). En cada cuadro la noch
 Cada cuadro se guarda en una transacción, con sus registros, sus cajas y la marca de hecho. Si la noche se corta a mitad de una zona, el barrido queda a medias y la noche siguiente sigue por el primer cuadro sin guardar. Cuando todas las zonas de la noche han acabado, se cierran sus barridos. Cerrar cuenta una ausencia a las observaciones vigentes de sus cuadros que ningún listado ha traído desde que empezó el barrido. Por eso una estación que se mueve a un cuadro de otra zona no se retira: el listado de la otra zona la trae, y su cuadro pasa a ser el nuevo.
 
 Un barrido falla, y no cuenta ausencias, si un cuadro falla o si vuelve vacío cuando la base tiene estaciones en él. Las demás zonas siguen. El tope de peticiones, `robots.txt` o una fuente que no responde ni tras los reintentos paran las zonas que quedan y las fichas. La ejecución queda completada si alguna zona se ha barrido.
+
+### antenasmoviles.es en la noche
+
+Va después del registro oficial y empieza apagado, como en Convex (ver [antenasmoviles.es](#antenasmovileses)). Encendido, hace esto (`ejecutarBarridoDePuntos`, `packages/ingesta/src/barridoDePuntos.ts`):
+
+1. Pide `robots.txt` y `showf?er5` una vez. El extractor se queda con los marcadores de los cuadros de sus zonas.
+2. Guarda los marcadores de cada zona en una transacción. Uno nuevo, o con otra huella, queda pendiente. Una zona que vuelve sin marcadores cuando la base tiene alguno falla y no cuenta ausencias.
+3. Cierra los barridos: un marcador que falta en dos barridos seguidos de su zona se retira con sus observaciones. Una zona que no está en la configuración de esa noche no cuenta ausencias.
+4. Lee el detalle de las ER5 pendientes, primero las que no dicen su compañía en el listado, 100 como mucho y a una petición cada 5 s. No lee el de los marcadores que copian el registro ni repasa los ya leídos, así que la nocturna no ve las fotos de desmontaje (investigación 08, apartado 5). Un marcador que deja de ser ER5 pierde las observaciones que dio su detalle.
+5. Fusiona.
+
+Un 403 o una página HTML en el listado es la fuente bloqueando a Celda: la ejecución queda fallida, sus zonas fallidas y nada se retira. En un detalle, para los detalles y deja el resto para la noche siguiente. Con Cataluña, la primera noche son `robots.txt`, `showf` y 100 detalles, unos 9 minutos.
+
+Para una prueba en local, `CELDA_ANTENASMOVILES_ACTIVO=true CELDA_ANTENASMOVILES_MAX_DETALLES=0 pnpm run ingesta noche` pide solo `robots.txt` y `showf`. No lo dejes encendido en ninguna máquina hasta que el usuario haya escrito a su administrador (#39).
 
 `node:sqlite` es síncrono. Si una conexión espera el cerrojo de otra del mismo proceso, bloquea el bucle de eventos y la otra no puede soltarlo. Por eso abrir una base al día no toma el cerrojo de escritura, y `estado` se puede lanzar en mitad de una noche desde otro proceso.
 
@@ -133,7 +155,9 @@ rm -f datos/ingesta.sqlite-wal datos/ingesta.sqlite-shm
 
 `apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la simulación de `muestras/espana/teselas.mjs`.
 
-`convex/test/nocturna.test.ts` comprueba que las dos ingestas publican lo mismo. Hace las mismas noches en Convex en memoria y en la nocturna, con las mismas respuestas grabadas y a la misma hora, y compara byte a byte las dos carpetas tras cada noche: con cambios, una baja, una alta y las fichas repartidas en varias noches. Se borra con la ingesta de Convex (#51).
+`apps/nocturna/src/antenasmoviles.test.ts` lanza noches con el extractor real de antenasmoviles.es sobre un cliente HTTP de prueba que apunta cada petición. Comprueba que apagado no pide nada, que con Cataluña solo guarda sus marcadores y nunca lee más de 100 detalles ni el de una copia del registro, que sin cambios solo pide `robots.txt` y `showf`, que un 403 o una página HTML no retiran nada, que retirar pide dos barridos de la zona, que una ER5 cambiada se relee, que una noche cortada en los detalles se retoma igual, el estado y la configuración.
+
+`convex/test/nocturna.test.ts` comprueba que las dos ingestas publican lo mismo. Hace las mismas noches en Convex en memoria y en la nocturna, con las mismas respuestas grabadas y a la misma hora, y compara byte a byte las dos carpetas tras cada noche: con cambios, una baja, una alta, las fichas repartidas en varias noches y antenasmoviles.es con una ER5 nueva, una movida y una que se retira. Convex lee el detalle de todos los marcadores y la nocturna solo el de las ER5; con los detalles reales, que no dan ninguna estación por desmontada, publican lo mismo. Se borra con la ingesta de Convex (#51).
 
 ## Backend local
 
@@ -191,7 +215,7 @@ Cómo funciona:
 
 - La fuente no tiene una ficha por estación sino puntos, los marcadores de su mapa. `GET /v1/showf?er5` da todos los de España de una vez (4 MB). El extractor busca con una expresión regular el principio de cada fila y solo analiza las de la caja de Barcelona, porque el runtime de Convex tiene poca memoria. La descarga del 26/09/2026 dio 42.851 filas y 1309 puntos en la caja.
 - La fuente no manda `ETag`. Cada punto guarda la huella FNV-1a de su fila (`packages/ingesta/src/huella.ts`) en la tabla `puntos`. Un punto nuevo o con otra huella queda pendiente de leer su detalle (`GET /v1/markers?id=<códigos>`).
-- Cada noche se leen como mucho 100 detalles (`CELDA_ANTENASMOVILES_MAX_DETALLES`), a una petición cada 5 s: unos 8 minutos, dentro del límite de una acción. Primero las ER5, luego los nuevos o cambiados y luego los leídos hace más de 14 días. Las fotos nuevas no cambian la huella, y esa vuelta cada 14 días es lo que las encuentra. El tope de peticiones por ejecución es 110 (`CELDA_ANTENASMOVILES_MAX_PETICIONES`).
+- Cada noche se leen como mucho 100 detalles (`CELDA_ANTENASMOVILES_MAX_DETALLES`), a una petición cada 5 s: unos 8 minutos, dentro del límite de una acción. Primero los nuevos o cambiados, con las ER5 sin compañía delante, luego las demás ER5 y los que copian el registro, y después los leídos hace más de 14 días. Las fotos nuevas no cambian la huella, y esa vuelta cada 14 días es lo que las encuentra. El tope de peticiones por ejecución es 110 (`CELDA_ANTENASMOVILES_MAX_PETICIONES`).
 - Del detalle solo se guardan las correcciones: cada ER5 como observación `presente` y cada estación del registro cuya foto más reciente lleva `desmantelada` como `desmontada`. Lo demás copia el registro y no se guarda. Tampoco se copian fotos ni historial: `/archive` está en `Disallow` y no hacen falta para el estado.
 - Un 403 o una página HTML donde debería haber JSON cuenta como fuente bloqueada. Si pasa en el listado, la ejecución queda fallida sin tocar nada. Si pasa en un detalle, se deja de pedir y los pendientes quedan para la noche siguiente.
 - Un punto que falta en dos barridos seguidos se retira con sus observaciones. Cada observación apunta el punto del que salió (`punto`), así que si la fuente reagrupa códigos y otro punto se la queda, retirar el viejo no la borra.

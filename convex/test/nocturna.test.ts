@@ -1,6 +1,16 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
-import type { Registro } from "@celda/ingesta/extractor";
+import { OPCIONES_PUNTOS } from "@celda/ingesta/barridoDePuntos";
+import { INTERRUPTOR_POR_DEFECTO } from "@celda/ingesta/ejecucion";
+import type { Punto, Registro } from "@celda/ingesta/extractor";
+import {
+  capaDePuntosGrabada,
+  muestraAntenasMoviles,
+  PUNTO_CAMPUS,
+  PUNTO_TARRAGONA,
+  PUNTO_URQUINAONA,
+  type PuntosGrabados,
+} from "@celda/ingesta/pruebas/antenasmoviles";
 import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
 import { OPCIONES_ZONAS } from "@celda/ingesta/barrido";
 import {
@@ -15,6 +25,7 @@ import {
   type Entorno,
   POR_LOTE,
   unaNoche,
+  type Variante,
 } from "@celda/nocturna/pruebas/entorno";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
@@ -26,8 +37,10 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import { TestClock } from "effect/testing";
 
+import refs from "../confect/_generated/refs";
+import { OPCIONES_PROCESO_DE_PUNTOS } from "../src/proceso";
 import { publicacionDirecta } from "../src/publicacion";
-import { convexEnMemoria, ejecutar } from "./ayudas";
+import { convexEnMemoria, ejecutar, ejecutarDePuntos } from "./ayudas";
 import * as TestConfect from "./TestConfect";
 
 /**
@@ -38,6 +51,12 @@ import * as TestConfect from "./TestConfect";
  * publicación; lo que se compara es todo lo que cada una guarda por su cuenta. Convex lee la caja
  * de Barcelona entera y la nocturna barre Cataluña por cuadros (#40): la muestra cae en un solo
  * cuadro, así que las dos cuentan las mismas ausencias.
+ *
+ * Con antenasmoviles.es (#48), las dos leen el mismo listado. Convex se queda con la caja de
+ * Barcelona y la nocturna con los cuadros de Cataluña, y la muestra cae en los dos. Convex lee el
+ * detalle de todos los puntos y la nocturna solo el de las ER5 pendientes: los demás copian el
+ * registro, y en los detalles reales grabados ninguno da una estación por desmontada, así que
+ * no dicen nada que publicar.
  */
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
@@ -73,12 +92,20 @@ const unDiaDespues = (grabada: FuenteGrabada): FuenteGrabada => ({
   fichas: new Map([...grabada.fichas, [NUEVO.clave, []]]),
 });
 
+/** Lo que contestan las fuentes una noche. Sin antenasmoviles.es, su interruptor sigue apagado. */
+interface NocheGrabada {
+  readonly registro: FuenteGrabada;
+  readonly antenasMoviles?: PuntosGrabados;
+}
+
 /**
  * Hace las mismas noches en Convex en memoria y en la ingesta nocturna, y compara las dos
- * carpetas después de cada una.
+ * carpetas después de cada una. Si la noche trae antenasmoviles.es, Convex lo ejecuta a la misma
+ * hora que el registro y publica al final, como la nocturna: publicar entre medias pondría a la
+ * capa del registro solo la versión que luego necesita la de las dos fuentes.
  */
 const compararNoches = (
-  noches: ReadonlyArray<FuenteGrabada>,
+  noches: ReadonlyArray<NocheGrabada>,
   proceso: OpcionesProceso = OPCIONES_PROCESO,
 ) =>
   conEntorno((nocturna: Entorno) =>
@@ -97,21 +124,49 @@ const compararNoches = (
         ),
       );
 
-      for (const [i, grabada] of noches.entries()) {
+      const convex = yield* TestConfect.TestConfect;
+      for (const [i, { registro, antenasMoviles }] of noches.entries()) {
         yield* TestClock.setTime(NOCHE + i * DIA);
         const enConvex = yield* ejecutar(
-          capaGrabada("registro-oficial", grabada),
+          capaGrabada("registro-oficial", registro),
           proceso,
-          publicacion,
+          antenasMoviles === undefined ? publicacion : undefined,
         );
+        if (antenasMoviles !== undefined) {
+          yield* convex.mutation(refs.internal.ingesta.cambiarInterruptor, {
+            fuente: "antenasmoviles",
+            activo: true,
+            motivo: "prueba",
+          });
+          const puntos = yield* ejecutarDePuntos(
+            capaDePuntosGrabada(antenasMoviles),
+            OPCIONES_PROCESO_DE_PUNTOS,
+            publicacion,
+          );
+          assert.strictEqual(puntos.estado, "completada");
+        }
         // La nocturna barre Cataluña por cuadros; Campus Nord cae entero en el de Barcelona.
-        const fuera = yield* unaNoche(nocturna, capaGrabadaPorCajas("registro-oficial", grabada), {
-          proceso: { ...proceso, zonas: OPCIONES_ZONAS },
-        });
+        const variante: Variante =
+          antenasMoviles === undefined
+            ? { proceso: { ...proceso, zonas: OPCIONES_ZONAS } }
+            : {
+                proceso: { ...proceso, zonas: OPCIONES_ZONAS },
+                interruptores: {
+                  ...INTERRUPTOR_POR_DEFECTO,
+                  antenasmoviles: { activo: true, motivo: "" },
+                },
+                antenasMoviles: capaDePuntosGrabada(antenasMoviles),
+                puntos: OPCIONES_PUNTOS,
+              };
+        const fuera = yield* unaNoche(
+          nocturna,
+          capaGrabadaPorCajas("registro-oficial", registro),
+          variante,
+        );
         assert.strictEqual(enConvex.estado, "completada");
         assert.deepStrictEqual(
           fuera.ejecuciones.map((e) => e.estado),
-          ["completada"],
+          ["completada", antenasMoviles === undefined ? "omitida" : "completada"],
         );
         const deConvex = yield* contenidoDe(carpetaDeConvex);
         const deNocturna = yield* contenidoDe(nocturna.almacen);
@@ -136,7 +191,7 @@ describe("la ingesta nocturna publica lo mismo que Convex (mismas respuestas gra
     Effect.gen(function* () {
       const grabada = yield* muestraCampusNord.pipe(Effect.provide(NodeServices.layer));
       const despues = unDiaDespues(grabada);
-      yield* compararNoches([grabada, despues, despues, grabada]);
+      yield* compararNoches([grabada, despues, despues, grabada].map((registro) => ({ registro })));
     }),
   );
 
@@ -144,10 +199,67 @@ describe("la ingesta nocturna publica lo mismo que Convex (mismas respuestas gra
     Effect.gen(function* () {
       const grabada = yield* muestraCampusNord.pipe(Effect.provide(NodeServices.layer));
       const despues = unDiaDespues(grabada);
-      yield* compararNoches([grabada, grabada, despues, despues, despues], {
-        ...OPCIONES_PROCESO,
-        maxFichas: 12,
-      });
+      yield* compararNoches(
+        [grabada, grabada, despues, despues, despues].map((registro) => ({ registro })),
+        { ...OPCIONES_PROCESO, maxFichas: 12 },
+      );
     }),
+  );
+
+  it.effect(
+    "con antenasmoviles.es: una ER5 nueva, una que cambia y una que falta dos noches se retira",
+    () =>
+      Effect.gen(function* () {
+        const registro = yield* muestraCampusNord.pipe(Effect.provide(NodeServices.layer));
+        const muestra = yield* muestraAntenasMoviles.pipe(Effect.provide(NodeServices.layer));
+        // Los detalles reales, sin la foto de desmontaje sintética de la entrada del campus.
+        const completa: PuntosGrabados = {
+          listado: muestra.listado,
+          detalles: new Map([...muestra.detalles].filter(([clave]) => clave !== PUNTO_CAMPUS)),
+        };
+        const sin = (grabada: PuntosGrabados, clave: string): PuntosGrabados => ({
+          ...grabada,
+          listado: {
+            ...grabada.listado,
+            puntos: grabada.listado.puntos.filter((p) => p.clave !== clave),
+          },
+        });
+        // Tarragona 177 sale 20 m al norte en el listado y en su detalle.
+        const mover = (p: Punto): Punto =>
+          p.clave === PUNTO_TARRAGONA
+            ? {
+                ...p,
+                huella: `${p.huella}-movida`,
+                posicion: { ...p.posicion, latitud: p.posicion.latitud + 0.00018 },
+              }
+            : p;
+        const movida: PuntosGrabados = {
+          listado: { ...completa.listado, puntos: completa.listado.puntos.map(mover) },
+          detalles: new Map(
+            [...completa.detalles].map(([clave, detalle]) => [
+              clave,
+              clave === PUNTO_TARRAGONA
+                ? {
+                    ...detalle,
+                    observaciones: detalle.observaciones.map((o) => ({
+                      ...o,
+                      posicion: { ...o.posicion, latitud: o.posicion.latitud + 0.00018 },
+                    })),
+                  }
+                : detalle,
+            ]),
+          ),
+        };
+        const sinUrquinaona = sin(movida, PUNTO_URQUINAONA);
+        yield* compararNoches([
+          { registro, antenasMoviles: sin(completa, PUNTO_TARRAGONA) },
+          { registro, antenasMoviles: completa },
+          { registro, antenasMoviles: sinUrquinaona },
+          { registro, antenasMoviles: sinUrquinaona },
+          { registro, antenasMoviles: sinUrquinaona },
+        ]);
+      }),
+    // Cinco noches en las dos ingestas: unos 3 s, y más con la máquina cargada.
+    30_000,
   );
 });
