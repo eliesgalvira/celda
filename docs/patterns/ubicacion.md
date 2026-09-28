@@ -65,7 +65,11 @@ La decisión y sus motivos están en el [ADR 0013](../adr/0013-busqueda-de-direc
 | Atribución | «Búsqueda: Nominatim · datos de OpenStreetMap (ODbL)», con enlace, bajo el buscador. |
 | Poder cambiar de servicio | `VITE_BUSCADOR_URL`. `apagado` lo apaga y la interfaz lo dice. |
 
-La consulta va limitada a los límites del mapa (`viewbox` y `bounded=1`), con `countrycodes=es` y `accept-language=es`. Las direcciones fuera de la zona o repetidas se descartan. Las pruebas usan respuestas grabadas en `referencia/`. Si pruebas contra el servidor real, haz pocas búsquedas y a mano.
+La consulta busca en toda España, con `countrycodes=es`, `accept-language=und` (el nombre oficial de cada lugar, Girona y A Coruña, no Gerona ni La Coruña; ver ADR 0013) y 10 resultados, y sin `viewbox`: con él, Nominatim descarta lo que queda fuera de la caja en cuanto encuentra algo dentro (ADR 0013). `buscar(consulta, encuadre)` recibe lo que se ve del mapa y pone primero lo que cae dentro (`ordenarPorEncuadre`); la caché guarda la respuesta por consulta y el orden se decide en cada búsqueda. Las direcciones que se leen igual se descartan.
+
+Cada `Direccion` tiene `nombre`, `detalle` (calle, barrio, distrito o núcleo dentro del municipio) y `lugar`, «Municipio (Provincia)». El municipio sale de `municipality`, `city`, `town` o `village`, en ese orden. `municipality` llega cuando el límite municipal no está unido a un núcleo, como los concellos de Galicia (Rúa Real: «A Insua» en el detalle, «Fisterra (A Coruña)» en el lugar). en Bajamar, `village` es el núcleo y `town`, San Cristóbal de La Laguna. La provincia, de `state_district`. En Madrid, Asturias y el resto de comunidades de una sola provincia no llega y se pone la comunidad.
+
+Las pruebas usan respuestas grabadas en `referencia/`: Barcelona, Girona y A Coruña (grabadas con `accept-language=und`), Soria (ocho plazas mayores de ocho municipios), Tenerife y «Calle Mayor 1» (Madrid y Zaragoza). Si pruebas contra el servidor real, haz pocas búsquedas, a mano y con un segundo como mínimo entre ellas.
 
 ## Interfaz
 
@@ -75,6 +79,7 @@ La consulta va limitada a los límites del mapa (`viewbox` y `bounded=1`), con `
 - Elegir un punto: en escritorio, un clic en el mapa o buscar; el punto se arrastra con el ratón y se mueve con las flechas. En el móvil, un pin fijo en el centro, mover el mapa y «Usar este punto», o buscar. La hoja de la ficha se aparta mientras tanto.
 - En el mapa, la ubicación GPS es el hexágono «TÚ» con su círculo de precisión, y el punto elegido, el hexágono naranja con «PUNTO».
 - Los avisos bajo la cabecera (fallo, esperando, no guardado) no repiten lo que ya dice la ficha abierta.
+- Si el punto de referencia queda a más de 3 km de la caja de los emplazamientos de la capa vigente, un aviso bajo la cabecera (`Aviso tono="limite"`) dice «Celda aún no tiene datos de ese punto» (o «de donde estás», con el GPS) y a cuántos kilómetros quedan los datos más cercanos. No nombra la zona cubierta: sale de la capa (`cajaDe` y `distanciaAlRectangulo` en `packages/dominio/src/area.ts`, `fueraDeLosDatos` en `textos.ts`), así que sigue siendo verdad al ampliar la capa. Se cierra con «Cerrar» hasta que cambie el punto. Con la capa por provincias (issue #43) habrá que mirar las cajas de las provincias cubiertas en lugar de una sola.
 
 La distancia es la de `distanciaMetros` y el rumbo, `rumboGrados` (`packages/dominio/src/area.ts`), mientras el emplazamiento no esté en la capa. Si está, el bloque enseña el sector que da servicio (abajo).
 
@@ -101,7 +106,7 @@ Con un punto de referencia, la sección «Mejorar la señal» de la ficha dice h
 
 ## Pruebas de componente
 
-`Ubicacion.test.tsx` monta la app con `ubicacionDePrueba()`: un GPS que contesta cuando la prueba llama a `responder` o `fallar`, un almacén en memoria y un buscador con respuestas fijas. Como el navegador, el GPS entrega al abrirse la última posición que tenga (`enCache` la primera vez), el permiso llega un momento después de montar y el almacén y el buscador contestan en otra tarea (ver [efectos.md](efectos.md)). Cuenta cuántas veces se pidió la ubicación, así que se puede comprobar que el paso previo va antes de pedirla y que una lectura nueva no vuelve a pedirla. `responderTarde` entrega una lectura a vigilancias ya quitadas, como un navegador que llama tarde.
+`Ubicacion.test.tsx` monta la app con `ubicacionDePrueba()`: un GPS que contesta cuando la prueba llama a `responder` o `fallar`, un almacén en memoria y un buscador con respuestas fijas, que ordena por encuadre como el de verdad. Como el navegador, el GPS entrega al abrirse la última posición que tenga (`enCache` la primera vez), el permiso llega un momento después de montar y el almacén y el buscador contestan en otra tarea (ver [efectos.md](efectos.md)). Cuenta cuántas veces se pidió la ubicación, así que se puede comprobar que el paso previo va antes de pedirla y que una lectura nueva no vuelve a pedirla. `responderTarde` entrega una lectura a vigilancias ya quitadas, como un navegador que llama tarde.
 
 `geolocalizacion.test.ts` prueba la capa real con un `Geolocation` y un permiso de prueba (objetos, no mocks de módulos) y `TestClock`: la espera propia de 20 s, que no corre mientras el aviso del navegador está abierto, los códigos de error en el móvil y en el ordenador, y apagar y volver a encender.
 

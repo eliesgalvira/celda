@@ -34,6 +34,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Nada salta al cargar: `DisposicionMapa` reserva desde el principio el sitio de cada pieza, el fondo ya tiene el color del mapa y los avisos se superponen. Cada aviso nuevo se monta con clave, de modo que el navegador lo cuenta como elemento nuevo y no como uno que se mueve.
 - Lo que dura poco no se ve: el aviso de espera aparece tras medio segundo (`animate-aparecer`).
 - Un fallo se dice con `Aviso tono="fallo"`: qué ha pasado, por qué si se sabe y qué hacer.
+- Lo que Celda aún no tiene se dice con `Aviso tono="limite"`: qué falta y que no por eso deja de existir. Sin alarma y sin rol de alerta.
 
 ## Marcadores y logos
 
@@ -109,7 +110,7 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - `MarcadorReferencia.tsx`: `UbicacionGps` es un SVG con el hexágono «TÚ» y el círculo de precisión, con el radio en píxeles que calcula la web. `PuntoElegido` es un botón de 44 px con el hexágono naranja (`--referencia`) y la cinta «PUNTO». Con `arrastrable` se arrastra con el ratón (captura el puntero y para el `mousedown` para que el mapa no se mueva a la vez); con el dedo no hace nada y el gesto mueve el mapa. Las flechas lo mueven 10 px, 50 con Mayúsculas. `CapaDeReferencia` lo monta dentro del mapa, como `CapaDeMarcadores`. `PinCentral` es el pin fijo del móvil: su punta está en el centro del mapa.
 - `MenuUbicacion.tsx`: el botón hexagonal con la mirilla y su menú, un `fieldset` con `OpcionUbicacion`. Cada opción lleva la etiqueta como nombre accesible y su explicación en `aria-describedby`; una desactivada sigue a la vista con el motivo. Escape o un clic fuera lo cierran.
 - El paso previo es un `Dialogo` con dos piezas de `PasoPrevio.tsx`: `ListaPasoPrevio` y `AccionesPasoPrevio`, la fila de botones del final.
-- `EleccionDePunto.tsx`: en escritorio, una barra bajo la cabecera; en el móvil, una hoja abajo con «Cancelar» y «Usar este punto». `BuscadorDeDirecciones` es un `<search>` con un formulario: busca al enviar, enseña el estado bajo el campo y cita el servicio.
+- `EleccionDePunto.tsx`: en escritorio, una barra bajo la cabecera; en el móvil, una hoja abajo con «Cancelar» y «Usar este punto». `BuscadorDeDirecciones` es un `<search>` con un formulario: busca al enviar, enseña el estado bajo el campo y cita el servicio. Cada resultado lleva su nombre, el detalle y, debajo, el municipio con la provincia.
 - `Referencia.tsx`: el bloque de la ficha. `SinReferencia`, `EsperandoReferencia` y `ConReferencia` van dentro de `SeccionReferencia`, que reserva 7,5rem de alto.
 - `DisposicionMapa` recibe `ubicacion` (bajo la fecha de los datos), `eligiendo`, `pinCentral` y `dialogo`. Con `eligiendo`, en el móvil se aparta la hoja de la ficha y los controles, y los créditos quedan por encima de la hoja de elegir. En escritorio el cursor del mapa es una cruz. Las reglas del móvil que suben piezas por encima del resumen usan `data-hoja` (panel abierto y no eligiendo); las de escritorio, `data-panel`.
 - `Boton` tiene la variante `ancho="completo"` para el botón principal de una fila, como «Usar este punto».

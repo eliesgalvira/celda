@@ -3,7 +3,13 @@ import type { PuntoElegido } from "@celda/dominio/aportacion";
 import { assert, describe, it } from "@effect/vitest";
 
 import type { Referencia } from "./estado.ts";
-import { nombreRumbo, textoDistancia, textosReferencia } from "./textos.ts";
+import {
+  fueraDeLosDatos,
+  nombreRumbo,
+  textoDistancia,
+  textosFueraDeLosDatos,
+  textosReferencia,
+} from "./textos.ts";
 
 const EMPLAZAMIENTO = { longitud: 2.113628, latitud: 41.388344 };
 // Unos 340 m al suroeste del emplazamiento.
@@ -87,5 +93,45 @@ describe("nombreRumbo", () => {
       "norte",
       "norte",
     ]);
+  });
+});
+
+describe("punto de referencia lejos de los datos", () => {
+  // La caja de los emplazamientos de una capa pequeña alrededor de Campus Nord.
+  const CAJA = {
+    suroeste: { longitud: 2.1, latitud: 41.38 },
+    noreste: { longitud: 2.12, latitud: 41.4 },
+  };
+  const elegido = (posicion: { longitud: number; latitud: number }): Referencia => ({
+    tipo: "elegido",
+    punto: { ...PUNTO, posicion },
+  });
+  const MEDINACELI = { longitud: -2.4354347, latitud: 41.1722846 };
+
+  it("dentro de la caja o a menos de 3 km de ella, no dice nada; sin capa, tampoco", () => {
+    assert.isUndefined(fueraDeLosDatos(elegido(CERCA), CAJA));
+    assert.isUndefined(fueraDeLosDatos(elegido({ longitud: 2.14, latitud: 41.39 }), CAJA));
+    assert.isUndefined(fueraDeLosDatos(elegido(MEDINACELI), undefined));
+  });
+
+  it("lejos, da la distancia a los datos sin nombrar la zona que cubren", () => {
+    const metros = fueraDeLosDatos(elegido(MEDINACELI), CAJA);
+    assert.isDefined(metros);
+    const textos = textosFueraDeLosDatos(elegido(MEDINACELI), metros ?? 0);
+    assert.strictEqual(textos.titulo, "Celda aún no tiene datos de ese punto");
+    assert.match(textos.texto, /quedan a unos 3[78]\d\u00a0km\./u);
+    assert.notMatch(`${textos.titulo} ${textos.texto}`, /Barcelona/u);
+    // Con un punto elegido, nunca «tú».
+    assert.notMatch(`${textos.titulo} ${textos.texto}`, /\b(ti|tu|tú|veas)\b/iu);
+  });
+
+  it("con la ubicación GPS habla de ti", () => {
+    const gpsLejos: Referencia = {
+      tipo: "gps",
+      lectura: { posicion: MEDINACELI, precision: 20, fecha: Date.UTC(2026, 8, 26, 10) },
+    };
+    const textos = textosFueraDeLosDatos(gpsLejos, 5400);
+    assert.strictEqual(textos.titulo, "Celda aún no tiene datos de donde estás");
+    assert.match(textos.texto, /quedan a 5,4 km de ti/u);
   });
 });

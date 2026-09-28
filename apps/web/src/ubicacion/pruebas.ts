@@ -18,7 +18,7 @@ import {
 } from "../mejorar/pruebas.ts";
 import { AlmacenLocal, AlmacenNoDisponible } from "./almacen.ts";
 import type { Direccion } from "./buscador.ts";
-import { BuscadorDeDirecciones, BusquedaFallida } from "./buscador.ts";
+import { BuscadorDeDirecciones, BusquedaFallida, ordenarPorEncuadre } from "./buscador.ts";
 import type { LecturaGps, MotivoFalloGps, Permiso } from "./estado.ts";
 import { Geolocalizacion, UbicacionNoDisponible } from "./geolocalizacion.ts";
 
@@ -182,7 +182,7 @@ const esFalloDeBusqueda = Schema.is(BusquedaFallida);
 
 /**
  * Un buscador que contesta con lo que diga `respuestas` para cada consulta, o que no hay nada. Como
- * la red, contesta en otra tarea.
+ * la red, contesta en otra tarea, y como el de verdad, pone primero lo que cae en el encuadre.
  */
 export const buscadorDePrueba = (
   respuestas: ReadonlyMap<string, ReadonlyArray<Direccion> | BusquedaFallida>,
@@ -192,13 +192,15 @@ export const buscadorDePrueba = (
     capa: Layer.succeed(
       BuscadorDeDirecciones,
       BuscadorDeDirecciones.of({
-        buscar: (consulta) =>
+        buscar: (consulta, encuadre) =>
           Effect.suspend(() => {
             consultas.push(consulta);
             const respuesta = respuestas.get(consulta) ?? [];
             return Effect.andThen(
               enOtraTarea,
-              esFalloDeBusqueda(respuesta) ? Effect.fail(respuesta) : Effect.succeed(respuesta),
+              esFalloDeBusqueda(respuesta)
+                ? Effect.fail(respuesta)
+                : Effect.succeed(ordenarPorEncuadre(respuesta, encuadre)),
             );
           }),
         atribucion: { texto: "Buscador de prueba", enlace: "https://buscador.prueba" },

@@ -84,3 +84,50 @@ export const rumboGrados = (desde: Coordenada, hasta: Coordenada): number => {
     Math.sin(latitud1) * Math.cos(latitud2) * Math.cos(diferencia);
   return (Math.atan2(y, x) / radianes + 360) % 360;
 };
+
+/** El rectángulo más pequeño que contiene todos los puntos, o `undefined` si no hay ninguno. */
+export const cajaDe = (puntos: ReadonlyArray<Coordenada>): Rectangulo | undefined => {
+  const [primero] = puntos;
+  if (primero === undefined) return undefined;
+  let oeste = primero.longitud;
+  let este = primero.longitud;
+  let sur = primero.latitud;
+  let norte = primero.latitud;
+  for (const { longitud, latitud } of puntos) {
+    oeste = Math.min(oeste, longitud);
+    este = Math.max(este, longitud);
+    sur = Math.min(sur, latitud);
+    norte = Math.max(norte, latitud);
+  }
+  return {
+    suroeste: { longitud: oeste, latitud: sur },
+    noreste: { longitud: este, latitud: norte },
+  };
+};
+
+/**
+ * Distancia en metros de un punto al borde más cercano de un rectángulo, 0 si cae dentro. Mide
+ * sobre la esfera (haversine) porque puede ser de cientos de kilómetros: de Tenerife a Barcelona.
+ */
+export const distanciaAlRectangulo = (punto: Coordenada, rectangulo: Rectangulo): number => {
+  const cercano = {
+    longitud: Math.min(
+      Math.max(punto.longitud, rectangulo.suroeste.longitud),
+      rectangulo.noreste.longitud,
+    ),
+    latitud: Math.min(
+      Math.max(punto.latitud, rectangulo.suroeste.latitud),
+      rectangulo.noreste.latitud,
+    ),
+  };
+  if (mismaCoordenada(punto, cercano)) return 0;
+  const radianes = Math.PI / 180;
+  const dLatitud = (cercano.latitud - punto.latitud) * radianes;
+  const dLongitud = (cercano.longitud - punto.longitud) * radianes;
+  const h =
+    Math.sin(dLatitud / 2) ** 2 +
+    Math.cos(punto.latitud * radianes) *
+      Math.cos(cercano.latitud * radianes) *
+      Math.sin(dLongitud / 2) ** 2;
+  return 2 * RADIO_TIERRA_METROS * Math.asin(Math.min(1, Math.sqrt(h)));
+};

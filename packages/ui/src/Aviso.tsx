@@ -9,6 +9,8 @@ export const variantesAviso = cva("chaflan flex w-full flex-col gap-2 px-5 py-4 
       espera: "animate-aparecer bg-superficie text-tinta",
       /** Algo no ha funcionado: se dice qué, por qué si se sabe y qué hacer. */
       fallo: "bg-aviso-fondo text-aviso-tinta",
+      /** Algo que Celda aún no tiene: se dice qué falta, sin alarmar y sin fingir que no existe. */
+      limite: "animate-aparecer bg-superficie text-tinta",
     },
   },
   defaultVariants: { tono: "espera" },
@@ -49,9 +51,12 @@ export function Aviso(props: AvisoProps) {
           <span
             aria-hidden="true"
             class={
-              props.tono === "fallo"
-                ? "hexagono size-3 shrink-0 bg-aviso"
-                : "hexagono size-3 shrink-0 animate-pulse bg-primario motion-reduce:animate-none"
+              {
+                fallo: "hexagono size-3 shrink-0 bg-aviso",
+                limite: "hexagono size-3 shrink-0 bg-aviso",
+                espera:
+                  "hexagono size-3 shrink-0 animate-pulse bg-primario motion-reduce:animate-none",
+              }[props.tono ?? "espera"]
             }
           />
           {props.titulo}

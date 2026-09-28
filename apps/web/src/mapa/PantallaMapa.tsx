@@ -1,4 +1,4 @@
-import { BARCELONA, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
+import { BARCELONA, cajaDe, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
@@ -260,6 +260,10 @@ export function PantallaMapa() {
     const actual = capa();
     return actual.tipo === "lista" ? actual.capa.emplazamientos : [];
   });
+  /** Hasta dónde llegan los datos: la caja de los emplazamientos de la capa vigente. */
+  const cajaDeLosDatos = createMemo(() =>
+    cajaDe(emplazamientos().map((emplazamiento) => emplazamiento.posicion)),
+  );
   const barrios = createMemo(() => {
     const actual = capa();
     return actual.tipo === "lista" ? actual.capa.barrios : [];
@@ -526,9 +530,16 @@ export function PantallaMapa() {
             datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
             ubicacion={
               <>
-                <AvisosDeUbicacion panelAbierto={panelAbierto()} />
+                <AvisosDeUbicacion
+                  panelAbierto={panelAbierto()}
+                  cajaDeLosDatos={cajaDeLosDatos()}
+                />
                 <Show when={eligiendo()}>
-                  <EleccionConBuscador alUsarCentro={usarCentro} alIrA={irA} />
+                  <EleccionConBuscador
+                    alUsarCentro={usarCentro}
+                    alIrA={irA}
+                    encuadre={encuadre()}
+                  />
                 </Show>
               </>
             }
