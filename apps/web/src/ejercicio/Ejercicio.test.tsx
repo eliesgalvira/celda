@@ -1,7 +1,7 @@
 import { ESQUEMA_AJUSTES } from "@celda/dominio/ajustes";
 import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
-import { simuladorEnHilo } from "@celda/sim/simulador";
+import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -78,7 +78,7 @@ const montar = (modoEstudiante: boolean) => {
       servicios={Layer.mergeAll(
         capaDePrueba([Effect.succeed(CAPA)]),
         fichas.capa,
-        simuladorEnHilo(),
+        simuladorDePrueba,
         ubicacionPrueba.capa,
       )}
     />

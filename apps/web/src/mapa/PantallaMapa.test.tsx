@@ -1,5 +1,5 @@
 import type { CapaLeida } from "@celda/dominio/capa";
-import { simuladorEnHilo } from "@celda/sim/simulador";
+import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -44,7 +44,7 @@ describe("capa de emplazamientos en el mapa", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([Effect.never]),
           fichasDePrueba().capa,
-          simuladorEnHilo(),
+          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />
@@ -65,7 +65,7 @@ describe("capa de emplazamientos en el mapa", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([NO_LLEGA, Effect.succeed(CAPA)]),
           fichasDePrueba().capa,
-          simuladorEnHilo(),
+          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />

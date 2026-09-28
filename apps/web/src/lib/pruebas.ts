@@ -1,4 +1,16 @@
 import { GLOSARIO, type Termino } from "@celda/dominio/glosario";
+import * as Effect from "effect/Effect";
+
+/**
+ * Espera a la siguiente tarea del navegador, como una respuesta de IndexedDB, de la red o de un
+ * aviso de permiso: los servicios de prueba contestan así y no en el acto.
+ */
+export const enOtraTarea: Effect.Effect<void> = Effect.callback<void>((reanudar) => {
+  // @effect-diagnostics-next-line globalTimersInEffect:off
+  const espera = setTimeout(() => reanudar(Effect.void), 0);
+  // @effect-diagnostics-next-line globalTimersInEffect:off
+  return Effect.sync(() => clearTimeout(espera));
+});
 
 /**
  * Busca por el texto entero de un elemento aunque un término subrayado lo parta en varios
