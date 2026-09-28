@@ -377,7 +377,7 @@
             CELDA_ANTENASMOVILES_MOTIVO = config.services.celda-nocturna.antenasmoviles.motivo;
             CELDA_ANTENASMOVILES_PAUSA_SEGUNDOS = toString config.services.celda-nocturna.antenasmoviles.pausa;
             CELDA_ANTENASMOVILES_USER_AGENT = config.services.celda-nocturna.antenasmoviles.userAgent;
-            CELDA_ANTENASMOVILES_ZONAS = listaDeZonas config.services.celda-nocturna.antenasmoviles.zonas;
+            CELDA_ANTENASMOVILES_ZONAS = listaDelPrograma config.services.celda-nocturna.antenasmoviles.zonas;
             CELDA_INGESTA_BASE = "/var/lib/${config.services.celda-nocturna.directorioDeEstado}/ingesta.sqlite";
             CELDA_INGESTA_COPIAS = config.services.celda-nocturna.copias.directorio;
             CELDA_INGESTA_COPIAS_CONSERVADAS = toString config.services.celda-nocturna.copias.conservar;
