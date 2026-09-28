@@ -13,7 +13,7 @@ import { TestClock } from "effect/testing";
 import refs from "../confect/_generated/refs";
 import { DatabaseReader, DatabaseWriter } from "../confect/_generated/services";
 import crons from "../confect/crons";
-import { SIN_CAMBIOS } from "../confect/tables/ejecuciones";
+import { SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
 import { ejecutar, instantanea, sinSistema } from "./ayudas";
 import * as TestConfect from "./TestConfect";
 

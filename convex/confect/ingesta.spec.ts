@@ -7,7 +7,7 @@ import * as Schema from "effect/Schema";
 
 import { Id } from "./_generated/id";
 import ejecuciones from "./_generated/tables/ejecuciones";
-import { Cambios } from "./tables/ejecuciones";
+import { Cambios } from "@celda/ingesta/ejecucion";
 
 export const Inicio = Schema.Struct({
   tipo: Schema.Literals(["omitida", "iniciada"]),

@@ -1,6 +1,7 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import type { Extractor, ExtractorDePuntos } from "@celda/ingesta/extractor";
+import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
 import { MutationRunner, QueryRunner } from "@confect/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -15,9 +16,7 @@ import { Publicacion } from "../src/publicacion";
 import {
   ejecutarIngesta,
   ejecutarIngestaDePuntos,
-  OPCIONES_PROCESO,
   OPCIONES_PROCESO_DE_PUNTOS,
-  type OpcionesProceso,
   type OpcionesProcesoDePuntos,
 } from "../src/proceso";
 import * as TestConfect from "./TestConfect";

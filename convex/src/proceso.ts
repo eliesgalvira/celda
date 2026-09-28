@@ -1,47 +1,21 @@
 import type { Emplazamiento } from "@celda/dominio/emplazamiento";
 import { fusionar } from "@celda/dominio/fusion";
 import { Fuente, type Observacion } from "@celda/dominio/observacion";
-import { describirError, Extractor, ExtractorDePuntos } from "@celda/ingesta/extractor";
+import { SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
+import { describirError, ExtractorDePuntos } from "@celda/ingesta/extractor";
+import * as Proceso from "@celda/ingesta/proceso";
+import { BaseDeIngesta, type OpcionesProceso } from "@celda/ingesta/proceso";
 import { MutationRunner, QueryRunner } from "@confect/server";
 import * as Clock from "effect/Clock";
 import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 
 import refs from "../confect/_generated/refs";
-import { SIN_CAMBIOS } from "../confect/tables/ejecuciones";
+import { Id } from "../confect/_generated/id";
 import { publicarTrasLaIngesta } from "./publicacion";
-
-/** Cuánto hace cada ejecución, aparte del extractor. */
-export interface OpcionesProceso {
-  /** Fichas que se leen como mucho en una ejecución. */
-  readonly maxFichas: number;
-  /** Una ficha leída hace más que esto se vuelve a leer. */
-  readonly rotacion: Duration.Duration;
-  /** Registros por mutación al guardar el listado. */
-  readonly lote: number;
-  /** Fallos seguidos de fichas tras los que se dejan para la próxima ejecución. */
-  readonly fallosSeguidos: number;
-}
-
-/**
- * Por defecto: unas 250 fichas por noche, así que las ~2400 de la caja de Barcelona se leen
- * en diez noches (investigación del registro oficial, apartado 6).
- */
-export const OPCIONES_PROCESO: OpcionesProceso = {
-  maxFichas: 250,
-  rotacion: Duration.days(14),
-  lote: 200,
-  fallosSeguidos: 3,
-};
-
-export const opcionesProcesoDesdeConfig: Config.Config<OpcionesProceso> = Config.Int(
-  "CELDA_INGESTA_MAX_FICHAS",
-).pipe(
-  Config.withDefault(OPCIONES_PROCESO.maxFichas),
-  Config.map((maxFichas) => ({ ...OPCIONES_PROCESO, maxFichas })),
-);
 
 /** Documentos por página al leer, lejos del límite de 4096 lecturas por función de Convex. */
 const PAGINA = 1000;
@@ -114,102 +88,64 @@ export const fusionarTodo = Effect.fn("Ingesta.fusionarTodo")(function* (fecha: 
   return cuentas;
 }, Effect.orDie);
 
+/** El identificador de una ejecución que devuelve `BaseDeIngesta.iniciar`. */
+const decodificarEjecucion = Schema.decodeUnknownEffect(Id("ejecuciones"));
+
 /**
- * Una ejecución de ingesta de la fuente del `Extractor`:
- *
- * 1. Abre la ejecución. Si el interruptor está apagado queda omitida y no pide nada.
- * 2. Recorre el listado. Si falla, la ejecución queda fallida sin tocar los datos, porque sin
- *    el listado completo no se sabe qué ha desaparecido.
- * 3. Guarda el listado por lotes: solo escribe las observaciones nuevas o cambiadas.
- * 4. Lee las fichas pendientes (nuevas, cambiadas o de hace más de `rotacion`).
- * 5. Cierra el barrido: cuenta una ausencia a lo que no ha traído el listado.
- * 6. Vuelve a fusionar y apunta los cambios y los errores.
- * 7. Publica la capa y las fichas de la instantánea nueva. Sin cambios no escribe nada, y un
- *    fallo al publicar no deshace la ejecución: la siguiente lo vuelve a intentar.
- *
- * Los pasos son idempotentes, así que repetir una ejecución cortada deja lo mismo que una
- * completa. Todos los datos llevan la fecha de inicio de la ejecución.
+ * La `BaseDeIngesta` sobre las tablas de Convex, con sus funciones internas. Cada llamada es una
+ * mutación o una consulta, así que el proceso se prueba igual en memoria que en el backend real.
  */
-export const ejecutarIngesta = Effect.fn("Ingesta.ejecutar")(function* (opciones: OpcionesProceso) {
-  const extractor = yield* Extractor;
+export const baseEnConvex = Effect.gen(function* () {
   const mutacion = yield* MutationRunner.MutationRunner;
   const consulta = yield* QueryRunner.QueryRunner;
-  const { fuente } = extractor;
-  const inicio = yield* Clock.currentTimeMillis;
-
-  const arranque = yield* mutacion(refs.internal.ingesta.iniciar, { fuente, fecha: inicio });
-  const { ejecucion } = arranque;
-  if (arranque.tipo === "omitida") {
-    return yield* consulta(refs.internal.ingesta.ejecucion, { id: ejecucion });
-  }
-
-  const listado = yield* Effect.result(extractor.listado);
-  if (Result.isFailure(listado)) {
-    yield* mutacion(refs.internal.ingesta.fallar, {
-      ejecucion,
-      fin: yield* Clock.currentTimeMillis,
-      cambios: SIN_CAMBIOS,
-      errores: [describirError(listado.failure)],
-    });
-    return yield* consulta(refs.internal.ingesta.ejecucion, { id: ejecucion });
-  }
-  const { registros, avisos } = listado.success;
-
-  const observaciones = { creados: 0, cambiados: 0 };
-  const fichas = { leidas: 0, cambiadas: 0 };
-  for (const lote of trozos(registros, opciones.lote)) {
-    const escritos = yield* mutacion(refs.internal.ingesta.aplicarListado, {
-      fuente,
-      fecha: inicio,
-      registros: lote,
-    });
-    observaciones.creados += escritos.creados;
-    observaciones.cambiados += escritos.cambiados;
-  }
-
-  const pendientes = yield* consulta(refs.internal.ingesta.pendientesDeFicha, {
-    fuente,
-    leidasAntesDe: inicio - Duration.toMillis(opciones.rotacion),
-    limite: opciones.maxFichas,
+  const contexto = yield* Effect.context<MutationRunner.MutationRunner | QueryRunner.QueryRunner>();
+  const ejecucion = (id: string) => Effect.orDie(decodificarEjecucion(id));
+  return BaseDeIngesta.of({
+    iniciar: (fuente, fecha) =>
+      Effect.orDie(mutacion(refs.internal.ingesta.iniciar, { fuente, fecha })),
+    aplicarListado: (fuente, fecha, registros) =>
+      Effect.orDie(mutacion(refs.internal.ingesta.aplicarListado, { fuente, fecha, registros })),
+    pendientesDeFicha: (fuente, leidasAntesDe, limite) =>
+      Effect.orDie(
+        consulta(refs.internal.ingesta.pendientesDeFicha, { fuente, leidasAntesDe, limite }),
+      ),
+    aplicarFicha: (fuente, clave, fecha, bandas) =>
+      Effect.orDie(mutacion(refs.internal.ingesta.aplicarFicha, { fuente, clave, fecha, bandas })),
+    cerrarBarrido: (id, vistas) =>
+      Effect.flatMap(ejecucion(id), (ejecucion) =>
+        Effect.orDie(mutacion(refs.internal.ingesta.cerrarBarrido, { ejecucion, vistas })),
+      ),
+    fusionar: (fecha) => fusionarTodo(fecha).pipe(Effect.provideContext(contexto)),
+    completar: (id, cierre) =>
+      Effect.flatMap(ejecucion(id), (ejecucion) =>
+        Effect.orDie(mutacion(refs.internal.ingesta.completar, { ejecucion, ...cierre })),
+      ),
+    fallar: (id, cierre) =>
+      Effect.flatMap(ejecucion(id), (ejecucion) =>
+        Effect.orDie(mutacion(refs.internal.ingesta.fallar, { ejecucion, ...cierre })),
+      ),
   });
-  const errores: Array<string> = [...avisos];
-  let fallos = 0;
-  for (const registro of pendientes) {
-    const bandas = yield* Effect.result(extractor.ficha(registro));
-    if (Result.isFailure(bandas)) {
-      errores.push(describirError(bandas.failure));
-      fallos++;
-      if (fallos >= opciones.fallosSeguidos || bandas.failure._tag === "LimiteDePeticiones") {
-        errores.push("Fichas pendientes para la próxima ejecución");
-        break;
-      }
-      continue;
-    }
-    fallos = 0;
-    const cambiada = yield* mutacion(refs.internal.ingesta.aplicarFicha, {
-      fuente,
-      clave: registro.clave,
-      fecha: inicio,
-      bandas: bandas.success,
-    });
-    fichas.leidas++;
-    fichas.cambiadas += cambiada ? 1 : 0;
-  }
+});
 
-  const { retirados } = yield* mutacion(refs.internal.ingesta.cerrarBarrido, {
-    ejecucion,
-    vistas: registros.map((r) => r.clave),
+/**
+ * Una ejecución de ingesta de la fuente del `Extractor` sobre Convex (`ejecutarIngesta` de
+ * `@celda/ingesta/proceso`). Al acabar una completada publica la capa y las fichas de la
+ * instantánea nueva. Sin cambios no escribe nada, y un fallo al publicar no deshace la
+ * ejecución: la siguiente lo vuelve a intentar.
+ */
+export const ejecutarIngesta = Effect.fn("Ingesta.ejecutarEnConvex")(function* (
+  opciones: OpcionesProceso,
+) {
+  const consulta = yield* QueryRunner.QueryRunner;
+  const { ejecucion, estado } = yield* Proceso.ejecutarIngesta(opciones).pipe(
+    Effect.provideService(BaseDeIngesta, yield* baseEnConvex),
+  );
+  if (estado === "completada") {
+    yield* publicarTrasLaIngesta;
+  }
+  return yield* consulta(refs.internal.ingesta.ejecucion, {
+    id: yield* decodificarEjecucion(ejecucion),
   });
-  const emplazamientos = yield* fusionarTodo(inicio);
-  yield* mutacion(refs.internal.ingesta.completar, {
-    ejecucion,
-    fin: yield* Clock.currentTimeMillis,
-    registros: registros.length,
-    cambios: { observaciones: { ...observaciones, retirados }, fichas, emplazamientos },
-    errores,
-  });
-  yield* publicarTrasLaIngesta;
-  return yield* consulta(refs.internal.ingesta.ejecucion, { id: ejecucion });
 }, Effect.orDie);
 
 /** Cuánto hace cada ejecución de una fuente que lista puntos, aparte del extractor. */

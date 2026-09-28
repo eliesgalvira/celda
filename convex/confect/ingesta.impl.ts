@@ -1,8 +1,16 @@
 import { EmplazamientoSinEstaciones, EstacionBase } from "@celda/dominio/emplazamiento";
-import { Banda } from "@celda/dominio/banda";
-import { Fuente, Observacion } from "@celda/dominio/observacion";
+import { Fuente } from "@celda/dominio/observacion";
 import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
-import { ObservacionDePunto, Punto, Registro } from "@celda/ingesta/extractor";
+import { SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
+import { ObservacionDePunto, Punto } from "@celda/ingesta/extractor";
+import {
+  observacionDe,
+  registroDe,
+  trasAusencia,
+  trasFicha,
+  trasListado,
+} from "@celda/ingesta/guardado";
+import { opcionesProcesoDesdeConfig } from "@celda/ingesta/proceso";
 import type { ResultadoPublicacion } from "@celda/publicacion/publicar";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import { ActionRunner, ConvexConfigProvider, FunctionImpl, GroupImpl } from "@confect/server";
@@ -20,20 +28,16 @@ import {
   ejecutarIngestaDePuntos,
   fusionarTodo,
   opcionesProcesoDePuntosDesdeConfig,
-  opcionesProcesoDesdeConfig,
 } from "../src/proceso";
 import { Publicacion, publicarTrasLaIngesta } from "../src/publicacion";
 import refs from "./_generated/refs";
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 import ingesta from "./ingesta.spec";
-import { SIN_CAMBIOS } from "./tables/ejecuciones";
 import { INTERRUPTOR_POR_DEFECTO } from "./tables/interruptores";
 
 const mismoEmplazamiento = Schema.toEquivalence(EmplazamientoSinEstaciones);
 const mismaEstacion = Schema.toEquivalence(EstacionBase);
-const mismoRegistro = Schema.toEquivalence(Registro);
-const mismasBandas = Schema.toEquivalence(Schema.Array(Banda));
 const mismoPunto = Schema.toEquivalence(Punto);
 const mismaObservacionDePunto = Schema.toEquivalence(ObservacionDePunto);
 
@@ -52,16 +56,12 @@ const observacionDePuntoDe = (o: ObservacionDePunto): ObservacionDePunto => ({
   afirma: o.afirma,
 });
 
-/** Los campos del listado de una observación guardada. */
-const registroDe = (o: Registro): Registro => ({
-  clave: o.clave,
-  compania: o.compania,
-  codigo: o.codigo,
-  posicion: o.posicion,
-  direccion: o.direccion,
-  municipio: o.municipio,
-  url: o.url,
-});
+/** Un documento leído de Convex, sin los campos del sistema. */
+const sinSistema = <Documento extends { readonly _id: unknown; readonly _creationTime: number }>({
+  _id,
+  _creationTime,
+  ...resto
+}: Documento): Omit<Documento, "_id" | "_creationTime"> => resto;
 
 const iniciar = FunctionImpl.make(databaseSchema, ingesta, "iniciar", ({ fuente, fecha }) =>
   Effect.gen(function* () {
@@ -116,37 +116,20 @@ const aplicarListado = FunctionImpl.make(
           .table("observaciones")
           .index("por_clave", (q) => q.eq("fuente", fuente).eq("clave", registro.clave))
           .first();
-        if (Option.isNone(previa)) {
-          yield* writer.table("observaciones").insert({
-            ...registro,
-            fuente,
-            afirma: "presente",
-            bandas: [],
-            fecha,
-            fichaLeidaEn: null,
-            ausencias: 0,
-            retiradaEn: null,
+        const { guardar, cuenta } = trasListado(
+          Option.getOrUndefined(Option.map(previa, sinSistema)),
+          registro,
+          fuente,
+          fecha,
+        );
+        if (guardar !== undefined) {
+          yield* Option.match(previa, {
+            onNone: () => Effect.asVoid(writer.table("observaciones").insert(guardar)),
+            onSome: ({ _id }) => writer.table("observaciones").replace(_id, guardar),
           });
-          creados++;
-          continue;
         }
-        const { _id, _creationTime, ...guardada } = previa.value;
-        const igual = mismoRegistro(registroDe(guardada), registro);
-        if (igual && guardada.ausencias === 0 && guardada.retiradaEn === null) {
-          continue;
-        }
-        yield* writer.table("observaciones").replace(_id, {
-          ...guardada,
-          ...registro,
-          fecha: igual ? guardada.fecha : fecha,
-          // Si cambia el listado, la ficha se vuelve a leer en esta misma ejecución.
-          fichaLeidaEn: igual ? guardada.fichaLeidaEn : null,
-          ausencias: 0,
-          retiradaEn: null,
-        });
-        if (!igual || guardada.retiradaEn !== null) {
-          cambiados++;
-        }
+        creados += cuenta === "creada" ? 1 : 0;
+        cambiados += cuenta === "cambiada" ? 1 : 0;
       }
       return { creados, cambiados };
     }).pipe(Effect.orDie),
@@ -187,15 +170,9 @@ const aplicarFicha = FunctionImpl.make(
       if (Option.isNone(previa)) {
         return false;
       }
-      const { _id, _creationTime, ...guardada } = previa.value;
-      const iguales = mismasBandas(guardada.bandas, bandas);
-      yield* writer.table("observaciones").replace(_id, {
-        ...guardada,
-        bandas,
-        fecha: iguales ? guardada.fecha : fecha,
-        fichaLeidaEn: fecha,
-      });
-      return !iguales;
+      const { guardada, cambiada } = trasFicha(sinSistema(previa.value), bandas, fecha);
+      yield* writer.table("observaciones").replace(previa.value._id, guardada);
+      return cambiada;
     }).pipe(Effect.orDie),
 );
 
@@ -223,12 +200,8 @@ const cerrarBarrido = FunctionImpl.make(
         if (o.retiradaEn !== null || vistasEnListado.has(o.clave)) {
           continue;
         }
-        // Una baja solo cuenta tras dos barridos completos sin verla.
-        const ausencias = o.ausencias + 1;
-        const retirada = ausencias >= 2;
-        yield* writer
-          .table("observaciones")
-          .replace(_id, { ...o, ausencias, retiradaEn: retirada ? actual.inicio : null });
+        const { guardada, retirada } = trasAusencia(o, actual.inicio);
+        yield* writer.table("observaciones").replace(_id, guardada);
         retirados += retirada ? 1 : 0;
       }
       return { retirados };
@@ -459,21 +432,7 @@ const observacionesVigentes = FunctionImpl.make(
         )
         .take(limite);
       return {
-        elementos: pagina
-          .filter((o) => o.retiradaEn === null)
-          .map((o): Observacion => ({
-            fuente: o.fuente,
-            clave: o.clave,
-            compania: o.compania,
-            codigo: o.codigo,
-            posicion: o.posicion,
-            direccion: o.direccion,
-            municipio: o.municipio,
-            bandas: o.bandas,
-            url: o.url,
-            fecha: o.fecha,
-            afirma: o.afirma,
-          })),
+        elementos: pagina.filter((o) => o.retiradaEn === null).map(observacionDe),
         ultima: pagina.length < limite ? null : (pagina.at(-1)?.clave ?? null),
       };
     }).pipe(Effect.orDie),
