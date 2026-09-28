@@ -15,17 +15,34 @@
       inherit (lib.meta) getExe;
       inherit (lib.modules) mkIf;
       inherit (lib.options) literalExpression mkEnableOption mkOption;
-      inherit (lib.strings) hasPrefix;
+      inherit (lib.strings) concatStringsSep hasPrefix;
       inherit (lib.trivial) boolToString;
       inherit (lib.types)
         bool
+        enum
         externalPath
         ints
+        listOf
         nullOr
         package
         str
         strMatching
         ;
+
+      # Las zonas de barrido del programa, `ZONAS_DE_BARRIDO` en packages/dominio/src/barrido.ts.
+      # Una prueba de apps/nocturna comprueba que son las mismas.
+      zonaDeBarrido = enum [
+        "cataluna"
+        "centro"
+        "andalucia"
+        "levante"
+        "norte"
+        "ebro-y-duero"
+        "oeste-y-canarias"
+      ];
+
+      # La lista de zonas como la lee el programa: separadas por comas, o `ninguna`.
+      listaDeZonas = zonas: if zonas == [ ] then "ninguna" else concatStringsSep "," zonas;
     in
     {
       options.services.celda-nocturna = {
@@ -151,6 +168,43 @@
           description = "Segundos que se espera una respuesta antes de darla por fallida.";
         };
 
+        registroOficial.zonas = mkOption {
+          type = listOf zonaDeBarrido;
+          default = singleton "cataluna";
+          example = [
+            "cataluna"
+            "centro"
+          ];
+          description = ''
+            Zonas de barrido del listado que se barren todas las noches (ADR 0014). Cataluña son 9
+            cuadros de 1° y unas 37 peticiones la primera noche; las siguientes, unas 30.
+          '';
+        };
+
+        registroOficial.zonasEnTurno = mkOption {
+          type = listOf zonaDeBarrido;
+          default = [ ];
+          example = [
+            "centro"
+            "andalucia"
+            "levante"
+            "norte"
+            "ebro-y-duero"
+            "oeste-y-canarias"
+          ];
+          description = ''
+            Zonas de barrido que se turnan: cada noche se barren `zonasPorNoche` de ellas, primero
+            la que quedó a medias y luego las que llevan más tiempo sin barrer. Una zona que también
+            está en `zonas` se barre todas las noches.
+          '';
+        };
+
+        registroOficial.zonasPorNoche = mkOption {
+          type = ints.unsigned;
+          default = 1;
+          description = "Cuántas de las zonas que se turnan se barren cada noche.";
+        };
+
         registroOficial.userAgent = mkOption {
           type = str;
           default = "Celda (ingesta; contacto en celda.elies.site)";
@@ -223,6 +277,9 @@
             CELDA_REGISTRO_PAUSA_SEGUNDOS = toString config.services.celda-nocturna.registroOficial.pausa;
             CELDA_REGISTRO_REINTENTOS = toString config.services.celda-nocturna.registroOficial.reintentos;
             CELDA_REGISTRO_USER_AGENT = config.services.celda-nocturna.registroOficial.userAgent;
+            CELDA_REGISTRO_ZONAS = listaDeZonas config.services.celda-nocturna.registroOficial.zonas;
+            CELDA_REGISTRO_ZONAS_EN_TURNO = listaDeZonas config.services.celda-nocturna.registroOficial.zonasEnTurno;
+            CELDA_REGISTRO_ZONAS_POR_NOCHE = toString config.services.celda-nocturna.registroOficial.zonasPorNoche;
           };
 
           serviceConfig = {

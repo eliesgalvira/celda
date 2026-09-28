@@ -28,12 +28,14 @@
               -days 36500 -extfile san -out "$out/servidor.pem"
           '';
 
-      # El geoportal contesta con el listado y una ficha grabados en el Campus Nord. R2 guarda lo
-      # que le llega en una carpeta y apunta la firma de cada petición.
+      # El geoportal contesta el listado de cada caja con los elementos grabados en el Campus Nord
+      # que caen en ella, y cada ficha con una grabada. R2 guarda lo que le llega en una carpeta y
+      # apunta la firma de cada petición.
       fuentesDePrueba =
         pkgs.writers.writePython3Bin "fuentes-de-prueba" { flakeIgnore = singleton "E501"; }
           /* python */ ''
             import http.server
+            import json
             import os
             import ssl
             import sys
@@ -48,6 +50,19 @@
             def leer(ruta):
                 with open(ruta, "rb") as fichero:
                     return fichero.read()
+
+
+            def listado(consulta):
+                oeste, sur, este, norte = (float(g) for g in consulta["bbox"][0].split(","))
+                grabado = json.loads(leer(LISTADO).decode("latin-1"))
+                dentro = []
+                for elemento in grabado["features"]:
+                    longitud, latitud = elemento["geometry"]["coordinates"]
+                    if oeste <= longitud <= este and sur <= latitud <= norte:
+                        dentro.append(elemento)
+                if not dentro:
+                    return b"{}"
+                return json.dumps({"type": "FeatureCollection", "features": dentro}, ensure_ascii=False).encode("latin-1")
 
 
             class Fuentes(http.server.BaseHTTPRequestHandler):
@@ -74,7 +89,8 @@
                         if ruta == "/robots.txt":
                             return self.responder(200, b"User-agent: *\nAllow: /\n")
                         if ruta == "/VCTEL/infoantenasGeoJSON.do":
-                            return self.responder(200, leer(LISTADO), "application/json")
+                            consulta = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                            return self.responder(200, listado(consulta), "application/json")
                         if ruta == "/VCTEL/detalleEstacion.do":
                             return self.responder(200, leer(FICHA), "text/html")
                         return self.responder(404)
@@ -146,6 +162,12 @@
               copias.directorio = "/srv/copias/celda";
               origenPublico = "https://capas.prueba";
               registroOficial.maxFichas = 2;
+              registroOficial.zonas = singleton "cataluna";
+              registroOficial.zonasEnTurno = [
+                "cataluna"
+                "centro"
+                "andalucia"
+              ];
             };
 
             # La prueba mueve el reloj para disparar el temporizador.
@@ -216,6 +238,15 @@
                   print(estado)
                   assert "completada" in estado
                   assert "Última versión publicada: ninguna" not in estado
+
+              with subtest("la noche barre Cataluña y una de las zonas que se turnan, cuadro a cuadro"):
+                  assert "- cataluna: completado, 9 cuadros" in estado, estado
+                  assert "- centro: completado, 10 cuadros" in estado, estado
+                  assert "andalucia" not in estado, estado
+                  assert "40 registros" in estado, estado
+                  # Los 19 cuadros de las dos zonas, una petición cada uno: ninguno llega al tope.
+                  listados = maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log").strip()
+                  assert listados == "19", listados
 
               with subtest("el servicio corre endurecido"):
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))

@@ -1,6 +1,11 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
-import { type Caja, Caja as CajaEsquema, type ZonaDeBarrido } from "@celda/dominio/barrido";
+import {
+  type Caja,
+  Caja as CajaEsquema,
+  type ZonaDeBarrido,
+  ZONAS_DE_BARRIDO,
+} from "@celda/dominio/barrido";
 import type { OpcionesZonas } from "@celda/ingesta/barrido";
 import { ExtractorPorCajas, RespuestaInesperada } from "@celda/ingesta/extractor";
 import { ObservacionGuardada } from "@celda/ingesta/guardado";
@@ -471,6 +476,25 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
         assert.strictEqual((yield* observadas(entorno)).size, 0);
       }),
     ),
+  );
+
+  it.effect("el módulo de NixOS acepta las mismas zonas de barrido que el programa", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const modulo = yield* fs.readFileString(
+        path.join(
+          yield* path.fromFileUrl(new URL(".", import.meta.url)),
+          "../../../nix/nocturna-nixos.mod.nix",
+        ),
+      );
+      const enumerado = /zonaDeBarrido = enum \[([^\]]*)\]/u.exec(modulo)?.[1] ?? "";
+      const enNix = [...enumerado.matchAll(/"([^"]+)"/gu)].map((nombre) => nombre[1]);
+      assert.deepStrictEqual(
+        enNix,
+        ZONAS_DE_BARRIDO.map((zona) => zona.nombre),
+      );
+    }).pipe(Effect.provide(NodeServices.layer)),
   );
 
   it.effect(
