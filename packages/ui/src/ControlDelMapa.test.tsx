@@ -2,13 +2,13 @@ import { assert, describe, it } from "@effect/vitest";
 import { render } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 
-import { BotonHexagonal } from "./BotonHexagonal.tsx";
+import { ControlDelMapa } from "./ControlDelMapa.tsx";
 
-describe("BotonHexagonal", () => {
+describe("ControlDelMapa", () => {
   it("se nombra por su etiqueta visible y refleja si está activo", () => {
     const [activo, setActivo] = createSignal(false);
     const { getByRole } = render(() => (
-      <BotonHexagonal etiqueta="Interferencia" icono="≈" activo={activo()} />
+      <ControlDelMapa etiqueta="Interferencia" icono="≈" activo={activo()} />
     ));
 
     const boton = getByRole("button", { name: "Interferencia" });
@@ -20,7 +20,7 @@ describe("BotonHexagonal", () => {
   });
 
   it("sin estado de encendido no anuncia aria-pressed", () => {
-    const { getByRole } = render(() => <BotonHexagonal etiqueta="Acercar" icono="+" />);
+    const { getByRole } = render(() => <ControlDelMapa etiqueta="Acercar" icono="+" />);
     assert.isNull(getByRole("button", { name: "Acercar" }).getAttribute("aria-pressed"));
   });
 });

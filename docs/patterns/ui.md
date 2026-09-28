@@ -29,7 +29,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 ## Reglas de la librería
 
 - Objetivos de 44 px como mínimo: la diana (`variantesDiana`) es rectangular y lleva el foco; la forma recortada va dentro. Un `clip-path` en el propio botón se comería el anillo de foco.
-- Todo control tiene etiqueta visible. `BotonHexagonal` escribe su `etiqueta` bajo el hexágono y esa etiqueta es su nombre accesible.
+- Todo control tiene etiqueta visible o, en Acercar y Alejar, un nombre accesible y un `title`. La `etiqueta` de `ControlDelMapa` es siempre su nombre accesible.
 - Estados completos: normal, `hover`, `focus-visible` (regla global en `tema.css`), `active`, `disabled` y, en `Boton`, `cargando`, que pone un hexágono sobre la etiqueta invisible para que el ancho no cambie.
 - Nada salta al cargar: `DisposicionMapa` reserva desde el principio el sitio de cada pieza, el fondo ya tiene el color del mapa y los avisos se superponen. Cada aviso nuevo se monta con clave, de modo que el navegador lo cuenta como elemento nuevo y no como uno que se mueve.
 - Lo que dura poco no se ve: el aviso de espera aparece tras medio segundo (`animate-aparecer`).
@@ -63,7 +63,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - `marcadores/Ausencias.tsx` es la cinta «sin» con el logo de cada compañía ausente. El logo va entero, del mismo dibujo que en los marcadores, y la × va en un círculo oscuro en su esquina inferior derecha, fuera del círculo del logo. En el diseño se descartaron los logos tachados y los translúcidos. Para el lector de pantalla, la cinta dice «sin Vodafone ni Digi» en texto oculto y los logos van con `aria-hidden`.
 - Las agrupaciones en hexágono no marcan ausencias; solo los barrios.
 - El mapa base no rotula barrios por debajo del zoom 14 (`estilo.ts`): se pisaban con las etiquetas de Celda.
-- El crédito de los límites de barrio va con los del mapa base. En el móvil los créditos ocupan dos líneas, así que los controles están a `bottom-[4.5rem]`.
+- El crédito de los límites de barrio va con los del mapa base. En el móvil los créditos se pliegan tras un botón «i» (ver «Controles del mapa»).
 
 ## Panel del emplazamiento
 
@@ -73,7 +73,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Un toque sube una altura y desde la completa vuelve al resumen. Las flechas suben y bajan, e Inicio y Fin van a los extremos. Escape cierra el panel. Al abrirse se lleva el foco y al cerrarse lo devuelve al marcador.
 - `panel/Ficha.tsx` tiene las piezas de dentro. `CabeceraFicha` y `EsqueletoFicha` comparten contenedor y alto de línea, así que al llegar la ficha no se mueve nada. El esqueleto dice «Cargando la ficha…» a los 0,5 s y, a los 8 s, que tarda más de lo normal (`animate-aparecer-tarde`).
 - `MarcaDeAguaFicha` tiene dos tonos. `al-dia` enseña la fecha de la ficha y `posterior` avisa de que la ficha ha cambiado después del mapa.
-- Con un panel abierto, `DisposicionMapa` (`panelAbierto`) sube en el móvil los controles y los créditos por encima del resumen, y en escritorio aparta los créditos a la derecha de la columna.
+- Con un panel abierto, `DisposicionMapa` (`panelAbierto`) sube en el móvil los controles y los créditos por encima del resumen, y en escritorio aparta los créditos a la derecha de la columna del panel.
 - `MarcadorEmplazamiento` con `seleccionado` lleva un anillo del color primario y `aria-current`. Si al alejar el seleccionado queda dentro de una agrupación, se sigue viendo suelto y la agrupación lo sigue contando. Si el emplazamiento no está verificado, lleva en la esquina un hexágono pequeño del color de su estado, como en el prototipo, y su nombre accesible acaba en el estado.
 
 ## Resumen, eje de frecuencias y datos técnicos
@@ -132,7 +132,7 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - Las capas de las celdas van en el estilo del mapa (`mapa/celdas.ts`), con una fuente GeoJSON vacía que la web llena. Salen desde `ZOOM_CELDAS` (15) y se funden en medio nivel. En Barcelona una de cada diez celdas mide menos de 140 m de lado a lado; a zoom 15 eso son unos 80 px, casi el doble que un marcador. A zoom 14 bajaba a 40 px y las líneas se amontonaban.
 - Todas llevan un trazo de 1 px con `--mapa-celda`, el verde azulado del primario, por debajo de los nombres de las calles. Al seleccionar un emplazamiento, `remarcarCelda` pinta la suya con 2 px y baja las demás al 14 %, como en el prototipo v8. Así no se amontonan líneas alrededor de la que importa. El relleno de la seleccionada es el degradado de abajo.
 - Un `minzoom` por encima de 24 invalida el estilo y MapLibre ya no carga el mapa base, así que `ZOOM_CELDAS` no puede pasar de ahí.
-- Mientras se ven, la `Pista` dice «Modelo celdas@1» y qué es una celda; si el cálculo falla, lo dice con un botón «Reintentar». En el móvil la pista va a la izquierda y no llega a la columna de controles; en escritorio se centra en lo que deja libre el panel.
+- Mientras se ven, la `Pista` dice «Modelo celdas@1» y qué es una celda; si el cálculo falla, lo dice con un botón «Reintentar». En el móvil la pista va a la izquierda y no llega a las pastillas de los controles; en escritorio se centra en lo que deja libre el panel.
 - Cuándo se calculan y cuándo se cancela lo decide la web (`apps/web/src/celdas/enMapa.ts`). Se calculan en el Worker del simulador la primera vez que el mapa llega al zoom de las celdas, una vez por capa. Otra capa o cerrar el mapa a medio cálculo lo cancela.
 - En Chromium con GPU (Vulkan) y la CPU a ×4 el mapa va a 60 fps con la rueda y al arrastrar entre zoom 15 y 17,5, en 390 px y en 1400 px, igual que sin celdas. El primer cruce del zoom 15, que calcula y pone las celdas, da 56-57 fps en 390 px (57-58 sin celdas) y 43-44 en 1400 px (44-45 sin ellas). En 1400 px lo que pesa son los marcadores.
 
@@ -141,7 +141,7 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - La trama va en el estilo del mapa (`mapa/interferencia.ts`), escondida y con su fuente vacía hasta que la web la llena. Cada hexágono lleva `sinr` y se colorea por tramos (`CORTES_SINR`: 0, 5, 10, 15 y 20 dB) con `--mapa-sinr-1` (naranja oscuro, domina la interferencia) a `--mapa-sinr-6` (verde azulado, señal limpia), al 62 % de opacidad. Se dibujan un 8 % más pequeños que la trama, y queda una línea entre ellos.
 - `mostrarInterferencia` enseña la trama y oculta a la vez las celdas y el degradado del sector que da servicio con su línea hasta el punto; de la seleccionada queda solo su contorno discontinuo (`celda-seleccionada-contorno`). Las capas que se cruzan se descartaron en los prototipos.
 - `interferencia/PanelInterferencia.tsx` tiene las piezas del panel: `PanelInterferencia` con «Simulación orientativa», la etiqueta de modelo y «Cerrar»; `TextoVista`, `ParDeControles`, `EscalaSinr`, `ValorEnPunto` (reserva su alto con valor o sin él) y `EstadoVista`. `Deslizador` (en `Eleccion.tsx`) es un `<input type="range">` de 44 px de alto con la etiqueta y el valor encima.
-- `DisposicionMapa` recibe el panel en `vista`. En escritorio va abajo a la derecha, a la izquierda de la columna de controles, con 22 rem de ancho. En el móvil es una hoja de 22,5 rem sobre los créditos y los controles suben por encima, sin hueco entre ellos para no llegar a la fecha de los datos. Con la hoja de la ficha o la de elegir un punto abiertas, en el móvil el panel se aparta. En el móvil el título solo lo lee el lector de pantalla.
+- `DisposicionMapa` recibe el panel en `vista`. En escritorio va abajo a la derecha, a la izquierda de las pastillas de los controles, con 22 rem de ancho. En el móvil es una hoja de 22,5 rem sobre el botón de los créditos, y las pastillas suben por encima. Con la hoja de la ficha o la de elegir un punto abiertas, en el móvil el panel se aparta. En el móvil el título solo lo lee el lector de pantalla.
 - Mientras la vista está activa no sale la pista de las celdas.
 - Medido en Chromium con GPU (Vulkan) y la CPU a ×4, arrastrando el mapa a zoom 16 en el Eixample con Movistar en 1800 MHz: 56 fps en 1400 px (59 sin la vista) y 59,5 en 390 px (60 sin ella). Tras soltar, la trama nueva llega en unos 330 ms en 1400 px y 200 ms en 390 px, con los 120 ms de espera incluidos.
 
@@ -157,7 +157,7 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 
 ## Ajustes y modo estudiante
 
-- El botón «Ajustes» va siempre en la columna de controles y abre un `Dialogo` con `Interruptor`, una casilla nativa con `role="switch"` y `aria-checked`, que se cambia con toda la fila. El modo estudiante se guarda en `AlmacenLocal` (`leerAjustes` y `guardarAjustes`, en el almacén `ajustes` de la base `celda`, versión 2). Hasta que se leen valen los iniciales, con el modo apagado: nadie ve el ejercicio sin haberlo encendido.
+- El botón «Ajustes» va siempre en el menú «Funciones» y abre un `Dialogo` con `Interruptor`, una casilla nativa con `role="switch"` y `aria-checked`, que se cambia con toda la fila. El modo estudiante se guarda en `AlmacenLocal` (`leerAjustes` y `guardarAjustes`, en el almacén `ajustes` de la base `celda`, versión 2). Hasta que se leen valen los iniciales, con el modo apagado: nadie ve el ejercicio sin haberlo encendido.
 - «Ejercicio» y «Ajustes» van en `controlesSecundarios` de `DisposicionMapa`, al final de la columna. En el móvil se esconden mientras se ve el panel de una vista, como la de interferencia: con ellos la columna no cabía encima del panel y «Acercar» se salía de la pantalla.
 - Las bandas del ejercicio salen de la capa (formato 3 o posterior) y, si se leen las fichas publicadas, de ellas; la tabla dice cuál de las dos y su fecha. Las fichas de una zona suelen caer en uno o dos lotes, así que leerlas cuesta pocas peticiones.
 - Con el modo encendido aparece el botón «Ejercicio», que abre `PanelEjercicio` (`apps/web/src/ejercicio`) en el sitio de la ficha. La URL lleva `?ejercicio=<código del barrio>`; sin el modo, esa URL no abre nada.
@@ -174,6 +174,34 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - La flecha gira con una transición de 200 ms que acumula el ángulo sin saltar de 359° a 0°. Con la preferencia de reducir movimiento, `motion-reduce:transition-none` la quita.
 - La columna de la derecha reserva 12,5 rem de alto: pasar de un estado de la brújula a otro mueve poco la ficha. En el móvil el dial mide 6,5 rem y en escritorio 7,5.
 - La barra que simula el giro es el `Deslizador` de `Eleccion.tsx`, con la etiqueta «Simular el giro».
+
+## Controles del mapa
+
+Los controles eran hexágonos oscuros como las agrupaciones, en una columna de siete que tapaba grupos del mapa. Se probaron tres disposiciones en el móvil (28/09/2026; la rama `celda/diseno-logo-controles` las conserva en su historia) y se eligió la de un menú:
+
+- Abajo a la derecha solo hay dos pastillas claras: «Ubicación», que se usa también con la ficha abierta, y «Funciones». `MenuDeControles` despliega encima el resto, una fila por control con una línea que explica qué hace (`detalle`). Se cierra al usar uno, con Escape o tocando fuera.
+- En escritorio, Acercar y Alejar van a la vista en dos losas pequeñas sobre «Ubicación». En el móvil van dentro de «Funciones», porque el mapa se amplía con dos dedos; así quien no puede hacer el gesto sigue teniendo un botón.
+- `ControlDelMapa` es el botón. Su aspecto lo pone `DisposicionMapa` con el contexto `AspectoDeControl`: `pastilla`, `zoom` o `fila`. Una pantalla solo pasa los controles en `zoom`, `controles`, `botonUbicacion` y `controlesSecundarios`.
+- Son claros (`--control`, `--control-tinta` y `--control-borde`) para no confundirse con las agrupaciones, que son los datos. `mapa/color.test.ts` exige 3:1 (WCAG 1.4.11) entre el borde y cada fondo del mapa, y entre el relleno y una agrupación.
+- En el móvil los créditos se pliegan tras un botón «i». Se ven al cargar y se pliegan al primer toque en el mapa o a los 5 s, como permiten las [pautas de atribución de la OSMF](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines). En escritorio se ven siempre.
+
+## Marca
+
+La marca es la celda de un emplazamiento con sus tres sectores. Sale de `marca/geometria.ts`, y la cabecera (`MarcaCelda`) y los iconos dibujan la misma figura.
+
+- El hexágono oscuro con borde de color es la celda, el mismo que el de las agrupaciones del mapa.
+- Tres líneas claras salen del centro hacia tres vértices alternos y la parten en los tres sectores de 120° de un emplazamiento.
+- En cada sector hay un triángulo claro, el símbolo con que se dibuja un emplazamiento en los esquemas de celdas. Juntos forman una Trifuerza reinterpretada, no la de Nintendo: tiene hueco en el centro y las líneas de los sectores salen de sus vértices.
+- Las líneas se afilan y no llegan al borde. Si lo tocaran, los tres rombos se leerían como un cubo.
+- Se lee a 16 px y sin color: la figura es oscura y lo recortado, claro. Se eligió el 28/09/2026 entre cuatro versiones (la rama `celda/diseno-logo-controles` las conserva en su historia).
+
+## Favicon, iconos y manifiesto
+
+No hay ficheros de iconos en el repositorio: el plugin `iconosDeCelda` (`marca/iconos.ts`, en `apps/web/vite.config.ts`) los genera desde la geometría de la marca y los tokens `--icono-*` de `tema.css`. En desarrollo los sirve y en la build los escribe en `dist/iconos/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180 px), `icono-192.png`, `icono-512.png` y `manifest.webmanifest`, y pone en el HTML sus enlaces.
+
+- Los PNG salen de `marca/raster.ts`, un rasterizador de polígonos par-impar con suavizado, sin dependencias, y se codifican con `node:zlib`.
+- El favicon es la figura sin fondo: su parte oscura lleva `--icono-fondo` y lo recortado `--icono-figura`, así que se ve en pestañas claras y oscuras. El icono de la pantalla de inicio va a sangre sobre un cuadrado oscuro, porque el sistema lo recorta a su forma.
+- `vercel.json` deja `/iconos/` fuera de la reescritura a `index.html`: un icono que falta da 404.
 
 ## Qué rechaza la regla fuera de `packages/ui`
 

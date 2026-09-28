@@ -2,7 +2,7 @@ import { BARCELONA, type Rectangulo } from "@celda/dominio/area";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
-import { BotonHexagonal } from "@celda/ui/BotonHexagonal.tsx";
+import { ControlDelMapa } from "@celda/ui/ControlDelMapa.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
@@ -530,47 +530,56 @@ export function PantallaMapa() {
               </Show>
             }
             pista={pista()}
-            controles={
+            zoom={
               <>
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Acercar"
                   icono="+"
                   disabled={!listo()}
                   onClick={() => mapa?.zoomIn()}
                 />
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Alejar"
                   icono="−"
                   disabled={!listo()}
                   onClick={() => mapa?.zoomOut()}
                 />
-                <BotonHexagonal
+              </>
+            }
+            controles={
+              <>
+                <ControlDelMapa
                   etiqueta="Interferencia"
+                  detalle="Simula dónde se pisan las señales de una compañía."
                   icono={<IconoOndas />}
                   activo={vistaActiva()}
                   disabled={!listo() || emplazamientos().length === 0}
                   onClick={cambiarVista}
                 />
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Medir mi señal"
+                  detalle="Cómo leer en el móvil la señal que te llega."
                   icono={<IconoSenal />}
                   aria-haspopup="dialog"
                   onClick={() => navegar(conMedir(ubicacion(), true))}
                 />
-                <MenuDeUbicacion
-                  puedeCentrar={listo()}
-                  alCentrar={() => {
-                    const referencia = puntoDeReferencia.referencia();
-                    if (referencia !== undefined) irA(posicionDe(referencia));
-                  }}
-                />
               </>
+            }
+            botonUbicacion={
+              <MenuDeUbicacion
+                puedeCentrar={listo()}
+                alCentrar={() => {
+                  const referencia = puntoDeReferencia.referencia();
+                  if (referencia !== undefined) irA(posicionDe(referencia));
+                }}
+              />
             }
             controlesSecundarios={
               <>
                 <Show when={ajustes.ajustes().modoEstudiante}>
-                  <BotonHexagonal
+                  <ControlDelMapa
                     etiqueta="Ejercicio"
+                    detalle="Los cálculos de un barrio paso a paso, con sus fuentes."
                     icono={<IconoEjercicio />}
                     activo={ejercicio() !== null}
                     onClick={() =>
@@ -578,8 +587,9 @@ export function PantallaMapa() {
                     }
                   />
                 </Show>
-                <BotonHexagonal
+                <ControlDelMapa
                   etiqueta="Ajustes"
+                  detalle="Las preferencias de Celda en este dispositivo."
                   icono={<IconoAjustes />}
                   aria-haspopup="dialog"
                   onClick={() => navegar(conAjustes(ubicacion(), true))}

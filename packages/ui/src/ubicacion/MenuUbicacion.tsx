@@ -2,7 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
 import { createUniqueId, onSettled, Show } from "solid-js";
 
-import { BotonHexagonal } from "../BotonHexagonal.tsx";
+import { ControlDelMapa } from "../ControlDelMapa.tsx";
 import { IconoMirilla } from "./MarcadorReferencia.tsx";
 
 export interface MenuUbicacionProps {
@@ -16,7 +16,7 @@ export interface MenuUbicacionProps {
 }
 
 /**
- * El botón de ubicación del mapa, un hexágono con una mirilla, y su menú: usar la ubicación,
+ * El botón de ubicación del mapa, con una mirilla, y su menú, que sale encima: usar la ubicación,
  * elegir un punto, centrar el mapa o quitarlo. Escape o un clic fuera lo cierran.
  */
 export function MenuUbicacion(props: MenuUbicacionProps) {
@@ -53,7 +53,7 @@ export function MenuUbicacion(props: MenuUbicacionProps) {
       }}
       class="relative"
     >
-      <BotonHexagonal
+      <ControlDelMapa
         etiqueta="Ubicación"
         icono={<IconoMirilla />}
         activo={props.activo}
@@ -69,7 +69,7 @@ export function MenuUbicacion(props: MenuUbicacionProps) {
               elemento.querySelector<HTMLButtonElement>("button:enabled")?.focus(),
             );
           }}
-          class="chaflan absolute right-full bottom-0 mr-2 flex w-72 flex-col bg-superficie p-1.5 drop-shadow-panel [--corte:10px]"
+          class="chaflan absolute right-0 bottom-full z-20 mb-2 flex w-72 flex-col bg-superficie p-1.5 drop-shadow-panel [--corte:10px]"
         >
           <legend class="sr-only">Punto de referencia</legend>
           {props.children}

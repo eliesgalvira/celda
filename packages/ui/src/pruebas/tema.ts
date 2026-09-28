@@ -1,20 +1,7 @@
 import tema from "../tema.css?raw";
+import { leerTokens, type Tema } from "../tokens.ts";
 
-export type Tema = "claro" | "oscuro";
-
-const SELECTORES: Readonly<Record<Tema, string>> = {
-  claro: ":root {",
-  oscuro: '[data-tema="oscuro"] {',
-};
+export type { Tema };
 
 /** Las variables CSS que define tema.css para un tema, con su valor tal cual. */
-export const tokensDelTema = (cual: Tema): ReadonlyMap<string, string> => {
-  const inicio = tema.indexOf(SELECTORES[cual]);
-  const cuerpo = tema.slice(inicio, tema.indexOf("\n}", inicio));
-  return new Map(
-    Array.from(cuerpo.matchAll(/--([\w-]+):\s*([^;]+);/gu), ([, nombre = "", valor = ""]) => [
-      nombre,
-      valor.replaceAll(/\s+/gu, " ").trim(),
-    ]),
-  );
-};
+export const tokensDelTema = (cual: Tema): ReadonlyMap<string, string> => leerTokens(tema, cual);

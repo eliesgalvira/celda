@@ -50,6 +50,35 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   // Las etiquetas de barrio, escritas sobre el mapa con un halo del color de su fondo.
   ["tinta", "mapa-halo"],
   ["primario-texto", "mapa-halo"],
+  // Las etiquetas y los iconos de los controles claros.
+  ["control-tinta", "control"],
+  ["control-tinta", "control-hover"],
+];
+
+/** Los fondos del mapa base sobre los que puede quedar un control. */
+const FONDOS_DEL_MAPA = [
+  "mapa-fondo",
+  "mapa-parque",
+  "mapa-agua",
+  "mapa-edificio",
+  "mapa-camino",
+  "mapa-calle",
+  "mapa-avenida",
+] as const;
+
+/**
+ * Pares de piezas que no son texto y que tienen que distinguirse: 3:1, como pide WCAG 1.4.11
+ * para los componentes de la interfaz. Los controles eran hexágonos oscuros como las
+ * agrupaciones, los dos `superficie-invertida` (1:1): por eso ahora son claros.
+ */
+const PARES_NO_TEXTO: ReadonlyArray<readonly [pieza: string, fondo: string]> = [
+  // El borde de un control claro frente a cualquier fondo del mapa.
+  ...FONDOS_DEL_MAPA.map((fondo) => ["control-borde", fondo] as const),
+  // El relleno de un control claro frente a una agrupación, que es oscura.
+  ["control", "superficie-invertida"],
+  // El favicon: lo recortado y el borde frente a la figura oscura.
+  ["icono-figura", "icono-fondo"],
+  ["icono-acento", "icono-fondo"],
 ];
 
 describe("contraste del tema", () => {
@@ -59,6 +88,18 @@ describe("contraste del tema", () => {
       for (const [texto, fondo] of PARES) {
         const ratio = contraste(oklch(tokens.get(texto) ?? ""), oklch(tokens.get(fondo) ?? ""));
         assert.isAtLeast(ratio, 4.5, `--${texto} sobre --${fondo}: ${ratio.toFixed(2)}:1`);
+      }
+    });
+  }
+});
+
+describe("contraste de los controles frente al mapa y las agrupaciones", () => {
+  for (const tema of ["claro", "oscuro"] as const) {
+    it(`cumple WCAG AA para componentes (3:1) en el tema ${tema}`, () => {
+      const tokens = tokensDelTema(tema);
+      for (const [pieza, fondo] of PARES_NO_TEXTO) {
+        const ratio = contraste(oklch(tokens.get(pieza) ?? ""), oklch(tokens.get(fondo) ?? ""));
+        assert.isAtLeast(ratio, 3, `--${pieza} frente a --${fondo}: ${ratio.toFixed(2)}:1`);
       }
     });
   }

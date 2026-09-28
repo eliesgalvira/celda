@@ -75,6 +75,23 @@
   --qr-fondo: oklch(99% 0 0);
   --qr-tinta: oklch(20% 0 0);
 
+  /*
+   * ICONOS: el favicon y el de la pantalla de inicio (marca/iconos.ts). La figura, oscura como
+   * las agrupaciones, con lo recortado claro: se ven en pestañas claras y oscuras.
+   */
+  --icono-fondo: oklch(29.9% 0.005 121.8);
+  --icono-figura: oklch(94.1% 0.009 84.6);
+  --icono-acento: oklch(72% 0.085 203.3);
+
+  /*
+   * CONTROLES DEL MAPA: piedra clara con tinta y borde oscuro. Así no se
+   * confunden con las agrupaciones, que son los datos y van en oscuro.
+   */
+  --control: oklch(95.5% 0.008 84.6);
+  --control-hover: oklch(98.5% 0.004 90);
+  --control-tinta: oklch(29.9% 0.005 121.8);
+  --control-borde: oklch(29.9% 0.005 121.8);
+
   /* MAPA BASE */
   --mapa-fondo: oklch(86.7% 0.011 89.7);
   --mapa-parque: oklch(83.9% 0.021 116);
@@ -157,6 +174,15 @@
 
   --qr-fondo: oklch(99% 0 0);
   --qr-tinta: oklch(20% 0 0);
+
+  --icono-fondo: oklch(29.9% 0.005 121.8);
+  --icono-figura: oklch(94.1% 0.009 84.6);
+  --icono-acento: oklch(72% 0.085 203.3);
+
+  --control: oklch(31% 0.008 100);
+  --control-hover: oklch(36% 0.008 100);
+  --control-tinta: oklch(93% 0.008 87.5);
+  --control-borde: oklch(93% 0.008 87.5);
 
   --eje-lejos: oklch(70% 0.09 78);
 
@@ -248,6 +274,10 @@
   --color-compania-tinta: var(--compania-tinta);
   --color-qr-fondo: var(--qr-fondo);
   --color-qr-tinta: var(--qr-tinta);
+  --color-control: var(--control);
+  --color-control-hover: var(--control-hover);
+  --color-control-tinta: var(--control-tinta);
+  --color-control-borde: var(--control-borde);
 
   --font-texto: var(--fuente-texto);
   --font-titulo: var(--fuente-titulo);
