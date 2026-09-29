@@ -1,6 +1,6 @@
 # La web en Vercel, las capas y las fichas en R2 con copia en Vercel, y aviso ante bloqueos
 
-Estado: aceptada el 28/09/2026, tras la exploración técnica 05 (issue #7, rama `spike/celda-cloudflare`). Sustituye la decisión 10 de `../arquitectura.md`, que ponía la web en Cloudflare Pages. Falta la parte con cuentas reales, que es el ticket #14. Revisada el mismo día con la retención de versiones que decidió el #14.
+Estado: aceptada el 28/09/2026, tras la exploración técnica 05 (issue #7, rama `spike/celda-cloudflare`). Sustituye la decisión 10 de `../arquitectura.md`, que ponía la web en Cloudflare Pages. Falta la parte con cuentas reales, que es el ticket #14. Revisada el mismo día con la retención de versiones que decidió el #14, y el 29/09/2026 con la copia de reserva que se construye en Vercel desde R2 (#46).
 
 ## Contexto
 
@@ -14,7 +14,7 @@ Desde el ADR 0008, lo que se publica son ficheros JSON inmutables, no PMTiles: l
 
 - La web estática se sirve desde Vercel en `celda.elies.site`.
 - La publicación escribe la capa, las fichas y `vigente.json` en un cubo de R2, por su API compatible con S3 (`packages/publicacion/src/almacenes/r2.ts`). Un Worker o una Pages Function con binding a R2 los sirve con sus cabeceras. Es el origen principal de las capas.
-- Vercel tiene una copia de los mismos ficheros en `/capas`, en el mismo origen que la web. Es el origen de reserva. `apps/web/scripts/sitio.sh` monta ese sitio: la web construida, lo publicado y `apps/web/vercel.json`.
+- Vercel tiene en `/capas`, en el mismo origen que la web, una copia de la versión vigente de R2, y solo de esa. Es el origen de reserva. La construye el build de Vercel (#46, «La copia de reserva» abajo).
 - Cabeceras: los ficheros con versión en el nombre llevan `public, max-age=31536000, immutable`; `vigente.json`, `public, max-age=0, must-revalidate`. Una petición de un fichero que no existe da 404, no la página de la web.
 - Los ficheros con versión no cambian nunca y `vigente.json` se escribe el último, cuando la capa y todas sus fichas ya están. El cliente no compara ETag entre orígenes: el nombre versionado basta.
 - El cliente pide cada fichero al origen activo con un tiempo límite de 3 s. Un error de red, un tiempo agotado, un 5xx, un 429 o el error 1027 de Cloudflare lo hacen pasar al otro. Recuerda durante una hora que el principal falló y lo vuelve a sondear en segundo plano.
@@ -30,13 +30,30 @@ La publicación es automática: al acabar cada ejecución de ingesta completada,
 
 `CELDA_ALMACEN_ORIGEN` es la URL pública de lo publicado. Sin almacén, la publicación no hace nada y lo apunta en el registro.
 
+Desde el ADR 0015 publica la ingesta nocturna, con el mismo `AlmacenDeFicheros`.
+
+## La copia de reserva (#46, 29/09/2026)
+
+La copia de Vercel ya no se sube a mano ni guarda ocho versiones. Con toda España no cabían: una subida por CLI en Hobby admite 100 MB y 15.000 ficheros, y ocho versiones eran unos 580 MB. Ahora la monta el build de Vercel con la versión vigente de R2:
+
+1. Tras publicar, la noche lee el `vigente.json` de R2 y el de la copia (`CELDA_RESERVA_ORIGEN`, `https://celda.elies.site/capas`). Si no dicen la misma versión con el mismo resumen, o la copia no contesta, llama al deploy hook de Vercel (`CELDA_VERCEL_DEPLOY_HOOK`, una credencial de systemd). Si coinciden, no hace nada. Lo hace también si la publicación de esa noche falló, porque la copia sigue a lo que haya en R2. Un hook que falla queda en el diario y la noche siguiente vuelve a comparar (`actualizarReserva` en `packages/publicacion/src/reserva.ts`).
+2. El build (`apps/web/scripts/vercel.sh`) construye la web con `VITE_CAPAS_ORIGEN` apuntando a R2 y `VITE_CAPAS_RESERVA=/capas`, y lanza `celda-nocturna reserva <R2> dist/capas` (`copiarVigente`). La orden lee `vigente.json` una vez y copia su resumen, su manifiesto y las capas y los lotes que lista el manifiesto. Comprueba que el resumen es de esa versión y que cada fichero nombrado por su contenido coincide con su huella. Escribe `vigente.json` el último.
+3. Si no llega a R2, si falta algo o si una huella no cuadra, la orden falla y el build con ella. Vercel no publica un despliegue que no ha terminado, así que sigue sirviendo el anterior entero, web y copia.
+
+Así la copia nunca anuncia en su `vigente.json` una versión que no tiene entera, y nunca mezcla ficheros de dos versiones. Mientras el build corre, o si falla, la copia sirve la versión anterior. El cliente lo aguanta: un fichero que la reserva no tiene da 404, y los servicios de capa y de fichas leen entonces la vigente de ese origen (ADR 0004).
+
+Con los 42.900 emplazamientos sintéticos de `tools/capas` (`pnpm run sintetica`), la copia son 415 ficheros y 24 MB. Con las fichas de verdad serían unos 400 ficheros y 72 MB sin comprimir (investigación 08). La salida de un build no tiene el tope de ficheros de la subida por CLI.
+
+`apps/web/vercel.json` lleva el build (`buildCommand`, `installCommand`, `outputDirectory`), así que el proyecto de Vercel tiene que tener como raíz `apps/web`. `sitio.sh` usa la misma orden para montar el sitio en local o subirlo a mano si el hook falla.
+
 ## Consecuencias
 
 - No hay que cambiar el DNS de `elies.site`.
 - Cada petición a la función de R2 gasta cuota gratuita de Workers (100.000 al día), también los aciertos de caché. Al agotarla, el tráfico pasa a Vercel.
-- Publicar es escribir en R2 y, además, volver a desplegar la copia de Vercel con los ficheros nuevos. La publicación de R2 ya está hecha y probada contra un cubo S3 de prueba; conectarla a un cubo real y hacer el despliegue de la copia tras cada publicación, por ejemplo con un deploy hook de Vercel cuyo build descargue lo vigente de R2, es el ticket #14. Hasta entonces la copia de Vercel se hace a mano con `sitio.sh`.
-- Retención (issue #14, 28/09/2026): el almacén guarda la versión vigente y las 7 anteriores. Al acabar cada publicación, también cuando ya estaba al día, `retirarVersionesViejas` lista el almacén y borra las versiones más viejas, primero la capa y luego sus lotes. Nunca toca la vigente ni una posterior a ella, que puede ser otra publicación a medias que aún no ha escrito `vigente.json`. Si el borrado falla, la publicación sigue siendo buena: queda en el registro y la siguiente lo repite. Una pestaña que lleve abierta más de ocho publicaciones lee la ficha de la vigente y lo dice (ADR 0004). Con toda España serían unos 800 lotes y 190 MB sin comprimir por versión, unos 1,5 GB con ocho, dentro de los 10 GB gratis de R2. Para listar, R2 usa ListObjectsV2 con la consulta firmada, y para borrar, DELETE. La copia de Vercel sale de la misma carpeta y guarda lo mismo. Para España no cabría: una subida por CLI en Hobby admite 100 MB y 15.000 ficheros, así que habrá que subir los ficheros comprimidos o generar la copia en el build.
-- Una pestaña que lleva abierta desde antes de una publicación puede pedir un lote de una versión que la reserva ya no tiene. El servicio de fichas lo resuelve leyendo la vigente, y la marca de agua lo dice (ADR 0004).
+- Publicar es escribir en R2 y, si la copia de Vercel no está al día, llamar a su deploy hook. Cada build lee de R2 unos 400 ficheros por el Worker, que cuentan en la cuota diaria de 100.000. Conectarlo a las cuentas reales es cosa del usuario (#42).
+- Retención (issue #14, 28/09/2026): el almacén guarda la versión vigente y las 7 anteriores. Al acabar cada publicación, también cuando ya estaba al día, `retirarVersionesViejas` lista el almacén y borra las versiones más viejas, primero la capa y luego sus lotes. Nunca toca la vigente ni una posterior a ella, que puede ser otra publicación a medias que aún no ha escrito `vigente.json`. Si el borrado falla, la publicación sigue siendo buena: queda en el registro y la siguiente lo repite. Una pestaña que lleve abierta más de ocho publicaciones lee la ficha de la vigente y lo dice (ADR 0004). Con toda España serían unos 800 lotes y 190 MB sin comprimir por versión, unos 1,5 GB con ocho, dentro de los 10 GB gratis de R2. Para listar, R2 usa ListObjectsV2 con la consulta firmada, y para borrar, DELETE. Desde el formato 5 las versiones comparten capas de provincia y lotes: la retirada lee los manifiestos y solo borra lo que no lista ninguna versión que se queda (ADR 0016). La copia de Vercel no retira nada: cada despliegue solo lleva la vigente.
+- Una pestaña que lleva abierta desde antes de una publicación puede pedir a la reserva un lote de una versión que ya no tiene, porque solo guarda la vigente. El servicio de fichas lo resuelve leyendo la vigente, y la marca de agua lo dice (ADR 0004).
+- El cliente con los dos orígenes está en `apps/web/src/capa/origenes.ts`. Pide a R2 primero, pasa a `/capas` en los casos de arriba y guarda en `localStorage` hasta cuándo va primero a la reserva. Mientras tanto prueba R2 cada cinco minutos con `vigente.json`. Sus pruebas repasan los escenarios de la exploración 05.
 - Vercel también ha sido bloqueado alguna vez. Si caen los dos orígenes, Celda lo dice. Un Service Worker que guarde la web queda como mejora.
 - Un extracto propio del mapa base de Barcelona (24 MB) puede seguir el mismo camino que las capas. Queda fuera de este ADR.
 
