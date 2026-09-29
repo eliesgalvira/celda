@@ -57,14 +57,15 @@ export interface OpcionesFichas {
 }
 
 /**
- * Por defecto (ADR 0014): una cada 3 s durante 6 horas, unas 5.500 por noche, empezando por
- * Barcelona, y relectura a los 30 días.
+ * Por defecto (ADR 0014): una cada 3 s durante 6 horas, unas 5.500 por noche, y relectura a los
+ * 30 días. Primero la provincia de Barcelona, luego el resto de Cataluña (Girona, Lleida y
+ * Tarragona) y después el resto de España, por zonas de barrido.
  */
 export const OPCIONES_FICHAS: OpcionesFichas = {
   ritmo: RITMO_MINIMO,
   ventana: Duration.hours(6),
   relectura: Duration.days(30),
-  prioridad: ["08"],
+  prioridad: ["08", "17", "25", "43"],
   maximo: undefined,
   fallosSeguidos: 3,
 };
@@ -96,7 +97,7 @@ const ListaDeProvincias = Schema.String.check(
  * - `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS`: minutos de fichas desde que empieza la noche (360).
  * - `CELDA_REGISTRO_FICHAS_RELECTURA_DIAS`: días tras los que se vuelve a leer una ficha (30).
  * - `CELDA_REGISTRO_FICHAS_PRIORIDAD`: provincias que van primero, por su código INE y
- *   separadas por comas, o `ninguna` (`08`, Barcelona).
+ *   separadas por comas, o `ninguna` (`08,17,25,43`: Barcelona y el resto de Cataluña).
  * - `CELDA_INGESTA_MAX_FICHAS`: tope de fichas por noche (sin tope; con 0 no se lee ninguna).
  */
 export const opcionesFichasDesdeConfig: Config.Config<OpcionesFichas> = Config.all({
@@ -227,9 +228,8 @@ export const ordenarFichas = (
     .map(({ ficha }) => ficha);
 };
 
-/** Lo que queda por leer en un grupo de la cola. */
-export interface GrupoPendiente {
-  readonly grupo: GrupoDeCola;
+/** Cuántas fichas quedan por leer en una parte de la cola. */
+export interface Pendientes {
   /** Nuevas o con el listado cambiado: nunca se han leído así. */
   readonly nuevas: number;
   /** Leídas hace más que la relectura. */
@@ -237,6 +237,19 @@ export interface GrupoPendiente {
   /** Esperando tras un fallo. */
   readonly enEspera: number;
 }
+
+/** Lo que queda por leer en un grupo de la cola. */
+export interface GrupoPendiente extends Pendientes {
+  readonly grupo: GrupoDeCola;
+}
+
+const contar =
+  (cuenta: { nuevas: number; porReleer: number; enEspera: number }) =>
+  (ficha: FichaEnCola, ahora: number) => {
+    if (esperando(ficha, ahora)) cuenta.enEspera++;
+    else if (ficha.leidaEn === null) cuenta.nuevas++;
+    else cuenta.porReleer++;
+  };
 
 /** Cuántas fichas quedan en cada grupo de la cola, en el orden en que se leen. */
 export const resumirCola = (
@@ -248,12 +261,35 @@ export const resumirCola = (
   const cuentas = grupos.map((grupo) => ({ grupo, nuevas: 0, porReleer: 0, enEspera: 0 }));
   for (const ficha of cola) {
     const cuenta = cuentas[grupoDe(ficha)];
-    if (cuenta === undefined) continue;
-    if (esperando(ficha, ahora)) cuenta.enEspera++;
-    else if (ficha.leidaEn === null) cuenta.nuevas++;
-    else cuenta.porReleer++;
+    if (cuenta !== undefined) contar(cuenta)(ficha, ahora);
   }
   return cuentas.filter((c) => c.nuevas + c.porReleer + c.enEspera > 0);
+};
+
+/**
+ * Cuántas fichas le quedan a cada zona de barrido, contando también las de sus provincias con
+ * prioridad: todas las de las observaciones de sus cuadros. Una zona repetida sale una vez.
+ */
+export const pendientesPorZona = (
+  cola: ReadonlyArray<FichaEnCola>,
+  zonas: ReadonlyArray<ZonaDeBarrido>,
+  ahora: number,
+): ReadonlyMap<string, Pendientes> => {
+  const cuentas = new Map<string, { nuevas: number; porReleer: number; enEspera: number }>();
+  const deCuadro = new Map<string, { nuevas: number; porReleer: number; enEspera: number }>();
+  for (const zona of zonas) {
+    if (cuentas.has(zona.nombre)) continue;
+    const cuenta = { nuevas: 0, porReleer: 0, enEspera: 0 };
+    cuentas.set(zona.nombre, cuenta);
+    for (const cuadro of zona.cuadros) {
+      if (!deCuadro.has(cuadro)) deCuadro.set(cuadro, cuenta);
+    }
+  }
+  for (const ficha of cola) {
+    const cuenta = deCuadro.get(ficha.cuadro);
+    if (cuenta !== undefined) contar(cuenta)(ficha, ahora);
+  }
+  return cuentas;
 };
 
 /**

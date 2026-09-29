@@ -234,19 +234,10 @@
               origenPublico = "https://capas.prueba";
               origenDeReserva = "https://celda.prueba/capas";
               # Una ficha cada 4 s durante los 2 primeros minutos de la noche: el listado se lleva
-              # uno, y no caben las 40.
+              # medio, y no caben las 40. Las zonas y la prioridad de las fichas son las de por
+              # defecto, las de toda España: la primera noche barre Cataluña.
               registroOficial.fichas.ritmo = 4;
               registroOficial.fichas.ventana = 2;
-              registroOficial.fichas.prioridad = [
-                "17"
-                "08"
-              ];
-              registroOficial.zonas = singleton "cataluna";
-              registroOficial.zonasEnTurno = [
-                "cataluna"
-                "centro"
-                "andalucia"
-              ];
               antenasmoviles.enable = true;
               antenasmoviles.maxDetalles = 4;
               antenasmoviles.zonas = singleton "cataluna";
@@ -336,14 +327,25 @@
                   assert "completada" in estado
                   assert "Última versión publicada: ninguna" not in estado
 
-              with subtest("la noche barre Cataluña y una de las zonas que se turnan, cuadro a cuadro"):
+              with subtest("por defecto las siete zonas se turnan: la primera noche barre Cataluña, cuadro a cuadro"):
+                  entorno = maquina.succeed("systemctl show celda-nocturna.service --property=Environment")
+                  for variable in (
+                      "CELDA_REGISTRO_ZONAS=ninguna",
+                      "CELDA_REGISTRO_ZONAS_EN_TURNO=cataluna,centro,andalucia,levante,norte,ebro-y-duero,oeste-y-canarias",
+                      "CELDA_REGISTRO_ZONAS_POR_NOCHE=1",
+                      "CELDA_REGISTRO_MAX_PETICIONES=400",
+                  ):
+                      assert variable in entorno, entorno
                   assert "- cataluna: completado, 9 cuadros" in estado, estado
-                  assert "- centro: completado, 10 cuadros" in estado, estado
-                  assert "andalucia" not in estado, estado
+                  assert "- centro: completado" not in estado, estado
                   assert "40 registros" in estado, estado
-                  # Los 19 cuadros de las dos zonas, una petición cada uno: ninguno llega al tope.
+                  # Por zona: cuándo se barrió y cuántas fichas le faltan, y cuál va la noche siguiente.
+                  assert "- cataluna: último barrido completado" in estado, estado
+                  assert "- centro: ningún barrido completado; fichas por leer: ninguna" in estado, estado
+                  assert "La próxima noche barre: centro" in estado, estado
+                  # Los 9 cuadros de Cataluña, una petición cada uno: ninguno llega al tope.
                   listados = maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log").strip()
-                  assert listados == "19", listados
+                  assert listados == "9", listados
 
               with subtest("antenasmoviles.es: un listado y el detalle de las ER5 pendientes de Cataluña, hasta el tope"):
                   assert "antenasmoviles: encendida" in estado, estado
@@ -365,7 +367,7 @@
                   for variable in (
                       "CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS=4",
                       "CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS=2",
-                      "CELDA_REGISTRO_FICHAS_PRIORIDAD=17,08",
+                      "CELDA_REGISTRO_FICHAS_PRIORIDAD=08,17,25,43",
                       "CELDA_REGISTRO_FICHAS_RELECTURA_DIAS=30",
                   ):
                       assert variable in entorno, entorno
@@ -385,6 +387,7 @@
                   assert fichas[-1] - inicio < 120, fichas[-1] - inicio
                   assert f"fichas {len(fichas)} leídas" in estado, estado
                   assert f"- provincia 08 (Barcelona): {40 - len(fichas)} sin leer, 0 por releer" in estado, estado
+                  assert f"; fichas por leer: {40 - len(fichas)} sin leer, 0 por releer" in estado, estado
                   assert "ventana cerrada" in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
                   # Se publica a mitad de la ventana y otra vez al cerrarla.
                   capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^ficheros@'").strip()

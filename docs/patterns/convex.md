@@ -33,7 +33,7 @@ La acción `ingesta:registroOficial` es fina: lee la configuración, monta el ex
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (Cataluña, por defecto), antenasmoviles.es si está encendido, la publicación, el aviso a la copia de reserva de Vercel y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (una de las siete de España cada noche, por defecto), antenasmoviles.es si está encendido, la publicación, el aviso a la copia de reserva de Vercel y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
 
 ### Lanzarla en local
 
@@ -56,7 +56,7 @@ CELDA_ALMACEN_CARPETA=$PWD/tools/capas/salida \
 pnpm run ingesta noche
 ```
 
-Con la zona de Cataluña por defecto, la primera noche son 38 peticiones, `robots.txt` y 37 de listado, y unos 2 min 30 s. La del 29/09/2026 trajo 10.305 registros de los 9 cuadros y publicó 5.049 emplazamientos en 40 lotes (investigación 08, «Primera pasada real de Cataluña»). Las noches siguientes piden solo las 30 cajas guardadas. Con `pnpm run servir` en `tools/capas`, la web en desarrollo lee esa carpeta.
+Con los valores por defecto, la primera noche en una base nueva barre Cataluña: 38 peticiones, `robots.txt` y 37 de listado, y unos 2 min 30 s. La del 29/09/2026 trajo 10.305 registros de los 9 cuadros y publicó 5.049 emplazamientos en 40 lotes (investigación 08, «Primera pasada real de Cataluña»). La noche siguiente barre la zona `centro` (la pasada real del 29/09 fueron 40 peticiones y 12.528 registros), y así hasta las siete. Cuando una zona vuelve a tocar, se piden solo sus cajas guardadas: 30 en Cataluña y 24 en `centro`. Con `pnpm run servir` en `tools/capas`, la web en desarrollo lee esa carpeta.
 
 ### Configuración
 
@@ -71,15 +71,15 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_PUBLICAR_REINTENTO_MINUTOS` | 60 | Espera antes de repetir una publicación fallida |
 | `CELDA_REGISTRO_ACTIVO` | `true` | Interruptor del registro oficial |
 | `CELDA_REGISTRO_MOTIVO` | | Lo que se apunta si está apagado |
-| `CELDA_REGISTRO_ZONAS` | `cataluna` | Zonas de barrido de cada noche, separadas por comas, o `ninguna` |
-| `CELDA_REGISTRO_ZONAS_EN_TURNO` | `ninguna` | Zonas que se turnan |
+| `CELDA_REGISTRO_ZONAS` | `ninguna` | Zonas de barrido de cada noche, separadas por comas, o `ninguna` |
+| `CELDA_REGISTRO_ZONAS_EN_TURNO` | las siete, de `cataluna` a `oeste-y-canarias` | Zonas que se turnan |
 | `CELDA_REGISTRO_ZONAS_POR_NOCHE` | 1 | Cuántas de las que se turnan se barren cada noche |
 | `CELDA_REGISTRO_PAUSA_SEGUNDOS` | 3 | Pausa entre peticiones del listado; nunca baja de 3 |
-| `CELDA_REGISTRO_MAX_PETICIONES` | 300 | Tope de peticiones del listado por noche, `robots.txt` y reintentos incluidos |
+| `CELDA_REGISTRO_MAX_PETICIONES` | 400 | Tope de peticiones del listado por noche, `robots.txt` y reintentos incluidos. Deja barrer toda España en una noche |
 | `CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS` | 3 | Pausa entre el final de una ficha y la siguiente; nunca baja de 3 |
 | `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS` | 360 | Minutos de fichas, desde que empieza la noche |
 | `CELDA_REGISTRO_FICHAS_RELECTURA_DIAS` | 30 | Días tras los que se vuelve a leer una ficha |
-| `CELDA_REGISTRO_FICHAS_PRIORIDAD` | `08` | Provincias cuyas fichas van primero, por código INE y separadas por comas, o `ninguna` |
+| `CELDA_REGISTRO_FICHAS_PRIORIDAD` | `08,17,25,43` | Provincias cuyas fichas van primero, por código INE y separadas por comas, o `ninguna` |
 | `CELDA_REGISTRO_REINTENTOS` | 3 | Reintentos de un fallo pasajero |
 | `CELDA_REGISTRO_ESPERA_SEGUNDOS` | 10 | Tiempo máximo de una respuesta |
 | `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
@@ -91,13 +91,19 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_ANTENASMOVILES_MAX_PETICIONES` | los detalles más 10 | Tope de peticiones por noche |
 | `CELDA_ANTENASMOVILES_USER_AGENT` | el del registro | Se envía en cada petición |
 
-Las zonas son `cataluna`, `centro` (Madrid y Castilla-La Mancha), `andalucia` (con Ceuta y Melilla), `levante` (Comunitat Valenciana, Murcia e Illes Balears), `norte` (Galicia, Asturias, Cantabria y País Vasco), `ebro-y-duero` (Castilla y León, Aragón, Navarra y La Rioja) y `oeste-y-canarias` (Extremadura y Canarias), con sus cuadros en `ZONAS_DE_BARRIDO` (`packages/dominio/src/barrido.ts`). Un nombre que no está ahí para el programa al arrancar. De las que se turnan va primero la que quedó a medias, luego las que nunca se han completado y luego las que llevan más tiempo sin completarse. Toda España en siete noches y Cataluña todas:
+Las zonas son `cataluna`, `centro` (Madrid y Castilla-La Mancha), `andalucia` (con Ceuta y Melilla), `levante` (Comunitat Valenciana, Murcia e Illes Balears), `norte` (Galicia, Asturias, Cantabria y País Vasco), `ebro-y-duero` (Castilla y León, Aragón, Navarra y La Rioja) y `oeste-y-canarias` (Extremadura y Canarias), con sus cuadros en `ZONAS_DE_BARRIDO` (`packages/dominio/src/barrido.ts`). Un nombre que no está ahí para el programa al arrancar. De las que se turnan va primero la que quedó a medias, luego las que nunca se han completado, en el orden de la configuración, y luego las que llevan más tiempo sin completarse.
+
+Por defecto se turnan las siete, una por noche: toda España en siete noches, unas 31 peticiones de listado cada noche (34 de media la primera semana, que divide los cuadros). Una alta tarda hasta una semana en verse y una baja, dos. Hay otras dos formas, cambiando solo la configuración:
 
 ```sh
-CELDA_REGISTRO_ZONAS=cataluna \
-CELDA_REGISTRO_ZONAS_EN_TURNO=centro,andalucia,levante,norte,ebro-y-duero,oeste-y-canarias \
-pnpm run ingesta noche
+# Cataluña todas las noches y las otras seis por turnos: unas 61 peticiones, toda España en seis noches.
+CELDA_REGISTRO_ZONAS=cataluna pnpm run ingesta noche
+
+# Toda España cada noche: unas 215 peticiones y 15 minutos (250 la primera vez).
+CELDA_REGISTRO_ZONAS_POR_NOCHE=7 pnpm run ingesta noche
 ```
+
+Por qué siete noches y no todas cada noche: el listado entero son 43 MB por noche, casi tanto como las 5.500 fichas (unos 50 MB), para un registro que cambia poco de un día para otro, y las bandas de cada ficha ya se releen solo cada 30 días. Las cifras están en la investigación 08, «Toda España en la ingesta nocturna».
 
 `robots.txt` se respeta siempre. El grupo que se aplica es el del primer producto del `User-Agent`, así que cambiarlo cambia también con qué nombre se busca a Celda en él. El almacén se elige como en Convex: `CELDA_ALMACEN_CARPETA` o las cuatro de R2, con `CELDA_ALMACEN_ORIGEN` (`almacenDesdeConfig` en `packages/publicacion`). Sin almacén, la noche ingiere y apunta `sin-almacen`.
 
@@ -132,7 +138,7 @@ Las fichas del registro dan las bandas. Tras el barrido, la noche las lee una a 
 
 La cola no es una tabla aparte. Sale de `observaciones` cada noche con `ordenarFichas` (`packages/ingesta/src/fichas.ts`), una función pura:
 
-1. las de las provincias de `CELDA_REGISTRO_FICHAS_PRIORIDAD`, en su orden (Barcelona, 08, por defecto). La provincia sale de los límites del IGN, como en la publicación;
+1. las de las provincias de `CELDA_REGISTRO_FICHAS_PRIORIDAD`, en su orden: por defecto Barcelona (08), Girona (17), Lleida (25) y Tarragona (43). La provincia sale de los límites del IGN, como en la publicación;
 2. las de cada zona de barrido, en el orden de `CELDA_REGISTRO_ZONAS` y `CELDA_REGISTRO_ZONAS_EN_TURNO`;
 3. las de fuera de esas zonas.
 
@@ -145,7 +151,7 @@ Las fichas usan su propio cliente sobre la misma conexión que el listado: su pa
 - tres fallos seguidos paran las fichas de la noche;
 - un 401 o un 403, una página que no es una ficha del geoportal (todas llevan la tabla `tablaDetalleEstacion`) o un listado en HTML son la fuente bloqueando a Celda (`FuenteBloqueada`). Se deja de pedir en el acto, sin reintentos.
 
-Lo que para las fichas queda en los errores de la ejecución («Fichas paradas hasta la próxima noche: …»). El diario dice cuántas se leyeron, cuántas quedan y por qué pararon. La orden `estado` dice cuántas quedan en cada parte de la cola: sin leer, por releer y esperando tras fallar.
+Lo que para las fichas queda en los errores de la ejecución («Fichas paradas hasta la próxima noche: …»). El diario dice cuántas se leyeron, cuántas quedan y por qué pararon. La orden `estado` dice cuántas quedan en cada parte de la cola: sin leer, por releer y esperando tras fallar. También las da por zona de barrido, junto a la fecha de su último barrido completo, contando las de sus provincias con prioridad, y dice qué zonas barre la noche siguiente.
 
 Al pasar la mitad de la ventana con alguna ficha leída, la noche fusiona y publica, sin esperar ni repetir si falla. Si la noche se corta después, lo leído hasta entonces ya está publicado. La primera fusión lleva la fecha de inicio de la ejecución, como todos sus datos; la del cierre lleva la hora a la que se hace, para que la versión de los datos avance. Así una noche con fichas publica dos versiones, y las ocho que se conservan cubren unas cuatro noches.
 
@@ -176,11 +182,44 @@ cp datos/copias/ingesta-2026-09-28T21-40-45.318Z.sqlite datos/ingesta.sqlite
 rm -f datos/ingesta.sqlite-wal datos/ingesta.sqlite-shm
 ```
 
+### Toda España: memoria y tiempo
+
+Medido el 29/09/2026 en un portátil con Node 24, con la España sintética de `apps/nocturna/src/pruebas/espana.ts` (69.770 registros, 41.994 emplazamientos) y el programa de la noche de verdad, salvo el geoportal, que contesta al momento. Los tiempos no cuentan las pausas entre peticiones.
+
+| Noche | Sin las pausas | RSS máximo | RSS con el montón de V8 a 512 MB |
+|---|---|---|---|
+| Toda España, primera pasada, sin fichas | 16 s | 1.269 MB | 630 MB |
+| Las 69.770 fichas en una noche, y publicar todos los lotes con bandas | 101 s | 1.704 MB | 750 MB |
+| Por defecto: una zona y 5.500 fichas que cambian | 22 s | 2.018 MB | 761 MB |
+
+Sin límite, V8 deja crecer el montón con la basura de la publicación antes de recogerla, y el RSS pasa de 1,1 a 2 GB según la noche y cuándo recoja. Lo que sigue vivo es mucho menos: las tres noches caben con el montón limitado a 512 MB, y la noche por defecto no cabe en 384. De ese montón, 47 MB son la España sintética de la medida, y 77 MB los límites de municipios que carga cualquier orden. La fusión y la publicación leen las observaciones y los emplazamientos de 2.000 en 2.000 (`PAGINA` en `apps/nocturna/src/base.ts`); leyéndolos de una vez, la noche de las fichas no cabía en 512 MB.
+
+Si la máquina anda justa de memoria, se puede limitar el montón en su configuración de NixOS; con 1 GB queda el doble de lo que hace falta:
+
+```nix
+systemd.services.celda-nocturna.environment.NODE_OPTIONS = "--max-old-space-size=1024";
+```
+
+La noche por defecto son unos 2 minutos de listado, las 6 horas de fichas y dos publicaciones de unos 10 s. La base con las bandas de toda España ocupa unos 190 MB, y sus catorce copias, unos 2,6 GB.
+
+Para repetir la medida, las tres fases en orden sobre la misma carpeta, cada una en su proceso:
+
+```sh
+cd apps/nocturna
+pnpm run medir-espana /tmp/espana primera   # toda España en una noche, sin fichas
+pnpm run medir-espana /tmp/espana fichas    # todas las fichas
+pnpm run medir-espana /tmp/espana turno     # una noche por defecto
+```
+
+Para ver lo que cabe, `node --max-old-space-size=512 src/medida/espana.ts /tmp/espana turno`.
+
 ### Pruebas
 
 `apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord, que contesta cada caja como el geoportal (`capaGrabadaPorCajas`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
 
 `apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/fichas.test.ts` prueba el orden de la cola y la lectura en la ventana con el extractor real, fichas grabadas y el reloj de prueba: el ritmo, el cierre de la ventana con el resto pendiente, la publicación a mitad, unas 5.500 fichas con los valores por defecto y respuestas de 0,9 s, el bloqueo, los tres fallos seguidos, la espera tras un fallo y el tope. `apps/nocturna/src/fichas.test.ts` hace lo mismo con la base SQLite: una noche que cierra la ventana y la siguiente que sigue por donde iba, la provincia con prioridad, un bloqueo que queda en la ejecución, una ficha que espera un día tras fallar y una base de la versión 3 del esquema que se pone al día sin perder sus puntos ni su cola. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la simulación de `muestras/espana/teselas.mjs`.
+
+`apps/nocturna/src/espana.test.ts` prueba toda España con la España sintética, que copia emplazamientos de los listados grabados de Barcelona y Valencia y los reparte por los municipios del padrón con los registros por zona de la investigación 08. Comprueba que por defecto se barre una zona cada noche, en su orden; que una provincia queda cubierta en el resumen cuando se han barrido todos sus cuadros, y antes no; que toda España cabe en una noche con `CELDA_REGISTRO_ZONAS_POR_NOCHE=7` y dentro del tope de peticiones; el orden de las fichas, y lo que dice `estado` de cada zona. Con los listados grabados de Barcelona y del centro de Madrid, la primera noche barre Cataluña, la segunda `centro`, y publican los 1.294 y 1.331 emplazamientos de la revisión de la fusión. Tarda unos 30 s.
 
 `apps/nocturna/src/antenasmoviles.test.ts` lanza noches con el extractor real de antenasmoviles.es sobre un cliente HTTP de prueba que apunta cada petición. Comprueba que apagado no pide nada, que con Cataluña solo guarda sus marcadores y nunca lee más de 100 detalles ni el de una copia del registro, que sin cambios solo pide `robots.txt` y `showf`, que un 403 o una página HTML no retiran nada, que retirar pide dos barridos de la zona, que una ER5 cambiada se relee, que una noche cortada en los detalles se retoma igual, el estado y la configuración.
 

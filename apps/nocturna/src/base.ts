@@ -6,11 +6,11 @@ import {
   type ZonaDeBarrido,
 } from "@celda/dominio/barrido";
 import { compararTexto } from "@celda/dominio/banda";
-import { emplazamientoDeCapa } from "@celda/dominio/capa";
+import { type EmplazamientoDeCapa, emplazamientoDeCapa } from "@celda/dominio/capa";
 import { Emplazamiento } from "@celda/dominio/emplazamiento";
 import { fichaDe } from "@celda/dominio/ficha";
 import { fusionar } from "@celda/dominio/fusion";
-import { Fuente } from "@celda/dominio/observacion";
+import { Fuente, type Observacion } from "@celda/dominio/observacion";
 import {
   type BarridoAbierto,
   BaseDeBarrido,
@@ -207,6 +207,7 @@ const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
 const PuntoEnJson = Schema.fromJsonString(PuntoGuardado);
 const ZonasEnJson = Schema.fromJsonString(Schema.Array(ZonaEnLaEjecucion));
 const EmplazamientoEnJson = Schema.fromJsonString(Emplazamiento);
+const decodificarEmplazamiento = Schema.decodeEffect(EmplazamientoEnJson);
 
 const FilaObservacion = Schema.Struct({ id: Schema.Int, datos: ObservacionEnJson });
 const FilaPunto = Schema.Struct({ id: Schema.Int, datos: PuntoEnJson });
@@ -281,6 +282,13 @@ const mismoEmplazamiento = Schema.toEquivalence(Emplazamiento);
 
 /** Registros por consulta al guardar el listado de un cuadro. */
 const LOTE = 200;
+
+/**
+ * Filas por página al leer todas las observaciones o todos los emplazamientos. Con toda España
+ * son unas 70.000 y 42.000: leídas de una vez, el JSON de todas y lo decodificado de todas
+ * estarían a la vez en memoria (#50).
+ */
+const PAGINA = 2000;
 
 const trozos = <A>(elementos: ReadonlyArray<A>, tamano: number): ReadonlyArray<ReadonlyArray<A>> =>
   Array.from({ length: Math.ceil(elementos.length / tamano) }, (_, i) =>
@@ -677,14 +685,30 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         fusionar: Effect.fn("BaseNocturna.fusionar")(function* (fecha) {
           return yield* sql.withTransaction(
             Effect.gen(function* () {
-              const vigentes = yield* decodificar(FilaObservacion)(
-                yield* sql`SELECT id, datos FROM observaciones WHERE retirada_en IS NULL`,
-              );
-              const nuevos = fusionar(vigentes.map((fila) => observacionDe(fila.datos)));
+              // Por páginas, y cada una pasa a observación antes de leer la siguiente.
+              const vigentes: Array<Observacion> = [];
+              for (let desde = 0; ;) {
+                const pagina = yield* decodificar(FilaObservacion)(
+                  yield* sql`SELECT id, datos FROM observaciones
+                      WHERE retirada_en IS NULL AND id > ${desde} ORDER BY id LIMIT ${PAGINA}`,
+                );
+                for (const fila of pagina) vigentes.push(observacionDe(fila.datos));
+                const ultima = pagina.at(-1);
+                if (ultima === undefined) break;
+                desde = ultima.id;
+              }
+              const nuevos = fusionar(vigentes);
+              vigentes.length = 0;
+              // Los guardados en su JSON: casi todos salen iguales al codificar el nuevo, y solo
+              // los que no se decodifican para compararlos.
               const guardados = new Map(
-                (yield* decodificar(FilaEmplazamiento)(
-                  yield* sql`SELECT clave, version, datos FROM emplazamientos`,
-                )).map((fila) => [fila.clave, fila.datos]),
+                (yield* sql<{
+                  readonly clave: string;
+                  readonly datos: string;
+                }>`SELECT clave, datos FROM emplazamientos`).map((fila) => [
+                  fila.clave,
+                  fila.datos,
+                ]),
               );
               const cuentas = { creados: 0, cambiados: 0, retirados: 0 };
               const claves = new Set(nuevos.map((e) => e.clave));
@@ -695,8 +719,14 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               }
               for (const emplazamiento of nuevos) {
                 const previo = guardados.get(emplazamiento.clave);
-                if (previo !== undefined && mismoEmplazamiento(previo, emplazamiento)) continue;
                 const datos = yield* codificarEmplazamiento(emplazamiento);
+                if (
+                  previo !== undefined &&
+                  (previo === datos ||
+                    mismoEmplazamiento(yield* decodificarEmplazamiento(previo), emplazamiento))
+                ) {
+                  continue;
+                }
                 yield* sql`INSERT INTO emplazamientos ${sql.insert({
                   clave: emplazamiento.clave,
                   version: fecha,
@@ -1030,11 +1060,22 @@ export const baseNocturna = (opciones: OpcionesBase) =>
             new Map([...estados].map(([zona, estado]) => [zona, estado.completado])),
           ),
         ),
+        // Por páginas, y cada una pasa a lo que guarda la capa antes de leer la siguiente.
         emplazamientos: Effect.gen(function* () {
-          const filas = yield* decodificar(FilaEmplazamiento)(
-            yield* sql`SELECT clave, version, datos FROM emplazamientos ORDER BY clave`,
-          );
-          return filas.map((fila) => emplazamientoDeCapa(fila.datos, fila.datos.estaciones));
+          const deCapa: Array<EmplazamientoDeCapa> = [];
+          for (let desde = ""; ;) {
+            const pagina = yield* decodificar(FilaEmplazamiento)(
+              yield* sql`SELECT clave, version, datos FROM emplazamientos
+                  WHERE clave > ${desde} ORDER BY clave LIMIT ${PAGINA}`,
+            );
+            for (const fila of pagina) {
+              deCapa.push(emplazamientoDeCapa(fila.datos, fila.datos.estaciones));
+            }
+            const ultima = pagina.at(-1);
+            if (ultima === undefined) break;
+            desde = ultima.clave;
+          }
+          return deCapa;
         }).pipe(Effect.mapError(noDisponible)),
         fichas: (claves) =>
           Effect.map(Effect.forEach(claves, fichaDeClave), (fichas) => fichas.flat()).pipe(

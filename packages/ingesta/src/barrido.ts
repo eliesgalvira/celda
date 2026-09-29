@@ -267,10 +267,13 @@ export interface OpcionesZonas {
   readonly porNoche: number;
 }
 
-/** Por defecto, Cataluña entera cada noche (ADR 0014). */
+/**
+ * Por defecto, toda España en siete noches (ADR 0014, #50): las siete zonas se turnan, una por
+ * noche, empezando por Cataluña. Cada noche son unas 31 peticiones de listado.
+ */
 export const OPCIONES_ZONAS: OpcionesZonas = {
-  cadaNoche: ZONAS_DE_BARRIDO.filter((zona) => zona.nombre === "cataluna"),
-  enTurno: [],
+  cadaNoche: [],
+  enTurno: ZONAS_DE_BARRIDO,
   porNoche: 1,
 };
 
@@ -341,15 +344,19 @@ export const zonasDesdeConfig = (
 /**
  * Las zonas desde variables de entorno, por su nombre y separadas por comas, o `ninguna`:
  *
- * - `CELDA_REGISTRO_ZONAS`: las de cada noche (`cataluna`).
- * - `CELDA_REGISTRO_ZONAS_EN_TURNO`: las que se turnan (ninguna).
- * - `CELDA_REGISTRO_ZONAS_POR_NOCHE`: cuántas de las que se turnan se barren cada noche (1).
+ * - `CELDA_REGISTRO_ZONAS`: las de cada noche (ninguna).
+ * - `CELDA_REGISTRO_ZONAS_EN_TURNO`: las que se turnan (las siete de `ZONAS_DE_BARRIDO`).
+ * - `CELDA_REGISTRO_ZONAS_POR_NOCHE`: cuántas de las que se turnan se barren cada noche (1). Con
+ *   7, toda España cada noche.
  *
  * Un nombre que no está en `ZONAS_DE_BARRIDO` es un error de configuración.
  */
 export const opcionesZonasDesdeConfig: Config.Config<OpcionesZonas> = Config.all({
-  cadaNoche: zonasDeLista("CELDA_REGISTRO_ZONAS", "cataluna"),
-  enTurno: zonasDeLista("CELDA_REGISTRO_ZONAS_EN_TURNO", NINGUNA),
+  cadaNoche: zonasDeLista("CELDA_REGISTRO_ZONAS", NINGUNA),
+  enTurno: zonasDeLista(
+    "CELDA_REGISTRO_ZONAS_EN_TURNO",
+    OPCIONES_ZONAS.enTurno.map((zona) => zona.nombre).join(","),
+  ),
   porNoche: Config.Int("CELDA_REGISTRO_ZONAS_POR_NOCHE").pipe(
     Config.withDefault(OPCIONES_ZONAS.porNoche),
   ),
@@ -361,7 +368,7 @@ export interface OpcionesBarrido {
   readonly fichas: OpcionesFichas;
 }
 
-/** Por defecto: Cataluña cada noche y las fichas a una cada 3 s durante 6 horas. */
+/** Por defecto: una zona por noche y las fichas a una cada 3 s durante 6 horas. */
 export const OPCIONES_BARRIDO: OpcionesBarrido = { zonas: OPCIONES_ZONAS, fichas: OPCIONES_FICHAS };
 
 /** Cómo ha acabado una ejecución del barrido por zonas. */

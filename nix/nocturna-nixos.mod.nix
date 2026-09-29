@@ -29,9 +29,9 @@
         strMatching
         ;
 
-      # Las zonas de barrido del programa, `ZONAS_DE_BARRIDO` en packages/dominio/src/barrido.ts.
-      # Una prueba de apps/nocturna comprueba que son las mismas.
-      zonaDeBarrido = enum [
+      # Las zonas de barrido del programa, `ZONAS_DE_BARRIDO` en packages/dominio/src/barrido.ts,
+      # en su orden. Una prueba de apps/nocturna comprueba que son las mismas.
+      zonasDeBarrido = [
         "cataluna"
         "centro"
         "andalucia"
@@ -40,6 +40,8 @@
         "ebro-y-duero"
         "oeste-y-canarias"
       ];
+
+      zonaDeBarrido = enum zonasDeBarrido;
 
       # Una lista como la lee el programa: separada por comas, o `ninguna`.
       listaDelPrograma = zonas: if zonas == [ ] then "ninguna" else concatStringsSep "," zonas;
@@ -176,8 +178,8 @@
 
         registroOficial.maxPeticiones = mkOption {
           type = ints.positive;
-          default = 300;
-          description = "Tope de peticiones del listado por noche, `robots.txt` y reintentos incluidos. Las fichas tienen el suyo: las que caben en su ventana.";
+          default = 400;
+          description = "Tope de peticiones del listado por noche, `robots.txt` y reintentos incluidos. Con el valor por defecto cabe toda España en una noche: unas 250 peticiones la primera vez y unas 215 después. Las fichas tienen el suyo: las que caben en su ventana.";
         };
 
         registroOficial.fichas.ritmo = mkOption {
@@ -201,17 +203,18 @@
 
         registroOficial.fichas.prioridad = mkOption {
           type = listOf <| strMatching "[0-9]{2}";
-          default = singleton "08";
-          example = [
+          default = [
             "08"
             "17"
             "25"
             "43"
           ];
+          example = singleton "08";
           description = ''
             Provincias, por su código INE de dos cifras, cuyas fichas se leen antes que las de
             ninguna zona de barrido, en este orden. Después van las de cada zona de barrido, en el
-            orden de `zonas` y `zonasEnTurno`, y al final las demás. Barcelona es 08.
+            orden de `zonas` y `zonasEnTurno`, y al final las demás. Por defecto, Barcelona (08) y
+            luego Girona, Lleida y Tarragona.
           '';
         };
 
@@ -236,20 +239,17 @@
 
         registroOficial.zonas = mkOption {
           type = listOf zonaDeBarrido;
-          default = singleton "cataluna";
-          example = [
-            "cataluna"
-            "centro"
-          ];
+          default = [ ];
+          example = singleton "cataluna";
           description = ''
-            Zonas de barrido del listado que se barren todas las noches (ADR 0014). Cataluña son 9
-            cuadros de 1° y unas 37 peticiones la primera noche; las siguientes, unas 30.
+            Zonas de barrido del listado que se barren todas las noches (ADR 0014). Por defecto
+            ninguna: todas se turnan. Cataluña son 9 cuadros de 1° y unas 30 peticiones cada noche.
           '';
         };
 
         registroOficial.zonasEnTurno = mkOption {
           type = listOf zonaDeBarrido;
-          default = [ ];
+          default = zonasDeBarrido;
           example = [
             "centro"
             "andalucia"
@@ -260,15 +260,18 @@
           ];
           description = ''
             Zonas de barrido que se turnan: cada noche se barren `zonasPorNoche` de ellas, primero
-            la que quedó a medias y luego las que llevan más tiempo sin barrer. Una zona que también
-            está en `zonas` se barre todas las noches.
+            la que quedó a medias, luego las que nunca se han completado, en este orden, y luego las
+            que llevan más tiempo sin barrer. Una zona que también está en `zonas` se barre todas
+            las noches. Por defecto, las siete: toda España en siete noches, unas 31 peticiones cada
+            una.
           '';
         };
 
         registroOficial.zonasPorNoche = mkOption {
           type = ints.unsigned;
           default = 1;
-          description = "Cuántas de las zonas que se turnan se barren cada noche.";
+          example = 7;
+          description = "Cuántas de las zonas que se turnan se barren cada noche. Con 7 y las zonas por defecto, toda España cada noche: unas 215 peticiones y 15 minutos.";
         };
 
         registroOficial.userAgent = mkOption {

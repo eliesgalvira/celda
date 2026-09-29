@@ -3,10 +3,11 @@
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Fuente } from "@celda/dominio/observacion";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
-import { OPCIONES_BARRIDO, type OpcionesBarrido } from "@celda/ingesta/barrido";
+import { zonaDeBarrido } from "@celda/dominio/barrido";
+import type { OpcionesBarrido } from "@celda/ingesta/barrido";
 import { OPCIONES_PUNTOS, type OpcionesPuntos } from "@celda/ingesta/barridoDePuntos";
 import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
-import { Provincias } from "@celda/ingesta/fichas";
+import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
 import { capaDePuntosGrabada } from "@celda/ingesta/pruebas/antenasmoviles";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
@@ -24,7 +25,14 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { baseNocturna } from "../base.ts";
 import { COPIAS_CONSERVADAS, REINTENTO_DE_PUBLICACION } from "../configuracion.ts";
-import { Extractores, noche, type OpcionesNoche, provinciasDe, publicadorEn } from "../programa.ts";
+import {
+  Extractores,
+  noche,
+  type OpcionesNoche,
+  provinciasDe,
+  publicadorEn,
+  sinAlmacen,
+} from "../programa.ts";
 
 /** Lotes pequeños, para que la muestra del Campus Nord ocupe varios. */
 export const POR_LOTE = 8;
@@ -79,11 +87,22 @@ export const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<
     });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
-export { OPCIONES_BARRIDO };
+/**
+ * La muestra del Campus Nord cae en Cataluña: las pruebas con ella la barren cada noche, sin
+ * turnos, y las fichas van con sus valores por defecto.
+ */
+export const CATALUNA_CADA_NOCHE: OpcionesBarrido = {
+  zonas: {
+    cadaNoche: [zonaDeBarrido("cataluna")].flatMap((z) => z ?? []),
+    enTurno: [],
+    porNoche: 1,
+  },
+  fichas: OPCIONES_FICHAS,
+};
 
 /** Las opciones de la noche por defecto, con las carpetas del entorno. */
 export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
-  proceso: OPCIONES_BARRIDO,
+  proceso: CATALUNA_CADA_NOCHE,
   puntos: OPCIONES_PUNTOS,
   reintento: REINTENTO_DE_PUBLICACION,
   copias: { carpeta: entorno.copias, conservar: COPIAS_CONSERVADAS },
@@ -92,6 +111,10 @@ export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
 /** Lo que cambia de una noche a otra en una prueba. */
 export interface Variante {
   readonly almacen?: Layer.Layer<AlmacenDeFicheros>;
+  /** Sin almacén, como el programa sin configurarle uno: la noche ingiere y no publica. */
+  readonly sinPublicar?: boolean;
+  /** Emplazamientos por lote de fichas; por defecto, `POR_LOTE`. */
+  readonly porLote?: number;
   /** La copia de reserva de Vercel. Sin ella, la noche no la toca. */
   readonly reserva?: Layer.Layer<CopiaDeReserva>;
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
@@ -120,10 +143,12 @@ export const unaNoche = (
   Effect.gen(function* () {
     const zonas = yield* zonasDePublicacion;
     const entornoDeLaNoche = Layer.mergeAll(
-      publicadorEn(zonas, POR_LOTE).pipe(
-        Layer.provide(variante.almacen ?? entorno.almacenVigilado),
-        Layer.provide(variante.reserva ?? Layer.empty),
-      ),
+      variante.sinPublicar === true
+        ? sinAlmacen
+        : publicadorEn(zonas, variante.porLote ?? POR_LOTE).pipe(
+            Layer.provide(variante.almacen ?? entorno.almacenVigilado),
+            Layer.provide(variante.reserva ?? Layer.empty),
+          ),
       Layer.succeed(
         Extractores,
         Extractores.of({
@@ -143,7 +168,7 @@ export const unaNoche = (
     return yield* noche({
       ...opcionesDe(entorno),
       reintento: variante.reintento ?? REINTENTO_DE_PUBLICACION,
-      proceso: variante.proceso ?? OPCIONES_BARRIDO,
+      proceso: variante.proceso ?? CATALUNA_CADA_NOCHE,
       puntos: variante.puntos ?? OPCIONES_PUNTOS,
     }).pipe(Effect.provide(entornoDeLaNoche));
   });

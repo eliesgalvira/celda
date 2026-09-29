@@ -1,7 +1,7 @@
 import { versionDeCapa } from "@celda/dominio/capa";
 import type { ZonaEnLaEjecucion } from "@celda/ingesta/barrido";
 import type { Cambios } from "@celda/ingesta/ejecucion";
-import type { GrupoDeCola, GrupoPendiente } from "@celda/ingesta/fichas";
+import type { GrupoDeCola, GrupoPendiente, Pendientes } from "@celda/ingesta/fichas";
 import type { ResultadoPublicacion } from "@celda/publicacion/publicar";
 import * as DateTime from "effect/DateTime";
 
@@ -46,12 +46,48 @@ const describirZonaEnLaEjecucion = (z: ZonaEnLaEjecucion): string =>
   `+${z.observaciones.creados} ~${z.observaciones.cambiados} -${z.observaciones.retirados}` +
   (z.error === undefined ? "" : `; ${z.error}`);
 
-const describirZona = (z: ResumenDeZona): string =>
+const describirPendientes = ({ nuevas, porReleer, enEspera }: Pendientes): string =>
+  nuevas + porReleer + enEspera === 0
+    ? "ninguna"
+    : `${nuevas} sin leer, ${porReleer} por releer` +
+      (enEspera === 0 ? "" : `, ${enEspera} esperando tras fallar`);
+
+const describirZona = (z: ResumenDeZona, fichas?: Pendientes): string =>
   `    - ${z.zona}: ` +
   (z.completado === null
     ? "ningún barrido completado"
     : `último barrido completado ${fecha(z.completado)}`) +
-  (z.aMedias ? "; tiene uno a medias, que se retoma" : "");
+  (z.aMedias ? "; tiene uno a medias, que se retoma" : "") +
+  (fichas === undefined ? "" : `; fichas por leer: ${describirPendientes(fichas)}`);
+
+/**
+ * Las zonas de barrido del registro oficial en la configuración, en su orden, con las fichas que
+ * le quedan a cada una, y las que barrerá la noche siguiente.
+ */
+export interface Turno {
+  readonly zonas: ReadonlyArray<{ readonly zona: string; readonly fichas: Pendientes }>;
+  readonly proxima: ReadonlyArray<string>;
+}
+
+/**
+ * Las zonas de la configuración, en su orden y con sus fichas, y luego las demás que se han
+ * barrido alguna vez, por nombre.
+ */
+const describirZonasEnTurno = (
+  barridas: ReadonlyArray<ResumenDeZona>,
+  turno: Turno,
+): ReadonlyArray<string> => {
+  const deLaBase = new Map(barridas.map((z) => [z.zona, z]));
+  const configuradas = new Set(turno.zonas.map((z) => z.zona));
+  return [
+    "  Zonas de barrido, en el orden de la configuración:",
+    ...turno.zonas.map(({ zona, fichas }) =>
+      describirZona(deLaBase.get(zona) ?? { zona, completado: null, aMedias: false }, fichas),
+    ),
+    ...barridas.filter((z) => !configuradas.has(z.zona)).map((z) => describirZona(z)),
+    `  La próxima noche barre: ${turno.proxima.length === 0 ? "ninguna zona" : turno.proxima.join(", ")}`,
+  ];
+};
 
 const describirEjecucion = (e: EjecucionGuardada): ReadonlyArray<string> => [
   `  Última ejecución: ${fecha(e.inicio)}, ${e.estado}` +
@@ -89,7 +125,7 @@ const describirPendiente = (
   `    - ${describirGrupo(grupo, nombreDe)}: ${nuevas} sin leer, ${porReleer} por releer` +
   (enEspera === 0 ? "" : `, ${enEspera} esperando tras fallar`);
 
-const describirFuente = (f: ResumenDeFuente): ReadonlyArray<string> => [
+const describirFuente = (f: ResumenDeFuente, turno?: Turno): ReadonlyArray<string> => [
   `${f.fuente}: ${f.interruptor.activo ? "encendida" : `apagada (${f.interruptor.motivo})`}`,
   ...(f.ultima === undefined ? ["  Ninguna ejecución todavía"] : describirEjecucion(f.ultima)),
   ...(f.puntos > 0
@@ -103,23 +139,29 @@ const describirFuente = (f: ResumenDeFuente): ReadonlyArray<string> => [
           `  Observaciones vigentes: ${f.vigentes}; fichas pendientes: ${f.sinLeer} sin leer y ` +
             `${f.porReleer} por releer`,
         ]),
-  ...(f.zonas.length === 0 ? [] : ["  Zonas de barrido:", ...f.zonas.map(describirZona)]),
+  ...(turno !== undefined
+    ? describirZonasEnTurno(f.zonas, turno)
+    : f.zonas.length === 0
+      ? []
+      : ["  Zonas de barrido:", ...f.zonas.map((z) => describirZona(z))]),
 ];
 
 /**
  * El estado de la base en texto, para la orden `estado`. `cola` son las fichas que quedan del
- * registro oficial en cada parte de su cola, en el orden en que se leen.
+ * registro oficial en cada parte de su cola, en el orden en que se leen, y `turno`, sus zonas de
+ * barrido en la configuración.
  */
 export const describirResumen = (
   fichero: string,
   resumen: Resumen,
   cola: ReadonlyArray<GrupoPendiente> = [],
   nombreDe: (codigo: string) => string | undefined = () => undefined,
+  turno?: Turno,
 ): string =>
   [
     `Base: ${fichero}`,
     ...resumen.fuentes.flatMap((f) => [
-      ...describirFuente(f),
+      ...describirFuente(f, f.fuente === "registro-oficial" ? turno : undefined),
       ...(f.fuente !== "registro-oficial" || cola.length === 0
         ? []
         : [

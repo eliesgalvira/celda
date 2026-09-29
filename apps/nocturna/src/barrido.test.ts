@@ -30,10 +30,10 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { BaseNocturna, ESQUEMA } from "./base.ts";
 import { describirResumen } from "./estado.ts";
 import {
+  CATALUNA_CADA_NOCHE,
   conBase,
   conEntorno,
   type Entorno,
-  OPCIONES_BARRIDO,
   tablasDe,
   unaNoche,
 } from "./pruebas/entorno.ts";
@@ -131,7 +131,7 @@ const conFallos = (
 const registro = (grabada: FuenteGrabada) => capaGrabadaPorCajas("registro-oficial", grabada);
 
 const noche = (entorno: Entorno, extractor: Layer.Layer<ExtractorPorCajas>, zonas: OpcionesZonas) =>
-  unaNoche(entorno, extractor, { proceso: { ...OPCIONES_BARRIDO, zonas } });
+  unaNoche(entorno, extractor, { proceso: { ...CATALUNA_CADA_NOCHE, zonas } });
 
 interface Observada {
   readonly clave: string;
@@ -478,23 +478,28 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
     ),
   );
 
-  it.effect("el módulo de NixOS acepta las mismas zonas de barrido que el programa", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const modulo = yield* fs.readFileString(
-        path.join(
-          yield* path.fromFileUrl(new URL(".", import.meta.url)),
-          "../../../nix/nocturna-nixos.mod.nix",
-        ),
-      );
-      const enumerado = /zonaDeBarrido = enum \[([^\]]*)\]/u.exec(modulo)?.[1] ?? "";
-      const enNix = [...enumerado.matchAll(/"([^"]+)"/gu)].map((nombre) => nombre[1]);
-      assert.deepStrictEqual(
-        enNix,
-        ZONAS_DE_BARRIDO.map((zona) => zona.nombre),
-      );
-    }).pipe(Effect.provide(NodeServices.layer)),
+  it.effect(
+    "el módulo de NixOS acepta las mismas zonas de barrido que el programa, en su orden",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const modulo = yield* fs.readFileString(
+          path.join(
+            yield* path.fromFileUrl(new URL(".", import.meta.url)),
+            "../../../nix/nocturna-nixos.mod.nix",
+          ),
+        );
+        // La lista da el enumerado de las opciones y el orden de las que se turnan por defecto.
+        const enumerado = /zonasDeBarrido = \[([^\]]*)\]/u.exec(modulo)?.[1] ?? "";
+        assert.include(modulo, "zonaDeBarrido = enum zonasDeBarrido;");
+        assert.include(modulo, "default = zonasDeBarrido;");
+        const enNix = [...enumerado.matchAll(/"([^"]+)"/gu)].map((nombre) => nombre[1]);
+        assert.deepStrictEqual(
+          enNix,
+          ZONAS_DE_BARRIDO.map((zona) => zona.nombre),
+        );
+      }).pipe(Effect.provide(NodeServices.layer)),
   );
 
   it.effect(

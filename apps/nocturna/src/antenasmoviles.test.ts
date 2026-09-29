@@ -1,6 +1,6 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
-import { type ZonaDeBarrido, zonaDeBarrido } from "@celda/dominio/barrido";
+import { type ZonaDeBarrido, zonaDeBarrido, ZONAS_DE_BARRIDO } from "@celda/dominio/barrido";
 import { decodificarVigente, FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
 import { leerCapaDeProvincia, leerLoteDeProvincia, leerResumen } from "@celda/dominio/provincias";
@@ -644,9 +644,10 @@ describe("antenasmoviles.es en la ingesta nocturna (#48)", () => {
           INTERRUPTOR_POR_DEFECTO.antenasmoviles,
         );
         assert.isFalse(porDefecto.interruptores.antenasmoviles.activo);
+        // Las siete del registro oficial, que por defecto se turnan: toda España cada noche.
         assert.deepStrictEqual(
           porDefecto.noche.puntos.zonas.map((zona) => zona.nombre),
-          ["cataluna"],
+          ZONAS_DE_BARRIDO.map((zona) => zona.nombre),
         );
         assert.strictEqual(porDefecto.noche.puntos.maxDetalles, 100);
         assert.strictEqual(Duration.toSeconds(porDefecto.antenasMoviles.pausa), 5);

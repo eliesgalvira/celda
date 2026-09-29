@@ -8,6 +8,7 @@
   "scripts": {
     "build": "vp build",
     "ingesta": "vp build && node dist/nocturna.js",
+    "medir-espana": "node src/medida/espana.ts",
     "reserva": "vp build && node dist/nocturna.js reserva",
     "test": "vp test run",
     "typecheck": "tsc --noEmit"

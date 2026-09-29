@@ -25,7 +25,7 @@ Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias
 2. adelanta el reloj hasta la hora del temporizador y espera a que la noche acabe bien;
 3. comprueba que la base está en `/var/lib/celda-nocturna`, que la copia está en el directorio de copias y que `vigente.json` y la capa llegaron al cubo, firmados con la clave del fichero;
 4. lanza `celda-nocturna estado` como el usuario del servicio;
-5. comprueba que la noche barrió Cataluña cada noche y `centro`, la primera de las zonas que se turnan, con una petición por cuadro;
+5. comprueba que, con las zonas por defecto, la primera noche barrió Cataluña con una petición por cuadro, y que la orden de estado dice, por zona, cuándo se barrió y cuántas fichas le faltan, y que la siguiente barre `centro`;
 6. comprueba que antenasmoviles.es recibió un solo `showf` y cuatro detalles, los de las dos ER5 sin compañía de Barcelona primero, ninguno de Madrid ni de una copia del registro, y que la ER5 de Urquinaona se publicó con su enlace a antenasmoviles.es;
 7. comprueba que las fichas llegaron a una cada 4 s como mínimo, que pararon al cerrarse su ventana de 2 minutos con las demás en la cola, y que se publicó a mitad de la ventana y al cerrarla;
 8. comprueba que la noche llamó una vez al deploy hook y que Vercel sirve una copia con solo la versión vigente, igual byte a byte que R2, aunque R2 tenga las dos de la noche;
@@ -145,16 +145,16 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `registroOficial.enable` | `true` | Interruptor del registro oficial |
 | `registroOficial.motivo` | `apagado en la configuración de la ingesta` | Lo que se apunta si está apagado |
 | `registroOficial.pausa` | 3 | Segundos entre peticiones del listado, entre 3 y 3600 |
-| `registroOficial.maxPeticiones` | 300 | Tope de peticiones del listado por noche |
+| `registroOficial.maxPeticiones` | 400 | Tope de peticiones del listado por noche; deja barrer toda España en una |
 | `registroOficial.fichas.ritmo` | 3 | Segundos entre una ficha y la siguiente, entre 3 y 3600 |
 | `registroOficial.fichas.ventana` | 360 | Minutos de fichas desde que empieza la noche |
 | `registroOficial.fichas.relectura` | 30 | Días tras los que se vuelve a leer una ficha |
-| `registroOficial.fichas.prioridad` | `[ "08" ]` | Provincias, por código INE, cuyas fichas van primero |
+| `registroOficial.fichas.prioridad` | `[ "08" "17" "25" "43" ]` | Provincias, por código INE, cuyas fichas van primero |
 | `registroOficial.fichas.maximo` | `null` | Tope de fichas por noche; sin él, las que quepan en la ventana. Antes se llamaba `maxFichas` |
 | `registroOficial.reintentos` | 3 | Reintentos de un fallo pasajero |
 | `registroOficial.espera` | 10 | Segundos que se espera una respuesta |
-| `registroOficial.zonas` | `[ "cataluna" ]` | Zonas de barrido de todas las noches |
-| `registroOficial.zonasEnTurno` | `[ ]` | Zonas de barrido que se turnan |
+| `registroOficial.zonas` | `[ ]` | Zonas de barrido de todas las noches |
+| `registroOficial.zonasEnTurno` | las siete, de `cataluna` a `oeste-y-canarias` | Zonas de barrido que se turnan |
 | `registroOficial.zonasPorNoche` | 1 | Cuántas de las que se turnan se barren cada noche |
 | `registroOficial.userAgent` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición. Si montas tu propia ingesta, pon tu contacto |
 | `antenasmoviles.enable` | `false` | Interruptor de antenasmoviles.es. Déjalo apagado hasta escribir a su administrador |
@@ -165,24 +165,24 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `antenasmoviles.zonas` | `registroOficial.zonas` y `zonasEnTurno` | Zonas de barrido cuyos marcadores se guardan, todas cada noche |
 | `antenasmoviles.userAgent` | `registroOficial.userAgent` | Se envía en cada petición |
 
-Las zonas de barrido son `cataluna`, `centro`, `andalucia`, `levante`, `norte`, `ebro-y-duero` y `oeste-y-canarias` (la guía de la ingesta, en [convex.md](convex.md), dice qué comunidades lleva cada una). Toda España en siete noches, con Cataluña todas:
+Las zonas de barrido son `cataluna`, `centro`, `andalucia`, `levante`, `norte`, `ebro-y-duero` y `oeste-y-canarias` (la guía de la ingesta, en [convex.md](convex.md), dice qué comunidades lleva cada una). Por defecto se turnan las siete, una por noche: toda España en siete noches, con unas 31 peticiones de listado cada una y Cataluña la primera. Para barrer Cataluña todas las noches y las demás por turnos, unas 61 peticiones y toda España en seis noches:
 
 ```nix
-services.celda-nocturna.registroOficial = {
-  zonas = [ "cataluna" ];
-  zonasEnTurno = [ "centro" "andalucia" "levante" "norte" "ebro-y-duero" "oeste-y-canarias" ];
-};
+services.celda-nocturna.registroOficial.zonas = [ "cataluna" ];
+```
+
+Y toda España cada noche, unas 215 peticiones y 15 minutos de listado:
+
+```nix
+services.celda-nocturna.registroOficial.zonasPorNoche = 7;
 ```
 
 El listado de antenasmoviles.es es de toda España y se pide una vez por noche, así que sus zonas se barren todas cada noche, también las que el registro turna. Qué hace cada noche está en [convex.md](convex.md#antenasmovileses-en-la-noche).
 
-Las fichas se leen a una cada `fichas.ritmo` segundos hasta que pasan `fichas.ventana` minutos desde que empezó la noche: con los valores por defecto, unas 5.500. Primero van las de las provincias de `fichas.prioridad`, luego las de cada zona de barrido en el orden de `zonas` y `zonasEnTurno`, y al final las demás. Cómo funciona la cola está en [convex.md](convex.md#las-fichas). Si el ministerio pide menos peticiones, basta con subir el ritmo:
+Las fichas se leen a una cada `fichas.ritmo` segundos hasta que pasan `fichas.ventana` minutos desde que empezó la noche: con los valores por defecto, unas 5.500. Primero van las de las provincias de `fichas.prioridad` (Barcelona y el resto de Cataluña), luego las de cada zona de barrido en el orden de `zonas` y `zonasEnTurno`, y al final las demás. Cómo funciona la cola está en [convex.md](convex.md#las-fichas). Si el ministerio pide menos peticiones, basta con subir el ritmo:
 
 ```nix
-services.celda-nocturna.registroOficial.fichas = {
-  ritmo = 10;
-  prioridad = [ "08" "17" "25" "43" ];
-};
+services.celda-nocturna.registroOficial.fichas.ritmo = 10;
 ```
 
 `tiempoMaximo` sigue a la ventana. Si lo pones a mano, que cubra la ventana, la hora de espera antes de repetir una publicación y la copia.
