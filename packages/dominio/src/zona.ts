@@ -83,7 +83,11 @@ export const resumirMunicipios = (
     const { longitud: x, latitud: y } = posicion;
     const cuenta = porMunicipio.get(municipio);
     if (cuenta === undefined) {
-      porMunicipio.set(municipio, { cuantos: 1, presentes: new Set(companias), caja: [x, y, x, y] });
+      porMunicipio.set(municipio, {
+        cuantos: 1,
+        presentes: new Set(companias),
+        caja: [x, y, x, y],
+      });
       continue;
     }
     cuenta.cuantos += 1;
