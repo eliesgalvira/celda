@@ -54,7 +54,7 @@ Con 100.000 sintéticos, la capa única tarda 1.040 ms en indexarse en el hilo p
 - Las claves de las agrupaciones y los barrios llevan la provincia (`a:08:123`), así no chocan en la misma escena. La transición es la del agrupador de la provincia donde hay detalle a los dos lados, y desde su hexágono o hacia él cuando un lado es el resumen; también en el mismo nivel, cuando llega una provincia mientras se mira (`pintados.ts` anima entonces aunque no cambie el nivel).
 - Mientras llega una provincia se ve su hexágono dentro de lo que se ve de ella, latiendo y con `aria-busy`. Si no llega, la marca de agua lo dice con un reintento y no se vuelve a pedir sola al mover el mapa. Una provincia leída se queda para la visita; si su capa ya no está en el origen, se lee la de la vigente y se marca con su versión, y la marca de agua da entonces la fecha de lo que se ve de la más antigua a la más reciente.
 - Fuera de lo barrido, de cerca, la marca de agua dice «Celda aún no tiene datos de aquí». El aviso del punto de referencia (#38) usa las cajas de las zonas barridas del resumen, no la de los emplazamientos.
-- Un enlace a una ficha lleva su provincia (`?emplazamiento=…&provincia=08`), que se pide en cuanto llega el resumen; uno sin ella es de antes, de Barcelona.
+- Un enlace a una ficha lleva su provincia (`?emplazamiento=…&provincia=08`), que se pide en cuanto llega el resumen. Uno sin ella la busca en el índice de claves (#45).
 - La web solo lee el formato 5. Con un `vigente.json` del 4 dice que la capa no es la esperada; la siguiente publicación, aunque la versión sea la misma, publica el 5.
 
 Medidas del 29/09/2026. La tabla completa y cómo repetirlas están en `docs/patterns/rendimiento.md`.
@@ -67,11 +67,33 @@ Medidas del 29/09/2026. La tabla completa y cómo repetirlas están en `docs/pat
 | fps: alejar a España · acercar a la calle · alejar a provincias · cruzar provincias | 58,4 · 56,8 · 52,1 · 59,2 | 59,3 · 58,3 · 58,1 · 60,0 | 59,9 · 58,3 · 58,7 · 60,0 |
 | Memoria de la página y sus Workers | 73 MB | 60 MB | 57 MB |
 
+## Cómo quedó (#45)
+
+**Un enlace sin provincia.** El resumen lista las partes de un índice de claves: 16 ficheros `claves/<huella>.json`, y en cada uno las claves que le tocan por FNV-1a (`parteDeClave`), agrupadas por provincia. La web que abre `?emplazamiento=<clave>` sin `provincia` lee la parte de esa clave, pone la provincia en la dirección con `replaceState` y pide solo esa provincia. Si ninguna la tiene, la ficha dice que el emplazamiento no existe. Con un resumen de antes del índice, el enlace se da por de Barcelona, como antes.
+
+Descarté meter la provincia en la clave: la clave es la identidad del emplazamiento en las fichas, las correcciones y los enlaces ya compartidos, y el código de un emplazamiento del registro no siempre empieza por su provincia: 1.739 de las 5.049 claves de Cataluña no lo hacen. La otra opción era un índice entero en el resumen. Medido con gzip el 29/09/2026:
+
+| | Cataluña real, 5.049 | España, unas 42.900 (estimado) |
+|---|---|---|
+| Todas las claves con su provincia | 14 KB | 125 KB |
+| Una parte de 16 | 1,2 KB | 8 KB |
+| Lo que crece el resumen con los nombres de las 16 partes | 215 B (de 2.067 a 2.282) | lo mismo |
+
+Todo el mundo descarga el resumen y casi nadie abre un enlace sin provincia, así que el índice va aparte. Con 32 partes el enlace pediría 4 KB y el resumen crecería 379 B. Las partes van en el manifiesto de la versión y se retiran con ella; una noche que solo barre conserva las del resumen anterior.
+
+**Provincias vecinas.** Las celdas se calculan con las provincias cuya caja queda a 2 km o menos de lo que se ve al zoom de las celdas y del emplazamiento seleccionado. Una celda que podría recortar una provincia de fuera del cálculo no se dibuja ni la usa el sector que da servicio. Para saberlo basta con mirar sus vértices: un emplazamiento de esa provincia recorta la celda si queda más cerca que el suyo de algún punto de ella, y como la celda es convexa, eso pasa si y solo si pasa en algún vértice. Si una celda dudosa se ve, su provincia también se pide, así que una celda del campo que llega a 10 km tampoco sale mal. Las celdas se recortan a la caja de todas las provincias del cálculo, también de las que aún no han llegado: las que se dibujan mientras falta una son las mismas que cuando llegan todas (prueba en `celdas.test.ts`).
+
+La vista de interferencia pide las provincias con estaciones a 1,5 km de lo que se ve o del punto de referencia, en el mismo plano con que `pedirSinr` elige las estaciones. Mientras falta alguna no calcula y lo dice; con todas, da lo mismo que con las provincias juntas en una sola capa. La pista de las celdas y el panel de la vista nombran la provincia que falta y, si no llega, ofrecen pedirla otra vez.
+
+**Hasta dónde llegan los datos.** El aviso del punto de referencia y la marca de agua de «sin datos» miden la distancia a lo barrido recortado a las cajas de los emplazamientos de cada provincia (`distanciaALosDatos`). Los cuadros de 1° de Cataluña llegan al mar y a Francia: Perpiñán queda dentro de uno barrido, pero a 28 km del último emplazamiento de Girona, y ahora sale el aviso.
+
+Medido con Cataluña real, la CPU a ×4 y 390 px, abriendo un enlace sin provincia junto al borde (escenario `borde` de `tools/rendimiento`): de 59,7 a 60 fps al cruzar el borde con las celdas y con la vista de interferencia, sin fotogramas de más de 50 ms. Las cifras están en `docs/patterns/rendimiento.md`.
+
 ## Consecuencias
 
 - Abrir la web descarga el resumen (de 2 a 4 KB con gzip, según cuántas zonas lleve) y las provincias de la vista inicial, no toda España.
-- Buscar un emplazamiento por su clave ya no puede recorrer toda la capa en el navegador. Los enlaces llevan la provincia; buscar una clave sin ella queda pendiente.
-- La vista de interferencia y las celdas se calculan con las provincias cargadas. En el borde de una provincia sin cargar faltan vecinos: cargar antes las provincias vecinas queda pendiente para el ticket que lleve esas vistas a toda España.
+- Buscar un emplazamiento por su clave ya no puede recorrer toda la capa en el navegador. Los enlaces llevan la provincia, y uno sin ella la busca en el índice de claves (#45, abajo).
+- La vista de interferencia y las celdas necesitan también las provincias vecinas de lo que se ve. Desde el #45 las piden y no dibujan nada que una provincia sin cargar pudiera cambiar.
 - La agrupación sigue dependiendo de detalles internos de supercluster 9.1: `_getOriginZoom` y, ahora, la forma de sus árboles. La versión sigue fijada y una prueba compara las escenas del índice rehidratado con las del construido en el hilo.
 - El resumen es una segunda fuente de verdad para los números por provincia. Sale de la misma instantánea en la misma publicación, así que no puede discrepar de las capas de su versión.
 

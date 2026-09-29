@@ -132,7 +132,11 @@ _Evitar_: tiles, teselas, mapa
 
 **Resumen nacional**:
 Parte de la capa con una fila por provincia: su número de emplazamientos, sus compañías, si está cubierta y cuándo se barrió por última vez lo que se sabe de ella. Es lo único que dibuja el mapa de lejos, un hexágono por provincia, y lo que abre la web.
-_Evitar_: índice, overview, mapa general
+_Evitar_: índice (ese es el de claves), overview, mapa general
+
+**Índice de claves**:
+Parte de la capa que dice en qué provincia va cada emplazamiento, repartida en 16 ficheros por su clave. El resumen nacional lista esos ficheros. Sirve para abrir el enlace a una ficha que no dice su provincia sin descargar ninguna capa.
+_Evitar_: diccionario, tabla de búsqueda, índice a secas
 
 **Provincia cubierta**:
 Provincia de la que se han barrido todos los cuadros con datos que la tocan: su número es el de toda la provincia. Si solo se ha barrido una parte, sus emplazamientos de esa parte están todos, pero su número es el de esa parte y la interfaz lo dice. Sin nada barrido, no tiene número.
