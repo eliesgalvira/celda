@@ -142,6 +142,9 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `origenPublico` | `null` | URL pública de lo publicado (`CELDA_ALMACEN_ORIGEN`) |
 | `origenDeReserva` | `null` | URL pública de la copia de reserva, `https://celda.elies.site/capas` (`CELDA_RESERVA_ORIGEN`) |
 | `reintentoDePublicacion` | 60 | Minutos antes de repetir una publicación fallida |
+| `memoria.monton` | 512 | Megabytes del montón de V8 (`NODE_OPTIONS=--max-old-space-size`) |
+| `memoria.alta` | el doble del montón, `1024M` | Desde dónde systemd frena el servicio (`MemoryHigh=`) |
+| `memoria.maxima` | el triple del montón, `1536M` | Lo más que puede usar antes de que systemd lo pare (`MemoryMax=`) |
 | `registroOficial.enable` | `true` | Interruptor del registro oficial |
 | `registroOficial.motivo` | `apagado en la configuración de la ingesta` | Lo que se apunta si está apagado |
 | `registroOficial.pausa` | 3 | Segundos entre peticiones del listado, entre 3 y 3600 |
@@ -214,6 +217,7 @@ El módulo instala `celda-nocturna` con la configuración de la máquina pero si
 
 - Corre como el usuario `celda-nocturna`, sin capacidades ni privilegios nuevos.
 - Solo escribe en su directorio de estado y en el de copias: el resto del sistema de ficheros es de solo lectura, y `/home` y `/root` no se ven.
+- Su montón de V8 no pasa de `memoria.monton` y el proceso, de `memoria.maxima`. Sin límite, V8 deja crecer el montón con la basura de la publicación hasta 2 GB de RSS con toda España; con 512 MB, la noche más pesada medida acabó con unos 760 MB ([convex.md](convex.md#toda-españa-memoria-y-tiempo)). Si una noche acaba sin memoria («JavaScript heap out of memory» en el diario), sube `memoria.monton`.
 - Solo abre sockets IPv4 e IPv6. Sin sockets locales no llega a nscd, así que resuelve los nombres con `/etc/hosts` y el DNS de `/etc/resolv.conf`.
 - Filtra las llamadas al sistema a las de un servicio (`@system-service`). No lleva `MemoryDenyWriteExecute`, porque el compilador de V8 escribe y ejecuta su código.
 
