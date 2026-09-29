@@ -1,7 +1,7 @@
 {"fuente":{"atribucion":"Instituto Geográfico Nacional","producto":"Base de Datos de Límites Jurisdiccionales de España","licencia":"CC BY 4.0","enlace":"https://www.ign.es/atom/dataset_feeds/lin_lim_mun.es.xml","fecha":"2026-08-10","huella":"sha256:5bd73c530af995c05da8d9ff4e3d293f62d0dc91c5e48ee773fe881716c108a6"},"toleranciaMetros":200,"unidadesPorGrado":10000,"provincias":[
 {"codigo":"51","nombre":"Ceuta","etiqueta":{"longitud":-5.34289,"latitud":35.893598}}
 ],"territorios":[
-{"codigo":"51001","tipo":"municipio","nombre":"Ceuta","provincia":"51","etiqueta":{"longitud":-5.34289,"latitud":35.893598},"areaKm2":19.8585,"poligonos":[[[0]]]}
+{"codigo":"51001","tipo":"municipio","nombre":"Ceuta","provincia":"51","etiqueta":{"longitud":-5.34289,"latitud":35.893598},"areaKm2":19.863,"poligonos":[[[0]]]}
 ],"arcos":[
 [-53821,359124,37,47,115,9,194,-105,21,-56,97,-76,108,66,137,-47,-89,24,-46,-18,54,-50,48,17,-33,-35,43,-9,-16,19,127,18,4,19,-59,10,67,-7,33,64,95,58,101,-93,-85,-69,-99,-13,-88,-51,-132,27,-97,-93,-96,3,-55,-76,-64,49,-18,-29,-43,2,-158,85,-60,146,10,88,-53,76]
 ]}

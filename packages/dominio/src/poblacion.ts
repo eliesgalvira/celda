@@ -61,14 +61,20 @@ const areaDelAnillo = (origen: Coordenada, anillo: Poligono[number]): number => 
 
 /**
  * Área en km² de unos polígonos en grados WGS84: el anillo exterior de cada uno menos sus
- * agujeros. Proyecta cada polígono en el plano local de su primer vértice; en un barrio el error
- * frente al área geodésica es menor que una milésima.
+ * agujeros. Proyecta cada polígono en el plano local del centro de su caja: la escala del este
+ * que sobra al norte del centro falta al sur, y el error frente al área geodésica queda por
+ * debajo de una diezmilésima también en los municipios más grandes (unos 0,6° de norte a sur).
+ * Con el origen en un vértice del borde, como antes, llegaba al 0,34 % en Cuenca.
  */
 export const areaKm2 = (poligonos: ReadonlyArray<Poligono>): number => {
   let metros = 0;
   for (const [exterior, ...agujeros] of poligonos) {
-    const [x = 0, y = 0] = exterior?.[0] ?? [];
-    const origen = { longitud: x, latitud: y };
+    const latitudes = (exterior ?? []).map(([, y = 0]) => y);
+    const longitudes = (exterior ?? []).map(([x = 0]) => x);
+    const origen = {
+      longitud: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+      latitud: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+    };
     metros += Math.abs(areaDelAnillo(origen, exterior ?? []));
     for (const agujero of agujeros) metros -= Math.abs(areaDelAnillo(origen, agujero));
   }
