@@ -27,7 +27,7 @@ const calculadas = () => {
     este: new Float64Array(0),
     norte: new Float64Array(0),
   });
-  return { emplazamientos: CAPA, origen, resultado };
+  return { emplazamientos: CAPA, origen, resultado, dudosas: new Map() };
 };
 
 const A = CAPA[0]?.posicion ?? { longitud: 0, latitud: 0 };
@@ -48,6 +48,13 @@ describe("sector que da servicio en la web", () => {
     assert.isAbove(celda?.length ?? 0, 2);
     assert.isUndefined(celdaDe(calculadas(), "z"));
     assert.isUndefined(celdaDe(undefined, "a"));
+  });
+
+  it("no toma una celda dudosa, que podría recortar una provincia que aún no ha llegado", () => {
+    const caja = { suroeste: A, noreste: A };
+    const dudosa = { ...calculadas(), dudosas: new Map([["a", { provincias: ["17"], caja }]]) };
+    assert.isUndefined(celdaDe(dudosa, "a"));
+    assert.isDefined(celdaDe(dudosa, "b"));
   });
 
   it("pide la simulación en un plano con el emplazamiento en el origen", () => {

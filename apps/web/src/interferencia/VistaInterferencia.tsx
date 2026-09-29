@@ -16,6 +16,7 @@ import {
 import { TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { createMemo } from "solid-js";
 
+import { enumerar } from "../capa/vecinas.ts";
 import type { CalculoVista } from "./enMapa.ts";
 import {
   BANDAS_DE_LA_VISTA,
@@ -40,6 +41,7 @@ export interface VistaInterferenciaProps {
   readonly eleccion: EleccionVista;
   readonly alCambiar: (eleccion: EleccionVista) => void;
   readonly calculo: CalculoVista;
+  /** Vuelve a calcular tras un fallo o a pedir las provincias vecinas que no han llegado. */
   readonly reintentar: () => void;
   /** El punto de referencia que hay, o ninguno. */
   readonly referencia: "gps" | "elegido" | undefined;
@@ -50,6 +52,13 @@ export interface VistaInterferenciaProps {
 
 /** Lo que dice la línea de estado del cálculo. */
 const textoDeEstado = (calculo: CalculoVista, cerca: boolean): string | undefined => {
+  const faltan = enumerar((calculo.faltan ?? []).map((p) => p.nombre));
+  if (calculo.estado === "esperando") {
+    return `Cargando los emplazamientos de ${faltan}: sin ellos, la interferencia junto al borde no sería cierta.`;
+  }
+  if (calculo.estado === "sin-vecinas") {
+    return `No han llegado los emplazamientos de ${faltan}, y sin ellos la interferencia de aquí no sería cierta.`;
+  }
   if (calculo.estado === "calculando") return "Calculando la interferencia…";
   if (calculo.estado === "fallo") return "No se ha podido calcular la interferencia.";
   return cerca ? undefined : "Acerca el mapa para ver la trama.";
@@ -127,6 +136,8 @@ export function VistaInterferencia(props: VistaInterferenciaProps) {
             <TextoConTerminos texto={SIN_PUNTO} />
           ) : props.calculo.estado === "lista" ? (
             "No hay estaciones base de esta compañía en esta banda cerca del punto."
+          ) : props.calculo.estado === "sin-vecinas" ? (
+            "Sin valor: faltan emplazamientos cerca del punto."
           ) : (
             "Calculando el valor en el punto…"
           )
@@ -135,7 +146,7 @@ export function VistaInterferencia(props: VistaInterferenciaProps) {
       <EstadoVista
         texto={textoDeEstado(props.calculo, props.cerca)}
         accion={
-          props.calculo.estado === "fallo" ? (
+          props.calculo.estado === "fallo" || props.calculo.estado === "sin-vecinas" ? (
             <Boton variante="secundario" onClick={() => props.reintentar()}>
               Reintentar
             </Boton>

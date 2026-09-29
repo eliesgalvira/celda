@@ -1,6 +1,6 @@
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { celdas, type ResultadoCeldas } from "@celda/sim/celdas";
-import type { Coordenada } from "@celda/dominio/area";
+import type { Coordenada, Rectangulo } from "@celda/dominio/area";
 import { Simulador } from "@celda/sim/simulador";
 import { FUENTE_CELDAS, remarcarCelda } from "@celda/ui/mapa/celdas.ts";
 import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
@@ -12,9 +12,12 @@ import { createEffect, createSignal } from "solid-js";
 
 import {
   type CalculoCeldas,
+  type CeldaDudosa,
   type CeldasEnMapa,
+  celdasDudosas,
   celdasEnMapa,
   pedirCeldas,
+  type ProvinciaFuera,
   SIN_CELDAS,
 } from "./celdas.ts";
 
@@ -38,8 +41,21 @@ export const lienzoDelMapa = (mapa: MapaMapLibre): LienzoDeCeldas => ({
 export interface EntradaCeldas {
   /** El mapa donde dibujarlas, cuando está listo. */
   readonly lienzo: () => LienzoDeCeldas | undefined;
-  /** Los emplazamientos de la capa. Si cambian, las celdas se vuelven a calcular. */
+  /**
+   * Los emplazamientos con que se calculan: los de las provincias cargadas que hacen falta para lo
+   * que se ve. Si cambian, las celdas se vuelven a calcular.
+   */
   readonly emplazamientos: () => ReadonlyArray<EmplazamientoDeCapa>;
+  /**
+   * Las provincias con emplazamientos que no entran en el cálculo. Las celdas que podrían recortar
+   * no se dibujan (`celdasDudosas`). Sin ellas, se dibujan todas.
+   */
+  readonly fuera?: () => ReadonlyArray<ProvinciaFuera>;
+  /**
+   * Hasta dónde llegan las celdas: la caja de las provincias del cálculo, también de las que aún
+   * no han llegado, con `MARGEN_CELDAS_M`. Sin ella, la de los emplazamientos.
+   */
+  readonly caja?: () => Rectangulo | undefined;
   /** Si el mapa está al zoom de las celdas o más cerca. */
   readonly cerca: () => boolean;
   /** El emplazamiento seleccionado, cuya celda se remarca. */
@@ -51,7 +67,11 @@ export interface CeldasCalculadas {
   readonly emplazamientos: ReadonlyArray<EmplazamientoDeCapa>;
   readonly origen: Coordenada;
   readonly resultado: ResultadoCeldas;
+  /** Las que alguna provincia de fuera podría recortar, por clave: ni se dibujan ni se usan. */
+  readonly dudosas: ReadonlyMap<string, CeldaDudosa>;
 }
+
+const NINGUNA_FUERA: ReadonlyArray<ProvinciaFuera> = [];
 
 export interface CeldasDelMapa {
   readonly calculo: () => CalculoCeldas;
@@ -62,13 +82,14 @@ export interface CeldasDelMapa {
 }
 
 /**
- * Las celdas de todos los emplazamientos de la capa en el mapa. Se calculan en el simulador (en
+ * Las celdas de los emplazamientos de unas provincias en el mapa. Se calculan en el simulador (en
  * el navegador, su Worker) la primera vez que el mapa se acerca al zoom de las celdas, y una sola
- * vez por capa: después, moverse o alejarse no las recalcula. Si llega otra capa o se cierra el
- * mapa a medio cálculo, el cálculo se cancela.
+ * vez por conjunto de emplazamientos: después, moverse o alejarse no las recalcula. Si cambian los
+ * emplazamientos o se cierra el mapa a medio cálculo, el cálculo se cancela.
  *
- * Se calculan todas y no solo las de la vista: cuestan unos 20 ms en el Worker, y así MapLibre
- * dibuja lo que se ve en cada momento sin volver a pedir nada al moverse.
+ * Se calculan todas las de esas provincias y no solo las de la vista: cuestan unos 20 ms por cada
+ * 1.300 emplazamientos en el Worker, y así MapLibre dibuja lo que se ve en cada momento sin volver
+ * a pedir nada al moverse. Las que una provincia de fuera podría recortar no se dibujan.
  */
 export function crearCeldas(
   datos: ManagedRuntime.ManagedRuntime<Simulador, never>,
@@ -98,11 +119,13 @@ export function crearCeldas(
         : {
             lienzo,
             emplazamientos: entrada.emplazamientos(),
+            fuera: entrada.fuera?.() ?? NINGUNA_FUERA,
+            caja: entrada.caja?.(),
             pedidas: pedidas(),
             intento: intento(),
           };
     },
-    ({ lienzo, emplazamientos, pedidas: pedidasAhora }) => {
+    ({ lienzo, emplazamientos, fuera, caja, pedidas: pedidasAhora }) => {
       if (pedidasAhora !== emplazamientos) {
         // Otra capa, todavía sin pedir: las celdas de la anterior ya no valen.
         lienzo.dibujar(SIN_CELDAS);
@@ -112,20 +135,30 @@ export function crearCeldas(
       }
       setCalculo("calculando");
       const cancelar = new AbortController();
-      const { origen, params } = pedirCeldas(emplazamientos);
+      const { origen, params } = pedirCeldas(emplazamientos, caja);
       const calcular = Effect.gen(function* () {
         const simulador = yield* Simulador;
         const resultado = yield* simulador.ejecutar(celdas, params, {
           este: new Float64Array(0),
           norte: new Float64Array(0),
         });
-        return { resultado, enMapa: celdasEnMapa(resultado, emplazamientos, origen) };
+        const dudosas = celdasDudosas(resultado, emplazamientos, origen, fuera);
+        return {
+          resultado,
+          dudosas,
+          enMapa: celdasEnMapa(resultado, emplazamientos, origen, dudosas),
+        };
       });
       void datos.runPromiseExit(calcular, { signal: cancelar.signal }).then((salida) => {
         if (cancelar.signal.aborted) return;
         if (Exit.isSuccess(salida)) {
           lienzo.dibujar(salida.value.enMapa);
-          setCalculadas({ emplazamientos, origen, resultado: salida.value.resultado });
+          setCalculadas({
+            emplazamientos,
+            origen,
+            resultado: salida.value.resultado,
+            dudosas: salida.value.dudosas,
+          });
           setCalculo("listas");
         } else {
           setCalculo("fallo");

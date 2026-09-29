@@ -10,6 +10,8 @@ import type * as ManagedRuntime from "effect/ManagedRuntime";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal } from "solid-js";
 
+import type { ProvinciaNombrada } from "../capa/estado.ts";
+import { type EstadoDeLasVecinas, mismasVecinas, VECINAS_LISTAS } from "../capa/vecinas.ts";
 import {
   type EleccionVista,
   type Encuadre,
@@ -47,6 +49,12 @@ export interface EntradaInterferencia {
   /** Lo que se ve, puesto al pararse el mapa. */
   readonly encuadre: () => Encuadre | undefined;
   readonly referencia: () => Coordenada | undefined;
+  /**
+   * Cómo van las provincias con estaciones cerca de lo que se ve o del punto
+   * (`provinciasParaSinr`). Mientras falta alguna no se calcula nada: la trama saldría sin sus
+   * estaciones. Sin esta entrada, se calcula siempre.
+   */
+  readonly vecinas?: () => EstadoDeLasVecinas;
 }
 
 /**
@@ -55,10 +63,16 @@ export interface EntradaInterferencia {
  * deslizador no deja el hueco vacío.
  */
 export interface CalculoVista {
-  readonly estado: "sin-pedir" | "calculando" | "lista" | "fallo";
+  /**
+   * `esperando`: falta alguna provincia vecina y no se calcula hasta que llegue; `sin-vecinas`:
+   * alguna no ha llegado y no se volverá a pedir sola.
+   */
+  readonly estado: "sin-pedir" | "esperando" | "sin-vecinas" | "calculando" | "lista" | "fallo";
   readonly valor: number | undefined;
   /** Si el último cálculo terminado dibujó la trama o solo el punto (mapa demasiado alejado). */
   readonly conTrama: boolean;
+  /** Con `esperando` o `sin-vecinas`, las provincias que faltan. */
+  readonly faltan?: ReadonlyArray<ProvinciaNombrada>;
 }
 
 const SIN_CALCULO: CalculoVista = { estado: "sin-pedir", valor: undefined, conTrama: false };
@@ -109,6 +123,9 @@ export function crearInterferencia(
   // deslizador y al punto que se arrastra, así que abre muchas veces por segundo; la espera va
   // dentro.
   const referencia = createMemo(() => entrada.referencia(), { equals: mismaCoordenada });
+  const vecinas = createMemo(() => entrada.vecinas?.() ?? VECINAS_LISTAS, {
+    equals: mismasVecinas,
+  });
   recurso(
     "simulador:interferencia",
     () => {
@@ -121,17 +138,33 @@ export function crearInterferencia(
         eleccion,
         encuadre: encuadre(),
         referencia: referencia(),
+        vecinas: vecinas(),
         intento: intento(),
       };
     },
-    ({ lienzo, emplazamientos, eleccion, encuadre, referencia }) => {
+    ({ lienzo, emplazamientos, eleccion, encuadre, referencia, vecinas: comoVan }) => {
+      if (comoVan.tipo !== "listas") {
+        // Sin las estaciones del otro lado del borde la trama no sería cierta: no se dibuja.
+        lienzo.dibujar(SIN_TRAMA);
+        setCalculo({
+          estado: comoVan.tipo === "fallo" ? "sin-vecinas" : "esperando",
+          valor: undefined,
+          conTrama: false,
+          faltan: comoVan.provincias,
+        });
+        return undefined;
+      }
       const pedida = pedirSinr({ emplazamientos, eleccion, encuadre, referencia });
       if (pedida === undefined) {
         lienzo.dibujar(SIN_TRAMA);
         setCalculo(SIN_CALCULO);
         return undefined;
       }
-      setCalculo((anterior) => ({ ...anterior, estado: "calculando" }));
+      setCalculo((anterior) => ({
+        estado: "calculando",
+        valor: anterior.valor,
+        conTrama: anterior.conTrama,
+      }));
       const cancelar = new AbortController();
       const calcular = Effect.gen(function* () {
         const simulador = yield* Simulador;

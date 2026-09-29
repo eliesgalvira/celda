@@ -1,4 +1,4 @@
-import { BARCELONA, type Coordenada } from "@celda/dominio/area";
+import { BARCELONA, type Coordenada, type Rectangulo as CajaGeografica } from "@celda/dominio/area";
 import type { Mhz } from "@celda/dominio/banda";
 import { COMPANIAS_DE_CAPA, type EmplazamientoDeCapa } from "@celda/dominio/capa";
 import type { Compania } from "@celda/dominio/compania";
@@ -212,6 +212,57 @@ export interface EntradaSinr {
  * ve o del punto de referencia (`MARGEN_ESTACIONES_M`). Todas tienen tres sectores supuestos y la
  * potencia típica. Sin encuadre al zoom de la vista ni punto, no hay nada que calcular.
  */
+/**
+ * Hasta dónde se miran estaciones, en el plano de la vista: lo que se ve al zoom de la trama y el
+ * punto de referencia, con `MARGEN_ESTACIONES_M` alrededor. Vacío si no hay ni una cosa ni otra.
+ */
+const zonasDeEstaciones = (
+  encuadre: Encuadre | undefined,
+  referencia: Coordenada | undefined,
+): ReadonlyArray<Rectangulo> => {
+  const conTrama = encuadre !== undefined && encuadre.zoom >= ZOOM_INTERFERENCIA;
+  const punto = referencia === undefined ? undefined : aPlano(ORIGEN_VISTA, referencia);
+  return [
+    ...(conTrama ? [ampliar(rectanguloDe(encuadre, 0), MARGEN_ESTACIONES_M)] : []),
+    ...(punto === undefined
+      ? []
+      : [
+          ampliar(
+            { oeste: punto.este, sur: punto.norte, este: punto.este, norte: punto.norte },
+            MARGEN_ESTACIONES_M,
+          ),
+        ]),
+  ];
+};
+
+const seCortanEnElPlano = (a: Rectangulo, b: Rectangulo): boolean =>
+  a.oeste <= b.este && b.oeste <= a.este && a.sur <= b.norte && b.sur <= a.norte;
+
+/**
+ * Las provincias que necesita la vista: las que tienen emplazamientos donde `pedirSinr` mira
+ * estaciones. Se mira en el mismo plano y con las mismas cajas, así que con ellas cargadas la
+ * vista da lo mismo que con todas las provincias en una sola capa.
+ */
+export const provinciasParaSinr = (
+  provincias: ReadonlyArray<{
+    readonly codigo: string;
+    readonly caja: CajaGeografica | undefined;
+    readonly fichero: string | undefined;
+  }>,
+  encuadre: Encuadre | undefined,
+  referencia: Coordenada | undefined,
+): ReadonlyArray<string> => {
+  const zonas = zonasDeEstaciones(encuadre, referencia);
+  if (zonas.length === 0) return [];
+  return provincias.flatMap(({ codigo, caja, fichero }) => {
+    if (caja === undefined || fichero === undefined) return [];
+    const so = aPlano(ORIGEN_VISTA, caja.suroeste);
+    const ne = aPlano(ORIGEN_VISTA, caja.noreste);
+    const enPlano = { oeste: so.este, sur: so.norte, este: ne.este, norte: ne.norte };
+    return zonas.some((zona) => seCortanEnElPlano(zona, enPlano)) ? [codigo] : [];
+  });
+};
+
 export const pedirSinr = (entrada: EntradaSinr): SinrPedida | undefined => {
   const { eleccion, encuadre, referencia } = entrada;
   const conTrama = encuadre !== undefined && encuadre.zoom >= ZOOM_INTERFERENCIA;
@@ -224,17 +275,7 @@ export const pedirSinr = (entrada: EntradaSinr): SinrPedida | undefined => {
     ? mallaHexagonal(rectanguloDe(encuadre, MARGEN_TRAMA), radio)
     : { este: new Float64Array(0), norte: new Float64Array(0) };
 
-  const cercanas: Array<Rectangulo> = [
-    ...(conTrama ? [ampliar(rectanguloDe(encuadre, 0), MARGEN_ESTACIONES_M)] : []),
-    ...(punto === undefined
-      ? []
-      : [
-          ampliar(
-            { oeste: punto.este, sur: punto.norte, este: punto.este, norte: punto.norte },
-            MARGEN_ESTACIONES_M,
-          ),
-        ]),
-  ];
+  const cercanas = zonasDeEstaciones(encuadre, referencia);
   const estaciones: Array<EstacionSinr> = [];
   for (const emplazamiento of entrada.emplazamientos) {
     const trato = tratoDe(emplazamiento, eleccion.compania, eleccion.mhz);

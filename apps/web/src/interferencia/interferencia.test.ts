@@ -14,6 +14,7 @@ import {
   ORIGEN_VISTA,
   palabraDeSinr,
   pedirSinr,
+  provinciasParaSinr,
   RADIO_HEXAGONO_PX,
   recuentoDe,
   textoDb,
@@ -22,6 +23,7 @@ import {
   valorEnPunto,
   ZOOM_INTERFERENCIA,
 } from "./interferencia.ts";
+import { EMPLAZAMIENTOS_POR_PROVINCIA, RESUMEN } from "../capa/pruebasNacional.ts";
 import { textoDeEstaciones } from "./textos.ts";
 
 /** Un punto a tantos metros al este y al norte del origen de la vista. */
@@ -232,6 +234,64 @@ describe("trama y valor en el punto", () => {
         "12 dB · buena",
         "25 dB · excelente",
       ],
+    );
+  });
+});
+
+describe("interferencia junto al borde entre dos provincias", () => {
+  // Barcelona al oeste y Girona al este (`pruebasNacional.ts`), todas de Movistar y sin bandas
+  // leídas, así que todas entran en la vista.
+  const deMovistar = (codigo: string) =>
+    (EMPLAZAMIENTOS_POR_PROVINCIA.get(codigo) ?? []).map((e) => ({
+      ...e,
+      companias: ["movistar" as const],
+    }));
+  const barcelona = deMovistar("08");
+  const girona = deMovistar("17");
+  const vista = (longitud: number): Encuadre => ({
+    suroeste: { longitud, latitud: 41.91 },
+    noreste: { longitud: longitud + 0.008, latitud: 41.925 },
+    zoom: 16,
+  });
+  const ELECCION = { compania: "movistar" as const, mhz: 1800 as const, ocupacion: 0.5 };
+  const estaciones = (emplazamientos: ReadonlyArray<EmplazamientoDeCapa>, encuadre: Encuadre) =>
+    pedirSinr({ emplazamientos, eleccion: ELECCION, encuadre, referencia: undefined })?.params
+      .estaciones.length;
+
+  it("junto al borde necesita las dos provincias; lejos, solo la suya", () => {
+    assert.deepStrictEqual(provinciasParaSinr(RESUMEN.provincias, vista(2.477), undefined), [
+      "08",
+      "17",
+    ]);
+    assert.deepStrictEqual(provinciasParaSinr(RESUMEN.provincias, vista(2.4), undefined), ["08"]);
+    // Un punto de referencia junto al borde también, aunque el mapa esté lejos.
+    const alejado = { ...vista(2.4), zoom: ZOOM_INTERFERENCIA - 1 };
+    assert.deepStrictEqual(
+      provinciasParaSinr(RESUMEN.provincias, alejado, { longitud: 2.49, latitud: 41.92 }),
+      ["08", "17"],
+    );
+    assert.deepStrictEqual(provinciasParaSinr(RESUMEN.provincias, alejado, undefined), []);
+  });
+
+  it("con las provincias que pide, da lo mismo que con todas en una sola capa", () => {
+    const juntas = [...barcelona, ...girona];
+    // Junto al borde, sin Girona faltarían estaciones: por eso la vista espera a que llegue.
+    assert.isBelow(estaciones(barcelona, vista(2.477)) ?? 0, estaciones(juntas, vista(2.477)) ?? 0);
+    // Lejos, Girona no añade ninguna: no hace falta esperarla.
+    assert.strictEqual(estaciones(barcelona, vista(2.4)), estaciones(juntas, vista(2.4)));
+    assert.deepStrictEqual(
+      pedirSinr({
+        emplazamientos: barcelona,
+        eleccion: ELECCION,
+        encuadre: vista(2.4),
+        referencia: undefined,
+      })?.params,
+      pedirSinr({
+        emplazamientos: juntas,
+        eleccion: ELECCION,
+        encuadre: vista(2.4),
+        referencia: undefined,
+      })?.params,
     );
   });
 });

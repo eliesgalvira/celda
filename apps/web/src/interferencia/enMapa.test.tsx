@@ -10,6 +10,7 @@ import * as Layer from "effect/Layer";
 import { createSignal, flush, type Setter } from "solid-js";
 
 import { capaDePrueba } from "../capa/pruebas.ts";
+import { type EstadoDeLasVecinas, VECINAS_LISTAS } from "../capa/vecinas.ts";
 import { ProveedorDeDatos, usarDatos } from "../datos.tsx";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
@@ -58,6 +59,7 @@ interface Mandos {
   readonly setEleccion: Setter<EleccionVista>;
   readonly setEncuadre: Setter<Encuadre | undefined>;
   readonly setReferencia: Setter<Coordenada | undefined>;
+  readonly setVecinas: Setter<EstadoDeLasVecinas>;
 }
 
 function Prueba(props: {
@@ -68,6 +70,7 @@ function Prueba(props: {
   const [eleccion, setEleccion] = createSignal(ELECCION);
   const [encuadre, setEncuadre] = createSignal<Encuadre | undefined>(ENCUADRE);
   const [referencia, setReferencia] = createSignal<Coordenada | undefined>();
+  const [vecinas, setVecinas] = createSignal<EstadoDeLasVecinas>(VECINAS_LISTAS);
   const lienzo = props.lienzo;
   const vista = crearInterferencia(usarDatos(), {
     lienzo: () => lienzo,
@@ -76,8 +79,9 @@ function Prueba(props: {
     eleccion,
     encuadre,
     referencia,
+    vecinas,
   });
-  props.mandos({ vista, setActiva, setEleccion, setEncuadre, setReferencia });
+  props.mandos({ vista, setActiva, setEleccion, setEncuadre, setReferencia, setVecinas });
   return null;
 }
 
@@ -117,6 +121,29 @@ const montar = async () => {
 };
 
 describe("vista de interferencia en el mapa", () => {
+  it("mientras falta una provincia vecina no calcula ni dibuja nada, y lo dice", async () => {
+    const m = await montar();
+    const girona = { codigo: "17", nombre: "Girona" };
+    m.setVecinas({ tipo: "cargando", provincias: [girona] });
+    m.setActiva(true);
+    await esperar(() => assert.strictEqual(m.vista.calculo().estado, "esperando"));
+    assert.deepStrictEqual(m.vista.calculo().faltan, [girona]);
+    assert.lengthOf(m.dibujadas.at(-1)?.features ?? [0], 0);
+    assert.strictEqual(m.worker.creados(), 0);
+
+    // Si no llega, tampoco: la vista dice que falta.
+    m.setVecinas({ tipo: "fallo", provincias: [girona] });
+    await esperar(() => assert.strictEqual(m.vista.calculo().estado, "sin-vecinas"));
+    assert.strictEqual(m.worker.creados(), 0);
+
+    // Cuando llega, calcula con ella.
+    m.setVecinas(VECINAS_LISTAS);
+    await esperar(() => assert.lengthOf(m.worker.pendientes(), 1));
+    assert.strictEqual(m.vista.calculo().estado, "calculando");
+    assert.isUndefined(m.vista.calculo().faltan);
+    m.desmontar();
+  });
+
   it("no calcula nada hasta activarla; entonces pide sinr@1 y dibuja la trama", async () => {
     const m = await montar();
     assert.deepStrictEqual(m.mostradas, [false]);
