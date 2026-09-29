@@ -63,11 +63,6 @@ const JUSTIFICADOS: ReadonlyArray<Justificado> = [
     motivo: "fichas de ejemplo de las pruebas de correcciones",
   },
   {
-    fichero: "packages/dominio/src/area.ts",
-    texto: "Barcelona",
-    motivo: "la caja de la primera versión; solo fija el origen del plano de la interferencia",
-  },
-  {
     fichero: "packages/dominio/src/medida.ts",
     texto: "Plaça de Catalunya, Barcelona",
     motivo: "la medida de ejemplo se tomó ahí; es un ejemplo, no dice dónde está Celda",

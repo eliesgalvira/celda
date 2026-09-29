@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import {
-  BARCELONA,
   cajaDe,
   ESPANA,
   Coordenada,
@@ -20,7 +19,7 @@ describe("Coordenada", () => {
   it.effect("acepta un punto de Barcelona", () =>
     Effect.gen(function* () {
       const plazaCatalunya = yield* decodificar({ longitud: 2.17, latitud: 41.387 });
-      assert.isTrue(contiene(BARCELONA.encuadre, plazaCatalunya));
+      assert.isTrue(contiene(ESPANA.encuadre, plazaCatalunya));
     }),
   );
 
@@ -30,14 +29,6 @@ describe("Coordenada", () => {
       assert.match(error.message, /latitud/u);
     }),
   );
-});
-
-describe("BARCELONA", () => {
-  it("abre el mapa dentro de los límites por los que se puede mover", () => {
-    assert.isTrue(contiene(BARCELONA.limites, BARCELONA.encuadre.suroeste));
-    assert.isTrue(contiene(BARCELONA.limites, BARCELONA.encuadre.noreste));
-    assert.isBelow(BARCELONA.zoomMinimo, BARCELONA.zoomMaximo);
-  });
 });
 
 describe("ESPANA", () => {
@@ -50,6 +41,7 @@ describe("ESPANA", () => {
     assert.isTrue(contiene(ESPANA.encuadre, madrid));
     assert.isTrue(contiene(ESPANA.encuadre, palma));
     assert.isTrue(contiene(ESPANA.limites, tenerife));
+    assert.isBelow(ESPANA.zoomMinimo, ESPANA.zoomMaximo);
   });
 });
 
