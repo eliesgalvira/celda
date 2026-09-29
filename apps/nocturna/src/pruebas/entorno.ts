@@ -25,7 +25,14 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { baseNocturna } from "../base.ts";
 import { COPIAS_CONSERVADAS, REINTENTO_DE_PUBLICACION } from "../configuracion.ts";
-import { Extractores, noche, type OpcionesNoche, provinciasDe, publicadorEn } from "../programa.ts";
+import {
+  Extractores,
+  noche,
+  type OpcionesNoche,
+  provinciasDe,
+  publicadorEn,
+  sinAlmacen,
+} from "../programa.ts";
 
 /** Lotes pequeños, para que la muestra del Campus Nord ocupe varios. */
 export const POR_LOTE = 8;
@@ -104,6 +111,10 @@ export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
 /** Lo que cambia de una noche a otra en una prueba. */
 export interface Variante {
   readonly almacen?: Layer.Layer<AlmacenDeFicheros>;
+  /** Sin almacén, como el programa sin configurarle uno: la noche ingiere y no publica. */
+  readonly sinPublicar?: boolean;
+  /** Emplazamientos por lote de fichas; por defecto, `POR_LOTE`. */
+  readonly porLote?: number;
   /** La copia de reserva de Vercel. Sin ella, la noche no la toca. */
   readonly reserva?: Layer.Layer<CopiaDeReserva>;
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
@@ -132,10 +143,12 @@ export const unaNoche = (
   Effect.gen(function* () {
     const zonas = yield* zonasDePublicacion;
     const entornoDeLaNoche = Layer.mergeAll(
-      publicadorEn(zonas, POR_LOTE).pipe(
-        Layer.provide(variante.almacen ?? entorno.almacenVigilado),
-        Layer.provide(variante.reserva ?? Layer.empty),
-      ),
+      variante.sinPublicar === true
+        ? sinAlmacen
+        : publicadorEn(zonas, variante.porLote ?? POR_LOTE).pipe(
+            Layer.provide(variante.almacen ?? entorno.almacenVigilado),
+            Layer.provide(variante.reserva ?? Layer.empty),
+          ),
       Layer.succeed(
         Extractores,
         Extractores.of({
