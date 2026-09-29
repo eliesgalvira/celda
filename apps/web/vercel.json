@@ -1,5 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "./scripts/vercel.sh",
+  "outputDirectory": "dist",
   "rewrites": [{ "source": "/((?!capas/|assets/|iconos/).*)", "destination": "/index.html" }],
   "headers": [
     {
