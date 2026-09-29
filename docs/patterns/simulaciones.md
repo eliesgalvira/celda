@@ -66,7 +66,7 @@ La tolerancia se declara al generar el fichero y va dentro de él. Las de TypeSc
 - Cada celda es la caja recortada por la mediatriz con cada vecino. Los vecinos se buscan por anillos en una rejilla y se para cuando ninguno de los que faltan puede recortar más. Con los 1318 emplazamientos de la capa tarda unos 20 ms.
 - Las pruebas comprueban la propiedad y no solo casos: las celdas suman el área de la caja, dos celdas no tienen área en común y cada punto al azar cae en la celda de su emplazamiento más cercano, calculado comparando con todos. Hay configuraciones con repetidos, en fila, en rejilla (empates en las esquinas) y fuera de la caja.
 - Si dos emplazamientos están en el mismo punto, la celda es del primero y el otro se queda sin ella.
-- La web la calcula entre todos los emplazamientos, sea cual sea su compañía (`CONTEXT.md`), en un plano centrado en la capa (`aPlano` de `@celda/dominio/plano`) y con una caja 100 m más ancha que los emplazamientos. Fuera de la zona de la ingesta puede haber emplazamientos que Celda no conoce, así que las celdas no se alargan por ahí.
+- La web la calcula entre todos los emplazamientos, sea cual sea su compañía (`CONTEXT.md`), en un plano con el origen en la casilla de lo que se ve (`origenCerca` de `@celda/dominio/plano`, ver «Planos locales») y con una caja 100 m más ancha que los emplazamientos. Fuera de la zona de la ingesta puede haber emplazamientos que Celda no conoce, así que las celdas no se alargan por ahí.
 
 `repartirEnSectores(celda, emplazamiento, azimuts)` divide una celda entre los sectores de su estación base. A cada punto le toca el sector cuyo eje queda más cerca de su rumbo, que con sectores iguales es el que da más ganancia en el diagrama de sector. Devuelve un polígono por azimut; un sector de más de 180° no es convexo, pero juntos cubren la celda sin solaparse. No está en el registro porque es geometría sobre el resultado de `celdas`; la usa `sector-servicio`.
 
@@ -90,7 +90,7 @@ En la web (`apps/web/src/servicio/`), `crearServicio` lo pide al simulador cada 
 - Las pruebas de propiedades: empeora en cada punto al subir la ocupación (configuraciones al azar), los bordes con menos de 0 dB crecen con ella, mejora al acercarse por el eje al emplazamiento que da servicio y da servicio el sector que más llega. Que otra compañía u otra banda no cambian nada se comprueba en la web, que es quien elige las estaciones (`apps/web/src/interferencia/interferencia.test.ts`).
 - `mallaHexagonal(rectangulo, radio)` da los centros de una trama de hexágonos anclada al origen del plano: dos rectángulos que se solapan comparten los puntos, así que al mover el mapa la trama no baila.
 
-La web (`apps/web/src/interferencia/`) usa un plano con origen fijo en el centro de Barcelona. Entran las estaciones base de la compañía que el registro da en la banda y las que aún no tienen bandas leídas, que se suponen en ella; las que el registro da solo en otras bandas no estorban. El panel lo dice con el recuento. Todas llevan tres sectores supuestos a 0°, 120° y 240°. Solo cuentan las que quedan a 1,5 km o menos de lo que se ve o del punto de referencia. La trama tiene hexágonos de 13 px al medio nivel de zoom y cubre lo que se ve más un 15 % por cada lado, así que un arrastre corto no vuelve a calcular (`mismaTrama`). Por debajo del zoom 14 solo se calcula el valor en el punto de referencia, que va como último punto de la malla.
+La web (`apps/web/src/interferencia/`) usa un plano con el origen en la casilla del centro de lo que se ve (`origenDeLaTrama`). Si el punto de referencia queda lejos de lo que se ve, lo calcula en otro plano, junto a él (`pedidasDeSinr`). Entran las estaciones base de la compañía que el registro da en la banda y las que aún no tienen bandas leídas, que se suponen en ella; las que el registro da solo en otras bandas no estorban. El panel lo dice con el recuento. Todas llevan tres sectores supuestos a 0°, 120° y 240°. Solo cuentan las que quedan a 1,5 km o menos de lo que se ve o del punto de referencia. La trama tiene hexágonos de 13 px al medio nivel de zoom y cubre lo que se ve más un 15 % por cada lado, así que un arrastre corto no vuelve a calcular (`mismaTrama`). Por debajo del zoom 14 solo se calcula el valor en el punto de referencia, que va como último punto de la malla.
 
 ## Diagrama de sector y orientación
 
@@ -100,3 +100,22 @@ El registro oficial no publica el azimut de los sectores, y antenasmoviles.es ta
 - si no hay ninguno, que hoy es siempre, tres sectores supuestos a 0°, 120° y 240°, con trazo discontinuo y una nota que dice que la orientación es supuesta y por qué.
 
 `orientacionDe` (`apps/web/src/ficha/diagrama.ts`) decide cuál de las dos. Cuando alguna fuente dé estimaciones, solo cambia lo que recibe.
+
+## Planos locales
+
+Las simulaciones miden en metros sobre un plano (`aPlano`), que es una proyección equirectangular: mide el norte al sur sin error y el este al oeste con la escala del paralelo del origen. Lejos del origen en latitud, esa escala se equivoca (`errorDelPlano`), unos 0,017 por cada grado a 41° N. Hasta el #45 la vista de interferencia tenía el origen fijo en Barcelona, y en Canarias medía las distancias un 17 % mal.
+
+Ahora cada vista pone el origen junto a lo que mide:
+
+| Sitio | Origen | Error como mucho |
+|---|---|---|
+| Vista de interferencia (`interferencia.ts`) | la casilla de 0,1° del centro de lo que se ve; el punto de referencia, en otro plano si no cabe | 0,26 % |
+| Celdas (`celdas/`, `PantallaMapa.tsx`) | la casilla de 0,1° del centro de lo que se ve | un borde se mueve un 0,26 % de la mitad de la distancia entre sus emplazamientos |
+| Sector que da servicio (`servicio/servicio.ts`) | el emplazamiento | menos de un 0,2 % en una celda que llegue a 10 km |
+| Área de barrios y municipios (`areaKm2`) | el centro de la caja de cada polígono | menos de una diezmilésima; con el primer vértice, como antes, un 0,34 % en Cuenca |
+| Municipio de un punto (`municipioDelPunto`) | el propio punto | nada que medir lejos |
+
+El 0,26 % es el caso peor: algo a `LATITUD_DEL_PLANO` (0,15°) del origen en Estaca de Bares, a 43,8° N. `origenCerca` ajusta el origen a una rejilla de 0,1°, así que mover el mapa dentro de una casilla no lo cambia, la trama de hexágonos no se mueve y las celdas no se recalculan. `plano.test.ts`, `interferencia.test.ts`, `celdas.test.ts` y `servicio.test.ts` miden una distancia conocida en Las Palmas, A Coruña y Maó, y fallan con el origen en Barcelona.
+
+Las simplificaciones de límites de `tools/capas` (`simplificarArco`, `simplificarAnillo`) también proyectan desde un vértice del propio arco; solo deciden qué vértices quitar con una tolerancia de 50 m, y un 0,3 % de esa tolerancia no cambia nada.
+
