@@ -27,6 +27,20 @@ describe("área de un barrio", () => {
     assert.closeTo(areaKm2([[anillo.toReversed()]]), 1, 0.001);
   });
 
+  it("mide bien un municipio grande, con 0,6° de norte a sur, sin importar su primer vértice", () => {
+    // El área exacta en la esfera de un rectángulo entre dos paralelos y dos meridianos.
+    const radio = 6_371.0088;
+    const [oeste, sur, lado] = [-6.6, 39.2, 0.6];
+    const exacta =
+      radio ** 2 *
+      ((lado * Math.PI) / 180) *
+      (Math.sin(((sur + lado) * Math.PI) / 180) - Math.sin((sur * Math.PI) / 180));
+    const anillo = cuadrado(oeste, sur, lado);
+    for (const empezando of [anillo, [...anillo.slice(2), ...anillo.slice(0, 2)]]) {
+      assert.isBelow(Math.abs(areaKm2([[empezando]]) / exacta - 1), 1e-4);
+    }
+  });
+
   it("resta los agujeros y suma los polígonos sueltos", () => {
     const grande = areaKm2([[cuadrado(2.1, 41.3, 0.01)]]);
     const conAgujero = areaKm2([[cuadrado(2.1, 41.3, 0.01), cuadrado(2.102, 41.302, 0.005)]]);

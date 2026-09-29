@@ -1,7 +1,7 @@
 {"fuente":{"atribucion":"Instituto Geográfico Nacional","producto":"Base de Datos de Límites Jurisdiccionales de España","licencia":"CC BY 4.0","enlace":"https://www.ign.es/atom/dataset_feeds/lin_lim_mun.es.xml","fecha":"2026-08-10","huella":"sha256:5bd73c530af995c05da8d9ff4e3d293f62d0dc91c5e48ee773fe881716c108a6"},"toleranciaMetros":200,"unidadesPorGrado":10000,"provincias":[
 {"codigo":"52","nombre":"Melilla","etiqueta":{"longitud":-2.950452,"latitud":35.29105}}
 ],"territorios":[
-{"codigo":"52001","tipo":"municipio","nombre":"Melilla","provincia":"52","etiqueta":{"longitud":-2.950452,"latitud":35.29105},"areaKm2":13.6251,"poligonos":[[[0]]]}
+{"codigo":"52001","tipo":"municipio","nombre":"Melilla","provincia":"52","etiqueta":{"longitud":-2.950452,"latitud":35.29105},"areaKm2":13.6297,"poligonos":[[[0]]]}
 ],"arcos":[
 [-29703,352887,66,210,37,63,74,43,79,-52,-25,-62,98,-66,18,-75,116,-24,-2,-38,-54,43,-62,-8,30,-24,-26,-19,36,13,-55,-32,0,-28,33,3,-30,-4,17,-48,78,-38,33,57,-53,-83,-210,-63,-36,72,-144,93,33,64,-51,3]
 ]}

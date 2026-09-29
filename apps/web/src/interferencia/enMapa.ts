@@ -16,7 +16,7 @@ import {
   type EleccionVista,
   type Encuadre,
   mismaTrama,
-  pedirSinr,
+  pedidasDeSinr,
   SIN_TRAMA,
   type TramaEnMapa,
   tramaEnMapa,
@@ -154,8 +154,8 @@ export function crearInterferencia(
         });
         return undefined;
       }
-      const pedida = pedirSinr({ emplazamientos, eleccion, encuadre, referencia });
-      if (pedida === undefined) {
+      const pedidas = pedidasDeSinr({ emplazamientos, eleccion, encuadre, referencia });
+      if (pedidas.length === 0) {
         lienzo.dibujar(SIN_TRAMA);
         setCalculo(SIN_CALCULO);
         return undefined;
@@ -166,10 +166,24 @@ export function crearInterferencia(
         conTrama: anterior.conTrama,
       }));
       const cancelar = new AbortController();
+      // Casi siempre una simulación; dos si el punto queda lejos de lo que se ve, cada una en su
+      // plano (`pedidasDeSinr`).
       const calcular = Effect.gen(function* () {
         const simulador = yield* Simulador;
-        const resultado = yield* simulador.ejecutar(sinr, pedida.params, pedida.malla);
-        return { trama: tramaEnMapa(pedida, resultado), valor: valorEnPunto(pedida, resultado) };
+        const hechas = yield* Effect.forEach(pedidas, (pedida) =>
+          Effect.map(simulador.ejecutar(sinr, pedida.params, pedida.malla), (resultado) => ({
+            pedida,
+            resultado,
+          })),
+        );
+        const conTrama = hechas.find((h) => h.pedida.hexagonos > 0);
+        const conPunto = hechas.find((h) => h.pedida.conPunto);
+        return {
+          trama:
+            conTrama === undefined ? SIN_TRAMA : tramaEnMapa(conTrama.pedida, conTrama.resultado),
+          valor:
+            conPunto === undefined ? undefined : valorEnPunto(conPunto.pedida, conPunto.resultado),
+        };
       });
       void datos
         .runPromiseExit(Effect.andThen(Effect.sleep(ESPERA_MS), calcular), {
@@ -182,7 +196,7 @@ export function crearInterferencia(
             setCalculo({
               estado: "lista",
               valor: salida.value.valor,
-              conTrama: pedida.hexagonos > 0,
+              conTrama: pedidas.some((pedida) => pedida.hexagonos > 0),
             });
           } else {
             setCalculo((anterior) => ({ ...anterior, estado: "fallo" }));

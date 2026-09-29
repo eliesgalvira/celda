@@ -1,6 +1,6 @@
-import type { Coordenada } from "@celda/dominio/area";
+import { type Coordenada, distanciaMetros } from "@celda/dominio/area";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
-import { desdePlano } from "@celda/dominio/plano";
+import { aPlano, desdePlano } from "@celda/dominio/plano";
 import { sinr } from "@celda/sim/sinr";
 import { assert, describe, it } from "@effect/vitest";
 
@@ -9,10 +9,12 @@ import {
   companiasDeLaCapa,
   type Encuadre,
   type EntradaSinr,
+  type SinrPedida,
   metrosPorPixel,
   mismaTrama,
-  ORIGEN_VISTA,
+  origenDeLaTrama,
   palabraDeSinr,
+  pedidasDeSinr,
   pedirSinr,
   provinciasParaSinr,
   RADIO_HEXAGONO_PX,
@@ -26,8 +28,11 @@ import {
 import { EMPLAZAMIENTOS_POR_PROVINCIA, RESUMEN } from "../capa/pruebasNacional.ts";
 import { textoDeEstaciones } from "./textos.ts";
 
-/** Un punto a tantos metros al este y al norte del origen de la vista. */
-const en = (este: number, norte: number): Coordenada => desdePlano(ORIGEN_VISTA, { este, norte });
+/** El centro de una casilla de la rejilla de los orígenes, en Barcelona: el origen de la trama. */
+const ORIGEN: Coordenada = { longitud: 2.15, latitud: 41.35 };
+
+/** Un punto a tantos metros al este y al norte del origen. */
+const en = (este: number, norte: number): Coordenada => desdePlano(ORIGEN, { este, norte });
 
 const emplazamiento = (
   clave: string,
@@ -163,7 +168,7 @@ describe("estaciones de la vista de interferencia", () => {
 describe("trama y valor en el punto", () => {
   it("cubre lo que se ve con un margen, con hexágonos de 13 px al zoom del mapa", () => {
     const { pedida, resultado } = calcular(entrada());
-    const radio = RADIO_HEXAGONO_PX * metrosPorPixel(16, ORIGEN_VISTA.latitud);
+    const radio = RADIO_HEXAGONO_PX * metrosPorPixel(16, ORIGEN.latitud);
     assert.closeTo(pedida.radio, radio, 1e-9);
     assert.strictEqual(pedida.malla.este.length, pedida.hexagonos + 1);
     const trama = tramaEnMapa(pedida, resultado);
@@ -293,5 +298,103 @@ describe("interferencia junto al borde entre dos provincias", () => {
         referencia: undefined,
       })?.params,
     );
+  });
+});
+
+describe("la vista mide bien lejos de Barcelona", () => {
+  const LUGARES = {
+    "Las Palmas de Gran Canaria": { longitud: -15.4363, latitud: 28.1235 },
+    "A Coruña": { longitud: -8.4115, latitud: 43.3623 },
+    Maó: { longitud: 4.2658, latitud: 39.8885 },
+  };
+  /** Un emplazamiento de Movistar 1 km al este de `p`, una distancia conocida. */
+  const alEste = (p: Coordenada): EmplazamientoDeCapa => ({
+    clave: "este",
+    posicion: {
+      longitud: p.longitud + 1000 / (111_195 * Math.cos((p.latitud * Math.PI) / 180)),
+      latitud: p.latitud,
+    },
+    estado: "verificado",
+    companias: ["movistar"],
+  });
+  const vistaEn = (p: Coordenada): Encuadre => ({
+    suroeste: { longitud: p.longitud - 0.01, latitud: p.latitud - 0.006 },
+    noreste: { longitud: p.longitud + 0.01, latitud: p.latitud + 0.006 },
+    zoom: 16,
+  });
+  /** La distancia del punto a la estación en el plano de la simulación, frente a la del mapa. */
+  const errorDe = (pedida: SinrPedida, real: number) => {
+    const [estacion] = pedida.params.estaciones;
+    const n = pedida.malla.este.length - 1;
+    const enPlano = Math.hypot(
+      (estacion?.este ?? 0) - (pedida.malla.este[n] ?? 0),
+      (estacion?.norte ?? 0) - (pedida.malla.norte[n] ?? 0),
+    );
+    return Math.abs(enPlano / real - 1);
+  };
+
+  it("en Canarias, Galicia y Menorca, 1 km sale 1 km; con el origen en Barcelona, no", () => {
+    for (const [lugar, p] of Object.entries(LUGARES)) {
+      const estacion = alEste(p);
+      const real = distanciaMetros(p, estacion.posicion);
+      const [pedida] = pedidasDeSinr(
+        entrada({ emplazamientos: [estacion], encuadre: vistaEn(p), referencia: p }),
+      );
+      if (pedida === undefined) return assert.fail(lugar);
+      assert.isTrue(pedida.conPunto, lugar);
+      assert.isBelow(errorDe(pedida, real), 0.0026, lugar);
+      // En el plano de antes, con el origen fijo en Barcelona, la misma distancia sale mal.
+      const a = aPlano(ORIGEN, p);
+      const b = aPlano(ORIGEN, estacion.posicion);
+      const enBarcelona = Math.hypot(b.este - a.este, b.norte - a.norte);
+      assert.isAbove(Math.abs(enBarcelona / real - 1), 0.02, lugar);
+    }
+  });
+
+  it("la trama se dibuja donde se ve, con su origen en la casilla de lo que se ve", () => {
+    const coruna = LUGARES["A Coruña"];
+    const vista = vistaEn(coruna);
+    assert.isBelow(Math.abs(origenDeLaTrama(vista).latitud - coruna.latitud), 0.05);
+    const { pedida, resultado } = calcular(
+      entrada({ emplazamientos: [alEste(coruna)], encuadre: vista, referencia: coruna }),
+    );
+    const trama = tramaEnMapa(pedida, resultado);
+    const [primero] = trama.features;
+    const [lon = 0, lat = 0] = primero?.geometry.coordinates[0]?.[0] ?? [];
+    assert.isBelow(Math.abs(lon - coruna.longitud), 0.03);
+    assert.isBelow(Math.abs(lat - coruna.latitud), 0.02);
+  });
+
+  it("con el punto lejos de lo que se ve, lo calcula en su propio plano", () => {
+    const coruna = LUGARES["A Coruña"];
+    const palmas = LUGARES["Las Palmas de Gran Canaria"];
+    const estacion = alEste(palmas);
+    const pedidas = pedidasDeSinr(
+      entrada({
+        emplazamientos: [alEste(coruna), estacion],
+        encuadre: vistaEn(coruna),
+        referencia: palmas,
+      }),
+    );
+    assert.lengthOf(pedidas, 2);
+    const [trama, punto] = pedidas;
+    assert.isFalse(trama?.conPunto);
+    assert.isAbove(trama?.hexagonos ?? 0, 0);
+    assert.strictEqual(punto?.hexagonos, 0);
+    assert.isTrue(punto?.conPunto);
+    if (punto === undefined) return;
+    assert.isBelow(errorDe(punto, distanciaMetros(palmas, estacion.posicion)), 0.0026);
+    // pedirSinr da solo la de lo que se ve.
+    assert.isFalse(pedirSinr(entrada({ encuadre: vistaEn(coruna), referencia: palmas }))?.conPunto);
+  });
+
+  it("al pasar a otra casilla de la rejilla, la trama se vuelve a calcular", () => {
+    const junto = (longitud: number): Encuadre => ({
+      suroeste: { longitud: longitud - 0.005, latitud: 41.375 },
+      noreste: { longitud: longitud + 0.005, latitud: 41.385 },
+      zoom: 16,
+    });
+    assert.isTrue(mismaTrama(junto(2.195), junto(2.1951)));
+    assert.isFalse(mismaTrama(junto(2.1999), junto(2.2001)));
   });
 });

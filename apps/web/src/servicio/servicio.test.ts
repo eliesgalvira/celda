@@ -1,3 +1,4 @@
+import { distanciaMetros } from "@celda/dominio/area";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { aPlano } from "@celda/dominio/plano";
 import { celdas } from "@celda/sim/celdas";
@@ -114,5 +115,21 @@ describe("sector que da servicio en la web", () => {
     ]);
     assert.lengthOf(lineaDe(A, undefined).features, 0);
     assert.lengthOf(lineaDe(undefined, PUNTO).features, 0);
+  });
+});
+
+describe("sector que da servicio lejos de Barcelona", () => {
+  it("el punto de referencia queda a su distancia del emplazamiento, también en Canarias", () => {
+    const palmas = { longitud: -15.4363, latitud: 28.1235 };
+    const punto = { longitud: palmas.longitud + 0.0102, latitud: palmas.latitud + 0.004 };
+    const { malla } = pedirServicio({
+      clave: "a",
+      emplazamiento: palmas,
+      punto,
+      celda: undefined,
+      orientacion: orientacionDe([]),
+    });
+    const enPlano = Math.hypot(malla.este[0] ?? 0, malla.norte[0] ?? 0);
+    assert.isBelow(Math.abs(enPlano / distanciaMetros(palmas, punto) - 1), 0.001);
   });
 });
