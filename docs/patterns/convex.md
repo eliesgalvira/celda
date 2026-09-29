@@ -194,11 +194,7 @@ Medido el 29/09/2026 en un portátil con Node 24, con la España sintética de `
 
 Sin límite, V8 deja crecer el montón con la basura de la publicación antes de recogerla, y el RSS pasa de 1,1 a 2 GB según la noche y cuándo recoja. Lo que sigue vivo es mucho menos: las tres noches caben con el montón limitado a 512 MB, y la noche por defecto no cabe en 384. De ese montón, 47 MB son la España sintética de la medida, y 77 MB los límites de municipios que carga cualquier orden. La fusión y la publicación leen las observaciones y los emplazamientos de 2.000 en 2.000 (`PAGINA` en `apps/nocturna/src/base.ts`); leyéndolos de una vez, la noche de las fichas no cabía en 512 MB.
 
-Si la máquina anda justa de memoria, se puede limitar el montón en su configuración de NixOS; con 1 GB queda el doble de lo que hace falta:
-
-```nix
-systemd.services.celda-nocturna.environment.NODE_OPTIONS = "--max-old-space-size=1024";
-```
+Por eso el módulo de NixOS limita el montón a 512 MB (`memoria.monton`) y el servicio a 1.536 MB (`memoria.maxima`, [nixos.md](nixos.md#opciones)). En local, `NODE_OPTIONS=--max-old-space-size=512 pnpm run ingesta noche` hace lo mismo.
 
 La noche por defecto son unos 2 minutos de listado, las 6 horas de fichas y dos publicaciones de unos 10 s. La base con las bandas de toda España ocupa unos 190 MB, y sus catorce copias, unos 2,6 GB.
 
