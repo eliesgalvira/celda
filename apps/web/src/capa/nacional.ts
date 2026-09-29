@@ -68,7 +68,7 @@ export const prefijoDeProvincia = (codigo: string): string => `${codigo}:`;
 
 /** La provincia de una clave de agrupación, de barrio o de municipio (`a:08:123`), o `undefined`. */
 const provinciaDeClave = (clave: string): string | undefined =>
-  /^[afbm]:([^:]+):/u.exec(clave)?.[1];
+  /^[afbms]:([^:]+):/u.exec(clave)?.[1];
 
 /**
  * El agrupador de una provincia leída, con sus barrios y, si está cubierta en `resumen`, sus

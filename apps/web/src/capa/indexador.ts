@@ -57,6 +57,7 @@ export type RespuestaDeIndice =
       readonly capa: CapaDeProvincia;
       readonly todos: IndiceSerializado;
       readonly fuera: IndiceSerializado | undefined;
+      readonly sinMunicipio: IndiceSerializado | undefined;
     }
   | { readonly numero: number; readonly tipo: "fallo"; readonly motivo: string };
 
@@ -82,6 +83,8 @@ export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar
   const indices = indexarCapa(capa.emplazamientos, capa.barrios.length > 0);
   const todos = serializarIndice(indices.todos);
   const fuera = indices.fuera === undefined ? undefined : serializarIndice(indices.fuera);
+  const sinMunicipio =
+    indices.sinMunicipio === undefined ? undefined : serializarIndice(indices.sinMunicipio);
   return {
     respuesta: {
       numero: solicitud.numero,
@@ -89,8 +92,13 @@ export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar
       capa,
       todos: todos.serializado,
       fuera: fuera?.serializado,
+      sinMunicipio: sinMunicipio?.serializado,
     },
-    transferibles: [...todos.transferibles, ...(fuera?.transferibles ?? [])],
+    transferibles: [
+      ...todos.transferibles,
+      ...(fuera?.transferibles ?? []),
+      ...(sinMunicipio?.transferibles ?? []),
+    ],
   };
 };
 
@@ -108,6 +116,10 @@ const indexadaDe = (
         respuesta.fuera === undefined
           ? undefined
           : rehidratarIndice(respuesta.fuera, posiciones.fuera ?? []),
+      sinMunicipio:
+        respuesta.sinMunicipio === undefined
+          ? undefined
+          : rehidratarIndice(respuesta.sinMunicipio, posiciones.sinMunicipio ?? []),
     },
   };
 };

@@ -233,8 +233,8 @@ export const esNivelDeMunicipios = (nivel: number): boolean =>
  * Agrupa los emplazamientos de una capa. Indexar 1300 emplazamientos cuesta unos milisegundos.
  * Con `barrios`, el nivel `NIVEL_DE_BARRIOS` recoge por barrio los emplazamientos que tienen uno;
  * sin ellos, ese nivel es uno más de hexágonos. Con `municipios`, los niveles de municipios los
- * recogen por municipio, y los que no tienen ninguno van sueltos: son pocos, los de un territorio
- * compartido.
+ * recogen por municipio, y los que no tienen ninguno (un territorio compartido, el mar) van en
+ * hexágonos de su propio índice.
  */
 export const crearAgrupador = (
   emplazamientos: ReadonlyArray<EmplazamientoLeido>,
@@ -247,6 +247,8 @@ export const crearAgrupador = (
   const PREFIJO_AGRUPACION_FUERA = `f:${prefijo}`;
   const PREFIJO_BARRIO = `b:${prefijo}`;
   const PREFIJO_MUNICIPIO = `m:${prefijo}`;
+  // Las agrupaciones de los que no tienen municipio en los niveles de municipios.
+  const PREFIJO_SIN_MUNICIPIO = `s:${prefijo}`;
   const idDeClave = (clave: string): number | undefined => idConPrefijo(clave, PREFIJO_AGRUPACION);
   const indices = opciones.indices ?? indexarCapa(emplazamientos, barrios.length > 0);
   const indice = indices.todos;
@@ -269,6 +271,7 @@ export const crearAgrupador = (
   );
   const esDeBarrios = (nivel: number): boolean => hayBarrios && nivel === NIVEL_DE_BARRIOS;
 
+  const sinMunicipioIndice = indices.sinMunicipio;
   const municipios = (opciones.municipios ?? []).map((resumen): ElementoMunicipio => ({
     tipo: "municipio",
     clave: `${PREFIJO_MUNICIPIO}${resumen.municipio.codigo}`,
@@ -277,14 +280,10 @@ export const crearAgrupador = (
   }));
   const hayMunicipios = municipios.length > 0;
   const deMunicipio = new Map<string, Array<number>>();
-  const sinMunicipio: Array<number> = [];
   if (hayMunicipios) {
     for (const [i, emplazamiento] of emplazamientos.entries()) {
       const codigo = emplazamiento.municipio ?? null;
-      if (codigo === null) {
-        sinMunicipio.push(i);
-        continue;
-      }
+      if (codigo === null) continue;
       const suyos = deMunicipio.get(codigo) ?? [];
       suyos.push(i);
       deMunicipio.set(codigo, suyos);
@@ -345,6 +344,18 @@ export const crearAgrupador = (
         };
   };
 
+  /** El índice de una agrupación por el prefijo de su clave, y su identificador en él. */
+  const indiceDeAgrupacion = (clave: string): readonly [Indice, number | undefined] => {
+    const id = idDeClave(clave);
+    if (id !== undefined) return [indice, id];
+    const idFuera = idConPrefijo(clave, PREFIJO_AGRUPACION_FUERA);
+    if (idFuera !== undefined) return [fuera, idFuera];
+    const idSin = idConPrefijo(clave, PREFIJO_SIN_MUNICIPIO);
+    return idSin === undefined || sinMunicipioIndice === undefined
+      ? [indice, undefined]
+      : [sinMunicipioIndice, idSin];
+  };
+
   // Las escenas de este agrupador: las claves de agrupación de otro no valen en este índice.
   const propias = new WeakSet<Escena>();
 
@@ -360,16 +371,9 @@ export const crearAgrupador = (
     ];
     if (esDeMunicipios(nivel)) {
       municipiosEn(caja, elementos);
-      for (const i of sinMunicipio) {
-        const emplazamiento = emplazamientos[i];
-        if (emplazamiento === undefined || !contiene(caja, emplazamiento.posicion)) continue;
-        const clave = claveDeEmplazamiento(emplazamiento.clave);
-        elementos.set(clave, {
-          tipo: "emplazamiento",
-          clave,
-          posicion: emplazamiento.posicion,
-          emplazamiento,
-        });
+      for (const punto of sinMunicipioIndice?.getClusters(bbox, nivel) ?? []) {
+        const elemento = elementoDe(punto, PREFIJO_SIN_MUNICIPIO);
+        if (elemento !== undefined) elementos.set(elemento.clave, elemento);
       }
     } else {
       if (esDeBarrios(nivel)) {
@@ -441,9 +445,7 @@ export const crearAgrupador = (
         return [];
       }
       case "agrupacion": {
-        const id = idDeClave(elemento.clave);
-        const idFuera = idConPrefijo(elemento.clave, PREFIJO_AGRUPACION_FUERA);
-        const [origen, cual] = id === undefined ? [fuera, idFuera] : [indice, id];
+        const [origen, cual] = indiceDeAgrupacion(elemento.clave);
         return cual === undefined
           ? []
           : origen.getLeaves(cual, Number.POSITIVE_INFINITY).map((hoja) => hoja.properties.indice);
@@ -514,14 +516,8 @@ export const crearAgrupador = (
     // hexágonos pequeños en el resto.
     if (elemento.tipo === "municipio") return NIVEL_DE_BARRIOS;
     if (elemento.tipo === "provincia") return NIVEL_MAXIMO + 1;
-    const id = idDeClave(elemento.clave);
-    const idFuera = idConPrefijo(elemento.clave, PREFIJO_AGRUPACION_FUERA);
-    const expansion =
-      id === undefined
-        ? idFuera === undefined
-          ? NIVEL_MAXIMO + 1
-          : fuera.getClusterExpansionZoom(idFuera)
-        : indice.getClusterExpansionZoom(id);
+    const [origen, cual] = indiceDeAgrupacion(elemento.clave);
+    const expansion = cual === undefined ? NIVEL_MAXIMO + 1 : origen.getClusterExpansionZoom(cual);
     return Math.min(expansion, NIVEL_MAXIMO + 1);
   };
 

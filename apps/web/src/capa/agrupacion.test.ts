@@ -473,7 +473,7 @@ describe("niveles de municipios", () => {
     );
   });
 
-  it("cada emplazamiento va en su municipio; los que no tienen ninguno van sueltos", () => {
+  it("cada emplazamiento va en su municipio; los que no tienen ninguno, en hexágonos aparte", () => {
     for (const nivel of [NIVEL_DE_MUNICIPIOS, NIVEL_DE_BARRIOS - 1]) {
       const escena = agrupador.escena(nivel, MUNDO);
       assert.deepStrictEqual(
@@ -488,9 +488,11 @@ describe("niveles de municipios", () => {
           assert.isTrue(suyos.every((s) => s.municipio === e.resumen.municipio.codigo));
           suma += suyos.length;
         } else {
-          assert.strictEqual(e.tipo, "emplazamiento", `${e.clave} no es ni municipio ni suelto`);
-          assert.isTrue(suyos.every((s) => s.municipio === null));
-          suma += 1;
+          assert.isTrue(
+            suyos.every((s) => s.municipio === null),
+            `${e.clave} mezcla emplazamientos con municipio`,
+          );
+          suma += suyos.length;
         }
       }
       assert.strictEqual(suma, EMPLAZAMIENTOS.length);
@@ -540,12 +542,16 @@ describe("niveles de municipios", () => {
     comprobarSaltoDeZonas(agrupador, NIVEL_DE_BARRIOS - 1, 8);
   });
 
-  it("entre los dos niveles de municipios no se mueve nada", () => {
+  it("entre los dos niveles de municipios, los municipios no se mueven", () => {
     const t = agrupador.transicion(
       agrupador.escena(NIVEL_DE_MUNICIPIOS, MUNDO),
       agrupador.escena(NIVEL_DE_MUNICIPIOS + 1, MUNDO),
     );
-    assert.strictEqual(t.destino.size + t.origen.size, 0);
+    const claves = [...t.origen.keys(), ...t.origen.values()];
+    assert.isFalse(claves.some((clave) => clave.startsWith("m:")));
+    // Solo cambian los hexágonos de los que no tienen municipio.
+    assert.isTrue(claves.every((clave) => /^[se]:/u.test(clave)));
+    comprobarSaltoDeZonas(agrupador, NIVEL_DE_MUNICIPIOS + 1, NIVEL_DE_MUNICIPIOS);
   });
 
   it("pulsar un municipio acerca hasta el nivel de barrios", () => {
@@ -577,15 +583,42 @@ describe("niveles de municipios", () => {
 });
 
 describe("índice construido en un Worker y rehidratado aquí", () => {
-  // Los mismos emplazamientos con barrios que arriba: así pasa también por el índice de los de
-  // fuera de Barcelona.
+  // Los mismos emplazamientos con barrios y municipios que arriba: así pasa también por el índice
+  // de los de fuera de Barcelona y por el de los que no tienen municipio.
   const barrioDe = (longitud: number, latitud: number): string | null =>
     latitud < 41.36 ? null : longitud < 2.15 ? "01" : "02";
+  const municipioDe = (longitud: number, latitud: number): string | null =>
+    latitud < 41.34 ? null : longitud < 2.15 ? "08101" : "08019";
   const CON_BARRIO: ReadonlyArray<EmplazamientoLeido> = SINTETICOS.map((e, i) => ({
     ...e,
     barrio: barrioDe(e.posicion.longitud, e.posicion.latitud),
+    municipio: municipioDe(e.posicion.longitud, e.posicion.latitud),
     companias: i % 2 === 0 ? ["movistar"] : ["vodafone"],
   }));
+  const MUNICIPIOS = resumirMunicipios(
+    [
+      {
+        codigo: "08101",
+        nombre: "Oeste",
+        etiqueta: { longitud: 2.1, latitud: 41.4 },
+        habitantes: 1000,
+        areaKm2: 10,
+        emplazamientos: 0,
+        companias: [],
+      },
+      {
+        codigo: "08019",
+        nombre: "Barcelona",
+        etiqueta: { longitud: 2.17, latitud: 41.4 },
+        habitantes: 1000,
+        areaKm2: 10,
+        emplazamientos: 0,
+        companias: [],
+      },
+    ],
+    CON_BARRIO.map((e) => ({ ...e, municipio: e.municipio ?? null })),
+    new Set(["movistar", "vodafone"]),
+  );
   const BARRIOS: ReadonlyArray<Barrio> = [
     { codigo: "01", nombre: "Oeste", etiqueta: { longitud: 2.1, latitud: 41.4 } },
     { codigo: "02", nombre: "Este", etiqueta: { longitud: 2.2, latitud: 41.4 } },
@@ -597,19 +630,25 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
     return structuredClone(serializado, { transfer: [...transferibles] });
   };
 
-  const enHilo = crearAgrupador(CON_BARRIO, BARRIOS, { prefijo: "08:" });
+  const enHilo = crearAgrupador(CON_BARRIO, BARRIOS, { prefijo: "08:", municipios: MUNICIPIOS });
   const construidos = indexarCapa(CON_BARRIO, true);
   const posiciones = indicesDeCapa(CON_BARRIO, true);
-  const deFuera = construidos.fuera;
+  const { fuera: deFuera, sinMunicipio } = construidos;
   assert.isDefined(deFuera);
+  assert.isDefined(sinMunicipio);
   const rehidratado = crearAgrupador(CON_BARRIO, BARRIOS, {
     prefijo: "08:",
+    municipios: MUNICIPIOS,
     indices: {
       todos: rehidratarIndice(porElWorker(construidos.todos), posiciones.todos),
       fuera:
         deFuera === undefined
           ? undefined
           : rehidratarIndice(porElWorker(deFuera), posiciones.fuera ?? []),
+      sinMunicipio:
+        sinMunicipio === undefined
+          ? undefined
+          : rehidratarIndice(porElWorker(sinMunicipio), posiciones.sinMunicipio ?? []),
     },
   });
 
@@ -624,7 +663,7 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
       assert.deepStrictEqual(despues.elementos, antes.elementos, `nivel ${nivel}`);
       for (const e of antes.elementos.values()) {
         assert.deepStrictEqual(claves(rehidratado, e), claves(enHilo, e), e.clave);
-        if (e.tipo === "agrupacion" || e.tipo === "barrio") {
+        if (e.tipo === "agrupacion" || e.tipo === "barrio" || e.tipo === "municipio") {
           assert.strictEqual(rehidratado.zoomDeApertura(e), enHilo.zoomDeApertura(e), e.clave);
         }
       }
@@ -658,5 +697,8 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
     assert.isTrue(claves.some((clave) => clave.startsWith("a:08:")));
     assert.isTrue(claves.every((clave) => clave.startsWith("a:08:") || clave.startsWith("e:")));
     assert.isTrue(rehidratado.escena(NIVEL_DE_BARRIOS, MUNDO).elementos.has("b:08:01"));
+    const municipios = [...rehidratado.escena(NIVEL_DE_MUNICIPIOS, MUNDO).elementos.keys()];
+    assert.include(municipios, "m:08:08019");
+    assert.isTrue(municipios.some((clave) => clave.startsWith("s:08:")));
   });
 });

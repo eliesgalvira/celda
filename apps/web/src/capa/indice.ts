@@ -156,21 +156,37 @@ export const rehidratarIndice = (
   return indice;
 };
 
-/** Los índices de una capa: el de todos y, si tiene barrios, el de los que no tienen ninguno. */
+/**
+ * Los índices de una capa: el de todos; si tiene barrios, el de los que no tienen ninguno; y si
+ * alguno no tiene municipio, el de esos, que en los niveles de municipios van en hexágonos.
+ */
 export interface IndicesDeCapa<I> {
   readonly todos: I;
   readonly fuera: I | undefined;
+  readonly sinMunicipio: I | undefined;
 }
 
-/** Las posiciones en la capa de sus emplazamientos, y de los que quedan fuera de los barrios. */
+/** Lo que los índices necesitan saber de cada emplazamiento, además de su posición. */
+interface ConZonas {
+  readonly barrio: string | null;
+  /** `null` sin municipio; sin la clave, una capa de antes del formato 5. */
+  readonly municipio?: string | null;
+}
+
+/**
+ * Las posiciones en la capa de sus emplazamientos, de los que quedan fuera de los barrios y de
+ * los que no tienen municipio (un territorio compartido, el mar).
+ */
 export const indicesDeCapa = (
-  emplazamientos: ReadonlyArray<{ readonly barrio: string | null }>,
+  emplazamientos: ReadonlyArray<ConZonas>,
   conBarrios: boolean,
 ): IndicesDeCapa<ReadonlyArray<number>> => {
   const todos = emplazamientos.map((_, i) => i);
+  const sinMunicipio = todos.filter((i) => emplazamientos[i]?.municipio === null);
   return {
     todos,
     fuera: conBarrios ? todos.filter((i) => emplazamientos[i]?.barrio === null) : undefined,
+    sinMunicipio: sinMunicipio.length > 0 ? sinMunicipio : undefined,
   };
 };
 
@@ -179,10 +195,7 @@ export const indicesDeCapa = (
  * falta el índice de los de fuera.
  */
 export const indexarCapa = (
-  emplazamientos: ReadonlyArray<{
-    readonly posicion: Coordenada;
-    readonly barrio: string | null;
-  }>,
+  emplazamientos: ReadonlyArray<ConZonas & { readonly posicion: Coordenada }>,
   conBarrios: boolean,
 ): IndicesDeCapa<Indice> => {
   const posiciones = emplazamientos.map((e) => e.posicion);
@@ -190,5 +203,7 @@ export const indexarCapa = (
   return {
     todos: indexar(posiciones, indices.todos),
     fuera: indices.fuera === undefined ? undefined : indexar(posiciones, indices.fuera),
+    sinMunicipio:
+      indices.sinMunicipio === undefined ? undefined : indexar(posiciones, indices.sinMunicipio),
   };
 };

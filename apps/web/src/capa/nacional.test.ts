@@ -231,11 +231,13 @@ describe("zonas de cada provincia", () => {
         ["m:08:08003", 3],
       ],
     );
-    // Los dos sin municipio van sueltos, y Girona, que no tiene municipios, en hexágonos.
-    const sueltos = [...escena.elementos.values()].filter(
-      (e) => e.tipo === "emplazamiento" && e.emplazamiento.provincia === "08",
+    // Los dos sin municipio van en su propio hexágono, y Girona, que no tiene municipios, en los
+    // de siempre.
+    const sinMunicipio = [...escena.elementos.values()].filter((e) => e.clave.startsWith("s:08:"));
+    assert.deepStrictEqual(
+      sinMunicipio.flatMap((e) => agrupador.emplazamientosDe(e).map((s) => s.municipio)),
+      [null, null],
     );
-    assert.lengthOf(sueltos, 2);
     for (const m of municipiosDe(escena)) {
       assert.strictEqual(agrupador.emplazamientosDe(m).length, m.resumen.emplazamientos);
     }
