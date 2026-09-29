@@ -16,11 +16,13 @@ import {
   type DatosDeProvincia,
   decodificarManifiesto,
   ficheroDeCapaDeProvincia,
+  ficheroDeIndiceDeClaves,
   ficheroDeLoteDeProvincia,
   ficheroDeManifiesto,
   ficheroDeResumen,
   type FuentesDeZonas,
   generarCapaDeProvincia,
+  generarIndiceDeClaves,
   generarLoteDeProvincia,
   generarManifiesto,
   generarResumen,
@@ -326,7 +328,8 @@ const fuentesDe = (zonas: ZonasDePublicacion): FuentesDeZonas => ({
  *    alguna ficha, los datos han cambiado.
  * 4. Guarda la capa de cada provincia, que dice el lote de cada emplazamiento, también con su
  *    huella en el nombre. Una provincia sin cambios da los mismos ficheros, que ya están: no se
- *    vuelven a escribir.
+ *    vuelven a escribir. Guarda también las partes del índice de claves, que dicen la provincia de
+ *    cada emplazamiento para abrir un enlace que no la lleva.
  * 5. Vuelve a comprobar la versión, guarda el manifiesto y el resumen, y registra la versión.
  * 6. Cambia `vigente.json`, salvo que otra publicación haya dejado ya una versión posterior.
  * 7. Retira las versiones que sobran (`retirarVersionesViejas`), también si estaba al día.
@@ -429,6 +432,13 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
       return { provincia, publicado: yield* ficheroPublicado(fichero, contenido) };
     }),
   );
+  const indice = yield* Effect.forEach(generarIndiceDeClaves(situados), (contenido) =>
+    Effect.gen(function* () {
+      const fichero = ficheroDeIndiceDeClaves(yield* huellaDe(contenido));
+      yield* guardarSiFalta(fichero, contenido);
+      return yield* ficheroPublicado(fichero, contenido);
+    }),
+  );
   yield* comprobarVersion;
 
   const ficheroDe = new Map(capas.map((c) => [c.provincia, c.publicado.fichero]));
@@ -444,7 +454,11 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
       fichero: ficheroDe.get(p.codigo),
     };
   });
-  const compartidos = [...capas.map((c) => c.publicado), ...lotes.map((l) => l.publicado)];
+  const compartidos = [
+    ...capas.map((c) => c.publicado),
+    ...lotes.map((l) => l.publicado),
+    ...indice,
+  ];
   const manifiesto = generarManifiesto(
     version,
     compartidos.map((f) => f.fichero),
@@ -452,7 +466,13 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
   const ficheroManifiesto = ficheroDeManifiesto(version);
   yield* guardar(ficheroManifiesto, manifiesto);
   const resumen = yield* resumenNombrado(
-    { version, fuentes: fuentesDe(zonas), cobertura, provincias },
+    {
+      version,
+      fuentes: fuentesDe(zonas),
+      cobertura,
+      provincias,
+      claves: indice.map((parte) => parte.fichero),
+    },
     zonas,
   );
   yield* guardar(resumen.fichero, resumen.contenido);
@@ -529,6 +549,7 @@ const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
       fuentes: leido.success.fuentes,
       cobertura,
       provincias: leido.success.provincias,
+      claves: leido.success.claves,
     },
     zonas,
   );
