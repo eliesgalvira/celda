@@ -1,6 +1,6 @@
 # Provincias y municipios del IGN como zonas, con el padrón del INE
 
-Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
+Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El #47 lleva el ejercicio a los municipios. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
 
 ## Contexto
 
@@ -30,6 +30,16 @@ Las fuentes, medidas el 28/09/2026:
 - **Territorios compartidos y sin provincia.** Un emplazamiento en un territorio compartido va sin municipio pero con la provincia que da el código del IGN. La capa por provincias del ADR 0016 necesita una provincia para cada emplazamiento. En uno de los siete territorios sin provincia (Gibraltar, las plazas de soberanía, la isla de los Faisanes) no lleva ninguna de las dos cosas, y el mar junto a ellos tampoco.
 - **Dónde llega.** La publicación compartida (`packages/publicacion`, ADR 0015) los usa igual en Convex y en la ingesta nocturna. La ficha tiene un campo opcional `lugar` con el municipio y la provincia. El lote de fichas cita la fuente una vez (`fuenteDeLugares`), y la web la pone al final de «De dónde salen los datos» con la forma que piden las condiciones del IGN. La capa no cambia de formato: la columna del municipio, las tablas por provincia y el crédito del IGN a pie de mapa llegan con el #43. Para ellos están `municipioDelPunto` y `municipiosConHabitantes` en `packages/dominio/src/municipio.ts`.
 - **El producto** se cita con el título del canal, «Base de Datos de Límites Jurisdiccionales de España», porque sigue sin estar claro que «BDLJE» sea su identificador oficial.
+
+## Cómo quedó el ejercicio (#47)
+
+- **Zona en la URL.** `?ejercicio=` lleva el código del barrio, de dos cifras, o el código INE del municipio, de cinco (`zonaDeCodigo`). Los enlaces de antes, con un barrio, siguen abriendo lo mismo. En Barcelona se elige un barrio o el municipio entero.
+- **Habitantes y área de la capa.** Los de un municipio salen de la tabla de municipios de la capa de su provincia, de la misma versión que sus emplazamientos, y se citan con la fuente del padrón que lleva el resumen nacional. El texto del INE sigue su aviso legal: «Elaboración propia con datos extraídos del sitio web del INE: www.ine.es». Los de un barrio siguen saliendo del padrón del Ayuntamiento que lleva la web. Un municipio sin habitantes en el padrón hace el ejercicio sin nada por habitante (`resolverEjercicio` acepta `habitantes: null`).
+- **Contornos a 200 m en la web, no en la capa.** La orden `zonas` de `tools/capas` escribe desde `municipios.json`, sin red, un índice con el nombre de los 8.132 municipios (73 KB con gzip) y un contorno por provincia, con los arcos compartidos simplificados otra vez a 200 m y en diezmilésimas de grado. Pesan de 18 a 33 KB con gzip, menos de lo estimado arriba, y van en `apps/web/src/ejercicio/zonas`, cada uno en su trozo de la web: solo se descargan al abrir el ejercicio, el índice siempre y el contorno de la provincia de la zona. Son 3,6 MB en git. Ponerlos en la capa habría hecho que cada publicación los escribiera en R2 y en la copia de Vercel sin que cambien más que una vez al año.
+- **Elegir en el mapa.** El contorno sirve también para saber qué municipio hay bajo un clic, con `municipioDelPunto`: se leen los contornos de las provincias cuya caja contiene el punto.
+- **Vecinas al otro lado del borde.** La vecina de una estación puede estar en otra provincia. `provinciasParaLasVecinas` pide las provincias cuya caja queda más cerca que la vecina encontrada, y solo la más cercana si la compañía no tiene otra estación cargada; se repite con cada provincia que llega. Con la pasada real de Cataluña, Tordera carga Girona y Alcanar carga Castellón, de la que solo hay una parte, y el ejercicio lo dice.
+- **Cobertura de la zona.** Un municipio de una provincia a medias puede estar entero en lo barrido. Se da por completo si su provincia está cubierta o si todos los vértices de su contorno caen en cajas barridas (`zonaCubierta`); si no, el ejercicio avisa de que los recuentos se quedan cortos.
+- **Pruebas con datos reales.** `packages/dominio/src/ejercicioMunicipios.test.ts` hace el ejercicio en Barcelona, Queralbs, Bordils (sin emplazamientos), Tordera y Alcanar con una muestra de la primera pasada real de Cataluña (`docs/investigacion/muestras/ejercicio/`), y su resultado va en `referencia/ejercicio-municipios.json`.
 
 ## Consecuencias
 

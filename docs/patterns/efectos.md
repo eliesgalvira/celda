@@ -131,7 +131,9 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 | `mapa/Marcadores.tsx`, precarga de fichas | `fetch` de lotes por `alVer` | las claves sueltas que se ven | Volvía a pedir con cada escena, también al seleccionar un marcador; la caché del servicio evitaba la red salvo tras un fallo | riesgo → seguro | `recurso`, `mismasListas` |
 | `mapa/CapaAgrupada.tsx`, latido | `requestAnimationFrame` hasta que acaba la transición | si queda algo yéndose | Se pedía desde la segunda función del efecto; el bucle se paraba solo | seguro | `recurso("marcadores:latido")` |
 | `ubicacion/ReferenciaEnMapa.tsx` | `map.on("move")` y un fotograma por movimiento | el mapa | `onSettled` | seguro | `recurso` |
-| `ejercicio/PanelEjercicio.tsx`, población | lectura de la población | fija | `onSettled` | seguro | `recursoFijo` |
+| `ejercicio/PanelEjercicio.tsx`, zonas | lectura del índice de zonas y de los habitantes por barrio | fija | `onSettled` | seguro | `recursoFijo("ejercicio:zonas")` |
+| `ejercicio/PanelEjercicio.tsx`, provincias | pide la capa de la provincia de la zona y la de las vecinas del borde a la pantalla del mapa, que no repite las ya pedidas | la provincia, un texto; las que faltan, unidas en un texto | nuevo | seguro | `recurso("ejercicio:provincia")`, `recurso("ejercicio:vecinas")` |
+| `ejercicio/PanelEjercicio.tsx`, contornos | lectura del contorno de la provincia | la provincia de un municipio con capa | nuevo | seguro | `recurso("ejercicio:contornos")`; cada provincia se lee una vez |
 | `ubicacion/Ubicacion.tsx`, atribución del buscador | lectura del servicio | fija | `onSettled` | seguro | `recursoFijo` |
 | `ubicacion/Ubicacion.tsx`, búsqueda de direcciones | petición al buscador | cada envío del formulario | desde el manejador; una respuesta vieja se descartaba con un contador y la petición seguía al cerrar la elección | seguro | `recurso("buscador:busqueda")`, la cierra la búsqueda siguiente o cerrar la elección |
 | `ui/controles/MenuDeControles.tsx` | `pointerdown` del documento | fija | `onSettled` | seguro | `recursoFijo` |
@@ -149,10 +151,10 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 | `ficha/PanelFicha.tsx` | vuelve al resumen | la clave (`defer`) | seguro |
 | `ficha/PanelFicha.tsx`, memo `ficha` | lee el lote (red) con `leerEnSolid` | solo la clave, un texto | seguro |
 | `ficha/ComoEmite.tsx`, memo `diagrama` | cálculo en el Worker con `leerEnSolid` | solo la clave | seguro |
-| `ejercicio/PanelEjercicio.tsx` | olvida las bandas leídas | el barrio (`defer`) | seguro |
-| `ejercicio/PanelEjercicio.tsx` | manda la zona al mapa | barrio y vecinas | seguro |
+| `ejercicio/PanelEjercicio.tsx` | olvida las bandas leídas | la zona (`defer`) | seguro |
+| `ejercicio/PanelEjercicio.tsx` | manda la zona al mapa | la zona resuelta y el dibujo, calculado en la primera función | seguro |
 | `mapa/PantallaMapa.tsx` | lleva el mapa a la primera lectura (`easeTo`) | todo el estado de la ubicación; solo actúa al pasar de «pidiendo» a GPS | seguro |
-| `mapa/PantallaMapa.tsx` | `setData` de la zona y `fitBounds` | mapa y zona; el encuadre solo al cambiar de barrio | seguro |
+| `mapa/PantallaMapa.tsx` | `setData` de la zona y `fitBounds` | mapa y zona; el encuadre solo al cambiar de zona | seguro |
 | `mapa/PantallaMapa.tsx` | salta al emplazamiento de la dirección | una vez | seguro |
 | `celdas/enMapa.ts` | pide las celdas; remarca la seleccionada | cerca y capa; lienzo y selección | seguro |
 | `interferencia/enMapa.ts` | enseña u oculta la trama | lienzo y si está activa | seguro |

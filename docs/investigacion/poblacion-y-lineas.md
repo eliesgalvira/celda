@@ -13,7 +13,7 @@ Consultado el 26/09/2026. Son los datos que usa el ejercicio de emplazamientos d
 
 El ejercicio usa los habitantes empadronados del barrio entero. No cuenta la población flotante (gente que trabaja o estudia allí), que en barrios como Pedralbes o les Corts puede pesar más que la residente.
 
-Fuera de Barcelona no hay barrios en la capa, así que el ejercicio no los ofrece. Para los municipios de alrededor harían falta el padrón del INE por sección censal y sus límites, que quedan para más adelante.
+Fuera de Barcelona la zona del ejercicio es el municipio, con las cifras oficiales del padrón del INE a 1 de enero de 2025 (tabla 29005) que lleva la capa de cada provincia (ADR 0017). Barcelona se puede hacer por barrio, con el padrón del Ayuntamiento de 2026, o entera, con el del INE de 2025: las dos cifras no coinciden, porque son de años distintos. Las secciones censales del INE siguen fuera.
 
 ## Líneas por habitante y cuotas: CNMC
 
