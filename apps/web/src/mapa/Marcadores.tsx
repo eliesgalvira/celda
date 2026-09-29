@@ -1,9 +1,10 @@
 import type { Coordenada } from "@celda/dominio/area";
 import type { ResumenLeido } from "@celda/dominio/provincias";
+import { quitarRotulosDeMunicipios } from "@celda/ui/mapa/estilo.ts";
 import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import type { Map as MapaMapLibre } from "maplibre-gl";
-import { createMemo, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal } from "solid-js";
 
 import { type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
 import { type ConEtiqueta, formasDeEtiquetas } from "../capa/etiquetas.ts";
@@ -158,6 +159,21 @@ export function Marcadores(props: MarcadoresProps) {
     );
     const proyectarAhora = proyectar();
     return formasDeEtiquetas(etiquetas, (etiqueta) => proyectarAhora(etiqueta.posicion));
+  });
+
+  /**
+   * Los municipios con etiqueta de Celda en la escena. Sus rótulos del mapa base se quitan: se
+   * pisarían con la etiqueta, como los de los barrios (`estilo.ts`).
+   */
+  const municipiosConEtiqueta = createMemo(
+    () =>
+      [...(escena()?.elementos.values() ?? [])].flatMap((elemento) =>
+        elemento.tipo === "municipio" ? [elemento.resumen.municipio.nombre] : [],
+      ),
+    { equals: mismasListas },
+  );
+  createEffect(municipiosConEtiqueta, (nombres) => {
+    quitarRotulosDeMunicipios(props.mapa, nombres);
   });
 
   /**

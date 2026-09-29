@@ -6,8 +6,10 @@ import { tokensDelTema } from "../pruebas/tema.ts";
 import { leerOklch } from "./color.ts";
 import {
   estiloMapa,
+  filtroDeRotulosDeMunicipios,
   FUENTE_MAPA_BASE,
   RECURSOS_INICIALES_MAPA_BASE,
+  ROTULOS_DE_MUNICIPIOS,
   TOKENS_MAPA,
 } from "./estilo.ts";
 
@@ -76,5 +78,28 @@ describe("estiloMapa", () => {
         .replace("{range}", "0-255");
       assert.include(RECURSOS_INICIALES_MAPA_BASE, glifos);
     }
+  });
+
+  it("los rótulos de ciudades y pueblos dejan fuera, sin mirar mayúsculas, los que lleva Celda", () => {
+    const capa = estiloMapa(() => "red").layers.find((c) => c.id === ROTULOS_DE_MUNICIPIOS);
+    assert.isDefined(capa);
+    assert.deepStrictEqual(
+      capa !== undefined && "filter" in capa ? capa.filter : undefined,
+      filtroDeRotulosDeMunicipios([]),
+    );
+    const deMunicipio = ["in", ["get", "class"], ["literal", ["city", "town"]]];
+    assert.deepStrictEqual<unknown>(filtroDeRotulosDeMunicipios([]), deMunicipio);
+    assert.deepStrictEqual<unknown>(filtroDeRotulosDeMunicipios(["L'Hospitalet de Llobregat"]), [
+      "all",
+      deMunicipio,
+      [
+        "!",
+        [
+          "in",
+          ["downcase", ["to-string", ["get", "name"]]],
+          ["literal", ["l'hospitalet de llobregat"]],
+        ],
+      ],
+    ]);
   });
 });
