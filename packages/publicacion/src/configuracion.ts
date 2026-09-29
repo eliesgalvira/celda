@@ -8,6 +8,7 @@ import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import type { AlmacenDeFicheros } from "./almacen.ts";
 import { almacenEnCarpeta } from "./almacenes/carpeta.ts";
 import { almacenEnR2 } from "./almacenes/r2.ts";
+import { type CopiaDeReserva, copiaEnVercel } from "./reserva.ts";
 
 /**
  * Dónde se publica, según la configuración:
@@ -48,4 +49,22 @@ export const almacenDesdeConfig = Effect.map(
       almacenEnR2({ ...credenciales, origen: sinBarra }).pipe(Layer.provide(FetchHttpClient.layer)),
     );
   },
+);
+
+/**
+ * La copia de reserva de Vercel, según la configuración (ADR 0010):
+ *
+ * - `CELDA_VERCEL_DEPLOY_HOOK`: el deploy hook del proyecto de Vercel. Sin él, la copia no se toca.
+ * - `CELDA_RESERVA_ORIGEN`: la URL pública de la copia, `https://celda.elies.site/capas`. Sin
+ *   ella no se sabe qué sirve la copia, y cada publicación pide un despliegue.
+ */
+export const reservaDesdeConfig = Effect.map(
+  Config.all({
+    hook: Config.option(Config.Redacted("CELDA_VERCEL_DEPLOY_HOOK")),
+    origen: Config.option(Config.String("CELDA_RESERVA_ORIGEN")),
+  }),
+  ({ hook, origen }): Option.Option<Layer.Layer<CopiaDeReserva>> =>
+    Option.map(hook, (valor) =>
+      copiaEnVercel({ hook: valor, origen }).pipe(Layer.provide(FetchHttpClient.layer)),
+    ),
 );

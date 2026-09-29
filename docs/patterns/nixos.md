@@ -2,7 +2,7 @@
 
 El flake de Celda exporta la ingesta nocturna (ADR 0015) de dos formas:
 
-- `packages.<sistema>.celda-nocturna`: el programa de `apps/nocturna` en un solo fichero, con el Node 24 de nixpkgs. Acepta las mismas órdenes que `pnpm run ingesta`: `noche`, `estado`, `publicar` y `copia`.
+- `packages.<sistema>.celda-nocturna`: el programa de `apps/nocturna` en un solo fichero, con el Node 24 de nixpkgs. Acepta las mismas órdenes que `pnpm run ingesta`: `noche`, `estado`, `publicar`, `copia` y `reserva`.
 - `nixosModules.celda-nocturna`: un servicio de systemd que lanza `noche` una vez al día con su temporizador, su usuario y sus directorios.
 
 El módulo no sabe nada de la máquina que lo usa. El horario, las rutas y las credenciales van en la configuración de esa máquina, en su propio repositorio.
@@ -19,16 +19,19 @@ nix flake check
 
 Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias/` del directorio desde el que se lanza, como `pnpm run ingesta`. La configuración y sus variables están en [convex.md](convex.md#configuración).
 
-`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal, un antenasmoviles.es y un R2 de mentira que contestan por HTTPS. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. antenasmoviles.es da como listado los marcadores grabados en el Campus Nord, las 42 ER5 grabadas de Barcelona y una ER5 de Madrid, y los detalles grabados. La prueba enciende antenasmoviles.es con 4 detalles por noche y:
+`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal, un antenasmoviles.es, un R2 y un Vercel de mentira que contestan por HTTPS. El R2 sirve el cubo también sin firma, como el Worker, en `capas.prueba`. El Vercel, en cada llamada al deploy hook, construye un despliegue con `celda-nocturna reserva https://capas.prueba <carpeta>` y, si acaba bien, lo sirve en `celda.prueba/capas`; si falla, sigue sirviendo el anterior. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. antenasmoviles.es da como listado los marcadores grabados en el Campus Nord, las 42 ER5 grabadas de Barcelona y una ER5 de Madrid, y los detalles grabados. La prueba enciende antenasmoviles.es con 4 detalles por noche y:
 
-1. crea el fichero de credenciales de R2 con valores al azar;
+1. crea los ficheros de credenciales de R2 y del deploy hook con valores al azar;
 2. adelanta el reloj hasta la hora del temporizador y espera a que la noche acabe bien;
 3. comprueba que la base está en `/var/lib/celda-nocturna`, que la copia está en el directorio de copias y que `vigente.json` y la capa llegaron al cubo, firmados con la clave del fichero;
 4. lanza `celda-nocturna estado` como el usuario del servicio;
 5. comprueba que la noche barrió Cataluña cada noche y `centro`, la primera de las zonas que se turnan, con una petición por cuadro;
 6. comprueba que antenasmoviles.es recibió un solo `showf` y cuatro detalles, los de las dos ER5 sin compañía de Barcelona primero, ninguno de Madrid ni de una copia del registro, y que la ER5 de Urquinaona se publicó con su enlace a antenasmoviles.es;
 7. comprueba que las fichas llegaron a una cada 4 s como mínimo, que pararon al cerrarse su ventana de 2 minutos con las demás en la cola, y que se publicó a mitad de la ventana y al cerrarla;
-8. busca la clave y el secreto en todo el almacén de Nix de la máquina y no los encuentra.
+8. comprueba que la noche llamó una vez al deploy hook y que Vercel sirve una copia con solo la versión vigente, igual byte a byte que R2, aunque R2 tenga las dos de la noche;
+9. publica a mano con `systemd-run`, como el servicio, y comprueba que con la copia al día no se llama al hook;
+10. deja servida una copia de otra versión y tira el origen público de R2: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo la copia anterior. Con R2 de vuelta, la siguiente publicación la pone al día;
+11. busca la clave, el secreto y el hook en todo el almacén de Nix de la máquina y no los encuentra.
 
 Con todo construido, la máquina virtual tarda unos 2 min 30 s en arrancar y pasar la prueba. Casi todo es la ventana de fichas.
 
@@ -79,8 +82,10 @@ Un ejemplo mínimo del flake de la máquina:
               enable = true;
               horario = "*-*-* 04:30:00 Europe/Madrid";
               credenciales.r2 = "/etc/secretos/celda-r2.env";
+              credenciales.vercel = "/etc/secretos/celda-vercel.env";
               copias.directorio = "/srv/copias/celda";
               origenPublico = "https://capas.example.org";
+              origenDeReserva = "https://celda.example.org/capas";
             };
           }
         ];
@@ -110,7 +115,13 @@ CELDA_R2_SECRETO=secreto-de-la-clave
 
 El módulo solo guarda la ruta. systemd copia el fichero a un directorio privado del servicio al arrancarlo (`LoadCredential=`), y el programa lee cada fichero de `$CREDENTIALS_DIRECTORY` detrás de las variables de entorno (`apps/nocturna/src/credenciales.ts`). Los secretos no pasan por el entorno del proceso. Las opciones de credenciales rechazan rutas del almacén de Nix, así que un `./secreto.env` del repositorio no se acepta. Si el fichero no existe, el servicio no arranca.
 
-`credenciales.vercel` funciona igual, con `CELDA_VERCEL_DEPLOY_HOOK=…`. El programa aún no lo usa: llega con el deploy hook de Vercel (#46).
+`credenciales.vercel` funciona igual, con el deploy hook del proyecto de Vercel:
+
+```sh
+CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/prj_…/…
+```
+
+Con él y `origenDeReserva`, la noche compara tras publicar el `vigente.json` de R2 con el de la copia de reserva y, si no coinciden, llama al hook. El build de Vercel copia entonces la versión vigente de R2 (ADR 0010, «La copia de reserva»). Sin `origenDeReserva`, llama al hook en cada noche.
 
 ### Opciones
 
@@ -127,8 +138,9 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `copias.directorio` | `/var/lib/celda-nocturna/copias` | Dónde van las copias de la base |
 | `copias.conservar` | 14 | Copias que se conservan |
 | `credenciales.r2` | `null` | Fichero de credenciales de R2; sin él no se publica |
-| `credenciales.vercel` | `null` | Fichero del deploy hook de Vercel |
+| `credenciales.vercel` | `null` | Fichero del deploy hook de Vercel; sin él no se toca la copia de reserva |
 | `origenPublico` | `null` | URL pública de lo publicado (`CELDA_ALMACEN_ORIGEN`) |
+| `origenDeReserva` | `null` | URL pública de la copia de reserva, `https://celda.elies.site/capas` (`CELDA_RESERVA_ORIGEN`) |
 | `reintentoDePublicacion` | 60 | Minutos antes de repetir una publicación fallida |
 | `registroOficial.enable` | `true` | Interruptor del registro oficial |
 | `registroOficial.motivo` | `apagado en la configuración de la ingesta` | Lo que se apunta si está apagado |

@@ -12,8 +12,8 @@
       inherit (lib.meta) getExe;
       inherit (lib.modules) mkIf;
 
-      # Una autoridad y un certificado para el geoportal, antenasmoviles.es y el R2 de mentira. Son de la prueba: no
-      # protegen nada.
+      # Una autoridad y un certificado para el geoportal, antenasmoviles.es, el R2 y el Vercel de mentira. Son de la
+      # prueba: no protegen nada.
       certificados =
         pkgs.runCommand "celda-nocturna-certificados-de-prueba"
           { nativeBuildInputs = singleton pkgs.openssl; }
@@ -23,7 +23,7 @@
               -days 36500 -subj "/CN=Autoridad de prueba" -keyout ca.key -out "$out/ca.pem"
             openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
               -subj "/CN=Fuentes de prueba" -keyout "$out/servidor.key" -out servidor.csr
-            printf "subjectAltName=DNS:geoportal.minetur.gob.es,DNS:antenasmoviles.es,DNS:cuenta.r2.cloudflarestorage.com" > san
+            printf "subjectAltName=DNS:geoportal.minetur.gob.es,DNS:antenasmoviles.es,DNS:cuenta.r2.cloudflarestorage.com,DNS:capas.prueba,DNS:api.vercel.com,DNS:celda.prueba" > san
             openssl x509 -req -in servidor.csr -CA "$out/ca.pem" -CAkey ca.key -CAcreateserial \
               -days 36500 -extfile san -out "$out/servidor.pem"
           '';
@@ -32,7 +32,9 @@
       # que caen en ella, y cada ficha con una grabada. antenasmoviles.es da como listado los
       # marcadores grabados en el Campus Nord, las ER5 grabadas de Barcelona y una ER5 de Madrid, y
       # el detalle grabado de cada marcador que lo tiene. R2 guarda lo que le llega en una carpeta
-      # y apunta la firma de cada petición.
+      # y apunta la firma de cada petición; `capas.prueba` sirve el cubo sin firma, como el Worker.
+      # Vercel construye un despliegue con la orden `reserva` en cada llamada al deploy hook y, si
+      # acaba bien, lo sirve en `celda.prueba/capas`; si falla, sigue sirviendo el anterior.
       fuentesDePrueba =
         pkgs.writers.writePython3Bin "fuentes-de-prueba" { flakeIgnore = singleton "E501"; }
           /* python */ ''
@@ -40,14 +42,35 @@
             import json
             import os
             import ssl
+            import subprocess
             import sys
+            import threading
             import time
             import urllib.parse
             from xml.sax.saxutils import escape
 
-            LISTADO, FICHA, ANTENAS, CERTIFICADO, CLAVE, CARPETA = sys.argv[1:7]
+            LISTADO, FICHA, ANTENAS, CERTIFICADO, CLAVE, CARPETA, CELDA = sys.argv[1:8]
             CUBOS = os.path.join(CARPETA, "r2")
             PETICIONES = os.path.join(CARPETA, "peticiones.log")
+            # Con este fichero, el origen público de R2 contesta 503: el build de Vercel no llega.
+            R2_CAIDO = os.path.join(CARPETA, "r2-publico-caido")
+            VERCEL = os.path.join(CARPETA, "vercel")
+            DESPLIEGUES = os.path.join(CARPETA, "despliegues.log")
+            despliegues = []
+
+
+            def desplegar():
+                """Un build: la orden reserva de R2 a una carpeta nueva, que se sirve si acaba bien."""
+                despliegues.append(None)
+                numero = len(despliegues)
+                destino = os.path.join(VERCEL, str(numero))
+                build = subprocess.run([CELDA, "reserva", "https://capas.prueba", destino], capture_output=True, text=True)
+                if build.returncode == 0:
+                    os.symlink(str(numero), os.path.join(VERCEL, "nuevo"))
+                    os.replace(os.path.join(VERCEL, "nuevo"), os.path.join(VERCEL, "actual"))
+                with open(DESPLIEGUES, "a") as registro:
+                    registro.write(f"{numero} {'servido' if build.returncode == 0 else 'fallido'}\n")
+                print(build.stdout, build.stderr, flush=True)
 
 
             def leer(ruta):
@@ -112,6 +135,18 @@
                         if ruta == "/VCTEL/detalleEstacion.do":
                             return self.responder(200, leer(FICHA), "text/html")
                         return self.responder(404)
+                    if host == "capas.prueba":
+                        if os.path.exists(R2_CAIDO):
+                            return self.responder(503)
+                        fichero = os.path.join(CUBOS, "celda", ruta.lstrip("/"))
+                        if not os.path.isfile(fichero):
+                            return self.responder(404)
+                        return self.responder(200, leer(fichero), "application/json")
+                    if host == "celda.prueba":
+                        fichero = os.path.join(VERCEL, "actual", ruta.removeprefix("/capas/"))
+                        if not ruta.startswith("/capas/") or not os.path.isfile(fichero):
+                            return self.responder(404)
+                        return self.responder(200, leer(fichero), "application/json")
                     if host == "antenasmoviles.es":
                         if ruta == "/robots.txt":
                             return self.responder(200, leer(os.path.join(ANTENAS, "robots.txt")))
@@ -138,6 +173,14 @@
                     if not os.path.isfile(fichero):
                         return self.responder(404, b"<Error><Code>NoSuchKey</Code></Error>")
                     return self.responder(200, leer(fichero), "application/json")
+
+                def do_POST(self):
+                    host, ruta, _ = self.apuntar()
+                    if host != "api.vercel.com" or not ruta.startswith("/v1/integrations/deploy/"):
+                        return self.responder(404)
+                    os.makedirs(VERCEL, exist_ok=True)
+                    threading.Thread(target=desplegar).start()
+                    return self.responder(201, b'{"job":{"state":"PENDING"}}', "application/json")
 
                 def do_PUT(self):
                     _, ruta, firma = self.apuntar()
@@ -186,8 +229,10 @@
               enable = true;
               horario = "*-*-* 04:00:00";
               credenciales.r2 = "/run/secretos/celda-r2.env";
+              credenciales.vercel = "/run/secretos/celda-vercel.env";
               copias.directorio = "/srv/copias/celda";
               origenPublico = "https://capas.prueba";
+              origenDeReserva = "https://celda.prueba/capas";
               # Una ficha cada 4 s durante los 2 primeros minutos de la noche: el listado se lleva
               # uno, y no caben las 40.
               registroOficial.fichas.ritmo = 4;
@@ -214,6 +259,9 @@
               "geoportal.minetur.gob.es"
               "antenasmoviles.es"
               "cuenta.r2.cloudflarestorage.com"
+              "capas.prueba"
+              "api.vercel.com"
+              "celda.prueba"
             ];
 
             systemd.services.celda-nocturna.environment.NODE_EXTRA_CA_CERTS = "${certificados}/ca.pem";
@@ -221,8 +269,11 @@
             systemd.services.fuentes-de-prueba = {
               wantedBy = singleton "multi-user.target";
 
+              # El build de Vercel lee de `capas.prueba` con el certificado de la prueba.
+              environment.NODE_EXTRA_CA_CERTS = "${certificados}/ca.pem";
+
               serviceConfig = {
-                ExecStart = "${getExe fuentesDePrueba} ${../docs/investigacion/muestras/geojson-campus-nord.iso-8859-1.json} ${../docs/investigacion/muestras/detalle-telefonica-0800942.iso-8859-1.html} ${../docs/investigacion/muestras/antenasmoviles} ${certificados}/servidor.pem ${certificados}/servidor.key /var/lib/fuentes-de-prueba";
+                ExecStart = "${getExe fuentesDePrueba} ${../docs/investigacion/muestras/geojson-campus-nord.iso-8859-1.json} ${../docs/investigacion/muestras/detalle-telefonica-0800942.iso-8859-1.html} ${../docs/investigacion/muestras/antenasmoviles} ${certificados}/servidor.pem ${certificados}/servidor.key /var/lib/fuentes-de-prueba ${getExe config.packages.celda-nocturna}";
                 StateDirectory = "fuentes-de-prueba";
               };
             };
@@ -249,6 +300,13 @@
                   )
                   id_clave = maquina.succeed("sed --quiet 's/^CELDA_R2_ID_CLAVE=//p' /run/secretos/celda-r2.env").strip()
                   secreto = maquina.succeed("sed --quiet 's/^CELDA_R2_SECRETO=//p' /run/secretos/celda-r2.env").strip()
+                  maquina.succeed(
+                      "umask 077; echo CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/prj_prueba/"
+                      "hook$(od --address-radix=n --format=x1 --read-bytes=12 /dev/urandom | tr --delete ' \\n')"
+                      " > /run/secretos/celda-vercel.env"
+                  )
+                  hook = maquina.succeed("sed --quiet 's/^CELDA_VERCEL_DEPLOY_HOOK=//p' /run/secretos/celda-vercel.env").strip()
+                  secreto_del_hook = hook.rsplit("/", 1)[1]
 
               with subtest("el temporizador recupera las noches perdidas y dispara la noche a su hora"):
                   assert maquina.succeed("systemctl show celda-nocturna.timer --property=Persistent --value").strip() == "yes"
@@ -332,11 +390,81 @@
                   capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^ficheros@'").strip()
                   assert capas == "2", capas
 
+              def llamadas_al_hook():
+                  return [
+                      linea.split()[3]
+                      for linea in maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
+                      if " POST api.vercel.com " in linea
+                  ]
+
+              def publicar_a_mano():
+                  # Como el servicio: su usuario, sus credenciales y la configuración de la máquina.
+                  salida = maquina.succeed(
+                      "systemd-run --wait --pipe --collect --quiet"
+                      " --uid=celda-nocturna --gid=celda-nocturna"
+                      " --property=LoadCredential=r2:/run/secretos/celda-r2.env"
+                      " --property=LoadCredential=vercel:/run/secretos/celda-vercel.env"
+                      " --setenv=NODE_EXTRA_CA_CERTS=${certificados}/ca.pem"
+                      " /run/current-system/sw/bin/celda-nocturna publicar 2>&1"
+                  )
+                  print(salida)
+                  return salida
+
+              servida = "/var/lib/fuentes-de-prueba/vercel/actual"
+              r2 = "/var/lib/fuentes-de-prueba/r2/celda"
+
+              with subtest("tras publicar, la noche llama una vez al deploy hook y Vercel sirve solo la versión vigente"):
+                  assert "Copia de reserva: despliegue pedido para sitios@" in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
+                  assert llamadas_al_hook() == [hook.removeprefix("https://api.vercel.com")], llamadas_al_hook()
+                  maquina.wait_until_succeeds("grep --line-regexp '1 servido' /var/lib/fuentes-de-prueba/despliegues.log", timeout=60)
+                  maquina.succeed(f"cmp {servida}/vigente.json {r2}/vigente.json")
+                  # R2 tiene las dos versiones de la noche; la copia, solo la vigente.
+                  assert maquina.succeed(f"ls {servida} | grep --count '^ficheros@'").strip() == "1"
+                  manifiesto = maquina.succeed(f"ls {servida} | grep '^ficheros@'").strip()
+                  listados = maquina.succeed(f"grep --only-matching '\"[a-z]*/[0-9]*/[0-9a-f]*\\.json\"' {servida}/{manifiesto} | wc --lines").strip()
+                  ficheros = maquina.succeed(f"find -L {servida} -type f | wc --lines").strip()
+                  # Sus capas y lotes, el manifiesto, el resumen y vigente.json.
+                  assert int(ficheros) == int(listados) + 3, (ficheros, listados)
+                  maquina.succeed(f"cd {servida} && find . -type f -exec cmp {{}} {r2}/{{}} \\;")
+
+              with subtest("con la copia al día, publicar otra vez no llama al hook"):
+                  salida = publicar_a_mano()
+                  assert "Copia de reserva: ya sirve sitios@" in salida, salida
+                  assert len(llamadas_al_hook()) == 1, llamadas_al_hook()
+
+              with subtest("un build que no llega a R2 falla, y Vercel sigue sirviendo la copia anterior"):
+                  # La copia servida es de otra versión y R2 no contesta al build.
+                  maquina.succeed(
+                      "cp --recursive --dereference /var/lib/fuentes-de-prueba/vercel/1 /var/lib/fuentes-de-prueba/vercel/anterior",
+                      "echo '{\"version\":\"sitios@2026-01-01T00:00:00Z\",\"fecha\":0,\"emplazamientos\":0,\"lotes\":0}'"
+                      " > /var/lib/fuentes-de-prueba/vercel/anterior/vigente.json",
+                      f"ln --symbolic --force --no-dereference anterior {servida}",
+                      "touch /var/lib/fuentes-de-prueba/r2-publico-caido",
+                  )
+                  salida = publicar_a_mano()
+                  assert "Copia de reserva: despliegue pedido para sitios@" in salida, salida
+                  assert len(llamadas_al_hook()) == 2, llamadas_al_hook()
+                  maquina.wait_until_succeeds("grep --line-regexp '2 fallido' /var/lib/fuentes-de-prueba/despliegues.log", timeout=60)
+                  assert maquina.succeed(f"readlink {servida}").strip() == "anterior"
+                  maquina.succeed(f"grep --fixed-strings 2026-01-01 {servida}/vigente.json")
+                  # El despliegue fallido no llegó a escribir vigente.json.
+                  maquina.fail("test -e /var/lib/fuentes-de-prueba/vercel/2/vigente.json")
+
+              with subtest("cuando R2 vuelve, la siguiente publicación despliega la copia al día"):
+                  maquina.succeed("rm /var/lib/fuentes-de-prueba/r2-publico-caido")
+                  publicar_a_mano()
+                  assert len(llamadas_al_hook()) == 3, llamadas_al_hook()
+                  maquina.wait_until_succeeds("grep --line-regexp '3 servido' /var/lib/fuentes-de-prueba/despliegues.log", timeout=60)
+                  maquina.succeed(f"cmp {servida}/vigente.json {r2}/vigente.json")
+                  assert "Copia de reserva: ya sirve sitios@" in publicar_a_mano()
+                  assert len(llamadas_al_hook()) == 3, llamadas_al_hook()
+
               with subtest("el servicio corre endurecido"):
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))
 
               with subtest("ningún secreto acaba en el almacén de Nix"):
-                  maquina.fail(f"systemctl show celda-nocturna.service | grep --fixed-strings {secreto}")
+                  for valor in (secreto, secreto_del_hook):
+                      maquina.fail(f"systemctl show celda-nocturna.service | grep --fixed-strings {valor}")
                   with open("${
                     pkgs.closureInfo { rootPaths = singleton nodes.maquina.system.build.toplevel; }
                   }/store-paths") as rutas:
@@ -351,7 +479,7 @@
 
                   # La búsqueda encuentra lo que sí está en el almacén: la configuración del servicio.
                   assert buscar("Celda (ingesta; contacto en celda.elies.site)").returncode == 0
-                  for valor in (id_clave, secreto):
+                  for valor in (id_clave, secreto, secreto_del_hook):
                       encontrado = buscar(valor)
                       assert encontrado.returncode == 1, f"secreto en el almacén: {encontrado.stdout}"
             '';

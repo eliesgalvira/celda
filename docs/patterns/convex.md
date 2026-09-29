@@ -33,14 +33,14 @@ La acción `ingesta:registroOficial` es fina: lee la configuración, monta el ex
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (Cataluña, por defecto), antenasmoviles.es si está encendido, la publicación y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md). El deploy hook de Vercel llega con el #46.
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (Cataluña, por defecto), antenasmoviles.es si está encendido, la publicación, el aviso a la copia de reserva de Vercel y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
 
 ### Lanzarla en local
 
 Desde la raíz de Celda, dentro de `nix develop`:
 
 ```sh
-pnpm run ingesta noche      # ingesta, publicación y copia de seguridad
+pnpm run ingesta noche      # ingesta, publicación, copia de reserva y copia de seguridad
 pnpm run ingesta estado     # última ejecución de cada fuente, fichas en cola, errores y lo publicado
 pnpm run ingesta publicar   # publica lo que haya en la base, sin pedir nada a las fuentes
 pnpm run ingesta copia      # copia la base a la carpeta de copias
@@ -299,9 +299,19 @@ Los municipios, las provincias y el padrón se descargan con `pnpm run municipio
 
 `datos:version` es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la consulta también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
 
+### La copia de reserva
+
+Tras publicar, la noche y `pnpm run ingesta publicar` comparan el `vigente.json` del almacén con el de la copia de Vercel (`CELDA_RESERVA_ORIGEN`) y, si no coinciden, llaman al deploy hook (`CELDA_VERCEL_DEPLOY_HOOK`). Sin el hook no tocan la copia. El build de Vercel (`apps/web/scripts/vercel.sh`) monta la copia con la orden `reserva`, que no abre la base:
+
+```sh
+pnpm --filter @celda/nocturna run reserva <URL o carpeta de lo publicado> <carpeta vacía>
+```
+
+Copia solo la versión vigente, comprueba la huella de cada fichero y escribe `vigente.json` el último; si falta algo, falla sin escribirlo. Cómo encaja con Vercel: ADR 0010, «La copia de reserva». Las pruebas están en `apps/nocturna/src/reserva.test.ts`, con un Vercel de mentira que construye cada despliegue con la misma orden.
+
 ### Vista previa
 
-`apps/web/scripts/sitio.sh <publicado> <destino>` construye la web y monta en `<destino>` el sitio entero: la web, lo publicado en `/capas` y `apps/web/vercel.json` con las cabeceras. Después, `npx vercel deploy <destino>` lo sube como vista previa. El primer despliegue de un proyecto nuevo de Vercel va a producción aunque no se pida; para una vista previa en un proyecto nuevo, despliega con `--target preview` desde el principio.
+`apps/web/scripts/sitio.sh <publicado> <destino>` construye la web y monta en `<destino>` el sitio como lo sirve Vercel: la web, la versión vigente de lo publicado en `/capas` y las cabeceras de `apps/web/vercel.json`. `<publicado>` es una carpeta o una URL. Después, `npx vercel deploy <destino>` lo sube como vista previa. El primer despliegue de un proyecto nuevo de Vercel va a producción aunque no se pida; para una vista previa en un proyecto nuevo, despliega con `--target preview` desde el principio.
 
 ## Ficha
 

@@ -124,7 +124,12 @@
           type = nullOr externalPath;
           default = null;
           example = "/etc/secretos/celda-vercel.env";
-          description = "Fichero con el deploy hook de Vercel (`CELDA_VERCEL_DEPLOY_HOOK=…`), fuera del almacén de Nix y legible solo por root. Se pasa como la credencial de R2.";
+          description = ''
+            Fichero con el deploy hook del proyecto de Vercel (`CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/…`),
+            fuera del almacén de Nix y legible solo por root. Se pasa como la credencial de R2. Tras
+            publicar, si la copia de reserva no sirve la versión vigente, la noche llama al hook y el
+            build de Vercel copia esa versión de R2 (ADR 0010). Sin él, la copia no se toca.
+          '';
         };
 
         origenPublico = mkOption {
@@ -132,6 +137,17 @@
           default = null;
           example = "https://capas.example.org";
           description = "URL pública desde la que la web lee lo publicado (`CELDA_ALMACEN_ORIGEN`). Se apunta en la base con cada versión.";
+        };
+
+        origenDeReserva = mkOption {
+          type = nullOr str;
+          default = null;
+          example = "https://celda.example.org/capas";
+          description = ''
+            URL pública de la copia de reserva de Vercel (`CELDA_RESERVA_ORIGEN`). La noche lee su
+            `vigente.json` y solo llama al deploy hook si no coincide con el de R2. Sin ella, cada
+            noche con `credenciales.vercel` pide un despliegue.
+          '';
         };
 
         reintentoDePublicacion = mkOption {
@@ -320,6 +336,15 @@
       };
 
       config = {
+        warnings =
+          optional
+            (
+              config.services.celda-nocturna.enable
+              && config.services.celda-nocturna.origenDeReserva != null
+              && config.services.celda-nocturna.credenciales.vercel == null
+            )
+            "services.celda-nocturna.origenDeReserva no hace nada sin credenciales.vercel: la noche no puede desplegar la copia de reserva.";
+
         users.users.celda-nocturna = mkIf config.services.celda-nocturna.enable {
           description = "Ingesta nocturna de Celda";
           group = "celda-nocturna";
@@ -385,6 +410,9 @@
               mkIf (config.services.celda-nocturna.registroOficial.fichas.maximo != null)
               <| toString config.services.celda-nocturna.registroOficial.fichas.maximo;
             CELDA_PUBLICAR_REINTENTO_MINUTOS = toString config.services.celda-nocturna.reintentoDePublicacion;
+            CELDA_RESERVA_ORIGEN = mkIf (
+              config.services.celda-nocturna.origenDeReserva != null
+            ) config.services.celda-nocturna.origenDeReserva;
             CELDA_REGISTRO_ACTIVO = boolToString config.services.celda-nocturna.registroOficial.enable;
             CELDA_REGISTRO_ESPERA_SEGUNDOS = toString config.services.celda-nocturna.registroOficial.espera;
             CELDA_REGISTRO_FICHAS_PRIORIDAD = listaDelPrograma config.services.celda-nocturna.registroOficial.fichas.prioridad;

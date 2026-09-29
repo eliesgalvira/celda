@@ -138,6 +138,10 @@ _Evitar_: provincia completa, provincia cargada (esa es la que ya ha llegado al 
 Paso que, al acabar cada ingesta, escribe la capa y las fichas de la instantánea en una misma versión y después cambia la versión vigente. Sin cambios en los datos no escribe nada; con un barrido nuevo y los mismos datos, solo el resumen nacional con su fecha.
 _Evitar_: despliegue, exportación, subida
 
+**Copia de reserva**:
+Copia de la versión vigente, y solo de esa, junto a la web y fuera de Cloudflare. La web la lee cuando el sitio principal de las capas no contesta, por ejemplo durante un bloqueo de LaLiga. Se rehace tras cada publicación que cambia la versión vigente, y nunca dice tener una versión que no tiene entera.
+_Evitar_: espejo, mirror, backup (la copia de seguridad es la de la base de la ingesta)
+
 **Mapa base**:
 Callejero de fondo sobre el que se dibujan las capas. No lo produce Celda.
 _Evitar_: capa base, fondo

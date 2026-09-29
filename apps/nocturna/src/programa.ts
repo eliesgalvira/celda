@@ -17,6 +17,11 @@ import {
   publicar,
   type ResultadoPublicacion,
 } from "@celda/publicacion/publicar";
+import {
+  actualizarReserva,
+  CopiaDeReserva,
+  type ResultadoReserva,
+} from "@celda/publicacion/reserva";
 import type { ZonasDePublicacion } from "@celda/publicacion/zonas";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
@@ -26,6 +31,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
 import { BaseNocturna } from "./base.ts";
@@ -49,10 +55,17 @@ export interface Intento {
   readonly reintentar: boolean;
 }
 
-/** Publica la base en el almacén de la configuración, o no hace nada si no hay almacén. */
+/**
+ * Publica la base en el almacén de la configuración, o no hace nada si no hay almacén, y pone al
+ * día la copia de reserva de Vercel.
+ */
 export class Publicador extends Context.Service<
   Publicador,
-  { readonly publicar: Effect.Effect<Intento> }
+  {
+    readonly publicar: Effect.Effect<Intento>;
+    /** Pide un despliegue de la copia de reserva si no sirve ya la versión vigente (ADR 0010). */
+    readonly actualizarReserva: Effect.Effect<ResultadoReserva>;
+  }
 >()("@celda/nocturna/programa/Publicador") {}
 
 /**
@@ -65,12 +78,19 @@ const PASAJEROS: ReadonlySet<FalloPublicacion["_tag"]> = new Set([
   "InstantaneaMovida",
 ]);
 
-/** El publicador sobre los `DatosPublicables` de la base y el almacén del contexto. */
+const SIN_RESERVA: Effect.Effect<ResultadoReserva> = Effect.succeed({ tipo: "sin-reserva" });
+
+/**
+ * El publicador sobre los `DatosPublicables` de la base y el almacén del contexto, con la copia de
+ * reserva si el contexto la tiene.
+ */
 export const publicadorEn = (zonas: ZonasDePublicacion, porLote?: number) =>
   Layer.effect(
     Publicador,
-    Effect.map(Effect.context<DatosPublicables | AlmacenDeFicheros>(), (contexto) =>
-      Publicador.of({
+    Effect.gen(function* () {
+      const contexto = yield* Effect.context<DatosPublicables | AlmacenDeFicheros>();
+      const reserva = yield* Effect.serviceOption(CopiaDeReserva);
+      return Publicador.of({
         publicar: publicar(zonas, porLote).pipe(
           Effect.map((publicada): Intento => ({ resultado: publicada, reintentar: false })),
           Effect.catch((fallo) =>
@@ -81,8 +101,16 @@ export const publicadorEn = (zonas: ZonasDePublicacion, porLote?: number) =>
           ),
           Effect.provideContext(contexto),
         ),
-      }),
-    ),
+        actualizarReserva: Option.match(reserva, {
+          onNone: () => SIN_RESERVA,
+          onSome: (copia) =>
+            actualizarReserva.pipe(
+              Effect.provideService(CopiaDeReserva, copia),
+              Effect.provideContext(contexto),
+            ),
+        }),
+      });
+    }),
   );
 
 /** Sin almacén configurado no se publica nada, y se apunta así. */
@@ -90,6 +118,7 @@ export const sinAlmacen = Layer.succeed(
   Publicador,
   Publicador.of({
     publicar: Effect.succeed({ resultado: { tipo: "sin-almacen" }, reintentar: false }),
+    actualizarReserva: SIN_RESERVA,
   }),
 );
 
@@ -121,6 +150,7 @@ export interface EjecucionDeLaNoche {
 export interface Noche {
   readonly ejecuciones: ReadonlyArray<EjecucionDeLaNoche>;
   readonly publicacion: ResultadoPublicacion;
+  readonly reserva: ResultadoReserva;
   /** La copia de seguridad que se ha hecho, o `undefined` si ha fallado. */
   readonly copia: string | undefined;
 }
@@ -178,6 +208,30 @@ const publicarYApuntar = Effect.fn("Nocturna.publicar")(function* (
   return intento;
 });
 
+/** Pone al día la copia de reserva y lo apunta en el diario. */
+const actualizarYApuntarReserva = Effect.gen(function* () {
+  const publicador = yield* Publicador;
+  const reserva = yield* publicador.actualizarReserva;
+  switch (reserva.tipo) {
+    case "sin-reserva":
+      yield* Effect.logInfo("Sin deploy hook de Vercel: la copia de reserva no se toca");
+      break;
+    case "sin-publicar":
+      yield* Effect.logInfo("Copia de reserva: no hay nada publicado que copiar");
+      break;
+    case "al-dia":
+      yield* Effect.logInfo(`Copia de reserva: ya sirve ${reserva.version}`);
+      break;
+    case "desplegada":
+      yield* Effect.logInfo(`Copia de reserva: despliegue pedido para ${reserva.version}`);
+      break;
+    case "fallida":
+      yield* Effect.logWarning(`Copia de reserva sin actualizar: ${reserva.motivo}`);
+      break;
+  }
+  return reserva;
+}).pipe(Effect.withSpan("Nocturna.actualizarReserva"));
+
 /** Una ejecución con el extractor que da `capa`, construido para ella sola. */
 const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<A, E, R>) =>
   Effect.scoped(
@@ -210,7 +264,10 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
  *    publicar, lo hace ahora. Si falla por algo pasajero, lo apunta, espera `reintento` y lo
  *    intenta otra vez; si vuelve a fallar, queda para la noche siguiente. Los datos ya están en
  *    la base.
- * 3. Copia la base a la carpeta de copias y deja las `conservar` últimas.
+ * 3. Si la copia de reserva de Vercel no sirve la versión vigente del almacén, pide un despliegue
+ *    con el deploy hook. Se hace también si la publicación ha fallado: la copia sigue a lo que
+ *    haya en el almacén.
+ * 4. Copia la base a la carpeta de copias y deja las `conservar` últimas.
  *
  * Una noche cortada a mitad deja su ejecución en curso; la siguiente la da por interrumpida y la
  * rehace, porque cada paso es idempotente. Un barrido de zona cortado se retoma por el primer
@@ -250,6 +307,7 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
     yield* Effect.sleep(opciones.reintento);
     intento = yield* publicarYApuntar(completadas);
   }
+  const reserva = yield* actualizarYApuntarReserva;
 
   const copia = yield* copiarBase(opciones.copias).pipe(
     Effect.tap((destino) => Effect.logInfo(`Copia de la base en ${destino}`)),
@@ -257,12 +315,16 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
       Effect.as(Effect.logWarning(`No se ha podido copiar la base: ${fallo.message}`), undefined),
     ),
   );
-  const hecha: Noche = { ejecuciones, publicacion: intento.resultado, copia };
+  const hecha: Noche = { ejecuciones, publicacion: intento.resultado, reserva, copia };
   return hecha;
 });
 
-/** Publica a mano, sin ingerir nada, y lo apunta en la base. */
-export const publicarAMano = Effect.map(publicarYApuntar([]), (intento) => intento.resultado);
+/** Publica a mano, sin ingerir nada, lo apunta en la base y pone al día la copia de reserva. */
+export const publicarAMano = Effect.gen(function* () {
+  const { resultado } = yield* publicarYApuntar([]);
+  const reserva = yield* actualizarYApuntarReserva;
+  return { publicacion: resultado, reserva };
+});
 
 /**
  * Escribe el estado de la base: cada fuente, las fichas que quedan en cada parte de su cola, lo
