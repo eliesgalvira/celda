@@ -24,7 +24,10 @@ export interface Area {
   readonly zoomMaximo: number;
 }
 
-/** La v1 cubre Barcelona y los municipios de alrededor. */
+/**
+ * La caja de la primera versión de Celda, Barcelona y los municipios de alrededor, de antes de la
+ * capa por provincias. Hoy solo fija el origen del plano de la vista de interferencia.
+ */
 export const BARCELONA: Area = {
   nombre: "Barcelona",
   encuadre: {
@@ -41,11 +44,15 @@ export const BARCELONA: Area = {
 
 /**
  * El mapa de Celda desde la capa por provincias (ADR 0016): se mueve por toda España, con
- * Canarias, y abre en Barcelona, donde más datos hay.
+ * Canarias. Su encuadre es la península con Baleares, lo que se ve si no se sabe nada mejor: la
+ * vista inicial de la web encuadra lo que Celda ya tiene o la provincia del punto de referencia.
  */
 export const ESPANA: Area = {
   nombre: "España",
-  encuadre: BARCELONA.encuadre,
+  encuadre: {
+    suroeste: { longitud: -9.4, latitud: 35.9 },
+    noreste: { longitud: 4.4, latitud: 43.8 },
+  },
   limites: {
     suroeste: { longitud: -19.5, latitud: 26.5 },
     noreste: { longitud: 5.5, latitud: 44.5 },

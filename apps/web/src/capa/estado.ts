@@ -1,4 +1,4 @@
-import { type Coordenada, contiene } from "@celda/dominio/area";
+import { type Coordenada, contiene, ESPANA } from "@celda/dominio/area";
 import type { FuenteDeBarrios } from "@celda/dominio/barrio";
 import { distanciaALosDatos, seCortan } from "@celda/dominio/cobertura";
 import { marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
@@ -136,6 +136,16 @@ export const creditoDeMunicipios = (fuente: FuenteDeMunicipios): Credito => {
     detalle: "Provincias y municipios de cada emplazamiento, con los límites del IGN",
   };
 };
+
+/**
+ * Dónde tiene Celda los emplazamientos, para el detalle de la marca de agua: España si todas las
+ * provincias están cubiertas y, si no, las zonas de barrido que ya se han barrido enteras. Sale
+ * del resumen, así que dice lo que hay y no lo que habrá.
+ */
+export const dondeHayDatos = (resumen: ResumenLeido): ReadonlyArray<string> =>
+  resumen.provincias.length > 0 && resumen.provincias.every((p) => p.cubierta)
+    ? [ESPANA.nombre]
+    : resumen.cobertura.filter((z) => z.barrido !== null).map((z) => z.titulo);
 
 /** Una provincia por su código y su nombre. */
 export interface ProvinciaNombrada {

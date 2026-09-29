@@ -33,6 +33,7 @@ import { createEffect, createMemo, createSignal, Match, Show, Switch, untrack } 
 import {
   creditoDeBarrios,
   creditoDeMunicipios,
+  dondeHayDatos,
   type EstadoCapa,
   estadoDeCarga,
   type EstadoDeLaVista,
@@ -58,7 +59,12 @@ import { AjustesContexto, crearAjustes } from "../ajustes/ajustes.ts";
 import { DialogoAjustes } from "../ajustes/DialogoAjustes.tsx";
 import { usarDatos } from "../datos.tsx";
 import { PanelEjercicio } from "../ejercicio/PanelEjercicio.tsx";
-import { SIN_ZONA, type ZonaEnMapa } from "../ejercicio/zona.ts";
+import {
+  cargarContornos,
+  cargarProvinciasDeZonas,
+  SIN_ZONA,
+  type ZonaEnMapa,
+} from "../ejercicio/zona.ts";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
@@ -105,12 +111,25 @@ import {
   PasoPrevio,
 } from "../ubicacion/Ubicacion.tsx";
 import { CREDITOS_MAPA_BASE, type EstadoMapa, hayWebgl, type MotivoFallo } from "./estado.ts";
+import { type CargasDeZonas, crearLugares } from "./lugar.ts";
 import { Marcadores } from "./Marcadores.tsx";
+import {
+  crearVistaInicial,
+  provinciaDelPunto,
+  rellenoDeLaVista,
+  zoomParaEncuadrar,
+} from "./vistaInicial.ts";
 
 type ModuloMapaBase = typeof import("./mapaBase.ts");
 
 /** Solo para los tipos: el panel de la vista no se monta sin elección. */
 const ELECCION_VACIA: EleccionVista = { compania: "movistar", mhz: 1800, ocupacion: 0.5 };
+
+/** De dónde salen las provincias y sus contornos para saber dónde cae un punto. */
+const CARGAS_DE_ZONAS: CargasDeZonas = {
+  provincias: cargarProvinciasDeZonas,
+  contornos: cargarContornos,
+};
 
 /** El ancho a partir del cual el panel va a la izquierda y el punto se elige con un clic. */
 const ESCRITORIO = "(min-width: 48rem)";
@@ -170,16 +189,71 @@ export function PantallaMapa() {
 
   const fallar = (motivo: MotivoFallo) => setEstado({ tipo: "fallo", motivo });
 
+  /** Lo que se ve, como vista de la capa: el centro dice el lugar de la cabecera. */
+  const vistaDelEncuadre = createMemo((): Vista | undefined => {
+    const actual = encuadre();
+    return actual === undefined
+      ? undefined
+      : { caja: { suroeste: actual.suroeste, noreste: actual.noreste }, zoom: actual.zoom };
+  });
+  /** El punto de referencia guardado en el dispositivo, mientras decide la vista inicial. */
+  const puntoAlAbrir = createMemo((): Coordenada | null | undefined => {
+    if (!puntoDeReferencia.puntoGuardadoLeido()) return undefined;
+    const referencia = puntoDeReferencia.referencia();
+    return referencia === undefined ? null : posicionDe(referencia);
+  });
+  /** Si ya se sabe la vista inicial: entonces el punto guardado ya no hace falta situarlo. */
+  const [inicialDecidida, setInicialDecidida] = createSignal(false);
+  const lugares = crearLugares({
+    vista: vistaDelEncuadre,
+    puntos: () => {
+      const punto = puntoAlAbrir();
+      return inicialDecidida() || punto === null || punto === undefined ? [] : [punto];
+    },
+    cargas: CARGAS_DE_ZONAS,
+  });
+  // Con un emplazamiento en la dirección, el mapa empieza en él (más abajo).
+  const vistaInicial = crearVistaInicial({
+    activa: emplazamientoDe(ubicacion()) === null,
+    alAbrir: () => {
+      const punto = puntoAlAbrir();
+      const actual = capa();
+      return {
+        punto,
+        provinciaDelPunto:
+          punto === null || punto === undefined
+            ? null
+            : provinciaDelPunto(lugares.dondeCae(punto), lugares.provincias()),
+        resumen:
+          actual.tipo === "cargando" ? undefined : actual.tipo === "lista" ? actual.resumen : null,
+      };
+    },
+    mapa: mapaCreado,
+    relleno: () => rellenoDeLaVista(escritorio()),
+  });
+  createEffect(
+    () => vistaInicial.encuadre() !== undefined,
+    (decidida) => {
+      if (decidida) setInicialDecidida(true);
+    },
+  );
+
   const crear = (modulo: ModuloMapaBase) => {
     if (contenedor === undefined) return;
     try {
-      const nuevo = modulo.crearMapaBase(contenedor, ESPANA, {
-        listo: () => {
-          setEstado({ tipo: "listo" });
-          setMapaListo(nuevo);
+      const inicial = vistaInicial.alCrear();
+      const nuevo = modulo.crearMapaBase(
+        contenedor,
+        inicial === undefined ? ESPANA : { ...ESPANA, encuadre: inicial },
+        {
+          listo: () => {
+            setEstado({ tipo: "listo" });
+            setMapaListo(nuevo);
+          },
+          fallo: fallar,
         },
-        fallo: fallar,
-      });
+        rellenoDeLaVista(escritorio()),
+      );
       const mirarZoom = () => setCerca(nuevo.getZoom() >= ZOOM_CELDAS);
       nuevo.on("zoom", mirarZoom);
       mirarZoom();
@@ -267,8 +341,20 @@ export function PantallaMapa() {
   /** Lo que hay que pedir para ver la vista, o la inicial si el mapa aún no ha dicho nada. */
   const pedirLoQueSeVe = () => {
     if (resumenLeido === undefined) return;
-    const inicial: Vista = { caja: ESPANA.encuadre, zoom: 10 };
-    pedirProvincias(provinciasDeLaVista(resumenLeido, ultimaVista ?? inicial));
+    const caja = vistaInicial.encuadre();
+    const inicial: Vista | undefined =
+      caja === undefined
+        ? undefined
+        : {
+            caja,
+            zoom: zoomParaEncuadrar(
+              caja,
+              { ancho: window.innerWidth, alto: window.innerHeight },
+              rellenoDeLaVista(escritorio()),
+            ),
+          };
+    const vista = ultimaVista ?? inicial;
+    if (vista !== undefined) pedirProvincias(provinciasDeLaVista(resumenLeido, vista));
   };
 
   /** El mapa ha decidido qué dibuja: se piden las provincias que se ven. */
@@ -300,6 +386,16 @@ export function PantallaMapa() {
         if (emplazamientoDe(ubicacion()) !== null && suya !== null) pedirProvincias([suya]);
       });
   };
+
+  // Cuando se sabe la vista inicial, sus provincias se piden sin esperar al mapa.
+  recurso(
+    "capa:vista-inicial",
+    () => vistaInicial.encuadre(),
+    () => {
+      pedirLoQueSeVe();
+      return undefined;
+    },
+  );
 
   recursoFijo("mapa", () => {
     arrancar();
@@ -354,6 +450,7 @@ export function PantallaMapa() {
 
   /** Lleva el mapa hasta una posición, sin alejarlo si ya está cerca. */
   const irA = (posicion: { readonly longitud: number; readonly latitud: number }) => {
+    vistaInicial.yaColocado();
     mapa?.easeTo({
       center: [posicion.longitud, posicion.latitud],
       zoom: Math.max(mapa.getZoom(), 16),
@@ -380,6 +477,11 @@ export function PantallaMapa() {
     const actual = capa();
     return actual.tipo === "lista" ? actual.resumen : undefined;
   });
+  /** Dónde tiene Celda emplazamientos, para la marca de agua. */
+  const donde = createMemo(() => {
+    const actual = resumen();
+    return actual === undefined ? [] : dondeHayDatos(actual);
+  });
   /** Las provincias que han llegado. */
   const cargadas = createMemo(() =>
     [...provincias().values()].flatMap((estado) =>
@@ -389,9 +491,10 @@ export function PantallaMapa() {
   /** Los emplazamientos de las provincias que han llegado: los que el mapa conoce ahora. */
   const emplazamientos = createMemo(() => cargadas().flatMap((p) => p.capa.emplazamientos));
   /**
-   * Los créditos del mapa base y, con el resumen, los de los límites de municipios y de barrio
-   * que usan las capas.
+   * Los créditos del mapa base y, con el resumen, el de los límites de municipios. El de los
+   * límites de barrio, solo con una provincia con barrios cargada: la de Barcelona.
    */
+  const conBarrios = createMemo(() => cargadas().some((p) => p.capa.barrios.length > 0));
   const creditos = createMemo(() => {
     const fuentes = resumen()?.fuentes;
     return fuentes === undefined
@@ -399,7 +502,7 @@ export function PantallaMapa() {
       : [
           ...CREDITOS_MAPA_BASE,
           creditoDeMunicipios(fuentes.municipios),
-          creditoDeBarrios(fuentes.barrios),
+          ...(conBarrios() ? [creditoDeBarrios(fuentes.barrios)] : []),
         ];
   });
   /** Lo que dice la marca de agua del mapa de lo que se ve. */
@@ -461,6 +564,7 @@ export function PantallaMapa() {
       actual.getSource<GeoJSONSource>(FUENTE_ZONA)?.setData(dibujo.zona);
       const encuadre = dibujo.encuadre;
       if (encuadre === undefined) return;
+      vistaInicial.yaColocado();
       // Deja libre lo que tapa el panel: la columna en escritorio y la hoja media en el móvil.
       actual.fitBounds(
         [
@@ -887,12 +991,13 @@ export function PantallaMapa() {
             lienzo={(elemento) => {
               contenedor = elemento;
             }}
-            cabecera={<Cabecera lugar={ESPANA.nombre} />}
+            cabecera={<Cabecera lugar={lugares.nombre()} />}
             datos={
               <EstadoDeLaCapa
                 estado={capa()}
                 vista={estadoVista()}
                 emplazamientos={resumen()?.provincias.reduce((n, p) => n + p.emplazamientos, 0)}
+                donde={donde()}
                 reintentar={cargarCapa}
                 reintentarProvincias={reintentarProvincias}
               />
@@ -1072,6 +1177,8 @@ export function EstadoDeLaCapa(props: {
   readonly vista: EstadoDeLaVista | undefined;
   /** Cuántos emplazamientos tiene el resumen. */
   readonly emplazamientos: number | undefined;
+  /** Dónde los tiene (`dondeHayDatos`). */
+  readonly donde: ReadonlyArray<string>;
   readonly reintentar: () => void;
   readonly reintentarProvincias: (codigos: ReadonlyArray<string>) => void;
 }) {
@@ -1131,13 +1238,13 @@ export function EstadoDeLaCapa(props: {
         <DatosDelMapa
           tono="limite"
           texto="Celda aún no tiene datos de aquí"
-          detalle={detalleDeMarca(marca(), props.emplazamientos)}
+          detalle={detalleDeMarca(marca(), props.emplazamientos, props.donde)}
         />
       </Match>
       <Match when={marca().tipo === "datos"}>
         <DatosDelMapa
           texto={<TextoConTerminos texto={textoMarcadoDe(marca())} />}
-          detalle={detalleDeMarca(marca(), props.emplazamientos)}
+          detalle={detalleDeMarca(marca(), props.emplazamientos, props.donde)}
         />
       </Match>
     </Switch>
@@ -1189,14 +1296,18 @@ const textoMarcadoDe = (marca: MarcaDeLaCapa) =>
     ? textoDatosDelMapa(marca.fecha, { hasta: marca.hasta, barrido: marca.barrido })
     : [];
 
-const detalleDeMarca = (marca: MarcaDeLaCapa, emplazamientos: number | undefined): string => {
+const detalleDeMarca = (
+  marca: MarcaDeLaCapa,
+  emplazamientos: number | undefined,
+  donde: ReadonlyArray<string>,
+): string => {
   if (marca.tipo === "sin-datos") {
     return marca.barridas.length === 0
       ? "Celda aún no ha barrido ninguna zona."
       : `Por ahora tiene los emplazamientos de ${enumerar(marca.barridas)}.`;
   }
   return marca.tipo === "datos"
-    ? `${emplazamientos ?? 0} emplazamientos en España · capa ${marca.version}`
+    ? `${emplazamientos ?? 0} emplazamientos${donde.length === 0 ? "" : ` en ${enumerar(donde)}`} · capa ${marca.version}`
     : "";
 };
 
