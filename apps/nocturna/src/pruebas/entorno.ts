@@ -3,10 +3,11 @@
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Fuente } from "@celda/dominio/observacion";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
-import { OPCIONES_BARRIDO, type OpcionesBarrido } from "@celda/ingesta/barrido";
+import { zonaDeBarrido } from "@celda/dominio/barrido";
+import type { OpcionesBarrido } from "@celda/ingesta/barrido";
 import { OPCIONES_PUNTOS, type OpcionesPuntos } from "@celda/ingesta/barridoDePuntos";
 import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
-import { Provincias } from "@celda/ingesta/fichas";
+import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
 import { capaDePuntosGrabada } from "@celda/ingesta/pruebas/antenasmoviles";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
@@ -79,11 +80,22 @@ export const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<
     });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
-export { OPCIONES_BARRIDO };
+/**
+ * La muestra del Campus Nord cae en Cataluña: las pruebas con ella la barren cada noche, sin
+ * turnos, y las fichas van con sus valores por defecto.
+ */
+export const CATALUNA_CADA_NOCHE: OpcionesBarrido = {
+  zonas: {
+    cadaNoche: [zonaDeBarrido("cataluna")].flatMap((z) => z ?? []),
+    enTurno: [],
+    porNoche: 1,
+  },
+  fichas: OPCIONES_FICHAS,
+};
 
 /** Las opciones de la noche por defecto, con las carpetas del entorno. */
 export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
-  proceso: OPCIONES_BARRIDO,
+  proceso: CATALUNA_CADA_NOCHE,
   puntos: OPCIONES_PUNTOS,
   reintento: REINTENTO_DE_PUBLICACION,
   copias: { carpeta: entorno.copias, conservar: COPIAS_CONSERVADAS },
@@ -143,7 +155,7 @@ export const unaNoche = (
     return yield* noche({
       ...opcionesDe(entorno),
       reintento: variante.reintento ?? REINTENTO_DE_PUBLICACION,
-      proceso: variante.proceso ?? OPCIONES_BARRIDO,
+      proceso: variante.proceso ?? CATALUNA_CADA_NOCHE,
       puntos: variante.puntos ?? OPCIONES_PUNTOS,
     }).pipe(Effect.provide(entornoDeLaNoche));
   });

@@ -30,10 +30,10 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { BaseNocturna, ESQUEMA } from "./base.ts";
 import { describirResumen } from "./estado.ts";
 import {
+  CATALUNA_CADA_NOCHE,
   conBase,
   conEntorno,
   type Entorno,
-  OPCIONES_BARRIDO,
   tablasDe,
   unaNoche,
 } from "./pruebas/entorno.ts";
@@ -131,7 +131,7 @@ const conFallos = (
 const registro = (grabada: FuenteGrabada) => capaGrabadaPorCajas("registro-oficial", grabada);
 
 const noche = (entorno: Entorno, extractor: Layer.Layer<ExtractorPorCajas>, zonas: OpcionesZonas) =>
-  unaNoche(entorno, extractor, { proceso: { ...OPCIONES_BARRIDO, zonas } });
+  unaNoche(entorno, extractor, { proceso: { ...CATALUNA_CADA_NOCHE, zonas } });
 
 interface Observada {
   readonly clave: string;

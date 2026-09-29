@@ -2,7 +2,6 @@
 // @effect-diagnostics strictEffectProvide:off
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import { ficheroDeManifiesto } from "@celda/dominio/provincias";
-import { OPCIONES_BARRIDO } from "@celda/ingesta/barrido";
 import {
   ExtractorPorCajas,
   FuenteBloqueada,
@@ -32,7 +31,13 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 
 import { BaseNocturna, ESQUEMA } from "./base.ts";
-import { conBase, conEntorno, type Entorno, unaNoche } from "./pruebas/entorno.ts";
+import {
+  CATALUNA_CADA_NOCHE,
+  conBase,
+  conEntorno,
+  type Entorno,
+  unaNoche,
+} from "./pruebas/entorno.ts";
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
@@ -42,7 +47,7 @@ const codificarPunto = Schema.encodeEffect(Schema.fromJsonString(PuntoGuardado))
 
 /** Las opciones de la noche con otras de fichas. */
 const conFichas = (fichas: Partial<OpcionesFichas>) => ({
-  proceso: { ...OPCIONES_BARRIDO, fichas: { ...OPCIONES_FICHAS, ...fichas } },
+  proceso: { ...CATALUNA_CADA_NOCHE, fichas: { ...OPCIONES_FICHAS, ...fichas } },
 });
 
 /**

@@ -35,10 +35,14 @@ export interface Opciones extends OpcionesCliente {
   readonly zona: Caja;
 }
 
+/**
+ * El tope de peticiones deja barrer toda España en una noche (#50): la primera pasada son unas
+ * 250 peticiones de listado y las siguientes, unas 215, más `robots.txt` y los reintentos.
+ */
 export const OPCIONES: Opciones = {
   userAgent: "Celda (ingesta; contacto en celda.elies.site)",
   pausa: Duration.seconds(3),
-  maxPeticiones: 300,
+  maxPeticiones: 400,
   espera: Duration.seconds(10),
   reintentos: 3,
   zona: ZONA_BARCELONA,

@@ -57,14 +57,15 @@ export interface OpcionesFichas {
 }
 
 /**
- * Por defecto (ADR 0014): una cada 3 s durante 6 horas, unas 5.500 por noche, empezando por
- * Barcelona, y relectura a los 30 días.
+ * Por defecto (ADR 0014): una cada 3 s durante 6 horas, unas 5.500 por noche, y relectura a los
+ * 30 días. Primero la provincia de Barcelona, luego el resto de Cataluña (Girona, Lleida y
+ * Tarragona) y después el resto de España, por zonas de barrido.
  */
 export const OPCIONES_FICHAS: OpcionesFichas = {
   ritmo: RITMO_MINIMO,
   ventana: Duration.hours(6),
   relectura: Duration.days(30),
-  prioridad: ["08"],
+  prioridad: ["08", "17", "25", "43"],
   maximo: undefined,
   fallosSeguidos: 3,
 };
@@ -96,7 +97,7 @@ const ListaDeProvincias = Schema.String.check(
  * - `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS`: minutos de fichas desde que empieza la noche (360).
  * - `CELDA_REGISTRO_FICHAS_RELECTURA_DIAS`: días tras los que se vuelve a leer una ficha (30).
  * - `CELDA_REGISTRO_FICHAS_PRIORIDAD`: provincias que van primero, por su código INE y
- *   separadas por comas, o `ninguna` (`08`, Barcelona).
+ *   separadas por comas, o `ninguna` (`08,17,25,43`: Barcelona y el resto de Cataluña).
  * - `CELDA_INGESTA_MAX_FICHAS`: tope de fichas por noche (sin tope; con 0 no se lee ninguna).
  */
 export const opcionesFichasDesdeConfig: Config.Config<OpcionesFichas> = Config.all({

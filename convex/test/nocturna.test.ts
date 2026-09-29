@@ -12,7 +12,6 @@ import {
   type PuntosGrabados,
 } from "@celda/ingesta/pruebas/antenasmoviles";
 import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
-import { OPCIONES_ZONAS } from "@celda/ingesta/barrido";
 import { OPCIONES_FICHAS } from "@celda/ingesta/fichas";
 import {
   capaGrabada,
@@ -21,6 +20,7 @@ import {
   muestraCampusNord,
 } from "@celda/ingesta/pruebas/grabado";
 import {
+  CATALUNA_CADA_NOCHE,
   conEntorno,
   contenidoDe,
   type Entorno,
@@ -180,7 +180,7 @@ const compararNoches = (
         }
         // La nocturna barre Cataluña por cuadros; Campus Nord cae entero en el de Barcelona.
         const barrido = {
-          zonas: OPCIONES_ZONAS,
+          zonas: CATALUNA_CADA_NOCHE.zonas,
           fichas: { ...OPCIONES_FICHAS, maximo: proceso.maxFichas, relectura: proceso.rotacion },
         };
         const variante: Variante =

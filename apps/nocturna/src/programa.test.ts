@@ -40,7 +40,7 @@ import {
   conEntorno,
   contenidoDe,
   type Entorno,
-  OPCIONES_BARRIDO,
+  CATALUNA_CADA_NOCHE,
   tablasDe,
   unaNoche,
 } from "./pruebas/entorno.ts";
@@ -507,7 +507,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           const provincias = provinciasDe((yield* zonasDePublicacion).municipios);
           const { resumen, cola } = yield* conBase(
             entorno.base,
-            estado(OPCIONES_BARRIDO).pipe(Effect.provideService(Provincias, provincias)),
+            estado(CATALUNA_CADA_NOCHE).pipe(Effect.provideService(Provincias, provincias)),
           );
           const fuente = resumen.fuentes.find((f) => f.fuente === "registro-oficial");
           assert.strictEqual(fuente?.sinLeer, 40);
@@ -548,19 +548,21 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       assert.strictEqual(Duration.toMinutes(porDefecto.noche.reintento), 60);
       assert.deepStrictEqual(porDefecto.noche.copias, { carpeta: "datos/copias", conservar: 14 });
       assert.strictEqual(Duration.toSeconds(porDefecto.registroOficial.pausa), 3);
-      assert.strictEqual(porDefecto.registroOficial.maxPeticiones, 300);
+      assert.strictEqual(porDefecto.registroOficial.maxPeticiones, 400);
       assert.strictEqual(porDefecto.registroOficial.reintentos, 3);
       assert.strictEqual(
         porDefecto.registroOficial.userAgent,
         "Celda (ingesta; contacto en celda.elies.site)",
       );
       assert.deepStrictEqual(porDefecto.interruptores, INTERRUPTOR_POR_DEFECTO);
+      // Toda España en siete noches, una zona cada noche y Cataluña la primera.
+      assert.deepStrictEqual(porDefecto.noche.proceso.zonas.cadaNoche, []);
       assert.deepStrictEqual(
-        porDefecto.noche.proceso.zonas.cadaNoche.map((zona) => zona.nombre),
-        ["cataluna"],
+        porDefecto.noche.proceso.zonas.enTurno.map((zona) => zona.nombre),
+        ["cataluna", "centro", "andalucia", "levante", "norte", "ebro-y-duero", "oeste-y-canarias"],
       );
-      assert.deepStrictEqual(porDefecto.noche.proceso.zonas.enTurno, []);
       assert.strictEqual(porDefecto.noche.proceso.zonas.porNoche, 1);
+      assert.deepStrictEqual(porDefecto.noche.proceso.fichas.prioridad, ["08", "17", "25", "43"]);
 
       const cambiada = yield* configuracion.parse(
         ConfigProvider.fromEnv({
