@@ -66,7 +66,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Mientras un municipio lleva etiqueta de Celda, su rótulo del mapa base se quita (`quitarRotulosDeMunicipios`): se pisaban.
 - Las agrupaciones en hexágono no marcan ausencias; solo las zonas.
 - El mapa base no rotula barrios por debajo del zoom 14 (`estilo.ts`): se pisaban con las etiquetas de Celda.
-- El crédito de los límites de barrio va con los del mapa base. En el móvil los créditos se pliegan tras un botón «i» (ver «Controles del mapa»).
+- El crédito de los límites de barrio va con los del mapa base, pero solo cuando ha llegado la provincia de Barcelona, la única con barrios. En el móvil los créditos se pliegan tras un botón «i» (ver «Controles del mapa»).
 
 ## Provincias y resumen nacional
 
@@ -76,6 +76,15 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Su nombre accesible lo escribe la web (`nombreDeProvincia` en `capa/marcadores.ts`): «Barcelona, 2904 emplazamientos, sin Yoigo, acercar», «Huesca, 184 emplazamientos en la parte que Celda ya tiene, acercar», «Soria, Celda aún no tiene sus emplazamientos, acercar». Pulsarlo acerca hasta ver sus emplazamientos, o hasta el zoom 8 si no tiene ninguno.
 - `DatosDelMapa` tiene el tono `limite`: lo que se ve queda fuera de lo barrido, «Celda aún no tiene datos de aquí», con un hexágono del color de aviso y, para el lector de pantalla, qué zonas tiene Celda. Con provincias de versiones distintas a la vista, la fecha va de la más antigua a la más reciente, y si el último barrido es posterior a los datos, también lo dice.
 - En escritorio los créditos no llegan a la columna de los controles aunque ocupen varias líneas: con el del IGN son más largos.
+
+## Cabecera y vista inicial
+
+- La cabecera (`Cabecera.tsx`) dice qué se mira: «España» de lejos, la provincia del centro desde el nivel de provincias y el municipio del centro desde el de municipios. Un móvil con una provincia entera encuadrada queda por debajo del zoom 8, así que la provincia se nombra también cuando lo que se ve no mide más de 2,7° de ancho, lo que mide Badajoz (`nombraUnSitio` en `apps/web/src/mapa/lugar.ts`). Con el centro en el mar o fuera de España dice «España».
+- El lugar sale de los contornos de municipios del ejercicio (`ejercicio/zonas`). `provincias.json` (2 KB con gzip) da la caja de cada provincia, y el contorno de una provincia se descarga la primera vez que el centro cae en su caja. De lejos no se descarga nada. Mientras llega un contorno, la cabecera sigue con el nombre de antes.
+- El lugar tiene un ancho fijo (12 rem en el móvil, 16 en escritorio) y va en una sola línea, cortado con puntos suspensivos. Al cambiar de nombre, ni la cinta ni la marca se mueven.
+- La vista inicial la decide `encuadreInicial` (`mapa/vistaInicial.ts`). Con un emplazamiento en la dirección, el mapa abre en él, como antes. Con un punto elegido guardado, encuadra la caja de los límites de su provincia, tenga Celda datos de ella o no. Si no, encuadra los emplazamientos de las provincias cubiertas del resumen nacional; sin ninguna cubierta, los de las que tienen alguno; sin resumen, la península con Baleares. La ubicación GPS no cuenta aunque el permiso esté dado: encenderla al abrir sería pedir algo que nadie ha pedido.
+- El mapa nace en esa vista si ya se sabe cuando MapLibre termina de descargarse, que es lo normal. Si no, se encuadra una vez, sin animación, en cuanto se sabe, salvo que una persona ya lo haya movido o la web lo haya llevado a otro sitio (el GPS, la zona del ejercicio). Como mucho abre al zoom 12.
+- Con Cataluña cubierta, la vista inicial queda por debajo del zoom 8 en el móvil y en una pantalla de 1400 px: al abrir solo se descarga el resumen nacional.
 
 ## Panel del emplazamiento
 

@@ -19,7 +19,7 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  *                     [--repeticiones 3] [--trazas <carpeta>] [--json <fichero>]
  *                     [--escenario barcelona|espana|borde] [--ruta /?emplazamiento=<clave>]
  *
- * El escenario `barcelona` hace los gestos de siempre sobre la vista inicial. El de `espana`, el
+ * El escenario `barcelona` va a Barcelona entera y hace allí los gestos de siempre. El de `espana`, el
  * de varias provincias (ADR 0016): aleja hasta ver toda España con el resumen, toca el hexágono
  * de Barcelona, acerca con el botón hasta el nivel de municipios y arrastra y pellizca allí,
  * acerca hasta la calle tocando la agrupación o la zona mayor, vuelve al nivel de provincias y
@@ -674,8 +674,17 @@ const ronda = async (
     memoria = await medirMemoria(pagina, cdp);
   };
   const gestosYFicha = async () => {
-    // Lejos: la vista inicial, Barcelona entera.
+    // La vista inicial es lo que Celda tiene, de lejos (#52). Se va a Barcelona entera como haría
+    // una persona: su hexágono y tres veces Acercar, hasta el zoom 10,7 o así.
     await esperar(500);
+    await pagina
+      .getByRole("button", { name: /^Barcelona, / })
+      .first()
+      .tap();
+    await esperar(1200);
+    await pulsar(pagina, "Acercar", 3);
+    await esperar(1500);
+    // Lejos: Barcelona entera.
     marcadores.lejos = await contarMarcadores(pagina);
     await medir("lejos-arrastre", () => arrastrar(cdp));
     await medir("lejos-pellizco", () => pellizcar(cdp));

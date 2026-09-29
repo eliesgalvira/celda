@@ -9,7 +9,7 @@ Qué se midió en septiembre de 2026, qué se cambió por esas medidas, qué se 
 Cada ronda abre una visita nueva, con la caché vacía, y hace siempre lo mismo:
 
 1. Carga: espera al mapa base y a los marcadores, y anota los tiempos, los bytes y las tareas largas.
-2. Con Barcelona entera (zoom 10,75, hexágonos): arrastra con un dedo, pellizca hacia dentro y hacia fuera y gira la rueda.
+2. Toca el hexágono de Barcelona y acerca tres veces con el botón, hasta Barcelona entera (zoom 10,7 más o menos, hexágonos). Arrastra con un dedo, pellizca hacia dentro y hacia fuera y gira la rueda. Hasta el #52 la web abría ahí, a zoom 10,75; ahora abre en lo que Celda tiene, de lejos, y al abrir solo descarga el resumen nacional. Las cifras de carga de abajo son de antes de ese cambio.
 3. Acerca tres veces con el botón, hasta el nivel de los barrios y los hexágonos del zoom 13,75, y repite los tres gestos.
 4. Acerca dos veces más, hasta el zoom 15,75, donde casi todo son logos sueltos, y repite los gestos.
 5. Toca el marcador más cercano al centro, cierra la ficha, toca uno vecino y vuelve a tocar el primero.

@@ -1,6 +1,6 @@
 # Celda
 
-Celda es una web pública que enseña en un mapa las antenas de telefonía móvil de Barcelona, de qué compañía son y cómo llega su señal. Este glosario fija las palabras que usan la interfaz, el código y las conversaciones sobre el proyecto. Lo que la interfaz explica al tocar un término subrayado está en `packages/dominio/src/glosario.ts`, con palabras más llanas, y no puede contradecir a este glosario.
+Celda es una web pública que enseña en un mapa las antenas de telefonía móvil de España, de qué compañía son y cómo llega su señal. Tiene las de las zonas que la ingesta ya ha barrido, y de las demás dice que aún no las tiene. Barcelona solo es especial donde tiene datos propios: sus barrios y su padrón por barrio. Este glosario fija las palabras que usan la interfaz, el código y las conversaciones sobre el proyecto. Lo que la interfaz explica al tocar un término subrayado está en `packages/dominio/src/glosario.ts`, con palabras más llanas, y no puede contradecir a este glosario.
 
 ## Lenguaje
 
@@ -321,6 +321,7 @@ _Evitar_: clientes, carga
 - Una **simulación** nunca es una **observación** ni una **medida**.
 - Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.
 - El **ejercicio de emplazamientos** se hace sobre una **zona**: un barrio de Barcelona o un municipio. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
+- Al abrir, el mapa encuadra la **provincia** del **punto elegido** que guarda el dispositivo o, sin él, las **provincias cubiertas** del **resumen nacional**. La **ubicación GPS** no cuenta: nunca se pide al abrir.
 - Con un **punto de referencia**, cada **emplazamiento** tiene un **rumbo** y los **consejos** dicen a qué rumbo apuntar una **antena exterior**. La **brújula** ayuda a alinearla.
 
 ## Ambigüedades señaladas
