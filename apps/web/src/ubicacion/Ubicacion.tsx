@@ -1,5 +1,5 @@
 import type { Coordenada, Rectangulo } from "@celda/dominio/area";
-import type { ZonaBarrida } from "@celda/dominio/cobertura";
+import type { AlcanceDeLosDatos } from "@celda/dominio/cobertura";
 import type { Credito } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
@@ -209,8 +209,8 @@ const TEXTO_ALMACEN = {
  */
 export function AvisosDeUbicacion(props: {
   readonly panelAbierto: boolean;
-  /** Las zonas barridas del resumen vigente: hasta dónde llegan los datos. */
-  readonly cobertura: ReadonlyArray<ZonaBarrida> | undefined;
+  /** Las zonas barridas y las cajas de las provincias del resumen: hasta dónde llegan los datos. */
+  readonly cobertura: AlcanceDeLosDatos | undefined;
 }) {
   const control = useContext(UbicacionContexto);
   /** El punto de referencia cuyo aviso de «sin datos» se ha cerrado: el GPS o un punto elegido. */

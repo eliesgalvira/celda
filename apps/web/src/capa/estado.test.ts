@@ -154,4 +154,16 @@ describe("marca de agua de lo que se ve", () => {
       barridas: ["Caja de Barcelona"],
     });
   });
+
+  it("un cuadro barrido sin emplazamientos cerca tampoco es de datos: la cobertura es la real", () => {
+    // Dentro del cuadro barrido 2,41, pero a 40 km de los emplazamientos de Barcelona y Girona.
+    const enElMar = {
+      caja: {
+        suroeste: { longitud: 2.7, latitud: 41.45 },
+        noreste: { longitud: 2.75, latitud: 41.5 },
+      },
+      zoom: 11,
+    };
+    assert.strictEqual(estadoDeLaVista(RESUMEN, estados(), enElMar).tipo, "sin-datos");
+  });
 });
