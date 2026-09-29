@@ -39,6 +39,21 @@ export const BARCELONA: Area = {
   zoomMaximo: 18.5,
 };
 
+/**
+ * El mapa de Celda desde la capa por provincias (ADR 0016): se mueve por toda España, con
+ * Canarias, y abre en Barcelona, donde más datos hay.
+ */
+export const ESPANA: Area = {
+  nombre: "España",
+  encuadre: BARCELONA.encuadre,
+  limites: {
+    suroeste: { longitud: -19.5, latitud: 26.5 },
+    noreste: { longitud: 5.5, latitud: 44.5 },
+  },
+  zoomMinimo: 4,
+  zoomMaximo: 18.5,
+};
+
 /** Si el punto cae dentro del rectángulo, bordes incluidos. */
 export const contiene = (rectangulo: Rectangulo, punto: Coordenada): boolean =>
   punto.longitud >= rectangulo.suroeste.longitud &&

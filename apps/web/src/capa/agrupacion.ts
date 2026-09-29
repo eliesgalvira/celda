@@ -1,7 +1,10 @@
 import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area";
 import { type Barrio, type ResumenDeBarrio, resumirBarrios } from "@celda/dominio/barrio";
 import { COMPANIAS_DE_CAPA, type EmplazamientoLeido } from "@celda/dominio/capa";
-import Supercluster from "supercluster";
+import type { Compania } from "@celda/dominio/compania";
+import type { ProvinciaDelResumen } from "@celda/dominio/provincias";
+
+import { type Indice, type IndicesDeCapa, indexarCapa, NIVEL_MAXIMO } from "./indice.ts";
 
 /**
  * Agrupación por zoom de los emplazamientos de la capa (ADR 0004). A cada nivel de zoom, los
@@ -15,16 +18,6 @@ import Supercluster from "supercluster";
  * emplazamientos que recoge cada elemento: cada uno va al elemento que se queda con la mayoría de
  * los suyos.
  */
-
-/**
- * Distancia en píxeles de pantalla por debajo de la cual se agrupa, en el zoom entero del nivel.
- * Con 48 salían más logos sueltos a zoom medio, pero con un tercio más de nodos el móvil simulado
- * bajaba de 55 a 51 fps al cruzar niveles. Con 60 nada se pisa: el hexágono mide 50 px.
- */
-const RADIO = 60;
-
-/** Último nivel con agrupaciones. En el siguiente y más cerca, todos los emplazamientos van sueltos. */
-const NIVEL_MAXIMO = 16;
 
 /**
  * Nivel en que los emplazamientos de Barcelona se agrupan por barrio: del zoom 13 al 14. Más
@@ -62,11 +55,38 @@ export interface ElementoBarrio {
   readonly resumen: ResumenDeBarrio;
 }
 
+/**
+ * Cómo está la capa de una provincia en el mapa: solo en el resumen, pidiéndose (se ve su
+ * hexágono mientras llega) o sin llegar por un fallo.
+ */
+export type CargaDeProvincia = "resumen" | "cargando" | "fallo";
+
+/**
+ * Una provincia del resumen nacional: su hexágono con su número. Se ve por debajo del nivel de
+ * provincias y, más cerca, mientras su capa no ha llegado.
+ */
+export interface ElementoProvincia {
+  readonly tipo: "provincia";
+  readonly clave: string;
+  readonly posicion: Coordenada;
+  readonly provincia: ProvinciaDelResumen;
+  readonly carga: CargaDeProvincia;
+  /**
+   * Compañías con algún emplazamiento en el resumen y ninguno en la provincia. Solo en una
+   * provincia cubierta: de una a medias no se puede decir que falte nadie.
+   */
+  readonly ausentes: ReadonlyArray<Compania>;
+}
+
 /** Lo que el mapa dibuja en un sitio. La clave identifica el mismo elemento entre escenas. */
-export type Elemento = ElementoEmplazamiento | ElementoAgrupacion | ElementoBarrio;
+export type Elemento =
+  | ElementoEmplazamiento
+  | ElementoAgrupacion
+  | ElementoBarrio
+  | ElementoProvincia;
 
 /** Lo que recoge varios emplazamientos y, al pulsarlo, acerca el mapa a su zona. */
-export type ElementoAbrible = ElementoAgrupacion | ElementoBarrio;
+export type ElementoAbrible = ElementoAgrupacion | ElementoBarrio | ElementoProvincia;
 
 /** Lo que se ve a un nivel de zoom dentro de una caja. */
 export interface Escena {
@@ -108,55 +128,16 @@ export interface Agrupador {
 export const nivelDeZoom = (zoom: number): number =>
   Math.max(0, Math.min(Math.floor(zoom), NIVEL_MAXIMO + 1));
 
-interface PropiedadesDePunto {
-  readonly indice: number;
-}
-
-type PropiedadesDeAgrupacion = Record<string, never>;
-
-/**
- * supercluster con `_getOriginZoom` a la vista. Es un detalle interno de la versión 9.1.0, fijada
- * exacta en el catálogo: el identificador de una agrupación lleva el nivel siguiente a aquel en
- * que se formó. Las pruebas de `agrupacion.test.ts` lo cubren; si una versión nueva lo cambia,
- * fallan.
- */
-class Indice extends Supercluster<PropiedadesDePunto, PropiedadesDeAgrupacion> {
-  declare _getOriginZoom: (id: number) => number;
-}
-
 const PREFIJO_EMPLAZAMIENTO = "e:";
-const PREFIJO_AGRUPACION = "a:";
-/** Las agrupaciones de fuera de Barcelona en el nivel de barrios, que salen de otro índice. */
-const PREFIJO_AGRUPACION_FUERA = "f:";
-const PREFIJO_BARRIO = "b:";
+
+/** La clave con que se ve suelto un emplazamiento, en cualquier agrupador. */
+export const claveDeEmplazamiento = (clave: string): string => `${PREFIJO_EMPLAZAMIENTO}${clave}`;
 
 /** El identificador de supercluster de una clave con ese prefijo, o `undefined` si no lo lleva. */
 const idConPrefijo = (clave: string, prefijo: string): number | undefined =>
   clave.startsWith(prefijo) ? Number(clave.slice(prefijo.length)) : undefined;
 
-/** El identificador de supercluster de una clave de agrupación, o `undefined` si no lo es. */
-const idDeClave = (clave: string): number | undefined => idConPrefijo(clave, PREFIJO_AGRUPACION);
-
 type Punto = ReturnType<Indice["getClusters"]>[number];
-
-/** Un índice de supercluster con los emplazamientos de `indices`, que guarda su posición. */
-const indexar = (
-  emplazamientos: ReadonlyArray<EmplazamientoLeido>,
-  indices: ReadonlyArray<number>,
-): Indice => {
-  const indice = new Indice({ radius: RADIO, maxZoom: NIVEL_MAXIMO });
-  indice.load(
-    indices.map((i) => {
-      const { longitud, latitud } = emplazamientos[i]?.posicion ?? { longitud: 0, latitud: 0 };
-      return {
-        type: "Feature",
-        properties: { indice: i },
-        geometry: { type: "Point", coordinates: [longitud, latitud] },
-      };
-    }),
-  );
-  return indice;
-};
 
 /** La clave del elemento que se lleva más votos; en caso de empate, el primero que los tuvo. */
 const masVotado = (votos: ReadonlyMap<string, number>): string | undefined => {
@@ -171,6 +152,19 @@ const masVotado = (votos: ReadonlyMap<string, number>): string | undefined => {
   return ganador;
 };
 
+export interface OpcionesAgrupador {
+  /**
+   * Los índices ya construidos, por ejemplo en un Worker (`rehidratarIndice`). Sin ellos, se
+   * construyen aquí.
+   */
+  readonly indices?: IndicesDeCapa<Indice>;
+  /**
+   * Lo que llevan detrás de su tipo las claves de agrupaciones y barrios, para que no se
+   * confundan con las de otro agrupador en la misma escena: el código de la provincia y «:».
+   */
+  readonly prefijo?: string;
+}
+
 /**
  * Agrupa los emplazamientos de una capa. Indexar 1300 emplazamientos cuesta unos milisegundos.
  * Con `barrios`, el nivel `NIVEL_DE_BARRIOS` recoge por barrio los emplazamientos que tienen uno;
@@ -179,14 +173,18 @@ const masVotado = (votos: ReadonlyMap<string, number>): string | undefined => {
 export const crearAgrupador = (
   emplazamientos: ReadonlyArray<EmplazamientoLeido>,
   barrios: ReadonlyArray<Barrio> = [],
+  opciones: OpcionesAgrupador = {},
 ): Agrupador => {
-  const todos = emplazamientos.map((_, i) => i);
-  const indice = indexar(emplazamientos, todos);
-  // Los de fuera de Barcelona se agrupan aparte en el nivel de barrios.
-  const fuera = indexar(
-    emplazamientos,
-    todos.filter((i) => emplazamientos[i]?.barrio === null),
-  );
+  const prefijo = opciones.prefijo ?? "";
+  const PREFIJO_AGRUPACION = `a:${prefijo}`;
+  // Las agrupaciones de fuera de Barcelona en el nivel de barrios, que salen de otro índice.
+  const PREFIJO_AGRUPACION_FUERA = `f:${prefijo}`;
+  const PREFIJO_BARRIO = `b:${prefijo}`;
+  const idDeClave = (clave: string): number | undefined => idConPrefijo(clave, PREFIJO_AGRUPACION);
+  const indices = opciones.indices ?? indexarCapa(emplazamientos, barrios.length > 0);
+  const indice = indices.todos;
+  // Los de fuera de Barcelona se agrupan aparte en el nivel de barrios. Sin barrios no hace falta.
+  const fuera = indices.fuera ?? indice;
   const resumenes = resumirBarrios(barrios, emplazamientos, COMPANIAS_DE_CAPA);
   const hayBarrios = resumenes.length > 0;
   const deBarrio = new Map<string, Array<number>>();
@@ -204,14 +202,17 @@ export const crearAgrupador = (
   );
   const esDeBarrios = (nivel: number): boolean => hayBarrios && nivel === NIVEL_DE_BARRIOS;
 
-  const elementoDe = (punto: Punto, prefijo = PREFIJO_AGRUPACION): Elemento | undefined => {
+  const elementoDe = (
+    punto: Punto,
+    prefijoAgrupacion = PREFIJO_AGRUPACION,
+  ): Elemento | undefined => {
     const [longitud = 0, latitud = 0] = punto.geometry.coordinates;
     const posicion = { longitud, latitud };
     const propiedades = punto.properties;
     if ("cluster" in propiedades) {
       return {
         tipo: "agrupacion",
-        clave: `${prefijo}${propiedades.cluster_id}`,
+        clave: `${prefijoAgrupacion}${propiedades.cluster_id}`,
         posicion,
         cuantos: propiedades.point_count,
       };
@@ -221,7 +222,7 @@ export const crearAgrupador = (
       ? undefined
       : {
           tipo: "emplazamiento",
-          clave: `${PREFIJO_EMPLAZAMIENTO}${emplazamiento.clave}`,
+          clave: claveDeEmplazamiento(emplazamiento.clave),
           posicion: emplazamiento.posicion,
           emplazamiento,
         };
@@ -245,16 +246,16 @@ export const crearAgrupador = (
         if (contiene(caja, barrio.posicion)) elementos.set(barrio.clave, barrio);
       }
     }
-    const [origen, prefijo] = esDeBarrios(nivel)
+    const [origen, prefijoAgrupacion] = esDeBarrios(nivel)
       ? [fuera, PREFIJO_AGRUPACION_FUERA]
       : [indice, PREFIJO_AGRUPACION];
     for (const punto of origen.getClusters(bbox, nivel)) {
-      const elemento = elementoDe(punto, prefijo);
+      const elemento = elementoDe(punto, prefijoAgrupacion);
       if (elemento !== undefined) elementos.set(elemento.clave, elemento);
     }
     const suelto = emplazamientos[indicePorClave.get(aparte ?? "") ?? -1];
     if (suelto !== undefined && contiene(caja, suelto.posicion)) {
-      const clave = `${PREFIJO_EMPLAZAMIENTO}${suelto.clave}`;
+      const clave = claveDeEmplazamiento(suelto.clave);
       elementos.set(clave, {
         tipo: "emplazamiento",
         clave,
@@ -300,6 +301,9 @@ export const crearAgrupador = (
       }
       case "barrio": {
         return deBarrio.get(elemento.resumen.barrio.codigo) ?? [];
+      }
+      case "provincia": {
+        return [];
       }
       case "agrupacion": {
         const id = idDeClave(elemento.clave);
@@ -371,6 +375,7 @@ export const crearAgrupador = (
 
   const zoomDeApertura = (elemento: ElementoAbrible): number => {
     if (elemento.tipo === "barrio") return NIVEL_DE_BARRIOS + 1;
+    if (elemento.tipo === "provincia") return NIVEL_MAXIMO + 1;
     const id = idDeClave(elemento.clave);
     const idFuera = idConPrefijo(elemento.clave, PREFIJO_AGRUPACION_FUERA);
     const expansion =

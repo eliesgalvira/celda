@@ -38,6 +38,8 @@ pnpm run medir -- --capas <carpeta> --trazas /tmp/trazas --perfil /tmp/perfiles
 - Antes de cada ronda espera a que la CPU esté por debajo del 8 % (`--calma`). Otro navegador o una compilación en marcha frenan el móvil simulado y dan fotogramas largos que no son de Celda. Durante este trabajo otro agente abría Chromium con SwiftShader a la vez, y una ronda sin esa espera salió el doble de mala.
 - `--trazas` graba una traza de CDP de cada gesto en una ronda aparte, que no cuenta en las medianas, y resume el tiempo propio por hilo y por tipo de trabajo. `--perfil` guarda el perfil de CPU de V8 de cada gesto; para leerlo, construye la web sin minificar (`npx vp build --minify false`).
 - `--solo-carga` se salta los gestos, `--cascada` imprime las peticiones de la carga con su inicio y su fin, y `--json` guarda las rondas enteras.
+- `--escenario espana` cambia los gestos por el recorrido de varias provincias (ADR 0016): alejar con el botón hasta ver toda España con el resumen, tocar el hexágono de Barcelona, acercar hasta la calle tocando cada vez la agrupación mayor, alejar hasta el nivel de provincias y cruzar de una a otra con seis arrastres largos. Al final mide la memoria de la página y sus Workers (`measureUserAgentSpecificMemory`, con el sitio aislado por COOP y COEP) y el montón del hilo principal, y cuenta lo pedido de las capas en toda la visita.
+- Para medir con muchos datos sin ingerir nada, `pnpm run sintetica` en `tools/capas` publica en `CELDA_CAPAS_CARPETA` una España sintética de `CELDA_SINTETICOS` emplazamientos (100.000 por defecto, la de la investigación 08) con la publicación de verdad.
 - El Chromium es el del sistema (`/usr/bin/chromium`, o `--chromium`, o `CELDA_CHROMIUM`): `playwright-core` no descarga navegadores.
 
 ## Antes y después
@@ -82,6 +84,41 @@ La primera ficha tardaba lo que tarda su lote por la red. Ahora el lote ya está
 
 Qué cuesta ahora el peor fotograma, en las trazas con ×4: el de reagrupar al asentarse dura unos 45 ms, con 11 de estilo, 8 de JavaScript de la web, 3 de maquetación y 4 de MapLibre. Antes, el peor era el de cruzar al nivel de barrios a mitad del zoom: 102 ms, con 27 de JavaScript, 27 de estilo y 13 de maquetación, sobre todo del texto de las 73 etiquetas de barrio. En los arrastres el hilo principal se va casi entero en MapLibre (`_render`, `draw`, `_calcMatrices`); los marcadores solo cambian su `transform`.
 
+## Capa por provincias (#43)
+
+Medianas de tres rondas del 29/09/2026 con la CPU a ×4, en las mismas condiciones de arriba y con el escenario `espana`. Tres capas del formato 5: la España sintética de 100.000 emplazamientos (`pnpm run sintetica`), la Cataluña real de la primera pasada del #40 (5.049 emplazamientos, con Barcelona, Girona, Lleida y Tarragona cubiertas y cuatro provincias a medias) y Barcelona real, esa misma base con solo los emplazamientos de la caja de Barcelona (1.294). La vista inicial es la de siempre, Barcelona a zoom 10,75, así que al abrir se piden el resumen y las provincias que corta.
+
+| Carga (ms desde que se pide la página) | España sintética, 100.000 | Cataluña real, 5.049 | Barcelona real, 1.294 |
+|---|---|---|---|
+| Resumen recibido | 1227 | 1211 | 1223 |
+| Primera capa de provincia recibida | 1473 | 1440 | 1433 |
+| Primer marcador (el hexágono de Barcelona, mientras llega) | 1515 | 1509 | 1515 |
+| Primeros emplazamientos o agrupaciones | 2125 | 1991 | 1941 |
+| Mapa base visible | 2238 | 2161 | 2145 |
+| Capas al abrir, con gzip | 226 KB, 5 peticiones | 50 KB, 3 | 28 KB, 3 |
+| Capas tras todo el recorrido | 485 KB, 25 | 153 KB, 12 | 64 KB, 7 |
+| Memoria: página y Workers / montón del hilo principal | 73 / 24 MB | 60 / 17 MB | 57 / 15 MB |
+| INP de la visita | 80 | 80 | 64 |
+
+| Gesto: fps · fotogramas de más de 20 ms · de más de 50 ms | España sintética | Cataluña real | Barcelona real |
+|---|---|---|---|
+| Alejar hasta ver España (seis veces el botón) | 58,4 · 9 · 1 | 59,3 · 3 · 0 | 59,9 · 1 · 0 |
+| Tocar el hexágono de Barcelona | 56,8 · 2 · 1 | 57,3 · 2 · 1 | 59,1 · 1 · 0 |
+| Acercar hasta la calle por las agrupaciones | 56,8 · 9 · 6 | 58,3 · 6 · 2 | 58,3 · 3 · 2 |
+| Alejar hasta el nivel de provincias | 52,1 · 36 · 6 | 58,1 · 9 · 1 | 58,7 · 5 · 1 |
+| Cruzar provincias arrastrando a zoom 8 | 59,2 · 11 · 1 | 60,0 · 0 · 0 | 60,0 · 0 · 0 |
+
+Con los gestos de siempre sobre Barcelona real salen las mismas cifras que en «Antes y después»: 60 fps en los arrastres, de 56,8 a 60 en el resto, primeros marcadores a 1493 ms y la primera ficha en 177 ms.
+
+Lo que dicen:
+
+- **Abrir no depende del tamaño de España.** El resumen (de 2 a 4 KB con gzip) llega a los 1,2 s y el hexágono de Barcelona se pinta a los 1,5 s en los tres casos, lo mismo que la capa entera de 1318 emplazamientos en el formato 4. Lo que cambia es cuánto tarda en llegar el detalle: medio segundo después con Barcelona real y 0,7 s con la Barcelona sintética de 13.226 emplazamientos, porque el Worker tiene que leer y agrupar 720 KB de JSON. Mientras tanto se ve el hexágono con su número, no un hueco.
+- **Bytes.** La capa de una provincia lleva las claves de los emplazamientos, que son casi la mitad del fichero: la Barcelona sintética pesa 176 KB con gzip y la real de Cataluña, 48 KB. El banco de la investigación, sin claves, se quedaba en 20 KB al abrir; en el formato real son 28 KB con Barcelona y 226 KB con la sintética.
+- **Fluidez.** Con datos reales todo va a 57-60 fps. Con 100.000 el peor gesto es alejar hasta el nivel de provincias, 52 fps y 36 fotogramas de más de 20 ms: por el camino llegan otras provincias con miles de emplazamientos (hasta 25 capas en todo el recorrido), y rehidratar su índice y pintar sus agrupaciones se hace en el hilo principal. La investigación daba 52 fps al alejar a España con 100.000 en el banco; aquí alejar a España va a 58, porque de lejos solo se pintan los 45 hexágonos del resumen.
+- **Un índice por provincia y no uno global.** Uno global habría que rehacerlo entero en el Worker cada vez que llega una provincia (477 ms con 100.000 y la CPU a ×4, más 45 ms de rehidratar, según la investigación). Por provincia, cada llegada cuesta lo de esa provincia. No medí la variante global en la web porque con esas cifras no compensa. Lo que cuesta la provincial es que en un borde puede haber dos hexágonos cerca, y cada uno cuenta solo los suyos.
+- **El Worker va menos frenado que el hilo principal** con CDP, como ya dijo la investigación. En un móvil de verdad el detalle tardaría algo más en llegar; la fluidez no cambia, porque ese tiempo no bloquea la página.
+- La máquina tenía otros agentes trabajando, así que cada ronda esperó a que la CPU bajara del 25 % (`--calma 0.25`) y no del 8 %.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.
@@ -97,7 +134,7 @@ Qué cuesta ahora el peor fotograma, en las trazas con ×4: el de reagrupar al a
 ## Qué se descartó
 
 - **Reciclar los nodos de los marcadores.** En el fotograma de reagrupar, crear los nodos es unos 8 ms de JavaScript con ×4; el estilo de los nodos nuevos, 11. Reciclar ahorraría parte de lo primero y poco de lo segundo, porque el marcador que entra se anima con `@starting-style`, que solo funciona al insertar el nodo. Habría que rehacer esas animaciones con la Web Animations API, y un nodo reciclado con el foco del teclado pasaría a ser otro emplazamiento. No compensa.
-- **Indexar supercluster en un worker.** Crear el agrupador cuesta unos 29 ms con ×4, una vez, al llegar la capa. Las escenas y las transiciones se piden de forma síncrona en cada reagrupación, y con un worker pasarían a ser asíncronas.
+- **Indexar supercluster en un worker**, con la capa entera de Barcelona. Crear el agrupador cuesta unos 29 ms con ×4, una vez, al llegar la capa. Las escenas y las transiciones se piden de forma síncrona en cada reagrupación, y con un worker pasarían a ser asíncronas. Con toda España sí entró (ADR 0016, #43): el Worker devuelve los árboles de supercluster ya hechos y el hilo principal los rehidrata, así que las escenas siguen siendo síncronas.
 - **`fadeDuration: 0` en MapLibre.** Medido en rondas alternadas: con ×4 salieron más fotogramas largos al pellizcar y girar la rueda de cerca, no menos, y los rótulos aparecían de golpe.
 - **Montar el cuerpo de la ficha un fotograma después.** El resumen saldría antes, pero ni la primera ficha ni el INP bajaron en la medida.
 - **Descargar MapLibre sin evaluarlo hasta después del primer pintado**, con un `modulepreload` de la URL del trozo sacada con un plugin de Vite. Ni el mapa base ni el LCP cambiaron, y el plugin partía el código compartido en un trozo más.
@@ -110,6 +147,8 @@ Qué cuesta ahora el peor fotograma, en las trazas con ×4: el de reagrupar al a
 ## Garantías con prueba
 
 - `tools/rendimiento/src/resistencia.ts`, en la CI: con la web quieta 30 s no se abre nada ni se pide ningún fotograma. Ver [efectos.md](efectos.md).
+- `apps/web/src/capa/agrupacion.test.ts`: el índice construido en un Worker y rehidratado da las mismas escenas, con lo mismo dentro de cada elemento, y las mismas transiciones entre cualquier par de niveles que el construido en el hilo.
+- `apps/web/src/capa/nacional.test.ts`: de lejos, solo el resumen; desde el zoom 8, las provincias que corta la vista; en el borde entre dos provincias ningún emplazamiento está dos veces y cada número cuadra, y cada provincia sale de su hexágono al acercar o al llegar.
 - `apps/web/src/mapa/vista.test.ts`: arrastrar o acercar varios niveles no vuelve a agrupar hasta que el mapa se asienta; al alejar, agrupa por el camino solo si cambia de nivel y la vista se ha salido de lo dibujado; se recoloca como mucho una vez por fotograma.
 - `apps/web/src/ficha/servicio.test.ts`: la precarga pide como mucho `LOTES_PRECARGADOS` lotes, los que más claves tienen; abrir después una ficha de ese lote no pide nada, y un fallo al precargar no falla y no se guarda.
 - `packages/ui/src/mapa/estilo.test.ts`: lo que se pide por adelantado (`RECURSOS_INICIALES_MAPA_BASE`) es el TileJSON del estilo y los glifos de los rótulos que se ven de lejos. Si alguien cambia la letra o la fuente del callejero, la precarga no se queda pidiendo lo que ya no se usa.

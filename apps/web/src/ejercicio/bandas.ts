@@ -4,7 +4,7 @@ import type { Ficha } from "@celda/dominio/ficha";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
-import { FichasPublicadas } from "../ficha/servicio.ts";
+import { type FichaPedida, FichasPublicadas } from "../ficha/servicio.ts";
 
 /** Cuántas fichas se leen a la vez. Las vecinas van en el mismo lote, que se pide una vez. */
 const A_LA_VEZ = 3;
@@ -33,14 +33,14 @@ export interface BandasLeidas {
  * ficha que falla, tarda demasiado o ya no existe no para las demás: se cuenta como no leída.
  */
 export const leerBandas = (
-  claves: ReadonlyArray<string>,
+  pedidas: ReadonlyArray<FichaPedida>,
 ): Effect.Effect<BandasLeidas, never, FichasPublicadas> =>
   Effect.gen(function* () {
     const fichas = yield* FichasPublicadas;
     const leidas = yield* Effect.forEach(
-      claves,
-      (clave) =>
-        fichas.leer(clave).pipe(
+      pedidas,
+      ({ clave, provincia }) =>
+        fichas.leer({ clave, provincia }).pipe(
           Effect.timeoutOption(ESPERA),
           Effect.map((salida) => ({ clave, ficha: Option.flatten(salida) })),
           Effect.catchTag("FichaNoLeida", () =>

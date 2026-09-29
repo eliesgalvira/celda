@@ -7,7 +7,7 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 | [0001](0001-monorepo-pnpm-autocontenido.md) | Monorepo pnpm autocontenido con las herramientas de Moli |
 | [0002](0002-solid-2-spa-sin-ssr.md) | Solid 2 como SPA, sin SSR |
 | [0003](0003-convex-con-confect-v10.md) | Convex como fuente canónica, con funciones Effect mediante Confect v10 |
-| [0004](0004-mapa-desde-capas-estaticas.md) | El mapa y las fichas se leen de ficheros estáticos versionados (JSON para Barcelona, fichas en lotes de 128), con marca de agua por vista |
+| [0004](0004-mapa-desde-capas-estaticas.md) | El mapa y las fichas se leen de ficheros estáticos versionados (JSON, desde el formato 5 por provincias; fichas en lotes de 128), con marca de agua por vista |
 | [0005](0005-simulaciones-puras-interfaz-fija.md) | Simulaciones como funciones puras detrás de una interfaz fija, sin Bend en la v1 |
 | [0006](0006-libreria-de-componentes-unico-sitio-con-estilos.md) | La librería de componentes es el único sitio con estilos, y lo impone el lint |
 | [0007](0007-aportaciones-locales-formato-definitivo.md) | Las aportaciones se guardan en el dispositivo con su formato definitivo |
@@ -19,5 +19,5 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 | [0013](0013-busqueda-de-direcciones-con-nominatim.md) | Búsqueda de direcciones en toda España con el Nominatim público, solo al pedirla y con su límite de una petición por segundo |
 | [0014](0014-barrido-por-zonas-y-ritmo-en-espana.md) | Propuesta: barrido del registro oficial por zonas, Cataluña primero y luego toda España, y fichas a una cada 3 s |
 | [0015](0015-ingesta-y-publicacion-fuera-de-convex.md) | Propuesta: la ingesta y la publicación, fuera de Convex, como servicio de NixOS con su estado en SQLite |
-| [0016](0016-capa-por-provincias-con-resumen-nacional.md) | Propuesta: capa por provincias con resumen nacional, indexada en un Worker |
+| [0016](0016-capa-por-provincias-con-resumen-nacional.md) | Capa por provincias con resumen nacional, indexada en un Worker |
 | [0017](0017-provincias-y-municipios-con-el-padron-del-ine.md) | Provincias y municipios del IGN como zonas, con el padrón del INE |

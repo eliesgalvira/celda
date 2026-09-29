@@ -40,8 +40,12 @@ export interface Sitio {
   readonly cerrar: () => Promise<void>;
 }
 
-/** Sirve `web` (la carpeta `dist`) con `capas` en `/capas` en un puerto libre de 127.0.0.1. */
-export const servirSitio = async (web: string, capas: string): Promise<Sitio> => {
+/**
+ * Sirve `web` (la carpeta `dist`) con `capas` en `/capas` en un puerto libre de 127.0.0.1. Con
+ * `aislado`, la página va aislada de otros orígenes (COOP y COEP), como pide
+ * `performance.measureUserAgentSpecificMemory` para medir la memoria de la página y sus Workers.
+ */
+export const servirSitio = async (web: string, capas: string, aislado = false): Promise<Sitio> => {
   const comprimidos = new Map<string, Buffer>();
 
   const leer = async (
@@ -77,6 +81,10 @@ export const servirSitio = async (web: string, capas: string): Promise<Sitio> =>
         "cache-control": encontrado.fichero.endsWith("index.html") ? SIN_CACHE : cacheDe(ruta),
         "access-control-allow-origin": "*",
       };
+      if (aislado) {
+        cabeceras["cross-origin-opener-policy"] = "same-origin";
+        cabeceras["cross-origin-embedder-policy"] = "credentialless";
+      }
       const aceptaGzip = /\bgzip\b/u.test(String(peticion.headers["accept-encoding"] ?? ""));
       let cuerpo = encontrado.contenido;
       if (aceptaGzip && COMPRIMIBLES.has(extension)) {

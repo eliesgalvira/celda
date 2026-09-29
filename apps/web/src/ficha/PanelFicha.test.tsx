@@ -1,13 +1,11 @@
-import {
-  type CapaLeida,
-  codificarVigente,
-  ficheroDeLote,
-  generarCapa,
-  versionDeCapa,
-} from "@celda/dominio/capa";
+import { versionDeCapa } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
-import { generarLote } from "@celda/dominio/loteDeFichas";
-import { indexarMunicipios, type LimitesDeMunicipios } from "@celda/dominio/municipio";
+import {
+  indexarMunicipios,
+  type LimitesDeMunicipios,
+  lugarDelPunto,
+} from "@celda/dominio/municipio";
+import { generarLoteDeProvincia } from "@celda/dominio/provincias";
 import { simuladorDePrueba, workerDePrueba } from "@celda/sim/pruebas";
 import { type Simulador, simuladorEnWorker } from "@celda/sim/simulador";
 import { assert, describe, it } from "@effect/vitest";
@@ -18,7 +16,13 @@ import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
-import { capaDePrueba, FUENTE_DE_BARRIOS, LIMITES_DE_PRUEBA } from "../capa/pruebas.ts";
+import {
+  type CapaDePrueba,
+  capaDePrueba,
+  FUENTE_DE_BARRIOS,
+  provinciaDePrueba,
+  publicacionDePrueba,
+} from "../capa/pruebas.ts";
 import { estaEnElGlosario, terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { loteConFichas, type OrigenDePrueba, origenDePrueba } from "./pruebas.ts";
@@ -113,7 +117,7 @@ const PEDRALBES: Ficha = {
 const ORIGEN = "http://capas.prueba";
 
 /** La capa del mapa: cada emplazamiento en su lote, para ver las peticiones por separado. */
-const CAPA: CapaLeida = {
+const CAPA: CapaDePrueba = {
   version: "sitios@2026-09-26T00:15:03Z",
   fecha: NOCHE,
   emplazamientos: [
@@ -145,7 +149,7 @@ const LOTE = new Map([
 ]);
 
 const urlDelLote = (clave: string) =>
-  `${ORIGEN}/${ficheroDeLote(CAPA.version, LOTE.get(clave) ?? -1)}`;
+  `${ORIGEN}/${provinciaDePrueba(CAPA).capa.lotes[LOTE.get(clave) ?? -1] ?? ""}`;
 
 /**
  * La app con la capa de prueba y las fichas del servicio real, sobre un origen estático que no
@@ -154,7 +158,7 @@ const urlDelLote = (clave: string) =>
  */
 const abrir = (clave: string, simulador: Layer.Layer<Simulador> = simuladorDePrueba) => {
   const origen = origenDePrueba();
-  navegar(ruta.emplazamiento(clave), { reemplazar: true });
+  navegar(ruta.emplazamiento(clave, "08"), { reemplazar: true });
   // Sin esperar, la app leería la dirección de la prueba anterior y pediría su ficha.
   flush();
   const pantalla = render(() => (
@@ -189,8 +193,7 @@ const contestar = async (origen: OrigenDePrueba, url: string, estado: number, cu
 
 /** Contesta a la petición del lote de `ficha` con su ficha, como lo publica Celda. */
 const responder = (origen: OrigenDePrueba, ficha: Ficha) => {
-  const lote = LOTE.get(ficha.clave) ?? -1;
-  const { estado, cuerpo } = loteConFichas(CAPA.version, lote, [ficha]);
+  const { estado, cuerpo } = loteConFichas([ficha]);
   return contestar(origen, urlDelLote(ficha.clave), estado, cuerpo);
 };
 
@@ -273,8 +276,15 @@ describe("panel del emplazamiento", () => {
 
   it("dice el municipio y la provincia del IGN y lo cita como obra derivada", async () => {
     const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
-    const lote = generarLote(CAPA.version, 0, [CAMPUS_NORD], indexarMunicipios(MUNICIPIOS));
-    await contestar(origen, urlDelLote(CAMPUS_NORD.clave), 200, lote.contenido);
+    const lote = generarLoteDeProvincia(
+      "08",
+      [CAMPUS_NORD],
+      new Map([
+        [CAMPUS_NORD.clave, lugarDelPunto(CAMPUS_NORD.posicion, indexarMunicipios(MUNICIPIOS))],
+      ]),
+      MUNICIPIOS.fuente,
+    );
+    await contestar(origen, urlDelLote(CAMPUS_NORD.clave), 200, lote);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
 
     assert.isNotNull(getByText("Barcelona, provincia de Barcelona"));
@@ -358,7 +368,7 @@ describe("panel del emplazamiento", () => {
     assert.lengthOf(antes?.querySelectorAll("path") ?? [], 0);
 
     // Se cancela en cuanto cambia, sin esperar a la ficha nueva.
-    navegar(ruta.emplazamiento(PEDRALBES.clave));
+    navegar(ruta.emplazamiento(PEDRALBES.clave, "08"));
     flush();
     await waitFor(() => {
       assert.strictEqual(worker.terminados(), 1);
@@ -435,7 +445,7 @@ describe("panel del emplazamiento", () => {
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
 
     const grabacion = grabarPanel();
-    navegar(ruta.emplazamiento(PEDRALBES.clave));
+    navegar(ruta.emplazamiento(PEDRALBES.clave, "08"));
     flush();
     // La ficha anterior desaparece en el acto, con su espacio reservado mientras llega la nueva.
     assert.isNull(queryByText(TITULO_CAMPUS_NORD));
@@ -458,7 +468,7 @@ describe("panel del emplazamiento", () => {
     });
     // Se cambia antes de que llegue la primera: su petición se cancela.
     const grabacion = grabarPanel();
-    navegar(ruta.emplazamiento(PEDRALBES.clave));
+    navegar(ruta.emplazamiento(PEDRALBES.clave, "08"));
     flush();
     await waitFor(() => {
       assert.deepStrictEqual(origen.abiertas(), [urlDelLote(PEDRALBES.clave)]);
@@ -466,7 +476,7 @@ describe("panel del emplazamiento", () => {
     assert.deepStrictEqual(origen.canceladas(), [urlDelLote(CAMPUS_NORD.clave)]);
 
     // La respuesta de la primera llega tarde, antes que la de la segunda: ya no la espera nadie.
-    const { cuerpo } = loteConFichas(CAPA.version, 0, [CAMPUS_NORD]);
+    const { cuerpo } = loteConFichas([CAMPUS_NORD]);
     origen.responder(urlDelLote(CAMPUS_NORD.clave), { estado: 200, cuerpo });
     await responder(origen, PEDRALBES);
     await findByRole("heading", { name: TITULO_PEDRALBES });
@@ -484,12 +494,12 @@ describe("panel del emplazamiento", () => {
     const { findByRole, origen } = abrir(CAMPUS_NORD.clave);
     await responder(origen, CAMPUS_NORD);
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
-    navegar(ruta.emplazamiento(PEDRALBES.clave));
+    navegar(ruta.emplazamiento(PEDRALBES.clave, "08"));
     flush();
     await responder(origen, PEDRALBES);
     await findByRole("heading", { name: TITULO_PEDRALBES });
 
-    navegar(ruta.emplazamiento(CAMPUS_NORD.clave));
+    navegar(ruta.emplazamiento(CAMPUS_NORD.clave, "08"));
     flush();
     await findByRole("heading", { name: TITULO_CAMPUS_NORD });
     assert.deepStrictEqual(origen.pedidas(), [
@@ -511,37 +521,21 @@ describe("panel del emplazamiento", () => {
     const { findByText, origen } = abrir(CAMPUS_NORD.clave);
     // Una publicación posterior ha cambiado la ficha y el origen ya no guarda la del mapa.
     const cambiada: Ficha = { ...CAMPUS_NORD, version: NOCHE + DIA };
-    const manana = generarCapa(
+    const manana = publicacionDePrueba(
+      versionDeCapa(NOCHE + DIA),
       NOCHE + DIA,
-      CAPA.emplazamientos.map(({ clave, posicion, estado, companias }) => ({
-        clave,
-        posicion,
-        estado,
-        companias,
-      })),
-      LIMITES_DE_PRUEBA,
+      [cambiada, PEDRALBES],
       1,
     );
-    const lote = manana.lotes.findIndex((l) => l.includes(CAMPUS_NORD.clave));
+    const ficheroDe = (prefijo: string) =>
+      [...manana.ficheros.keys()].find((f) => f.startsWith(prefijo)) ?? "";
+    const servir = (fichero: string) =>
+      contestar(origen, `${ORIGEN}/${fichero}`, 200, manana.ficheros.get(fichero) ?? "");
     await contestar(origen, urlDelLote(CAMPUS_NORD.clave), 404, "");
-    await contestar(
-      origen,
-      `${ORIGEN}/vigente.json`,
-      200,
-      codificarVigente({
-        version: versionDeCapa(NOCHE + DIA),
-        fecha: NOCHE + DIA,
-        emplazamientos: 2,
-        lotes: 2,
-      }),
-    );
-    await contestar(origen, `${ORIGEN}/${manana.fichero}`, 200, manana.contenido);
-    await contestar(
-      origen,
-      `${ORIGEN}/${ficheroDeLote(manana.version, lote)}`,
-      200,
-      loteConFichas(manana.version, lote, [cambiada]).cuerpo,
-    );
+    await servir("vigente.json");
+    await servir(ficheroDe("resumen@"));
+    await servir(ficheroDe("provincias/08/"));
+    await servir(manana.loteDe(CAMPUS_NORD.clave));
 
     const aviso = await findByText("Actualizado después del mapa");
     const marca = aviso.closest("[data-tono]");

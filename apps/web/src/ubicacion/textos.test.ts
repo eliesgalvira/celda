@@ -1,3 +1,4 @@
+import type { ZonaBarrida } from "@celda/dominio/cobertura";
 import { terminosDe, textoPlano } from "@celda/dominio/glosario";
 import type { PuntoElegido } from "@celda/dominio/aportacion";
 import { assert, describe, it } from "@effect/vitest";
@@ -97,18 +98,18 @@ describe("nombreRumbo", () => {
 });
 
 describe("punto de referencia lejos de los datos", () => {
-  // La caja de los emplazamientos de una capa pequeña alrededor de Campus Nord.
-  const CAJA = {
-    suroeste: { longitud: 2.1, latitud: 41.38 },
-    noreste: { longitud: 2.12, latitud: 41.4 },
-  };
+  // Una zona barrida pequeña alrededor de Campus Nord, y otra que aún no se ha acabado de barrer.
+  const CAJA: ReadonlyArray<ZonaBarrida> = [
+    { nombre: "prueba", titulo: "Campus Nord", cajas: [[2.1, 41.38, 2.12, 41.4]], barrido: 0 },
+    { nombre: "soria", titulo: "Soria", cajas: [[-3, 41, -2, 42]], barrido: null },
+  ];
   const elegido = (posicion: { longitud: number; latitud: number }): Referencia => ({
     tipo: "elegido",
     punto: { ...PUNTO, posicion },
   });
   const MEDINACELI = { longitud: -2.4354347, latitud: 41.1722846 };
 
-  it("dentro de la caja o a menos de 3 km de ella, no dice nada; sin capa, tampoco", () => {
+  it("dentro de lo barrido o a menos de 3 km, no dice nada; sin capa, tampoco", () => {
     assert.isUndefined(fueraDeLosDatos(elegido(CERCA), CAJA));
     assert.isUndefined(fueraDeLosDatos(elegido({ longitud: 2.14, latitud: 41.39 }), CAJA));
     assert.isUndefined(fueraDeLosDatos(elegido(MEDINACELI), undefined));

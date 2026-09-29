@@ -2,12 +2,11 @@
 // @effect-diagnostics strictEffectProvide:off
 import {
   decodificarVigente,
+  type EmplazamientoLeido,
   FICHERO_VIGENTE,
-  ficheroDeLote,
-  leerCapa,
   versionDeCapa,
 } from "@celda/dominio/capa";
-import { leerLote } from "@celda/dominio/loteDeFichas";
+import { leerCapaDeProvincia, leerLoteDeProvincia, leerResumen } from "@celda/dominio/provincias";
 import { INTERRUPTOR_POR_DEFECTO, SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
 import { ExtractorPorCajas } from "@celda/ingesta/extractor";
 import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
@@ -65,6 +64,38 @@ const sinQuitado = (grabada: FuenteGrabada): FuenteGrabada => ({
   },
 });
 
+/**
+ * Lo que la web leería del almacén: cada emplazamiento de la versión vigente con las claves de
+ * las fichas de su lote.
+ */
+const publicadoEn = (almacen: ReadonlyMap<string, string>) => {
+  const vigente = decodificarVigente(almacen.get(FICHERO_VIGENTE) ?? "");
+  if (Result.isFailure(vigente)) return assert.fail("vigente.json no se entiende");
+  const resumen = leerResumen(
+    almacen.get(vigente.success.resumen ?? "") ?? "",
+    vigente.success.version,
+  );
+  if (Result.isFailure(resumen)) return assert.fail(resumen.failure.message);
+  const emplazamientos: Array<{
+    readonly emplazamiento: EmplazamientoLeido;
+    readonly lote: ReadonlyArray<string>;
+  }> = [];
+  for (const provincia of resumen.success.provincias) {
+    if (provincia.fichero === undefined) continue;
+    const capa = leerCapaDeProvincia(almacen.get(provincia.fichero) ?? "", provincia.codigo);
+    if (Result.isFailure(capa)) return assert.fail(capa.failure.message);
+    for (const emplazamiento of capa.success.emplazamientos) {
+      const fichas = leerLoteDeProvincia(
+        almacen.get(capa.success.lotes[emplazamiento.lote ?? -1] ?? "") ?? "",
+        provincia.codigo,
+      );
+      if (Result.isFailure(fichas)) return assert.fail(fichas.failure.message);
+      emplazamientos.push({ emplazamiento, lote: fichas.success.map((f) => f.clave) });
+    }
+  }
+  return { vigente: vigente.success, resumen: resumen.success, emplazamientos };
+};
+
 /** El resumen de la base del entorno, como lo ve la orden `estado`. */
 const resumenDe = (entorno: Entorno) =>
   conBase(
@@ -95,7 +126,9 @@ const hastaQueAcabe = <A, E>(fibra: Fiber.Fiber<A, E>) =>
   Effect.gen(function* () {
     for (let minuto = 0; minuto < 180 && fibra.pollUnsafe() === undefined; minuto++) {
       yield* TestClock.adjust("1 minute");
-      yield* TestClock.withLive(Effect.sleep("5 millis"));
+      // Con tiempo de sobra para que la publicación acabe dentro de su minuto, aun con la máquina
+      // cargada.
+      yield* TestClock.withLive(Effect.sleep("25 millis"));
     }
     return yield* Fiber.join(fibra);
   });
@@ -141,24 +174,16 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           ],
         );
         assert.strictEqual(hecha.publicacion.tipo, "publicada");
-        // Los lotes, la capa y, al final, vigente.json.
+        // Los lotes y las capas, el manifiesto, el resumen y, al final, vigente.json.
         const escritos = yield* entorno.escritos;
-        assert.strictEqual(escritos.at(-2), `${VERSION}.json`);
+        const publicado = publicadoEn(yield* contenidoDe(entorno.almacen));
+        assert.strictEqual(publicado.vigente.version, VERSION);
+        assert.strictEqual(escritos.at(-2), publicado.vigente.resumen);
         assert.strictEqual(escritos.at(-1), FICHERO_VIGENTE);
-
-        const almacen = yield* contenidoDe(entorno.almacen);
-        const vigente = decodificarVigente(almacen.get(FICHERO_VIGENTE) ?? "");
-        assert.isTrue(Result.isSuccess(vigente));
-        const capa = leerCapa(almacen.get(`${VERSION}.json`) ?? "", VERSION);
-        if (Result.isFailure(capa)) return assert.fail(capa.failure.message);
-        for (const emplazamiento of capa.success.emplazamientos) {
-          const lote = leerLote(
-            almacen.get(ficheroDeLote(VERSION, emplazamiento.lote ?? -1)) ?? "",
-            VERSION,
-            emplazamiento.lote ?? -1,
-          );
-          if (Result.isFailure(lote)) return assert.fail(lote.failure.message);
-          assert.isTrue(lote.success.fichas.some((f) => f.clave === emplazamiento.clave));
+        assert.lengthOf(publicado.emplazamientos, 19);
+        for (const { emplazamiento, lote } of publicado.emplazamientos) {
+          assert.include(lote, emplazamiento.clave);
+          assert.strictEqual(emplazamiento.provincia, "08");
         }
 
         const fuente = yield* registroDe(entorno);
@@ -173,24 +198,51 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
     ),
   );
 
-  it.effect("repetir la noche sin cambios no escribe nada en el almacén", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const grabada = yield* muestraCampusNord;
-        yield* TestClock.setTime(NOCHE);
-        yield* unaNoche(entorno, registroOficial(grabada));
-        const antes = yield* entorno.escritos;
-        const almacenAntes = yield* contenidoDe(entorno.almacen);
+  it.effect(
+    "repetir la noche sin cambios solo rehace el resumen con el barrido nuevo, y otra vez nada",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          yield* TestClock.setTime(NOCHE);
+          yield* unaNoche(entorno, registroOficial(grabada));
+          const antes = yield* entorno.escritos;
+          const almacenAntes = yield* contenidoDe(entorno.almacen);
 
-        yield* TestClock.adjust(DIA);
-        const segunda = yield* unaNoche(entorno, registroOficial(grabada));
-        assert.strictEqual(segunda.publicacion.tipo, "al-dia");
-        assert.deepStrictEqual(yield* entorno.escritos, antes);
-        assert.deepStrictEqual(yield* contenidoDe(entorno.almacen), almacenAntes);
-        const fuente = yield* registroDe(entorno);
-        assert.deepStrictEqual(fuente.ultima?.cambios, SIN_CAMBIOS);
-      }),
-    ),
+          yield* TestClock.adjust(DIA);
+          const segunda = yield* unaNoche(entorno, registroOficial(grabada));
+          assert.strictEqual(segunda.publicacion.tipo, "barrido");
+          const almacen = yield* contenidoDe(entorno.almacen);
+          const publicado = publicadoEn(almacen);
+          assert.deepStrictEqual(yield* entorno.escritos, [
+            ...antes,
+            publicado.vigente.resumen ?? "",
+            FICHERO_VIGENTE,
+          ]);
+          assert.strictEqual(publicado.vigente.version, VERSION);
+          assert.strictEqual(
+            publicado.resumen.provincias.find((p) => p.codigo === "08")?.barrido,
+            NOCHE + DIA,
+          );
+          // Las capas y los lotes son los mismos ficheros.
+          for (const [fichero, contenido] of almacenAntes) {
+            if (fichero !== FICHERO_VIGENTE) assert.strictEqual(almacen.get(fichero), contenido);
+          }
+          const fuente = yield* registroDe(entorno);
+          assert.deepStrictEqual(fuente.ultima?.cambios, SIN_CAMBIOS);
+
+          // Publicar otra vez sin otra ejecución no escribe nada.
+          const tras = yield* entorno.escritos;
+          const apagada = yield* unaNoche(entorno, registroOficial(grabada), {
+            interruptores: {
+              ...INTERRUPTOR_POR_DEFECTO,
+              "registro-oficial": { activo: false, motivo: "prueba" },
+            },
+          });
+          assert.strictEqual(apagada.publicacion.tipo, "al-dia");
+          assert.deepStrictEqual(yield* entorno.escritos, tras);
+        }),
+      ),
   );
 
   it.effect("una noche cortada a mitad se retoma y deja lo mismo que una completa", () =>
@@ -264,13 +316,12 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
         assert.strictEqual(trasDos.ultima?.cambios.observaciones.retirados, 1);
         // La capa de esa noche ya no la tiene.
         assert.strictEqual(tercera.publicacion.tipo, "publicada");
-        const almacen = yield* contenidoDe(entorno.almacen);
-        const version = versionDeCapa(NOCHE + 2 * DIA);
-        const lotes = [...almacen]
-          .filter(([fichero]) => fichero.startsWith(`fichas@${version.slice("sitios@".length)}/`))
-          .map(([, contenido]) => contenido);
-        assert.isAbove(lotes.length, 0);
-        assert.isFalse(lotes.some((lote) => lote.includes(QUITADO)));
+        const publicado = publicadoEn(yield* contenidoDe(entorno.almacen));
+        assert.strictEqual(publicado.vigente.version, versionDeCapa(NOCHE + 2 * DIA));
+        assert.isFalse(
+          publicado.emplazamientos.some((e) => e.emplazamiento.clave === "vodafone-079808"),
+        );
+        assert.isFalse(publicado.emplazamientos.some((e) => e.lote.includes("vodafone-079808")));
       }),
     ),
   );
@@ -308,7 +359,8 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           yield* fs.makeDirectory(path.dirname(entorno.base), { recursive: true });
           yield* fs.copyFile(ultima ?? "", entorno.base);
           const tras = yield* unaNoche(entorno, registroOficial(grabada));
-          assert.strictEqual(tras.publicacion.tipo, "al-dia");
+          // Los datos son los mismos; solo cambia la fecha del barrido.
+          assert.strictEqual(tras.publicacion.tipo, "barrido");
           const fuente = yield* registroDe(entorno);
           assert.deepStrictEqual(fuente.ultima?.cambios.observaciones, SIN_CAMBIOS.observaciones);
         }),

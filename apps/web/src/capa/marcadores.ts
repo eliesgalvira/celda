@@ -4,6 +4,9 @@ import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import { textoDeAusencias } from "@celda/ui/marcadores/Ausencias.tsx";
 import { textoDeEmplazamientos } from "@celda/ui/marcadores/MarcadorBarrio.tsx";
+import type { CoberturaDeProvincia } from "@celda/ui/marcadores/MarcadorProvincia.tsx";
+
+import type { ElementoProvincia } from "./agrupacion.ts";
 
 /** Lo que enseña el mapa en un momento: dónde mira y a qué zoom. */
 export interface Vista {
@@ -67,3 +70,35 @@ export const combinacionesDe = (
 ): ReadonlyArray<ReadonlyArray<Compania>> => [
   ...new Map(emplazamientos.map((e) => [e.companias.join("-"), e.companias])).values(),
 ];
+
+/** Cuánto sabe Celda de una provincia del resumen. */
+export const coberturaDe = (elemento: ElementoProvincia): CoberturaDeProvincia =>
+  elemento.provincia.cubierta
+    ? "entera"
+    : elemento.provincia.emplazamientos > 0
+      ? "parcial"
+      : "ninguna";
+
+/**
+ * Nombre accesible de una provincia: lo que dice su hexágono, en el mismo orden, y qué hace al
+ * pulsarla. «Barcelona, 1318 emplazamientos en la parte que Celda ya tiene, acercar».
+ */
+export const nombreDeProvincia = (elemento: ElementoProvincia): string => {
+  const { nombre, emplazamientos } = elemento.provincia;
+  const cobertura = coberturaDe(elemento);
+  const cuantos =
+    cobertura === "ninguna"
+      ? "Celda aún no tiene sus emplazamientos"
+      : cobertura === "parcial"
+        ? `${textoDeEmplazamientos(emplazamientos)} en la parte que Celda ya tiene`
+        : textoDeEmplazamientos(emplazamientos);
+  const carga =
+    elemento.carga === "cargando"
+      ? "cargando"
+      : elemento.carga === "fallo"
+        ? "no han llegado sus emplazamientos"
+        : "";
+  return [nombre, cuantos, textoDeAusencias(elemento.ausentes), carga, "acercar"]
+    .filter((parte) => parte !== "")
+    .join(", ");
+};

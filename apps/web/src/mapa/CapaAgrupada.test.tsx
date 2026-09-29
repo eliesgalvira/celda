@@ -7,6 +7,8 @@ import { createSignal, flush } from "solid-js";
 
 import { crearAgrupador, type ElementoAbrible, NIVEL_DE_BARRIOS } from "../capa/agrupacion.ts";
 import { combinacionesDe } from "../capa/marcadores.ts";
+import { crearAgrupadorNacional, type EstadoProvincia } from "../capa/nacional.ts";
+import { BARCELONA, estados, GIRONA, RESUMEN } from "../capa/pruebasNacional.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
 
 const MUNDO: Rectangulo = {
@@ -176,5 +178,113 @@ describe("capa agrupada", () => {
     flush();
     assert.lengthOf(lamina.getAllByRole("button"), 2);
     assert.isTrue(lamina.getAllByRole("button").every((b) => b.hasAttribute("data-forma")));
+  });
+});
+
+describe("capa agrupada por provincias", () => {
+  /** Cerca del borde entre Barcelona y Girona. */
+  const BORDE: Rectangulo = {
+    suroeste: { longitud: 2.3, latitud: 41.85 },
+    noreste: { longitud: 2.7, latitud: 42 },
+  };
+  const todas = [...BARCELONA.capa.emplazamientos, ...GIRONA.capa.emplazamientos];
+
+  const montarNacional = (inicial: ReadonlyMap<string, EstadoProvincia>, nivel: number) => {
+    const [provincias, setProvincias] = createSignal(inicial);
+    const [nivelActual, setNivel] = createSignal(nivel);
+    const agrupador = () => crearAgrupadorNacional(RESUMEN, provincias());
+    const contenedor = document.createElement("div");
+    document.body.append(contenedor);
+    const abiertas: Array<ElementoAbrible> = [];
+    render(() => (
+      <CapaAgrupada
+        contenedor={contenedor}
+        combinaciones={combinacionesDe(todas)}
+        escena={agrupador().escena(nivelActual(), nivelActual() < 8 ? MUNDO : BORDE, null)}
+        transicion={agrupador().transicion}
+        proyectar={(posicion) => ({
+          x: (posicion.longitud - 2.3) * 2000,
+          y: (42 - posicion.latitud) * 2000,
+        })}
+        seVe={() => true}
+        fotograma={0}
+        movimientoReducido={false}
+        formas={new Map()}
+        seleccionada={null}
+        alSeleccionar={() => undefined}
+        alAbrir={(elemento) => abiertas.push(elemento)}
+      />
+    ));
+    flush();
+    const lamina = within(contenedor);
+    const pulsables = () =>
+      lamina.queryAllByRole("button").filter((boton) => !boton.hasAttribute("inert"));
+    return { setProvincias, setNivel, lamina, pulsables, abiertas };
+  };
+
+  it("una provincia que llega mientras el mapa se mueve sale de su hexágono, sin hueco", () => {
+    const { setProvincias, lamina, pulsables } = montarNacional(
+      estados(["08", { tipo: "cargando" }], ["17", { tipo: "lista", provincia: GIRONA }]),
+      10,
+    );
+    // Mientras llega, se ve su hexágono con su número y dice que se está cargando.
+    const hexagono = lamina.getByRole("button", {
+      name: "Barcelona, 40 emplazamientos, sin Vodafone, cargando, acercar",
+    });
+    assert.strictEqual(hexagono.getAttribute("aria-busy"), "true");
+    assert.include(hexagono.textContent, "40");
+    const deGirona = pulsables().length;
+
+    setProvincias(
+      estados(
+        ["08", { tipo: "lista", provincia: BARCELONA }],
+        ["17", { tipo: "lista", provincia: GIRONA }],
+      ),
+    );
+    flush();
+    // El hexágono ya no se puede pulsar, y lo de Barcelona sale de donde estaba.
+    assert.isFalse(pulsables().includes(hexagono));
+    const nuevos = pulsables().filter(
+      (b) => !(b.getAttribute("aria-label") ?? "").startsWith("Barcelona"),
+    );
+    assert.isAbove(nuevos.length, deGirona);
+    const entrando = nuevos.filter((b) =>
+      (b.firstElementChild?.getAttribute("style") ?? "").includes("--desde-x"),
+    );
+    assert.isAbove(entrando.length, 0);
+  });
+
+  it("una provincia sin cubrir va sin número, dice que aún no está y acerca al pulsarla", () => {
+    const { lamina, abiertas } = montarNacional(estados(), 6);
+    const lleida = lamina.getByRole("button", {
+      name: "Lleida, Celda aún no tiene sus emplazamientos, acercar",
+    });
+    assert.strictEqual(lleida.getAttribute("data-cobertura"), "ninguna");
+    assert.include(lleida.textContent, "aún no está");
+    assert.notMatch(lleida.textContent ?? "", /\d/u);
+    fireEvent.click(lleida);
+    assert.strictEqual(abiertas[0]?.tipo, "provincia");
+
+    // Las cubiertas dicen su número y sus ausencias.
+    assert.isNotNull(
+      lamina.getByRole("button", { name: "Barcelona, 40 emplazamientos, sin Vodafone, acercar" }),
+    );
+  });
+
+  it("al acercar desde el resumen, cada provincia se abre desde su hexágono", () => {
+    const { setNivel, pulsables } = montarNacional(
+      estados(
+        ["08", { tipo: "lista", provincia: BARCELONA }],
+        ["17", { tipo: "lista", provincia: GIRONA }],
+      ),
+      6,
+    );
+    assert.lengthOf(pulsables(), 3);
+    setNivel(12);
+    flush();
+    const entrando = pulsables().filter((b) =>
+      (b.firstElementChild?.getAttribute("style") ?? "").includes("--desde-x"),
+    );
+    assert.strictEqual(entrando.length, pulsables().length);
   });
 });

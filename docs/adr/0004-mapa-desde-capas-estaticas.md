@@ -1,6 +1,6 @@
 # El mapa y las fichas se leen de ficheros estáticos versionados, con marca de agua por vista
 
-Estado: aceptada el 24/09/2026. Revisada el 26/09/2026 tras la exploración técnica 03: la capa de emplazamientos de Barcelona es un fichero JSON entero, no PMTiles. Revisada otra vez el mismo día con el formato 2, que añade los barrios (ticket 14), y con el 3, que añade las bandas (ticket 25). Revisada el 28/09/2026 con el ADR 0008: las fichas también se publican como ficheros estáticos de la misma versión, en lotes, y la capa pasa al formato 4.
+Estado: aceptada el 24/09/2026. Revisada el 26/09/2026 tras la exploración técnica 03: la capa de emplazamientos de Barcelona es un fichero JSON entero, no PMTiles. Revisada otra vez el mismo día con el formato 2, que añade los barrios (ticket 14), y con el 3, que añade las bandas (ticket 25). Revisada el 28/09/2026 con el ADR 0008: las fichas también se publican como ficheros estáticos de la misma versión, en lotes, y la capa pasa al formato 4. Revisada el 29/09/2026 con el ADR 0016 (#43): la capa pasa al formato 5, un resumen nacional y una capa por provincia, y los lotes de fichas van por provincia y con nombre por contenido.
 
 El mapa necesita todos los emplazamientos a cualquier zoom. Servir eso en vivo gastaría el plan gratuito del backend y obligaría a limitar las lecturas una a una. En su lugar, una instantánea de los emplazamientos se publica como capa estática en una CDN, con su versión en el nombre, por ejemplo `sitios@2026-09-24T03:00Z`. Cada versión es inmutable. La CDN absorbe el volumen, así que el mapa carga rápido y el backend no recibe esas lecturas. Desde el ADR 0008, la ficha de cada emplazamiento se publica igual, junto a la capa, y el público no lee nada de Convex.
 
@@ -13,6 +13,8 @@ El formato 1 (ticket 10) llevaba `version`, `formato` y las columnas `clave`, `l
 El formato 3 (ticket 25) añade al final la columna `bandas`: por emplazamiento, un número con siete bits por compañía, uno por banda, con las bandas que el registro ya ha dado a cada estación base. La vista de interferencia necesita a la vez las bandas de todas las estaciones base de una compañía, y pedirlas al backend sería leer en vivo lo que ve el mapa entero, justo lo que esta decisión evita. Un 0 quiere decir que no se conoce ninguna banda, no que no emita en ninguna: la ingesta lee las fichas del registro poco a poco. La web lee el formato 2 y el 3; con el 2 no conoce ninguna banda.
 
 El formato 4 (28/09/2026) añade detrás la columna `lote`: el lote de fichas en que está la de cada emplazamiento. La web lee del 2 al 4, pero sin el 4 no encuentra las fichas y el panel lo dice como un fallo.
+
+El formato 5 (ADR 0016, 29/09/2026) parte la capa en ficheros. Un resumen nacional, `resumen@<fecha>.<huella>.json`, con una fila por provincia (su número, sus compañías, la caja de sus emplazamientos, si está cubierta, su último barrido y el nombre de su capa) y las zonas barridas. Una capa por provincia, `provincias/<código>/<huella>.json`, con las columnas del formato 4 salvo la versión, más el municipio de cada emplazamiento con la tabla de municipios de la provincia; el lote es la posición del fichero en su lista de lotes, y los barrios van solo en la de Barcelona. La web lee solo el formato 5: con un `vigente.json` del 4 dice que la capa no es la esperada hasta la siguiente publicación, que la rehace en el 5 aunque la versión de los datos sea la misma.
 
 La versión va al segundo, `sitios@2026-09-26T02:15:03Z`, y sale de la versión de los datos en Convex, no del reloj del generador: la misma instantánea con los mismos límites de barrio da siempre el mismo fichero. Con los 1318 emplazamientos de la caja de Barcelona y los 73 barrios pesa 67,2 KB, 17,8 KB con gzip, con el formato 4 (el 3 pesaba 61,9 y 16,5; el 1, 54,8 y 13,5).
 
@@ -48,15 +50,19 @@ El JSON de las fichas se comprime muy bien (las claves y los enlaces se repiten)
 
 La web encuentra el lote de una ficha en la columna `lote` de la capa que dibuja el mapa, así que siempre lee la ficha de la misma versión. Un enlace directo a una ficha espera a esa capa. Cada lote leído se guarda durante la visita, y dos lecturas a la vez del mismo lote hacen una sola petición. Cuando el mapa se asienta con marcadores de emplazamiento sueltos a la vista, la web descarga ya sus lotes, como mucho dos (`LOTES_PRECARGADOS`, los que más marcadores tienen), para que tocar uno no espere a la red. De cerca, lo que se ve cae en uno o dos lotes; en Barcelona son once en total, así que una visita pide como mucho esos once (docs/patterns/rendimiento.md).
 
+Desde el formato 5 los lotes se hacen dentro de cada provincia y se nombran por su contenido (`fichas/<código>/<huella>.json`), sin la versión dentro: las versiones que no cambian una provincia comparten sus lotes y su capa, y una publicación solo escribe los de las provincias que cambian. La web encuentra el lote en la capa de la provincia de la ficha, y un enlace a una ficha lleva su provincia (`?emplazamiento=…&provincia=08`); uno sin ella es de antes del formato 5, y por tanto de Barcelona.
+
 ## Qué versión se carga
 
-Lo único que cambia en el almacén es `vigente.json`: la versión, su fecha, cuántos emplazamientos y cuántos lotes tiene. La web lo lee primero, con caché corta, y luego la capa de esa versión. La publicación lo escribe el último, cuando la capa y todos sus lotes ya están, así que nunca apunta a algo a medias. Sin él, el mapa dice que todavía no hay ninguna capa publicada.
+Lo único que cambia en el almacén es `vigente.json`: la versión, su fecha, cuántos emplazamientos y cuántos lotes tiene y, desde el formato 5, el nombre de su resumen nacional. La web lo lee primero, con caché corta, y luego la capa de esa versión. La publicación lo escribe el último, cuando la capa y todos sus lotes ya están, así que nunca apunta a algo a medias. Sin él, el mapa dice que todavía no hay ninguna capa publicada.
 
-PMTiles se reserva para cuando la capa supere unos 20.000 emplazamientos (con 100.000, el JSON pesa 660 KB y tarda cerca de 1 s en indexarse), y para capas precalculadas grandes, como coberturas o simulaciones fuera de línea.
+Hasta el formato 5, PMTiles se reservaba para cuando la capa superara unos 20.000 emplazamientos (con 100.000, el JSON pesa 660 KB y tarda cerca de 1 s en indexarse). El ADR 0016 lo sustituye por la capa por provincias con el índice en un Worker. PMTiles queda para capas precalculadas grandes, como coberturas o simulaciones fuera de línea.
 
 ## Marca de agua por vista
 
 Cada vista conoce la versión de su dato, y la de la capa se lee de la cabecera antes de pintar. Como la ficha sale del lote de la misma versión que la capa del mapa, lo normal es que su marca no sea posterior a la capa. Hay un caso en que sí puede serlo: la pestaña lleva abierta desde antes de otra publicación y el origen ya no tiene los lotes de la versión del mapa, porque se hayan borrado versiones viejas o porque la copia de reserva de Vercel solo guarda la vigente (ADR 0010). Entonces la web lee `vigente.json`, la capa nueva y la ficha de esa versión, y la ficha lo dice («actualizado después del mapa»). El marcador no se corrige a medias: el mapa se queda con su capa hasta que se recarga la página. Si el emplazamiento ya no está en la versión nueva, el panel dice que no existe.
+
+Con el formato 5 la marca de agua va por provincia. Una provincia que se pide cuando el origen ya no tiene su capa de la versión del mapa llega de la vigente, con su versión; la marca de agua del mapa da entonces la fecha de lo que se ve, de la más antigua a la más reciente, y la ficha se compara con la fecha de su provincia.
 
 El mapa base es OpenFreeMap con el estilo del tema, servido desde sus servidores.
 

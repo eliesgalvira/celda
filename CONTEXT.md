@@ -123,11 +123,19 @@ _Evitar_: celda (esa es la de un emplazamiento), tesela, casilla
 ### Mapa publicado
 
 **Capa**:
-Copia fija de todos los emplazamientos y agrupaciones, publicada de una vez para dibujar el mapa.
+Copia fija de todos los emplazamientos, publicada de una vez para dibujar el mapa. Desde el formato 5 es un resumen nacional y una capa por provincia, que la web pide según lo que se ve.
 _Evitar_: tiles, teselas, mapa
 
+**Resumen nacional**:
+Parte de la capa con una fila por provincia: su número de emplazamientos, sus compañías, si está cubierta y cuándo se barrió por última vez lo que se sabe de ella. Es lo único que dibuja el mapa de lejos, un hexágono por provincia, y lo que abre la web.
+_Evitar_: índice, overview, mapa general
+
+**Provincia cubierta**:
+Provincia de la que se han barrido todos los cuadros con datos que la tocan: su número es el de toda la provincia. Si solo se ha barrido una parte, sus emplazamientos de esa parte están todos, pero su número es el de esa parte y la interfaz lo dice. Sin nada barrido, no tiene número.
+_Evitar_: provincia completa, provincia cargada (esa es la que ya ha llegado al navegador)
+
 **Publicación**:
-Paso que, al acabar cada ingesta, escribe la capa y las fichas de la instantánea en una misma versión y después cambia la versión vigente. Sin cambios en los datos no escribe nada.
+Paso que, al acabar cada ingesta, escribe la capa y las fichas de la instantánea en una misma versión y después cambia la versión vigente. Sin cambios en los datos no escribe nada; con un barrido nuevo y los mismos datos, solo el resumen nacional con su fecha.
 _Evitar_: despliegue, exportación, subida
 
 **Mapa base**:
@@ -143,7 +151,7 @@ Lo que el panel del emplazamiento cuenta de él al seleccionarlo. Se publica con
 _Evitar_: detalle, tarjeta, popup
 
 **Marca de agua**:
-Versión de los datos que conoce cada vista. La ficha sale de la misma versión que la capa del mapa, salvo que esa versión ya no esté publicada y se lea la vigente; entonces la ficha es posterior y la interfaz lo dice.
+Versión de los datos que conoce cada vista. La ficha sale de la misma versión que la capa de su provincia en el mapa, salvo que esa versión ya no esté publicada y se lea la vigente; entonces la ficha es posterior y la interfaz lo dice. Una provincia que llega cuando su versión ya no está publicada llega de la vigente, y la marca de agua del mapa da las dos fechas.
 _Evitar_: timestamp, sello, fecha de actualización
 
 ### Ubicación

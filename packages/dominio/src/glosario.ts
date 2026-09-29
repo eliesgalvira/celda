@@ -40,6 +40,7 @@ export const TERMINOS = [
   "rumbo",
   "router-movil",
   "antena-exterior",
+  "barrido",
 ] as const;
 
 export type Termino = (typeof TERMINOS)[number];
@@ -345,6 +346,14 @@ export const GLOSARIO: Glosario = {
       "al emplazamiento.",
     tecnico: "antena directiva exterior (Yagi o de panel)",
     relacionados: ["router-movil", "rumbo"],
+  },
+  barrido: {
+    nombre: "Barrido",
+    explicacion:
+      "La última vez que Celda leyó entero el registro oficial de una zona. Aunque no " +
+      "cambie nada, dice hasta cuándo se sabe que los datos seguían así.",
+    tecnico: "barrido del listado por zonas",
+    relacionados: ["registro-oficial", "version-de-los-datos"],
   },
 };
 

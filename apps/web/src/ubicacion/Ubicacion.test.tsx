@@ -1,5 +1,4 @@
 import type { PuntoElegido } from "@celda/dominio/aportacion";
-import type { CapaLeida } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
 import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
@@ -9,7 +8,7 @@ import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
-import { capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
+import { type CapaDePrueba, capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
@@ -47,7 +46,7 @@ const CAMPUS_NORD: Ficha = {
   version: NOCHE,
 };
 
-const CAPA: CapaLeida = {
+const CAPA: CapaDePrueba = {
   version: "sitios@2026-09-26T00:15:03Z",
   fecha: NOCHE,
   emplazamientos: [
@@ -113,7 +112,7 @@ const casillas = (region: ReturnType<typeof within>): ReadonlyArray<string> =>
 const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
   const fichas = fichasDePrueba();
   const ubicacion = ubicacionDePrueba(opciones);
-  navegar(ruta.emplazamiento(CAMPUS_NORD.clave), { reemplazar: true });
+  navegar(ruta.emplazamiento(CAMPUS_NORD.clave, "08"), { reemplazar: true });
   const pantalla = render(() => (
     <App
       servicios={Layer.mergeAll(

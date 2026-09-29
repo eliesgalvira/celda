@@ -3,14 +3,32 @@ import {
   decodificarVigente,
   type EmplazamientoDeCapa,
   FICHERO_VIGENTE,
-  ficheroDeCapa,
-  generarCapa,
   versionDeCapa,
   type Vigente,
 } from "@celda/dominio/capa";
+import type { ZonaBarrida } from "@celda/dominio/cobertura";
 import type { Ficha } from "@celda/dominio/ficha";
-import { generarLote } from "@celda/dominio/loteDeFichas";
-import { EMPLAZAMIENTOS_POR_LOTE } from "@celda/dominio/lotes";
+import { EMPLAZAMIENTOS_POR_LOTE, repartirEnLotes } from "@celda/dominio/lotes";
+import { municipiosConHabitantes } from "@celda/dominio/municipio";
+import {
+  cajaDeSituados,
+  companiasDeSituados,
+  type DatosDeProvincia,
+  decodificarManifiesto,
+  ficheroDeCapaDeProvincia,
+  ficheroDeLoteDeProvincia,
+  ficheroDeManifiesto,
+  ficheroDeResumen,
+  type FuentesDeZonas,
+  generarCapaDeProvincia,
+  generarLoteDeProvincia,
+  generarManifiesto,
+  generarResumen,
+  leerResumen,
+  type LoteNombrado,
+  selloDeVersion,
+  situarEmplazamientos,
+} from "@celda/dominio/provincias";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -26,13 +44,18 @@ import type { ZonasDePublicacion } from "./zonas.ts";
 /** Lo que ha hecho una publicación. */
 export const Publicada = Schema.Struct({
   version: Schema.String,
-  /** `al-dia` si el almacén ya tenía esa versión como vigente y no se ha escrito nada. */
-  tipo: Schema.Literals(["publicada", "al-dia"]),
+  /**
+   * - `publicada`: una versión nueva de los datos, con su resumen, sus capas y sus lotes.
+   * - `barrido`: la versión ya estaba publicada y solo ha cambiado la cobertura, por ejemplo la
+   *   fecha del último barrido. Se escriben el resumen y `vigente.json`.
+   * - `al-dia`: el almacén ya tenía todo eso y no se ha escrito nada.
+   */
+  tipo: Schema.Literals(["publicada", "barrido", "al-dia"]),
   emplazamientos: Schema.Int,
   lotes: Schema.Int,
   /** Ficheros escritos ahora, contando `vigente.json`. Cero si no ha cambiado nada. */
   escritos: Schema.Int,
-  /** Tamaño de la capa y del mayor lote de fichas, sin comprimir. */
+  /** Tamaño del resumen y de las capas de provincia, y del mayor lote de fichas, sin comprimir. */
   bytesCapa: Schema.Int,
   bytesLoteMayor: Schema.Int,
   /** Suma de los lotes de fichas, sin comprimir. */
@@ -58,17 +81,18 @@ export const FicheroPublicado = Schema.Struct({
 });
 export type FicheroPublicado = typeof FicheroPublicado.Type;
 
-/** Una versión recién publicada: la capa, dónde está y todos sus ficheros. */
+/** Una versión recién publicada: su resumen, dónde está y todos sus ficheros. */
 export interface VersionPublicada {
   readonly version: string;
   /** Fecha de la instantánea, en milisegundos. */
   readonly fecha: number;
+  /** URL del resumen nacional. */
   readonly url: string;
   readonly emplazamientos: number;
-  /** Tamaño de la capa sin comprimir. */
+  /** Tamaño del resumen sin comprimir. */
   readonly bytes: number;
   readonly publicadaEn: number;
-  /** La capa y sus lotes de fichas, sin `vigente.json`. */
+  /** El resumen, el manifiesto, las capas de provincia y los lotes, sin `vigente.json`. */
   readonly ficheros: ReadonlyArray<FicheroPublicado>;
 }
 
@@ -80,7 +104,8 @@ export class DatosNoDisponibles extends Schema.TaggedError<DatosNoDisponibles>()
 
 /**
  * De dónde saca la publicación lo que publica: la base de la ingesta. La publicación no sabe si
- * es Convex o una base SQLite; solo le pide la versión de los datos, la instantánea y las fichas.
+ * es Convex o una base SQLite; solo le pide la versión de los datos, la instantánea, las fichas y
+ * hasta dónde llegan.
  */
 export class DatosPublicables extends Context.Service<
   DatosPublicables,
@@ -96,6 +121,11 @@ export class DatosPublicables extends Context.Service<
     readonly fichas: (
       claves: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<Ficha>, DatosNoDisponibles>;
+    /**
+     * Las zonas de barrido del registro oficial que se han empezado a barrer, con la fecha de su
+     * último barrido completo (ADR 0014): hasta dónde llegan los datos.
+     */
+    readonly cobertura: Effect.Effect<ReadonlyArray<ZonaBarrida>, DatosNoDisponibles>;
     /** Apunta una versión publicada. Registrar otra vez la misma no la duplica. */
     readonly registrar: (publicada: VersionPublicada) => Effect.Effect<void, DatosNoDisponibles>;
   }
@@ -155,40 +185,84 @@ const vigenteDelAlmacen = Effect.gen(function* () {
 
 /**
  * Cuántas versiones anteriores a la vigente se quedan en el almacén (issue #14). Una pestaña que
- * lleva días abierta sigue leyendo las fichas de su versión; si ya no están, lee las de la
- * vigente y lo dice (ADR 0004).
+ * lleva días abierta sigue leyendo las capas y las fichas de su versión; si ya no están, lee las
+ * de la vigente y lo dice (ADR 0004).
  */
 export const VERSIONES_ANTERIORES = 7;
 
-/** El sello de la versión de un fichero publicado (`2026-09-26T02:15:03Z`), o `undefined`. */
+/**
+ * El sello de la versión de un fichero que es de una sola versión (`2026-09-26T02:15:03Z`): su
+ * resumen y su manifiesto, y la capa y los lotes del formato 4. Las capas de provincia y sus lotes
+ * no llevan versión: las comparten las versiones que los listan en su manifiesto.
+ */
 const selloDe = (fichero: string): string | undefined =>
-  /^(?:sitios|fichas)@([^/]+?)(?:\.json|\/\d+\.json)$/u.exec(fichero)?.[1];
+  /^(?:sitios|fichas|resumen|ficheros)@(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)(?:\.[0-9a-f]+)?(?:\.json|\/\d+\.json)$/u.exec(
+    fichero,
+  )?.[1];
+
+/** Lo que abre una versión en la web: su resumen o, en el formato 4, su capa. */
+const esEntrada = (fichero: string): boolean =>
+  fichero.startsWith("resumen@") || fichero.startsWith("sitios@");
+
+/** Los ficheros que lista el manifiesto de una versión, o `undefined` si no se puede leer. */
+const listadosEn = (fichero: string) =>
+  Effect.gen(function* () {
+    const almacen = yield* AlmacenDeFicheros;
+    const contenido = yield* almacen.leer(fichero);
+    if (Option.isNone(contenido)) return [];
+    const leido = decodificarManifiesto(contenido.value);
+    return Result.isSuccess(leido) ? leido.success.ficheros : undefined;
+  });
 
 /**
  * Borra del almacén las versiones que sobran: se quedan la vigente, las `VERSIONES_ANTERIORES`
  * anteriores y cualquier versión posterior a la vigente, que puede ser otra publicación a medias.
- * De cada versión retirada se borra primero la capa, para que nadie empiece a leerla, y luego
- * sus lotes. Devuelve las versiones retiradas.
+ * De cada versión retirada se borra primero lo que la abre (su resumen, o su capa en el formato
+ * 4), para que nadie empiece a leerla; luego las capas de provincia y los lotes de su manifiesto
+ * que ninguna versión que se queda lista, sus lotes del formato 4 y, al final, el manifiesto. Si
+ * el manifiesto de alguna versión que se queda no se entiende, no se borra ninguna capa ni ningún
+ * lote compartido. Devuelve las versiones retiradas.
  */
 export const retirarVersionesViejas = Effect.fn("Publicacion.retirarVersionesViejas")(function* (
   vigente: string,
 ) {
   const almacen = yield* AlmacenDeFicheros;
-  const sello = selloDe(ficheroDeCapa(vigente));
-  if (sello === undefined) return [];
+  const sello = selloDeVersion(vigente);
   const ficheros = yield* almacen.listar;
-  const anteriores = [
-    ...new Set(ficheros.flatMap((f) => selloDe(f) ?? []).filter((s) => s < sello)),
-  ].sort((a, b) => (a < b ? 1 : -1));
+  const sellos = [...new Set(ficheros.flatMap((f) => selloDe(f) ?? []))];
+  const anteriores = sellos.filter((s) => s < sello).sort((a, b) => (a < b ? 1 : -1));
   const viejas = new Set(anteriores.slice(VERSIONES_ANTERIORES));
+  if (viejas.size === 0) return [];
   const deViejas = ficheros.filter((f) => viejas.has(selloDe(f) ?? ""));
-  const capas = deViejas.filter((f) => f.startsWith("sitios@"));
-  yield* Effect.forEach(capas, almacen.borrar, { concurrency: A_LA_VEZ, discard: true });
+  const manifiestos = deViejas.filter((f) => f.startsWith("ficheros@"));
+  yield* Effect.forEach(deViejas.filter(esEntrada), almacen.borrar, {
+    concurrency: A_LA_VEZ,
+    discard: true,
+  });
+
+  const quedan = yield* Effect.forEach(
+    sellos.filter((s) => !viejas.has(s)),
+    (s) => listadosEn(`ficheros@${s}.json`),
+    { concurrency: A_LA_VEZ },
+  );
+  if (quedan.every((lista) => lista !== undefined)) {
+    const enUso = new Set(quedan.flat());
+    const deRetiradas = yield* Effect.forEach(manifiestos, listadosEn, { concurrency: A_LA_VEZ });
+    const sobran = [...new Set(deRetiradas.flatMap((lista) => lista ?? []))].filter(
+      (f) => !enUso.has(f),
+    );
+    yield* Effect.forEach(sobran, almacen.borrar, { concurrency: A_LA_VEZ, discard: true });
+  } else {
+    yield* Effect.logWarning(
+      "Un manifiesto no se entiende: no se borran capas ni lotes compartidos",
+    );
+  }
   yield* Effect.forEach(
-    deViejas.filter((f) => !f.startsWith("sitios@")),
+    deViejas.filter((f) => !esEntrada(f) && !f.startsWith("ficheros@")),
     almacen.borrar,
     { concurrency: A_LA_VEZ, discard: true },
   );
+  yield* Effect.forEach(manifiestos, almacen.borrar, { concurrency: A_LA_VEZ, discard: true });
   return [...viejas].map((s) => `sitios@${s}`);
 });
 
@@ -210,22 +284,50 @@ const retirarTrasPublicar = (vigente: string) =>
 
 /** Un fichero generado, con su huella y su tamaño. */
 const ficheroPublicado = (fichero: string, contenido: string) =>
-  Effect.map(
-    // Web Crypto no falla con un texto: si lo hace, es un defecto del entorno.
-    Effect.orDie(sha256(contenido)),
-    (huella): FicheroPublicado => ({ fichero, huella, bytes: bytesDe(contenido) }),
-  );
+  Effect.map(huellaDe(contenido), (huella): FicheroPublicado => ({
+    fichero,
+    huella,
+    bytes: bytesDe(contenido),
+  }));
+
+// Web Crypto no falla con un texto: si lo hace, es un defecto del entorno.
+const huellaDe = (contenido: string) => Effect.orDie(sha256(contenido));
+
+/** El resumen de una versión, nombrado por su contenido. */
+const resumenNombrado = (
+  resumen: Omit<Parameters<typeof generarResumen>[0], "cuadros">,
+  zonas: ZonasDePublicacion,
+) =>
+  Effect.gen(function* () {
+    const contenido = generarResumen({ ...resumen, cuadros: zonas.cuadros });
+    const fichero = ficheroDeResumen(resumen.version, yield* huellaDe(contenido));
+    return { fichero, contenido };
+  });
+
+/** Las fuentes de las zonas, que el resumen cita. */
+const fuentesDe = (zonas: ZonasDePublicacion): FuentesDeZonas => ({
+  barrios: zonas.barrios.fuente,
+  municipios: zonas.municipios.fuente,
+  padron: zonas.padron.fuente,
+});
 
 /**
- * Publica la instantánea actual: la capa y las fichas de todos sus emplazamientos, de la misma
- * versión, y después `vigente.json` apuntando a ella.
+ * Publica la instantánea actual en el formato 5 (ADR 0016): el resumen nacional, una capa por
+ * provincia y las fichas en lotes dentro de cada provincia, y después `vigente.json` apuntando al
+ * resumen.
  *
- * 1. Lee la versión de los datos. Si `vigente.json` ya apunta a ella, termina sin escribir nada.
- * 2. Lee todos los emplazamientos y comprueba que la versión no se ha movido.
- * 3. Genera la capa, con el barrio de cada emplazamiento según `zonas.barrios` y su lote de fichas.
- * 4. Lee las fichas de cada lote, les pone el municipio y la provincia según `zonas.municipios` y
- *    guarda el lote. Si falta alguna, los datos han cambiado.
- * 5. Vuelve a comprobar la versión, guarda la capa y la registra en la base.
+ * 1. Lee la versión de los datos y la cobertura. Si `vigente.json` ya apunta a esa versión, rehace
+ *    su resumen con la cobertura de ahora sin leer la instantánea: si sale el mismo fichero, no
+ *    escribe nada (`al-dia`); si no, escribe el resumen nuevo y `vigente.json` (`barrido`).
+ * 2. Lee todos los emplazamientos, comprueba que la versión no se ha movido y los sitúa en su
+ *    municipio y su provincia.
+ * 3. En cada provincia, reparte sus emplazamientos en lotes por la curva de Hilbert, lee las
+ *    fichas de cada lote, les pone su lugar y guarda el lote con su huella en el nombre. Si falta
+ *    alguna ficha, los datos han cambiado.
+ * 4. Guarda la capa de cada provincia, que dice el lote de cada emplazamiento, también con su
+ *    huella en el nombre. Una provincia sin cambios da los mismos ficheros, que ya están: no se
+ *    vuelven a escribir.
+ * 5. Vuelve a comprobar la versión, guarda el manifiesto y el resumen, y registra la versión.
  * 6. Cambia `vigente.json`, salvo que otra publicación haya dejado ya una versión posterior.
  * 7. Retira las versiones que sobran (`retirarVersionesViejas`), también si estaba al día.
  *
@@ -244,20 +346,15 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
     return yield* new SinEmplazamientos();
   }
   const version = versionDeCapa(fecha);
+  const cobertura = yield* datos.cobertura;
   const previa = yield* vigenteDelAlmacen;
   if (Option.isSome(previa)) {
     if (previa.value.version === version) {
-      yield* retirarTrasPublicar(version);
-      return {
-        version,
-        tipo: "al-dia",
-        emplazamientos: previa.value.emplazamientos,
-        lotes: previa.value.lotes,
-        escritos: 0,
-        bytesCapa: 0,
-        bytesLoteMayor: 0,
-        bytesFichas: 0,
-      } satisfies Publicada;
+      const soloCobertura = yield* rehacerCobertura(previa.value, cobertura, zonas);
+      if (soloCobertura !== undefined) {
+        yield* retirarTrasPublicar(version);
+        return soloCobertura;
+      }
     }
     if (previa.value.fecha > fecha) {
       return yield* new VigentePosterior({ vigente: previa.value.version, datos: version });
@@ -273,50 +370,121 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
   });
   yield* comprobarVersion;
 
-  const capa = generarCapa(fecha, emplazamientos, zonas.barrios, porLote);
+  const situados = situarEmplazamientos(emplazamientos, zonas.municipios);
+  const yaEstan = new Set(yield* almacen.listar);
   const escritos = yield* Ref.make(0);
   const guardar = (fichero: string, contenido: string) =>
     Effect.tap(almacen.guardar(fichero, contenido), (nuevo) =>
       nuevo ? Ref.update(escritos, (n) => n + 1) : Effect.void,
     );
+  /** Un fichero con nombre por contenido que ya está en el almacén no se vuelve a escribir. */
+  const guardarSiFalta = (fichero: string, contenido: string) =>
+    yaEstan.has(fichero) ? Effect.void : Effect.asVoid(guardar(fichero, contenido));
 
+  const repartos = [...situados].flatMap(([provincia, suyos]) =>
+    repartirEnLotes(
+      suyos.map((s) => s.emplazamiento),
+      porLote,
+    ).map((claves) => ({ provincia, claves })),
+  );
+  const lugares = new Map(
+    [...situados.values()].flat().map((s) => [s.emplazamiento.clave, s.lugar] as const),
+  );
   const lotes = yield* Effect.forEach(
-    capa.lotes,
-    (claves, lote) =>
+    repartos,
+    ({ provincia, claves }) =>
       Effect.gen(function* () {
         const fichas = yield* datos.fichas(claves);
         if (fichas.length !== claves.length) {
           return yield* new InstantaneaMovida({ antes: fecha, despues: null });
         }
-        const generado = generarLote(version, lote, fichas, zonas.municipios);
-        yield* guardar(generado.fichero, generado.contenido);
-        return yield* ficheroPublicado(generado.fichero, generado.contenido);
+        const contenido = generarLoteDeProvincia(
+          provincia,
+          fichas,
+          lugares,
+          zonas.municipios.fuente,
+        );
+        const fichero = ficheroDeLoteDeProvincia(provincia, yield* huellaDe(contenido));
+        yield* guardarSiFalta(fichero, contenido);
+        return { provincia, claves, publicado: yield* ficheroPublicado(fichero, contenido) };
       }),
     { concurrency: A_LA_VEZ },
   );
+
+  const municipios = municipiosConHabitantes(zonas.municipios, zonas.padron);
+  const capas = yield* Effect.forEach([...situados], ([provincia, suyos]) =>
+    Effect.gen(function* () {
+      const suyosLotes: ReadonlyArray<LoteNombrado> = lotes
+        .filter((l) => l.provincia === provincia)
+        .map((l) => ({ fichero: l.publicado.fichero, claves: l.claves }));
+      const contenido = generarCapaDeProvincia({
+        provincia,
+        situados: suyos,
+        barrios: zonas.barrios,
+        municipios: municipios.filter((m) => m.provincia === provincia),
+        lotes: suyosLotes,
+      });
+      const fichero = ficheroDeCapaDeProvincia(provincia, yield* huellaDe(contenido));
+      yield* guardarSiFalta(fichero, contenido);
+      return { provincia, publicado: yield* ficheroPublicado(fichero, contenido) };
+    }),
+  );
   yield* comprobarVersion;
 
-  const fichaDeCapa = yield* ficheroPublicado(capa.fichero, capa.contenido);
-  yield* guardar(capa.fichero, capa.contenido);
+  const ficheroDe = new Map(capas.map((c) => [c.provincia, c.publicado.fichero]));
+  const provincias = [...zonas.municipios.provincias.values()].map((p): DatosDeProvincia => {
+    const suyos = situados.get(p.codigo) ?? [];
+    return {
+      codigo: p.codigo,
+      nombre: p.nombre,
+      etiqueta: p.etiqueta,
+      caja: cajaDeSituados(suyos),
+      emplazamientos: suyos.length,
+      companias: companiasDeSituados(suyos),
+      fichero: ficheroDe.get(p.codigo),
+    };
+  });
+  const compartidos = [...capas.map((c) => c.publicado), ...lotes.map((l) => l.publicado)];
+  const manifiesto = generarManifiesto(
+    version,
+    compartidos.map((f) => f.fichero),
+  );
+  const ficheroManifiesto = ficheroDeManifiesto(version);
+  yield* guardar(ficheroManifiesto, manifiesto);
+  const resumen = yield* resumenNombrado(
+    { version, fuentes: fuentesDe(zonas), cobertura, provincias },
+    zonas,
+  );
+  yield* guardar(resumen.fichero, resumen.contenido);
+  const publicadoResumen = yield* ficheroPublicado(resumen.fichero, resumen.contenido);
   yield* datos.registrar({
     version,
     fecha,
-    url: almacen.url(capa.fichero),
-    emplazamientos: capa.emplazamientos,
-    bytes: fichaDeCapa.bytes,
+    url: almacen.url(resumen.fichero),
+    emplazamientos: emplazamientos.length,
+    bytes: publicadoResumen.bytes,
     publicadaEn: yield* Clock.currentTimeMillis,
-    ficheros: [fichaDeCapa, ...lotes],
+    ficheros: [
+      publicadoResumen,
+      yield* ficheroPublicado(ficheroManifiesto, manifiesto),
+      ...compartidos,
+    ],
   });
 
   // Otra publicación puede haber terminado mientras tanto: solo se avanza, nunca se retrocede.
   const antes = yield* vigenteDelAlmacen;
-  if (Option.isNone(antes) || antes.value.fecha < fecha) {
+  if (
+    Option.isNone(antes) ||
+    antes.value.fecha < fecha ||
+    (antes.value.fecha === fecha && antes.value.resumen !== resumen.fichero)
+  ) {
     yield* almacen.cambiarVigente(
       codificarVigente({
         version,
         fecha,
-        emplazamientos: capa.emplazamientos,
-        lotes: capa.lotes.length,
+        emplazamientos: emplazamientos.length,
+        lotes: lotes.length,
+        resumen: resumen.fichero,
       }),
     );
     yield* Ref.update(escritos, (n) => n + 1);
@@ -329,13 +497,57 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
   return {
     version,
     tipo: "publicada",
-    emplazamientos: capa.emplazamientos,
-    lotes: capa.lotes.length,
+    emplazamientos: emplazamientos.length,
+    lotes: lotes.length,
     escritos: yield* Ref.get(escritos),
-    bytesCapa: fichaDeCapa.bytes,
-    bytesLoteMayor: Math.max(0, ...lotes.map((l) => l.bytes)),
-    bytesFichas: lotes.reduce((suma, l) => suma + l.bytes, 0),
+    bytesCapa: publicadoResumen.bytes + capas.reduce((suma, c) => suma + c.publicado.bytes, 0),
+    bytesLoteMayor: Math.max(0, ...lotes.map((l) => l.publicado.bytes)),
+    bytesFichas: lotes.reduce((suma, l) => suma + l.publicado.bytes, 0),
   } satisfies Publicada;
+});
+
+/**
+ * Con `vigente.json` ya en la versión de los datos, rehace su resumen con la cobertura de ahora,
+ * sin leer la instantánea. Si sale el mismo, no escribe nada; si no, escribe el nuevo resumen y
+ * `vigente.json`. `undefined` si la vigente no tiene un resumen legible del formato 5: entonces
+ * hay que publicarla entera.
+ */
+const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
+  vigente: Vigente,
+  cobertura: ReadonlyArray<ZonaBarrida>,
+  zonas: ZonasDePublicacion,
+) {
+  const almacen = yield* AlmacenDeFicheros;
+  if (vigente.resumen === undefined) return undefined;
+  const contenido = yield* almacen.leer(vigente.resumen);
+  if (Option.isNone(contenido)) return undefined;
+  const leido = leerResumen(contenido.value, vigente.version);
+  if (Result.isFailure(leido)) return undefined;
+  const resumen = yield* resumenNombrado(
+    {
+      version: vigente.version,
+      fuentes: leido.success.fuentes,
+      cobertura,
+      provincias: leido.success.provincias,
+    },
+    zonas,
+  );
+  const igual = resumen.fichero === vigente.resumen;
+  if (!igual) {
+    yield* almacen.guardar(resumen.fichero, resumen.contenido);
+    yield* almacen.cambiarVigente(codificarVigente({ ...vigente, resumen: resumen.fichero }));
+  }
+  const publicada: Publicada = {
+    version: vigente.version,
+    tipo: igual ? "al-dia" : "barrido",
+    emplazamientos: vigente.emplazamientos,
+    lotes: vigente.lotes,
+    escritos: igual ? 0 : 2,
+    bytesCapa: igual ? 0 : bytesDe(resumen.contenido),
+    bytesLoteMayor: 0,
+    bytesFichas: 0,
+  };
+  return publicada;
 });
 
 /** Texto de un fallo de la publicación para el registro. */

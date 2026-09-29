@@ -49,8 +49,15 @@ const cruzaLaPantalla = (
   cambio.seVe(cambio.proyectar(desde)) ||
   (hasta !== undefined && cambio.seVe(cambio.proyectar(hasta)));
 
+/**
+ * Se anima al cambiar de nivel y, en el mismo nivel, cuando la transición dice algo: al llegar
+ * una provincia, sus emplazamientos salen de su hexágono (ADR 0016).
+ */
 const hayQueAnimar = (cambio: CambioDeEscena): boolean =>
-  !cambio.reducido && cambio.anterior !== undefined && cambio.anterior.nivel !== cambio.nueva.nivel;
+  !cambio.reducido &&
+  cambio.anterior !== undefined &&
+  (cambio.anterior.nivel !== cambio.nueva.nivel ||
+    cambio.transicion.destino.size + cambio.transicion.origen.size > 0);
 
 /** Qué pasa con lo que estaba pintado y no está en la escena nueva: se va o se quita ya. */
 const loQueSeVa = (pintado: Pintado, cambio: CambioDeEscena): Pintado | undefined => {
@@ -98,7 +105,8 @@ const comoLlega = (elemento: Elemento, cambio: CambioDeEscena): Movimiento => {
  * - Solo se anima lo que se ve: lo que se va fuera de la pantalla se quita ya y lo que llega fuera
  *   de ella aparece sin transición. Así un cambio de nivel toca los menos nodos posibles.
  * - En el mismo nivel (el mapa se ha desplazado), lo que desaparece está fuera de la vista y se
- *   quita ya, y lo que aparece lo hace sin transición.
+ *   quita ya, y lo que aparece lo hace sin transición. Salvo si llega una provincia: sus
+ *   emplazamientos salen del hexágono que la representaba.
  * - Con `reducido` (la preferencia de reducir movimiento) todo cambia de golpe.
  */
 export const siguientesPintados = (

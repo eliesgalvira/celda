@@ -1,4 +1,10 @@
-import { Caja as CajaEsquema, Cuadro, cuadroDe, type ZonaDeBarrido } from "@celda/dominio/barrido";
+import {
+  Caja as CajaEsquema,
+  Cuadro,
+  cuadroDe,
+  ZONAS_DE_BARRIDO,
+  type ZonaDeBarrido,
+} from "@celda/dominio/barrido";
 import { compararTexto } from "@celda/dominio/banda";
 import { emplazamientoDeCapa } from "@celda/dominio/capa";
 import { Emplazamiento } from "@celda/dominio/emplazamiento";
@@ -35,6 +41,7 @@ import {
 } from "@celda/ingesta/guardado";
 import { PRIORIDAD } from "@celda/ingesta/antenasmoviles/normalizar";
 import { BaseDePuntos } from "@celda/ingesta/barridoDePuntos";
+import { zonasBarridas } from "@celda/publicacion/cobertura";
 import {
   DatosNoDisponibles,
   DatosPublicables,
@@ -1016,6 +1023,13 @@ export const baseNocturna = (opciones: OpcionesBase) =>
 
       const datos = DatosPublicables.of({
         version: versionDeLosDatos.pipe(Effect.mapError(noDisponible)),
+        // Las zonas que se han empezado a barrer alguna vez, con su último barrido completo.
+        cobertura: Effect.map(base.estadoDeZonas("registro-oficial"), (estados) =>
+          zonasBarridas(
+            ZONAS_DE_BARRIDO.filter((zona) => estados.has(zona.nombre)),
+            new Map([...estados].map(([zona, estado]) => [zona, estado.completado])),
+          ),
+        ),
         emplazamientos: Effect.gen(function* () {
           const filas = yield* decodificar(FilaEmplazamiento)(
             yield* sql`SELECT clave, version, datos FROM emplazamientos ORDER BY clave`,

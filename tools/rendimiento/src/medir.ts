@@ -17,6 +17,12 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  *
  *   pnpm run medir -- --capas <carpeta publicada> [--web ../../apps/web/dist] [--cpu 4,6]
  *                     [--repeticiones 3] [--trazas <carpeta>] [--json <fichero>]
+ *                     [--escenario barcelona|espana]
+ *
+ * El escenario `barcelona` hace los gestos de siempre sobre la vista inicial. El de `espana`, el
+ * de varias provincias (ADR 0016): aleja hasta ver toda España con el resumen, toca el hexágono
+ * de Barcelona, acerca hasta la calle tocando la agrupación mayor, vuelve al nivel de provincias
+ * y cruza de una a otra arrastrando, y al final mide la memoria de la página y sus Workers.
  */
 
 const { values: opciones } = NodeUtil.parseArgs({
@@ -34,6 +40,7 @@ const { values: opciones } = NodeUtil.parseArgs({
     "solo-carga": { type: "boolean", default: false },
     // Fracción de CPU ocupada por encima de la cual se espera antes de cada ronda.
     calma: { type: "string", default: "0.08" },
+    escenario: { type: "string", default: "barcelona" },
   },
 });
 
@@ -281,6 +288,43 @@ const arrastrar = async (cdp: CDPSession) => {
   }
 };
 
+/** Un arrastre de un dedo de `dx`, `dy` píxeles en unos 0,6 s, y un momento para asentarse. */
+const arrastrarUnaVez = async (cdp: CDPSession, dx: number, dy: number) => {
+  const pasos = 36;
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [CENTRO] });
+  for (let i = 1; i <= pasos; i += 1) {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: CENTRO.x + (dx * i) / pasos, y: CENTRO.y + (dy * i) / pasos }],
+    });
+    await esperar(16);
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await esperar(700);
+};
+
+/**
+ * La memoria de la página y de sus Workers (`measureUserAgentSpecificMemory`, que pide la página
+ * aislada) y el montón de JavaScript del hilo principal (CDP).
+ */
+const medirMemoria = async (pagina: Page, cdp: CDPSession) => {
+  const total = await pagina
+    .evaluate(async () => {
+      // SAFETY: la API existe en Chromium con la página aislada; sin ella, no hay medida.
+      const medir = (
+        performance as Performance & {
+          measureUserAgentSpecificMemory?: () => Promise<{ bytes: number }>;
+        }
+      ).measureUserAgentSpecificMemory;
+      return medir === undefined ? undefined : (await medir.call(performance)).bytes;
+    })
+    .catch(() => undefined);
+  await cdp.send("Performance.enable");
+  const { metrics } = await cdp.send("Performance.getMetrics");
+  const hilo = metrics.find((m) => m.name === "JSHeapUsedSize")?.value;
+  return { total, hilo };
+};
+
 const pellizcar = async (cdp: CDPSession) => {
   for (const escala of [1.8, 1 / 1.8]) {
     await cdp.send("Input.synthesizePinchGesture", {
@@ -324,6 +368,30 @@ const pulsar = async (pagina: Page, etiqueta: string, veces: number) => {
     }
     await boton.tap();
     await esperar(700);
+  }
+};
+
+/**
+ * Acerca hasta la calle como lo haría una persona: toca la agrupación con más emplazamientos de
+ * las que se ven, y así hasta `veces` o hasta que ya no queda ninguna.
+ */
+const abrirAgrupaciones = async (pagina: Page, veces: number) => {
+  for (let i = 0; i < veces; i += 1) {
+    const objetivo = await pagina.evaluate(() => {
+      const lamina = document.querySelector('section[aria-label="Emplazamientos"]');
+      const botones = [...(lamina?.querySelectorAll(":scope > button:not([inert])") ?? [])];
+      return botones
+        .map((b) => {
+          const caja = b.getBoundingClientRect();
+          const numero = Number.parseInt(b.getAttribute("aria-label") ?? "", 10);
+          return { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2, numero };
+        })
+        .filter((c) => Number.isFinite(c.numero) && c.x > 30 && c.x < 330 && c.y > 160 && c.y < 700)
+        .sort((a, b) => b.numero - a.numero)[0];
+    });
+    if (objetivo === undefined) return;
+    await pagina.touchscreen.tap(objetivo.x, objetivo.y);
+    await esperar(1200);
   }
 };
 
@@ -389,7 +457,7 @@ const tocarFicha = async (pagina: Page, cerca: { x: number; y: number }) => {
   await esperar(50);
   let lotes = 0;
   const contar = (peticion: { url: () => string }) => {
-    if (peticion.url().includes("/fichas@")) lotes += 1;
+    if (peticion.url().includes("/fichas/")) lotes += 1;
   };
   pagina.on("request", contar);
   await pagina.touchscreen.tap(objetivo.x, objetivo.y);
@@ -411,8 +479,10 @@ interface Ronda {
   readonly carga: {
     readonly mapaBase: number | undefined;
     readonly marcadores: number | undefined;
+    readonly detalle: number | undefined;
     readonly lcp: number | undefined;
     readonly tesela: number | undefined;
+    readonly resumen: number | undefined;
     readonly capa: number | undefined;
     readonly bytes: number;
     readonly peticiones: number;
@@ -437,6 +507,10 @@ interface Ronda {
   /** Las interacciones más lentas, para saber de dónde sale el INP. */
   readonly interacciones: ReadonlyArray<{ readonly duracion: number; readonly tipo: string }>;
   readonly trazas: Readonly<Record<string, ResumenDeTraza>>;
+  /** Tras el escenario de España: memoria de la página y sus Workers, y del hilo principal. */
+  readonly memoria: { readonly total: number | undefined; readonly hilo: number | undefined };
+  /** Tras el escenario de España: lo pedido de las capas, en total. */
+  readonly capasTrasElRecorrido: { readonly bytes: number; readonly peticiones: number };
 }
 
 const ronda = async (
@@ -506,6 +580,47 @@ const ronda = async (
   };
 
   let ficha: Ronda["ficha"] = { fria: undefined, vecina: undefined, enCache: undefined };
+  let memoria: Ronda["memoria"] = { total: undefined, hilo: undefined };
+  /**
+   * Varias provincias: de la vista inicial a toda España con el resumen, de ahí a Barcelona y a
+   * la calle, vuelta al nivel de provincias y cruzar de una a otra. Al acabar, la memoria.
+   */
+  const recorridoPorEspana = async () => {
+    await esperar(500);
+    marcadores.inicio = await contarMarcadores(pagina);
+    await medir("alejar-a-espana", () => pulsar(pagina, "Alejar", 6));
+    marcadores.espana = await contarMarcadores(pagina);
+    // Con toda España a la vista, los límites del mapa lo han centrado: se vuelve a Barcelona
+    // tocando su hexágono, como haría una persona.
+    await medir("abrir-provincia", async () => {
+      await pagina
+        .getByRole("button", { name: /^Barcelona, / })
+        .first()
+        .tap();
+      await esperar(1200);
+    });
+    marcadores.provincia = await contarMarcadores(pagina);
+    await medir("acercar-a-calle", () => abrirAgrupaciones(pagina, 6));
+    marcadores.calle = await contarMarcadores(pagina);
+    await medir("alejar-a-provincias", () => pulsar(pagina, "Alejar", 6));
+    marcadores.provincias = await contarMarcadores(pagina);
+    // Hacia el oeste y el norte, cruzando bordes de provincia, y vuelta.
+    await medir("cruzar-provincias", async () => {
+      for (const [dx, dy] of [
+        [300, 0],
+        [300, 0],
+        [300, 150],
+        [-300, -150],
+        [-300, 0],
+        [-300, 0],
+      ] as const) {
+        await arrastrarUnaVez(cdp, dx, dy);
+      }
+    });
+    marcadores.cruzar = await contarMarcadores(pagina);
+    await esperar(1500);
+    memoria = await medirMemoria(pagina, cdp);
+  };
   const gestosYFicha = async () => {
     // Lejos: la vista inicial, Barcelona entera.
     await esperar(500);
@@ -542,7 +657,12 @@ const ronda = async (
 
     ficha = { fria: fria?.ms, vecina, enCache };
   };
-  if (opciones["solo-carga"] !== true) await gestosYFicha();
+  if (opciones["solo-carga"] !== true) {
+    await (opciones.escenario === "espana" ? recorridoPorEspana() : gestosYFicha());
+  }
+  const trasElRecorrido = (
+    await red.peticiones(await pagina.evaluate(() => performance.timeOrigin))
+  ).filter((p) => new URL(p.url).pathname.startsWith("/capas/"));
   const interacciones = await pagina.evaluate(() => window.__celda.interacciones());
   // Otra visita con la caché HTTP de la primera: lo que ve quien vuelve.
   const otra = await contexto.newPage();
@@ -565,9 +685,11 @@ const ronda = async (
     carga: {
       mapaBase: carga.mapaBase,
       marcadores: carga.marcadores,
+      detalle: carga.detalle,
       lcp: carga.lcp,
       tesela: primera(/tiles\.openfreemap\.org\/planet\/.*\.pbf/u),
-      capa: primera(/\/capas\/sitios@/u),
+      resumen: primera(/\/capas\/resumen@/u),
+      capa: primera(/\/capas\/provincias\//u),
       bytes,
       peticiones: peticiones.length,
       porOrigen,
@@ -579,6 +701,11 @@ const ronda = async (
     marcadores,
     repetida: { mapaBase: repetida.mapaBase, marcadores: repetida.marcadores },
     ficha,
+    memoria,
+    capasTrasElRecorrido: {
+      bytes: trasElRecorrido.reduce((a, p) => a + p.bytes, 0),
+      peticiones: trasElRecorrido.length,
+    },
     inp: Math.max(0, ...interacciones.map((i) => i.duracion)),
     interacciones: [...interacciones].sort((a, b) => b.duracion - a.duracion).slice(0, 5),
     trazas: resumenes,
@@ -605,8 +732,10 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
     lineas.push("| Carga | ms |", "|---|---|");
     lineas.push(`| Primera tesela recibida | ${f(m((r) => r.carga.tesela))} |`);
     lineas.push(`| Mapa base visible | ${f(m((r) => r.carga.mapaBase))} |`);
-    lineas.push(`| Capa recibida | ${f(m((r) => r.carga.capa))} |`);
+    lineas.push(`| Resumen recibido | ${f(m((r) => r.carga.resumen))} |`);
+    lineas.push(`| Primera capa de provincia recibida | ${f(m((r) => r.carga.capa))} |`);
     lineas.push(`| Primeros marcadores | ${f(m((r) => r.carga.marcadores))} |`);
+    lineas.push(`| Primeros emplazamientos o agrupaciones | ${f(m((r) => r.carga.detalle))} |`);
     lineas.push(`| LCP | ${f(m((r) => r.carga.lcp))} |`);
     lineas.push(
       `| Tareas largas (n / la mayor / bloqueo total) | ${f(m((r) => r.carga.tareasLargas))} / ${f(m((r) => r.carga.tareaMasLarga))} / ${f(m((r) => r.carga.bloqueo))} |`,
@@ -652,6 +781,12 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
     lineas.push(`| La primera otra vez (lote en caché) | ${f(m((r) => r.ficha.enCache))} |`);
     lineas.push(`| INP de toda la sesión | ${f(m((r) => r.inp))} |`);
     lineas.push(
+      `\nCapas tras el recorrido: ${f(m((r) => r.capasTrasElRecorrido.bytes / 1024))} KB / ${f(m((r) => r.capasTrasElRecorrido.peticiones))} peticiones`,
+    );
+    lineas.push(
+      `Memoria: ${f(m((r) => (r.memoria.total === undefined ? undefined : r.memoria.total / 1048576)))} MB página y Workers, ${f(m((r) => (r.memoria.hilo === undefined ? undefined : r.memoria.hilo / 1048576)))} MB de montón del hilo principal`,
+    );
+    lineas.push(
       `\nInteracciones más lentas: ${suyas.map((r) => r.interacciones.map((i) => `${i.tipo} ${Math.round(i.duracion)}`).join(", ")).join(" · ")}`,
     );
     const primera = suyas[0];
@@ -681,7 +816,9 @@ const principal = async () => {
   // Varias webs a la vez (`--web antes,despues`): las rondas se alternan, así el ruido de la
   // máquina reparte igual entre ellas.
   const webs = opciones.web.split(",").map((web) => NodePath.resolve(web));
-  const sitios = await Promise.all(webs.map((web) => servirSitio(web, NodePath.resolve(capas))));
+  const sitios = await Promise.all(
+    webs.map((web) => servirSitio(web, NodePath.resolve(capas), opciones.escenario === "espana")),
+  );
   const navegador = await chromium.launch({
     executablePath: opciones.chromium,
     args: [

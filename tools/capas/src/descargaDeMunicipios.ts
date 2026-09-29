@@ -2,6 +2,7 @@ import {
   type FuenteDeMunicipios,
   indexarMunicipios,
   LimitesDeMunicipios,
+  PadronDeMunicipios,
 } from "@celda/dominio/municipio";
 import {
   type ClienteDeFuente,
@@ -205,4 +206,12 @@ const decodificarMunicipios = Schema.decodeEffect(Schema.fromJsonString(LimitesD
 export const leerMunicipios = Effect.fn("Capas.leerMunicipios")(function* (ruta: string) {
   const fs = yield* FileSystem.FileSystem;
   return indexarMunicipios(yield* decodificarMunicipios(yield* fs.readFileString(ruta)));
+});
+
+const decodificarPadron = Schema.decodeEffect(Schema.fromJsonString(PadronDeMunicipios));
+
+/** Lee el padrón de los municipios guardado en el repositorio. */
+export const leerPadron = Effect.fn("Capas.leerPadron")(function* (ruta: string) {
+  const fs = yield* FileSystem.FileSystem;
+  return yield* decodificarPadron(yield* fs.readFileString(ruta));
 });

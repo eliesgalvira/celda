@@ -66,6 +66,15 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - El mapa base no rotula barrios por debajo del zoom 14 (`estilo.ts`): se pisaban con las etiquetas de Celda.
 - El crédito de los límites de barrio va con los del mapa base. En el móvil los créditos se pliegan tras un botón «i» (ver «Controles del mapa»).
 
+## Provincias y resumen nacional
+
+- Por debajo del zoom 8 el mapa solo dibuja el resumen nacional: `marcadores/MarcadorProvincia.tsx`, un hexágono por provincia con su número y, en la forma completa, su nombre y lo que se sabe de ella (ADR 0016). Como los barrios, tiene forma completa y compacta, y `formasDeEtiquetas` (`apps/web/src/capa/etiquetas.ts`) reparte las dos entre barrios y provincias con `medidaDeProvincia`.
+- Tres coberturas, cada una con su aspecto: `entera` (hexágono oscuro, borde continuo, su número y sus ausencias), `parcial` (el mismo hexágono con el borde discontinuo y «solo una parte»: su número es el de lo barrido, no el de la provincia) y `ninguna` (hexágono claro, borde discontinuo, sin número y «aún no está»). Nunca se pinta un trozo de provincia como si estuviera entero.
+- Desde el zoom 8, mientras llega la capa de una provincia se ve su hexágono dentro de lo que se ve de ella, con `carga="cargando"`: late (`animate-pulse`, sin él con la preferencia de reducir movimiento), lleva `aria-busy` y dice «cargando…». Si no llega, «no ha llegado», y la marca de agua lo dice con un reintento.
+- Su nombre accesible lo escribe la web (`nombreDeProvincia` en `capa/marcadores.ts`): «Barcelona, 2904 emplazamientos, sin Yoigo, acercar», «Huesca, 184 emplazamientos en la parte que Celda ya tiene, acercar», «Soria, Celda aún no tiene sus emplazamientos, acercar». Pulsarlo acerca hasta ver sus emplazamientos, o hasta el zoom 8 si no tiene ninguno.
+- `DatosDelMapa` tiene el tono `limite`: lo que se ve queda fuera de lo barrido, «Celda aún no tiene datos de aquí», con un hexágono del color de aviso y, para el lector de pantalla, qué zonas tiene Celda. Con provincias de versiones distintas a la vista, la fecha va de la más antigua a la más reciente, y si el último barrido es posterior a los datos, también lo dice.
+- En escritorio los créditos no llegan a la columna de los controles aunque ocupen varias líneas: con el del IGN son más largos.
+
 ## Panel del emplazamiento
 
 - `panel/PanelEmplazamiento.tsx` es el contenedor. En escritorio ocupa una columna de 27rem a la izquierda. En el móvil es una hoja inferior con tres alturas (resumen, media y completa) y el padre controla cuál toca con `altura` y `alCambiarAltura`.

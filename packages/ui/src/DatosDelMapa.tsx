@@ -13,6 +13,8 @@ export const variantesDatosDelMapa = cva(
         espera: "text-tinta-suave",
         /** La capa no ha cargado. */
         fallo: "text-aviso-tinta",
+        /** Lo que se ve queda fuera de lo que Celda tiene: se dice, sin alarmar. */
+        limite: "text-tinta",
       },
     },
     defaultVariants: { tono: "fecha" },
@@ -27,8 +29,10 @@ export type DatosDelMapaProps = VariantProps<typeof variantesDatosDelMapa> & {
 };
 
 /**
- * La marca de agua del mapa: de qué fecha son los datos que se ven (historia 56). Tiene un ancho
- * fijo, así que cambiar de «cargando» a la fecha no mueve nada.
+ * La marca de agua del mapa: de qué fecha son los datos que se ven (historia 56), o que Celda
+ * aún no tiene datos de lo que se ve. Tiene un ancho fijo, así que cambiar de «cargando» a la
+ * fecha no mueve nada. El detalle va en `title`; con el tono `limite`, además, en el texto que lee
+ * el lector de pantalla, porque dice qué tiene Celda.
  */
 export function DatosDelMapa(props: DatosDelMapaProps) {
   return (
@@ -43,7 +47,13 @@ export function DatosDelMapa(props: DatosDelMapaProps) {
           class="hexagono size-2 shrink-0 animate-pulse bg-primario motion-reduce:animate-none"
         />
       </Show>
+      <Show when={props.tono === "limite"}>
+        <span aria-hidden="true" class="hexagono size-2 shrink-0 bg-aviso" />
+      </Show>
       <span class="truncate">{props.texto}</span>
+      <Show when={props.tono === "limite" ? props.detalle : undefined}>
+        {(detalle) => <span class="sr-only">{detalle()}</span>}
+      </Show>
     </output>
   );
 }

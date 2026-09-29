@@ -36,8 +36,8 @@ describe("App", () => {
 
     const acercar = getByRole("button", { name: "Acercar" });
     assert.isTrue(acercar instanceof HTMLButtonElement && acercar.disabled);
-    assert.strictEqual(getByRole("main").getAttribute("aria-label"), "Mapa de Barcelona");
-    assert.strictEqual(document.title, "Mapa de Barcelona · Celda");
+    assert.strictEqual(getByRole("main").getAttribute("aria-label"), "Mapa de España");
+    assert.strictEqual(document.title, "Mapa de España · Celda");
   });
 
   it("una dirección que no existe lleva de vuelta al mapa", () => {

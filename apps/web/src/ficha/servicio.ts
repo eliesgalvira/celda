@@ -1,6 +1,5 @@
-import { type CapaLeida, ficheroDeLote } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
-import { leerLote } from "@celda/dominio/loteDeFichas";
+import { leerCapaDeProvincia, leerLoteDeProvincia } from "@celda/dominio/provincias";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -8,9 +7,15 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as HttpClient from "effect/unstable/http/HttpClient";
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
-import { CapaEmplazamientos, descargarCapa, leerVigente, origenDeCapas } from "../capa/servicio.ts";
+import type { ProvinciaCargada } from "../capa/nacional.ts";
+import {
+  CapaEmplazamientos,
+  descargarFichero,
+  descargarResumen,
+  leerVigente,
+  origenDeCapas,
+} from "../capa/servicio.ts";
 
 /** La ficha no se ha podido leer: el origen no responde o lo que ha llegado no es una ficha. */
 export class FichaNoLeida extends Schema.TaggedError<FichaNoLeida>()("FichaNoLeida", {
@@ -19,23 +24,29 @@ export class FichaNoLeida extends Schema.TaggedError<FichaNoLeida>()("FichaNoLei
 
 /** El origen ya no tiene el lote de esa versión. */
 class LoteRetirado extends Schema.TaggedError<LoteRetirado>()("LoteRetirado", {
-  url: Schema.String,
+  fichero: Schema.String,
 }) {}
+
+/** Un emplazamiento cuya ficha se pide: su clave y la provincia en cuya capa va. */
+export interface FichaPedida {
+  readonly clave: string;
+  readonly provincia: string;
+}
 
 /**
  * Las fichas publicadas de los emplazamientos. `leer` da la ficha de un emplazamiento de la capa
- * que dibuja el mapa, o `None` si esa capa no tiene ningún emplazamiento con esa clave.
+ * de su provincia, o `None` si esa capa no tiene ningún emplazamiento con esa clave.
  */
 export class FichasPublicadas extends Context.Service<
   FichasPublicadas,
   {
-    readonly leer: (clave: string) => Effect.Effect<Option.Option<Ficha>, FichaNoLeida>;
+    readonly leer: (pedida: FichaPedida) => Effect.Effect<Option.Option<Ficha>, FichaNoLeida>;
     /**
-     * Descarga ya el lote de las fichas de estas claves, sin abrir ninguna, para que abrirlas
-     * después no espere a la red. Pide como mucho `LOTES_PRECARGADOS` lotes, los que más claves
-     * tienen. No falla: si no llega, abrir la ficha lo vuelve a intentar.
+     * Descarga ya el lote de las fichas de estos emplazamientos, sin abrir ninguna, para que
+     * abrirlas después no espere a la red. Pide como mucho `LOTES_PRECARGADOS` lotes, los que más
+     * emplazamientos tienen. No falla: si no llega, abrir la ficha lo vuelve a intentar.
      */
-    readonly precargar: (claves: ReadonlyArray<string>) => Effect.Effect<void>;
+    readonly precargar: (pedidas: ReadonlyArray<FichaPedida>) => Effect.Effect<void>;
   }
 >()("@celda/web/ficha/servicio/FichasPublicadas") {}
 
@@ -45,16 +56,20 @@ export class FichasPublicadas extends Context.Service<
  */
 export const LOTES_PRECARGADOS = 2;
 
-/** Qué lote de fichas tiene cada clave en cada capa leída. */
-const lotesPorCapa = new WeakMap<CapaLeida, ReadonlyMap<string, number>>();
+/** Qué fichero de lote tiene cada clave en cada provincia cargada. */
+const lotesPorProvincia = new WeakMap<ProvinciaCargada, ReadonlyMap<string, string>>();
 
-const loteDe = (capa: CapaLeida, clave: string): Option.Option<number> => {
-  let lotes = lotesPorCapa.get(capa);
+const loteDe = (provincia: ProvinciaCargada, clave: string): Option.Option<string> => {
+  let lotes = lotesPorProvincia.get(provincia);
   if (lotes === undefined) {
+    const { capa } = provincia;
     lotes = new Map(
-      capa.emplazamientos.flatMap((e) => (e.lote === undefined ? [] : [[e.clave, e.lote]])),
+      capa.emplazamientos.flatMap((e) => {
+        const fichero = capa.lotes[e.lote ?? -1];
+        return fichero === undefined ? [] : [[e.clave, fichero] as const];
+      }),
     );
-    lotesPorCapa.set(capa, lotes);
+    lotesPorProvincia.set(provincia, lotes);
   }
   return Option.fromNullishOr(lotes.get(clave));
 };
@@ -62,15 +77,16 @@ const loteDe = (capa: CapaLeida, clave: string): Option.Option<number> => {
 const noLeida = (motivo: string) => new FichaNoLeida({ motivo });
 
 /**
- * Las fichas del origen estático, en lotes de emplazamientos vecinos de la misma versión que la
- * capa (ADR 0004):
+ * Las fichas del origen estático, en lotes de emplazamientos vecinos de cada provincia (ADR 0004
+ * y 0016):
  *
- * - Espera a la capa del mapa, que dice en qué lote está cada emplazamiento, y lee ese lote.
- * - Guarda cada lote leído, que no cambia nunca: abrir otra ficha del mismo lote no pide nada, y
- *   dos lecturas a la vez del mismo lote hacen una sola petición.
- * - Si el origen ya no tiene el lote de esa versión, porque la pestaña lleva abierta desde antes
- *   de otra publicación, lee la ficha de la versión vigente. Esa ficha puede ser más reciente que
- *   el mapa, y la marca de agua lo dice.
+ * - Espera a la capa de la provincia, que dice en qué lote está cada emplazamiento, y lee ese
+ *   lote. Los lotes se nombran por su contenido, así que un lote leído es el de esa capa.
+ * - Guarda cada lote leído: abrir otra ficha del mismo lote no pide nada, y dos lecturas a la vez
+ *   del mismo lote hacen una sola petición.
+ * - Si el origen ya no tiene el lote, porque la pestaña lleva abierta desde antes de varias
+ *   publicaciones, lee la ficha de la versión vigente. Esa ficha puede ser más reciente que el
+ *   mapa, y la marca de agua lo dice.
  *
  * Una lectura interrumpida, porque se ha cambiado de emplazamiento, cancela su petición.
  */
@@ -83,40 +99,32 @@ export const fichasDelOrigen = Layer.effect(
     const leidos = new Map<string, ReadonlyMap<string, Ficha>>();
     const turnos = new Map<string, Semaphore.Semaphore>();
 
-    const descargarLote = (version: string, lote: number) =>
+    const descargarLote = (cliente: HttpClient.HttpClient, provincia: string, fichero: string) =>
       Effect.gen(function* () {
-        const url = `${origen}/${ficheroDeLote(version, lote)}`;
-        const respuesta = yield* http
-          .get(url)
-          .pipe(Effect.mapError((error) => noLeida(error.message)));
-        if (respuesta.status === 404) {
-          return yield* new LoteRetirado({ url });
-        }
-        const texto = yield* HttpClientResponse.filterStatusOk(respuesta).pipe(
-          Effect.flatMap((ok) => ok.text),
+        const texto = yield* descargarFichero(cliente, origen, fichero).pipe(
+          Effect.mapError((error) => noLeida(error.motivo)),
+        );
+        if (Option.isNone(texto)) return yield* new LoteRetirado({ fichero });
+        const fichas = yield* Effect.fromResult(leerLoteDeProvincia(texto.value, provincia)).pipe(
           Effect.mapError((error) => noLeida(error.message)),
         );
-        const leido = yield* Effect.fromResult(leerLote(texto, version, lote)).pipe(
-          Effect.mapError((error) => noLeida(error.message)),
-        );
-        return new Map(leido.fichas.map((ficha) => [ficha.clave, ficha]));
+        return new Map(fichas.map((ficha) => [ficha.clave, ficha]));
       });
 
     /** El lote, de lo ya leído o del origen, una sola petición aunque lo pidan varios a la vez. */
-    const loteLeido = (version: string, lote: number) => {
-      const clave = ficheroDeLote(version, lote);
-      let turno = turnos.get(clave);
+    const loteLeido = (provincia: string, fichero: string) => {
+      let turno = turnos.get(fichero);
       if (turno === undefined) {
         turno = Semaphore.makeUnsafe(1);
-        turnos.set(clave, turno);
+        turnos.set(fichero, turno);
       }
       return turno.withPermits(1)(
         Effect.suspend(() => {
-          const guardado = leidos.get(clave);
+          const guardado = leidos.get(fichero);
           return guardado === undefined
-            ? Effect.tap(descargarLote(version, lote), (fichas) =>
+            ? Effect.tap(descargarLote(http, provincia, fichero), (fichas) =>
                 Effect.sync(() => {
-                  leidos.set(clave, fichas);
+                  leidos.set(fichero, fichas);
                 }),
               )
             : Effect.succeed(guardado);
@@ -124,33 +132,29 @@ export const fichasDelOrigen = Layer.effect(
       );
     };
 
-    const fichaDe = (
-      capa: CapaLeida,
-      clave: string,
-    ): Effect.Effect<Option.Option<Ficha>, FichaNoLeida | LoteRetirado> =>
-      Option.match(loteDe(capa, clave), {
-        // Sin lote puede ser que no exista o que la capa sea de antes de publicar las fichas.
-        onNone: () =>
-          capa.emplazamientos.some((e) => e.clave === clave)
-            ? Effect.fail(noLeida(`la capa ${capa.version} no dice dónde está la ficha`))
-            : Effect.succeed(Option.none<Ficha>()),
-        onSome: (lote) =>
-          Effect.map(loteLeido(capa.version, lote), (fichas) =>
-            Option.fromNullishOr(fichas.get(clave)),
-          ),
-      });
-
     /** La ficha en la versión vigente, cuando la del mapa ya no está en el origen. */
-    const fichaDeLaVigente = (clave: string, anterior: string) =>
+    const fichaDeLaVigente = (pedida: FichaPedida, anterior: string) =>
       Effect.gen(function* () {
         const vigente = yield* leerVigente(http, origen);
         if (vigente.version === anterior) {
           return yield* noLeida(`el origen no tiene las fichas de ${anterior}`);
         }
-        return yield* fichaDe(yield* descargarCapa(http, origen, vigente), clave);
+        const resumen = yield* descargarResumen(http, origen, vigente);
+        const fichero = resumen.provincias.find((p) => p.codigo === pedida.provincia)?.fichero;
+        const texto =
+          fichero === undefined
+            ? Option.none<string>()
+            : yield* descargarFichero(http, origen, fichero);
+        if (Option.isNone(texto)) return Option.none<Ficha>();
+        const capa = yield* Effect.fromResult(leerCapaDeProvincia(texto.value, pedida.provincia));
+        const emplazamiento = capa.emplazamientos.find((e) => e.clave === pedida.clave);
+        const lote = capa.lotes[emplazamiento?.lote ?? -1];
+        if (lote === undefined) return Option.none<Ficha>();
+        const fichas = yield* loteLeido(pedida.provincia, lote);
+        return Option.fromNullishOr(fichas.get(pedida.clave));
       }).pipe(
         Effect.catchTags({
-          LoteRetirado: (error) => Effect.fail(noLeida(`${error.url} no está en el origen`)),
+          LoteRetirado: (error) => Effect.fail(noLeida(`${error.fichero} no está en el origen`)),
           SinCapaPublicada: () => Effect.fail(noLeida("el origen no tiene ninguna capa")),
           OrigenNoResponde: (error) => Effect.fail(noLeida(error.motivo)),
           CapaNoDescargada: (error) => Effect.fail(noLeida(error.motivo)),
@@ -159,28 +163,31 @@ export const fichasDelOrigen = Layer.effect(
         }),
       );
 
-    const leer = Effect.fn("FichasPublicadas.leer")(function* (clave: string) {
-      const capa = yield* capas.cargar.pipe(
-        Effect.mapError(() => noLeida("no ha llegado la capa del mapa")),
-      );
-      return yield* fichaDe(capa, clave).pipe(
-        Effect.catchTag("LoteRetirado", () => fichaDeLaVigente(clave, capa.version)),
-      );
+    const leer = Effect.fn("FichasPublicadas.leer")(function* (pedida: FichaPedida) {
+      const provincia = yield* capas
+        .provincia(pedida.provincia)
+        .pipe(Effect.mapError(() => noLeida("no ha llegado la capa de su provincia")));
+      const fichero = loteDe(provincia, pedida.clave);
+      if (Option.isNone(fichero)) return Option.none<Ficha>();
+      return yield* Effect.map(loteLeido(pedida.provincia, fichero.value), (fichas) =>
+        Option.fromNullishOr(fichas.get(pedida.clave)),
+      ).pipe(Effect.catchTag("LoteRetirado", () => fichaDeLaVigente(pedida, provincia.version)));
     });
 
     const precargar = Effect.fn("FichasPublicadas.precargar")(
-      function* (claves: ReadonlyArray<string>) {
-        const capa = yield* capas.cargar;
-        const cuantas = new Map<number, number>();
-        for (const clave of claves) {
-          const lote = Option.getOrUndefined(loteDe(capa, clave));
-          if (lote !== undefined) cuantas.set(lote, (cuantas.get(lote) ?? 0) + 1);
+      function* (pedidas: ReadonlyArray<FichaPedida>) {
+        const cuantas = new Map<string, { provincia: string; cuantas: number }>();
+        for (const pedida of pedidas) {
+          const provincia = yield* capas.provincia(pedida.provincia);
+          const fichero = Option.getOrUndefined(loteDe(provincia, pedida.clave));
+          if (fichero === undefined) continue;
+          const antes = cuantas.get(fichero)?.cuantas ?? 0;
+          cuantas.set(fichero, { provincia: pedida.provincia, cuantas: antes + 1 });
         }
         const lotes = [...cuantas]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, LOTES_PRECARGADOS)
-          .map(([lote]) => lote);
-        yield* Effect.forEach(lotes, (lote) => loteLeido(capa.version, lote), {
+          .sort((a, b) => b[1].cuantas - a[1].cuantas)
+          .slice(0, LOTES_PRECARGADOS);
+        yield* Effect.forEach(lotes, ([fichero, { provincia }]) => loteLeido(provincia, fichero), {
           concurrency: "unbounded",
           discard: true,
         });

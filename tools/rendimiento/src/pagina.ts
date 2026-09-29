@@ -6,8 +6,10 @@
 export interface CargaEnPagina {
   /** Cuándo se quita el aviso «Cargando el mapa base»: ha llegado la primera tesela. */
   readonly mapaBase: number | undefined;
-  /** Cuándo se pinta el primer marcador. */
+  /** Cuándo se pinta el primer marcador, aunque sea el hexágono de una provincia que llega. */
   readonly marcadores: number | undefined;
+  /** Cuándo se pinta el primer emplazamiento o agrupación de una provincia ya cargada. */
+  readonly detalle: number | undefined;
   readonly lcp: number | undefined;
   /** Qué elemento es el LCP: su etiqueta y el principio de su texto. */
   readonly elementoLcp: string;
@@ -61,6 +63,7 @@ export const instalar = (): void => {
 
   let mapaBase: number | undefined;
   let marcadores: number | undefined;
+  let detalle: number | undefined;
   let lcp: number | undefined;
   let elementoLcp = "";
   let avisoVisto = false;
@@ -90,7 +93,20 @@ export const instalar = (): void => {
         marcadores = t;
       });
     }
-    if (mapaBase === undefined || marcadores === undefined) requestAnimationFrame(mirarCarga);
+    if (
+      detalle === undefined &&
+      document.querySelector(
+        'section[aria-label="Emplazamientos"] button:not([data-cobertura])',
+      ) !== null
+    ) {
+      detalle = -1;
+      void pintado().then((t) => {
+        detalle = t;
+      });
+    }
+    if (mapaBase === undefined || marcadores === undefined || detalle === undefined) {
+      requestAnimationFrame(mirarCarga);
+    }
   };
   requestAnimationFrame(mirarCarga);
 
@@ -184,6 +200,7 @@ export const instalar = (): void => {
     carga: () => ({
       mapaBase: mapaBase === -1 ? undefined : mapaBase,
       marcadores: marcadores === -1 ? undefined : marcadores,
+      detalle: detalle === -1 ? undefined : detalle,
       lcp,
       elementoLcp,
       tareasLargas: [...tareasLargas],

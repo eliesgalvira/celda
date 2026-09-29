@@ -199,8 +199,11 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         </AspectoDeControl>
       </div>
 
-      {/* Mientras se elige en el móvil, los créditos quedan por encima de la hoja, en su pie. */}
-      <div class="absolute bottom-[max(0.25rem,env(safe-area-inset-bottom))] left-1 z-10 max-w-[calc(100%-1rem)] max-md:max-w-[calc(100%-10.5rem)] max-md:group-data-creditos/mapa:z-20 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.5rem)] max-md:group-data-eligiendo/mapa:z-30 md:group-data-panel/mapa:left-[calc(27rem+0.5rem)] md:group-data-panel-ancho/mapa:left-[calc(min(46rem,100vw-8rem)+0.5rem)]">
+      {/*
+        Mientras se elige en el móvil, los créditos quedan por encima de la hoja, en su pie. En
+        escritorio no llegan a la columna de los controles, aunque ocupen varias líneas.
+      */}
+      <div class="absolute bottom-[max(0.25rem,env(safe-area-inset-bottom))] left-1 z-10 max-w-[calc(100%-1rem)] max-md:max-w-[calc(100%-10.5rem)] max-md:group-data-creditos/mapa:z-20 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.5rem)] max-md:group-data-eligiendo/mapa:z-30 md:max-w-[calc(100%-6rem)] md:group-data-panel/mapa:left-[calc(27rem+0.5rem)] md:group-data-panel/mapa:max-w-[calc(100%-27.5rem-6rem)] md:group-data-panel-ancho/mapa:left-[calc(min(46rem,100vw-8rem)+0.5rem)] md:group-data-panel-ancho/mapa:max-w-[calc(100%-min(46rem,100vw-8rem)-6.5rem)]">
         <PliegueDeCreditos value={pliegue}>{props.atribucion}</PliegueDeCreditos>
       </div>
 

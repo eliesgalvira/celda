@@ -1,4 +1,5 @@
-import { BARCELONA, cajaDe, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
+import { ESPANA, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
+import type { ResumenLeido } from "@celda/dominio/provincias";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
@@ -22,10 +23,16 @@ import { createEffect, createMemo, createSignal, Match, Show, Switch } from "sol
 
 import {
   creditoDeBarrios,
+  creditoDeMunicipios,
   type EstadoCapa,
   estadoDeCarga,
+  type EstadoDeLaVista,
+  estadoDeLaVista,
+  estadoDeProvincia,
   textoDatosDelMapa,
 } from "../capa/estado.ts";
+import type { Vista } from "../capa/marcadores.ts";
+import { type EstadoProvincia, provinciasDeLaVista } from "../capa/nacional.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
 import { pistaDeCeldas } from "../celdas/celdas.ts";
 import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
@@ -37,7 +44,7 @@ import { SIN_ZONA, type ZonaEnMapa } from "../ejercicio/zona.ts";
 import { desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
-import { FichasPublicadas } from "../ficha/servicio.ts";
+import { type FichaPedida, FichasPublicadas } from "../ficha/servicio.ts";
 import {
   crearInterferencia,
   lienzoDelMapa as lienzoDeInterferencia,
@@ -62,6 +69,7 @@ import {
   emplazamientoDe,
   medirAbierto,
   navegar,
+  provinciaDe,
   ruta,
   ubicacion,
 } from "../lib/rutas.ts";
@@ -88,8 +96,8 @@ const ELECCION_VACIA: EleccionVista = { compania: "movistar", mhz: 1800, ocupaci
 const ESCRITORIO = "(min-width: 48rem)";
 
 /**
- * El mapa de Barcelona a pantalla completa con los emplazamientos de la capa vigente, la fecha
- * de sus datos y un aviso claro si algo no carga.
+ * El mapa de España a pantalla completa con los emplazamientos de la capa vigente, provincia a
+ * provincia (ADR 0016), la fecha de sus datos y un aviso claro si algo no carga o no está.
  */
 export function PantallaMapa() {
   const datos = usarDatos();
@@ -99,6 +107,10 @@ export function PantallaMapa() {
   const [escritorio, setEscritorio] = createSignal(window.matchMedia(ESCRITORIO).matches);
   const [estado, setEstado] = createSignal<EstadoMapa>({ tipo: "cargando" });
   const [capa, setCapa] = createSignal<EstadoCapa>({ tipo: "cargando" });
+  /** Cómo va cada provincia pedida. Una vez pedida, se queda para la visita. */
+  const [provincias, setProvincias] = createSignal<ReadonlyMap<string, EstadoProvincia>>(new Map());
+  /** Lo que enseña el mapa cada vez que se decide qué se dibuja. */
+  const [vistaDelMapa, setVistaDelMapa] = createSignal<Vista>();
   /** El mapa, cuando ya enseña el callejero. */
   const [mapaListo, setMapaListo] = createSignal<MapaMapLibre>();
   /**
@@ -121,13 +133,20 @@ export function PantallaMapa() {
   let intento = 0;
   // Lo mismo para cada carga de la capa: una respuesta vieja no pisa a la nueva.
   let intentoCapa = 0;
+  /** Las provincias que se están pidiendo, para cancelarlas al cerrar la pantalla. */
+  const pidiendose = new Map<string, AbortController>();
+  /**
+   * Las provincias ya pedidas en esta visita. No es una señal: se consulta justo después de
+   * escribir, y en Solid 2 una señal escrita no cambia hasta el siguiente `flush`.
+   */
+  const yaPedidas = new Set<string>();
 
   const fallar = (motivo: MotivoFallo) => setEstado({ tipo: "fallo", motivo });
 
   const crear = (modulo: ModuloMapaBase) => {
     if (contenedor === undefined) return;
     try {
-      const nuevo = modulo.crearMapaBase(contenedor, BARCELONA, {
+      const nuevo = modulo.crearMapaBase(contenedor, ESPANA, {
         listo: () => {
           setEstado({ tipo: "listo" });
           setMapaListo(nuevo);
@@ -179,15 +198,77 @@ export function PantallaMapa() {
     );
   };
 
-  /** Pide la capa vigente y la descarga, a la vez que el mapa base. */
+  /**
+   * Pide las provincias que aún no se han pedido. Una que falló no se vuelve a pedir sola al mover
+   * el mapa: se reintenta con su botón.
+   */
+  const pedirProvincias = (codigos: ReadonlyArray<string>) => {
+    const nuevas = codigos.filter((codigo) => !yaPedidas.has(codigo));
+    if (nuevas.length === 0) return;
+    for (const codigo of nuevas) yaPedidas.add(codigo);
+    setProvincias((antes) => {
+      const despues = new Map(antes);
+      for (const codigo of nuevas) despues.set(codigo, { tipo: "cargando" });
+      return despues;
+    });
+    for (const codigo of nuevas) {
+      const parar = new AbortController();
+      pidiendose.set(codigo, parar);
+      void datos
+        .runPromiseExit(
+          Effect.flatMap(CapaEmplazamientos, (servicio) => servicio.provincia(codigo)),
+          { signal: parar.signal },
+        )
+        .then((salida) => {
+          if (parar.signal.aborted) return;
+          pidiendose.delete(codigo);
+          setProvincias((antes) => new Map(antes).set(codigo, estadoDeProvincia(salida)));
+        });
+    }
+  };
+
+  const reintentarProvincias = (codigos: ReadonlyArray<string>) => {
+    for (const codigo of codigos) yaPedidas.delete(codigo);
+    pedirProvincias(codigos);
+  };
+
+  /** El resumen ya leído, para pedir provincias sin esperar al siguiente `flush`. */
+  let resumenLeido: ResumenLeido | undefined;
+  /** La última vista del mapa, por lo mismo. */
+  let ultimaVista: Vista | undefined;
+
+  /** Lo que hay que pedir para ver la vista, o la inicial si el mapa aún no ha dicho nada. */
+  const pedirLoQueSeVe = () => {
+    if (resumenLeido === undefined) return;
+    const inicial: Vista = { caja: ESPANA.encuadre, zoom: 10 };
+    pedirProvincias(provinciasDeLaVista(resumenLeido, ultimaVista ?? inicial));
+  };
+
+  /** El mapa ha decidido qué dibuja: se piden las provincias que se ven. */
+  const alCambiarVista = (vista: Vista) => {
+    ultimaVista = vista;
+    setVistaDelMapa(vista);
+    pedirLoQueSeVe();
+  };
+
+  /**
+   * Pide el resumen de la capa vigente, a la vez que el mapa base. En cuanto llega pide las
+   * provincias de lo que se ve y la del emplazamiento de la dirección, si la hay.
+   */
   const cargarCapa = () => {
     intentoCapa += 1;
     const este = intentoCapa;
     setCapa({ tipo: "cargando" });
     void datos
-      .runPromiseExit(Effect.flatMap(CapaEmplazamientos, (servicio) => servicio.cargar))
+      .runPromiseExit(Effect.flatMap(CapaEmplazamientos, (servicio) => servicio.resumen))
       .then((salida) => {
-        if (este === intentoCapa) setCapa(estadoDeCarga(salida));
+        if (este !== intentoCapa) return;
+        const cargada = estadoDeCarga(salida);
+        setCapa(cargada);
+        if (cargada.tipo !== "lista") return;
+        resumenLeido = cargada.resumen;
+        pedirLoQueSeVe();
+        if (emplazamientoDe(ubicacion()) !== null) pedirProvincias([provinciaDe(ubicacion())]);
       });
   };
 
@@ -202,6 +283,8 @@ export function PantallaMapa() {
     cargarCapa();
     return () => {
       intentoCapa += 1;
+      for (const parar of pidiendose.values()) parar.abort();
+      pidiendose.clear();
     };
   });
   recursoFijo("pantalla:escritorio", () => {
@@ -256,28 +339,44 @@ export function PantallaMapa() {
     },
   );
 
-  const emplazamientos = createMemo(() => {
+  const resumen = createMemo(() => {
     const actual = capa();
-    return actual.tipo === "lista" ? actual.capa.emplazamientos : [];
+    return actual.tipo === "lista" ? actual.resumen : undefined;
   });
-  /** Hasta dónde llegan los datos: la caja de los emplazamientos de la capa vigente. */
-  const cajaDeLosDatos = createMemo(() =>
-    cajaDe(emplazamientos().map((emplazamiento) => emplazamiento.posicion)),
+  /** Las provincias que han llegado. */
+  const cargadas = createMemo(() =>
+    [...provincias().values()].flatMap((estado) =>
+      estado.tipo === "lista" ? [estado.provincia] : [],
+    ),
   );
-  const barrios = createMemo(() => {
-    const actual = capa();
-    return actual.tipo === "lista" ? actual.capa.barrios : [];
-  });
-  /** Los créditos del mapa base y, con la capa, los de los límites de barrio que usa. */
+  /** Los emplazamientos de las provincias que han llegado: los que el mapa conoce ahora. */
+  const emplazamientos = createMemo(() => cargadas().flatMap((p) => p.capa.emplazamientos));
+  /** Hasta dónde llegan los datos: las zonas barridas del resumen. */
+  const cobertura = createMemo(() => resumen()?.cobertura);
+  /**
+   * Los créditos del mapa base y, con el resumen, los de los límites de municipios y de barrio
+   * que usan las capas.
+   */
   const creditos = createMemo(() => {
-    const actual = capa();
-    return actual.tipo === "lista"
-      ? [...CREDITOS_MAPA_BASE, creditoDeBarrios(actual.capa.fuenteDeBarrios)]
-      : CREDITOS_MAPA_BASE;
+    const fuentes = resumen()?.fuentes;
+    return fuentes === undefined
+      ? CREDITOS_MAPA_BASE
+      : [
+          ...CREDITOS_MAPA_BASE,
+          creditoDeMunicipios(fuentes.municipios),
+          creditoDeBarrios(fuentes.barrios),
+        ];
+  });
+  /** Lo que dice la marca de agua del mapa de lo que se ve. */
+  const estadoVista = createMemo(() => {
+    const actual = resumen();
+    return actual === undefined ? undefined : estadoDeLaVista(actual, provincias(), vistaDelMapa());
   });
 
   /** El emplazamiento con la ficha abierta, que dice la URL. */
   const seleccionada = createMemo(() => emplazamientoDe(ubicacion()));
+  /** La provincia en cuya capa va, que también dice la URL. */
+  const provinciaSeleccionada = createMemo(() => provinciaDe(ubicacion()));
   /**
    * El barrio del ejercicio abierto (`""` sin barrio), o `null` si está cerrado. Sin el modo
    * estudiante el ejercicio no se abre, aunque lo pida la URL.
@@ -325,9 +424,12 @@ export function PantallaMapa() {
       );
     },
   );
-  const fechaCapa = createMemo(() => {
-    const actual = capa();
-    return actual.tipo === "lista" ? actual.capa.fecha : undefined;
+  /** La fecha de los datos del mapa: la del resumen. */
+  const fechaCapa = createMemo(() => resumen()?.fecha);
+  /** La de la provincia del emplazamiento seleccionado, que puede ser de otra versión. */
+  const fechaDeLaSeleccionada = createMemo(() => {
+    const estado = provincias().get(provinciaSeleccionada());
+    return estado?.tipo === "lista" ? estado.provincia.fecha : fechaCapa();
   });
 
   /**
@@ -453,13 +555,13 @@ export function PantallaMapa() {
   });
 
   /** Las fichas de lo que se ve de cerca se descargan antes de tocarlas (ver `FichasPublicadas`). */
-  const precargarFichas = (claves: ReadonlyArray<string>) => {
-    void datos.runPromise(Effect.flatMap(FichasPublicadas, (fichas) => fichas.precargar(claves)));
+  const precargarFichas = (pedidas: ReadonlyArray<FichaPedida>) => {
+    void datos.runPromise(Effect.flatMap(FichasPublicadas, (fichas) => fichas.precargar(pedidas)));
   };
 
   /** Abre la ficha y, si el marcador queda debajo del panel, mueve el mapa lo justo. */
-  const seleccionar = (clave: string) => {
-    navegar(ruta.emplazamiento(clave));
+  const seleccionar = (clave: string, provincia: string) => {
+    navegar(ruta.emplazamiento(clave, provincia));
     const posicion = emplazamientos().find((e) => e.clave === clave)?.posicion;
     if (mapa === undefined || posicion === undefined) return;
     const desplazamiento = desplazamientoParaVer(
@@ -479,9 +581,10 @@ export function PantallaMapa() {
   createEffect(
     () => {
       const clave = seleccionada();
+      const suya = provincias().get(provinciaSeleccionada());
       return {
         listo: mapaListo(),
-        lista: capa().tipo === "lista",
+        lista: suya !== undefined && suya.tipo !== "cargando",
         posicion: emplazamientos().find((e) => e.clave === clave)?.posicion,
       };
     },
@@ -521,19 +624,24 @@ export function PantallaMapa() {
       <UbicacionContexto value={puntoDeReferencia}>
         <ServicioContexto value={servicio}>
           <DisposicionMapa
-            nombre={`Mapa de ${BARCELONA.nombre}`}
+            nombre={`Mapa de ${ESPANA.nombre}`}
             ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
             lienzo={(elemento) => {
               contenedor = elemento;
             }}
-            cabecera={<Cabecera lugar={BARCELONA.nombre} />}
-            datos={<EstadoDeLaCapa estado={capa()} reintentar={cargarCapa} />}
+            cabecera={<Cabecera lugar={ESPANA.nombre} />}
+            datos={
+              <EstadoDeLaCapa
+                estado={capa()}
+                vista={estadoVista()}
+                emplazamientos={resumen()?.provincias.reduce((n, p) => n + p.emplazamientos, 0)}
+                reintentar={cargarCapa}
+                reintentarProvincias={reintentarProvincias}
+              />
+            }
             ubicacion={
               <>
-                <AvisosDeUbicacion
-                  panelAbierto={panelAbierto()}
-                  cajaDeLosDatos={cajaDeLosDatos()}
-                />
+                <AvisosDeUbicacion panelAbierto={panelAbierto()} cobertura={cobertura()} />
                 <Show when={eligiendo()}>
                   <EleccionConBuscador
                     alUsarCentro={usarCentro}
@@ -550,14 +658,19 @@ export function PantallaMapa() {
               <Show when={mapaCreado()}>
                 {(actual) => (
                   <>
-                    <Marcadores
-                      mapa={actual()}
-                      emplazamientos={emplazamientos()}
-                      barrios={barrios()}
-                      seleccionada={seleccionada()}
-                      alSeleccionar={seleccionar}
-                      alVer={precargarFichas}
-                    />
+                    <Show when={resumen()}>
+                      {(leido) => (
+                        <Marcadores
+                          mapa={actual()}
+                          resumen={leido()}
+                          provincias={provincias()}
+                          seleccionada={seleccionada()}
+                          alSeleccionar={seleccionar}
+                          alVer={precargarFichas}
+                          alCambiarVista={alCambiarVista}
+                        />
+                      )}
+                    </Show>
                     <ReferenciaEnMapa
                       mapa={actual()}
                       escritorio={escritorio()}
@@ -645,7 +758,8 @@ export function PantallaMapa() {
                   {(clave) => (
                     <PanelFicha
                       clave={clave()}
-                      fechaCapa={fechaCapa()}
+                      provincia={provinciaSeleccionada()}
+                      fechaCapa={fechaDeLaSeleccionada()}
                       alCerrar={() => navegar(ruta.mapa)}
                     />
                   )}
@@ -683,47 +797,150 @@ export function PantallaMapa() {
   );
 }
 
+/** «Barcelona», «Barcelona y Girona», «Barcelona, Girona y Lleida». */
+const enumerar = (nombres: ReadonlyArray<string>): string =>
+  nombres.length <= 1
+    ? (nombres[0] ?? "")
+    : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1) ?? ""}`;
+
 /**
- * La fecha de los datos del mapa o, mientras llega la capa, que está cargando. Si no llega, lo
- * dice con un reintento: un mapa sin marcadores no quiere decir que no haya emplazamientos.
+ * La fecha de los datos de lo que se ve o, mientras llega la capa, que está cargando. Si no llega,
+ * lo dice con un reintento: un mapa sin marcadores no quiere decir que no haya emplazamientos. Lo
+ * mismo con cada provincia que se ve, y si lo que se ve queda fuera de lo barrido, lo dice
+ * (ADR 0016).
  */
 export function EstadoDeLaCapa(props: {
   readonly estado: EstadoCapa;
+  readonly vista: EstadoDeLaVista | undefined;
+  /** Cuántos emplazamientos tiene el resumen. */
+  readonly emplazamientos: number | undefined;
   readonly reintentar: () => void;
+  readonly reintentarProvincias: (codigos: ReadonlyArray<string>) => void;
 }) {
-  const reintentar = (
-    <Boton variante="secundario" onClick={() => props.reintentar()}>
-      Reintentar
-    </Boton>
-  );
+  // Todo sale de un solo memo que se lee en cada rama sin pasar por el valor de `Match`: al cambiar
+  // de rama, la vieja puede volver a leer antes de desmontarse, y con el valor de `Match` eso es
+  // una lectura caducada.
+  const marca = createMemo(() => marcaDeLaCapa(props.estado, props.vista));
+  const fallidas = () => {
+    const actual = marca();
+    return actual.tipo === "fallo-provincias" ? actual.provincias : [];
+  };
+  const motivo = () => {
+    const actual = marca();
+    return actual.tipo === "fallo" ? actual.motivo : "interno";
+  };
   return (
     <Switch>
-      <Match when={props.estado.tipo === "cargando"}>
+      <Match when={marca().tipo === "cargando"}>
         <DatosDelMapa tono="espera" texto="Cargando los emplazamientos…" />
       </Match>
-      <Match when={props.estado.tipo === "lista" ? props.estado.capa : undefined}>
-        {(lista) => (
-          <DatosDelMapa
-            texto={<TextoConTerminos texto={textoDatosDelMapa(lista().fecha)} />}
-            detalle={`${lista().emplazamientos.length} emplazamientos · capa ${lista().version}`}
-          />
-        )}
+      <Match when={marca().tipo === "fallo"}>
+        <Aviso
+          tono="fallo"
+          titulo="No se han podido cargar los emplazamientos"
+          acciones={
+            <Boton variante="secundario" onClick={() => props.reintentar()}>
+              Reintentar
+            </Boton>
+          }
+        >
+          {EXPLICACION_FALLO_CAPA[motivo()]} El mapa se ve, pero sin marcadores: eso no quiere decir
+          que no haya <Termino termino="emplazamiento">emplazamientos</Termino>.
+        </Aviso>
       </Match>
-      <Match when={props.estado.tipo === "fallo" ? props.estado.motivo : undefined}>
-        {(motivo) => (
-          <Aviso
-            tono="fallo"
-            titulo="No se han podido cargar los emplazamientos"
-            acciones={reintentar}
-          >
-            {EXPLICACION_FALLO_CAPA[motivo()]} El mapa se ve, pero sin marcadores: eso no quiere
-            decir que no haya <Termino termino="emplazamiento">emplazamientos</Termino>.
-          </Aviso>
-        )}
+      <Match when={marca().tipo === "fallo-provincias"}>
+        <Aviso
+          tono="fallo"
+          titulo={`No han llegado los emplazamientos de ${enumerar(fallidas().map((p) => p.nombre))}`}
+          acciones={
+            <Boton
+              variante="secundario"
+              onClick={() => props.reintentarProvincias(fallidas().map((p) => p.codigo))}
+            >
+              Reintentar
+            </Boton>
+          }
+        >
+          Puede fallar la conexión o estar bloqueado el servidor. Lo que se ve de esa provincia es
+          su resumen: eso no quiere decir que no haya{" "}
+          <Termino termino="emplazamiento">emplazamientos</Termino>.
+        </Aviso>
+      </Match>
+      <Match when={marca().tipo === "cargando-provincias"}>
+        <DatosDelMapa tono="espera" texto={textoDeMarca(marca())} />
+      </Match>
+      <Match when={marca().tipo === "sin-datos"}>
+        <DatosDelMapa
+          tono="limite"
+          texto="Celda aún no tiene datos de aquí"
+          detalle={detalleDeMarca(marca(), props.emplazamientos)}
+        />
+      </Match>
+      <Match when={marca().tipo === "datos"}>
+        <DatosDelMapa
+          texto={<TextoConTerminos texto={textoMarcadoDe(marca())} />}
+          detalle={detalleDeMarca(marca(), props.emplazamientos)}
+        />
       </Match>
     </Switch>
   );
 }
+
+/** Lo que dice la marca de agua del mapa, de la capa y de lo que se ve. */
+type MarcaDeLaCapa =
+  | { readonly tipo: "cargando" }
+  | { readonly tipo: "fallo"; readonly motivo: keyof typeof EXPLICACION_FALLO_CAPA }
+  | {
+      readonly tipo: "fallo-provincias";
+      readonly provincias: ReadonlyArray<{ readonly codigo: string; readonly nombre: string }>;
+    }
+  | { readonly tipo: "cargando-provincias"; readonly nombres: ReadonlyArray<string> }
+  | { readonly tipo: "sin-datos"; readonly barridas: ReadonlyArray<string> }
+  | {
+      readonly tipo: "datos";
+      readonly version: string;
+      readonly fecha: number;
+      readonly hasta: number;
+      readonly barrido: number | null;
+    };
+
+const marcaDeLaCapa = (estado: EstadoCapa, vista: EstadoDeLaVista | undefined): MarcaDeLaCapa => {
+  if (estado.tipo !== "lista") return estado;
+  const { resumen } = estado;
+  if (vista?.tipo === "fallo") return { tipo: "fallo-provincias", provincias: vista.provincias };
+  if (vista?.tipo === "cargando") {
+    return { tipo: "cargando-provincias", nombres: vista.provincias.map((p) => p.nombre) };
+  }
+  if (vista?.tipo === "sin-datos") return vista;
+  return vista?.tipo === "datos"
+    ? { ...vista, version: resumen.version }
+    : {
+        tipo: "datos",
+        version: resumen.version,
+        fecha: resumen.fecha,
+        hasta: resumen.fecha,
+        barrido: null,
+      };
+};
+
+const textoDeMarca = (marca: MarcaDeLaCapa): string =>
+  marca.tipo === "cargando-provincias" ? `Cargando ${enumerar(marca.nombres)}…` : "";
+
+const textoMarcadoDe = (marca: MarcaDeLaCapa) =>
+  marca.tipo === "datos"
+    ? textoDatosDelMapa(marca.fecha, { hasta: marca.hasta, barrido: marca.barrido })
+    : [];
+
+const detalleDeMarca = (marca: MarcaDeLaCapa, emplazamientos: number | undefined): string => {
+  if (marca.tipo === "sin-datos") {
+    return marca.barridas.length === 0
+      ? "Celda aún no ha barrido ninguna zona."
+      : `Por ahora tiene los emplazamientos de ${enumerar(marca.barridas)}.`;
+  }
+  return marca.tipo === "datos"
+    ? `${emplazamientos ?? 0} emplazamientos en España · capa ${marca.version}`
+    : "";
+};
 
 const EXPLICACION_FALLO_CAPA = {
   "sin-publicar": "Todavía no hay ninguna capa de emplazamientos publicada.",

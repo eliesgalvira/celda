@@ -1,25 +1,37 @@
 // El script corre con Node tal cual, sin Effect.
 // @effect-diagnostics nodeBuiltinImport:off
+import * as NodeCrypto from "node:crypto";
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 
 // Rutas relativas y no `@celda/dominio`: Node no quita los tipos de los .ts de node_modules.
 import type { LimitesDeBarrios } from "../../../packages/dominio/src/barrio.ts";
 import {
-  carpetaDeFichas,
   codificarVigente,
   type EmplazamientoDeCapa,
   FICHERO_VIGENTE,
-  generarCapa,
+  versionDeCapa,
 } from "../../../packages/dominio/src/capa.ts";
 import type { Compania } from "../../../packages/dominio/src/compania.ts";
 import type { Ficha } from "../../../packages/dominio/src/ficha.ts";
-import { generarLote } from "../../../packages/dominio/src/loteDeFichas.ts";
+import { repartirEnLotes } from "../../../packages/dominio/src/lotes.ts";
+import {
+  cajaDeSituados,
+  companiasDeSituados,
+  type EmplazamientoSituado,
+  ficheroDeCapaDeProvincia,
+  ficheroDeLoteDeProvincia,
+  ficheroDeResumen,
+  generarCapaDeProvincia,
+  generarLoteDeProvincia,
+  generarResumen,
+} from "../../../packages/dominio/src/provincias.ts";
 
 /**
  * Una capa publicada de prueba, sin descargar nada: 25 emplazamientos en una rejilla alrededor
- * del Campus Nord, con sus fichas y sus bandas, en el formato que publica Celda. Basta para abrir
- * una ficha, calcular las celdas y la vista de interferencia.
+ * del Campus Nord, con sus fichas y sus bandas, en el formato 5 que publica Celda (ADR 0016): un
+ * resumen nacional con Barcelona, su capa y sus lotes. Basta para abrir una ficha, calcular las
+ * celdas y la vista de interferencia.
  */
 
 const NOCHE = Date.UTC(2026, 8, 26, 0, 15, 3);
@@ -52,6 +64,23 @@ const LIMITES: LimitesDeBarrios = {
       ],
     },
   ],
+};
+
+const FUENTE_IGN = {
+  atribucion: "Instituto Geográfico Nacional",
+  producto: "Base de Datos de Límites Jurisdiccionales de España",
+  licencia: "CC BY 4.0",
+  enlace: "https://www.ign.es/atom/dataset_feeds/lin_lim_mun.es.xml",
+  fecha: "2026-08-10",
+  huella: "sha256:prueba",
+};
+
+const FUENTE_INE = {
+  atribucion: "INE",
+  licencia: "CC BY 4.0",
+  enlace: "https://www.ine.es/jaxiT3/Tabla.htm?t=29005",
+  referencia: "2025-01-01",
+  publicada: "2025-12-11",
 };
 
 export interface CapaSintetica {
@@ -111,29 +140,83 @@ export const escribirCapaSintetica = async (base: string): Promise<CapaSintetica
   const central = emplazamientos[12];
   if (central === undefined) throw new Error("La rejilla no tiene centro");
 
-  const capa = generarCapa(NOCHE, emplazamientos, LIMITES);
   const carpeta = await NodeFSP.mkdtemp(NodePath.join(base, "celda-capas-"));
-  await NodeFSP.writeFile(NodePath.join(carpeta, capa.fichero), capa.contenido);
+  const guardar = async (fichero: string, contenido: string) => {
+    await NodeFSP.mkdir(NodePath.dirname(NodePath.join(carpeta, fichero)), { recursive: true });
+    await NodeFSP.writeFile(NodePath.join(carpeta, fichero), contenido);
+  };
+  const huella = (contenido: string) =>
+    NodeCrypto.createHash("sha256").update(contenido).digest("hex");
+  const version = versionDeCapa(NOCHE);
+  const situados: ReadonlyArray<EmplazamientoSituado> = emplazamientos.map((emplazamiento) => ({
+    emplazamiento,
+    provincia: "08",
+    municipio: null,
+    lugar: { municipio: null, provincia: null },
+  }));
   const fichas = new Map(emplazamientos.map((e, i) => [e.clave, fichaDe(e, i)]));
-  await NodeFSP.mkdir(NodePath.join(carpeta, carpetaDeFichas(capa.version)), { recursive: true });
-  for (const [lote, claves] of capa.lotes.entries()) {
-    const generado = generarLote(
-      capa.version,
-      lote,
-      claves.flatMap((clave) => {
-        const ficha = fichas.get(clave);
-        return ficha === undefined ? [] : [ficha];
-      }),
+  const lotes = [];
+  for (const claves of repartirEnLotes(emplazamientos)) {
+    const contenido = generarLoteDeProvincia(
+      "08",
+      claves.flatMap((clave) => fichas.get(clave) ?? []),
+      new Map(),
+      FUENTE_IGN,
     );
-    await NodeFSP.writeFile(NodePath.join(carpeta, generado.fichero), generado.contenido);
+    const fichero = ficheroDeLoteDeProvincia("08", huella(contenido));
+    await guardar(fichero, contenido);
+    lotes.push({ fichero, claves });
   }
-  await NodeFSP.writeFile(
-    NodePath.join(carpeta, FICHERO_VIGENTE),
+  const contenidoCapa = generarCapaDeProvincia({
+    provincia: "08",
+    situados: situados.toSorted((a, b) => (a.emplazamiento.clave < b.emplazamiento.clave ? -1 : 1)),
+    barrios: LIMITES,
+    municipios: [],
+    lotes,
+  });
+  const ficheroCapa = ficheroDeCapaDeProvincia("08", huella(contenidoCapa));
+  await guardar(ficheroCapa, contenidoCapa);
+  const resumen = generarResumen({
+    version,
+    fuentes: { barrios: LIMITES.fuente, municipios: FUENTE_IGN, padron: FUENTE_INE },
+    cobertura: [
+      {
+        nombre: "prueba",
+        titulo: "Campus Nord",
+        cajas: [
+          [
+            CENTRO.longitud - 0.05,
+            CENTRO.latitud - 0.05,
+            CENTRO.longitud + 0.05,
+            CENTRO.latitud + 0.05,
+          ],
+        ],
+        barrido: NOCHE,
+      },
+    ],
+    provincias: [
+      {
+        codigo: "08",
+        nombre: "Barcelona",
+        etiqueta: { longitud: 1.983915, latitud: 41.730886 },
+        caja: cajaDeSituados(situados),
+        emplazamientos: situados.length,
+        companias: companiasDeSituados(situados),
+        fichero: ficheroCapa,
+      },
+    ],
+    cuadros: new Map(),
+  });
+  const ficheroResumen = ficheroDeResumen(version, huella(resumen));
+  await guardar(ficheroResumen, resumen);
+  await guardar(
+    FICHERO_VIGENTE,
     codificarVigente({
-      version: capa.version,
+      version,
       fecha: NOCHE,
-      emplazamientos: capa.emplazamientos,
-      lotes: capa.lotes.length,
+      emplazamientos: emplazamientos.length,
+      lotes: lotes.length,
+      resumen: ficheroResumen,
     }),
   );
   return {

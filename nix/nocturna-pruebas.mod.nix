@@ -268,7 +268,8 @@
                   maquina.succeed("test \"$(stat --format=%U /var/lib/celda-nocturna/ingesta.sqlite)\" = celda-nocturna")
                   maquina.succeed("ls /srv/copias/celda/ingesta-*.sqlite")
                   maquina.succeed("test -s /var/lib/fuentes-de-prueba/r2/celda/vigente.json")
-                  maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/sitios@*.json")
+                  maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/resumen@*.json")
+                  maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/provincias/08/*.json")
                   maquina.succeed(f"grep --fixed-strings 'Credential={id_clave}/' /var/lib/fuentes-de-prueba/peticiones.log")
 
               with subtest("la orden de estado se lanza como el usuario del servicio"):
@@ -328,7 +329,7 @@
                   assert f"- provincia 08 (Barcelona): {40 - len(fichas)} sin leer, 0 por releer" in estado, estado
                   assert "ventana cerrada" in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
                   # Se publica a mitad de la ventana y otra vez al cerrarla.
-                  capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^sitios@'").strip()
+                  capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^ficheros@'").strip()
                   assert capas == "2", capas
 
               with subtest("el servicio corre endurecido"):

@@ -29,6 +29,7 @@ catalog:
   effect: 4.0.0-rc.117
   fake-indexeddb: 6.2.5
   happy-dom: 20.14.5
+  kdbush: 4.1.0
   maplibre-gl: 6.11.2
   oxlint: 1.85.0
   playwright-core: 1.63.0
