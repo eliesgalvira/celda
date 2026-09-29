@@ -3,7 +3,8 @@ import { celdas } from "@celda/sim/celdas";
 import { contiene } from "@celda/sim/poligono";
 import { assert, describe, it } from "@effect/vitest";
 
-import { cajaDe, type Rectangulo } from "@celda/dominio/area";
+import { cajaDe, distanciaMetros, type Rectangulo } from "@celda/dominio/area";
+import { aPlano, origenCerca } from "@celda/dominio/plano";
 
 import { EMPLAZAMIENTOS_POR_PROVINCIA, RESUMEN } from "../capa/pruebasNacional.ts";
 import {
@@ -196,5 +197,66 @@ describe("pista de las celdas", () => {
     const fallo = pistaDeCeldas(true, "listas", { tipo: "fallo", provincias: [girona] });
     assert.match(fallo?.texto ?? "", /^No han llegado los emplazamientos de Girona/u);
     assert.deepStrictEqual(fallo?.reintentar, ["17"]);
+  });
+});
+
+describe("celdas lejos de Barcelona", () => {
+  const LUGARES = {
+    "Las Palmas de Gran Canaria": { longitud: -15.4363, latitud: 28.1235 },
+    "A Coruña": { longitud: -8.4115, latitud: 43.3623 },
+    Maó: { longitud: 4.2658, latitud: 39.8885 },
+  };
+  const BARCELONA_CENTRO = { longitud: 2.1405, latitud: 41.3925 };
+
+  it("dos emplazamientos a 1 km salen a 1 km en el plano; con el origen en Barcelona, no", () => {
+    for (const [lugar, p] of Object.entries(LUGARES)) {
+      const este = {
+        longitud: p.longitud + 1000 / (111_195 * Math.cos((p.latitud * Math.PI) / 180)),
+        latitud: p.latitud,
+      };
+      const real = distanciaMetros(p, este);
+      const dos = [
+        emplazamiento("a", p.longitud, p.latitud),
+        emplazamiento("b", este.longitud, este.latitud),
+      ];
+      for (const origen of [undefined, origenCerca(p)]) {
+        const { params } = pedirCeldas(dos, undefined, origen);
+        const [a, b] = params.emplazamientos;
+        const enPlano = Math.hypot(
+          (b?.este ?? 0) - (a?.este ?? 0),
+          (b?.norte ?? 0) - (a?.norte ?? 0),
+        );
+        assert.isBelow(Math.abs(enPlano / real - 1), 0.0026, lugar);
+      }
+      const a = aPlano(BARCELONA_CENTRO, p);
+      const b = aPlano(BARCELONA_CENTRO, este);
+      assert.isAbove(
+        Math.abs(Math.hypot(b.este - a.este, b.norte - a.norte) / real - 1),
+        0.02,
+        lugar,
+      );
+    }
+  });
+
+  it("el borde entre dos celdas cae a mitad de camino, también en Canarias", () => {
+    const p = LUGARES["Las Palmas de Gran Canaria"];
+    const este = { longitud: p.longitud + 0.0102, latitud: p.latitud };
+    const dos = [
+      emplazamiento("a", p.longitud, p.latitud),
+      emplazamiento("b", este.longitud, este.latitud),
+    ];
+    const { origen, params } = pedirCeldas(dos, undefined, origenCerca(p));
+    const resultado = celdas.ejecutar(params, {
+      este: new Float64Array(0),
+      norte: new Float64Array(0),
+    });
+    const [celdaA] = celdasEnMapa(resultado, dos, origen).features;
+    // El vértice más al este de la celda de «a» está a la misma distancia de los dos.
+    const [lon = 0, lat = 0] =
+      [...(celdaA?.geometry.coordinates[0] ?? [])].sort((x, y) => y[0] - x[0])[0] ?? [];
+    const vertice = { longitud: lon, latitud: lat };
+    const hastaA = distanciaMetros(vertice, p);
+    const hastaB = distanciaMetros(vertice, este);
+    assert.isBelow(Math.abs(hastaA - hastaB) / hastaA, 0.003);
   });
 });

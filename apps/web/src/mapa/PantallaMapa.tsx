@@ -5,6 +5,7 @@ import {
   mismaCoordenada,
   type Rectangulo,
 } from "@celda/dominio/area";
+import { origenCerca } from "@celda/dominio/plano";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
@@ -597,6 +598,23 @@ export function PantallaMapa() {
           mismaCoordenada(a.noreste, b.noreste)),
     },
   );
+  /**
+   * El origen del plano de las celdas: el de la casilla de lo que se ve (`origenCerca`). Así las
+   * celdas que se ven se miden sin deformarse, estén en Barcelona o en Canarias, y moverse dentro
+   * de la casilla no las recalcula.
+   */
+  const origenDeCeldas = createMemo(
+    () => {
+      const [vista] = zonaDeCeldas() ?? [];
+      return vista === undefined
+        ? undefined
+        : origenCerca({
+            longitud: (vista.suroeste.longitud + vista.noreste.longitud) / 2,
+            latitud: (vista.suroeste.latitud + vista.noreste.latitud) / 2,
+          });
+    },
+    { equals: mismaCoordenada },
+  );
   /** Cómo van las provincias de las celdas: la pista lo dice mientras falta alguna. */
   const vecinasDeCeldas = createMemo(
     () => {
@@ -616,6 +634,7 @@ export function PantallaMapa() {
     emplazamientos: emplazamientosDeCeldas,
     fuera: fueraDeCeldas,
     caja: cajaDeCeldas,
+    origen: origenDeCeldas,
     cerca,
     seleccionada,
   });

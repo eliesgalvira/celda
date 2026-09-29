@@ -19,18 +19,24 @@ export interface CeldasPedidas {
 }
 
 /**
- * Los parámetros de las celdas de unos emplazamientos: sus posiciones en un plano centrado en
- * `caja` y esa caja con `MARGEN_CELDAS_M` de margen. Sin caja, la que los rodea. Con la caja de
- * todas las provincias del cálculo, también de las que aún no han llegado, una celda sale igual
- * mientras llegan que cuando están todas.
+ * Los parámetros de las celdas de unos emplazamientos: sus posiciones en un plano con origen en
+ * `origen` y la caja `caja` con `MARGEN_CELDAS_M` de margen. Sin caja, la que los rodea; sin
+ * origen, el centro de la caja. Con la caja de todas las provincias del cálculo, también de las
+ * que aún no han llegado, una celda sale igual mientras llegan que cuando están todas.
+ *
+ * El plano mide el este con la escala del paralelo del origen (`errorDelPlano`). Un borde entre
+ * dos celdas se mueve como mucho ese error por la mitad de la distancia entre sus
+ * emplazamientos: con el origen junto a lo que se ve (`origenCerca`), menos de un 0,26 %, 1,3 m
+ * entre dos emplazamientos a 1 km.
  */
 export const pedirCeldas = (
   emplazamientos: ReadonlyArray<EmplazamientoDeCapa>,
   caja: Rectangulo | undefined = cajaDe(emplazamientos.map((e) => e.posicion)),
+  origenPedido?: Coordenada,
 ): CeldasPedidas => {
   const suroeste = caja?.suroeste ?? { longitud: 0, latitud: 0 };
   const noreste = caja?.noreste ?? suroeste;
-  const origen = {
+  const origen = origenPedido ?? {
     longitud: (suroeste.longitud + noreste.longitud) / 2,
     latitud: (suroeste.latitud + noreste.latitud) / 2,
   };

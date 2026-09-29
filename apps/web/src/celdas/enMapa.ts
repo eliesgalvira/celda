@@ -56,6 +56,11 @@ export interface EntradaCeldas {
    * no han llegado, con `MARGEN_CELDAS_M`. Sin ella, la de los emplazamientos.
    */
   readonly caja?: () => Rectangulo | undefined;
+  /**
+   * El origen del plano del cálculo, junto a lo que se ve (`origenCerca`), para que las celdas
+   * que se ven no se deformen (`pedirCeldas`). Sin él, el centro de la caja.
+   */
+  readonly origen?: () => Coordenada | undefined;
   /** Si el mapa está al zoom de las celdas o más cerca. */
   readonly cerca: () => boolean;
   /** El emplazamiento seleccionado, cuya celda se remarca. */
@@ -121,11 +126,12 @@ export function crearCeldas(
             emplazamientos: entrada.emplazamientos(),
             fuera: entrada.fuera?.() ?? NINGUNA_FUERA,
             caja: entrada.caja?.(),
+            origen: entrada.origen?.(),
             pedidas: pedidas(),
             intento: intento(),
           };
     },
-    ({ lienzo, emplazamientos, fuera, caja, pedidas: pedidasAhora }) => {
+    ({ lienzo, emplazamientos, fuera, caja, origen: origenPedido, pedidas: pedidasAhora }) => {
       if (pedidasAhora !== emplazamientos) {
         // Otra capa, todavía sin pedir: las celdas de la anterior ya no valen.
         lienzo.dibujar(SIN_CELDAS);
@@ -135,7 +141,7 @@ export function crearCeldas(
       }
       setCalculo("calculando");
       const cancelar = new AbortController();
-      const { origen, params } = pedirCeldas(emplazamientos, caja);
+      const { origen, params } = pedirCeldas(emplazamientos, caja, origenPedido);
       const calcular = Effect.gen(function* () {
         const simulador = yield* Simulador;
         const resultado = yield* simulador.ejecutar(celdas, params, {
