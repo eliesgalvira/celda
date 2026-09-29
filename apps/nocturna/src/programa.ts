@@ -5,10 +5,16 @@ import {
   ejecutarBarrido,
   type OpcionesBarrido,
   type ZonaEnLaEjecucion,
+  zonasDeLaNoche,
 } from "@celda/ingesta/barrido";
 import { ejecutarBarridoDePuntos, type OpcionesPuntos } from "@celda/ingesta/barridoDePuntos";
 import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
-import { Provincias, PublicacionAMitad, resumirCola } from "@celda/ingesta/fichas";
+import {
+  pendientesPorZona,
+  Provincias,
+  PublicacionAMitad,
+  resumirCola,
+} from "@celda/ingesta/fichas";
 import type { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import {
   DatosPublicables,
@@ -35,7 +41,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
 import { BaseNocturna } from "./base.ts";
-import { describirResumen } from "./estado.ts";
+import { describirResumen, type Turno } from "./estado.ts";
 
 /**
  * Los extractores de la noche, uno por fuente que ya tiene extractor. Cada ejecución construye el
@@ -327,8 +333,9 @@ export const publicarAMano = Effect.gen(function* () {
 });
 
 /**
- * Escribe el estado de la base: cada fuente, las fichas que quedan en cada parte de su cola, lo
- * publicado y el último intento de publicar.
+ * Escribe el estado de la base: cada fuente; las zonas de barrido de la configuración, cuándo se
+ * barrió cada una, cuántas fichas le quedan y cuáles barre la noche siguiente; las fichas que
+ * quedan en cada parte de la cola, lo publicado y el último intento de publicar.
  */
 export const estado = Effect.fn("Nocturna.estado")(function* (opciones: OpcionesBarrido) {
   const base = yield* BaseNocturna;
@@ -337,15 +344,20 @@ export const estado = Effect.fn("Nocturna.estado")(function* (opciones: Opciones
   const ahora = yield* Clock.currentTimeMillis;
   const leidasAntesDe = ahora - Duration.toMillis(opciones.fichas.relectura);
   const resumen = yield* base.resumen(leidasAntesDe);
+  const pendientes = yield* barrido.colaDeFichas("registro-oficial", leidasAntesDe);
+  const zonas = [...opciones.zonas.cadaNoche, ...opciones.zonas.enTurno];
   const cola = resumirCola(
-    yield* barrido.colaDeFichas("registro-oficial", leidasAntesDe),
-    {
-      provincias: opciones.fichas.prioridad,
-      zonas: [...opciones.zonas.cadaNoche, ...opciones.zonas.enTurno],
-      provinciaDe: provincias.provinciaDe,
-    },
+    pendientes,
+    { provincias: opciones.fichas.prioridad, zonas, provinciaDe: provincias.provinciaDe },
     ahora,
   );
-  yield* Console.log(describirResumen(base.fichero, resumen, cola, provincias.nombreDe));
-  return { resumen, cola };
+  const porZona = pendientesPorZona(pendientes, zonas, ahora);
+  const turno: Turno = {
+    zonas: [...porZona].map(([zona, fichas]) => ({ zona, fichas })),
+    proxima: zonasDeLaNoche(opciones.zonas, yield* barrido.estadoDeZonas("registro-oficial")).map(
+      (zona) => zona.nombre,
+    ),
+  };
+  yield* Console.log(describirResumen(base.fichero, resumen, cola, provincias.nombreDe, turno));
+  return { resumen, cola, turno };
 });
