@@ -184,15 +184,15 @@ rm -f datos/ingesta.sqlite-wal datos/ingesta.sqlite-shm
 
 ### Toda España: memoria y tiempo
 
-Medido el 29/09/2026 en un portátil con Node 24, con la España sintética de `apps/nocturna/src/pruebas/espana.ts` (69.770 registros, 41.993 emplazamientos) y el programa de la noche de verdad, salvo el geoportal, que contesta al momento. Los tiempos no cuentan las pausas entre peticiones.
+Medido el 29/09/2026 en un portátil con Node 24, con la España sintética de `apps/nocturna/src/pruebas/espana.ts` (69.770 registros, 41.994 emplazamientos) y el programa de la noche de verdad, salvo el geoportal, que contesta al momento. Los tiempos no cuentan las pausas entre peticiones.
 
 | Noche | Sin las pausas | RSS máximo | RSS con el montón de V8 a 512 MB |
 |---|---|---|---|
-| Toda España, primera pasada, sin fichas | 15 s | 1.127 MB | 587 MB (con 384) |
-| Las 69.770 fichas en una noche, y publicar todos los lotes con bandas | 101 s | 1.168 MB | 734 MB |
-| Por defecto: una zona y 5.500 fichas que cambian | 21 s | 2.019 MB | 764 MB |
+| Toda España, primera pasada, sin fichas | 16 s | 1.269 MB | 630 MB |
+| Las 69.770 fichas en una noche, y publicar todos los lotes con bandas | 101 s | 1.704 MB | 750 MB |
+| Por defecto: una zona y 5.500 fichas que cambian | 22 s | 2.018 MB | 761 MB |
 
-Sin límite, V8 deja crecer el montón con la basura de la publicación antes de recogerla, y el RSS pasa de 1 a 2 GB según cuándo recoja. Lo que sigue vivo es mucho menos: las tres noches caben con el montón limitado a 512 MB, y la noche por defecto no cabe en 384. De ese montón, 47 MB son la España sintética de la medida, y 77 MB los límites de municipios que carga cualquier orden. La fusión y la publicación leen las observaciones y los emplazamientos de 2.000 en 2.000 (`PAGINA` en `apps/nocturna/src/base.ts`); leyéndolos de una vez, la noche de las fichas no cabía en 512 MB.
+Sin límite, V8 deja crecer el montón con la basura de la publicación antes de recogerla, y el RSS pasa de 1,1 a 2 GB según la noche y cuándo recoja. Lo que sigue vivo es mucho menos: las tres noches caben con el montón limitado a 512 MB, y la noche por defecto no cabe en 384. De ese montón, 47 MB son la España sintética de la medida, y 77 MB los límites de municipios que carga cualquier orden. La fusión y la publicación leen las observaciones y los emplazamientos de 2.000 en 2.000 (`PAGINA` en `apps/nocturna/src/base.ts`); leyéndolos de una vez, la noche de las fichas no cabía en 512 MB.
 
 Si la máquina anda justa de memoria, se puede limitar el montón en su configuración de NixOS; con 1 GB queda el doble de lo que hace falta:
 

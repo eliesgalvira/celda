@@ -184,16 +184,16 @@ La sintética da 238 peticiones la primera vez y 202 después, frente a las 251 
 
 **Siete noches por defecto.** La ingesta turna las siete zonas, una por noche y Cataluña la primera: unas 31 peticiones de listado por noche (34 de media la primera semana) y toda España en siete noches. Barrerla entera cada noche también cabe, unas 215 peticiones y 15 minutos de una ventana de 6 horas, y se hace con `CELDA_REGISTRO_ZONAS_POR_NOCHE=7`. No lo pongo por defecto porque son 43 MB por noche, casi lo mismo que las 5.500 fichas (unos 50 MB), para un registro que cambia poco, y porque las bandas, que es lo que más cambia en una estación, se releen cada 30 días de todas formas. A cambio, una alta tarda hasta una semana en verse y una baja, dos.
 
-**Memoria y tiempo con toda España.** Medido con la España sintética (69.770 registros, 41.993 emplazamientos) y el programa de la noche de verdad sobre una base SQLite y un almacén en carpeta, en esta máquina. Solo el geoportal es de mentira: contesta al momento, así que los tiempos no cuentan las pausas entre peticiones (`pnpm run medir-espana`, en `apps/nocturna`).
+**Memoria y tiempo con toda España.** Medido con la España sintética (69.770 registros, 41.994 emplazamientos) y el programa de la noche de verdad sobre una base SQLite y un almacén en carpeta, en esta máquina. Solo el geoportal es de mentira: contesta al momento, así que los tiempos no cuentan las pausas entre peticiones (`pnpm run medir-espana`, en `apps/nocturna`).
 
 | Noche | Tiempo sin pausas | RSS máximo | RSS con el montón de V8 a 512 MB |
 |---|---|---|---|
-| Toda España, primera pasada, sin fichas: 238 peticiones, 408 ficheros publicados | 15 s | 1.127 MB | 587 MB (a 384 MB) |
-| Las 69.770 fichas en una noche, y publicar todos los lotes con bandas | 101 s | 1.168 MB | 734 MB |
-| Por defecto: una zona y 5.500 fichas que cambian, 35 ficheros publicados | 21 s | 2.019 MB | 764 MB |
+| Toda España, primera pasada, sin fichas: 238 peticiones, 424 ficheros publicados | 16 s | 1.269 MB | 630 MB |
+| Las 69.770 fichas en una noche, y publicar todos los lotes con bandas | 101 s | 1.704 MB | 750 MB |
+| Por defecto: una zona y 5.500 fichas que cambian, 35 ficheros publicados | 22 s | 2.018 MB | 761 MB |
 
-- Sin límite, V8 deja crecer el montón con la basura de la publicación y el RSS va de 1,1 a 2 GB, según cuándo recoja. Lo vivo cabe en 512 MB de montón en las tres noches; la noche por defecto no cabe en 384. De ese montón, 47 MB son la España sintética de la medida y 77 MB los límites de municipios.
-- Antes de este ticket la fusión leía a la vez el JSON de todas las observaciones, todas decodificadas y todos los emplazamientos decodificados: la noche de las fichas llegaba a 1.475 MB de RSS y no cabía en 512 MB de montón. Ahora lee la base de 2.000 en 2.000 filas y compara los emplazamientos por su JSON.
+- Sin límite, V8 deja crecer el montón con la basura de la publicación y el RSS va de 1,1 a 2 GB, según la noche y cuándo recoja. Lo vivo cabe en 512 MB de montón en las tres noches; la noche por defecto no cabe en 384. De ese montón, 47 MB son la España sintética de la medida y 77 MB los límites de municipios.
+- Antes de este ticket la fusión leía a la vez el JSON de todas las observaciones, todas decodificadas y todos los emplazamientos decodificados: la noche de las fichas no cabía en 512 MB de montón. Ahora lee la base de 2.000 en 2.000 filas y compara los emplazamientos por su JSON.
 - Con los valores por defecto, una noche son unos 2 minutos de listado, las 6 horas de fichas, dos fusiones de unos 3 s y dos publicaciones de unos 10 s. La base con las bandas de toda España ocupa 190 MB y sus catorce copias, unos 2,6 GB.
 
 **Recuento de la primera semana.** Lo que falta de la tabla de arriba lo da la primera semana de la ingesta en el portátil (#42), con la orden `estado`: registros y peticiones de cada zona en su noche. Queda pendiente hasta entonces.
