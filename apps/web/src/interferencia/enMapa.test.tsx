@@ -19,14 +19,13 @@ import {
   type InterferenciaDelMapa,
   type LienzoDeInterferencia,
 } from "./enMapa.ts";
-import {
-  type EleccionVista,
-  type Encuadre,
-  ORIGEN_VISTA,
-  type TramaEnMapa,
-} from "./interferencia.ts";
+import { type EleccionVista, type Encuadre, type TramaEnMapa } from "./interferencia.ts";
 
-const en = (este: number, norte: number): Coordenada => desdePlano(ORIGEN_VISTA, { este, norte });
+/** El centro de una casilla de la rejilla de los orígenes, en Barcelona: el origen de la trama. */
+const ORIGEN: Coordenada = { longitud: 2.15, latitud: 41.35 };
+
+/** Un punto a tantos metros al este y al norte del origen. */
+const en = (este: number, norte: number): Coordenada => desdePlano(ORIGEN, { este, norte });
 
 const emplazamiento = (clave: string, este: number, norte: number): EmplazamientoDeCapa => ({
   clave,

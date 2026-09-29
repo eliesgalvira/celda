@@ -1,8 +1,14 @@
-import { BARCELONA, type Coordenada, type Rectangulo as CajaGeografica } from "@celda/dominio/area";
+import type { Coordenada, Rectangulo as CajaGeografica } from "@celda/dominio/area";
 import type { Mhz } from "@celda/dominio/banda";
 import { COMPANIAS_DE_CAPA, type EmplazamientoDeCapa } from "@celda/dominio/capa";
 import type { Compania } from "@celda/dominio/compania";
-import { aPlano, desdePlano, type PuntoLocal } from "@celda/dominio/plano";
+import {
+  aPlano,
+  cabeEnElPlano,
+  desdePlano,
+  origenCerca,
+  type PuntoLocal,
+} from "@celda/dominio/plano";
 import { BANDAS_NOMINALES } from "@celda/dominio/tecnologia";
 import { type Malla, mallaHexagonal, type Rectangulo } from "@celda/sim/simulacion";
 import {
@@ -17,15 +23,6 @@ import {
  * simulación es `sinr@1` (`@celda/sim/sinr`); aquí se eligen sus estaciones, su malla y lo que se
  * supone de lo que ninguna fuente publica.
  */
-
-/**
- * El origen fijo del plano de la vista: el centro del encuadre de Barcelona. Con el origen fijo,
- * la trama de hexágonos no se mueve al mover el mapa.
- */
-export const ORIGEN_VISTA: Coordenada = {
-  longitud: (BARCELONA.encuadre.suroeste.longitud + BARCELONA.encuadre.noreste.longitud) / 2,
-  latitud: (BARCELONA.encuadre.suroeste.latitud + BARCELONA.encuadre.noreste.latitud) / 2,
-};
 
 /** Ninguna fuente publica el azimut: tres sectores supuestos, como en el panel. */
 export const AZIMUTS_SUPUESTOS: ReadonlyArray<number> = [0, 120, 240];
@@ -142,9 +139,24 @@ export interface Encuadre {
 export const metrosPorPixel = (zoom: number, latitud: number): number =>
   (40_075_016.686 * Math.cos((latitud * Math.PI) / 180)) / (512 * 2 ** (Math.round(zoom * 2) / 2));
 
+/** El centro de lo que se ve. */
+const centroDe = (encuadre: Encuadre): Coordenada => ({
+  longitud: (encuadre.suroeste.longitud + encuadre.noreste.longitud) / 2,
+  latitud: (encuadre.suroeste.latitud + encuadre.noreste.latitud) / 2,
+});
+
+/**
+ * El origen del plano de la trama: el de la casilla de 0,1° en que cae el centro de lo que se ve
+ * (`origenCerca`). Mover el mapa dentro de ella no cambia el origen ni mueve la trama, y lo que se
+ * ve y sus estaciones quedan tan cerca que ninguna distancia se equivoca más de un 0,26 %
+ * (`LATITUD_DEL_PLANO`). Con un origen fijo en Barcelona, en Canarias se equivocaban un 17 %.
+ */
+export const origenDeLaTrama = (encuadre: Encuadre): Coordenada => origenCerca(centroDe(encuadre));
+
 const rectanguloDe = (encuadre: Encuadre, margen: number): Rectangulo => {
-  const so = aPlano(ORIGEN_VISTA, encuadre.suroeste);
-  const ne = aPlano(ORIGEN_VISTA, encuadre.noreste);
+  const origen = origenDeLaTrama(encuadre);
+  const so = aPlano(origen, encuadre.suroeste);
+  const ne = aPlano(origen, encuadre.noreste);
   const ancho = (ne.este - so.este) * margen;
   const alto = (ne.norte - so.norte) * margen;
   return {
@@ -176,6 +188,9 @@ export const mismaTrama = (
 ): boolean => {
   if (anterior === undefined || nuevo === undefined) return anterior === nuevo;
   if (Math.round(anterior.zoom * 2) !== Math.round(nuevo.zoom * 2)) return false;
+  const origen = origenDeLaTrama(anterior);
+  const otro = origenDeLaTrama(nuevo);
+  if (origen.longitud !== otro.longitud || origen.latitud !== otro.latitud) return false;
   const cubierto = rectanguloDe(anterior, MARGEN_TRAMA);
   const visto = rectanguloDe(nuevo, 0);
   return (
@@ -186,6 +201,8 @@ export const mismaTrama = (
 
 /** La simulación que pide la vista, con lo que hace falta para dibujarla y contarla. */
 export interface SinrPedida {
+  /** El origen del plano en que va todo lo de la simulación. */
+  readonly origen: Coordenada;
   readonly params: ParamsSinr;
   /** Los centros de la trama y, si hay punto de referencia, él al final. */
   readonly malla: Malla;
@@ -206,24 +223,51 @@ export interface EntradaSinr {
 }
 
 /**
- * Los parámetros y la malla de la simulación. Entran las estaciones base de la compañía que
- * emiten en la banda y las que aún no tienen bandas leídas, que se suponen en ella; las que
- * emiten en otras bandas no estorban y no entran. Solo cuentan las que quedan cerca de lo que se
- * ve o del punto de referencia (`MARGEN_ESTACIONES_M`). Todas tienen tres sectores supuestos y la
- * potencia típica. Sin encuadre al zoom de la vista ni punto, no hay nada que calcular.
+ * Un plano en que se calcula la vista: su origen y lo que se mide en él, la trama de lo que se ve
+ * (con `encuadre`), el punto de referencia o los dos.
  */
+interface PlanoDeSinr {
+  readonly origen: Coordenada;
+  /** Lo que se ve, si se dibuja la trama en este plano. */
+  readonly encuadre: Encuadre | undefined;
+  readonly referencia: Coordenada | undefined;
+}
+
 /**
- * Hasta dónde se miran estaciones, en el plano de la vista: lo que se ve al zoom de la trama y el
- * punto de referencia, con `MARGEN_ESTACIONES_M` alrededor. Vacío si no hay ni una cosa ni otra.
+ * Los planos de la vista. La trama va en el de `origenDeLaTrama`. El punto de referencia va en el
+ * mismo si cabe (`cabeEnElPlano`); si queda más lejos, por ejemplo con el GPS en casa y el mapa en
+ * otra ciudad, va en otro, con el origen junto a él. Sin trama, solo el del punto.
  */
-const zonasDeEstaciones = (
+const planosDeSinr = (
   encuadre: Encuadre | undefined,
   referencia: Coordenada | undefined,
-): ReadonlyArray<Rectangulo> => {
+): ReadonlyArray<PlanoDeSinr> => {
   const conTrama = encuadre !== undefined && encuadre.zoom >= ZOOM_INTERFERENCIA;
-  const punto = referencia === undefined ? undefined : aPlano(ORIGEN_VISTA, referencia);
+  if (!conTrama) {
+    return referencia === undefined
+      ? []
+      : [{ origen: origenCerca(referencia), encuadre: undefined, referencia }];
+  }
+  const origen = origenDeLaTrama(encuadre);
+  if (referencia === undefined || cabeEnElPlano(origen, referencia)) {
+    return [{ origen, encuadre, referencia }];
+  }
   return [
-    ...(conTrama ? [ampliar(rectanguloDe(encuadre, 0), MARGEN_ESTACIONES_M)] : []),
+    { origen, encuadre, referencia: undefined },
+    { origen: origenCerca(referencia), encuadre: undefined, referencia },
+  ];
+};
+
+/**
+ * Hasta dónde se miran estaciones en un plano: lo que se ve al zoom de la trama y el punto de
+ * referencia, con `MARGEN_ESTACIONES_M` alrededor.
+ */
+const zonasDeEstaciones = (plano: PlanoDeSinr): ReadonlyArray<Rectangulo> => {
+  const punto = plano.referencia === undefined ? undefined : aPlano(plano.origen, plano.referencia);
+  return [
+    ...(plano.encuadre === undefined
+      ? []
+      : [ampliar(rectanguloDe(plano.encuadre, 0), MARGEN_ESTACIONES_M)]),
     ...(punto === undefined
       ? []
       : [
@@ -239,8 +283,8 @@ const seCortanEnElPlano = (a: Rectangulo, b: Rectangulo): boolean =>
   a.oeste <= b.este && b.oeste <= a.este && a.sur <= b.norte && b.sur <= a.norte;
 
 /**
- * Las provincias que necesita la vista: las que tienen emplazamientos donde `pedirSinr` mira
- * estaciones. Se mira en el mismo plano y con las mismas cajas, así que con ellas cargadas la
+ * Las provincias que necesita la vista: las que tienen emplazamientos donde `pedidasDeSinr` mira
+ * estaciones. Se mira en los mismos planos y con las mismas cajas, así que con ellas cargadas la
  * vista da lo mismo que con todas las provincias en una sola capa.
  */
 export const provinciasParaSinr = (
@@ -252,35 +296,56 @@ export const provinciasParaSinr = (
   encuadre: Encuadre | undefined,
   referencia: Coordenada | undefined,
 ): ReadonlyArray<string> => {
-  const zonas = zonasDeEstaciones(encuadre, referencia);
-  if (zonas.length === 0) return [];
+  const planos = planosDeSinr(encuadre, referencia);
+  if (planos.length === 0) return [];
   return provincias.flatMap(({ codigo, caja, fichero }) => {
     if (caja === undefined || fichero === undefined) return [];
-    const so = aPlano(ORIGEN_VISTA, caja.suroeste);
-    const ne = aPlano(ORIGEN_VISTA, caja.noreste);
-    const enPlano = { oeste: so.este, sur: so.norte, este: ne.este, norte: ne.norte };
-    return zonas.some((zona) => seCortanEnElPlano(zona, enPlano)) ? [codigo] : [];
+    const corta = planos.some((plano) => {
+      const so = aPlano(plano.origen, caja.suroeste);
+      const ne = aPlano(plano.origen, caja.noreste);
+      const enPlano = { oeste: so.este, sur: so.norte, este: ne.este, norte: ne.norte };
+      return zonasDeEstaciones(plano).some((zona) => seCortanEnElPlano(zona, enPlano));
+    });
+    return corta ? [codigo] : [];
   });
 };
 
-export const pedirSinr = (entrada: EntradaSinr): SinrPedida | undefined => {
-  const { eleccion, encuadre, referencia } = entrada;
-  const conTrama = encuadre !== undefined && encuadre.zoom >= ZOOM_INTERFERENCIA;
-  if (!conTrama && referencia === undefined) return undefined;
-  const punto = referencia === undefined ? undefined : aPlano(ORIGEN_VISTA, referencia);
-  const radio = conTrama
-    ? RADIO_HEXAGONO_PX * metrosPorPixel(encuadre.zoom, ORIGEN_VISTA.latitud)
-    : 0;
-  const trama = conTrama
-    ? mallaHexagonal(rectanguloDe(encuadre, MARGEN_TRAMA), radio)
-    : { este: new Float64Array(0), norte: new Float64Array(0) };
+/**
+ * Las simulaciones que pide la vista, una por plano (`planosDeSinr`): casi siempre una, y dos si
+ * el punto de referencia queda lejos de lo que se ve. Entran las estaciones base de la compañía
+ * que emiten en la banda y las que aún no tienen bandas leídas, que se suponen en ella; las que
+ * emiten en otras bandas no estorban y no entran. Solo cuentan las que quedan cerca de lo que se
+ * ve o del punto de referencia (`MARGEN_ESTACIONES_M`). Todas tienen tres sectores supuestos y la
+ * potencia típica. Sin encuadre al zoom de la vista ni punto, no hay nada que calcular.
+ */
+export const pedidasDeSinr = (entrada: EntradaSinr): ReadonlyArray<SinrPedida> =>
+  planosDeSinr(entrada.encuadre, entrada.referencia).map((plano) => pedirEnPlano(entrada, plano));
 
-  const cercanas = zonasDeEstaciones(encuadre, referencia);
+/**
+ * La simulación del plano de lo que se ve, o del punto si no hay trama. Si el punto queda lejos de
+ * lo que se ve, no va en ella: lo calcula la segunda de `pedidasDeSinr`.
+ */
+export const pedirSinr = (entrada: EntradaSinr): SinrPedida | undefined =>
+  pedidasDeSinr(entrada)[0];
+
+const pedirEnPlano = (entrada: EntradaSinr, plano: PlanoDeSinr): SinrPedida => {
+  const { eleccion } = entrada;
+  const { origen, encuadre, referencia } = plano;
+  const punto = referencia === undefined ? undefined : aPlano(origen, referencia);
+  // El tamaño de un píxel a la latitud del origen, que no cambia al mover el mapa en la casilla.
+  const radio =
+    encuadre === undefined ? 0 : RADIO_HEXAGONO_PX * metrosPorPixel(encuadre.zoom, origen.latitud);
+  const trama =
+    encuadre === undefined
+      ? { este: new Float64Array(0), norte: new Float64Array(0) }
+      : mallaHexagonal(rectanguloDe(encuadre, MARGEN_TRAMA), radio);
+
+  const cercanas = zonasDeEstaciones(plano);
   const estaciones: Array<EstacionSinr> = [];
   for (const emplazamiento of entrada.emplazamientos) {
     const trato = tratoDe(emplazamiento, eleccion.compania, eleccion.mhz);
     if (trato === undefined || trato === "otra-banda") continue;
-    const enPlano = aPlano(ORIGEN_VISTA, emplazamiento.posicion);
+    const enPlano = aPlano(origen, emplazamiento.posicion);
     if (!cercanas.some((r) => dentro(r, enPlano))) continue;
     estaciones.push({
       este: enPlano.este,
@@ -299,6 +364,7 @@ export const pedirSinr = (entrada: EntradaSinr): SinrPedida | undefined => {
           norte: Float64Array.from([...trama.norte, punto.norte]),
         };
   return {
+    origen,
     params: {
       estaciones,
       frecuenciaMhz: eleccion.mhz,
@@ -349,7 +415,7 @@ export const tramaEnMapa = (pedida: SinrPedida, resultado: ResultadoSinr): Trama
     const este = pedida.malla.este[i] ?? 0;
     const norte = pedida.malla.norte[i] ?? 0;
     const anillo = esquinas.map((esquina): [number, number] => {
-      const punto = desdePlano(ORIGEN_VISTA, {
+      const punto = desdePlano(pedida.origen, {
         este: este + esquina.este,
         norte: norte + esquina.norte,
       });
