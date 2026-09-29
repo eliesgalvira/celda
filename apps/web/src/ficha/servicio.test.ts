@@ -94,6 +94,25 @@ const servir = (origen: OrigenDePrueba, publicacion: PublicacionDePrueba, ficher
 
 describe("fichas publicadas en el origen estático", () => {
   it.effect(
+    "un enlace sin provincia la busca antes; una clave que no está no pide ningún lote",
+    () => {
+      const origen = origenDePrueba();
+      return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
+        Effect.gen(function* () {
+          const [a] = FICHAS;
+          const clave = a?.clave ?? "";
+          const lectura = yield* Effect.forkChild(fichas.leer({ clave, provincia: null }));
+          yield* contestar(origen, HOY.urlDe(clave), 200, HOY.cuerpoDe(clave));
+          assert.deepStrictEqual(yield* Fiber.join(lectura), Option.some(a));
+          const nadie = yield* fichas.leer({ clave: "movistar-nadie", provincia: null });
+          assert.isTrue(Option.isNone(nadie));
+          assert.deepStrictEqual(origen.pedidas(), [HOY.urlDe(clave)]);
+        }),
+      );
+    },
+  );
+
+  it.effect(
     "lee la ficha del lote que dice su provincia, y otra del mismo lote no pide nada",
     () => {
       const origen = origenDePrueba();

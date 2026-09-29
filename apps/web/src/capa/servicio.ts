@@ -5,7 +5,12 @@ import {
   VersionDistinta,
   type Vigente,
 } from "@celda/dominio/capa";
-import { leerResumen, type ResumenLeido } from "@celda/dominio/provincias";
+import {
+  leerParteDelIndice,
+  leerResumen,
+  parteDeClave,
+  type ResumenLeido,
+} from "@celda/dominio/provincias";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -16,6 +21,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
+import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { IndexadorDeProvincias, type IndiceFallido } from "./indexador.ts";
 import { agrupadorDeProvincia, type ProvinciaCargada } from "./nacional.ts";
 
@@ -60,6 +66,12 @@ export class CapaEmplazamientos extends Context.Service<
      * marca con su versión.
      */
     readonly provincia: (codigo: string) => Effect.Effect<ProvinciaCargada, FalloCapa>;
+    /**
+     * La provincia en cuya capa va un emplazamiento, por su clave, sin descargar ninguna capa:
+     * lee la parte del índice de claves que le toca. `None` si ninguna provincia lo tiene. Un
+     * resumen de antes del índice no sabe buscar, y da la de los enlaces viejos (Barcelona).
+     */
+    readonly provinciaDeClave: (clave: string) => Effect.Effect<Option.Option<string>, FalloCapa>;
   }
 >()("@celda/web/capa/servicio/CapaEmplazamientos") {}
 
@@ -216,6 +228,39 @@ export const capaDelOrigen = Layer.effect(
       return carga.pipe(Effect.withSpan("CapaEmplazamientos.provincia"));
     };
 
-    return CapaEmplazamientos.of({ resumen, provincia });
+    /** Cada parte del índice leída, por su fichero: una sola petición por parte y visita. */
+    const partes = new Map<string, Effect.Effect<ReadonlyMap<string, string>, FalloCapa>>();
+    const parte = (fichero: string) => {
+      let carga = partes.get(fichero);
+      if (carga === undefined) {
+        carga = guardado(
+          Semaphore.makeUnsafe(1),
+          Effect.gen(function* () {
+            const texto = yield* descargarFichero(http, origen, fichero);
+            if (Option.isNone(texto)) {
+              return yield* new CapaNoDescargada({
+                url: `${origen}/${fichero}`,
+                motivo: "el origen no la tiene",
+              });
+            }
+            return yield* Effect.fromResult(leerParteDelIndice(texto.value));
+          }),
+        );
+        partes.set(fichero, carga);
+      }
+      return carga;
+    };
+
+    const provinciaDeClave = Effect.fn("CapaEmplazamientos.provinciaDeClave")(function* (
+      clave: string,
+    ) {
+      const { claves } = yield* resumen;
+      if (claves === undefined) return Option.some(PROVINCIA_DE_LOS_ENLACES_VIEJOS);
+      const fichero = claves[parteDeClave(clave, claves.length)];
+      if (fichero === undefined) return Option.none<string>();
+      return Option.fromNullishOr((yield* parte(fichero)).get(clave));
+    });
+
+    return CapaEmplazamientos.of({ resumen, provincia, provinciaDeClave });
   }),
 );

@@ -1,4 +1,10 @@
-import { type Coordenada, ESPANA, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
+import {
+  cajaDe,
+  type Coordenada,
+  ESPANA,
+  mismaCoordenada,
+  type Rectangulo,
+} from "@celda/dominio/area";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
@@ -14,12 +20,14 @@ import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
 import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
-import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
+import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Option from "effect/Option";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
-import { createEffect, createMemo, createSignal, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, Match, Show, Switch, untrack } from "solid-js";
 
 import {
   creditoDeBarrios,
@@ -34,7 +42,16 @@ import {
 import type { Vista } from "../capa/marcadores.ts";
 import { type EstadoProvincia, provinciasDeLaVista } from "../capa/nacional.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
-import { pistaDeCeldas } from "../celdas/celdas.ts";
+import {
+  cargadasDe,
+  enumerar,
+  estadoDeLasVecinas,
+  mismasVecinas,
+  provinciasCerca,
+  rectanguloDePunto,
+  VECINAS_LISTAS,
+} from "../capa/vecinas.ts";
+import { pistaDeCeldas, type ProvinciaFuera, provinciasQueFaltan } from "../celdas/celdas.ts";
 import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { AjustesContexto, crearAjustes } from "../ajustes/ajustes.ts";
 import { DialogoAjustes } from "../ajustes/DialogoAjustes.tsx";
@@ -55,6 +72,7 @@ import {
   type EleccionVista,
   type Encuadre,
   OCUPACION,
+  provinciasParaSinr,
   ZOOM_INTERFERENCIA,
 } from "../interferencia/interferencia.ts";
 import { VistaInterferencia } from "../interferencia/VistaInterferencia.tsx";
@@ -65,6 +83,7 @@ import {
   conAjustes,
   conEjercicio,
   conMedir,
+  conProvincia,
   ejercicioDe,
   emplazamientoDe,
   medirAbierto,
@@ -94,6 +113,13 @@ const ELECCION_VACIA: EleccionVista = { compania: "movistar", mhz: 1800, ocupaci
 
 /** El ancho a partir del cual el panel va a la izquierda y el punto se elige con un clic. */
 const ESCRITORIO = "(min-width: 48rem)";
+
+/**
+ * Hasta dónde, alrededor de lo que se ve al zoom de las celdas, se cargan las provincias vecinas
+ * antes de calcular. Una celda de ciudad no pasa de unos cientos de metros; si una del campo llega
+ * más lejos, la provincia que la puede recortar se pide igual (`provinciasQueFaltan`).
+ */
+const MARGEN_VECINAS_CELDAS_M = 2000;
 
 /**
  * El mapa de España a pantalla completa con los emplazamientos de la capa vigente, provincia a
@@ -268,7 +294,9 @@ export function PantallaMapa() {
         if (cargada.tipo !== "lista") return;
         resumenLeido = cargada.resumen;
         pedirLoQueSeVe();
-        if (emplazamientoDe(ubicacion()) !== null) pedirProvincias([provinciaDe(ubicacion())]);
+        // Sin provincia en el enlace, la pide `recurso("capa:clave")` cuando la encuentra.
+        const suya = provinciaDe(ubicacion());
+        if (emplazamientoDe(ubicacion()) !== null && suya !== null) pedirProvincias([suya]);
       });
   };
 
@@ -359,8 +387,6 @@ export function PantallaMapa() {
   );
   /** Los emplazamientos de las provincias que han llegado: los que el mapa conoce ahora. */
   const emplazamientos = createMemo(() => cargadas().flatMap((p) => p.capa.emplazamientos));
-  /** Hasta dónde llegan los datos: las zonas barridas del resumen. */
-  const cobertura = createMemo(() => resumen()?.cobertura);
   /**
    * Los créditos del mapa base y, con el resumen, los de los límites de municipios y de barrio
    * que usan las capas.
@@ -383,8 +409,36 @@ export function PantallaMapa() {
 
   /** El emplazamiento con la ficha abierta, que dice la URL. */
   const seleccionada = createMemo(() => emplazamientoDe(ubicacion()));
-  /** La provincia en cuya capa va, que también dice la URL. */
+  /** La provincia en cuya capa va, que también dice la URL, o `null` si no la dice. */
   const provinciaSeleccionada = createMemo(() => provinciaDe(ubicacion()));
+
+  // Un enlace sin provincia: se busca en el índice de claves del resumen y, si está, la dirección
+  // pasa a llevarla y se pide su provincia. Si no está, la ficha dice que no existe.
+  recurso(
+    "capa:clave",
+    () => {
+      const clave = seleccionada();
+      return clave !== null && provinciaSeleccionada() === null && resumen() !== undefined
+        ? clave
+        : undefined;
+    },
+    (clave) => {
+      const parar = new AbortController();
+      void datos
+        .runPromiseExit(
+          Effect.flatMap(CapaEmplazamientos, (servicio) => servicio.provinciaDeClave(clave)),
+          { signal: parar.signal },
+        )
+        .then((salida) => {
+          if (parar.signal.aborted || !Exit.isSuccess(salida)) return;
+          const provincia = Option.getOrUndefined(salida.value);
+          if (provincia === undefined || emplazamientoDe(ubicacion()) !== clave) return;
+          pedirProvincias([provincia]);
+          navegar(conProvincia(ubicacion(), provincia), { reemplazar: true });
+        });
+      return () => parar.abort();
+    },
+  );
   /**
    * La zona del ejercicio abierto (`""` sin zona), o `null` si está cerrado. Sin el modo
    * estudiante el ejercicio no se abre, aunque lo pida la URL.
@@ -436,7 +490,8 @@ export function PantallaMapa() {
   const fechaCapa = createMemo(() => resumen()?.fecha);
   /** La de la provincia del emplazamiento seleccionado, que puede ser de otra versión. */
   const fechaDeLaSeleccionada = createMemo(() => {
-    const estado = provincias().get(provinciaSeleccionada());
+    const codigo = provinciaSeleccionada();
+    const estado = codigo === null ? undefined : provincias().get(codigo);
     return estado?.tipo === "lista" ? estado.provincia.fecha : fechaCapa();
   });
 
@@ -452,26 +507,187 @@ export function PantallaMapa() {
     { equals: mismaCoordenada },
   );
 
+  /** Dónde está el emplazamiento seleccionado, si su provincia ya ha llegado. */
+  const posicionSeleccionada = createMemo(
+    () => {
+      const clave = seleccionada();
+      return clave === null ? undefined : emplazamientos().find((e) => e.clave === clave)?.posicion;
+    },
+    { equals: mismaCoordenada },
+  );
+
+  /**
+   * Lo que miran las celdas: lo que se ve al zoom de las celdas y el emplazamiento seleccionado,
+   * cuyo sector que da servicio usa su celda. Alejado, lo último que miraron: así alejarse no
+   * cambia las provincias de las celdas ni las recalcula.
+   */
+  const zonaDeCeldas = createMemo<ReadonlyArray<Rectangulo> | undefined>((antes) => {
+    const actual = encuadre();
+    if (!cerca() || actual === undefined) return antes;
+    const posicion = posicionSeleccionada();
+    return [
+      { suroeste: actual.suroeste, noreste: actual.noreste },
+      ...(posicion === undefined ? [] : [rectanguloDePunto(posicion)]),
+    ];
+  });
+  /** Las provincias cerca de lo que miran las celdas, por código. */
+  const cercaDeLasCeldas = createMemo(
+    () => {
+      const actual = resumen();
+      const zona = zonaDeCeldas();
+      return actual === undefined || zona === undefined
+        ? []
+        : provinciasCerca(actual, zona, MARGEN_VECINAS_CELDAS_M);
+    },
+    { equals: mismasListas },
+  );
+  /**
+   * Las provincias que alguna celda que se ve necesita además de las cercanas: las que podrían
+   * recortarla (`provinciasQueFaltan`). Valen mientras no cambien las cercanas; se acumulan, y así
+   * una provincia pedida no sale del cálculo en cuanto su celda deja de ser dudosa.
+   */
+  const [lejanas, setLejanas] = createSignal<{
+    readonly cerca: ReadonlyArray<string>;
+    readonly codigos: ReadonlyArray<string>;
+  }>({ cerca: [], codigos: [] });
+  /** Las provincias con que se calculan las celdas, por código. */
+  const provinciasDeCeldas = createMemo(
+    () => {
+      const base = cercaDeLasCeldas();
+      const extra = lejanas();
+      return extra.cerca === base ? [...new Set([...base, ...extra.codigos])].sort() : base;
+    },
+    { equals: mismasListas },
+  );
+  /** Las que ya han llegado: con ellas se calcula. */
+  const cargadasDeCeldas = createMemo(() => cargadasDe(provincias(), provinciasDeCeldas()), {
+    equals: mismasListas,
+  });
+  const emplazamientosDeCeldas = createMemo(() =>
+    cargadasDeCeldas().flatMap((p) => p.capa.emplazamientos),
+  );
+  /** Las provincias con emplazamientos que no entran en el cálculo, con su caja. */
+  const fueraDeCeldas = createMemo((): ReadonlyArray<ProvinciaFuera> => {
+    const actual = resumen();
+    const dentro = new Set(cargadasDeCeldas().map((p) => p.codigo));
+    return (actual?.provincias ?? []).flatMap((p) =>
+      p.caja === undefined || p.fichero === undefined || dentro.has(p.codigo)
+        ? []
+        : [{ codigo: p.codigo, caja: p.caja }],
+    );
+  });
+  /**
+   * Hasta dónde llegan las celdas: la caja de las provincias del cálculo, también de las que aún
+   * no han llegado. Así una celda que ya se dibuja no cambia cuando llegan las demás.
+   */
+  const cajaDeCeldas = createMemo(
+    () => {
+      const codigos = provinciasDeCeldas();
+      const cajas = (resumen()?.provincias ?? []).flatMap((p) =>
+        codigos.includes(p.codigo) && p.caja !== undefined ? [p.caja.suroeste, p.caja.noreste] : [],
+      );
+      return cajaDe(cajas);
+    },
+    {
+      equals: (a, b) =>
+        a === b ||
+        (a !== undefined &&
+          b !== undefined &&
+          mismaCoordenada(a.suroeste, b.suroeste) &&
+          mismaCoordenada(a.noreste, b.noreste)),
+    },
+  );
+  /** Cómo van las provincias de las celdas: la pista lo dice mientras falta alguna. */
+  const vecinasDeCeldas = createMemo(
+    () => {
+      const actual = resumen();
+      return actual === undefined
+        ? VECINAS_LISTAS
+        : estadoDeLasVecinas(actual, provincias(), provinciasDeCeldas());
+    },
+    { equals: mismasVecinas },
+  );
+
   const celdas = crearCeldas(datos, {
     lienzo: createMemo(() => {
       const actual = mapaListo();
       return actual === undefined ? undefined : lienzoDelMapa(actual);
     }),
-    emplazamientos,
+    emplazamientos: emplazamientosDeCeldas,
+    fuera: fueraDeCeldas,
+    caja: cajaDeCeldas,
     cerca,
     seleccionada,
   });
+
+  // Si alguna celda que se ve es dudosa, se piden también las provincias que podrían recortarla.
+  createEffect(
+    () => {
+      const calculadas = celdas.calculadas();
+      const zona = zonaDeCeldas();
+      return {
+        base: cercaDeLasCeldas(),
+        faltan:
+          calculadas === undefined || zona === undefined
+            ? []
+            : zona.flatMap((r) => provinciasQueFaltan(calculadas.dudosas, r)),
+      };
+    },
+    ({ base, faltan }) => {
+      const antes = untrack(lejanas);
+      const previas = antes.cerca === base ? antes.codigos : [];
+      const nuevas = faltan.filter((codigo) => !previas.includes(codigo));
+      if (nuevas.length > 0 || antes.cerca !== base) {
+        setLejanas({ cerca: base, codigos: [...previas, ...nuevas].sort() });
+      }
+    },
+  );
+
+  /** Las provincias con estaciones que mira la vista de interferencia, por código. */
+  const provinciasDeInterferencia = createMemo(
+    () => {
+      const actual = resumen();
+      return actual === undefined || !vistaActiva()
+        ? []
+        : provinciasParaSinr(actual.provincias, encuadre(), posicionDeReferencia());
+    },
+    { equals: mismasListas },
+  );
+  const cargadasDeInterferencia = createMemo(
+    () => cargadasDe(provincias(), provinciasDeInterferencia()),
+    { equals: mismasListas },
+  );
   const interferencia = crearInterferencia(datos, {
     lienzo: createMemo(() => {
       const actual = mapaListo();
       return actual === undefined ? undefined : lienzoDeInterferencia(actual);
     }),
     activa: vistaActiva,
-    emplazamientos,
+    emplazamientos: createMemo(() =>
+      cargadasDeInterferencia().flatMap((p) => p.capa.emplazamientos),
+    ),
     eleccion,
     encuadre,
     referencia: posicionDeReferencia,
+    vecinas: () => {
+      const actual = resumen();
+      return actual === undefined
+        ? VECINAS_LISTAS
+        : estadoDeLasVecinas(actual, provincias(), provinciasDeInterferencia());
+    },
   });
+
+  // Las provincias vecinas que necesitan las celdas y la vista se piden como las que se ven: una
+  // vez por visita. Una que falla se reintenta con su botón.
+  recurso(
+    "capa:vecinas",
+    () => [...new Set([...provinciasDeCeldas(), ...provinciasDeInterferencia()])].sort(),
+    (codigos) => {
+      pedirProvincias(codigos);
+      return undefined;
+    },
+    { iguales: mismasListas },
+  );
 
   /**
    * Abre o cierra la vista. Al abrirla por primera vez elige la compañía del emplazamiento
@@ -518,7 +734,14 @@ export function PantallaMapa() {
           );
         }}
         calculo={interferencia.calculo()}
-        reintentar={() => interferencia.reintentar()}
+        reintentar={() => {
+          const { estado, faltan } = interferencia.calculo();
+          if (estado === "sin-vecinas") {
+            reintentarProvincias((faltan ?? []).map((p) => p.codigo));
+          } else {
+            interferencia.reintentar();
+          }
+        }}
         referencia={puntoDeReferencia.referencia()?.tipo}
         cerca={(encuadre()?.zoom ?? 0) >= ZOOM_INTERFERENCIA}
         alCerrar={() => setVistaActiva(false)}
@@ -546,17 +769,24 @@ export function PantallaMapa() {
   const pista = createMemo(() => {
     // Con la vista de interferencia, su panel dice qué es cada cosa y las celdas no se ven.
     if (vistaActiva()) return undefined;
-    const actual = pistaDeCeldas(cerca(), celdas.calculo());
-    return actual === undefined ? undefined : (
+    const actual = pistaDeCeldas(cerca(), celdas.calculo(), vecinasDeCeldas());
+    if (actual === undefined) return undefined;
+    const { reintentar } = actual;
+    return (
       <Pista
         texto={actual.texto}
         modelo={actual.modelo}
         accion={
-          actual.reintentar ? (
-            <Boton variante="secundario" onClick={() => celdas.reintentar()}>
+          reintentar === false ? undefined : (
+            <Boton
+              variante="secundario"
+              onClick={() =>
+                reintentar === "calculo" ? celdas.reintentar() : reintentarProvincias(reintentar)
+              }
+            >
               Reintentar
             </Boton>
-          ) : undefined
+          )
         }
       />
     );
@@ -589,7 +819,8 @@ export function PantallaMapa() {
   createEffect(
     () => {
       const clave = seleccionada();
-      const suya = provincias().get(provinciaSeleccionada());
+      const codigo = provinciaSeleccionada();
+      const suya = codigo === null ? undefined : provincias().get(codigo);
       return {
         listo: mapaListo(),
         lista: suya !== undefined && suya.tipo !== "cargando",
@@ -649,7 +880,7 @@ export function PantallaMapa() {
             }
             ubicacion={
               <>
-                <AvisosDeUbicacion panelAbierto={panelAbierto()} cobertura={cobertura()} />
+                <AvisosDeUbicacion panelAbierto={panelAbierto()} cobertura={resumen()} />
                 <Show when={eligiendo()}>
                   <EleccionConBuscador
                     alUsarCentro={usarCentro}
@@ -810,12 +1041,6 @@ export function PantallaMapa() {
     </AjustesContexto>
   );
 }
-
-/** «Barcelona», «Barcelona y Girona», «Barcelona, Girona y Lleida». */
-const enumerar = (nombres: ReadonlyArray<string>): string =>
-  nombres.length <= 1
-    ? (nombres[0] ?? "")
-    : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1) ?? ""}`;
 
 /**
  * La fecha de los datos de lo que se ve o, mientras llega la capa, que está cargando. Si no llega,

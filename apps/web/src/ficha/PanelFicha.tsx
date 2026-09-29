@@ -58,8 +58,11 @@ import {
 export interface PanelFichaProps {
   /** Clave del emplazamiento seleccionado. */
   readonly clave: string;
-  /** La provincia en cuya capa va (ADR 0016). */
-  readonly provincia: string;
+  /**
+   * La provincia en cuya capa va (ADR 0016), o `null` si el enlace no la dice: entonces se busca
+   * en el índice de claves.
+   */
+  readonly provincia: string | null;
   /** Fecha de la capa de su provincia en el mapa, si ya ha llegado: su marca de agua. */
   readonly fechaCapa: number | undefined;
   readonly alCerrar: () => void;
