@@ -1,7 +1,13 @@
 import type { Coordenada, Rectangulo } from "@celda/dominio/area";
 import type { Poligono } from "@celda/dominio/barrio";
 import type { EmplazamientoDelEjercicio, Vecina } from "@celda/dominio/ejercicio";
+import {
+  type IndiceDeMunicipios,
+  indexarMunicipios,
+  LimitesDeMunicipios,
+} from "@celda/dominio/municipio";
 import { PoblacionDeBarrios } from "@celda/dominio/poblacion";
+import { IndiceDeZonas } from "@celda/dominio/zonaDelEjercicio";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -31,7 +37,7 @@ export const SIN_ZONA: ZonaEnMapa = { type: "FeatureCollection", features: [] };
 const par = (c: Coordenada): Vertice => [c.longitud, c.latitud];
 
 /**
- * La zona para el mapa: un polígono por parte del barrio y una línea de cada estación base a su
+ * La zona para el mapa: un polígono por parte de la zona y una línea de cada estación base a su
  * vecina. Una vecina que no está entre los emplazamientos conocidos no se dibuja.
  */
 export const zonaEnMapa = (
@@ -80,27 +86,65 @@ export const encuadreDe = (poligonos: ReadonlyArray<Poligono>): Rectangulo | und
   };
 };
 
-const decodificar = Schema.decodeUnknownEffect(PoblacionDeBarrios);
+const decodificarPoblacion = Schema.decodeUnknownEffect(PoblacionDeBarrios);
+const decodificarIndice = Schema.decodeUnknownEffect(IndiceDeZonas);
+const decodificarContorno = Schema.decodeUnknownEffect(LimitesDeMunicipios);
 
-/** Los habitantes por barrio no se han podido cargar. */
-export class PoblacionNoCargada extends Schema.TaggedError<PoblacionNoCargada>()(
-  "PoblacionNoCargada",
-  { motivo: Schema.String },
-) {}
+/** Algo que el ejercicio descarga al abrirse no ha llegado o no es lo que se esperaba. */
+export class ZonasNoCargadas extends Schema.TaggedError<ZonasNoCargadas>()("ZonasNoCargadas", {
+  motivo: Schema.String,
+}) {}
+
+const noHaLlegado = () => new ZonasNoCargadas({ motivo: "no ha llegado" });
+
+const noEsElEsperado = (error: ZonasNoCargadas | Schema.SchemaError) =>
+  error._tag === "ZonasNoCargadas"
+    ? error
+    : new ZonasNoCargadas({ motivo: "el fichero no es el que se esperaba" });
+
+// Cada fichero va en un trozo aparte de la web que se descarga la primera vez que se pide, y solo
+// lo pide el ejercicio: quien no usa el modo estudiante no lo descarga nunca.
+
+/** Los habitantes, el área y el límite de cada barrio de Barcelona, del padrón de Open Data BCN. */
+export const cargarPoblacion: Effect.Effect<PoblacionDeBarrios, ZonasNoCargadas> =
+  Effect.tryPromise({ try: () => import("./poblacion.json"), catch: noHaLlegado }).pipe(
+    Effect.flatMap((modulo) => decodificarPoblacion(modulo.default)),
+    Effect.mapError(noEsElEsperado),
+  );
+
+/** El índice de municipios y provincias para buscar una zona (`pnpm run zonas`). */
+export const cargarIndiceDeZonas: Effect.Effect<IndiceDeZonas, ZonasNoCargadas> = Effect.tryPromise(
+  { try: () => import("./zonas/indice.json"), catch: noHaLlegado },
+).pipe(
+  Effect.flatMap((modulo) => decodificarIndice(modulo.default)),
+  Effect.mapError(noEsElEsperado),
+);
+
+/** Los contornos de cada provincia, uno por trozo: solo se descarga el de la que se pide. */
+const CONTORNOS = import.meta.glob("./zonas/[0-9][0-9].json", { import: "default" });
 
 /**
- * Los habitantes por barrio. Van en un trozo aparte de la web que solo se descarga al abrir el
- * ejercicio: quien no usa el modo estudiante no lo descarga nunca.
+ * El contorno de los municipios de una provincia, a 200 m, listo para dibujar un municipio y
+ * saber en cuál cae un punto.
  */
-export const cargarPoblacion: Effect.Effect<PoblacionDeBarrios, PoblacionNoCargada> =
-  Effect.tryPromise({
-    try: () => import("./poblacion.json"),
-    catch: () => new PoblacionNoCargada({ motivo: "no ha llegado" }),
-  }).pipe(
-    Effect.flatMap((modulo) => decodificar(modulo.default)),
-    Effect.mapError((error) =>
-      error._tag === "PoblacionNoCargada"
-        ? error
-        : new PoblacionNoCargada({ motivo: "el fichero no es el que se esperaba" }),
-    ),
-  );
+export const cargarContornos = (
+  provincia: string,
+): Effect.Effect<IndiceDeMunicipios, ZonasNoCargadas> => {
+  const importar = CONTORNOS[`./zonas/${provincia}.json`];
+  return importar === undefined
+    ? Effect.fail(new ZonasNoCargadas({ motivo: `no hay contornos de ${provincia}` }))
+    : Effect.tryPromise({ try: importar, catch: noHaLlegado }).pipe(
+        Effect.flatMap(decodificarContorno),
+        Effect.mapError(noEsElEsperado),
+        Effect.map(indexarMunicipios),
+      );
+};
+
+/** Los polígonos de un municipio en los contornos de su provincia, o nada si no está. */
+export const poligonosDelMunicipio = (
+  contornos: IndiceDeMunicipios,
+  codigo: string,
+): ReadonlyArray<Poligono> | undefined => {
+  const posicion = contornos.territorios.findIndex((t) => t.codigo === codigo);
+  return posicion === -1 ? undefined : contornos.poligonosDe(posicion);
+};

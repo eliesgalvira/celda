@@ -1,4 +1,4 @@
-import { ESPANA, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
+import { type Coordenada, ESPANA, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
@@ -294,7 +294,11 @@ export function PantallaMapa() {
     return () => pantalla.removeEventListener("change", medir);
   });
 
-  // En escritorio, mientras se elige un punto, un clic en el mapa lo marca (historia 26).
+  /** Quien espera el siguiente punto que se toque en el mapa: el ejercicio al elegir su zona. */
+  let esperandoPunto: ((punto: Coordenada) => void) | undefined;
+
+  // En escritorio, mientras se elige un punto, un clic en el mapa lo marca (historia 26). Si el
+  // ejercicio espera un punto para elegir su zona, el clic es suyo, también en el móvil.
   recurso(
     "mapa:clic",
     () => mapaListo(),
@@ -302,6 +306,10 @@ export function PantallaMapa() {
       const alClic = (evento: {
         readonly lngLat: { readonly lng: number; readonly lat: number };
       }) => {
+        if (esperandoPunto !== undefined) {
+          esperandoPunto({ longitud: evento.lngLat.lng, latitud: evento.lngLat.lat });
+          return;
+        }
         if (!eligiendo() || !escritorio()) return;
         puntoDeReferencia.elegir(
           { longitud: evento.lngLat.lng, latitud: evento.lngLat.lat },
@@ -378,7 +386,7 @@ export function PantallaMapa() {
   /** La provincia en cuya capa va, que también dice la URL. */
   const provinciaSeleccionada = createMemo(() => provinciaDe(ubicacion()));
   /**
-   * El barrio del ejercicio abierto (`""` sin barrio), o `null` si está cerrado. Sin el modo
+   * La zona del ejercicio abierto (`""` sin zona), o `null` si está cerrado. Sin el modo
    * estudiante el ejercicio no se abre, aunque lo pida la URL.
    */
   const ejercicio = createMemo(() =>
@@ -730,7 +738,7 @@ export function PantallaMapa() {
                 <Show when={ajustes.ajustes().modoEstudiante}>
                   <ControlDelMapa
                     etiqueta="Ejercicio"
-                    detalle="Los cálculos de un barrio paso a paso, con sus fuentes."
+                    detalle="Los cálculos de un municipio o un barrio paso a paso, con sus fuentes."
                     icono={<IconoEjercicio />}
                     activo={ejercicio() !== null}
                     onClick={() =>
@@ -766,12 +774,18 @@ export function PantallaMapa() {
                 </Match>
                 <Match when={ejercicio() !== null}>
                   <PanelEjercicio
-                    barrio={ejercicio() ?? ""}
+                    zona={ejercicio() ?? ""}
+                    resumen={resumen()}
+                    provincias={provincias()}
                     emplazamientos={emplazamientos()}
-                    fechaCapa={fechaCapa()}
-                    alElegirBarrio={(codigo) =>
+                    alElegirZona={(codigo) =>
                       navegar(conEjercicio(ubicacion(), codigo), { reemplazar: true })
                     }
+                    alPedirProvincias={pedirProvincias}
+                    alReintentarProvincias={reintentarProvincias}
+                    alEsperarPunto={(alTocar) => {
+                      esperandoPunto = alTocar;
+                    }}
                     alDibujar={(dibujo, encuadre) => setZona({ zona: dibujo, encuadre })}
                     alCerrar={() => navegar(conEjercicio(ubicacion(), null))}
                   />

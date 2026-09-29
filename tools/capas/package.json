@@ -12,6 +12,7 @@
     "servir": "vp build && node dist/capas.js servir",
     "sintetica": "vp build && node dist/capas.js sintetica",
     "test": "vp test run",
+    "zonas": "vp build && node dist/capas.js zonas",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

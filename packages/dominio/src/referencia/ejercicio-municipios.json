@@ -1,0 +1,472 @@
+[
+  {
+    "municipio": "08019",
+    "nombre": "Barcelona",
+    "habitantes": 1731649,
+    "areaKm2": 100.52,
+    "densidad": 17226.91,
+    "lineas": 2221705.67,
+    "provinciasCargadas": [],
+    "provinciasIncompletas": [],
+    "companias": [
+      {
+        "compania": "movistar",
+        "estaciones": 675,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 185.01,
+        "radio": 92.5,
+        "habitantesPorEstacion": 2565.41,
+        "usuariosPorEstacion": 860.05,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "vodafone",
+        "estaciones": 383,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 276.86,
+        "radio": 138.43,
+        "habitantesPorEstacion": 4521.28,
+        "usuariosPorEstacion": 1085.91,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "orange",
+        "estaciones": 399,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 263.66,
+        "radio": 131.83,
+        "habitantesPorEstacion": 4339.97,
+        "usuariosPorEstacion": 2260.68,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "digi",
+        "estaciones": 24,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 703.49,
+        "radio": 351.75,
+        "habitantesPorEstacion": 72152.04,
+        "usuariosPorEstacion": 11765.78,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "yoigo",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      }
+    ]
+  },
+  {
+    "municipio": "17043",
+    "nombre": "Queralbs",
+    "habitantes": 202,
+    "areaKm2": 93.43,
+    "densidad": 2.16,
+    "lineas": 259.17,
+    "provinciasCargadas": [],
+    "provinciasIncompletas": [],
+    "companias": [
+      {
+        "compania": "movistar",
+        "estaciones": 3,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 2153.4,
+        "radio": 1076.7,
+        "habitantesPorEstacion": 67.33,
+        "usuariosPorEstacion": 22.57,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "vodafone",
+        "estaciones": 1,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 9387.47,
+        "radio": 4693.74,
+        "habitantesPorEstacion": 202,
+        "usuariosPorEstacion": 48.52,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "orange",
+        "estaciones": 1,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 9387.47,
+        "radio": 4693.74,
+        "habitantesPorEstacion": 202,
+        "usuariosPorEstacion": 105.22,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "digi",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "yoigo",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      }
+    ]
+  },
+  {
+    "municipio": "17025",
+    "nombre": "Bordils",
+    "habitantes": 1841,
+    "areaKm2": 6.98,
+    "densidad": 263.75,
+    "lineas": 2362,
+    "provinciasCargadas": [],
+    "provinciasIncompletas": [],
+    "companias": [
+      {
+        "compania": "movistar",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "vodafone",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "orange",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "digi",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "yoigo",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      }
+    ]
+  },
+  {
+    "municipio": "08284",
+    "nombre": "Tordera",
+    "habitantes": 19039,
+    "areaKm2": 84.42,
+    "densidad": 225.53,
+    "lineas": 24427.04,
+    "provinciasCargadas": [
+      [
+        "17"
+      ]
+    ],
+    "provinciasIncompletas": [],
+    "companias": [
+      {
+        "compania": "movistar",
+        "estaciones": 5,
+        "vecinasEnOtraProvincia": 2,
+        "distanciaMedia": 2129.91,
+        "radio": 1064.96,
+        "habitantesPorEstacion": 3807.8,
+        "usuariosPorEstacion": 1276.56,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "vodafone",
+        "estaciones": 5,
+        "vecinasEnOtraProvincia": 1,
+        "distanciaMedia": 2167.88,
+        "radio": 1083.94,
+        "habitantesPorEstacion": 3807.8,
+        "usuariosPorEstacion": 914.55,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "orange",
+        "estaciones": 6,
+        "vecinasEnOtraProvincia": 1,
+        "distanciaMedia": 1738.37,
+        "radio": 869.18,
+        "habitantesPorEstacion": 3173.17,
+        "usuariosPorEstacion": 1652.9,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "digi",
+        "estaciones": 1,
+        "vecinasEnOtraProvincia": 1,
+        "distanciaMedia": 5302.18,
+        "radio": 2651.09,
+        "habitantesPorEstacion": 19039,
+        "usuariosPorEstacion": 3104.68,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "yoigo",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      }
+    ]
+  },
+  {
+    "municipio": "43004",
+    "nombre": "Alcanar",
+    "habitantes": 10104,
+    "areaKm2": 46.89,
+    "densidad": 215.48,
+    "lineas": 12963.43,
+    "provinciasCargadas": [
+      [
+        "12"
+      ]
+    ],
+    "provinciasIncompletas": [
+      "12"
+    ],
+    "companias": [
+      {
+        "compania": "movistar",
+        "estaciones": 4,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 3045.53,
+        "radio": 1522.77,
+        "habitantesPorEstacion": 2526,
+        "usuariosPorEstacion": 846.84,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "vodafone",
+        "estaciones": 5,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 2259.79,
+        "radio": 1129.9,
+        "habitantesPorEstacion": 2020.8,
+        "usuariosPorEstacion": 485.35,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "orange",
+        "estaciones": 5,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": 2259.79,
+        "radio": 1129.9,
+        "habitantesPorEstacion": 2020.8,
+        "usuariosPorEstacion": 1052.63,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "digi",
+        "estaciones": 2,
+        "vecinasEnOtraProvincia": 1,
+        "distanciaMedia": 5335.54,
+        "radio": 2667.77,
+        "habitantesPorEstacion": 5052,
+        "usuariosPorEstacion": 823.83,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      },
+      {
+        "compania": "yoigo",
+        "estaciones": 0,
+        "vecinasEnOtraProvincia": 0,
+        "distanciaMedia": null,
+        "radio": null,
+        "habitantesPorEstacion": null,
+        "usuariosPorEstacion": null,
+        "bandas": [],
+        "tecnologias": {
+          "2G": "no-consta",
+          "3G": "no-consta",
+          "4G": "no-consta",
+          "5G": "no-consta"
+        }
+      }
+    ]
+  }
+]

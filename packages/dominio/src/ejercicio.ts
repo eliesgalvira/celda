@@ -1,4 +1,9 @@
-import { type Coordenada, distanciaMetros } from "./area.ts";
+import {
+  type Coordenada,
+  distanciaAlRectangulo,
+  distanciaMetros,
+  type Rectangulo,
+} from "./area.ts";
 import type { Mhz } from "./banda.ts";
 import { Compania } from "./compania.ts";
 import { type Generacion, USOS_DE_BANDA } from "./tecnologia.ts";
@@ -80,7 +85,8 @@ export interface EmplazamientoDelEjercicio {
 export type BandasPorCompania = Readonly<Partial<Record<Compania, ReadonlyArray<Mhz | null>>>>;
 
 export interface EntradaDelEjercicio {
-  readonly habitantes: number;
+  /** Del padrón; `null` si el padrón aún no tiene la zona, como un municipio recién creado. */
+  readonly habitantes: number | null;
   readonly areaKm2: number;
   /** Los emplazamientos que caen en la zona. */
   readonly enZona: ReadonlyArray<EmplazamientoDelEjercicio>;
@@ -113,7 +119,7 @@ export interface ResultadoDeCompania {
   readonly radio: number | undefined;
   readonly habitantesPorEstacion: number | undefined;
   /** Líneas móviles de su grupo en la zona. Orange y Yoigo comparten las suyas. */
-  readonly lineasDelGrupo: number;
+  readonly lineasDelGrupo: number | undefined;
   /** Las líneas del grupo entre sus estaciones base de la zona. */
   readonly usuariosPorEstacion: number | undefined;
   /** Estaciones de la zona con alguna banda conocida en su ficha. */
@@ -126,12 +132,13 @@ export interface ResultadoDeCompania {
 }
 
 export interface ResultadoDelEjercicio {
-  readonly habitantes: number;
+  /** `null` si el padrón no tiene la zona: entonces no hay nada por habitante. */
+  readonly habitantes: number | null;
   readonly areaKm2: number;
   /** Habitantes por km². */
-  readonly densidad: number;
+  readonly densidad: number | undefined;
   /** Líneas móviles de toda la zona: habitantes por la penetración. */
-  readonly lineas: number;
+  readonly lineas: number | undefined;
   readonly companias: ReadonlyArray<ResultadoDeCompania>;
 }
 
@@ -192,7 +199,8 @@ const entre = (dividendo: number, divisor: number): number | undefined =>
  * - Cada emplazamiento de la zona en que emite una compañía es una estación base suya.
  * - La vecina de una estación es la más cercana de su misma compañía en toda la capa, esté o no
  *   en la zona. El radio de cobertura es la mitad de la distancia media a la vecina.
- * - Los habitantes por estación son los de la zona entre las estaciones de la compañía.
+ * - Los habitantes por estación son los de la zona entre las estaciones de la compañía. Sin
+ *   habitantes en el padrón no se calcula nada por habitante: nunca se divide por cero.
  * - Las líneas de la zona son los habitantes por la penetración; las de cada grupo, por su
  *   cuota. Los usuarios por estación son las líneas del grupo entre sus estaciones de la zona.
  * - Las tecnologías salen de las bandas y nunca son seguras: «probable» si es el uso más
@@ -200,7 +208,7 @@ const entre = (dividendo: number, divisor: number): number | undefined =>
  */
 export const resolverEjercicio = (entrada: EntradaDelEjercicio): ResultadoDelEjercicio => {
   const { habitantes, areaKm2, parametros } = entrada;
-  const lineas = (habitantes * parametros.penetracion) / 100;
+  const lineas = habitantes === null ? undefined : (habitantes * parametros.penetracion) / 100;
   const todos = new Map(entrada.todos.map((e) => [e.clave, e]));
   for (const e of entrada.enZona) todos.set(e.clave, e);
   const candidatas = [...todos.values()];
@@ -221,7 +229,8 @@ export const resolverEjercicio = (entrada: EntradaDelEjercicio): ResultadoDelEje
     });
     const distanciaMedia = media(vecinas.map((v) => v.metros));
     const grupo = GRUPO_DE_LINEAS[compania];
-    const lineasDelGrupo = (lineas * parametros.cuotas[grupo]) / 100;
+    const lineasDelGrupo =
+      lineas === undefined ? undefined : (lineas * parametros.cuotas[grupo]) / 100;
 
     const bandas = new Set<Mhz>();
     let conBandas = 0;
@@ -244,10 +253,12 @@ export const resolverEjercicio = (entrada: EntradaDelEjercicio): ResultadoDelEje
       vecinas,
       distanciaMedia,
       radio: distanciaMedia === undefined ? undefined : distanciaMedia / 2,
-      habitantesPorEstacion: entre(habitantes, propias.length),
+      habitantesPorEstacion: habitantes === null ? undefined : entre(habitantes, propias.length),
       lineasDelGrupo,
       usuariosPorEstacion:
-        propias.length === 0 ? undefined : entre(lineasDelGrupo, estacionesDelGrupo(grupo)),
+        propias.length === 0 || lineasDelGrupo === undefined
+          ? undefined
+          : entre(lineasDelGrupo, estacionesDelGrupo(grupo)),
       conBandas,
       sinFicha,
       bandas: ordenadas,
@@ -258,8 +269,79 @@ export const resolverEjercicio = (entrada: EntradaDelEjercicio): ResultadoDelEje
   return {
     habitantes,
     areaKm2,
-    densidad: areaKm2 === 0 ? 0 : habitantes / areaKm2,
+    densidad: habitantes === null ? undefined : entre(habitantes, areaKm2),
     lineas,
     companias,
   };
+};
+
+/** Lo que el resumen nacional dice de una provincia y hace falta para buscar vecinas en ella. */
+export interface ProvinciaConVecinas {
+  readonly codigo: string;
+  /** La caja de sus emplazamientos, o `undefined` si no tiene ninguno. */
+  readonly caja: Rectangulo | undefined;
+  readonly companias: ReadonlyArray<Compania>;
+  /** Si Celda tiene todos sus emplazamientos, o solo los de una parte. */
+  readonly cubierta: boolean;
+  /** Si tiene capa que pedir. */
+  readonly conCapa: boolean;
+}
+
+/** Qué provincias hacen falta para que las vecinas de la zona sean las de verdad. */
+export interface ProvinciasDelBorde {
+  /**
+   * Las que aún no están en `todos` y pueden tener una vecina más cercana que la encontrada: hay
+   * que cargarlas antes de fiarse del radio. Por código.
+   */
+  readonly faltan: ReadonlyArray<string>;
+  /**
+   * Las que pueden tener una vecina más cercana pero de las que Celda solo tiene una parte: el
+   * radio puede salir mayor que el de verdad. Por código.
+   */
+  readonly incompletas: ReadonlyArray<string>;
+}
+
+/**
+ * Las provincias que pueden cambiar el radio de cobertura de una zona junto a un borde. Una
+ * estación base de la zona puede tener su vecina en otra provincia si la caja de esa provincia
+ * queda más cerca que la vecina encontrada entre `todos`, los emplazamientos de las provincias
+ * cargadas. Si su compañía no tiene ninguna otra estación cargada, basta con la provincia más
+ * cercana que la tenga: al cargarla, la vecina encontrada acota las demás. Se llama otra vez con
+ * cada provincia que llega, hasta que no falta ninguna. Es una función pura.
+ */
+export const provinciasParaLasVecinas = (entrada: {
+  readonly enZona: ReadonlyArray<EmplazamientoDelEjercicio>;
+  readonly todos: ReadonlyArray<EmplazamientoDelEjercicio>;
+  readonly provincias: ReadonlyArray<ProvinciaConVecinas>;
+  /** Las provincias cuyos emplazamientos ya están en `todos`. */
+  readonly cargadas: ReadonlySet<string>;
+}): ProvinciasDelBorde => {
+  const faltan = new Set<string>();
+  const incompletas = new Set<string>();
+  for (const compania of Compania.literals) {
+    const propias = entrada.enZona.filter((e) => e.companias.includes(compania));
+    if (propias.length === 0) continue;
+    const suyas = [...entrada.todos, ...entrada.enZona].filter((e) =>
+      e.companias.includes(compania),
+    );
+    const conLaCompania = entrada.provincias.filter(
+      (p): p is ProvinciaConVecinas & { readonly caja: Rectangulo } =>
+        p.caja !== undefined && p.companias.includes(compania),
+    );
+    for (const estacion of propias) {
+      const metros = vecinaDe(estacion, suyas)?.metros ?? Infinity;
+      const cerca = conLaCompania
+        .map((p) => ({ provincia: p, metros: distanciaAlRectangulo(estacion.posicion, p.caja) }))
+        .filter((c) => c.metros < metros);
+      for (const { provincia } of cerca) {
+        if (!provincia.cubierta) incompletas.add(provincia.codigo);
+      }
+      const porCargar = cerca
+        .filter((c) => c.provincia.conCapa && !entrada.cargadas.has(c.provincia.codigo))
+        .sort((a, b) => a.metros - b.metros);
+      const elegidas = Number.isFinite(metros) ? porCargar : porCargar.slice(0, 1);
+      for (const { provincia } of elegidas) faltan.add(provincia.codigo);
+    }
+  }
+  return { faltan: [...faltan].sort(), incompletas: [...incompletas].sort() };
 };

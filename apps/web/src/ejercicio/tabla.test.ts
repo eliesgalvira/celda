@@ -5,8 +5,14 @@ import {
 } from "@celda/dominio/ejercicio";
 import { assert, describe, it } from "@effect/vitest";
 
-import { FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
-import { csvDeTabla, filasExportadas, nombreDeFichero, tablaDelEjercicio } from "./tabla.ts";
+import { FUENTE_DE_BARRIOS, FUENTES_DE_PRUEBA } from "../capa/pruebas.ts";
+import {
+  type ContextoDeTabla,
+  csvDeTabla,
+  filasExportadas,
+  nombreDeFichero,
+  tablaDelEjercicio,
+} from "./tabla.ts";
 import { crc32, letraDeColumna, xlsxDeFilas } from "./xlsx.ts";
 
 const ENTRADA: EntradaDelEjercicio = {
@@ -21,19 +27,34 @@ const ENTRADA: EntradaDelEjercicio = {
   parametros: PARAMETROS_POR_DEFECTO,
 };
 
-const CONTEXTO = {
+const CONTEXTO: ContextoDeTabla = {
   zona: "Pedralbes",
-  poblacion: {
-    atribucion: "Ajuntament de Barcelona",
-    licencia: "CC BY 4.0",
-    enlace: "https://opendata-ajuntament.barcelona.cat/data/es/dataset/pad_mdbas",
-    referencia: "2026-01-01",
-    publicada: "2026-05-28",
+  origen: {
+    tipo: "barrio",
+    limites: FUENTE_DE_BARRIOS,
+    poblacion: {
+      atribucion: "Ajuntament de Barcelona",
+      licencia: "CC BY 4.0",
+      enlace: "https://opendata-ajuntament.barcelona.cat/data/es/dataset/pad_mdbas",
+      referencia: "2026-01-01",
+      publicada: "2026-05-28",
+    },
   },
-  limites: FUENTE_DE_BARRIOS,
   fechaCapa: Date.UTC(2026, 8, 25, 23, 44, 53),
   parametros: PARAMETROS_POR_DEFECTO,
-  bandas: { de: "fichas" as const, fecha: Date.UTC(2026, 8, 26, 10) },
+  bandas: { de: "fichas", fecha: Date.UTC(2026, 8, 26, 10) },
+};
+
+/** El mismo ejercicio en un municipio, con los límites del IGN y el padrón del INE. */
+const EN_TORDERA: ContextoDeTabla = {
+  ...CONTEXTO,
+  zona: "Tordera (Barcelona)",
+  origen: {
+    tipo: "municipio",
+    codigo: "08284",
+    limites: FUENTES_DE_PRUEBA.municipios,
+    poblacion: FUENTES_DE_PRUEBA.padron,
+  },
 };
 
 const tabla = () => tablaDelEjercicio(resolverEjercicio(ENTRADA), CONTEXTO, PARAMETROS_POR_DEFECTO);
@@ -58,6 +79,43 @@ describe("tabla del ejercicio", () => {
     assert.strictEqual(fila("Habitantes").fecha, "2026-05-28");
     assert.match(fila("Penetración").fuente, /CNMC.*julio de 2026/u);
     assert.strictEqual(fila("Estaciones base en la zona").fecha, "2026-09-26");
+  });
+
+  it("en un municipio cita al IGN y al INE como piden, con el código del municipio", () => {
+    const filas = tablaDelEjercicio(
+      resolverEjercicio(ENTRADA),
+      EN_TORDERA,
+      PARAMETROS_POR_DEFECTO,
+    ).secciones.flatMap((s) => s.filas);
+    const deMagnitud = (magnitud: string) => filas.find((f) => f.magnitud === magnitud);
+    assert.strictEqual(
+      deMagnitud("Zona")?.fuente,
+      "Obra derivada de Base de Datos de Límites Jurisdiccionales de España 2026-08-10 CC-BY 4.0 ign.es",
+    );
+    assert.strictEqual(deMagnitud("Código INE")?.valores[0]?.texto, "08284");
+    assert.strictEqual(
+      deMagnitud("Habitantes")?.fuente,
+      "Padrón a 2025-01-01, INE (CC BY 4.0). Elaboración propia con datos extraídos del sitio web del INE: www.ine.es",
+    );
+    assert.strictEqual(deMagnitud("Habitantes")?.fecha, "2025-12-11");
+    assert.strictEqual(
+      deMagnitud("Área")?.fuente,
+      "Calculada con los límites del IGN sin simplificar",
+    );
+  });
+
+  it("sin habitantes en el padrón, la tabla lo dice y deja en blanco lo que depende de ellos", () => {
+    const filas = tablaDelEjercicio(
+      resolverEjercicio({ ...ENTRADA, habitantes: null }),
+      EN_TORDERA,
+      PARAMETROS_POR_DEFECTO,
+    ).secciones.flatMap((s) => s.filas);
+    const deMagnitud = (magnitud: string) => filas.find((f) => f.magnitud === magnitud);
+    assert.strictEqual(deMagnitud("Habitantes")?.valores[0]?.texto, "—");
+    assert.match(deMagnitud("Habitantes")?.fuente ?? "", /El padrón aún no tiene esta zona$/u);
+    assert.strictEqual(deMagnitud("Densidad")?.valores[0]?.texto, "—");
+    assert.strictEqual(deMagnitud("Usuarios por estación base")?.valores[0]?.texto, "—");
+    assert.strictEqual(deMagnitud("Estaciones base en la zona")?.valores[0]?.texto, "2");
   });
 
   it("con parámetros cambiados a mano no cita a la CNMC", () => {

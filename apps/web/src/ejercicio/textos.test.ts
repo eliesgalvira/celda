@@ -45,4 +45,22 @@ describe("cadenas del ejercicio", () => {
     assert.strictEqual(pasos[2]?.etiqueta, "Líneas de Orange y Yoigo");
     assert.strictEqual(pasos[3]?.operacion, "÷ 2 estaciones base de Orange y Yoigo en la zona");
   });
+
+  it("sin habitantes en el padrón lo dice en lugar de dividir por cero", () => {
+    const sinPadron = resolverEjercicio({
+      habitantes: null,
+      areaKm2: 1,
+      enZona: [{ clave: "a", posicion: { longitud: 2.16, latitud: 41.39 }, companias: ["digi"] }],
+      todos: [],
+      bandas: new Map(),
+      parametros: PARAMETROS_POR_DEFECTO,
+    });
+    const pasos = cadenaDeUsuarios(sinPadron, "digi", PARAMETROS_POR_DEFECTO, "CNMC");
+    assert.deepStrictEqual(
+      pasos.map((p) => p.valor),
+      ["—", "—", "—", "—"],
+    );
+    assert.strictEqual(pasos[0]?.fuente, "El padrón aún no tiene esta zona");
+    assert.strictEqual(pasos[3]?.fuente, "Sin habitantes no hay líneas que repartir");
+  });
 });

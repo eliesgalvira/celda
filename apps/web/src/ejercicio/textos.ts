@@ -19,6 +19,9 @@ export interface Eslabon {
 
 const metros = (n: number | undefined) => (n === undefined ? "—" : `${entero(n)} m`);
 
+/** Un entero, o una raya si no se puede calcular. */
+const cuenta = (n: number | null | undefined) => (n === undefined || n === null ? "—" : entero(n));
+
 /**
  * Cómo sale el radio de cobertura de una compañía: sus estaciones, la media de las distancias a
  * la vecina y la mitad. Si no tiene otra estación en toda la capa, lo dice.
@@ -73,19 +76,20 @@ export const cadenaDeUsuarios = (
   return [
     {
       etiqueta: "Habitantes de la zona",
-      valor: entero(resultado.habitantes),
-      fuente: "Padrón municipal",
+      valor: cuenta(resultado.habitantes),
+      fuente:
+        resultado.habitantes === null ? "El padrón aún no tiene esta zona" : "Padrón municipal",
     },
     {
       operacion: `× ${decimal(parametros.penetracion)} líneas por cada 100 habitantes`,
       etiqueta: "Líneas móviles en la zona",
-      valor: entero(resultado.lineas),
+      valor: cuenta(resultado.lineas),
       fuente: fuenteParametros,
     },
     {
       operacion: `× ${decimal(parametros.cuotas[grupo])} % de cuota de ${NOMBRE_GRUPO[grupo]}`,
       etiqueta: `Líneas de ${NOMBRE_GRUPO[grupo]}`,
-      valor: entero(c?.lineasDelGrupo ?? 0),
+      valor: cuenta(c?.lineasDelGrupo),
       fuente: fuenteParametros,
     },
     {
@@ -93,11 +97,13 @@ export const cadenaDeUsuarios = (
         ? `÷ ${entero(estacionesDelGrupo)} estaciones base de Orange y Yoigo en la zona`
         : `÷ ${entero(c?.estaciones ?? 0)} estaciones base en la zona`,
       etiqueta: "Usuarios por estación base",
-      valor: c?.usuariosPorEstacion === undefined ? "—" : entero(c.usuariosPorEstacion),
+      valor: cuenta(c?.usuariosPorEstacion),
       fuente:
-        c?.usuariosPorEstacion === undefined
+        c === undefined || c.estaciones === 0
           ? `${NOMBRE_COMPANIA[compania]} no tiene estaciones base en la zona`
-          : "Se supone que cada línea usa una estación base de la zona",
+          : c.usuariosPorEstacion === undefined
+            ? "Sin habitantes no hay líneas que repartir"
+            : "Se supone que cada línea usa una estación base de la zona",
     },
   ];
 };

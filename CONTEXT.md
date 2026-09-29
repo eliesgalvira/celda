@@ -281,7 +281,7 @@ Ejercicio del modo estudiante que cuenta, para una zona, las estaciones base de 
 _Evitar_: práctica, dimensionado
 
 **Zona**:
-Área sobre la que se hace el ejercicio. En la v1 es siempre un barrio.
+Área sobre la que se hace el ejercicio: un barrio de Barcelona o un municipio.
 _Evitar_: área de estudio, región
 
 **Radio de cobertura**:
