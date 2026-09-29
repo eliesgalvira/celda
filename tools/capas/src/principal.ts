@@ -22,9 +22,10 @@ import { convexPorHttp } from "./convex.ts";
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
 import { descargarMunicipios, leerMunicipios, leerPadron } from "./descargaDeMunicipios.ts";
 import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
+import { escribirZonas } from "./zonas.ts";
 
 /**
- * Generador de capas. Seis órdenes:
+ * Generador de capas. Siete órdenes:
  *
  * - `publicar`: publica la instantánea de un despliegue de Convex en una carpeta, igual que la
  *   publicación automática tras cada ingesta: el resumen nacional, la capa y las fichas de cada
@@ -36,6 +37,8 @@ import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
  *   cada barrio, con su área y su límite, donde los lee la web.
  * - `municipios`: descarga los límites de municipios y provincias del IGN y el padrón del INE, y
  *   los guarda en el repositorio junto a los barrios (ADR 0017).
+ * - `zonas`: escribe desde esos límites, sin descargar nada, el índice de municipios y el
+ *   contorno de cada provincia que la web descarga al abrir el ejercicio de emplazamientos.
  * - `sintetica`: publica en la carpeta una España sintética de `CELDA_SINTETICOS` emplazamientos
  *   (100.000 por defecto), con la publicación de verdad, para medir el mapa (ADR 0016).
  */
@@ -77,6 +80,11 @@ const configMunicipios = Config.all({
     Config.orElse(() => Config.String("HOME").pipe(Config.map((casa) => `${casa}/.cache/celda`))),
   ),
 });
+
+/** Dónde escribe `zonas` el índice y los contornos: la web los lee de su carpeta. */
+const configZonas = Config.String("CELDA_ZONAS").pipe(
+  Config.withDefault("../../apps/web/src/ejercicio/zonas"),
+);
 
 /** Pausa entre dos peticiones al mismo sitio de la orden `municipios`. */
 const PAUSA_MUNICIPIOS = Duration.seconds(5);
@@ -202,11 +210,19 @@ const municipios = Effect.gen(function* () {
   );
 });
 
+const zonas = Effect.gen(function* () {
+  const { municipios } = yield* configMunicipios;
+  const destino = yield* configZonas;
+  const escritos = yield* escribirZonas(municipios, destino);
+  const bytes = [...escritos.values()].reduce((suma, n) => suma + n, 0);
+  yield* Effect.log(`${escritos.size} ficheros de zonas, ${bytes} bytes, escritos en ${destino}`);
+});
+
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «publicar», «servir», «barrios», «poblacion», «municipios» o «sintetica».`;
+    return `Orden desconocida «${this.orden}». Usa «publicar», «servir», «barrios», «poblacion», «municipios», «zonas» o «sintetica».`;
   }
 }
 
@@ -217,6 +233,7 @@ const principal = Effect.gen(function* () {
   if (orden === "barrios") return yield* barrios;
   if (orden === "poblacion") return yield* poblacion;
   if (orden === "municipios") return yield* municipios;
+  if (orden === "zonas") return yield* zonas;
   if (orden === "sintetica") return yield* sintetica;
   return yield* new OrdenDesconocida({ orden });
 });
