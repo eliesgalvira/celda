@@ -81,8 +81,8 @@ export const dia = (fecha: number): string =>
 
 const NINGUNO: Valor = { texto: "—" };
 
-const numero = (n: number | undefined, formato: (n: number) => string): Valor =>
-  n === undefined ? NINGUNO : { texto: formato(n), numero: n };
+const numero = (n: number | null | undefined, formato: (n: number) => string): Valor =>
+  n === undefined || n === null ? NINGUNO : { texto: formato(n), numero: n };
 
 const TEXTO_CERTEZA: Readonly<Record<Certeza, Valor>> = {
   probable: { texto: "probable", marca: "probable" },

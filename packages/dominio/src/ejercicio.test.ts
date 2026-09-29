@@ -4,6 +4,8 @@ import type { Coordenada } from "./area.ts";
 import {
   type EmplazamientoDelEjercicio,
   type EntradaDelEjercicio,
+  type ProvinciaConVecinas,
+  provinciasParaLasVecinas,
   resolverEjercicio,
   type ResultadoDelEjercicio,
 } from "./ejercicio.ts";
@@ -107,7 +109,7 @@ describe("ejercicio de emplazamientos", () => {
     assert.isUndefined(digi.radio);
     assert.isUndefined(digi.habitantesPorEstacion);
     assert.isUndefined(digi.usuariosPorEstacion);
-    assert.closeTo(digi.lineasDelGrupo, 1200, 1e-9);
+    assert.closeTo(digi.lineasDelGrupo ?? 0, 1200, 1e-9);
   });
 
   it("reparte habitantes y usuarios por estación base", () => {
@@ -146,8 +148,110 @@ describe("ejercicio de emplazamientos", () => {
     assert.strictEqual(vodafone.tecnologias["4G"], "no-consta");
   });
 
+  it("sin habitantes en el padrón no divide por cero: no hay nada por habitante", () => {
+    const resultado = resolverEjercicio({ ...ENTRADA, habitantes: null });
+    assert.isNull(resultado.habitantes);
+    assert.isUndefined(resultado.densidad);
+    assert.isUndefined(resultado.lineas);
+    const movistar = de(resultado, "movistar");
+    assert.strictEqual(movistar.estaciones, 3);
+    assert.closeTo(movistar.radio ?? 0, 1300 / 6, 0.01);
+    assert.isUndefined(movistar.habitantesPorEstacion);
+    assert.isUndefined(movistar.lineasDelGrupo);
+    assert.isUndefined(movistar.usuariosPorEstacion);
+  });
+
+  it("con área cero no hay densidad", () => {
+    assert.isUndefined(resolverEjercicio({ ...ENTRADA, areaKm2: 0 }).densidad);
+  });
+
   it("da el resultado de referencia", async () => {
     const json = `${JSON.stringify(redondeado(resolverEjercicio(ENTRADA)), null, 2)}\n`;
     await expect(json).toMatchFileSnapshot("./referencia/ejercicio-emplazamientos.json");
+  });
+});
+
+/** Una provincia a lo largo del eje, de `desde` a `hasta` metros al este del origen. */
+const provincia = (
+  codigo: string,
+  desde: number,
+  hasta: number,
+  otras: Partial<ProvinciaConVecinas> = {},
+): ProvinciaConVecinas => ({
+  codigo,
+  caja: {
+    suroeste: { ...alEste(desde), latitud: ORIGEN.latitud - 0.01 },
+    noreste: { ...alEste(hasta), latitud: ORIGEN.latitud + 0.01 },
+  },
+  companias: ["movistar", "vodafone", "orange"],
+  cubierta: true,
+  conCapa: true,
+  ...otras,
+});
+
+describe("provincias para las vecinas", () => {
+  // La zona está en la provincia «Z», que acaba 200 m al este de C; «E» empieza allí.
+  const ZONA = provincia("Z", -5000, 1200);
+  const AL_ESTE = provincia("E", 1200, 9000);
+  const LEJANA = provincia("L", 50_000, 60_000);
+
+  it("pide la vecina de al lado si su caja queda más cerca que la vecina encontrada", () => {
+    // Sin el emplazamiento del este, la vecina de C en Vodafone es A, a 1000 m, y «E» queda a 200 m.
+    const { faltan, incompletas } = provinciasParaLasVecinas({
+      enZona: ENTRADA.enZona,
+      todos: [OESTE, A, B, C],
+      provincias: [ZONA, AL_ESTE, LEJANA],
+      cargadas: new Set(["Z"]),
+    });
+    assert.deepStrictEqual(faltan, ["E"]);
+    assert.deepStrictEqual(incompletas, []);
+  });
+
+  it("con la vecina ya más cerca que el borde, no pide nada", () => {
+    const { faltan } = provinciasParaLasVecinas({
+      enZona: [A, B],
+      todos: [OESTE, A, B],
+      provincias: [ZONA, provincia("E", 5000, 9000, { companias: ["movistar"] })],
+      cargadas: new Set(["Z"]),
+    });
+    assert.deepStrictEqual(faltan, []);
+  });
+
+  it("una provincia ya cargada o sin capa no se pide, y una a medias se dice", () => {
+    const { faltan, incompletas } = provinciasParaLasVecinas({
+      enZona: ENTRADA.enZona,
+      todos: [OESTE, A, B, C],
+      provincias: [ZONA, { ...AL_ESTE, cubierta: false, conCapa: false }],
+      cargadas: new Set(["Z"]),
+    });
+    assert.deepStrictEqual(faltan, []);
+    assert.deepStrictEqual(incompletas, ["E"]);
+  });
+
+  it("sin ninguna otra estación de la compañía, pide solo la provincia más cercana que la tenga", () => {
+    // Yoigo solo está en C: de las dos provincias con Yoigo, la de al lado.
+    const conYoigo = { companias: ["yoigo"] as const };
+    const { faltan } = provinciasParaLasVecinas({
+      enZona: [C],
+      todos: [C],
+      provincias: [
+        ZONA,
+        provincia("E", 1200, 9000, conYoigo),
+        provincia("L", 50_000, 60_000, conYoigo),
+      ],
+      cargadas: new Set(["Z"]),
+    });
+    assert.deepStrictEqual(faltan, ["E"]);
+  });
+
+  it("una zona sin emplazamientos no pide nada", () => {
+    const { faltan, incompletas } = provinciasParaLasVecinas({
+      enZona: [],
+      todos: [OESTE],
+      provincias: [ZONA, AL_ESTE, LEJANA],
+      cargadas: new Set(["Z"]),
+    });
+    assert.deepStrictEqual(faltan, []);
+    assert.deepStrictEqual(incompletas, []);
   });
 });
