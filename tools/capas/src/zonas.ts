@@ -131,23 +131,33 @@ export const indiceDeZonas = (
     .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
 });
 
-/** El fichero del índice, con una provincia o un municipio por línea. */
-export const ficheroDeIndice = (indice: IndiceDeZonas): string => {
-  const lineas = <A>(elementos: ReadonlyArray<A>) =>
-    elementos.map((elemento) => JSON.stringify(elemento)).join(",\n");
-  return (
-    `{"fuente":${JSON.stringify(indice.fuente)},` +
-    `"toleranciaMetros":${indice.toleranciaMetros},"provincias":[\n` +
-    `${lineas(indice.provincias)}\n],"municipios":[\n` +
-    `${lineas(indice.municipios)}\n]}\n`
-  );
-};
+const lineas = <A>(elementos: ReadonlyArray<A>) =>
+  elementos.map((elemento) => JSON.stringify(elemento)).join(",\n");
 
-/** Los ficheros de las zonas, por nombre: `indice.json` y uno por provincia, `08.json`. */
+/** El fichero del índice, con una provincia o un municipio por línea. */
+export const ficheroDeIndice = (indice: IndiceDeZonas): string =>
+  `{"fuente":${JSON.stringify(indice.fuente)},` +
+  `"toleranciaMetros":${indice.toleranciaMetros},"provincias":[\n` +
+  `${lineas(indice.provincias)}\n],"municipios":[\n` +
+  `${lineas(indice.municipios)}\n]}\n`;
+
+/**
+ * El fichero de las provincias del índice, sin los municipios, con una provincia por línea: lo
+ * que la web necesita para saber en qué provincia cae el centro del mapa.
+ */
+export const ficheroDeProvincias = (indice: IndiceDeZonas): string =>
+  `{"fuente":${JSON.stringify(indice.fuente)},"provincias":[\n${lineas(indice.provincias)}\n]}\n`;
+
+/**
+ * Los ficheros de las zonas, por nombre: `indice.json`, `provincias.json` y uno por provincia,
+ * `08.json`.
+ */
 export const ficherosDeZonas = (limites: LimitesDeMunicipios): ReadonlyMap<string, string> => {
   const contornos = contornosDeProvincias(limites);
+  const indice = indiceDeZonas(limites, contornos);
   return new Map([
-    ["indice.json", ficheroDeIndice(indiceDeZonas(limites, contornos))],
+    ["indice.json", ficheroDeIndice(indice)],
+    ["provincias.json", ficheroDeProvincias(indice)],
     ...[...contornos].map(
       ([codigo, contorno]) => [`${codigo}.json`, ficheroDeMunicipios(contorno)] as const,
     ),
