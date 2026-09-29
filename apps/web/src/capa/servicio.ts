@@ -16,9 +16,8 @@ import * as Semaphore from "effect/Semaphore";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
-import { crearAgrupador } from "./agrupacion.ts";
 import { IndexadorDeProvincias, type IndiceFallido } from "./indexador.ts";
-import { type ProvinciaCargada, prefijoDeProvincia } from "./nacional.ts";
+import { agrupadorDeProvincia, type ProvinciaCargada } from "./nacional.ts";
 
 /** El origen no tiene todavía ninguna capa publicada: no hay `vigente.json`. */
 export class SinCapaPublicada extends Schema.TaggedError<SinCapaPublicada>()(
@@ -172,7 +171,7 @@ export const capaDelOrigen = Layer.effect(
         }
         const texto = yield* descargarFichero(http, origen, fichero);
         if (Option.isSome(texto)) {
-          return { version: delMapa.version, fecha: delMapa.fecha, texto: texto.value };
+          return { resumen: delMapa, texto: texto.value };
         }
         const vigente = yield* leerVigente(http, origen);
         const url = `${origen}/${fichero}`;
@@ -189,7 +188,7 @@ export const capaDelOrigen = Layer.effect(
             motivo: "ni esa versión ni la vigente la tienen",
           });
         }
-        return { version: nuevo.version, fecha: nuevo.fecha, texto: deLaVigente.value };
+        return { resumen: nuevo, texto: deLaVigente.value };
       });
 
     const cargas = new Map<string, Effect.Effect<ProvinciaCargada, FalloCapa>>();
@@ -199,17 +198,15 @@ export const capaDelOrigen = Layer.effect(
         carga = guardado(
           Semaphore.makeUnsafe(1),
           Effect.gen(function* () {
-            const { version, fecha, texto } = yield* textoDe(codigo);
+            // Su marca de agua y su cobertura son las del resumen que la listó.
+            const { resumen: suyo, texto } = yield* textoDe(codigo);
             const { capa, indices } = yield* indexador.indexar(codigo, texto);
             const cargada: ProvinciaCargada = {
               codigo,
-              version,
-              fecha,
+              version: suyo.version,
+              fecha: suyo.fecha,
               capa,
-              agrupador: crearAgrupador(capa.emplazamientos, capa.barrios, {
-                indices,
-                prefijo: prefijoDeProvincia(codigo),
-              }),
+              agrupador: agrupadorDeProvincia(capa, suyo, indices),
             };
             return cargada;
           }),

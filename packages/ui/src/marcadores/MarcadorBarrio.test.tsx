@@ -123,3 +123,38 @@ describe("MarcadorBarrio", () => {
     assert.isAtLeast(compacta.ancho, 44);
   });
 });
+
+describe("MarcadorBarrio de un municipio", () => {
+  it("se ve como un barrio y lo dice en `data-zona`; sin ausencias no hay cinta ni marca", () => {
+    const { getByRole } = render(() => (
+      <>
+        <MarcadorBarrio
+          x={0}
+          y={0}
+          zona="municipio"
+          forma="completa"
+          barrio="Aiguafreda"
+          emplazamientos={3}
+          ausentes={[]}
+          nombre="Aiguafreda, 3 emplazamientos, acercar"
+        />
+        <MarcadorBarrio
+          x={0}
+          y={0}
+          zona="municipio"
+          forma="compacta"
+          barrio="Castellcir"
+          emplazamientos={2}
+          ausentes={[]}
+          nombre="Castellcir, 2 emplazamientos, acercar"
+        />
+      </>
+    ));
+    const completo = getByRole("button", { name: "Aiguafreda, 3 emplazamientos, acercar" });
+    assert.strictEqual(completo.getAttribute("data-zona"), "municipio");
+    assert.notInclude(completo.textContent ?? "", "sin");
+    const compacto = getByRole("button", { name: "Castellcir, 2 emplazamientos, acercar" });
+    assert.strictEqual(compacto.textContent, "2");
+    assert.isNull(compacto.querySelector(".rounded-full"));
+  });
+});

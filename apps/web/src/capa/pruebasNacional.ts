@@ -1,9 +1,19 @@
 import { cajaDe, type Rectangulo } from "@celda/dominio/area";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
-import type { ProvinciaDelResumen, ResumenLeido } from "@celda/dominio/provincias";
+import type {
+  CapaDeProvincia,
+  MunicipioDeCapa,
+  ProvinciaDelResumen,
+  ResumenLeido,
+} from "@celda/dominio/provincias";
 
 import { crearAgrupador } from "./agrupacion.ts";
-import { type EstadoProvincia, type ProvinciaCargada, prefijoDeProvincia } from "./nacional.ts";
+import {
+  agrupadorDeProvincia,
+  type EstadoProvincia,
+  type ProvinciaCargada,
+  prefijoDeProvincia,
+} from "./nacional.ts";
 import { cajaDeBarcelona, FUENTES_DE_PRUEBA } from "./pruebas.ts";
 
 /** El mundo entero, como caja de una escena. */
@@ -109,3 +119,50 @@ export const GIRONA = cargada("17");
 export const estados = (
   ...pares: ReadonlyArray<readonly [string, EstadoProvincia]>
 ): ReadonlyMap<string, EstadoProvincia> => new Map(pares);
+
+const municipio = (
+  codigo: string,
+  nombre: string,
+  longitud: number,
+  latitud: number,
+): MunicipioDeCapa => ({
+  codigo,
+  nombre,
+  etiqueta: { longitud, latitud },
+  habitantes: 5000,
+  areaKm2: 20,
+  emplazamientos: 0,
+  companias: [],
+});
+
+/**
+ * La capa de Barcelona con tres municipios: Oeste con 20 emplazamientos, Este con 15, Pequeño con
+ * 3 (menos del umbral de ausencias) y dos sin municipio, como en un territorio compartido.
+ */
+export const CAPA_CON_MUNICIPIOS: CapaDeProvincia = {
+  ...BARCELONA.capa,
+  emplazamientos: BARCELONA.capa.emplazamientos.map((e, i) => ({
+    ...e,
+    municipio: i % 10 < 5 ? "08001" : i < 30 ? "08002" : i % 10 < 8 ? "08003" : null,
+  })),
+  municipios: [
+    municipio("08001", "Oeste", 2.42, 41.915),
+    municipio("08002", "Este", 2.47, 41.915),
+    municipio("08003", "Pequeño", 2.47, 41.935),
+  ],
+};
+
+/** El resumen de prueba con Barcelona cubierta o a medias. */
+export const resumenConBarcelona = (cubierta: boolean): ResumenLeido => ({
+  ...RESUMEN,
+  provincias: RESUMEN.provincias.map((p) => (p.codigo === "08" ? { ...p, cubierta } : p)),
+});
+
+/** Barcelona con sus municipios, agrupada según su cobertura en `resumen`. */
+export const barcelonaConMunicipios = (resumen: ResumenLeido): ProvinciaCargada => ({
+  codigo: "08",
+  version: resumen.version,
+  fecha: NOCHE,
+  capa: CAPA_CON_MUNICIPIOS,
+  agrupador: agrupadorDeProvincia(CAPA_CON_MUNICIPIOS, resumen),
+});

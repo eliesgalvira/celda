@@ -1,5 +1,6 @@
 import type { Rectangulo } from "@celda/dominio/area";
 import type { ResumenDeBarrio } from "@celda/dominio/barrio";
+import type { ResumenDeMunicipio } from "@celda/dominio/zona";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import { textoDeAusencias } from "@celda/ui/marcadores/Ausencias.tsx";
@@ -24,6 +25,20 @@ export const cajaConMargen = (caja: Rectangulo): Rectangulo => {
   return {
     suroeste: { longitud: caja.suroeste.longitud - dx, latitud: caja.suroeste.latitud - dy },
     noreste: { longitud: caja.noreste.longitud + dx, latitud: caja.noreste.latitud + dy },
+  };
+};
+
+/** Lo que se ve de una caja con el margen de `cajaConMargen`, algo más adentro. */
+export const cajaVisible = (conMargen: Rectangulo): Rectangulo => {
+  // La caja con margen crece un 15 % por cada lado; esto la deja en un 80 % de lo que se ve.
+  const dx = (conMargen.noreste.longitud - conMargen.suroeste.longitud) * (0.25 / 1.3);
+  const dy = (conMargen.noreste.latitud - conMargen.suroeste.latitud) * (0.25 / 1.3);
+  return {
+    suroeste: {
+      longitud: conMargen.suroeste.longitud + dx,
+      latitud: conMargen.suroeste.latitud + dy,
+    },
+    noreste: { longitud: conMargen.noreste.longitud - dx, latitud: conMargen.noreste.latitud - dy },
   };
 };
 
@@ -57,6 +72,21 @@ export const nombreDeAgrupacion = (cuantos: number): string => `${cuantos} empla
 export const nombreDeBarrio = (resumen: ResumenDeBarrio): string =>
   [
     resumen.barrio.nombre,
+    textoDeEmplazamientos(resumen.emplazamientos),
+    textoDeAusencias(resumen.ausentes),
+    "acercar",
+  ]
+    .filter((parte) => parte !== "")
+    .join(", ");
+
+/**
+ * Nombre accesible de un municipio, como el de un barrio: «Terrassa, 118 emplazamientos, sin Digi,
+ * acercar». Uno con menos de 10 emplazamientos no tiene ausencias: «Aiguafreda, 3 emplazamientos,
+ * acercar».
+ */
+export const nombreDeMunicipio = (resumen: ResumenDeMunicipio): string =>
+  [
+    resumen.municipio.nombre,
     textoDeEmplazamientos(resumen.emplazamientos),
     textoDeAusencias(resumen.ausentes),
     "acercar",

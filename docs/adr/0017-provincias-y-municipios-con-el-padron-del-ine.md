@@ -1,6 +1,6 @@
 # Provincias y municipios del IGN como zonas, con el padrón del INE
 
-Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El #47 lleva el ejercicio a los municipios. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
+Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El #44 lleva los niveles de zona al mapa y el #47, el ejercicio a los municipios. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
 
 ## Contexto
 
@@ -40,6 +40,19 @@ Las fuentes, medidas el 28/09/2026:
 - **Vecinas al otro lado del borde.** La vecina de una estación puede estar en otra provincia. `provinciasParaLasVecinas` pide las provincias cuya caja queda más cerca que la vecina encontrada, y solo la más cercana si la compañía no tiene otra estación cargada; se repite con cada provincia que llega. Con la pasada real de Cataluña, Tordera carga Girona y Alcanar carga Castellón, de la que solo hay una parte, y el ejercicio lo dice.
 - **Cobertura de la zona.** Un municipio de una provincia a medias puede estar entero en lo barrido. Se da por completo si su provincia está cubierta o si todos los vértices de su contorno caen en cajas barridas (`zonaCubierta`); si no, el ejercicio avisa de que los recuentos se quedan cortos.
 - **Pruebas con datos reales.** `packages/dominio/src/ejercicioMunicipios.test.ts` hace el ejercicio en Barcelona, Queralbs, Bordils (sin emplazamientos), Tordera y Alcanar con una muestra de la primera pasada real de Cataluña (`docs/investigacion/muestras/ejercicio/`), y su resultado va en `referencia/ejercicio-municipios.json`.
+
+## Cómo quedó en el mapa (#44)
+
+- **Niveles.** Por debajo del zoom 8, el resumen nacional: un hexágono por provincia con su número y, si está cubierta, sus ausencias (#43). Del 8 al 10, hexágonos de supercluster. En los niveles 11 y 12 (`NIVEL_DE_MUNICIPIOS` en `apps/web/src/capa/agrupacion.ts`), una etiqueta por municipio, con el aspecto de los barrios (`MarcadorBarrio` con `zona="municipio"`). En el 13, los barrios de Barcelona como antes, y hexágonos en el resto. Del 14 en adelante, hexágonos y emplazamientos sueltos.
+- **Por qué el 11.** Con la capa real de Cataluña, en la pantalla de un móvil alrededor de Barcelona, Manresa o Vic caben unas 60 etiquetas de municipio en el nivel 11 y unas 180 en el 10. Los barrios del 13 son 73, y ese era ya el fotograma más caro. Así, al alejar, los barrios van a su municipio y los municipios a los hexágonos del 10, que son más grandes que casi todos.
+- **El umbral** es `UMBRAL_DE_AUSENCIAS` en `packages/dominio/src/zona.ts`, con su prueba. Allí están también `resumirMunicipios` y `ausentesDeProvincia`. Las compañías que cuentan para las ausencias de un municipio son las de todo el resumen nacional, como en las provincias.
+- **Los números salen de los emplazamientos de la capa de la provincia**, los mismos que dibuja el mapa, no de la columna `emplazamientos` de la tabla de municipios. Salen del mismo fichero, así que no pueden discrepar, pero así la suma de las etiquetas cuadra con los hexágonos del nivel de al lado aunque se lea una capa vieja.
+- **Solo en provincias cubiertas.** En una provincia a medias, un municipio del borde de lo barrido contaría solo una parte de sus emplazamientos, así que sigue en hexágonos también en los niveles 11 y 12. Una sin nada barrido sigue con su hexágono del resumen, sin número.
+- **Municipios sin emplazamientos** se ven con «ningún emplazamiento», como un barrio vacío. Los emplazamientos sin municipio (un territorio compartido, o el mar lejos de la costa) van en hexágonos de un índice aparte, que el Worker construye con los demás (`sinMunicipio` en `capa/indice.ts`). En los datos reales de Cataluña no hay ninguno, pero la España sintética pone miles en el mar, y sueltos eran 734 logos en la pantalla y 21 fps al arrastrar.
+- **Etiqueta a la vista.** Un municipio grande puede tener emplazamientos en la vista y la etiqueta fuera. Entonces la etiqueta va dentro de lo que se ve de la caja de sus emplazamientos, como el hexágono de una provincia mientras llega.
+- **Transiciones.** Entre un nivel de zonas y cualquier otro, cada elemento va al que se queda con la mayoría de sus emplazamientos, como ya pasaba con los barrios. Entre el 11 y el 12 los municipios no se mueven; solo se reagrupan los hexágonos de los que no tienen municipio. Desde el resumen, cada municipio sale del hexágono de su provincia.
+- **Rótulos del mapa base.** Mientras un municipio lleva la etiqueta de Celda, la web quita su rótulo de ciudad o pueblo del mapa base (`quitarRotulosDeMunicipios` en `packages/ui/src/mapa/estilo.ts`), comparando nombres en minúsculas. Si el nombre del IGN y el de OpenStreetMap no coinciden se ven los dos, y fuera de las provincias cubiertas el mapa base sigue rotulando.
+- **Créditos.** El del IGN va a pie de mapa desde el #43. El del INE no: el mapa no enseña habitantes; los cita el ejercicio (#47).
 
 ## Consecuencias
 

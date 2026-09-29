@@ -1,17 +1,13 @@
 import type { Coordenada } from "@celda/dominio/area";
 import type { ResumenLeido } from "@celda/dominio/provincias";
+import { quitarRotulosDeMunicipios } from "@celda/ui/mapa/estilo.ts";
 import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import type { Map as MapaMapLibre } from "maplibre-gl";
-import { createMemo, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal } from "solid-js";
 
-import {
-  type ElementoAbrible,
-  type ElementoBarrio,
-  type ElementoProvincia,
-  nivelDeZoom,
-} from "../capa/agrupacion.ts";
-import { formasDeEtiquetas } from "../capa/etiquetas.ts";
+import { type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
+import { type ConEtiqueta, formasDeEtiquetas } from "../capa/etiquetas.ts";
 import { cajaConMargen, combinacionesDe, type Vista } from "../capa/marcadores.ts";
 import {
   crearAgrupadorNacional,
@@ -150,21 +146,38 @@ export function Marcadores(props: MarcadoresProps) {
   );
 
   /**
-   * Las etiquetas de barrio y de provincia que caben enteras en la pantalla y las que van
-   * compactas. Se decide con la escena, al pararse el mapa o al cambiar de nivel, como qué se
+   * Las etiquetas de barrio, de municipio y de provincia que caben enteras en la pantalla y las que
+   * van compactas. Se decide con la escena, al pararse el mapa o al cambiar de nivel, como qué se
    * dibuja.
    */
   const formas = createMemo(() => {
     const etiquetas = [...(escena()?.elementos.values() ?? [])].filter(
-      (elemento): elemento is ElementoBarrio | ElementoProvincia =>
-        elemento.tipo === "barrio" || elemento.tipo === "provincia",
+      (elemento): elemento is ConEtiqueta =>
+        elemento.tipo === "barrio" ||
+        elemento.tipo === "municipio" ||
+        elemento.tipo === "provincia",
     );
     const proyectarAhora = proyectar();
     return formasDeEtiquetas(etiquetas, (etiqueta) => proyectarAhora(etiqueta.posicion));
   });
 
   /**
-   * Acerca el mapa hasta que la agrupación, el barrio o la provincia se abre: una provincia con
+   * Los municipios con etiqueta de Celda en la escena. Sus rótulos del mapa base se quitan: se
+   * pisarían con la etiqueta, como los de los barrios (`estilo.ts`).
+   */
+  const municipiosConEtiqueta = createMemo(
+    () =>
+      [...(escena()?.elementos.values() ?? [])].flatMap((elemento) =>
+        elemento.tipo === "municipio" ? [elemento.resumen.municipio.nombre] : [],
+      ),
+    { equals: mismasListas },
+  );
+  createEffect(municipiosConEtiqueta, (nombres) => {
+    quitarRotulosDeMunicipios(props.mapa, nombres);
+  });
+
+  /**
+   * Acerca el mapa hasta que la agrupación, el barrio, el municipio o la provincia se abre: una provincia con
    * emplazamientos, hasta verlos todos. Con el teclado, el foco vuelve al mapa. Con la preferencia
    * de reducir movimiento, MapLibre salta sin animación.
    */

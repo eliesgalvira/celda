@@ -21,6 +21,7 @@ import {
   nombreDeAgrupacion,
   nombreDeBarrio,
   nombreDeMarcador,
+  nombreDeMunicipio,
   nombreDeProvincia,
 } from "../capa/marcadores.ts";
 import {
@@ -45,20 +46,21 @@ export interface CapaAgrupadaProps {
   readonly fotograma: number;
   /** La preferencia de reducir movimiento: sin transiciones. */
   readonly movimientoReducido: boolean;
-  /** Qué forma toma la etiqueta de cada barrio o provincia; la que no esté aquí va completa. */
+  /** Qué forma toma la etiqueta de cada zona; la que no esté aquí va completa. */
   readonly formas: ReadonlyMap<string, FormaDeBarrio>;
   /** Clave del emplazamiento con la ficha abierta: su marcador se resalta. */
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento: se abre su ficha. */
   readonly alSeleccionar: (clave: string) => void;
-  /** Se ha pulsado una agrupación o un barrio: hay que acercar el mapa a su zona. */
+  /** Se ha pulsado una agrupación o una zona: hay que acercar el mapa a ella. */
   readonly alAbrir: (elemento: ElementoAbrible) => void;
 }
 
 /**
  * Los marcadores de la escena: logos para los emplazamientos sueltos, hexágonos con número para
- * las agrupaciones y las provincias del resumen, y etiquetas para los barrios. Al alejar, cada marcador que se agrupa se desliza
- * hacia su hexágono o su barrio; al acercar, sale de él. Lo que se va sigue en el DOM mientras
+ * las agrupaciones y las provincias del resumen, y etiquetas para los barrios y los municipios. Al
+ * alejar, cada marcador que se agrupa se desliza hacia su hexágono o su zona; al acercar, sale de
+ * él. Lo que se va sigue en el DOM mientras
  * dura la transición y luego se quita.
  */
 export function CapaAgrupada(props: CapaAgrupadaProps) {
@@ -168,6 +170,10 @@ function MarcadorPintado(props: {
     const elemento = props.pintado.elemento;
     return elemento.tipo === "barrio" ? elemento : undefined;
   };
+  const municipio = () => {
+    const elemento = props.pintado.elemento;
+    return elemento.tipo === "municipio" ? elemento : undefined;
+  };
   const provincia = () => {
     const elemento = props.pintado.elemento;
     return elemento.tipo === "provincia" ? elemento : undefined;
@@ -210,6 +216,22 @@ function MarcadorPintado(props: {
             emplazamientos={elegido().resumen.emplazamientos}
             ausentes={elegido().resumen.ausentes}
             nombre={nombreDeBarrio(elegido().resumen)}
+            movimiento={props.pintado.movimiento}
+            onClick={() => props.alAbrir(elegido())}
+          />
+        )}
+      </Match>
+      <Match when={municipio()}>
+        {(elegido) => (
+          <MarcadorBarrio
+            x={punto().x}
+            y={punto().y}
+            zona="municipio"
+            forma={props.formas.get(elegido().clave) ?? "completa"}
+            barrio={elegido().resumen.municipio.nombre}
+            emplazamientos={elegido().resumen.emplazamientos}
+            ausentes={elegido().resumen.ausentes}
+            nombre={nombreDeMunicipio(elegido().resumen)}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(elegido())}
           />

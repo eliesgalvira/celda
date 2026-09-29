@@ -160,6 +160,7 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 | `interferencia/enMapa.ts` | enseña u oculta la trama | lienzo y si está activa | seguro |
 | `servicio/enMapa.ts` | `setData` del degradado y de la línea; borra sin pedido | lo calculado; el punto, ya por coordenadas | seguro |
 | `mapa/CapaAgrupada.tsx` | calcula lo pintado y enciende el latido | la escena | seguro |
+| `mapa/Marcadores.tsx` | `setFilter` de los rótulos de municipio del mapa base | los nombres de los municipios de la escena, con `mismasListas` | seguro |
 | `ui/Eleccion.tsx`, `ui/Termino.tsx`, `ui/Dialogo.tsx` | escriben el campo, colocan, enfocan | un valor o un título | seguro |
 
 ### Lo que se abre fuera de los efectos

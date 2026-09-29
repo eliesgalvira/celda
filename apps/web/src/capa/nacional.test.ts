@@ -1,7 +1,14 @@
 import { contiene } from "@celda/dominio/area";
+import type { ResumenLeido } from "@celda/dominio/provincias";
 import { assert, describe, it } from "@effect/vitest";
 
-import type { Elemento, ElementoProvincia, Escena } from "./agrupacion.ts";
+import {
+  type Elemento,
+  type ElementoMunicipio,
+  type ElementoProvincia,
+  type Escena,
+  NIVEL_DE_MUNICIPIOS,
+} from "./agrupacion.ts";
 import {
   claveDeProvincia,
   crearAgrupadorNacional,
@@ -10,11 +17,13 @@ import {
 } from "./nacional.ts";
 import {
   BARCELONA,
+  barcelonaConMunicipios,
   EMPLAZAMIENTOS_POR_PROVINCIA,
   estados,
   GIRONA,
   MUNDO,
   RESUMEN,
+  resumenConBarcelona,
 } from "./pruebasNacional.ts";
 
 const LISTAS = estados(
@@ -198,5 +207,106 @@ describe("transiciones entre el resumen y las provincias", () => {
   it("todos los emplazamientos de la prueba están en alguna provincia", () => {
     const total = [...EMPLAZAMIENTOS_POR_PROVINCIA.values()].flat().length;
     assert.strictEqual(total, 70);
+  });
+});
+
+describe("zonas de cada provincia", () => {
+  const cargadaCon = (resumen: ResumenLeido) =>
+    estados(
+      ["08", { tipo: "lista", provincia: barcelonaConMunicipios(resumen) }],
+      ["17", { tipo: "lista", provincia: GIRONA }],
+    );
+  const municipiosDe = (escena: Escena): ReadonlyArray<ElementoMunicipio> =>
+    [...escena.elementos.values()].filter((e): e is ElementoMunicipio => e.tipo === "municipio");
+
+  it("una provincia cubierta se ve por municipios, con sus claves y sus números", () => {
+    const resumen = resumenConBarcelona(true);
+    const agrupador = crearAgrupadorNacional(resumen, cargadaCon(resumen));
+    const escena = agrupador.escena(NIVEL_DE_MUNICIPIOS, BORDE);
+    assert.deepStrictEqual(
+      municipiosDe(escena).map((m) => [m.clave, m.resumen.emplazamientos]),
+      [
+        ["m:08:08001", 20],
+        ["m:08:08002", 15],
+        ["m:08:08003", 3],
+      ],
+    );
+    // Los dos sin municipio van en su propio hexágono, y Girona, que no tiene municipios, en los
+    // de siempre.
+    const sinMunicipio = [...escena.elementos.values()].filter((e) => e.clave.startsWith("s:08:"));
+    assert.deepStrictEqual(
+      sinMunicipio.flatMap((e) => agrupador.emplazamientosDe(e).map((s) => s.municipio)),
+      [null, null],
+    );
+    for (const m of municipiosDe(escena)) {
+      assert.strictEqual(agrupador.emplazamientosDe(m).length, m.resumen.emplazamientos);
+    }
+  });
+
+  it("las ausencias de un municipio cuentan con las compañías de todo el resumen", () => {
+    const resumen = resumenConBarcelona(true);
+    const escena = crearAgrupadorNacional(resumen, cargadaCon(resumen)).escena(
+      NIVEL_DE_MUNICIPIOS,
+      BORDE,
+    );
+    // Solo hay Movistar en Barcelona y Vodafone en Girona: a los municipios les falta Vodafone,
+    // pero Pequeño, con 3, no lo dice.
+    assert.deepStrictEqual(
+      municipiosDe(escena).map((m) => m.resumen.ausentes),
+      [["vodafone"], ["vodafone"], []],
+    );
+  });
+
+  it("una provincia a medias sigue en hexágonos: sus municipios del borde contarían solo una parte", () => {
+    const resumen = resumenConBarcelona(false);
+    const escena = crearAgrupadorNacional(resumen, cargadaCon(resumen)).escena(
+      NIVEL_DE_MUNICIPIOS,
+      BORDE,
+    );
+    assert.lengthOf(municipiosDe(escena), 0);
+    assert.isTrue([...escena.elementos.keys()].some((c) => c.startsWith("a:08:")));
+  });
+
+  it("una provincia sin cubrir se sigue viendo de cerca con su hexágono, sin número", () => {
+    const resumen = resumenConBarcelona(true);
+    const escena = crearAgrupadorNacional(resumen, cargadaCon(resumen)).escena(
+      NIVEL_DE_MUNICIPIOS,
+      MUNDO,
+    );
+    const lleida = escena.elementos.get(claveDeProvincia("25"));
+    assert.strictEqual(lleida?.tipo, "provincia");
+    if (lleida?.tipo !== "provincia") return;
+    assert.isFalse(lleida.provincia.cubierta);
+    assert.strictEqual(lleida.provincia.emplazamientos, 0);
+    assert.deepStrictEqual(lleida.ausentes, []);
+  });
+
+  it("al acercar desde el resumen, cada municipio sale del hexágono de su provincia", () => {
+    const resumen = resumenConBarcelona(true);
+    const agrupador = crearAgrupadorNacional(resumen, cargadaCon(resumen));
+    const lejos = agrupador.escena(7, MUNDO);
+    const cerca = agrupador.escena(NIVEL_DE_MUNICIPIOS, BORDE);
+    const acercar = agrupador.transicion(lejos, cerca);
+    for (const m of municipiosDe(cerca)) assert.strictEqual(acercar.origen.get(m.clave), "p:08");
+    const alejar = agrupador.transicion(cerca, lejos);
+    for (const m of municipiosDe(cerca)) assert.strictEqual(alejar.destino.get(m.clave), "p:08");
+  });
+
+  it("al alejar de los municipios a los hexágonos, cada municipio va al que recoge los suyos", () => {
+    const resumen = resumenConBarcelona(true);
+    const agrupador = crearAgrupadorNacional(resumen, cargadaCon(resumen));
+    const municipios = agrupador.escena(NIVEL_DE_MUNICIPIOS, BORDE);
+    const hexagonos = agrupador.escena(NIVEL_DE_MUNICIPIOS - 1, BORDE);
+    const alejar = agrupador.transicion(municipios, hexagonos);
+    for (const m of municipiosDe(municipios)) {
+      const destino = hexagonos.elementos.get(alejar.destino.get(m.clave) ?? "");
+      assert.isDefined(destino, m.clave);
+      if (destino === undefined) continue;
+      const suyos = new Set(agrupador.emplazamientosDe(destino).map((e) => e.clave));
+      assert.isTrue(
+        agrupador.emplazamientosDe(m).some((e) => suyos.has(e.clave)),
+        `${m.clave} va a un hexágono sin ninguno de los suyos`,
+      );
+    }
   });
 });

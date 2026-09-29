@@ -2,19 +2,25 @@ import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area"
 import { COMPANIAS_DE_CAPA, type EmplazamientoLeido } from "@celda/dominio/capa";
 import { seCortan } from "@celda/dominio/cobertura";
 import type { CapaDeProvincia, ProvinciaDelResumen, ResumenLeido } from "@celda/dominio/provincias";
+import { ausentesDeProvincia, companiasDelResumen, resumirMunicipios } from "@celda/dominio/zona";
 
 import {
   type Agrupador,
+  alBorde,
   type CargaDeProvincia,
   claveDeEmplazamiento,
+  crearAgrupador,
   type Elemento,
   type ElementoAbrible,
   type ElementoProvincia,
   type Escena,
+  interseccion,
+  type OpcionesAgrupador,
   SIN_TRANSICION,
   type Transicion,
 } from "./agrupacion.ts";
-import { cajaConMargen, type Vista } from "./marcadores.ts";
+import type { Indice, IndicesDeCapa } from "./indice.ts";
+import { cajaConMargen, cajaVisible, type Vista } from "./marcadores.ts";
 
 /**
  * El mapa de toda España (ADR 0016). Por debajo del nivel de provincias solo se dibuja el resumen
@@ -60,8 +66,39 @@ export const claveDeProvincia = (codigo: string): string => `${PREFIJO_PROVINCIA
 /** El prefijo de las claves de las agrupaciones y los barrios de una provincia. */
 export const prefijoDeProvincia = (codigo: string): string => `${codigo}:`;
 
-/** La provincia de una clave de agrupación o de barrio (`a:08:123`), o `undefined`. */
-const provinciaDeClave = (clave: string): string | undefined => /^[afb]:([^:]+):/u.exec(clave)?.[1];
+/** La provincia de una clave de agrupación, de barrio o de municipio (`a:08:123`), o `undefined`. */
+const provinciaDeClave = (clave: string): string | undefined =>
+  /^[afbms]:([^:]+):/u.exec(clave)?.[1];
+
+/**
+ * El agrupador de una provincia leída, con sus barrios y, si está cubierta en `resumen`, sus
+ * municipios. Las ausencias de los municipios cuentan con las compañías de todo el resumen, como
+ * las de las provincias. Una provincia a medias va en hexágonos también en los niveles de
+ * municipios: un municipio del borde de lo barrido contaría solo una parte de sus emplazamientos.
+ */
+export const agrupadorDeProvincia = (
+  capa: CapaDeProvincia,
+  resumen: ResumenLeido,
+  indices?: IndicesDeCapa<Indice>,
+): Agrupador => {
+  const cubierta = resumen.provincias.find((p) => p.codigo === capa.provincia)?.cubierta === true;
+  const opciones: OpcionesAgrupador = {
+    prefijo: prefijoDeProvincia(capa.provincia),
+    municipios: cubierta
+      ? resumirMunicipios(
+          capa.municipios,
+          capa.emplazamientos.map((e) => ({ ...e, municipio: e.municipio ?? null })),
+          companiasDelResumen(resumen.provincias),
+          COMPANIAS_DE_CAPA,
+        )
+      : [],
+  };
+  return crearAgrupador(
+    capa.emplazamientos,
+    capa.barrios,
+    indices === undefined ? opciones : { ...opciones, indices },
+  );
+};
 
 /**
  * Las provincias con capa que hay que pedir para ver `vista`: las que tienen emplazamientos en la
@@ -73,38 +110,6 @@ export const provinciasDeLaVista = (resumen: ResumenLeido, vista: Vista): Readon
   return resumen.provincias.flatMap((p) =>
     p.fichero !== undefined && p.caja !== undefined && seCortan(p.caja, caja) ? [p.codigo] : [],
   );
-};
-
-/** El punto de `caja` más cercano a `punto`. */
-const alBorde = (punto: Coordenada, caja: Rectangulo): Coordenada => ({
-  longitud: Math.min(Math.max(punto.longitud, caja.suroeste.longitud), caja.noreste.longitud),
-  latitud: Math.min(Math.max(punto.latitud, caja.suroeste.latitud), caja.noreste.latitud),
-});
-
-/** Lo común a dos rectángulos que se cortan. */
-const interseccion = (a: Rectangulo, b: Rectangulo): Rectangulo => ({
-  suroeste: {
-    longitud: Math.max(a.suroeste.longitud, b.suroeste.longitud),
-    latitud: Math.max(a.suroeste.latitud, b.suroeste.latitud),
-  },
-  noreste: {
-    longitud: Math.min(a.noreste.longitud, b.noreste.longitud),
-    latitud: Math.min(a.noreste.latitud, b.noreste.latitud),
-  },
-});
-
-/** Lo que se ve de una caja con el margen de `cajaConMargen`, algo más adentro. */
-const cajaVisible = (conMargen: Rectangulo): Rectangulo => {
-  // La caja con margen crece un 15 % por cada lado; esto la deja en un 80 % de lo que se ve.
-  const dx = (conMargen.noreste.longitud - conMargen.suroeste.longitud) * (0.25 / 1.3);
-  const dy = (conMargen.noreste.latitud - conMargen.suroeste.latitud) * (0.25 / 1.3);
-  return {
-    suroeste: {
-      longitud: conMargen.suroeste.longitud + dx,
-      latitud: conMargen.suroeste.latitud + dy,
-    },
-    noreste: { longitud: conMargen.noreste.longitud - dx, latitud: conMargen.noreste.latitud - dy },
-  };
 };
 
 /** Cada provincia de una escena: detalle de su agrupador, o su hexágono del resumen (`null`). */
@@ -126,7 +131,7 @@ export const crearAgrupadorNacional = (
   resumen: ResumenLeido,
   provincias: ReadonlyMap<string, EstadoProvincia>,
 ): Agrupador => {
-  const enElResumen = new Set(resumen.provincias.flatMap((p) => p.companias));
+  const enElResumen = companiasDelResumen(resumen.provincias);
   const cargadas = new Map(
     [...provincias].flatMap(([codigo, estado]) =>
       estado.tipo === "lista" ? [[codigo, estado.provincia] as const] : [],
@@ -157,9 +162,7 @@ export const crearAgrupadorNacional = (
     posicion,
     provincia: p,
     carga: cargaDe(p.codigo),
-    ausentes: p.cubierta
-      ? COMPANIAS_DE_CAPA.filter((c) => enElResumen.has(c) && !p.companias.includes(c))
-      : [],
+    ausentes: ausentesDeProvincia(p, enElResumen, COMPANIAS_DE_CAPA),
   });
 
   /**

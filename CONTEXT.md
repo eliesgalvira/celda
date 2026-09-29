@@ -43,7 +43,7 @@ Uno de los 73 barrios de Barcelona, con los límites que publica el Ayuntamiento
 _Evitar_: zona, vecindario, distrito
 
 **Municipio**:
-Uno de los 8.132 municipios de España, con los límites del IGN y los habitantes del padrón del INE. Se identifica por su código INE de cinco cifras, nunca por su nombre. Cada emplazamiento cae en uno, salvo en un territorio compartido.
+Uno de los 8.132 municipios de España, con los límites del IGN y los habitantes del padrón del INE. Se identifica por su código INE de cinco cifras, nunca por su nombre. Cada emplazamiento cae en uno, salvo en un territorio compartido. En los niveles de municipios del mapa, los de una provincia cubierta recogen sus emplazamientos con su número y, si tienen 10 o más, sus ausencias.
 _Evitar_: localidad, pueblo, ciudad, término municipal
 
 **Provincia**:
@@ -54,8 +54,12 @@ _Evitar_: región, comarca
 Terreno que el IGN no asigna a ningún municipio porque lo comparten varios, como las Bardenas Reales. Tiene provincia pero no municipio.
 _Evitar_: mancomunidad, comunidad (son solo parte del nombre de algunos)
 
+**Zona**:
+Barrio, municipio o provincia: lo que el mapa recoge con su nombre, su número de emplazamientos y, donde dice algo, sus ausencias. Provincias de lejos, municipios a media distancia y barrios dentro del municipio de Barcelona. El ejercicio de emplazamientos se hace sobre un barrio de Barcelona o un municipio.
+_Evitar_: área, región, zona de barrido (esa es la de la ingesta)
+
 **Ausencia**:
-Compañía que no tiene ningún emplazamiento en un barrio. Solo cuenta si la compañía tiene algún emplazamiento en la capa: de una que no aparece en ninguna parte no se dice que falte en un barrio.
+Compañía que no tiene ningún emplazamiento en una zona. Solo cuenta si la compañía tiene algún emplazamiento en la capa: de una que no aparece en ninguna parte no se dice que falte. Se enseña en las provincias cubiertas, en los barrios y en los municipios con 10 emplazamientos o más. En un municipio con menos, que falten compañías no es un hueco de cobertura, y solo se da su número; en una provincia a medias, no se sabe.
 _Evitar_: hueco, falta de cobertura
 
 ### Procedencia de los datos
@@ -114,7 +118,7 @@ _Evitar_: scan, rastreo, crawl
 
 **Zona de barrido**:
 Grupo con nombre de cuadros que la ingesta barre en una misma ejecución, como Cataluña. Hay siete, que juntan comunidades autónomas. La configuración dice cuáles se barren cada noche y cuáles se turnan. La zona de barrido de una observación es la del cuadro en que cae.
-_Evitar_: zona a secas (esa es la del ejercicio), región, grupo, provincia
+_Evitar_: zona a secas (esa es la del mapa y el ejercicio), región, grupo, provincia
 
 **Cuadro**:
 Cuadrado de 1° de longitud por 1° de latitud de la rejilla fija con que se recorre el listado del registro oficial. Se escribe con la esquina suroeste en grados enteros: `2,41` es el de Barcelona. Como el listado corta en 1000 registros sin avisar, un cuadro se pide por cajas que se dividen en cuatro al llegar al tope, y guarda las de la última vez.
@@ -280,9 +284,6 @@ _Evitar_: preferencias, configuración
 Ejercicio del modo estudiante que cuenta, para una zona, las estaciones base de cada compañía, su radio de cobertura, los habitantes y usuarios por estación base y las tecnologías y bandas, y da la tabla para descargar.
 _Evitar_: práctica, dimensionado
 
-**Zona**:
-Área sobre la que se hace el ejercicio: un barrio de Barcelona o un municipio.
-_Evitar_: área de estudio, región
 
 **Radio de cobertura**:
 En el ejercicio, la mitad de la distancia media de cada estación base a su vecina más cercana de la misma compañía, esté o no en la zona. Es una estimación del ejercicio, no la cobertura real.
@@ -314,7 +315,8 @@ _Evitar_: clientes, carga
 - Una **medida propia** queda unida al emplazamiento y al sector que daban servicio donde se tomó.
 - Las **aportaciones** viven en el dispositivo. Una **corrección propuesta** solo pasaría a ser **corrección** si se compartiera.
 - Una **simulación** nunca es una **observación** ni una **medida**.
-- El **ejercicio de emplazamientos** se hace sobre una **zona**. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
+- Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.
+- El **ejercicio de emplazamientos** se hace sobre una **zona**: un barrio de Barcelona o un municipio. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
 - Con un **punto de referencia**, cada **emplazamiento** tiene un **rumbo** y los **consejos** dicen a qué rumbo apuntar una **antena exterior**. La **brújula** ayuda a alinearla.
 
 ## Ambigüedades señaladas

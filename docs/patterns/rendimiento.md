@@ -38,7 +38,7 @@ pnpm run medir -- --capas <carpeta> --trazas /tmp/trazas --perfil /tmp/perfiles
 - Antes de cada ronda espera a que la CPU esté por debajo del 8 % (`--calma`). Otro navegador o una compilación en marcha frenan el móvil simulado y dan fotogramas largos que no son de Celda. Durante este trabajo otro agente abría Chromium con SwiftShader a la vez, y una ronda sin esa espera salió el doble de mala.
 - `--trazas` graba una traza de CDP de cada gesto en una ronda aparte, que no cuenta en las medianas, y resume el tiempo propio por hilo y por tipo de trabajo. `--perfil` guarda el perfil de CPU de V8 de cada gesto; para leerlo, construye la web sin minificar (`npx vp build --minify false`).
 - `--solo-carga` se salta los gestos, `--cascada` imprime las peticiones de la carga con su inicio y su fin, y `--json` guarda las rondas enteras.
-- `--escenario espana` cambia los gestos por el recorrido de varias provincias (ADR 0016): alejar con el botón hasta ver toda España con el resumen, tocar el hexágono de Barcelona, acercar hasta la calle tocando cada vez la agrupación mayor, alejar hasta el nivel de provincias y cruzar de una a otra con seis arrastres largos. Al final mide la memoria de la página y sus Workers (`measureUserAgentSpecificMemory`, con el sitio aislado por COOP y COEP) y el montón del hilo principal, y cuenta lo pedido de las capas en toda la visita.
+- `--escenario espana` cambia los gestos por el recorrido de varias provincias (ADR 0016): alejar con el botón hasta ver toda España con el resumen, tocar el hexágono de Barcelona, acercar con el botón hasta el nivel de municipios y arrastrar y pellizcar allí, acercar hasta la calle tocando cada vez la agrupación o la zona mayor, alejar hasta el nivel de provincias y cruzar de una a otra con seis arrastres largos. Al final mide la memoria de la página y sus Workers (`measureUserAgentSpecificMemory`, con el sitio aislado por COOP y COEP) y el montón del hilo principal, y cuenta lo pedido de las capas en toda la visita.
 - Para medir con muchos datos sin ingerir nada, `pnpm run sintetica` en `tools/capas` publica en `CELDA_CAPAS_CARPETA` una España sintética de `CELDA_SINTETICOS` emplazamientos (100.000 por defecto, la de la investigación 08) con la publicación de verdad.
 - El Chromium es el del sistema (`/usr/bin/chromium`, o `--chromium`, o `CELDA_CHROMIUM`): `playwright-core` no descarga navegadores.
 
@@ -118,6 +118,27 @@ Lo que dicen:
 - **Un índice por provincia y no uno global.** Uno global habría que rehacerlo entero en el Worker cada vez que llega una provincia (477 ms con 100.000 y la CPU a ×4, más 45 ms de rehidratar, según la investigación). Por provincia, cada llegada cuesta lo de esa provincia. No medí la variante global en la web porque con esas cifras no compensa. Lo que cuesta la provincial es que en un borde puede haber dos hexágonos cerca, y cada uno cuenta solo los suyos.
 - **El Worker va menos frenado que el hilo principal** con CDP, como ya dijo la investigación. En un móvil de verdad el detalle tardaría algo más en llegar; la fluidez no cambia, porque ese tiempo no bloquea la página.
 - La máquina tenía otros agentes trabajando, así que cada ronda esperó a que la CPU bajara del 25 % (`--calma 0.25`) y no del 8 %.
+
+## Niveles de municipios (#44)
+
+Medianas de tres rondas alternadas del 29/09/2026 con la CPU a ×4, 390 px y el escenario `espana`, que desde el #44 acerca con el botón del zoom 8 al 11 alrededor de Manresa y arrastra y pellizca allí antes de bajar a la calle. «Antes» es `celda/v1` con el #43; «después», esta rama. Cada celda dice fps, fotogramas de más de 20 ms y de más de 50 ms.
+
+| Gesto | Cataluña real, antes | Cataluña real, después | España sintética, antes | España sintética, después |
+|---|---|---|---|---|
+| Alejar hasta ver España | 59,2 · 6 · 0 | 59,3 · 4 · 0 | 58,1 · 8 · 2 | 57,8 · 10 · 3 |
+| Tocar el hexágono de Barcelona | 56,9 · 2 · 1 | 57,7 · 2 · 1 | 56,4 · 2 · 1 | 55,5 · 2 · 1 |
+| Acercar del 8 al 11 | 58,4 · 2 · 2 | 57,6 · 5 · 2 | 56,9 · 4 · 3 | 56,5 · 4 · 3 |
+| Arrastrar a zoom 11 | 60,0 · 0 · 0 | 59,8 · 1 · 0 | 59,7 · 2 · 0 | 59,4 · 3 · 0 |
+| Pellizcar a zoom 11 | 60,0 · 0 · 0 | 60,0 · 0 · 0 | 55,1 · 6 · 2 | 55,1 · 5 · 2 |
+| Acercar hasta la calle | 60,0 · 0 · 0 | 60,0 · 0 · 0 | 54,7 · 6 · 4 | 52,6 · 5 · 2 |
+| Alejar hasta el nivel de provincias | 57,5 · 13 · 1 | 57,2 · 16 · 2 | 56,3 · 18 · 3 | 56,7 · 15 · 2 |
+| Cruzar provincias a zoom 8 | 60,0 · 0 · 0 | 60,0 · 0 · 0 | 59,7 · 6 · 0 | 59,6 · 7 · 0 |
+
+A zoom 11 se ven 17 etiquetas de municipio en la Cataluña real (antes, 9 hexágonos y 10 logos) y la memoria no cambia (60 MB con Cataluña, 143 MB con la sintética). Las diferencias entre antes y después caben en el ruido de ±1 fotograma largo por gesto. El fotograma más largo de «acercar hasta la calle» con la sintética es la rehidratación del índice de Barcelona (13.226 emplazamientos) al llegar del Worker, antes y después.
+
+La primera medida con la sintética dio 21 fps al arrastrar a zoom 11: sus emplazamientos caen al azar, también en el mar, y los que no tienen municipio iban sueltos, 734 logos en la pantalla. Ahora van en hexágonos de su propio índice (ADR 0017). En los datos reales de Cataluña no hay ninguno sin municipio.
+
+La prueba de resistencia sigue en 0 en todo salvo `setTimeout` (331 con 330 lecturas).
 
 ## Qué entró
 

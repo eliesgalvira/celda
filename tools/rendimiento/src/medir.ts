@@ -21,8 +21,9 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  *
  * El escenario `barcelona` hace los gestos de siempre sobre la vista inicial. El de `espana`, el
  * de varias provincias (ADR 0016): aleja hasta ver toda España con el resumen, toca el hexágono
- * de Barcelona, acerca hasta la calle tocando la agrupación mayor, vuelve al nivel de provincias
- * y cruza de una a otra arrastrando, y al final mide la memoria de la página y sus Workers.
+ * de Barcelona, acerca con el botón hasta el nivel de municipios y arrastra y pellizca allí,
+ * acerca hasta la calle tocando la agrupación o la zona mayor, vuelve al nivel de provincias y
+ * cruza de una a otra arrastrando, y al final mide la memoria de la página y sus Workers.
  */
 
 const { values: opciones } = NodeUtil.parseArgs({
@@ -372,8 +373,8 @@ const pulsar = async (pagina: Page, etiqueta: string, veces: number) => {
 };
 
 /**
- * Acerca hasta la calle como lo haría una persona: toca la agrupación con más emplazamientos de
- * las que se ven, y así hasta `veces` o hasta que ya no queda ninguna.
+ * Acerca hasta la calle como lo haría una persona: toca la agrupación, el municipio o el barrio
+ * con más emplazamientos de los que se ven, y así hasta `veces` o hasta que ya no queda ninguno.
  */
 const abrirAgrupaciones = async (pagina: Page, veces: number) => {
   for (let i = 0; i < veces; i += 1) {
@@ -383,7 +384,10 @@ const abrirAgrupaciones = async (pagina: Page, veces: number) => {
       return botones
         .map((b) => {
           const caja = b.getBoundingClientRect();
-          const numero = Number.parseInt(b.getAttribute("aria-label") ?? "", 10);
+          // «12 emplazamientos, acercar» o «Terrassa, 118 emplazamientos, sin Digi, acercar».
+          const numero = Number(
+            /(\d+) emplazamientos?,/u.exec(b.getAttribute("aria-label") ?? "")?.[1] ?? Number.NaN,
+          );
           return { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2, numero };
         })
         .filter((c) => Number.isFinite(c.numero) && c.x > 30 && c.x < 330 && c.y > 160 && c.y < 700)
@@ -600,6 +604,11 @@ const ronda = async (
       await esperar(1200);
     });
     marcadores.provincia = await contarMarcadores(pagina);
+    // Del zoom 8 al 11: los municipios de alrededor de Manresa.
+    await medir("acercar-a-municipios", () => pulsar(pagina, "Acercar", 3));
+    marcadores.municipios = await contarMarcadores(pagina);
+    await medir("municipios-arrastre", () => arrastrar(cdp));
+    await medir("municipios-pellizco", () => pellizcar(cdp));
     await medir("acercar-a-calle", () => abrirAgrupaciones(pagina, 6));
     marcadores.calle = await contarMarcadores(pagina);
     await medir("alejar-a-provincias", () => pulsar(pagina, "Alejar", 6));

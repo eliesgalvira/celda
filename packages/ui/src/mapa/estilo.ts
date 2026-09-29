@@ -67,6 +67,58 @@ const deClase = (clases: ReadonlyArray<string>): FilterSpecification => [
   ["literal", clases],
 ];
 
+/** La capa de los rótulos de ciudades y pueblos del mapa base. */
+export const ROTULOS_DE_MUNICIPIOS = "municipios";
+
+/** Las ciudades y los pueblos entre los lugares del mapa base. */
+const DE_MUNICIPIO: ExpressionSpecification = [
+  "in",
+  ["get", "class"],
+  ["literal", ["city", "town"]],
+];
+
+/**
+ * El filtro de los rótulos de ciudades y pueblos del mapa base, sin los de `nombres`: los
+ * municipios que ya llevan la etiqueta de Celda, con su número y sus ausencias. Los dos rótulos se
+ * pisarían. Se comparan en minúsculas, porque el mapa base escribe «l'Hospitalet» y el IGN,
+ * «L'Hospitalet». Un nombre que no coincide deja los dos rótulos, que es lo menos malo: quitar el
+ * del mapa base donde Celda no pone etiqueta dejaría esa parte del mapa sin nombres.
+ */
+export const filtroDeRotulosDeMunicipios = (nombres: ReadonlyArray<string>): FilterSpecification =>
+  nombres.length === 0
+    ? DE_MUNICIPIO
+    : [
+        "all",
+        DE_MUNICIPIO,
+        [
+          "!",
+          [
+            "in",
+            ["downcase", ["to-string", ["get", "name"]]],
+            ["literal", nombres.map((n) => n.toLowerCase())],
+          ],
+        ],
+      ];
+
+/** Lo que hace falta del mapa de MapLibre para cambiar los rótulos de municipio. */
+export interface MapaConRotulos {
+  readonly getLayer: (capa: string) => object | undefined;
+  readonly setFilter: (capa: string, filtro: FilterSpecification) => void;
+}
+
+/**
+ * Quita del mapa base los rótulos de los municipios de `nombres`. Antes de que el estilo tenga sus
+ * capas no hace nada: MapLibre no deja cambiar un filtro todavía, y en la vista inicial no hay
+ * etiquetas de municipio. No espera a las teselas (`isStyleLoaded` sí).
+ */
+export const quitarRotulosDeMunicipios = (
+  mapa: MapaConRotulos,
+  nombres: ReadonlyArray<string>,
+): void => {
+  if (mapa.getLayer(ROTULOS_DE_MUNICIPIOS) === undefined) return;
+  mapa.setFilter(ROTULOS_DE_MUNICIPIOS, filtroDeRotulosDeMunicipios(nombres));
+};
+
 /** Grosor de una vía en píxeles a zoom 12, 16 y 18,5. */
 const grosor = (z12: number, z16: number, z18: number): ExpressionSpecification => [
   "interpolate",
@@ -249,12 +301,13 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       },
     },
     {
-      id: "municipios",
+      id: ROTULOS_DE_MUNICIPIOS,
       type: "symbol",
       source: FUENTE_MAPA_BASE,
       "source-layer": "place",
       maxzoom: 13,
-      filter: deClase(["city", "town"]),
+      // La web quita los que llevan la etiqueta de Celda (`filtroDeRotulosDeMunicipios`).
+      filter: filtroDeRotulosDeMunicipios([]),
       layout: {
         "text-field": ["get", "name"],
         "text-font": [LETRA_ROTULOS],
