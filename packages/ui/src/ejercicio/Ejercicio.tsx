@@ -178,18 +178,100 @@ export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
 }
 
 /**
- * El cuerpo del ejercicio mientras llegan los habitantes: el sitio de cada sección reservado. Lo
+ * El cuerpo del ejercicio mientras llega lo que necesita: el sitio de cada sección reservado. Lo
  * que dura poco no se ve.
  */
-export function EsqueletoEjercicio() {
+export function EsqueletoEjercicio(props: { readonly texto: string }) {
   return (
     <div aria-busy="true" class="flex flex-col gap-3 px-5 py-4 md:px-6">
-      <output class="block animate-aparecer text-sm text-tinta-suave">
-        Cargando los habitantes por barrio…
-      </output>
+      <output class="block animate-aparecer text-sm text-tinta-suave">{props.texto}</output>
       <span aria-hidden="true" class="block h-11 bg-linea" />
       <span aria-hidden="true" class="block h-40 bg-linea" />
       <span aria-hidden="true" class="block h-40 bg-linea" />
+    </div>
+  );
+}
+
+/** Una zona que se puede elegir en el buscador. */
+export interface ZonaDelBuscador {
+  /** Lo que se devuelve al elegirla. */
+  readonly clave: string;
+  readonly nombre: string;
+  /** Dónde está, en pequeño bajo el nombre: la provincia o «Barrio de Barcelona». */
+  readonly lugar: string;
+}
+
+export interface BuscadorDeZonasProps {
+  readonly consulta: string;
+  readonly alCambiarConsulta: (texto: string) => void;
+  /** Lo que casa con la consulta, ya ordenado. */
+  readonly resultados: ReadonlyArray<ZonaDelBuscador>;
+  readonly alElegir: (clave: string) => void;
+  /** Mientras llega el índice no se puede buscar. */
+  readonly disabled?: boolean;
+}
+
+/**
+ * Un campo para buscar una zona por su nombre y la lista de lo que casa, que cambia al escribir:
+ * se busca en el dispositivo, sin enviar nada. Intro elige la primera.
+ */
+export function BuscadorDeZonas(props: BuscadorDeZonasProps) {
+  return (
+    <div class="flex flex-col gap-1.5">
+      <search>
+        <form
+          class="flex flex-col gap-1.5"
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            const [primera] = props.resultados;
+            if (primera !== undefined) props.alElegir(primera.clave);
+          }}
+        >
+          <label class="flex flex-col gap-1.5">
+            <span class="font-mono text-xs font-semibold tracking-wider text-tinta-suave">
+              Municipio o barrio
+            </span>
+            <input
+              type="search"
+              autocomplete="off"
+              enterkeyhint="search"
+              placeholder="Escribe un nombre, como Tordera o Pedralbes"
+              value={props.consulta}
+              disabled={props.disabled}
+              onInput={(evento) => props.alCambiarConsulta(evento.currentTarget.value)}
+              class={
+                "min-h-11 w-full border border-linea-fuerte bg-superficie-alta px-3 text-base " +
+                "placeholder:text-tinta-suave disabled:opacity-60 md:text-sm"
+              }
+            />
+          </label>
+        </form>
+      </search>
+      <Show when={props.consulta.trim() !== ""}>
+        <div aria-live="polite" class="text-sm">
+          <Show
+            when={props.resultados.length > 0}
+            fallback={<p class="text-tinta-suave">Ningún municipio ni barrio se llama así.</p>}
+          >
+            <ul aria-label="Zonas encontradas" class="flex max-h-56 flex-col overflow-y-auto">
+              <For each={props.resultados}>
+                {(zona) => (
+                  <li class="border-b border-linea last:border-b-0">
+                    <button
+                      type="button"
+                      class="flex min-h-11 w-full flex-col justify-center px-2 py-1.5 text-left hover:bg-superficie-alta"
+                      onClick={() => props.alElegir(zona.clave)}
+                    >
+                      <span>{zona.nombre}</span>
+                      <span class="text-xs text-tinta-suave">{zona.lugar}</span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+      </Show>
     </div>
   );
 }
