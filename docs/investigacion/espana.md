@@ -9,7 +9,7 @@ Consultas y medidas del 28/09/2026. Cada cifra lleva una de dos marcas:
 
 Peticiones hechas a las fuentes, todas con el `User-Agent` «Celda (investigación; contacto en celda.elies.site)»:
 
-- Registro oficial: 61 peticiones, `robots.txt` (sigue dando 404) y 60 de listado, de 19:25 a 19:30 hora de Madrid, con 4 s entre el final de una respuesta y la siguiente. Ninguna ficha de detalle. Para la revisión de Madrid (ticket 49), 11 más de 23:13 a 23:14: `robots.txt` y 10 de listado. Para la primera pasada real de Cataluña (ticket 40), 38 más de 00:13:40 a 00:16:00 del 29/09: `robots.txt` y 37 de listado, con el `User-Agent` de la ingesta, «Celda (ingesta; contacto en celda.elies.site)», y 3 s entre una respuesta y la siguiente petición.
+- Registro oficial: 61 peticiones, `robots.txt` (sigue dando 404) y 60 de listado, de 19:25 a 19:30 hora de Madrid, con 4 s entre el final de una respuesta y la siguiente. Ninguna ficha de detalle. Para la revisión de Madrid (ticket 49), 11 más de 23:13 a 23:14: `robots.txt` y 10 de listado. Para la primera pasada real de Cataluña (ticket 40), 38 más de 00:13:40 a 00:16:00 del 29/09: `robots.txt` y 37 de listado, con el `User-Agent` de la ingesta, «Celda (ingesta; contacto en celda.elies.site)», y 3 s entre una respuesta y la siguiente petición. Para comprobar el barrido fuera de Cataluña (ticket 50), 40 más de 03:07:52 a 03:10:08 del 29/09: `robots.txt` y 39 de listado de la zona `centro`, con el mismo `User-Agent` y el mismo ritmo, sin ninguna ficha.
 - antenasmoviles.es: una sola, `GET /v1/showf?er5`, la misma que hace cualquier visitante al abrir su mapa. Ningún `markers`.
 - IGN, CNIG e INE: unas 25 peticiones a sus servicios de descarga (ATOM, WFS y la API de INEbase).
 - Protomaps y OpenFreeMap: `pmtiles extract --dry-run`, que solo lee los directorios del archivo.
@@ -154,6 +154,49 @@ La provincia de la dirección del registro da las mismas cifras, salvo un regist
 Barcelona provincia tiene 5.917 registros, frente a los unos 5.500 estimados. Son las fichas que el #41 tiene que leer la primera noche.
 
 **La publicación de hoy aguanta Cataluña.** Con la capa única del formato 4 la noche publicó 5.049 emplazamientos en 42 ficheros: la capa, 252 KB y 63 KB con gzip, 40 lotes de fichas, 5,5 MB y 403 KB con gzip, y `vigente.json`. Publicar tardó unos 4 s. El límite está en la web: el mapa se abre con el área de Barcelona (`BARCELONA` en `packages/dominio/src/area.ts`), que no deja salir de la caja de 1,85° a 2,45° de longitud y 41,2° a 41,6° de latitud. Los emplazamientos de Girona, Lleida, Tarragona y los bordes de Aragón y Castelló están en la capa, pero no se llega a ellos hasta que la web cambie de área o llegue la capa por provincias (#43).
+
+### Toda España en la ingesta nocturna (ticket 50)
+
+**Pasada real de la zona `centro`** (Madrid y Castilla-La Mancha), el 29/09/2026 de 03:07:52 a 03:10:08 hora de Madrid, con la ingesta nocturna, sus valores por defecto de listado y `CELDA_INGESTA_MAX_FICHAS=0`. Todo medido.
+
+- **Peticiones:** 40, `robots.txt` y 39 de listado. Ningún error ni aviso.
+- **Tiempo:** 2 min 15 s el programa entero.
+- **Datos:** 12,0 MB sin comprimir.
+- **Registros:** 12.528 en los 10 cuadros, un 2,4 % más de los 12.230 previstos. Vodafone 4.537, Movistar 4.115, Orange 3.309, Digi 508 y Yoigo 59.
+- **Cajas guardadas:** 24. El cuadro `-4,40` (Madrid) tiene 7.643 registros y necesitó 19; el `-5,40`, 1.118 y 4; los otros ocho, una cada uno. La pasada siguiente son 24 peticiones.
+- **Emplazamientos:** 6.333, 0,51 por registro.
+- **Memoria:** 523 MB de RSS máximo, frente a 402 MB de la orden `estado`, que no hace nada más que cargar el programa y los límites de municipios.
+
+**Previsto y medido por zona.** Registros previstos con la densidad de `showf` (`ZONAS_DE_BARRIDO`); peticiones de la España sintética (`apps/nocturna/src/pruebas/espana.ts`), que reparte por municipios los registros previstos, y de las pasadas reales:
+
+| Zona | Registros previstos | Medidos | Peticiones, primera pasada: sintética · real | Siguientes: sintética · real |
+|---|---|---|---|---|
+| `cataluna` | 9.859 | 10.305 | 33 · 37 | 27 · 30 |
+| `centro` | 12.230 | 12.528 | 34 · 39 | 28 · 24 |
+| `andalucia` | 11.351 | | 42 | 35 |
+| `levante` | 10.709 | | 42 | 35 |
+| `norte` | 9.488 | | 38 | 32 |
+| `ebro-y-duero` | 10.045 | | 29 | 26 |
+| `oeste-y-canarias` | 5.229 | | 20 | 19 |
+| **Toda España** | **68.911** | | **238** | **202** |
+
+La sintética da 238 peticiones la primera vez y 202 después, frente a las 251 y 215 de la simulación con `showf`. Las dos pasadas reales dieron un 3 % más de registros de los previstos y la sintética se queda algo corta en peticiones, así que la primera semana real serán unas 250.
+
+**Siete noches por defecto.** La ingesta turna las siete zonas, una por noche y Cataluña la primera: unas 31 peticiones de listado por noche (34 de media la primera semana) y toda España en siete noches. Barrerla entera cada noche también cabe, unas 215 peticiones y 15 minutos de una ventana de 6 horas, y se hace con `CELDA_REGISTRO_ZONAS_POR_NOCHE=7`. No lo pongo por defecto porque son 43 MB por noche, casi lo mismo que las 5.500 fichas (unos 50 MB), para un registro que cambia poco, y porque las bandas, que es lo que más cambia en una estación, se releen cada 30 días de todas formas. A cambio, una alta tarda hasta una semana en verse y una baja, dos.
+
+**Memoria y tiempo con toda España.** Medido con la España sintética (69.770 registros, 41.993 emplazamientos) y el programa de la noche de verdad sobre una base SQLite y un almacén en carpeta, en esta máquina. Solo el geoportal es de mentira: contesta al momento, así que los tiempos no cuentan las pausas entre peticiones (`pnpm run medir-espana`, en `apps/nocturna`).
+
+| Noche | Tiempo sin pausas | RSS máximo | RSS con el montón de V8 a 512 MB |
+|---|---|---|---|
+| Toda España, primera pasada, sin fichas: 238 peticiones, 408 ficheros publicados | 15 s | 1.127 MB | 587 MB (a 384 MB) |
+| Las 69.770 fichas en una noche, y publicar todos los lotes con bandas | 101 s | 1.168 MB | 734 MB |
+| Por defecto: una zona y 5.500 fichas que cambian, 35 ficheros publicados | 21 s | 2.019 MB | 764 MB |
+
+- Sin límite, V8 deja crecer el montón con la basura de la publicación y el RSS va de 1,1 a 2 GB, según cuándo recoja. Lo vivo cabe en 512 MB de montón en las tres noches; la noche por defecto no cabe en 384. De ese montón, 47 MB son la España sintética de la medida y 77 MB los límites de municipios.
+- Antes de este ticket la fusión leía a la vez el JSON de todas las observaciones, todas decodificadas y todos los emplazamientos decodificados: la noche de las fichas llegaba a 1.475 MB de RSS y no cabía en 512 MB de montón. Ahora lee la base de 2.000 en 2.000 filas y compara los emplazamientos por su JSON.
+- Con los valores por defecto, una noche son unos 2 minutos de listado, las 6 horas de fichas, dos fusiones de unos 3 s y dos publicaciones de unos 10 s. La base con las bandas de toda España ocupa 190 MB y sus catorce copias, unos 2,6 GB.
+
+**Recuento de la primera semana.** Lo que falta de la tabla de arriba lo da la primera semana de la ingesta en el portátil (#42), con la orden `estado`: registros y peticiones de cada zona en su noche. Queda pendiente hasta entonces.
 
 ### Fichas de detalle
 
@@ -554,7 +597,7 @@ El problema no es el tamaño sino dónde ponerlo. 1,5 GB cabe en R2, pero R2 est
 
 ## Qué no he podido comprobar
 
-- El total de registros es una extrapolación. Solo una pasada completa del listado lo mide, y es lo primero que hará la ingesta de España.
+- El total de registros es una extrapolación. Cataluña y `centro` ya están medidas (22.833 registros, un 3 % más de lo previsto); el resto lo mide la primera semana de la ingesta en el portátil.
 - La E/S de Convex es una cuenta sobre el código, no una lectura del panel. Hay que confirmarla con el uso real del despliegue de Barcelona.
 - Las fotos `desmantelada` de antenasmoviles.es siguen sin un caso real.
 - Las cifras del navegador son de un móvil simulado con la GPU de un portátil.
