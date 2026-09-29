@@ -275,7 +275,12 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
   );
   recurso(
     "ejercicio:contornos",
-    () => (zona()?.tipo === "municipio" ? provincia() : undefined),
+    () => {
+      // Sin capa de la provincia no hay ejercicio: su contorno no hace falta.
+      const codigo = provincia();
+      const suya = props.resumen?.provincias.find((p) => p.codigo === codigo);
+      return zona()?.tipo === "municipio" && suya?.fichero !== undefined ? codigo : undefined;
+    },
     (codigo) => {
       void cargarContornosDe([codigo]);
       return undefined;
@@ -636,7 +641,11 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       {
                         etiqueta: "Área",
                         valor: `${decimal(actual().areaKm2)} km²`,
-                        fuente: `${citaDeLimites(actual().origen)}, ${actual().origen.limites.fecha}`,
+                        // La cita del IGN ya lleva la fecha de los límites.
+                        fuente:
+                          actual().origen.tipo === "barrio"
+                            ? `${citaDeLimites(actual().origen)}, ${actual().origen.limites.fecha}`
+                            : citaDeLimites(actual().origen),
                       },
                       {
                         etiqueta: "Habitantes",
