@@ -158,6 +158,31 @@
           description = "Minutos de espera antes de repetir una publicación fallida la misma noche.";
         };
 
+        memoria.monton = mkOption {
+          type = ints.positive;
+          default = 512;
+          description = ''
+            Megabytes del montón de V8 (`--max-old-space-size`). Sin límite, V8 deja crecer el
+            montón con la basura de la publicación y la noche llega a 2 GB de RSS con toda España.
+            Con 512, la noche más pesada medida (69.770 registros) acaba con unos 760 MB de RSS
+            (investigación 08). Si una noche acaba sin memoria, súbelo.
+          '';
+        };
+
+        memoria.alta = mkOption {
+          type = str;
+          default = "${toString (config.services.celda-nocturna.memoria.monton * 2)}M";
+          defaultText = literalExpression ''"''${toString (memoria.monton * 2)}M"'';
+          description = "A partir de cuánta memoria systemd frena el servicio y le quita páginas (`MemoryHigh=`). Por defecto, el doble del montón: 1024M.";
+        };
+
+        memoria.maxima = mkOption {
+          type = str;
+          default = "${toString (config.services.celda-nocturna.memoria.monton * 3)}M";
+          defaultText = literalExpression ''"''${toString (memoria.monton * 3)}M"'';
+          description = "Lo más que puede usar el servicio antes de que systemd lo pare (`MemoryMax=`). Por defecto, el triple del montón: 1536M.";
+        };
+
         registroOficial.enable = mkOption {
           type = bool;
           default = true;
@@ -430,12 +455,19 @@
             CELDA_REGISTRO_ZONAS = listaDelPrograma config.services.celda-nocturna.registroOficial.zonas;
             CELDA_REGISTRO_ZONAS_EN_TURNO = listaDelPrograma config.services.celda-nocturna.registroOficial.zonasEnTurno;
             CELDA_REGISTRO_ZONAS_POR_NOCHE = toString config.services.celda-nocturna.registroOficial.zonasPorNoche;
+            NODE_OPTIONS = "--max-old-space-size=${toString config.services.celda-nocturna.memoria.monton}";
           };
 
           serviceConfig = {
             ExecStart = "${getExe config.services.celda-nocturna.package} noche";
             Type = "oneshot";
             TimeoutStartSec = config.services.celda-nocturna.tiempoMaximo;
+
+            # MEMORIA
+            # El montón de V8 va en NODE_OPTIONS; esto es el techo de todo el proceso, con margen
+            # sobre los unos 760 MB de RSS medidos con el montón a 512 MB.
+            MemoryHigh = config.services.celda-nocturna.memoria.alta;
+            MemoryMax = config.services.celda-nocturna.memoria.maxima;
 
             # USUARIO Y DIRECTORIOS
             Group = "celda-nocturna";

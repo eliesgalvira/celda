@@ -347,6 +347,20 @@
                   listados = maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log").strip()
                   assert listados == "9", listados
 
+              with subtest("la noche corre con el montón de V8 a 512 MB y la memoria del servicio limitada"):
+                  assert "NODE_OPTIONS=--max-old-space-size=512" in entorno, entorno
+                  alta = maquina.succeed("systemctl show celda-nocturna.service --property=MemoryHigh --value").strip()
+                  maxima = maquina.succeed("systemctl show celda-nocturna.service --property=MemoryMax --value").strip()
+                  assert alta == str(1024 * 1024 * 1024), alta
+                  assert maxima == str(1536 * 1024 * 1024), maxima
+                  # El Node del paquete lee el límite de NODE_OPTIONS: con 1024 su montón crece 512 MB.
+                  def limite(megas):
+                      return int(maquina.succeed(
+                          f"systemd-run --wait --pipe --collect --quiet --setenv=NODE_OPTIONS=--max-old-space-size={megas}"
+                          " ${getExe pkgs.nodejs-slim_24} --print 'v8.getHeapStatistics().heap_size_limit'"
+                      ).strip())
+                  assert limite(1024) - limite(512) == 512 * 1024 * 1024, (limite(512), limite(1024))
+
               with subtest("antenasmoviles.es: un listado y el detalle de las ER5 pendientes de Cataluña, hasta el tope"):
                   assert "antenasmoviles: encendida" in estado, estado
                   assert "- cataluna: completado, 9 cuadros, 4 peticiones, 0 kB, 83 registros" in estado, estado
