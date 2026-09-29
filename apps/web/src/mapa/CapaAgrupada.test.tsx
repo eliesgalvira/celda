@@ -5,10 +5,24 @@ import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 
-import { crearAgrupador, type ElementoAbrible, NIVEL_DE_BARRIOS } from "../capa/agrupacion.ts";
+import type { ResumenLeido } from "@celda/dominio/provincias";
+
+import {
+  crearAgrupador,
+  type ElementoAbrible,
+  NIVEL_DE_BARRIOS,
+  NIVEL_DE_MUNICIPIOS,
+} from "../capa/agrupacion.ts";
 import { combinacionesDe } from "../capa/marcadores.ts";
 import { crearAgrupadorNacional, type EstadoProvincia } from "../capa/nacional.ts";
-import { BARCELONA, estados, GIRONA, RESUMEN } from "../capa/pruebasNacional.ts";
+import {
+  BARCELONA,
+  barcelonaConMunicipios,
+  estados,
+  GIRONA,
+  RESUMEN,
+  resumenConBarcelona,
+} from "../capa/pruebasNacional.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
 
 const MUNDO: Rectangulo = {
@@ -189,10 +203,14 @@ describe("capa agrupada por provincias", () => {
   };
   const todas = [...BARCELONA.capa.emplazamientos, ...GIRONA.capa.emplazamientos];
 
-  const montarNacional = (inicial: ReadonlyMap<string, EstadoProvincia>, nivel: number) => {
+  const montarNacional = (
+    inicial: ReadonlyMap<string, EstadoProvincia>,
+    nivel: number,
+    { resumen = RESUMEN, reducido = false }: { resumen?: ResumenLeido; reducido?: boolean } = {},
+  ) => {
     const [provincias, setProvincias] = createSignal(inicial);
     const [nivelActual, setNivel] = createSignal(nivel);
-    const agrupador = () => crearAgrupadorNacional(RESUMEN, provincias());
+    const agrupador = () => crearAgrupadorNacional(resumen, provincias());
     const contenedor = document.createElement("div");
     document.body.append(contenedor);
     const abiertas: Array<ElementoAbrible> = [];
@@ -208,7 +226,7 @@ describe("capa agrupada por provincias", () => {
         })}
         seVe={() => true}
         fotograma={0}
-        movimientoReducido={false}
+        movimientoReducido={reducido}
         formas={new Map()}
         seleccionada={null}
         alSeleccionar={() => undefined}
@@ -286,5 +304,99 @@ describe("capa agrupada por provincias", () => {
       (b.firstElementChild?.getAttribute("style") ?? "").includes("--desde-x"),
     );
     assert.strictEqual(entrando.length, pulsables().length);
+  });
+
+  describe("a escala de municipio", () => {
+    const resumen = resumenConBarcelona(true);
+    const conMunicipios = estados(
+      ["08", { tipo: "lista", provincia: barcelonaConMunicipios(resumen) }],
+      ["17", { tipo: "lista", provincia: GIRONA }],
+    );
+
+    it("cada municipio dice su nombre, su número y, con 10 o más, sus ausencias", () => {
+      const { setNivel, lamina, abiertas } = montarNacional(
+        conMunicipios,
+        NIVEL_DE_MUNICIPIOS - 1,
+        {
+          resumen,
+        },
+      );
+      setNivel(NIVEL_DE_MUNICIPIOS);
+      flush();
+
+      const oeste = lamina.getByRole("button", {
+        name: "Oeste, 20 emplazamientos, sin Vodafone, acercar",
+      });
+      assert.strictEqual(oeste.getAttribute("data-zona"), "municipio");
+      // El nombre se ve (en mayúsculas por su estilo) junto a su número.
+      assert.include(oeste.textContent, "Oeste");
+      assert.include(oeste.textContent, "20 emplazamientos");
+      // Con 3 emplazamientos no se dice que falte nadie, ni en el nombre ni en lo que se ve.
+      const pequeno = lamina.getByRole("button", { name: "Pequeño, 3 emplazamientos, acercar" });
+      assert.notInclude(pequeno.textContent, "sin");
+
+      // Es un botón de verdad: se enfoca con el teclado y acerca al pulsarlo.
+      pequeno.focus();
+      assert.strictEqual(document.activeElement, pequeno);
+      fireEvent.click(pequeno);
+      assert.strictEqual(abiertas[0]?.tipo, "municipio");
+    });
+
+    it("al acercar desde los hexágonos, los municipios salen de ellos", () => {
+      const { setNivel, lamina } = montarNacional(conMunicipios, NIVEL_DE_MUNICIPIOS - 1, {
+        resumen,
+      });
+      setNivel(NIVEL_DE_MUNICIPIOS);
+      flush();
+      const municipios = lamina
+        .getAllByRole("button")
+        .filter((b) => b.getAttribute("data-zona") === "municipio");
+      assert.lengthOf(municipios, 3);
+      assert.isTrue(
+        municipios.every((b) =>
+          (b.firstElementChild?.getAttribute("style") ?? "").includes("--desde-x"),
+        ),
+      );
+    });
+
+    it("con la preferencia de reducir movimiento, los municipios aparecen de golpe", () => {
+      const { setNivel, lamina } = montarNacional(conMunicipios, NIVEL_DE_MUNICIPIOS - 1, {
+        resumen,
+        reducido: true,
+      });
+      setNivel(NIVEL_DE_MUNICIPIOS);
+      flush();
+      const botones = lamina.getAllByRole("button");
+      assert.isTrue(botones.every((b) => !b.hasAttribute("inert")));
+      assert.isTrue(
+        botones.every(
+          (b) => !(b.firstElementChild?.getAttribute("style") ?? "").includes("--desde-x"),
+        ),
+      );
+      assert.lengthOf(
+        botones.filter((b) => b.getAttribute("data-zona") === "municipio"),
+        3,
+      );
+    });
+
+    it("una provincia a medias no se parte en municipios: sigue en hexágonos", () => {
+      const aMedias = resumenConBarcelona(false);
+      const { lamina } = montarNacional(
+        estados(
+          ["08", { tipo: "lista", provincia: barcelonaConMunicipios(aMedias) }],
+          ["17", { tipo: "lista", provincia: GIRONA }],
+        ),
+        NIVEL_DE_MUNICIPIOS,
+        { resumen: aMedias },
+      );
+      assert.lengthOf(
+        lamina.getAllByRole("button").filter((b) => b.getAttribute("data-zona") === "municipio"),
+        0,
+      );
+      assert.isAbove(
+        lamina.getAllByRole("button", { name: /emplazamientos, acercar$/u }).length,
+        0,
+      );
+    });
   });
 });

@@ -6,7 +6,7 @@ import {
 } from "@celda/ui/marcadores/MarcadorBarrio.tsx";
 import { medidaDeProvincia } from "@celda/ui/marcadores/MarcadorProvincia.tsx";
 
-import type { ElementoBarrio, ElementoProvincia } from "./agrupacion.ts";
+import type { ElementoBarrio, ElementoMunicipio, ElementoProvincia } from "./agrupacion.ts";
 
 interface Caja {
   readonly izquierda: number;
@@ -33,39 +33,43 @@ const cajaDeProvincia = (punto: Salto, medida: Medida): Caja => ({
 const sePisan = (a: Caja, b: Caja): boolean =>
   a.izquierda < b.derecha && b.izquierda < a.derecha && a.arriba < b.abajo && b.arriba < a.abajo;
 
-/** Una etiqueta que puede ir completa o compacta: un barrio o una provincia. */
-type ConEtiqueta = ElementoBarrio | ElementoProvincia;
+/** Una etiqueta que puede ir completa o compacta: un barrio, un municipio o una provincia. */
+export type ConEtiqueta = ElementoBarrio | ElementoMunicipio | ElementoProvincia;
 
 const emplazamientosDe = (e: ConEtiqueta): number =>
-  e.tipo === "barrio" ? e.resumen.emplazamientos : e.provincia.emplazamientos;
+  e.tipo === "provincia" ? e.provincia.emplazamientos : e.resumen.emplazamientos;
 
 const codigoDe = (e: ConEtiqueta): string =>
-  e.tipo === "barrio" ? e.resumen.barrio.codigo : e.provincia.codigo;
+  e.tipo === "barrio"
+    ? e.resumen.barrio.codigo
+    : e.tipo === "municipio"
+      ? e.resumen.municipio.codigo
+      : e.provincia.codigo;
+
+const nombreDe = (e: ConEtiqueta): string =>
+  e.tipo === "barrio"
+    ? e.resumen.barrio.nombre
+    : e.tipo === "municipio"
+      ? e.resumen.municipio.nombre
+      : e.provincia.nombre;
 
 /** Primero los que tienen más emplazamientos; a igualdad, por código, para que no baile. */
 const porPrioridad = (a: ConEtiqueta, b: ConEtiqueta): number =>
   emplazamientosDe(b) - emplazamientosDe(a) || (codigoDe(a) < codigoDe(b) ? -1 : 1);
 
 const cajaDe = (e: ConEtiqueta, punto: Salto, forma: FormaDeBarrio): Caja =>
-  e.tipo === "barrio"
-    ? cajaEn(
+  e.tipo === "provincia"
+    ? cajaDeProvincia(punto, medidaDeProvincia(forma, forma === "completa" ? e.ausentes.length : 0))
+    : cajaEn(
         punto,
-        medidaDeBarrio(
-          forma,
-          e.resumen.barrio.nombre,
-          forma === "completa" ? e.resumen.ausentes.length : 0,
-        ),
-      )
-    : cajaDeProvincia(
-        punto,
-        medidaDeProvincia(forma, forma === "completa" ? e.ausentes.length : 0),
+        medidaDeBarrio(forma, nombreDe(e), forma === "completa" ? e.resumen.ausentes.length : 0),
       );
 
 /**
- * Qué forma toma la etiqueta de cada barrio o provincia en la pantalla. Se colocan de más a menos
+ * Qué forma toma la etiqueta de cada barrio, municipio o provincia en la pantalla. Se colocan de más a menos
  * emplazamientos: cada una va completa si no pisa ninguna de las ya colocadas y compacta si no.
- * La compacta se dibuja aunque pise otra, porque esconder un barrio o una provincia haría creer
- * que no tiene emplazamientos. Con el zoom del nivel de barrios, en Barcelona se pisan pocas.
+ * La compacta se dibuja aunque pise otra, porque esconder una zona haría creer que no tiene
+ * emplazamientos. Con el zoom del nivel de barrios, en Barcelona se pisan pocas.
  */
 export const formasDeEtiquetas = (
   etiquetas: ReadonlyArray<ConEtiqueta>,

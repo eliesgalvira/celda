@@ -8,9 +8,9 @@ import { Ausencias, MarcaDeAusencia } from "./Ausencias.tsx";
 import { Deslizable, type Movimiento } from "./Deslizable.tsx";
 
 /**
- * - `completa`: el nombre del barrio, su número de emplazamientos y sus ausencias.
+ * - `completa`: el nombre del barrio o del municipio, su número de emplazamientos y sus ausencias.
  * - `compacta`: un hexágono pequeño con el número, y la marca de ausencia si falta alguna
- *   compañía. Es para cuando la completa pisaría la etiqueta de un barrio vecino.
+ *   compañía. Es para cuando la completa pisaría la etiqueta de una zona vecina.
  */
 export type FormaDeBarrio = "completa" | "compacta";
 
@@ -27,8 +27,11 @@ const LINEA = 16;
 /** Alto de la cinta de ausencias con logos de 20 px. */
 const ALTO_AUSENCIAS = 32;
 
+/** Qué zona es la etiqueta: se ven igual, pero las pruebas y el DOM las distinguen. */
+export type ZonaDeEtiqueta = "barrio" | "municipio";
+
 /**
- * Lo que ocupa la etiqueta de un barrio en la pantalla, para decidir si cabe entera sin pisar
+ * Lo que ocupa la etiqueta de un barrio o un municipio en la pantalla, para decidir si cabe entera sin pisar
  * otra. Es una estimación por arriba a partir de las medidas de las clases de este fichero: el
  * nombre ocupa como mucho tres líneas.
  */
@@ -47,13 +50,15 @@ export interface MarcadorBarrioProps {
   readonly x: number;
   readonly y: number;
   readonly forma: FormaDeBarrio;
-  /** Nombre del barrio, que se ve en mayúsculas. */
+  /** Barrio, sin él, o municipio. */
+  readonly zona?: ZonaDeEtiqueta;
+  /** Nombre del barrio o del municipio, que se ve en mayúsculas. */
   readonly barrio: string;
   /** Cuántos emplazamientos tiene. */
   readonly emplazamientos: number;
-  /** Compañías sin ningún emplazamiento en el barrio. */
+  /** Compañías sin ningún emplazamiento en la zona. En un municipio pequeño, ninguna. */
   readonly ausentes: ReadonlyArray<Compania>;
-  /** Nombre accesible: el barrio, su número, sus ausencias y qué hace al pulsarlo. */
+  /** Nombre accesible: la zona, su número, sus ausencias y qué hace al pulsarla. */
   readonly nombre: string;
   /** Cómo aparece o se va al cambiar de nivel. Sin él, aparece sin transición. */
   readonly movimiento?: Movimiento;
@@ -71,9 +76,10 @@ export const textoDeEmplazamientos = (cuantos: number): string =>
       : `${cuantos} emplazamientos`;
 
 /**
- * Un barrio en el mapa, centrado en su etiqueta (historia 7). Completo, como en el prototipo v8:
- * el nombre en mayúsculas espaciadas, «N emplazamientos» y «sin» con el logo de cada compañía
- * ausente. Compacto, un hexágono claro con el número. Es un botón que acerca el mapa al barrio.
+ * Un barrio o un municipio en el mapa, centrado en su etiqueta (historia 7). Completo, como en el
+ * prototipo v8: el nombre en mayúsculas espaciadas, «N emplazamientos» y «sin» con el logo de cada
+ * compañía ausente. Compacto, un hexágono claro con el número. Es un botón que acerca el mapa a la
+ * zona.
  */
 export function MarcadorBarrio(props: MarcadorBarrioProps) {
   const saliendo = () => props.movimiento?.tipo === "sale";
@@ -83,6 +89,7 @@ export function MarcadorBarrio(props: MarcadorBarrioProps) {
       aria-label={props.nombre}
       inert={saliendo()}
       data-forma={props.forma}
+      data-zona={props.zona ?? "barrio"}
       class={cn(
         variantesDiana(),
         "absolute top-0 left-0 z-10 -translate-1/2 cursor-zoom-in will-change-transform",
