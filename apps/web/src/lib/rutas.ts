@@ -75,31 +75,34 @@ export const conMedir = (ubicacion: Ubicacion, abierto: boolean): string => {
   return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
 };
 
-/** El parámetro de la URL que abre el ejercicio de emplazamientos, con el código del barrio. */
+/**
+ * El parámetro de la URL que abre el ejercicio de emplazamientos, con el código de la zona: el del
+ * barrio o el del municipio.
+ */
 const EJERCICIO = "ejercicio";
 
 /** El parámetro de la URL que abre los ajustes. No lleva valor. */
 const AJUSTES = "ajustes";
 
 /**
- * El ejercicio abierto en una ubicación: `null` si está cerrado y, abierto, el código del barrio
- * elegido o `""` si aún no hay ninguno.
+ * El ejercicio abierto en una ubicación: `null` si está cerrado y, abierto, el código de la zona
+ * elegida o `""` si aún no hay ninguna.
  */
 export const ejercicioDe = (ubicacion: Ubicacion): string | null =>
   ubicacion.search.get(EJERCICIO)?.trim() ?? null;
 
 /**
- * El mapa con el ejercicio abierto en un barrio (o sin barrio con `""`), o cerrado con `null`.
+ * El mapa con el ejercicio abierto en una zona (o sin zona con `""`), o cerrado con `null`.
  * El ejercicio y la ficha ocupan el mismo panel: abrir uno cierra el otro.
  */
-export const conEjercicio = (ubicacion: Ubicacion, barrio: string | null): string => {
+export const conEjercicio = (ubicacion: Ubicacion, zona: string | null): string => {
   const parametros = new URLSearchParams(ubicacion.search);
   parametros.delete(EMPLAZAMIENTO);
   parametros.delete(PROVINCIA);
-  if (barrio === null) {
+  if (zona === null) {
     parametros.delete(EJERCICIO);
   } else {
-    parametros.set(EJERCICIO, barrio);
+    parametros.set(EJERCICIO, zona);
   }
   const busqueda = parametros.toString();
   return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;

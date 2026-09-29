@@ -129,20 +129,32 @@ describe("modo estudiante", () => {
     assert.isNull(queryByRole("button", { name: "Ejercicio", hidden: true }));
   });
 
-  it("encendido, resuelve el ejercicio de un barrio con sus fuentes y lee las bandas", async () => {
+  it("encendido, resuelve el ejercicio de un barrio buscado con sus fuentes y lee las bandas", async () => {
     navegar(ruta.mapa, { reemplazar: true });
-    const { findByRole, findByText, queryByRole, fichas } = montar(true);
+    const { findAllByText, findByRole, findByText, queryByRole, fichas } = montar(true);
     await abrirFunciones(findByRole);
     fireEvent.click(await findByRole("button", { name: "Ejercicio" }));
     flush();
     const panel = await findByRole("complementary", { name: "Ejercicio de emplazamientos" });
-    const barrio = await findByRole("combobox", { name: "Barrio" });
-    fireEvent.change(barrio, { target: { value: "21" } });
+    // Se busca por el nombre, sin tildes ni mayúsculas.
+    const buscador = await findByRole("searchbox", { name: "Municipio o barrio" });
+    await waitFor(() => assert.isFalse(buscador.hasAttribute("disabled")));
+    fireEvent.input(buscador, { target: { value: "pedralbes" } });
+    flush();
+    fireEvent.click(await findByRole("button", { name: /Pedralbes\s*Barrio de Barcelona/u }));
     flush();
     assert.strictEqual(ubicacion().search.get("ejercicio"), "21");
+    // En Barcelona se puede pasar del barrio al municipio entero.
+    const barrio = await findByRole("combobox", { name: "Barrio" });
+    assert.strictEqual(
+      barrio.querySelector("option[value='08019']")?.textContent,
+      "Todo el municipio",
+    );
 
     // Los habitantes salen del padrón que lleva la web, con su fuente.
-    await findByText(/Padrón a 2026-01-01, Ajuntament de Barcelona, CC BY 4\.0/u);
+    assert.isNotEmpty(
+      await findAllByText(/Padrón a 2026-01-01, Ajuntament de Barcelona \(CC BY 4\.0\)/u),
+    );
     const tabla = await findByRole("table", {
       name: "Emplazamiento de estaciones base en Pedralbes",
     });

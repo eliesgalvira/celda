@@ -1,4 +1,5 @@
 import type { FuenteDeBarrios } from "@celda/dominio/barrio";
+import type { FuenteDeMunicipios } from "@celda/dominio/municipio";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import {
   type Certeza,
@@ -47,11 +48,48 @@ export interface Tabla {
   readonly secciones: ReadonlyArray<Seccion>;
 }
 
+/**
+ * De dónde salen el límite, el área y los habitantes de la zona: un barrio de Barcelona, con los
+ * límites y el padrón del Ayuntamiento, o un municipio, con los límites del IGN y el padrón del
+ * INE.
+ */
+export type OrigenDeLaZona =
+  | {
+      readonly tipo: "barrio";
+      readonly limites: FuenteDeBarrios;
+      readonly poblacion: FuenteDePoblacion;
+    }
+  | {
+      readonly tipo: "municipio";
+      /** Código INE del municipio. */
+      readonly codigo: string;
+      readonly limites: FuenteDeMunicipios;
+      readonly poblacion: FuenteDePoblacion;
+    };
+
+/** Cómo se cita el límite de la zona: el IGN pide su fórmula para una obra derivada. */
+export const citaDeLimites = (origen: OrigenDeLaZona): string =>
+  origen.tipo === "barrio"
+    ? `Límites de barrio, ${origen.limites.atribucion} (${origen.limites.licencia})`
+    : `Obra derivada de ${origen.limites.producto} ${origen.limites.fecha} CC-BY 4.0 ign.es`;
+
+/**
+ * Cómo se citan los habitantes: el padrón, su fecha de referencia, quién lo publica y su licencia.
+ * El INE pide además decir que los datos elaborados son propios.
+ */
+export const citaDelPadron = (origen: OrigenDeLaZona): string => {
+  const { poblacion } = origen;
+  const padron = `Padrón a ${poblacion.referencia}, ${poblacion.atribucion} (${poblacion.licencia})`;
+  return origen.tipo === "barrio"
+    ? padron
+    : `${padron}. Elaboración propia con datos extraídos del sitio web del INE: www.ine.es`;
+};
+
 /** De dónde salen los datos que no calcula el ejercicio. */
 export interface ContextoDeTabla {
+  /** El nombre de la zona como se lee en el título: «Pedralbes» o «Tordera (Barcelona)». */
   readonly zona: string;
-  readonly poblacion: FuenteDePoblacion;
-  readonly limites: FuenteDeBarrios;
+  readonly origen: OrigenDeLaZona;
   /** Fecha de la capa de emplazamientos, en milisegundos. */
   readonly fechaCapa: number;
   readonly parametros: ParametrosDelEjercicio;
@@ -119,7 +157,9 @@ export const tablaDelEjercicio = (
   const companias = resultado.companias;
   const porCompania = (valor: (c: ResultadoDeCompania) => Valor) => companias.map(valor);
   const parametros = fuenteDeParametros(contexto.parametros, porDefecto);
-  const padron = `Padrón a ${contexto.poblacion.referencia}, ${contexto.poblacion.atribucion} (${contexto.poblacion.licencia})`;
+  const { origen } = contexto;
+  const padron = citaDelPadron(origen);
+  const fechaPadron = origen.poblacion.publicada;
   const capa = "Mapa de Celda: registro oficial y correcciones";
   const fechaCapa = dia(contexto.fechaCapa);
   const fechaBandas = dia(contexto.bandas.fecha);
@@ -137,28 +177,44 @@ export const tablaDelEjercicio = (
           {
             magnitud: "Zona",
             valores: [{ texto: contexto.zona }],
-            fuente: `Límites de barrio, ${contexto.limites.atribucion} (${contexto.limites.licencia})`,
-            fecha: contexto.limites.fecha,
+            fuente: citaDeLimites(origen),
+            fecha: origen.limites.fecha,
           },
+          ...(origen.tipo === "municipio"
+            ? [
+                {
+                  magnitud: "Código INE",
+                  valores: [{ texto: origen.codigo }],
+                  fuente: citaDeLimites(origen),
+                  fecha: origen.limites.fecha,
+                },
+              ]
+            : []),
           {
             magnitud: "Área",
             unidad: "km²",
             valores: [numero(resultado.areaKm2, decimal)],
-            fuente: "Calculada con los límites",
-            fecha: contexto.limites.fecha,
+            fuente:
+              origen.tipo === "barrio"
+                ? "Calculada con los límites"
+                : "Calculada con los límites del IGN sin simplificar",
+            fecha: origen.limites.fecha,
           },
           {
             magnitud: "Habitantes",
             valores: [numero(resultado.habitantes, entero)],
-            fuente: padron,
-            fecha: contexto.poblacion.publicada,
+            fuente:
+              resultado.habitantes === null
+                ? `${padron}. El padrón aún no tiene esta zona`
+                : padron,
+            fecha: fechaPadron,
           },
           {
             magnitud: "Densidad",
             unidad: "habitantes por km²",
             valores: [numero(resultado.densidad, entero)],
             fuente: "Habitantes entre área",
-            fecha: contexto.poblacion.publicada,
+            fecha: fechaPadron,
           },
           {
             magnitud: "Penetración",
@@ -171,7 +227,7 @@ export const tablaDelEjercicio = (
             magnitud: "Líneas móviles en la zona",
             valores: [numero(resultado.lineas, entero)],
             fuente: "Habitantes por penetración",
-            fecha: contexto.poblacion.publicada,
+            fecha: fechaPadron,
           },
         ],
       },
@@ -202,7 +258,7 @@ export const tablaDelEjercicio = (
             magnitud: "Habitantes por estación base",
             valores: porCompania((c) => numero(c.habitantesPorEstacion, entero)),
             fuente: "Habitantes entre estaciones",
-            fecha: contexto.poblacion.publicada,
+            fecha: fechaPadron,
           },
           {
             magnitud: "Cuota de líneas móviles",
@@ -218,7 +274,7 @@ export const tablaDelEjercicio = (
             magnitud: "Usuarios por estación base",
             valores: porCompania((c) => numero(c.usuariosPorEstacion, entero)),
             fuente: "Líneas por cuota, entre estaciones del grupo",
-            fecha: parametros.fecha === "" ? contexto.poblacion.publicada : parametros.fecha,
+            fecha: parametros.fecha === "" ? fechaPadron : parametros.fecha,
           },
         ],
       },

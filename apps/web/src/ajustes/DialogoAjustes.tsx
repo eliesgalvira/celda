@@ -15,7 +15,7 @@ export function DialogoAjustes(props: { readonly alCerrar: () => void }) {
     <Dialogo titulo="Ajustes" antetitulo="ESTE DISPOSITIVO" alCerrar={props.alCerrar}>
       <Interruptor
         etiqueta="Modo estudiante"
-        descripcion="Para quien estudia redes móviles. Añade a los controles del mapa un ejercicio sobre un barrio: estaciones base por compañía, radio, habitantes y usuarios por estación, con una tabla para descargar."
+        descripcion="Para quien estudia redes móviles. Añade a los controles del mapa un ejercicio sobre un municipio o un barrio: estaciones base por compañía, radio, habitantes y usuarios por estación, con una tabla para descargar."
         encendido={control?.ajustes().modoEstudiante ?? false}
         disabled={control === undefined}
         alCambiar={(encendido) => control?.cambiarModoEstudiante(encendido)}
