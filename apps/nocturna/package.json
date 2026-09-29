@@ -8,8 +8,9 @@
   "scripts": {
     "build": "vp build",
     "ingesta": "vp build && node dist/nocturna.js",
-    "typecheck": "tsc --noEmit",
-    "test": "vp test run"
+    "reserva": "vp build && node dist/nocturna.js reserva",
+    "test": "vp test run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@celda/dominio": "workspace:*",

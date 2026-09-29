@@ -10,6 +10,7 @@ import { Provincias } from "@celda/ingesta/fichas";
 import { capaDePuntosGrabada } from "@celda/ingesta/pruebas/antenasmoviles";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
+import type { CopiaDeReserva } from "@celda/publicacion/reserva";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
@@ -91,6 +92,8 @@ export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
 /** Lo que cambia de una noche a otra en una prueba. */
 export interface Variante {
   readonly almacen?: Layer.Layer<AlmacenDeFicheros>;
+  /** La copia de reserva de Vercel. Sin ella, la noche no la toca. */
+  readonly reserva?: Layer.Layer<CopiaDeReserva>;
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
   readonly reintento?: Duration.Duration;
   readonly proceso?: OpcionesBarrido;
@@ -119,6 +122,7 @@ export const unaNoche = (
     const entornoDeLaNoche = Layer.mergeAll(
       publicadorEn(zonas, POR_LOTE).pipe(
         Layer.provide(variante.almacen ?? entorno.almacenVigilado),
+        Layer.provide(variante.reserva ?? Layer.empty),
       ),
       Layer.succeed(
         Extractores,
