@@ -92,3 +92,43 @@ describe("capa de emplazamientos en el mapa", () => {
     });
   });
 });
+
+describe("enlace a una ficha sin provincia", () => {
+  const servicios = (fichas = fichasDePrueba()) =>
+    Layer.mergeAll(
+      capaDePrueba([Effect.succeed(CAPA)]),
+      fichas.capa,
+      simuladorDePrueba,
+      ubicacionDePrueba().capa,
+    );
+
+  it("busca su provincia en el índice de claves y la pone en la dirección, sin perder el resto", async () => {
+    navegar("/?emplazamiento=movistar-0802532&medir", { reemplazar: true });
+    const fichas = fichasDePrueba();
+    render(() => <App servicios={servicios(fichas)} />);
+    flush();
+    await waitFor(() => {
+      flush();
+      assert.strictEqual(
+        window.location.search,
+        "?emplazamiento=movistar-0802532&medir&provincia=08",
+      );
+    });
+    assert.include(fichas.abiertas(), "movistar-0802532");
+  });
+
+  it("una clave que no tiene ninguna provincia no existe, y la dirección se queda como estaba", async () => {
+    navegar("/?emplazamiento=movistar-nadie", { reemplazar: true });
+    const fichas = fichasDePrueba();
+    const { findByText } = render(() => <App servicios={servicios(fichas)} />);
+    flush();
+    await findByText(textoEntero("Datos del mapa: 26 sept 2026"));
+    await waitFor(() => {
+      flush();
+      assert.include(fichas.abiertas(), "movistar-nadie");
+    });
+    fichas.responder("movistar-nadie", "no-existe");
+    await findByText("Este emplazamiento no existe");
+    assert.strictEqual(window.location.search, "?emplazamiento=movistar-nadie");
+  });
+});

@@ -33,14 +33,21 @@ export interface FichaPedida {
   readonly provincia: string;
 }
 
+/** La ficha que abre un enlace: su clave y su provincia, o `null` si el enlace no la dice. */
+export interface FichaEnlazada {
+  readonly clave: string;
+  readonly provincia: string | null;
+}
+
 /**
  * Las fichas publicadas de los emplazamientos. `leer` da la ficha de un emplazamiento de la capa
- * de su provincia, o `None` si esa capa no tiene ningún emplazamiento con esa clave.
+ * de su provincia, o `None` si esa capa no tiene ningún emplazamiento con esa clave. Sin
+ * provincia, la busca antes en el índice de claves.
  */
 export class FichasPublicadas extends Context.Service<
   FichasPublicadas,
   {
-    readonly leer: (pedida: FichaPedida) => Effect.Effect<Option.Option<Ficha>, FichaNoLeida>;
+    readonly leer: (pedida: FichaEnlazada) => Effect.Effect<Option.Option<Ficha>, FichaNoLeida>;
     /**
      * Descarga ya el lote de las fichas de estos emplazamientos, sin abrir ninguna, para que
      * abrirlas después no espere a la red. Pide como mucho `LOTES_PRECARGADOS` lotes, los que más
@@ -163,15 +170,27 @@ export const fichasDelOrigen = Layer.effect(
         }),
       );
 
-    const leer = Effect.fn("FichasPublicadas.leer")(function* (pedida: FichaPedida) {
+    const leerDe = (pedida: FichaPedida) =>
+      Effect.gen(function* () {
+        const provincia = yield* capas
+          .provincia(pedida.provincia)
+          .pipe(Effect.mapError(() => noLeida("no ha llegado la capa de su provincia")));
+        const fichero = loteDe(provincia, pedida.clave);
+        if (Option.isNone(fichero)) return Option.none<Ficha>();
+        return yield* Effect.map(loteLeido(pedida.provincia, fichero.value), (fichas) =>
+          Option.fromNullishOr(fichas.get(pedida.clave)),
+        ).pipe(Effect.catchTag("LoteRetirado", () => fichaDeLaVigente(pedida, provincia.version)));
+      });
+
+    const leer = Effect.fn("FichasPublicadas.leer")(function* (pedida: FichaEnlazada) {
+      if (pedida.provincia !== null) {
+        return yield* leerDe({ clave: pedida.clave, provincia: pedida.provincia });
+      }
       const provincia = yield* capas
-        .provincia(pedida.provincia)
-        .pipe(Effect.mapError(() => noLeida("no ha llegado la capa de su provincia")));
-      const fichero = loteDe(provincia, pedida.clave);
-      if (Option.isNone(fichero)) return Option.none<Ficha>();
-      return yield* Effect.map(loteLeido(pedida.provincia, fichero.value), (fichas) =>
-        Option.fromNullishOr(fichas.get(pedida.clave)),
-      ).pipe(Effect.catchTag("LoteRetirado", () => fichaDeLaVigente(pedida, provincia.version)));
+        .provinciaDeClave(pedida.clave)
+        .pipe(Effect.mapError(() => noLeida("no ha llegado el índice de claves")));
+      if (Option.isNone(provincia)) return Option.none<Ficha>();
+      return yield* leerDe({ clave: pedida.clave, provincia: provincia.value });
     });
 
     const precargar = Effect.fn("FichasPublicadas.precargar")(

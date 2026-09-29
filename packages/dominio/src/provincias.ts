@@ -77,6 +77,10 @@ export const ficheroDeCapaDeProvincia = (provincia: string, huella: string): str
 export const ficheroDeLoteDeProvincia = (provincia: string, huella: string): string =>
   `fichas/${provincia}/${huella.slice(0, LARGO_HUELLA)}.json`;
 
+/** Una parte del índice de claves: `claves/<huella>.json`. */
+export const ficheroDeIndiceDeClaves = (huella: string): string =>
+  `claves/${huella.slice(0, LARGO_HUELLA)}.json`;
+
 // ── Dónde va cada emplazamiento ─────────────────────────────────────────────────────────────────
 
 /** Un emplazamiento con la provincia de la capa en que va y el lugar que dirá su ficha. */
@@ -503,6 +507,91 @@ export const leerCapaDeProvincia = (
     ),
   );
 
+// ── Índice de claves ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * En cuántas partes se reparte el índice de claves. Medido el 29/09/2026 con gzip: las claves de
+ * Cataluña (5.049) ocupan 14 KB y las de toda España (unas 42.900) ocuparían unos 125 KB. En 16
+ * partes, abrir un enlace sin provincia pide unos 8 KB con toda España, y los nombres de las
+ * partes suman 218 bytes al resumen, que pide todo el mundo. Con 32, 4 KB y 379 bytes.
+ */
+export const PARTES_DEL_INDICE = 16;
+
+/**
+ * La parte del índice en que va una clave: FNV-1a de 32 bits sobre sus bytes en UTF-8, módulo
+ * `partes`. La publicación y la web tienen que dar la misma.
+ */
+export const parteDeClave = (clave: string, partes: number): number => {
+  let huella = 0x811c_9dc5;
+  for (const byte of new TextEncoder().encode(clave)) {
+    huella = Math.imul(huella ^ byte, 0x0100_0193) >>> 0;
+  }
+  return huella % Math.max(1, partes);
+};
+
+/** Una parte del índice de claves: en qué provincia va cada clave de la parte. */
+const ParteDelIndice = Schema.Struct({
+  formato: Schema.Literal(FORMATO_PROVINCIAS),
+  /** Las provincias con alguna clave en la parte, por código. */
+  provincias: Schema.Array(Schema.String),
+  /** Las claves de cada provincia de `provincias`, ordenadas. */
+  claves: Schema.Array(Schema.Array(Schema.String)),
+});
+type ParteDelIndice = typeof ParteDelIndice.Type;
+
+const ParteEnJson = Schema.fromJsonString(ParteDelIndice);
+const codificarParte = Schema.encodeSync(ParteEnJson);
+const decodificarParte = Schema.decodeUnknownResult(ParteEnJson);
+
+/**
+ * El índice de claves de una versión: en qué provincia va cada emplazamiento, repartido en
+ * `partes` ficheros por `parteDeClave`. Sirve para abrir un enlace a una ficha que no dice su
+ * provincia sin descargar ninguna capa (ADR 0016). Devuelve el contenido de cada parte, en orden;
+ * una parte sin claves también se escribe. Es una función pura.
+ */
+export const generarIndiceDeClaves = (
+  situados: ReadonlyMap<string, ReadonlyArray<EmplazamientoSituado>>,
+  partes: number = PARTES_DEL_INDICE,
+): ReadonlyArray<string> => {
+  const porParte = Array.from({ length: partes }, () => new Map<string, Array<string>>());
+  for (const [provincia, suyos] of situados) {
+    for (const { emplazamiento } of suyos) {
+      const parte = porParte[parteDeClave(emplazamiento.clave, partes)];
+      const claves = parte?.get(provincia) ?? [];
+      claves.push(emplazamiento.clave);
+      parte?.set(provincia, claves);
+    }
+  }
+  return porParte.map((parte) => {
+    const provincias = [...parte.keys()].sort();
+    const columnas: ParteDelIndice = {
+      formato: FORMATO_PROVINCIAS,
+      provincias,
+      claves: provincias.map((p) => (parte.get(p) ?? []).slice().sort()),
+    };
+    return codificarParte(columnas);
+  });
+};
+
+/** Lee una parte del índice de claves: la provincia de cada clave que tiene. */
+export const leerParteDelIndice = (
+  contenido: string,
+): Result.Result<ReadonlyMap<string, string>, CapaIlegible> =>
+  decodificarParte(contenido).pipe(
+    Result.mapError((error) => new CapaIlegible({ motivo: error.message })),
+    Result.flatMap((parte) =>
+      parte.claves.length === parte.provincias.length
+        ? Result.succeed(
+            new Map(
+              parte.provincias.flatMap((provincia, i) =>
+                (parte.claves[i] ?? []).map((clave) => [clave, provincia] as const),
+              ),
+            ),
+          )
+        : descuadrada("el índice de claves está descuadrado"),
+    ),
+  );
+
 // ── Resumen nacional ────────────────────────────────────────────────────────────────────────────
 
 /** De dónde salen las zonas y los habitantes: lo que hay que citar al usarlos. */
@@ -535,6 +624,11 @@ const ColumnasDelResumen = Schema.Struct({
     /** Su capa, o `null` si no tiene emplazamientos. */
     fichero: Schema.Array(Schema.NullOr(Schema.String)),
   }),
+  /**
+   * Las partes del índice de claves, en el orden de `parteDeClave`. Los resúmenes publicados antes
+   * del índice no lo llevan.
+   */
+  claves: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 type ColumnasDelResumen = typeof ColumnasDelResumen.Type;
 
@@ -602,12 +696,14 @@ export const generarResumen = (resumen: {
   readonly cobertura: ReadonlyArray<ZonaBarrida>;
   readonly provincias: ReadonlyArray<DatosDeProvincia>;
   readonly cuadros: ReadonlyMap<string, ReadonlySet<Cuadro>>;
+  /** Las partes del índice de claves (`generarIndiceDeClaves`), ya nombradas. */
+  readonly claves?: ReadonlyArray<string> | undefined;
 }): string => {
   const provincias = resumen.provincias.slice().sort(porCodigo);
   const estados = provincias.map((p) =>
     coberturaDeProvincia(resumen.cuadros.get(p.codigo) ?? new Set(), p.caja, resumen.cobertura),
   );
-  const columnas: ColumnasDelResumen = {
+  const sinIndice: ColumnasDelResumen = {
     version: resumen.version,
     formato: FORMATO_PROVINCIAS,
     fuentes: resumen.fuentes,
@@ -625,7 +721,10 @@ export const generarResumen = (resumen: {
       fichero: provincias.map((p) => p.fichero ?? null),
     },
   };
-  return codificarResumen(columnas);
+  // Un resumen de antes del índice, rehecho con otra cobertura, sigue sin él.
+  return codificarResumen(
+    resumen.claves === undefined ? sinIndice : { ...sinIndice, claves: resumen.claves },
+  );
 };
 
 /** El resumen nacional, leído. */
@@ -637,6 +736,8 @@ export interface ResumenLeido {
   readonly cobertura: ReadonlyArray<ZonaBarrida>;
   /** Por código INE. */
   readonly provincias: ReadonlyArray<ProvinciaDelResumen>;
+  /** Las partes del índice de claves, o nada en un resumen de antes del índice. */
+  readonly claves?: ReadonlyArray<string> | undefined;
 }
 
 /**
@@ -697,6 +798,7 @@ export const leerResumen = (
         fuentes: c.fuentes,
         cobertura: c.cobertura,
         provincias,
+        claves: c.claves,
       });
     }),
   );

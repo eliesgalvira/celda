@@ -35,8 +35,8 @@ const EMPLAZAMIENTO = "emplazamiento";
 const PROVINCIA = "provincia";
 
 /**
- * La provincia de un enlace a un emplazamiento sin ella: los de antes de la capa por provincias
- * (ADR 0016), cuando Celda solo tenía Barcelona.
+ * La provincia de un emplazamiento que no la dice: los enlaces de antes de la capa por provincias
+ * (ADR 0016), cuando Celda solo tenía Barcelona, si el resumen aún no tiene índice de claves.
  */
 export const PROVINCIA_DE_LOS_ENLACES_VIEJOS = "08";
 
@@ -130,12 +130,24 @@ export const emplazamientoDe = (ubicacion: Ubicacion): string | null => {
 };
 
 /**
- * La provincia del emplazamiento seleccionado en una ubicación. Un enlace sin ella es de antes de
- * la capa por provincias, y entonces es de Barcelona.
+ * La provincia del emplazamiento seleccionado en una ubicación, o `null` si el enlace no la dice:
+ * uno de antes de la capa por provincias o uno escrito a mano con la clave. Entonces la busca el
+ * índice de claves del resumen.
  */
-export const provinciaDe = (ubicacion: Ubicacion): string => {
+export const provinciaDe = (ubicacion: Ubicacion): string | null => {
   const provincia = ubicacion.search.get(PROVINCIA)?.trim() ?? "";
-  return provincia === "" ? PROVINCIA_DE_LOS_ENLACES_VIEJOS : provincia;
+  return provincia === "" ? null : provincia;
+};
+
+/**
+ * La misma ubicación con la provincia del emplazamiento seleccionado; el resto de la URL no
+ * cambia. Es lo que se hace con un enlace que no la dice en cuanto se sabe cuál es.
+ */
+export const conProvincia = (ubicacion: Ubicacion, provincia: string): string => {
+  const parametros = new URLSearchParams(ubicacion.search);
+  parametros.set(PROVINCIA, provincia);
+  const busqueda = parametros.toString().replace(/(^|&)(medir|ajustes)=(?=&|$)/gu, "$1$2");
+  return `${ubicacion.pathname}?${busqueda}`;
 };
 
 /** Un clic normal con el botón principal y sin modificadores: el que navega dentro de la app. */

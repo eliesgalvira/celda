@@ -39,6 +39,7 @@ pnpm run medir -- --capas <carpeta> --trazas /tmp/trazas --perfil /tmp/perfiles
 - `--trazas` graba una traza de CDP de cada gesto en una ronda aparte, que no cuenta en las medianas, y resume el tiempo propio por hilo y por tipo de trabajo. `--perfil` guarda el perfil de CPU de V8 de cada gesto; para leerlo, construye la web sin minificar (`npx vp build --minify false`).
 - `--solo-carga` se salta los gestos, `--cascada` imprime las peticiones de la carga con su inicio y su fin, y `--json` guarda las rondas enteras.
 - `--escenario espana` cambia los gestos por el recorrido de varias provincias (ADR 0016): alejar con el botón hasta ver toda España con el resumen, tocar el hexágono de Barcelona, acercar con el botón hasta el nivel de municipios y arrastrar y pellizcar allí, acercar hasta la calle tocando cada vez la agrupación o la zona mayor, alejar hasta el nivel de provincias y cruzar de una a otra con seis arrastres largos. Al final mide la memoria de la página y sus Workers (`measureUserAgentSpecificMemory`, con el sitio aislado por COOP y COEP) y el montón del hilo principal, y cuenta lo pedido de las capas en toda la visita.
+- `--escenario borde --ruta "/?emplazamiento=<clave>"` abre la web con el enlace a la ficha de un emplazamiento junto al borde de dos provincias, sin su provincia (#45). Cierra la ficha, cruza el borde con cuatro arrastres de 500 px con las celdas, abre la vista de interferencia, lo cruza otra vez y aleja y acerca dos niveles.
 - Para medir con muchos datos sin ingerir nada, `pnpm run sintetica` en `tools/capas` publica en `CELDA_CAPAS_CARPETA` una España sintética de `CELDA_SINTETICOS` emplazamientos (100.000 por defecto, la de la investigación 08) con la publicación de verdad.
 - El Chromium es el del sistema (`/usr/bin/chromium`, o `--chromium`, o `CELDA_CHROMIUM`): `playwright-core` no descarga navegadores.
 
@@ -139,6 +140,23 @@ A zoom 11 se ven 17 etiquetas de municipio en la Cataluña real (antes, 9 hexág
 La primera medida con la sintética dio 21 fps al arrastrar a zoom 11: sus emplazamientos caen al azar, también en el mar, y los que no tienen municipio iban sueltos, 734 logos en la pantalla. Ahora van en hexágonos de su propio índice (ADR 0017). En los datos reales de Cataluña no hay ninguno sin municipio.
 
 La prueba de resistencia sigue en 0 en todo salvo `setTimeout` (331 con 330 lecturas).
+
+## Junto al borde de dos provincias (#45)
+
+Medianas de tres rondas del 29/09/2026 con la CPU a ×4, 390 px y GPU, con el escenario `borde` y la Cataluña real de antes, publicada otra vez con el índice de claves. Cada ronda abre el enlace sin provincia de un emplazamiento de Barcelona a menos de 1,3 km de otra provincia: `movistar-0804787`, en Cubelles, junto a Tarragona, y `movistar-0801317`, en Malgrat de Mar, junto a Girona. A zoom 16, 500 px son unos 600 m, así que cada arrastre cruza el borde.
+
+| Gesto: fps · fotogramas de más de 20 ms · de más de 50 ms | Barcelona–Tarragona | Barcelona–Girona |
+|---|---|---|
+| Cerrar la ficha | 60,0 · 0 · 0 | 60,0 · 0 · 0 |
+| Cruzar el borde con las celdas | 60,0 · 0 · 0 | 60,0 · 0 · 0 |
+| Abrir la vista de interferencia | 59,7 · 1 · 0 | 59,7 · 1 · 0 |
+| Cruzar el borde con la vista | 59,9 · 1 · 0 | 60,0 · 0 · 0 |
+| Alejar y acercar dos niveles | 59,8 · 1 · 0 | 60,0 · 0 · 0 |
+| Capas en toda la visita, con gzip | 76 KB, 6 peticiones | 89 KB, 7 |
+| Memoria: página y Workers / montón del hilo principal | 63 / 17 MB | 61 / 17 MB |
+| INP de la visita | 72 | 80 |
+
+Las seis peticiones de Cubelles son `vigente.json`, el resumen, una parte del índice de claves (1,2 KB), la capa de Barcelona, un lote de fichas y la de Tarragona, que piden las celdas. El primer marcador sale a 1,5 s, como sin el índice: la parte se pide a la vez que el mapa base. El peor Long Animation Frame de la vista, unos 55 ms, es pasar la trama calculada a GeoJSON al llegar del Worker, en el hilo principal; no llega a perder un fotograma de 50 ms.
 
 ## Qué entró
 

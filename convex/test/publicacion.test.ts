@@ -16,7 +16,10 @@ import {
   ficheroDeManifiesto,
   leerCapaDeProvincia,
   leerLoteDeProvincia,
+  leerParteDelIndice,
   leerResumen,
+  parteDeClave,
+  PARTES_DEL_INDICE,
   type ResumenLeido,
 } from "@celda/dominio/provincias";
 import { capaDePuntosGrabada, muestraAntenasMoviles } from "@celda/ingesta/pruebas/antenasmoviles";
@@ -291,6 +294,17 @@ const lugarEsperado = (e: EmplazamientoLeido) =>
  * Cada emplazamiento publicado tiene su ficha en su lote, igual que la da Convex, con el lugar en
  * que cae y sin ser posterior a la noche de la ingesta.
  */
+/** El índice de claves dice la provincia de cada emplazamiento, en la parte que le toca. */
+const comprobarIndice = (entorno: Entorno, leida: Leida) =>
+  Effect.gen(function* () {
+    const partes = leida.resumen.claves ?? [];
+    for (const e of leida.emplazamientos) {
+      const parte = partes[parteDeClave(e.clave, partes.length)] ?? "";
+      const indice = leerParteDelIndice((yield* entorno.leer(parte)) ?? "");
+      assert.strictEqual(Result.getOrUndefined(indice)?.get(e.clave), e.provincia, e.clave);
+    }
+  });
+
 const comprobarFichas = (entorno: Entorno, leida: Leida) =>
   Effect.gen(function* () {
     const convex = yield* TestConfect.TestConfect;
@@ -336,11 +350,14 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
           assert.strictEqual(publicada.tipo, "publicada");
           assert.isAbove(publicada.lotes, 2);
 
-          // Los lotes y las capas, luego el manifiesto y el resumen, y al final vigente.json: la
-          // web no ve la versión hasta tenerlo todo.
+          // Los lotes, las capas y el índice de claves, luego el manifiesto y el resumen, y al
+          // final vigente.json: la web no ve la versión hasta tenerlo todo. Las partes del índice
+          // que salen iguales (vacías) son un mismo fichero.
           const escritos = yield* entorno.escritos;
           const leida = yield* leerVigente(entorno);
-          assert.strictEqual(escritos.length, publicada.lotes + 2 + 3);
+          const partes = leida.resumen.claves ?? [];
+          assert.lengthOf(partes, PARTES_DEL_INDICE);
+          assert.strictEqual(escritos.length, publicada.lotes + 2 + new Set(partes).size + 3);
           assert.strictEqual(escritos.at(-3), ficheroDeManifiesto(version));
           assert.strictEqual(escritos.at(-2), leida.vigente.resumen);
           assert.strictEqual(escritos.at(-1), FICHERO_VIGENTE);
@@ -411,9 +428,14 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
           assert.deepStrictEqual(
             Result.getOrUndefined(manifiesto)?.ficheros,
             escritos
-              .filter((f) => f.startsWith("provincias/") || f.startsWith("fichas/"))
+              .filter(
+                (f) =>
+                  f.startsWith("provincias/") || f.startsWith("fichas/") || f.startsWith("claves/"),
+              )
               .toSorted(),
           );
+
+          yield* comprobarIndice(entorno, leida);
 
           const registrada = yield* convex.query(refs.internal.capas.vigente);
           assert.deepStrictEqual(

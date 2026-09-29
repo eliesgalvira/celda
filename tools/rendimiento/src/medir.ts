@@ -17,13 +17,18 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  *
  *   pnpm run medir -- --capas <carpeta publicada> [--web ../../apps/web/dist] [--cpu 4,6]
  *                     [--repeticiones 3] [--trazas <carpeta>] [--json <fichero>]
- *                     [--escenario barcelona|espana]
+ *                     [--escenario barcelona|espana|borde] [--ruta /?emplazamiento=<clave>]
  *
  * El escenario `barcelona` hace los gestos de siempre sobre la vista inicial. El de `espana`, el
  * de varias provincias (ADR 0016): aleja hasta ver toda España con el resumen, toca el hexágono
  * de Barcelona, acerca con el botón hasta el nivel de municipios y arrastra y pellizca allí,
  * acerca hasta la calle tocando la agrupación o la zona mayor, vuelve al nivel de provincias y
  * cruza de una a otra arrastrando, y al final mide la memoria de la página y sus Workers.
+ *
+ * El de `borde` (#45) abre la web con `--ruta`, el enlace a la ficha de un emplazamiento junto al
+ * borde de dos provincias, sin su provincia: la web la busca en el índice de claves y abre el
+ * mapa a zoom 16 sobre él. Cierra la ficha y cruza el borde arrastrando con las celdas, abre la
+ * vista de interferencia y lo cruza otra vez, y aleja y acerca.
  */
 
 const { values: opciones } = NodeUtil.parseArgs({
@@ -42,6 +47,7 @@ const { values: opciones } = NodeUtil.parseArgs({
     // Fracción de CPU ocupada por encima de la cual se espera antes de cada ronda.
     calma: { type: "string", default: "0.08" },
     escenario: { type: "string", default: "barcelona" },
+    ruta: { type: "string", default: "/" },
   },
 });
 
@@ -529,7 +535,7 @@ const ronda = async (
   await frenar(cdp, cpu);
   const red = seguirRed(pagina);
 
-  await pagina.goto(origen, { waitUntil: "load" });
+  await pagina.goto(new URL(opciones.ruta, origen).href, { waitUntil: "load" });
   await pagina.waitForFunction(
     () => {
       const carga = window.__celda.carga();
@@ -630,6 +636,43 @@ const ronda = async (
     await esperar(1500);
     memoria = await medirMemoria(pagina, cdp);
   };
+  /**
+   * Junto al borde de dos provincias, con la vista abierta en un emplazamiento: celdas e
+   * interferencia necesitan las dos. Cada arrastre cruza el borde de ida o de vuelta.
+   */
+  const recorridoPorElBorde = async () => {
+    await esperar(1500);
+    await medir("cerrar-ficha", async () => {
+      await pagina.getByRole("button", { name: "Cerrar", exact: true }).first().tap();
+      await pagina.waitForSelector("article[aria-label]", { state: "detached" });
+      await esperar(1200);
+    });
+    marcadores.borde = await contarMarcadores(pagina);
+    const cruzar = async () => {
+      // A zoom 16, 500 px son unos 600 m: de un lado del borde al otro.
+      for (const [dx, dy] of [
+        [500, 0],
+        [-500, 0],
+        [-500, 100],
+        [500, -100],
+      ] as const) {
+        await arrastrarUnaVez(cdp, dx, dy);
+      }
+    };
+    await medir("cruzar-con-celdas", cruzar);
+    await medir("abrir-interferencia", async () => {
+      await pulsar(pagina, "Interferencia", 1);
+      await esperar(1500);
+    });
+    await medir("cruzar-con-interferencia", cruzar);
+    await medir("alejar-y-acercar", async () => {
+      await pulsar(pagina, "Alejar", 2);
+      await pulsar(pagina, "Acercar", 2);
+    });
+    marcadores.final = await contarMarcadores(pagina);
+    await esperar(1500);
+    memoria = await medirMemoria(pagina, cdp);
+  };
   const gestosYFicha = async () => {
     // Lejos: la vista inicial, Barcelona entera.
     await esperar(500);
@@ -667,7 +710,11 @@ const ronda = async (
     ficha = { fria: fria?.ms, vecina, enCache };
   };
   if (opciones["solo-carga"] !== true) {
-    await (opciones.escenario === "espana" ? recorridoPorEspana() : gestosYFicha());
+    await (opciones.escenario === "espana"
+      ? recorridoPorEspana()
+      : opciones.escenario === "borde"
+        ? recorridoPorElBorde()
+        : gestosYFicha());
   }
   const trasElRecorrido = (
     await red.peticiones(await pagina.evaluate(() => performance.timeOrigin))
@@ -826,7 +873,9 @@ const principal = async () => {
   // máquina reparte igual entre ellas.
   const webs = opciones.web.split(",").map((web) => NodePath.resolve(web));
   const sitios = await Promise.all(
-    webs.map((web) => servirSitio(web, NodePath.resolve(capas), opciones.escenario === "espana")),
+    webs.map((web) =>
+      servirSitio(web, NodePath.resolve(capas), opciones.escenario !== "barcelona"),
+    ),
   );
   const navegador = await chromium.launch({
     executablePath: opciones.chromium,

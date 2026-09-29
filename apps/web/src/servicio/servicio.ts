@@ -26,13 +26,13 @@ export interface PedidoServicio {
 
 /**
  * La celda del emplazamiento `clave`, en longitud y latitud, si las celdas ya están calculadas y
- * tiene una.
+ * tiene una. Una celda dudosa, que podría recortar una provincia que aún no ha llegado, no se da.
  */
 export const celdaDe = (
   calculadas: CeldasCalculadas | undefined,
   clave: string,
 ): ReadonlyArray<Coordenada> | undefined => {
-  if (calculadas === undefined) return undefined;
+  if (calculadas === undefined || calculadas.dudosas.has(clave)) return undefined;
   const k = calculadas.emplazamientos.findIndex((e) => e.clave === clave);
   if (k < 0) return undefined;
   const poligono = poligonoDe(calculadas.resultado, k);

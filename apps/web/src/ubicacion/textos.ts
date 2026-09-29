@@ -1,5 +1,5 @@
 import { type Coordenada, distanciaMetros, rumboGrados } from "@celda/dominio/area";
-import { distanciaALoBarrido, type ZonaBarrida } from "@celda/dominio/cobertura";
+import { type AlcanceDeLosDatos, distanciaALosDatos } from "@celda/dominio/cobertura";
 import { bloque, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
 import { type MotivoFalloGps, posicionDe, type Referencia } from "./estado.ts";
@@ -113,16 +113,17 @@ export const EXPLICACION_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
 export const MARGEN_DE_LOS_DATOS = 3000;
 
 /**
- * A cuántos metros queda el punto de referencia de lo barrido, las cajas de las zonas de barrido
- * del resumen (ADR 0016), si queda fuera de ellas y de su margen. Sin resumen, o sin ninguna zona
- * barrida, no se sabe y no dice nada.
+ * A cuántos metros queda el punto de referencia de los datos, si queda fuera de ellos y de su
+ * margen. Los datos son la cobertura real del resumen nacional (ADR 0016): las zonas barridas
+ * recortadas a las cajas de los emplazamientos de sus provincias (`distanciaALosDatos`). Sin
+ * resumen, o sin ninguna zona barrida, no se sabe y no dice nada.
  */
 export const fueraDeLosDatos = (
   referencia: Referencia,
-  cobertura: ReadonlyArray<ZonaBarrida> | undefined,
+  alcance: AlcanceDeLosDatos | undefined,
 ): number | undefined => {
   const metros =
-    cobertura === undefined ? undefined : distanciaALoBarrido(posicionDe(referencia), cobertura);
+    alcance === undefined ? undefined : distanciaALosDatos(posicionDe(referencia), alcance);
   return metros !== undefined && metros > MARGEN_DE_LOS_DATOS ? metros : undefined;
 };
 

@@ -14,10 +14,12 @@ import {
   cajaDeSituados,
   type EmplazamientoSituado,
   ficheroDeCapaDeProvincia,
+  ficheroDeIndiceDeClaves,
   ficheroDeLoteDeProvincia,
   ficheroDeResumen,
   type FuentesDeZonas,
   generarCapaDeProvincia,
+  generarIndiceDeClaves,
   generarLoteDeProvincia,
   generarResumen,
   leerCapaDeProvincia,
@@ -202,6 +204,20 @@ export const capaDePrueba = (
             provinciaDePrueba,
           ),
         ),
+      // Todos los emplazamientos de prueba van en Barcelona.
+      provinciaDeClave: (clave) =>
+        Effect.suspend(() =>
+          Effect.map(
+            Option.match(llegada, {
+              onSome: Effect.succeed,
+              onNone: () => carga(cargas.length - 1),
+            }),
+            (capa) =>
+              capa.emplazamientos.some((e) => e.clave === clave)
+                ? Option.some(BARCELONA.codigo)
+                : Option.none<string>(),
+          ),
+        ),
     });
   });
 
@@ -231,12 +247,15 @@ export interface PublicacionDePrueba {
 /**
  * Publica unas fichas en Barcelona como lo haría la publicación, en lotes de `porLote`, sin
  * municipios ni barrios, para probar el servicio de capa y el de fichas con el formato de verdad.
+ * El índice de claves va en `partesDelIndice` partes; con `null`, el resumen es de antes del
+ * índice.
  */
 export const publicacionDePrueba = (
   version: string,
   fecha: number,
   fichas: ReadonlyArray<Ficha>,
   porLote = 2,
+  partesDelIndice: number | null = 4,
 ): PublicacionDePrueba => {
   const situados: ReadonlyArray<EmplazamientoSituado> = fichas
     .map((f) => {
@@ -278,6 +297,14 @@ export const publicacionDePrueba = (
   });
   const ficheroCapa = ficheroDeCapaDeProvincia("08", huellaDePrueba(contenidoCapa));
   ficheros.set(ficheroCapa, contenidoCapa);
+  const claves =
+    partesDelIndice === null
+      ? undefined
+      : generarIndiceDeClaves(new Map([["08", situados]]), partesDelIndice).map((contenido) => {
+          const fichero = ficheroDeIndiceDeClaves(huellaDePrueba(contenido));
+          ficheros.set(fichero, contenido);
+          return fichero;
+        });
   const contenidoResumen = generarResumen({
     version,
     fuentes: FUENTES_DE_PRUEBA,
@@ -292,6 +319,7 @@ export const publicacionDePrueba = (
       },
     ],
     cuadros: new Map(),
+    claves,
   });
   const ficheroResumen = ficheroDeResumen(version, huellaDePrueba(contenidoResumen));
   ficheros.set(ficheroResumen, contenidoResumen);

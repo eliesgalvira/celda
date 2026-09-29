@@ -1,6 +1,7 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import { codificarVigente, versionDeCapa } from "@celda/dominio/capa";
+import { parteDeClave } from "@celda/dominio/provincias";
 import type { Ficha } from "@celda/dominio/ficha";
 import { assert, describe, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
@@ -338,6 +339,59 @@ describe("índice de una provincia en un Worker", () => {
       );
       assert.deepStrictEqual(resultado.map(errorDe), ["IndiceFallido", "IndiceFallido"]);
       assert.strictEqual(worker.creados(), 2);
+    }),
+  );
+});
+
+describe("provincia de una clave", () => {
+  const parteDe = (publicacion: PublicacionDePrueba, clave: string) => {
+    const partes = publicacion.resumen.claves ?? [];
+    return partes[parteDeClave(clave, partes.length)] ?? "";
+  };
+
+  it.effect("la busca en la parte del índice que le toca, sin descargar ninguna capa", () =>
+    Effect.gen(function* () {
+      const { resultado, peticiones } = yield* conCapa(origenCon(HOY), (capa) =>
+        Effect.all([capa.provinciaDeClave("movistar-a"), capa.provinciaDeClave("movistar-a")]),
+      );
+      assert.deepStrictEqual(resultado, [Option.some("08"), Option.some("08")]);
+      // El resumen y una sola vez la parte: ni la capa de la provincia ni las otras partes.
+      assert.deepStrictEqual(peticiones.slice(2), [parteDe(HOY, "movistar-a")]);
+    }),
+  );
+
+  it.effect("una clave que ninguna provincia tiene no está", () =>
+    Effect.gen(function* () {
+      const { resultado } = yield* conCapa(origenCon(HOY), (capa) =>
+        capa.provinciaDeClave("vodafone-nadie"),
+      );
+      assert.isTrue(Option.isNone(resultado));
+    }),
+  );
+
+  it.effect("con un resumen de antes del índice, un enlace sin provincia es de Barcelona", () =>
+    Effect.gen(function* () {
+      const antes = publicacionDePrueba(versionDeCapa(NOCHE), NOCHE, FICHAS, 2, null);
+      const { resultado, peticiones } = yield* conCapa(origenCon(antes), (capa) =>
+        capa.provinciaDeClave("vodafone-nadie"),
+      );
+      assert.deepStrictEqual(resultado, Option.some("08"));
+      assert.lengthOf(peticiones, 2);
+    }),
+  );
+
+  it.effect("si la parte no llega, falla, y la siguiente vez la vuelve a pedir", () =>
+    Effect.gen(function* () {
+      const sinParte = origenCon(HOY);
+      sinParte.delete(`${ORIGEN}/${parteDe(HOY, "movistar-a")}`);
+      const { resultado, peticiones } = yield* conCapa(sinParte, (capa) =>
+        Effect.all([
+          Effect.exit(capa.provinciaDeClave("movistar-a")),
+          Effect.exit(capa.provinciaDeClave("movistar-a")),
+        ]),
+      );
+      assert.deepStrictEqual(resultado.map(errorDe), ["CapaNoDescargada", "CapaNoDescargada"]);
+      assert.lengthOf(peticiones, 4);
     }),
   );
 });

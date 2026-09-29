@@ -10,6 +10,7 @@ import {
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import { crearAgrupador } from "../capa/agrupacion.ts";
 import { type ProvinciaCargada, prefijoDeProvincia } from "../capa/nacional.ts";
@@ -158,6 +159,12 @@ export const capaDeProvincias = (provincias: ReadonlyArray<ProvinciaDePrueba>) =
           }
           return provinciaCargada(provincia);
         }),
+      provinciaDeClave: (clave) =>
+        Effect.succeed(
+          Option.fromNullishOr(
+            provincias.find((p) => p.emplazamientos.some((e) => e.clave === clave))?.codigo,
+          ),
+        ),
     }),
   );
   return {

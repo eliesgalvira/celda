@@ -4,7 +4,12 @@ import * as Result from "effect/Result";
 import type { LimitesDeBarrios } from "./barrio.ts";
 import { type EmplazamientoDeCapa, versionDeCapa } from "./capa.ts";
 import { cajaDeCuadro, zonaDeBarrido } from "./barrido.ts";
-import { cuadrosDeProvincias, distanciaALoBarrido, type ZonaBarrida } from "./cobertura.ts";
+import {
+  cuadrosDeProvincias,
+  distanciaALoBarrido,
+  distanciaALosDatos,
+  type ZonaBarrida,
+} from "./cobertura.ts";
 import type { Ficha } from "./ficha.ts";
 import {
   indexarMunicipios,
@@ -20,12 +25,17 @@ import {
   ficheroDeManifiesto,
   ficheroDeResumen,
   type FuentesDeZonas,
+  ficheroDeIndiceDeClaves,
   generarCapaDeProvincia,
+  generarIndiceDeClaves,
   generarLoteDeProvincia,
   generarResumen,
   leerCapaDeProvincia,
   leerLoteDeProvincia,
+  leerParteDelIndice,
   leerResumen,
+  parteDeClave,
+  PARTES_DEL_INDICE,
   situarEmplazamientos,
 } from "./provincias.ts";
 
@@ -496,6 +506,30 @@ describe("resumen nacional", () => {
     );
   });
 
+  it("lleva las partes del índice de claves, y se rehace con ellas", () => {
+    const claves = ["claves/0.json", "claves/1.json"];
+    const contenido = generarResumen({
+      version: VERSION,
+      fuentes: FUENTES,
+      cobertura: [CAJA_DE_BARCELONA],
+      provincias,
+      cuadros: CUADROS,
+      claves,
+    });
+    const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
+    assert.deepStrictEqual(leido?.claves, claves);
+    // Uno de antes del índice se sigue leyendo, sin él.
+    const sinIndice = generarResumen({
+      version: VERSION,
+      fuentes: FUENTES,
+      cobertura: [CAJA_DE_BARCELONA],
+      provincias,
+      cuadros: CUADROS,
+    });
+    assert.notInclude(sinIndice, '"claves"');
+    assert.isUndefined(Result.getOrUndefined(leerResumen(sinIndice, VERSION))?.claves);
+  });
+
   it("uno de otra versión no se da por bueno", () => {
     const contenido = generarResumen({
       version: VERSION,
@@ -514,6 +548,54 @@ describe("resumen nacional", () => {
       "resumen@2026-09-26T02:15:03Z.0123456789abcdef.json",
     );
     assert.strictEqual(ficheroDeManifiesto(VERSION), "ficheros@2026-09-26T02:15:03Z.json");
+  });
+});
+
+describe("índice de claves", () => {
+  const situados = situarEmplazamientos(TODOS, INDICE);
+
+  it("cada clave está en la parte que le toca, con su provincia, y solo en ella", () => {
+    const partes = generarIndiceDeClaves(situados, 4);
+    assert.lengthOf(partes, 4);
+    const leidas = partes.map((parte) => Result.getOrUndefined(leerParteDelIndice(parte)));
+    for (const e of TODOS) {
+      const suya = parteDeClave(e.clave, 4);
+      leidas.forEach((leida, i) => {
+        assert.strictEqual(leida?.has(e.clave), i === suya, `${e.clave} en la parte ${i}`);
+      });
+    }
+    const todas = new Map(leidas.flatMap((leida) => [...(leida ?? new Map<string, string>())]));
+    assert.deepStrictEqual(
+      [...todas].toSorted(),
+      [...situados]
+        .flatMap(([p, suyos]) => suyos.map((s) => [s.emplazamiento.clave, p]))
+        .toSorted(),
+    );
+  });
+
+  it("no depende del orden de llegada, y una parte sin claves también se escribe", () => {
+    const otraVez = situarEmplazamientos(TODOS.toReversed(), INDICE);
+    assert.deepStrictEqual(generarIndiceDeClaves(otraVez), generarIndiceDeClaves(situados));
+    const partes = generarIndiceDeClaves(situados, 64);
+    assert.lengthOf(partes, 64);
+    assert.isTrue(partes.some((p) => Result.getOrUndefined(leerParteDelIndice(p))?.size === 0));
+  });
+
+  it("la parte de una clave es estable y sale de sus bytes en UTF-8", () => {
+    // FNV-1a de 32 bits: el mismo número en la publicación y en la web, en cualquier máquina.
+    assert.strictEqual(parteDeClave("", PARTES_DEL_INDICE), 0x811c_9dc5 % PARTES_DEL_INDICE);
+    assert.strictEqual(parteDeClave("a", 1 << 30), 0xe40c_292c % (1 << 30));
+    assert.notStrictEqual(parteDeClave("ñ", 1 << 30), parteDeClave("n", 1 << 30));
+  });
+
+  it("una parte mal formada no se da por buena, y el nombre lleva la huella", () => {
+    assert.isTrue(
+      Result.isFailure(leerParteDelIndice('{"formato":5,"provincias":["08"],"claves":[]}')),
+    );
+    assert.strictEqual(
+      ficheroDeIndiceDeClaves("0123456789abcdef9999"),
+      "claves/0123456789abcdef.json",
+    );
   });
 });
 
@@ -537,5 +619,33 @@ describe("hasta dónde llegan los datos", () => {
     const girona = distanciaALoBarrido({ longitud: 2.82, latitud: 41.98 }, [CAJA_DE_BARCELONA]);
     assert.isAbove(girona ?? 0, 60_000);
     assert.isUndefined(distanciaALoBarrido({ longitud: 2.82, latitud: 41.98 }, []));
+  });
+
+  it("con la cobertura real, lo barrido se recorta a las cajas de los emplazamientos", () => {
+    const barcelona = {
+      caja: {
+        suroeste: { longitud: 1.4, latitud: 41.2 },
+        noreste: { longitud: 2.8, latitud: 42.3 },
+      },
+    };
+    const girona = {
+      caja: {
+        suroeste: { longitud: 1.8, latitud: 41.6 },
+        noreste: { longitud: 3.3, latitud: 42.45 },
+      },
+    };
+    const alcance = { cobertura: [CATALUNA], provincias: [barcelona, girona, { caja: undefined }] };
+    // Barcelona y Figueres, dentro.
+    assert.strictEqual(distanciaALosDatos({ longitud: 2.17, latitud: 41.39 }, alcance), 0);
+    assert.strictEqual(distanciaALosDatos({ longitud: 2.96, latitud: 42.27 }, alcance), 0);
+    // Perpiñán está en un cuadro barrido de Cataluña, pero a 28 km del último emplazamiento.
+    const perpinan = { longitud: 2.9, latitud: 42.7 };
+    assert.strictEqual(distanciaALoBarrido(perpinan, [CATALUNA]), 0);
+    assert.approximately(distanciaALosDatos(perpinan, alcance) ?? 0, 27_800, 500);
+    // Sin ninguna zona barrida no se sabe.
+    assert.isUndefined(distanciaALosDatos(perpinan, { ...alcance, cobertura: [] }));
+    assert.isUndefined(
+      distanciaALosDatos(perpinan, { cobertura: [CATALUNA], provincias: [{ caja: undefined }] }),
+    );
   });
 });

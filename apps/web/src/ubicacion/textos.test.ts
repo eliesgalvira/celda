@@ -1,4 +1,4 @@
-import type { ZonaBarrida } from "@celda/dominio/cobertura";
+import type { AlcanceDeLosDatos, ZonaBarrida } from "@celda/dominio/cobertura";
 import { terminosDe, textoPlano } from "@celda/dominio/glosario";
 import type { PuntoElegido } from "@celda/dominio/aportacion";
 import { assert, describe, it } from "@effect/vitest";
@@ -98,11 +98,16 @@ describe("nombreRumbo", () => {
 });
 
 describe("punto de referencia lejos de los datos", () => {
-  // Una zona barrida pequeña alrededor de Campus Nord, y otra que aún no se ha acabado de barrer.
-  const CAJA: ReadonlyArray<ZonaBarrida> = [
+  // Una zona barrida pequeña alrededor de Campus Nord, y otra que aún no se ha acabado de barrer,
+  // con los emplazamientos de Barcelona por toda la primera.
+  const ZONAS: ReadonlyArray<ZonaBarrida> = [
     { nombre: "prueba", titulo: "Campus Nord", cajas: [[2.1, 41.38, 2.12, 41.4]], barrido: 0 },
     { nombre: "soria", titulo: "Soria", cajas: [[-3, 41, -2, 42]], barrido: null },
   ];
+  const BARCELONA = {
+    caja: { suroeste: { longitud: 2, latitud: 41.3 }, noreste: { longitud: 2.3, latitud: 41.5 } },
+  };
+  const CAJA = { cobertura: ZONAS, provincias: [BARCELONA] };
   const elegido = (posicion: { longitud: number; latitud: number }): Referencia => ({
     tipo: "elegido",
     punto: { ...PUNTO, posicion },
@@ -124,6 +129,25 @@ describe("punto de referencia lejos de los datos", () => {
     assert.notMatch(`${textos.titulo} ${textos.texto}`, /Barcelona/u);
     // Con un punto elegido, nunca «tú».
     assert.notMatch(`${textos.titulo} ${textos.texto}`, /\b(ti|tu|tú|veas)\b/iu);
+  });
+
+  it("lo barrido sin emplazamientos alrededor no cuenta como datos", () => {
+    // Todo el cuadro de Barcelona barrido, pero con emplazamientos solo junto a Campus Nord: a
+    // 20 km mar adentro no hay datos, aunque el cuadro llegue hasta allí.
+    const cuadro = {
+      cobertura: [{ nombre: "prueba", titulo: "Barcelona", cajas: [[2, 41, 3, 42]], barrido: 0 }],
+      provincias: [
+        {
+          caja: {
+            suroeste: { longitud: 2.1, latitud: 41.38 },
+            noreste: { longitud: 2.12, latitud: 41.4 },
+          },
+        },
+      ],
+    } satisfies AlcanceDeLosDatos;
+    const enElMar = { longitud: 2.35, latitud: 41.3 };
+    assert.isAbove(fueraDeLosDatos(elegido(enElMar), cuadro) ?? 0, 15_000);
+    assert.isUndefined(fueraDeLosDatos(elegido(CERCA), cuadro));
   });
 
   it("con la ubicación GPS habla de ti", () => {

@@ -1,6 +1,6 @@
 import { type Coordenada, contiene } from "@celda/dominio/area";
 import type { FuenteDeBarrios } from "@celda/dominio/barrio";
-import { distanciaALoBarrido, seCortan } from "@celda/dominio/cobertura";
+import { distanciaALosDatos, seCortan } from "@celda/dominio/cobertura";
 import { marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 import type { FuenteDeMunicipios } from "@celda/dominio/municipio";
 import type { ResumenLeido } from "@celda/dominio/provincias";
@@ -148,7 +148,8 @@ export interface ProvinciaNombrada {
  *
  * - `fallo`: alguna provincia que se ve no ha llegado; se dice cuál y se puede reintentar.
  * - `cargando`: alguna provincia que se ve se está pidiendo; se ve su hexágono mientras.
- * - `sin-datos`: lo que se ve queda fuera de lo barrido; Celda aún no tiene datos de ahí.
+ * - `sin-datos`: lo que se ve queda fuera de lo barrido con emplazamientos
+ *   (`distanciaALosDatos`); Celda aún no tiene datos de ahí.
  * - `datos`: la fecha de los datos de lo que se ve, de la más antigua a la más reciente si las
  *   provincias son de versiones distintas, y su último barrido.
  */
@@ -197,7 +198,7 @@ export const estadoDeLaVista = (
   const cargando = conEstado("cargando");
   if (cargando.length > 0) return { tipo: "cargando", provincias: cargando };
   if (cerca) {
-    const distancia = distanciaALoBarrido(centroDe(vista), resumen.cobertura);
+    const distancia = distanciaALosDatos(centroDe(vista), resumen);
     if (distancia === undefined || distancia > MARGEN_DE_LOS_DATOS) {
       return {
         tipo: "sin-datos",

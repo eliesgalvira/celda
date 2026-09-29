@@ -421,9 +421,9 @@
                   # R2 tiene las dos versiones de la noche; la copia, solo la vigente.
                   assert maquina.succeed(f"ls {servida} | grep --count '^ficheros@'").strip() == "1"
                   manifiesto = maquina.succeed(f"ls {servida} | grep '^ficheros@'").strip()
-                  listados = maquina.succeed(f"grep --only-matching '\"[a-z]*/[0-9]*/[0-9a-f]*\\.json\"' {servida}/{manifiesto} | wc --lines").strip()
+                  listados = maquina.succeed(f"grep --only-matching '\"[a-z]*/[0-9a-f/]*\\.json\"' {servida}/{manifiesto} | wc --lines").strip()
                   ficheros = maquina.succeed(f"find -L {servida} -type f | wc --lines").strip()
-                  # Sus capas y lotes, el manifiesto, el resumen y vigente.json.
+                  # Sus capas, lotes y partes del índice de claves, el manifiesto, el resumen y vigente.json.
                   assert int(ficheros) == int(listados) + 3, (ficheros, listados)
                   maquina.succeed(f"cd {servida} && find . -type f -exec cmp {{}} {r2}/{{}} \\;")
 
