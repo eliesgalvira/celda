@@ -69,6 +69,51 @@ export const distanciaALoBarrido = (
   return minima;
 };
 
+/** Lo que dice hasta dónde llegan los datos: las zonas barridas y la caja de cada provincia. */
+export interface AlcanceDeLosDatos {
+  readonly cobertura: ReadonlyArray<ZonaBarrida>;
+  /** La caja de los emplazamientos de cada provincia, o `undefined` si no tiene ninguno. */
+  readonly provincias: ReadonlyArray<{ readonly caja: Rectangulo | undefined }>;
+}
+
+/**
+ * A cuántos metros queda un punto de los datos de Celda, con la cobertura real del resumen
+ * nacional: lo barrido recortado a las cajas de los emplazamientos de sus provincias. Los cuadros
+ * de 1° de una zona de barrido llegan al mar y pasan a Francia o a Andorra, donde el registro
+ * oficial no tiene nada; recortados, un punto en Perpiñán o a 20 km de la costa queda fuera. 0 si
+ * cae dentro. Sin ninguna zona barrida con emplazamientos, `undefined`: no se sabe.
+ */
+export const distanciaALosDatos = (
+  punto: Coordenada,
+  alcance: AlcanceDeLosDatos,
+): number | undefined => {
+  let minima: number | undefined;
+  for (const zona of alcance.cobertura) {
+    if (zona.barrido === null) continue;
+    for (const caja of zona.cajas) {
+      const barrida = rectanguloDeCaja(caja);
+      for (const { caja: suya } of alcance.provincias) {
+        if (suya === undefined || !seCortan(barrida, suya)) continue;
+        const metros = distanciaAlRectangulo(punto, interseccion(barrida, suya));
+        minima = minima === undefined ? metros : Math.min(minima, metros);
+      }
+    }
+  }
+  return minima;
+};
+
+/** Lo común a dos rectángulos que se cortan. */
+const interseccion = (a: Rectangulo, b: Rectangulo): Rectangulo => ({
+  suroeste: {
+    longitud: Math.max(a.suroeste.longitud, b.suroeste.longitud),
+    latitud: Math.max(a.suroeste.latitud, b.suroeste.latitud),
+  },
+  noreste: {
+    longitud: Math.min(a.noreste.longitud, b.noreste.longitud),
+    latitud: Math.min(a.noreste.latitud, b.noreste.latitud),
+  },
+});
+
 /** Los cuadros con algún dato en toda España: los de las zonas de barrido del ADR 0014. */
 const CUADROS_CON_DATOS: ReadonlySet<Cuadro> = new Set(ZONAS_DE_BARRIDO.flatMap((z) => z.cuadros));
 
