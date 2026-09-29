@@ -3,8 +3,8 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import {
-  BARCELONA,
   cajaDe,
+  ESPANA,
   Coordenada,
   contiene,
   distanciaAlRectangulo,
@@ -19,7 +19,7 @@ describe("Coordenada", () => {
   it.effect("acepta un punto de Barcelona", () =>
     Effect.gen(function* () {
       const plazaCatalunya = yield* decodificar({ longitud: 2.17, latitud: 41.387 });
-      assert.isTrue(contiene(BARCELONA.encuadre, plazaCatalunya));
+      assert.isTrue(contiene(ESPANA.encuadre, plazaCatalunya));
     }),
   );
 
@@ -31,11 +31,17 @@ describe("Coordenada", () => {
   );
 });
 
-describe("BARCELONA", () => {
-  it("abre el mapa dentro de los límites por los que se puede mover", () => {
-    assert.isTrue(contiene(BARCELONA.limites, BARCELONA.encuadre.suroeste));
-    assert.isTrue(contiene(BARCELONA.limites, BARCELONA.encuadre.noreste));
-    assert.isBelow(BARCELONA.zoomMinimo, BARCELONA.zoomMaximo);
+describe("ESPANA", () => {
+  it("abre en la península con Baleares, dentro de los límites que llegan a Canarias", () => {
+    assert.isTrue(contiene(ESPANA.limites, ESPANA.encuadre.suroeste));
+    assert.isTrue(contiene(ESPANA.limites, ESPANA.encuadre.noreste));
+    const madrid = { longitud: -3.7038, latitud: 40.4168 };
+    const palma = { longitud: 2.65, latitud: 39.57 };
+    const tenerife = { longitud: -16.25, latitud: 28.47 };
+    assert.isTrue(contiene(ESPANA.encuadre, madrid));
+    assert.isTrue(contiene(ESPANA.encuadre, palma));
+    assert.isTrue(contiene(ESPANA.limites, tenerife));
+    assert.isBelow(ESPANA.zoomMinimo, ESPANA.zoomMaximo);
   });
 });
 

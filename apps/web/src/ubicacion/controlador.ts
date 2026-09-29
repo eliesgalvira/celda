@@ -44,6 +44,11 @@ export interface ControlUbicacion {
   readonly cerrarAviso: () => void;
   readonly avisoAlmacen: () => AvisoAlmacen | undefined;
   readonly cerrarAvisoAlmacen: () => void;
+  /**
+   * Si ya se ha leído el punto elegido que guardaba el dispositivo, lo hubiera o no: hasta
+   * entonces no se sabe si al abrir hay punto de referencia.
+   */
+  readonly puntoGuardadoLeido: () => boolean;
 }
 
 export const UbicacionContexto = createContext<ControlUbicacion>();
@@ -58,6 +63,7 @@ export const crearUbicacion = (
 ): ControlUbicacion => {
   const [ubicacion, setUbicacion] = createSignal<Ubicacion>(INICIAL);
   const [avisoAlmacen, setAvisoAlmacen] = createSignal<AvisoAlmacen>();
+  const [puntoGuardadoLeido, setPuntoGuardadoLeido] = createSignal(false);
   const enviar = (evento: EventoUbicacion) => setUbicacion((u) => transicion(u, evento));
   const referencia = createMemo(() => referenciaDe(ubicacion().estado));
 
@@ -83,6 +89,7 @@ export const crearUbicacion = (
         // Si no se puede leer, se empieza sin punto; al guardar uno, el aviso lo dirá.
         const punto = Exit.isSuccess(salida) ? salida.value.at(-1) : undefined;
         if (punto?.tipo === "punto-elegido") enviar({ tipo: "restaurado", punto });
+        setPuntoGuardadoLeido(true);
       });
     return () => parar.abort();
   });
@@ -153,5 +160,6 @@ export const crearUbicacion = (
     cerrarAviso: () => enviar({ tipo: "cerrar-aviso" }),
     avisoAlmacen,
     cerrarAvisoAlmacen: () => setAvisoAlmacen(undefined),
+    puntoGuardadoLeido,
   };
 };

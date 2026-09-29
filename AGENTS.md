@@ -1,6 +1,6 @@
 # Celda
 
-Web pública, en castellano, con las antenas de telefonía móvil de Barcelona en un mapa. Monorepo pnpm autocontenido: nada de esta carpeta enlaza fuera de ella.
+Web pública, en castellano, con las antenas de telefonía móvil de España en un mapa. Monorepo pnpm autocontenido: nada de esta carpeta enlaza fuera de ella.
 
 ## Antes de dar una tarea por hecha
 

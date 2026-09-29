@@ -7,7 +7,7 @@ import {
   LimitesDeMunicipios,
 } from "@celda/dominio/municipio";
 import { PoblacionDeBarrios } from "@celda/dominio/poblacion";
-import { IndiceDeZonas } from "@celda/dominio/zonaDelEjercicio";
+import { IndiceDeZonas, ProvinciasDeZonas } from "@celda/dominio/zonaDelEjercicio";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -89,6 +89,7 @@ export const encuadreDe = (poligonos: ReadonlyArray<Poligono>): Rectangulo | und
 const decodificarPoblacion = Schema.decodeUnknownEffect(PoblacionDeBarrios);
 const decodificarIndice = Schema.decodeUnknownEffect(IndiceDeZonas);
 const decodificarContorno = Schema.decodeUnknownEffect(LimitesDeMunicipios);
+const decodificarProvincias = Schema.decodeUnknownEffect(ProvinciasDeZonas);
 
 /** Algo que el ejercicio descarga al abrirse no ha llegado o no es lo que se esperaba. */
 export class ZonasNoCargadas extends Schema.TaggedError<ZonasNoCargadas>()("ZonasNoCargadas", {
@@ -102,8 +103,10 @@ const noEsElEsperado = (error: ZonasNoCargadas | Schema.SchemaError) =>
     ? error
     : new ZonasNoCargadas({ motivo: "el fichero no es el que se esperaba" });
 
-// Cada fichero va en un trozo aparte de la web que se descarga la primera vez que se pide, y solo
-// lo pide el ejercicio: quien no usa el modo estudiante no lo descarga nunca.
+// Cada fichero va en un trozo aparte de la web que se descarga la primera vez que se pide. El
+// padrón de los barrios y el índice solo los pide el ejercicio: quien no usa el modo estudiante no
+// los descarga nunca. Las provincias y sus contornos los pide también la cabecera del mapa, desde
+// el nivel de provincias, para decir dónde está el centro.
 
 /** Los habitantes, el área y el límite de cada barrio de Barcelona, del padrón de Open Data BCN. */
 export const cargarPoblacion: Effect.Effect<PoblacionDeBarrios, ZonasNoCargadas> =
@@ -119,6 +122,13 @@ export const cargarIndiceDeZonas: Effect.Effect<IndiceDeZonas, ZonasNoCargadas> 
   Effect.flatMap((modulo) => decodificarIndice(modulo.default)),
   Effect.mapError(noEsElEsperado),
 );
+
+/** Las provincias con la caja de sus límites (`pnpm run zonas`), unos 2 KB con gzip. */
+export const cargarProvinciasDeZonas: Effect.Effect<ProvinciasDeZonas, ZonasNoCargadas> =
+  Effect.tryPromise({ try: () => import("./zonas/provincias.json"), catch: noHaLlegado }).pipe(
+    Effect.flatMap((modulo) => decodificarProvincias(modulo.default)),
+    Effect.mapError(noEsElEsperado),
+  );
 
 /** Los contornos de cada provincia, uno por trozo: solo se descarga el de la que se pide. */
 const CONTORNOS = import.meta.glob("./zonas/[0-9][0-9].json", { import: "default" });

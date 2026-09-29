@@ -1,8 +1,8 @@
 # Celda
 
-Celda es una web que enseña en un mapa las antenas de telefonía móvil de Barcelona: de qué compañía son y cómo llega su señal. Estará en celda.elies.site.
+Celda es una web que enseña en un mapa las antenas de telefonía móvil de España, de qué compañía son y cómo llega su señal. Estará en celda.elies.site.
 
-Hoy muestra sobre el mapa de Barcelona los emplazamientos del registro oficial, con los logos de las compañías que emiten en cada uno y la fecha de los datos. El panel de cada emplazamiento dibuja el diagrama de radiación de sus sectores, un modelo calculado en un Web Worker. El backend recoge cada noche el registro oficial y lo fusiona en emplazamientos, y `tools/capas` publica esa instantánea como una capa estática que la web descarga. El resto llega por partes; el glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
+El mapa abre con un hexágono por provincia y su número de emplazamientos. Al acercarse salen los municipios, los barrios de Barcelona y cada emplazamiento del registro oficial con los logos de sus compañías y la fecha de los datos. La ingesta barre el registro por zonas, empezando por Cataluña, y de las provincias que aún no ha barrido el mapa dice que no las tiene. El panel de cada emplazamiento dibuja el diagrama de radiación de sus sectores, un modelo calculado en un Web Worker. Cada noche la ingesta lee las fuentes, las fusiona en emplazamientos y publica la instantánea como capas estáticas por provincia que la web descarga. El glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
 
 ## Arrancar
 

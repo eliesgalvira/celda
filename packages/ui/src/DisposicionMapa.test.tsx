@@ -9,7 +9,7 @@ import { DisposicionMapa } from "./DisposicionMapa.tsx";
 const montar = () => {
   const pantalla = render(() => (
     <DisposicionMapa
-      nombre="Mapa de Barcelona"
+      nombre="Mapa de España"
       ocupado={false}
       lienzo={() => {}}
       cabecera={<header>Celda</header>}
@@ -31,9 +31,9 @@ const montar = () => {
 describe("DisposicionMapa", () => {
   it("con los créditos abiertos, la disposición lo marca para apartar la pista en el móvil", () => {
     const { getByRole } = montar();
-    const disposicion = getByRole("main", { name: "Mapa de Barcelona" }).parentElement;
+    const disposicion = getByRole("main", { name: "Mapa de España" }).parentElement;
     assert.isTrue(disposicion?.hasAttribute("data-creditos"));
-    fireEvent.pointerDown(getByRole("main", { name: "Mapa de Barcelona" }));
+    fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
     flush();
     assert.isFalse(disposicion?.hasAttribute("data-creditos"));
   });
@@ -44,7 +44,7 @@ describe("DisposicionMapa", () => {
     assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
     assert.isDefined(getByRole("link", { name: "© OpenStreetMap" }));
 
-    fireEvent.pointerDown(getByRole("main", { name: "Mapa de Barcelona" }));
+    fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
     flush();
     assert.strictEqual(boton.getAttribute("aria-expanded"), "false");
     // Siguen en el documento: el botón los vuelve a enseñar.
@@ -52,7 +52,7 @@ describe("DisposicionMapa", () => {
     flush();
     assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
     // Tocar el mapa otra vez ya no los pliega: lo ha decidido quien los abrió.
-    fireEvent.pointerDown(getByRole("main", { name: "Mapa de Barcelona" }));
+    fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
     flush();
     assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
   });

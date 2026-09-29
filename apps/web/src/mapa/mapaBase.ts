@@ -4,6 +4,7 @@ import { Map as MapaMapLibre, prewarm, setWorkerUrl } from "maplibre-gl";
 import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
 import type { MotivoFallo } from "./estado.ts";
+import { type Relleno, ZOOM_MAXIMO_AL_ABRIR } from "./vistaInicial.ts";
 
 // MapLibre 6 busca su worker junto a su propio fichero, que el empaquetador
 // mueve; Vite empaqueta el worker aparte y le da su URL.
@@ -24,12 +25,14 @@ export interface Avisos {
 /**
  * Crea el mapa base de `area` en `contenedor`, con el estilo del tema activo
  * y sin giros: se mueve con un dedo o el ratón y se acerca pellizcando, con
- * la rueda o con el teclado.
+ * la rueda o con el teclado. Nace encuadrando `area.encuadre` sin lo que tapa
+ * `relleno`.
  */
 export const crearMapaBase = (
   contenedor: HTMLElement,
   area: Area,
   avisos: Avisos,
+  relleno: Relleno,
 ): MapaMapLibre => {
   const { encuadre, limites } = area;
   const mapa = new MapaMapLibre({
@@ -39,6 +42,7 @@ export const crearMapaBase = (
       [encuadre.suroeste.longitud, encuadre.suroeste.latitud],
       [encuadre.noreste.longitud, encuadre.noreste.latitud],
     ],
+    fitBoundsOptions: { padding: relleno, maxZoom: ZOOM_MAXIMO_AL_ABRIR },
     maxBounds: [
       [limites.suroeste.longitud, limites.suroeste.latitud],
       [limites.noreste.longitud, limites.noreste.latitud],

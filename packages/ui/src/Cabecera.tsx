@@ -29,11 +29,15 @@ export function MarcaCelda() {
 }
 
 export interface CabeceraProps {
-  /** El sitio que enseña el mapa, como «Barcelona» o el nombre de un barrio. */
+  /** El sitio que enseña el mapa: «España», una provincia o un municipio. */
   readonly lugar: string;
 }
 
-/** La cinta de arriba del mapa con la marca, el nombre y el lugar. No tapa los gestos del mapa. */
+/**
+ * La cinta de arriba del mapa con la marca, el nombre y el lugar. No tapa los gestos del mapa. El
+ * lugar tiene un ancho fijo y va en una sola línea, cortado con puntos suspensivos si no cabe: al
+ * mover el mapa cambia de nombre, pero ni la cinta ni la marca se mueven.
+ */
 export function Cabecera(props: CabeceraProps) {
   return (
     <header class="cinta pointer-events-none flex items-center gap-3.5 bg-superficie py-1.5 pr-4 pl-2.5 [--pico:14px] md:py-2 md:pr-[22px] md:pl-3">
@@ -41,7 +45,12 @@ export function Cabecera(props: CabeceraProps) {
       <h1 class="font-mono text-[13px] font-semibold tracking-[0.3em] text-primario-texto">
         CELDA
       </h1>
-      <p class="font-titulo text-base tracking-[0.08em] text-tinta md:text-xl">{props.lugar}</p>
+      <p
+        data-lugar
+        class="w-48 truncate font-titulo text-base tracking-[0.08em] text-tinta md:w-64 md:text-xl"
+      >
+        {props.lugar}
+      </p>
     </header>
   );
 }

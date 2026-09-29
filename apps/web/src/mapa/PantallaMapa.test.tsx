@@ -59,7 +59,7 @@ describe("capa de emplazamientos en el mapa", () => {
 
   it("si no carga, lo dice con un reintento; al reintentar enseña la fecha de los datos", async () => {
     navegar(ruta.mapa, { reemplazar: true });
-    const { getByRole, findByText, queryByText } = render(() => (
+    const { getByRole, findByRole, findByText, queryByText } = render(() => (
       <App
         servicios={Layer.mergeAll(
           capaDePrueba([NO_LLEGA, Effect.succeed(CAPA)]),
@@ -82,8 +82,9 @@ describe("capa de emplazamientos en el mapa", () => {
 
     const fecha = await findByText(textoEntero("Datos del mapa: 26 sept 2026"));
     assert.strictEqual(fecha.closest("output")?.getAttribute("data-tono"), "fecha");
-    // Con la capa llegan sus barrios, y con ellos el crédito de sus límites.
-    const credito = getByRole("link", { name: /Ajuntament de Barcelona \(nov 2024/u });
+    // Lo que Celda tiene es Barcelona, así que se ve al abrir: con su provincia llegan sus barrios,
+    // y con ellos el crédito de sus límites.
+    const credito = await findByRole("link", { name: /Ajuntament de Barcelona \(nov 2024/u });
     assert.strictEqual(credito.getAttribute("href"), FUENTE_DE_BARRIOS.enlace);
     assert.match(credito.getAttribute("title") ?? "", /^Límites de barrio/u);
     assert.include(credito.textContent ?? "", "CC BY 4.0");

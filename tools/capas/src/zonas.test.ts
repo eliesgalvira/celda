@@ -3,7 +3,7 @@ import {
   LimitesDeMunicipios,
   municipioDelPunto,
 } from "@celda/dominio/municipio";
-import { IndiceDeZonas } from "@celda/dominio/zonaDelEjercicio";
+import { IndiceDeZonas, ProvinciasDeZonas } from "@celda/dominio/zonaDelEjercicio";
 import { assert, describe, it } from "@effect/vitest";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -21,6 +21,7 @@ import {
 
 const leerContorno = Schema.decodeSync(Schema.fromJsonString(LimitesDeMunicipios));
 const leerIndice = Schema.decodeSync(Schema.fromJsonString(IndiceDeZonas));
+const leerProvincias = Schema.decodeSync(Schema.fromJsonString(ProvinciasDeZonas));
 
 const unidades = (gml: string) => Result.getOrThrow(unidadesDelGml(gml));
 
@@ -103,14 +104,19 @@ describe("zonas del ejercicio", () => {
     }
   });
 
-  it("escribe el índice y un fichero por provincia que se vuelven a leer igual", () => {
+  it("escribe el índice, sus provincias y un fichero por provincia que se vuelven a leer igual", () => {
     const ficheros = ficherosDeZonas(LIMITES);
-    assert.deepStrictEqual([...ficheros.keys()], ["indice.json", "08.json", "09.json"]);
-    const contornos = contornosDeProvincias(LIMITES);
-    assert.deepStrictEqual(leerContorno(ficheros.get("08.json") ?? ""), contornos.get("08"));
     assert.deepStrictEqual(
-      leerIndice(ficheros.get("indice.json") ?? ""),
-      indiceDeZonas(LIMITES, contornos),
+      [...ficheros.keys()],
+      ["indice.json", "provincias.json", "08.json", "09.json"],
     );
+    const contornos = contornosDeProvincias(LIMITES);
+    const indice = indiceDeZonas(LIMITES, contornos);
+    assert.deepStrictEqual(leerContorno(ficheros.get("08.json") ?? ""), contornos.get("08"));
+    assert.deepStrictEqual(leerIndice(ficheros.get("indice.json") ?? ""), indice);
+    assert.deepStrictEqual(leerProvincias(ficheros.get("provincias.json") ?? ""), {
+      fuente: indice.fuente,
+      provincias: indice.provincias,
+    });
   });
 });

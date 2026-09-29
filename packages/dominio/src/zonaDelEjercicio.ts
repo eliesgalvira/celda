@@ -46,19 +46,35 @@ export const zonaDeCodigo = (codigo: string): ZonaDelEjercicio | undefined => {
 export const provinciaDeZona = (zona: ZonaDelEjercicio): string =>
   zona.tipo === "barrio" ? PROVINCIA_DE_BARCELONA : zona.codigo.slice(0, 2);
 
+/** Una provincia con la caja de sus límites: dice qué contornos mirar para un punto del mapa. */
+export const ProvinciaConCaja = Schema.Struct({
+  codigo: Schema.String,
+  nombre: Schema.String,
+  caja: Caja,
+});
+export type ProvinciaConCaja = typeof ProvinciaConCaja.Type;
+
 /** El índice de municipios y provincias que la web usa para buscar una zona. */
 export const IndiceDeZonas = Schema.Struct({
   fuente: FuenteDeMunicipios,
   /** Tolerancia de los contornos de cada provincia, en metros. */
   toleranciaMetros: Schema.Finite,
-  /** Por código, con la caja de sus límites: dice qué contornos mirar para un punto del mapa. */
-  provincias: Schema.Array(
-    Schema.Struct({ codigo: Schema.String, nombre: Schema.String, caja: Caja }),
-  ),
+  /** Por código. */
+  provincias: Schema.Array(ProvinciaConCaja),
   /** Código y nombre de cada municipio, por código. */
   municipios: Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
 });
 export type IndiceDeZonas = typeof IndiceDeZonas.Type;
+
+/**
+ * Las provincias del índice, sin los municipios. La cabecera del mapa y la vista inicial las usan
+ * para saber en qué provincia cae un punto sin descargar el nombre de los 8.132 municipios.
+ */
+export const ProvinciasDeZonas = Schema.Struct({
+  fuente: FuenteDeMunicipios,
+  provincias: Schema.Array(ProvinciaConCaja),
+});
+export type ProvinciasDeZonas = typeof ProvinciasDeZonas.Type;
 
 /** Una zona que se puede elegir, con lo que se lee de ella en la lista. */
 export interface ZonaNombrada {
