@@ -30,8 +30,9 @@ export const confianzaDelRegistro = (): Confianza => ({
 /**
  * `fetch` con su propio agente, que verifica los certificados con `confianza`. Es el `fetch` del
  * paquete `undici` y no el global de Node: el global lleva dentro otra versión de Undici y rechaza
- * los agentes de esta («invalid onRequestStart method»). Hace lo mismo que el global (cabeceras,
- * redirecciones, compresión), así que para el geoportal solo cambia en qué certificados se confía.
+ * los agentes de esta («invalid onRequestStart method»). Es la misma implementación que el global,
+ * en otra versión (cabeceras, redirecciones y compresión como siempre), así que para el geoportal
+ * solo cambia en qué certificados se confía.
  */
 const fetchCon = (confianza: Confianza) =>
   Effect.map(
