@@ -122,6 +122,29 @@ El registro de peticiones está en `muestras/teselas-area-barcelona.json`. Los e
 - Los endpoints son internos del visor y la nota legal avisa de que el ministerio «no garantiza la continuidad en la puesta a disposición de los documentos reutilizables, ni en contenido ni en forma». Pueden cambiar sin aviso.
 - Para toda España harían falta cientos de teselas. Según una fuente secundaria ([genbeta](https://www.genbeta.com/herramientas/este-mapa-nos-indica-todas-antenas-moviles-que-hay-a-nuestro-alrededor-radiacion-que-generan-asi-funciona)) hay más de 69.000 estaciones. No lo he comprobado.
 
+### Certificado del geoportal
+
+Comprobado el 01/10/2026, después de que la primera noche en el portátil de producción fallara en todas las zonas con `FuenteNoDisponible: TransportError (https://geoportal.minetur.gob.es/robots.txt)`.
+
+- `geoportal.minetur.gob.es` entrega solo su certificado, sin el intermedio que lo firma. `openssl s_client -showcerts` enseña un único certificado, `CN=geoportal.minetur.gob.es`, emitido por `C=ES, O=FNMT-RCM, OU=AC Componentes Informáticos`, válido del 08/10/2025 al 08/10/2026. OpenSSL, curl y Node lo rechazan con «unable to get local issuer certificate». Los navegadores no lo notan porque buscan el intermedio por su cuenta.
+- El certificado del geoportal dice dónde está el intermedio (AIA, «CA Issuers»): `http://www.cert.fnmt.es/certs/ACCOMP.crt`. La FNMT publica el mismo fichero en [su página de certificados raíz](https://www.sede.fnmt.gob.es/descargas/certificados-raiz-de-la-fnmt), como «AC Componentes Informáticos» (`AC_Componentes_Informaticos_SHA256.cer`). Los dos son idénticos:
+  - huella SHA-256 `F0:38:42:1F:07:F2:0D:63:A2:0D:36:91:E5:A1:78:AB:84:59:EB:E5:70:C1:64:7B:76:90:55:4E:F2:38:76:AB`;
+  - válido del 24/06/2013 al **24/06/2028**, autoridad intermedia (`CA:TRUE, pathlen:0`);
+  - su identificador de clave (`19:F8:58:2F:…:83:65`) es el identificador de la clave del emisor en el certificado del geoportal.
+- Lo firma `AC RAIZ FNMT-RCM` (huella SHA-256 `EB:C5:57:0C:…:9B:93:FA`, válida hasta el 01/01/2030). `openssl verify` con esa raíz lo acepta. Esa raíz está en el almacén de Mozilla (informe de certificados incluidos del CCADB) y en `tls.rootCertificates` de Node 24.20.
+
+Qué hace Celda. El intermedio va en el código, en PEM, en `packages/ingesta/src/registro-oficial/intermedio.ts`, con su huella. Solo lo usa el cliente HTTP del registro oficial en la ingesta nocturna, el del listado y las fichas (`apps/nocturna/src/conexionDelRegistro.ts`). Ese cliente confía en las raíces de siempre de Node (`tls.getCACertificates("default")`: las de Mozilla, más `NODE_EXTRA_CA_CERTS` si se da) y lleva además el intermedio, para que OpenSSL complete la cadena cuando el geoportal no lo envía. El intermedio no es una raíz: una cadena que llegue a él tiene que seguir hasta `AC RAIZ FNMT-RCM`, y un certificado de otra autoridad que llegue sin su cadena se sigue rechazando. La verificación no se desactiva en ningún momento. El resto de fuentes y la publicación siguen con el `fetch` de siempre.
+
+Por qué en el repositorio y no en el sistema o en `NODE_EXTRA_CA_CERTS`: es un arreglo para una sola fuente, y así viaja con el código, se prueba y no cambia la confianza del resto del proceso ni de la máquina. Tampoco se descarga el intermedio en cada noche siguiendo el AIA: sería una petición más, por HTTP sin cifrar.
+
+Cuándo revisarlo:
+
+- Antes del 24/06/2028, cuando caduca el intermedio. Una prueba (`intermedio.test.ts`) falla desde 90 días antes. Se descarga el nuevo de las dos direcciones de arriba, se comprueba que coinciden y que los firma una raíz de Mozilla, y se cambian el PEM, la huella y esta sección.
+- Cuando el ministerio renueve el certificado del geoportal (el de ahora caduca el 08/10/2026), si el nuevo lo emite otra autoridad intermedia. Se nota porque la noche vuelve a fallar con «el certificado del servidor no se pudo verificar, falta el certificado de su emisor».
+- Si el geoportal pasa a enviar la cadena completa, el intermedio sobra, pero no molesta.
+
+Inferido: la noche del 30/09/2026 la ingesta funcionó desde otra máquina de la misma red. Probablemente el dominio tiene detrás varios servidores y no todos envían la cadena completa. No lo he podido confirmar desde fuera.
+
 ## 3. Licencia y reutilización
 
 ### Comprobado
@@ -228,6 +251,7 @@ Por operador, en Barcelona: Telefónica 701, Vodafone 624 (540 como S.A.U. y 84 
 
 - Truncado silencioso a 1000 elementos. Si una tesela se descarga sin dividir, faltan operadores enteros sin ningún error.
 - Endpoints internos sin contrato. Pueden cambiar o desaparecer. Las pruebas de la ingesta deben usar las muestras grabadas y avisar si el formato cambia.
+- Cadena de certificados incompleta: el geoportal no siempre envía el intermedio de la FNMT, y Celda lo lleva en el código (ver «Certificado del geoportal»). Caduca el 24/06/2028.
 - Postura del ministerio sobre reutilización: sin licencia explícita y con una negativa de 2021 a dar la base de datos.
 - Calidad de origen: codificación mezclada (`G³ell`), direcciones distintas para el mismo punto, razones sociales antiguas y registros duplicados.
 - Sin fechas: la ficha no puede decir «actualizado el…» del registro, solo «extraído el…».

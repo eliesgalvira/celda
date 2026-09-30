@@ -213,6 +213,20 @@ sudo systemctl start celda-nocturna.service        # una noche ahora, con petici
 
 El módulo instala `celda-nocturna` con la configuración de la máquina pero sin credenciales. Sirve para `estado` y `copia`. Para una noche entera o para publicar, usa el servicio, que es el que tiene las credenciales.
 
+## Certificados del geoportal
+
+La primera noche en el portátil de producción (01/10/2026) falló en todas las zonas con `FuenteNoDisponible: TransportError (https://geoportal.minetur.gob.es/robots.txt)`. El geoportal entregó su certificado sin el intermedio de la FNMT que lo firma, «AC Componentes Informáticos», y Node no pudo llegar a la raíz. La noche anterior había funcionado desde otra máquina de la misma red, así que el fallo parece depender del servidor que conteste.
+
+No hay que tocar nada en la máquina. El intermedio va en el código de Celda (`packages/ingesta/src/registro-oficial/intermedio.ts`) y solo lo usa el cliente HTTP del registro oficial, que confía en las raíces de Node más ese intermedio. No hace falta `NODE_EXTRA_CA_CERTS` ni `security.pki.certificateFiles`, y no conviene usarlos para esto: cambiarían la confianza de todo el proceso o de toda la máquina para arreglar una sola fuente, y el arreglo no viajaría con el paquete. Si una máquina pone `NODE_EXTRA_CA_CERTS`, como la máquina virtual de la prueba con su autoridad de mentira, el cliente del registro también confía en esos certificados.
+
+Si la noche falla por un certificado, el diario lo dice: `el certificado del servidor no se pudo verificar, falta el certificado de su emisor (UNABLE_TO_GET_ISSUER_CERT_LOCALLY: …)`. Para ver qué cadena envía el geoportal:
+
+```sh
+openssl s_client -connect geoportal.minetur.gob.es:443 -servername geoportal.minetur.gob.es -showcerts </dev/null
+```
+
+Hay que revisarlo antes del 24/06/2028, cuando caduca el intermedio (una prueba falla desde 90 días antes), y si el ministerio renueva el certificado del geoportal con otra autoridad intermedia. Cómo se comprueba y se cambia: [registro-oficial.md](../investigacion/registro-oficial.md#certificado-del-geoportal).
+
 ## Qué puede hacer el servicio
 
 - Corre como el usuario `celda-nocturna`, sin capacidades ni privilegios nuevos.
