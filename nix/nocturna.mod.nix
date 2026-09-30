@@ -85,7 +85,9 @@
             runHook postConfigure
           '';
 
-          # Como el build de apps/nocturna (vite.config.ts), pero con el esbuild de nixpkgs.
+          # Como el build de apps/nocturna (vite.config.ts), pero con el esbuild de nixpkgs. Undici,
+          # el cliente HTTP del registro oficial, es CommonJS y pide los módulos de Node con
+          # `require`, que un módulo ES no tiene: la cabecera se lo da, como hace el build de vite.
           buildPhase = /* bash */ ''
             runHook preBuild
             esbuild apps/nocturna/src/principal.ts \
@@ -93,6 +95,7 @@
               --platform=node \
               --target=node24 \
               --format=esm \
+              --banner:js="import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" \
               --outfile=apps/nocturna/dist/nocturna.js
             runHook postBuild
           '';
