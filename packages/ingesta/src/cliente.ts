@@ -2,6 +2,7 @@ import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
@@ -46,6 +47,50 @@ class FalloPasajero extends Schema.TaggedError<FalloPasajero>()("FalloPasajero",
 }) {}
 
 const ESTADOS_PASAJEROS = new Set([408, 429, 500, 502, 503, 504]);
+
+/** Por qué no se pudo verificar un certificado, según el código de OpenSSL que da Node. */
+const CERTIFICADO_NO_VERIFICADO = new Map([
+  ["UNABLE_TO_GET_ISSUER_CERT", "falta el certificado de su emisor"],
+  ["UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "falta el certificado de su emisor"],
+  ["UNABLE_TO_VERIFY_LEAF_SIGNATURE", "falta el certificado de su emisor"],
+  ["SELF_SIGNED_CERT_IN_CHAIN", "la cadena acaba en una raíz que no es de confianza"],
+  ["DEPTH_ZERO_SELF_SIGNED_CERT", "está firmado por sí mismo"],
+  ["CERT_HAS_EXPIRED", "ha caducado"],
+  ["CERT_NOT_YET_VALID", "aún no es válido"],
+  ["ERR_TLS_CERT_ALTNAME_INVALID", "es de otro nombre"],
+]);
+
+/** Lo más que se guarda del mensaje de la causa: el diario no es sitio para trazas. */
+const LARGO_DE_CAUSA = 160;
+
+/**
+ * Motivo de un fallo de transporte para el diario: el tipo de fallo y, si se sabe, su causa en una
+ * línea, como `TransportError: el certificado del servidor no se pudo verificar, falta el
+ * certificado de su emisor (UNABLE_TO_GET_ISSUER_CERT_LOCALLY: unable to get local issuer
+ * certificate)`.
+ */
+export const motivoDeFallo = (tipo: string, cause: unknown): string => {
+  // La causa más honda: `fetch` envuelve en un «fetch failed» el fallo de la conexión.
+  let causa = cause;
+  for (let paso = 0; paso < 5 && Predicate.hasProperty(causa, "cause"); paso++) {
+    if (causa.cause === undefined) break;
+    causa = causa.cause;
+  }
+  const codigo =
+    Predicate.hasProperty(causa, "code") && Predicate.isString(causa.code) ? causa.code : undefined;
+  const mensaje =
+    causa instanceof Error
+      ? // Node añade a los fallos de certificado un consejo («try running Node.js with
+        // --use-system-ca») que despista: el arreglo no suele ser cambiar las raíces.
+        (causa.message.split("; if the root CA")[0] ?? "").replaceAll(/\s+/gu, " ").trim()
+      : "";
+  const detalle = [codigo, mensaje.slice(0, LARGO_DE_CAUSA)].filter(Boolean).join(": ");
+  const porque = codigo === undefined ? undefined : CERTIFICADO_NO_VERIFICADO.get(codigo);
+  if (porque !== undefined) {
+    return `${tipo}: el certificado del servidor no se pudo verificar, ${porque} (${detalle})`;
+  }
+  return detalle === "" ? tipo : `${tipo}: ${detalle}`;
+};
 
 const rutaDe = (url: string): string => {
   const { pathname, search } = new URL(url);
@@ -105,7 +150,10 @@ const unaPeticion = (conexion: Conexion, opciones: OpcionesCliente, hechas: Ref.
       Effect.mapError((error) =>
         error._tag === "FalloPasajero"
           ? error
-          : new FalloPasajero({ url, motivo: error.reason._tag }),
+          : new FalloPasajero({
+              url,
+              motivo: motivoDeFallo(error.reason._tag, error.reason.cause),
+            }),
       ),
       Effect.filterOrFail(
         (respuesta) => !ESTADOS_PASAJEROS.has(respuesta.estado),
