@@ -15,6 +15,7 @@ import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { baseNocturna } from "./base.ts";
+import { clienteHttpDelRegistro } from "./conexionDelRegistro.ts";
 import { configuracion } from "./configuracion.ts";
 import { credencialesDeSystemd } from "./credenciales.ts";
 import {
@@ -99,7 +100,7 @@ const principal = Effect.gen(function* () {
     Extractores,
     Extractores.of({
       registroOficial: RegistroOficial.capaPorCajas(c.registroOficial, c.fichasDelRegistro).pipe(
-        Layer.provide(FetchHttpClient.layer),
+        Layer.provide(clienteHttpDelRegistro()),
       ),
       antenasMoviles: AntenasMoviles.capa({
         ...c.antenasMoviles,
