@@ -7,7 +7,7 @@ import type { Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal } from "solid-js";
 
 import { type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
-import { type ConEtiqueta, formasDeEtiquetas } from "../capa/etiquetas.ts";
+import { formasDeEtiquetas } from "../capa/etiquetas.ts";
 import { cajaConMargen, combinacionesDe, type Vista } from "../capa/marcadores.ts";
 import {
   crearAgrupadorNacional,
@@ -146,24 +146,20 @@ export function Marcadores(props: MarcadoresProps) {
   );
 
   /**
-   * Las etiquetas de barrio, de municipio y de provincia que caben enteras en la pantalla y las que
-   * van compactas. Se decide con la escena, al pararse el mapa o al cambiar de nivel, como qué se
-   * dibuja.
+   * Las zonas (barrios, municipios y provincias) que caben enteras en la pantalla, con su nombre, y
+   * las que van compactas. Se decide con la escena, al pararse el mapa o al cambiar de nivel, como
+   * qué se dibuja.
    */
   const formas = createMemo(() => {
-    const etiquetas = [...(escena()?.elementos.values() ?? [])].filter(
-      (elemento): elemento is ConEtiqueta =>
-        elemento.tipo === "barrio" ||
-        elemento.tipo === "municipio" ||
-        elemento.tipo === "provincia",
-    );
     const proyectarAhora = proyectar();
-    return formasDeEtiquetas(etiquetas, (etiqueta) => proyectarAhora(etiqueta.posicion));
+    return formasDeEtiquetas([...(escena()?.elementos.values() ?? [])], (elemento) =>
+      proyectarAhora(elemento.posicion),
+    );
   });
 
   /**
-   * Los municipios con etiqueta de Celda en la escena. Sus rótulos del mapa base se quitan: se
-   * pisarían con la etiqueta, como los de los barrios (`estilo.ts`).
+   * Los municipios que son zona en la escena. Sus rótulos del mapa base se quitan: Celda ya pone
+   * su nombre bajo el hexágono, como en los barrios (`estilo.ts`).
    */
   const municipiosConEtiqueta = createMemo(
     () =>

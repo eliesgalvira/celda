@@ -7,12 +7,7 @@ import { createSignal, flush } from "solid-js";
 
 import type { ResumenLeido } from "@celda/dominio/provincias";
 
-import {
-  crearAgrupador,
-  type ElementoAbrible,
-  NIVEL_DE_BARRIOS,
-  NIVEL_DE_MUNICIPIOS,
-} from "../capa/agrupacion.ts";
+import { crearAgrupador, type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
 import { combinacionesDe } from "../capa/marcadores.ts";
 import { crearAgrupadorNacional, type EstadoProvincia } from "../capa/nacional.ts";
 import {
@@ -20,9 +15,11 @@ import {
   barcelonaConMunicipios,
   estados,
   GIRONA,
+  espanaDePrueba,
   RESUMEN,
   resumenConBarcelona,
 } from "../capa/pruebasNacional.ts";
+import { NIVEL_DE_BARRIOS, NIVEL_DE_MUNICIPIOS } from "../capa/zonas.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
 
 const MUNDO: Rectangulo = {
@@ -313,7 +310,7 @@ describe("capa agrupada por provincias", () => {
       ["17", { tipo: "lista", provincia: GIRONA }],
     );
 
-    it("cada municipio dice su nombre, su número y, con 10 o más, sus ausencias", () => {
+    it("cada zona es un hexágono con su número y su nombre y, con 10 o más, sus ausencias", () => {
       const { setNivel, lamina, abiertas } = montarNacional(
         conMunicipios,
         NIVEL_DE_MUNICIPIOS - 1,
@@ -328,17 +325,18 @@ describe("capa agrupada por provincias", () => {
         name: "Oeste, 20 emplazamientos, sin Vodafone, acercar",
       });
       assert.strictEqual(oeste.getAttribute("data-zona"), "municipio");
-      // El nombre se ve (en mayúsculas por su estilo) junto a su número.
+      // Se ve el hexágono con su número, el nombre debajo y la marca de quien falta.
+      assert.isNotNull(oeste.querySelector("svg polygon"));
+      assert.include(oeste.textContent, "20");
       assert.include(oeste.textContent, "Oeste");
-      assert.include(oeste.textContent, "20 emplazamientos");
-      // Con 3 emplazamientos no se dice que falte nadie, ni en el nombre ni en lo que se ve.
-      const pequeno = lamina.getByRole("button", { name: "Pequeño, 3 emplazamientos, acercar" });
-      assert.notInclude(pequeno.textContent, "sin");
+      assert.include(oeste.textContent, "sin");
+      // Pequeño, con 3, no llega al mínimo de una zona: sus emplazamientos van en hexágonos.
+      assert.isNull(lamina.queryByRole("button", { name: /^Pequeño/u }));
 
       // Es un botón de verdad: se enfoca con el teclado y acerca al pulsarlo.
-      pequeno.focus();
-      assert.strictEqual(document.activeElement, pequeno);
-      fireEvent.click(pequeno);
+      oeste.focus();
+      assert.strictEqual(document.activeElement, oeste);
+      fireEvent.click(oeste);
       assert.strictEqual(abiertas[0]?.tipo, "municipio");
     });
 
@@ -351,7 +349,7 @@ describe("capa agrupada por provincias", () => {
       const municipios = lamina
         .getAllByRole("button")
         .filter((b) => b.getAttribute("data-zona") === "municipio");
-      assert.lengthOf(municipios, 3);
+      assert.lengthOf(municipios, 2);
       assert.isTrue(
         municipios.every((b) =>
           (b.firstElementChild?.getAttribute("style") ?? "").includes("--desde-x"),
@@ -375,7 +373,7 @@ describe("capa agrupada por provincias", () => {
       );
       assert.lengthOf(
         botones.filter((b) => b.getAttribute("data-zona") === "municipio"),
-        3,
+        2,
       );
     });
 
@@ -399,4 +397,101 @@ describe("capa agrupada por provincias", () => {
       );
     });
   });
+});
+
+describe("capa agrupada a todos los zooms", () => {
+  const { resumen, provincias } = espanaDePrueba();
+  const agrupador = crearAgrupadorNacional(resumen, provincias);
+  const todos = [...provincias.values()].flatMap((estado) =>
+    estado.tipo === "lista" ? estado.provincia.capa.emplazamientos : [],
+  );
+  /** Una proyección cualquiera de la península: basta con que separe lo que está separado. */
+  const proyectarEspana = (posicion: Coordenada) => ({
+    x: (posicion.longitud + 2) * 4000,
+    y: (43 - posicion.latitud) * 4000,
+  });
+
+  const montarEspana = (nivel: number, reducido: boolean) => {
+    const [actual, setNivel] = createSignal(nivel);
+    const contenedor = document.createElement("div");
+    document.body.append(contenedor);
+    render(() => (
+      <CapaAgrupada
+        contenedor={contenedor}
+        combinaciones={combinacionesDe(todos)}
+        escena={agrupador.escena(actual(), MUNDO, null)}
+        transicion={agrupador.transicion}
+        proyectar={proyectarEspana}
+        seVe={() => true}
+        fotograma={0}
+        movimientoReducido={reducido}
+        formas={new Map()}
+        seleccionada={null}
+        alSeleccionar={() => undefined}
+        alAbrir={() => undefined}
+      />
+    ));
+    flush();
+    const botones = () => within(contenedor).queryAllByRole("button");
+    return { setNivel, botones };
+  };
+
+  /**
+   * Cuántos emplazamientos enseña un marcador: 1 si es un logo, y si no el número de su hexágono.
+   * Falla si no es ninguna de las dos cosas, como una zona que fuera solo un nombre.
+   */
+  const representados = (boton: HTMLElement): number => {
+    const nombre = boton.getAttribute("aria-label") ?? "";
+    if (boton.querySelector("svg use") !== null) return 1;
+    assert.isNotNull(boton.querySelector("svg polygon"), `«${nombre}» no tiene hexágono ni logo`);
+    if (boton.getAttribute("data-cobertura") === "ninguna") return 0;
+    const numero = boton.querySelector("svg + span")?.textContent ?? "";
+    assert.match(numero, /^\d+$/u, `«${nombre}» no enseña su número en el hexágono`);
+    return Number(numero);
+  };
+
+  // Cada zoom en su prueba: montar la capa abre su latido, y el vigilante de recursos pide que
+  // no se abra más de diez veces en un segundo.
+  const zooms = Array.from({ length: 14 }, (_, i) => 5 + i);
+
+  for (const zoom of zooms) {
+    it(`a zoom ${zoom}, cada emplazamiento está en un hexágono con su número o en un logo`, () => {
+      const { botones } = montarEspana(nivelDeZoom(zoom), true);
+      const suma = botones().reduce((total, boton) => total + representados(boton), 0);
+      assert.strictEqual(suma, todos.length, `zoom ${zoom}`);
+    });
+  }
+
+  for (const zoom of zooms.slice(1)) {
+    it(`al acercar al zoom ${zoom}, todo lo que aparece sale de algo que ya se veía`, () => {
+      const { setNivel, botones } = montarEspana(nivelDeZoom(zoom - 1), false);
+      setNivel(nivelDeZoom(zoom));
+      flush();
+      for (const boton of botones()) {
+        if (boton.hasAttribute("inert")) continue;
+        const estilo = boton.firstElementChild?.getAttribute("style") ?? "";
+        // Sin origen, crece en su sitio con escala 0,55; desde otro, sale con 0,3.
+        assert.notInclude(
+          estilo,
+          "--desde-escala: 0.55",
+          `«${boton.getAttribute("aria-label") ?? ""}» aparece de la nada`,
+        );
+      }
+    });
+
+    it(`al alejar desde el zoom ${zoom}, todo lo que se va se desliza a algo que se queda`, () => {
+      const { setNivel, botones } = montarEspana(nivelDeZoom(zoom), false);
+      setNivel(nivelDeZoom(zoom - 1));
+      flush();
+      for (const boton of botones()) {
+        if (!boton.hasAttribute("inert")) continue;
+        const estilo = boton.firstElementChild?.getAttribute("style") ?? "";
+        assert.notInclude(
+          estilo,
+          "scale(0.55)",
+          `«${boton.getAttribute("aria-label") ?? ""}» se apaga sin destino`,
+        );
+      }
+    });
+  }
 });

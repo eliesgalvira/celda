@@ -7,7 +7,6 @@ import {
   type ElementoMunicipio,
   type ElementoProvincia,
   type Escena,
-  NIVEL_DE_MUNICIPIOS,
 } from "./agrupacion.ts";
 import {
   claveDeProvincia,
@@ -25,6 +24,7 @@ import {
   RESUMEN,
   resumenConBarcelona,
 } from "./pruebasNacional.ts";
+import { NIVEL_DE_MUNICIPIOS } from "./zonas.ts";
 
 const LISTAS = estados(
   ["08", { tipo: "lista", provincia: BARCELONA }],
@@ -228,15 +228,23 @@ describe("zonas de cada provincia", () => {
       [
         ["m:08:08001", 20],
         ["m:08:08002", 15],
-        ["m:08:08003", 3],
       ],
     );
-    // Los dos sin municipio van en su propio hexágono, y Girona, que no tiene municipios, en los
-    // de siempre.
-    const sinMunicipio = [...escena.elementos.values()].filter((e) => e.clave.startsWith("s:08:"));
-    assert.deepStrictEqual(
-      sinMunicipio.flatMap((e) => agrupador.emplazamientosDe(e).map((s) => s.municipio)),
-      [null, null],
+    // Los dos sin municipio y los tres de Pequeño, que no llega al mínimo de una zona, van en
+    // hexágonos del nivel, y Girona, que no tiene municipios, en los de siempre.
+    const fueraDeZonas = [...escena.elementos.values()]
+      .filter((e) => e.tipo !== "municipio")
+      .flatMap((e) => agrupador.emplazamientosDe(e))
+      .filter((s) => s.provincia === "08");
+    assert.deepStrictEqual(fueraDeZonas.map((s) => s.municipio ?? "ninguno").toSorted(), [
+      "08003",
+      "08003",
+      "08003",
+      "ninguno",
+      "ninguno",
+    ]);
+    assert.isTrue(
+      [...escena.elementos.keys()].some((c) => c.startsWith(`s${NIVEL_DE_MUNICIPIOS}:08:`)),
     );
     for (const m of municipiosDe(escena)) {
       assert.strictEqual(agrupador.emplazamientosDe(m).length, m.resumen.emplazamientos);
@@ -249,11 +257,10 @@ describe("zonas de cada provincia", () => {
       NIVEL_DE_MUNICIPIOS,
       BORDE,
     );
-    // Solo hay Movistar en Barcelona y Vodafone en Girona: a los municipios les falta Vodafone,
-    // pero Pequeño, con 3, no lo dice.
+    // Solo hay Movistar en Barcelona y Vodafone en Girona: a los municipios les falta Vodafone.
     assert.deepStrictEqual(
       municipiosDe(escena).map((m) => m.resumen.ausentes),
-      [["vodafone"], ["vodafone"], []],
+      [["vodafone"], ["vodafone"]],
     );
   });
 

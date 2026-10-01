@@ -2,6 +2,8 @@ import type { Coordenada } from "@celda/dominio/area";
 import KDBush from "kdbush";
 import Supercluster from "supercluster";
 
+import { type ConMunicipio, type EtiquetaDeMunicipio, zonasDeMunicipios } from "./zonas.ts";
+
 /**
  * El índice de supercluster de una capa de provincia, que se construye en un Worker y se
  * rehidrata en el hilo principal (ADR 0016). supercluster 9.1 guarda cada nivel de zoom en un
@@ -157,53 +159,61 @@ export const rehidratarIndice = (
 };
 
 /**
- * Los índices de una capa: el de todos; si tiene barrios, el de los que no tienen ninguno; y si
- * alguno no tiene municipio, el de esos, que en los niveles de municipios van en hexágonos.
+ * Los índices de una capa: el de todos; si tiene barrios, el de los que no tienen ninguno; y, por
+ * cada nivel de municipios (`NIVELES_DE_MUNICIPIOS`), el de los que en ese nivel no van en la zona
+ * de su municipio (`zonasDeMunicipios`), que se agrupan en hexágonos. Es `undefined` si en ese
+ * nivel no hay ninguna zona, y entonces vale el de todos, o si todos van en zona.
  */
 export interface IndicesDeCapa<I> {
   readonly todos: I;
   readonly fuera: I | undefined;
-  readonly sinMunicipio: I | undefined;
+  readonly fueraDeZonas: ReadonlyArray<I | undefined>;
 }
 
 /** Lo que los índices necesitan saber de cada emplazamiento, además de su posición. */
-interface ConZonas {
+interface ConZonas extends ConMunicipio {
   readonly barrio: string | null;
-  /** `null` sin municipio; sin la clave, una capa de antes del formato 5. */
-  readonly municipio?: string | null;
 }
 
 /**
- * Las posiciones en la capa de sus emplazamientos, de los que quedan fuera de los barrios y de
- * los que no tienen municipio (un territorio compartido, el mar).
+ * Las posiciones en la capa de sus emplazamientos, de los que quedan fuera de los barrios y, en
+ * cada nivel de municipios, de los que no van en zona: los de un municipio pequeño o muy grande en
+ * la pantalla, y los que no tienen municipio (un territorio compartido, el mar).
  */
 export const indicesDeCapa = (
   emplazamientos: ReadonlyArray<ConZonas>,
   conBarrios: boolean,
+  municipios: ReadonlyArray<EtiquetaDeMunicipio>,
 ): IndicesDeCapa<ReadonlyArray<number>> => {
   const todos = emplazamientos.map((_, i) => i);
-  const sinMunicipio = todos.filter((i) => emplazamientos[i]?.municipio === null);
+  const zonas = zonasDeMunicipios(emplazamientos, municipios);
   return {
     todos,
     fuera: conBarrios ? todos.filter((i) => emplazamientos[i]?.barrio === null) : undefined,
-    sinMunicipio: sinMunicipio.length > 0 ? sinMunicipio : undefined,
+    fueraDeZonas: zonas.map((enZona) => {
+      if (enZona.size === 0) return undefined;
+      const fuera = todos.filter((i) => !enZona.has(emplazamientos[i]?.municipio ?? ""));
+      return fuera.length > 0 ? fuera : undefined;
+    }),
   };
 };
 
 /**
  * Los índices de una capa. Sin barrios, el nivel de barrios es uno más de hexágonos y no hace
- * falta el índice de los de fuera.
+ * falta el índice de los de fuera. Sin `municipios` no hay zonas de municipio.
  */
 export const indexarCapa = (
   emplazamientos: ReadonlyArray<ConZonas & { readonly posicion: Coordenada }>,
   conBarrios: boolean,
+  municipios: ReadonlyArray<EtiquetaDeMunicipio>,
 ): IndicesDeCapa<Indice> => {
   const posiciones = emplazamientos.map((e) => e.posicion);
-  const indices = indicesDeCapa(emplazamientos, conBarrios);
+  const indices = indicesDeCapa(emplazamientos, conBarrios, municipios);
   return {
     todos: indexar(posiciones, indices.todos),
     fuera: indices.fuera === undefined ? undefined : indexar(posiciones, indices.fuera),
-    sinMunicipio:
-      indices.sinMunicipio === undefined ? undefined : indexar(posiciones, indices.sinMunicipio),
+    fueraDeZonas: indices.fueraDeZonas.map((lista) =>
+      lista === undefined ? undefined : indexar(posiciones, lista),
+    ),
   };
 };

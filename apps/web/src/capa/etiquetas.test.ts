@@ -1,8 +1,8 @@
 import type { Compania } from "@celda/dominio/compania";
 import { assert, describe, it } from "@effect/vitest";
 
-import type { ElementoBarrio, ElementoMunicipio } from "./agrupacion.ts";
-import { formasDeBarrios, formasDeEtiquetas } from "./etiquetas.ts";
+import type { Elemento, ElementoBarrio, ElementoMunicipio } from "./agrupacion.ts";
+import { formasDeEtiquetas } from "./etiquetas.ts";
 import { nombreDeBarrio, nombreDeMunicipio } from "./marcadores.ts";
 
 /** Un barrio cuya etiqueta cae en el píxel (x, 100) de una proyección de prueba. */
@@ -22,11 +22,13 @@ const barrio = (
   },
 });
 
-const proyectar = (b: ElementoBarrio) => ({ x: b.posicion.longitud, y: 100 });
+const proyectar = (e: Elemento) => ({ x: e.posicion.longitud, y: 100 });
+const formasDeBarrios = (barrios: ReadonlyArray<ElementoBarrio>) =>
+  formasDeEtiquetas(barrios, proyectar);
 
-describe("forma de las etiquetas de barrio", () => {
+describe("forma de las zonas de barrio", () => {
   it("las que caben sin pisarse van completas", () => {
-    const formas = formasDeBarrios([barrio("01", 0, 5), barrio("02", 400, 3)], proyectar);
+    const formas = formasDeBarrios([barrio("01", 0, 5), barrio("02", 400, 3)]);
     assert.deepStrictEqual(
       [...formas],
       [
@@ -37,10 +39,11 @@ describe("forma de las etiquetas de barrio", () => {
   });
 
   it("si dos se pisan, la del barrio con más emplazamientos va completa y la otra, compacta", () => {
-    const formas = formasDeBarrios(
-      [barrio("01", 0, 5), barrio("02", 60, 30, ["digi"]), barrio("03", 120, 1)],
-      proyectar,
-    );
+    const formas = formasDeBarrios([
+      barrio("01", 0, 5),
+      barrio("02", 60, 30, ["digi"]),
+      barrio("03", 120, 1),
+    ]);
     assert.strictEqual(formas.get("b:02"), "completa");
     assert.strictEqual(formas.get("b:01"), "compacta");
     assert.strictEqual(formas.get("b:03"), "compacta");
@@ -48,11 +51,31 @@ describe("forma de las etiquetas de barrio", () => {
 
   it("ningún barrio se queda sin dibujar, aunque su forma compacta pise otra", () => {
     const encima = [barrio("01", 0, 5), barrio("02", 1, 5), barrio("03", 2, 5)];
-    const formas = formasDeBarrios(encima, proyectar);
+    const formas = formasDeBarrios(encima);
     assert.strictEqual(formas.size, 3);
     // A igualdad de emplazamientos, manda el código: la forma no baila de una vez a otra.
     assert.strictEqual(formas.get("b:01"), "completa");
-    assert.deepStrictEqual(formasDeBarrios(encima.toReversed(), proyectar), formas);
+    assert.deepStrictEqual(formasDeBarrios(encima.toReversed()), formas);
+  });
+
+  it("el nombre no tapa una agrupación ni un emplazamiento: si los pisaría, va compacta", () => {
+    const debajo: Elemento = {
+      tipo: "agrupacion",
+      clave: "a:1",
+      posicion: { longitud: 0, latitud: 0 },
+      cuantos: 4,
+    };
+    // La agrupación cae 60 px por debajo del centro del barrio, donde va su nombre.
+    const formas = formasDeEtiquetas([barrio("01", 0, 5), debajo], (e) =>
+      e.tipo === "agrupacion" ? { x: 0, y: 160 } : proyectar(e),
+    );
+    assert.strictEqual(formas.get("b:01"), "compacta");
+    assert.isFalse(formas.has("a:1"));
+    // Lejos, cabe entera.
+    const lejos = formasDeEtiquetas([barrio("01", 0, 5), debajo], (e) =>
+      e.tipo === "agrupacion" ? { x: 300, y: 100 } : proyectar(e),
+    );
+    assert.strictEqual(lejos.get("b:01"), "completa");
   });
 });
 
@@ -100,11 +123,11 @@ const municipio = (
   },
 });
 
-describe("forma de las etiquetas de municipio", () => {
+describe("forma de las zonas de municipio", () => {
   it("se reparten como las de barrio: la de más emplazamientos va completa", () => {
     const formas = formasDeEtiquetas(
       [municipio("08279", "Terrassa", 0, 118, ["digi"]), municipio("08184", "Rubí", 60, 40)],
-      (e) => ({ x: e.posicion.longitud, y: 100 }),
+      proyectar,
     );
     assert.strictEqual(formas.get("m:08279"), "completa");
     assert.strictEqual(formas.get("m:08184"), "compacta");

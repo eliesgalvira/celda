@@ -13,9 +13,6 @@ import {
   type ElementoBarrio,
   type ElementoMunicipio,
   type Escena,
-  esNivelDeMunicipios,
-  NIVEL_DE_BARRIOS,
-  NIVEL_DE_MUNICIPIOS,
   nivelDeZoom,
 } from "./agrupacion.ts";
 import {
@@ -26,6 +23,7 @@ import {
   rehidratarIndice,
   serializarIndice,
 } from "./indice.ts";
+import { NIVEL_DE_BARRIOS, NIVEL_DE_MUNICIPIOS, NIVELES_DE_MUNICIPIOS } from "./zonas.ts";
 
 const MUNDO: Rectangulo = {
   suroeste: { longitud: -180, latitud: -85 },
@@ -411,28 +409,41 @@ describe("nivel de barrios", () => {
   });
 });
 
-describe("niveles de municipios", () => {
-  // Tres municipios por franjas de longitud al norte de 41,33°: Oeste, Barcelona (con dos barrios
-  // al norte de 41,36°) y Este, solo de Movistar. Al sur, los cinco primeros son de Pequeño, con
-  // menos de 10, y el resto no tiene municipio, como en un territorio compartido. Vacío no tiene
-  // ninguno.
-  const municipioDe = (longitud: number, latitud: number, i: number): string | null => {
-    if (latitud < 41.33) return i < 40 ? "08200" : null;
-    if (longitud < 2.1) return "08101";
-    return longitud < 2.2 ? "08019" : "08015";
-  };
-  const barrioDe = (longitud: number, latitud: number, municipio: string | null) =>
-    municipio !== "08019" || latitud < 41.36 ? null : longitud < 2.15 ? "02" : "03";
-  const EMPLAZAMIENTOS: ReadonlyArray<EmplazamientoLeido> = SINTETICOS.map((e, i) => {
-    const { longitud, latitud } = e.posicion;
-    const municipio = municipioDe(longitud, latitud, i);
-    return {
-      ...e,
-      municipio,
-      barrio: barrioDe(longitud, latitud, municipio),
-      companias: municipio === "08015" || i % 2 === 0 ? ["movistar"] : ["vodafone"],
-    };
-  });
+/**
+ * Municipios de varios tamaños alrededor de Barcelona, cada uno una nube de emplazamientos:
+ *
+ * - Compacto (08101): 20 de Movistar en 1 km. Es zona en el 11 y en el 12, y le falta Vodafone.
+ * - Mediano (08015): 12 en 4 km. En el 11 mide unos 150 px y es zona; en el 12, unos 300, y no.
+ * - Barcelona (08019): 120 en 9 km, con dos barrios. Mide más de 240 px en los dos niveles.
+ * - Pequeño (08200): 3, menos del mínimo. Vacío (08300): ninguno.
+ * - 10 sin municipio, como en un territorio compartido.
+ */
+const municipiosDePrueba = () => {
+  const r = azar(29);
+  const nube = (
+    prefijo: string,
+    n: number,
+    [lon, lat]: readonly [number, number],
+    lado: number,
+    municipio: string | null,
+  ): ReadonlyArray<EmplazamientoLeido> =>
+    Array.from({ length: n }, (_, i) => {
+      const longitud = lon + (r() - 0.5) * lado;
+      const latitud = lat + (r() - 0.5) * lado * 0.75;
+      return {
+        ...en(`${prefijo}${i}`, longitud, latitud),
+        municipio,
+        barrio: municipio === "08019" ? (longitud < 2.15 ? "02" : "03") : null,
+        companias: municipio === "08101" || i % 2 === 0 ? ["movistar"] : ["vodafone"],
+      };
+    });
+  const emplazamientos = [
+    ...nube("c", 20, [2.02, 41.38], 0.01, "08101"),
+    ...nube("m", 12, [2.28, 41.42], 0.05, "08015"),
+    ...nube("b", 120, [2.15, 41.4], 0.1, "08019"),
+    ...nube("p", 3, [2.1, 41.3], 0.004, "08200"),
+    ...nube("s", 10, [2.35, 41.3], 0.05, null),
+  ];
   const municipio = (codigo: string, nombre: string, longitud: number, latitud: number) =>
     ({
       codigo,
@@ -443,59 +454,73 @@ describe("niveles de municipios", () => {
       emplazamientos: 0,
       companias: [],
     }) satisfies MunicipioDeCapa;
-  const MUNICIPIOS = [
-    municipio("08101", "Oeste", 2.08, 41.38),
+  const municipios = [
+    municipio("08101", "Compacto", 2.02, 41.38),
     municipio("08019", "Barcelona", 2.15, 41.4),
-    municipio("08015", "Este", 2.22, 41.42),
-    municipio("08200", "Pequeño", 2.1, 41.325),
-    municipio("08300", "Vacío", 2.3, 41.5),
+    municipio("08015", "Mediano", 2.28, 41.42),
+    municipio("08200", "Pequeño", 2.1, 41.3),
+    municipio("08300", "Vacío", 2.4, 41.5),
   ];
-  const BARRIOS: ReadonlyArray<Barrio> = [
+  const barrios: ReadonlyArray<Barrio> = [
     { codigo: "02", nombre: "Centro", etiqueta: { longitud: 2.13, latitud: 41.4 } },
     { codigo: "03", nombre: "Este", etiqueta: { longitud: 2.18, latitud: 41.41 } },
   ];
   const resumenes = resumirMunicipios(
-    MUNICIPIOS,
-    EMPLAZAMIENTOS.map((e) => ({ ...e, municipio: e.municipio ?? null })),
+    municipios,
+    emplazamientos.map((e) => ({ ...e, municipio: e.municipio ?? null })),
     new Set(["movistar", "vodafone"]),
   );
+  return { emplazamientos, barrios, resumenes };
+};
+
+describe("niveles de municipios", () => {
+  const { emplazamientos: EMPLAZAMIENTOS, barrios: BARRIOS, resumenes } = municipiosDePrueba();
   const agrupador = crearAgrupador(EMPLAZAMIENTOS, BARRIOS, { municipios: resumenes });
   const sinMunicipios = crearAgrupador(EMPLAZAMIENTOS, BARRIOS);
 
   const municipiosDe = (escena: Escena): ReadonlyArray<ElementoMunicipio> =>
     [...escena.elementos.values()].filter((e) => e.tipo === "municipio");
 
-  it("los niveles de municipios van del 11 al 12, justo antes del de barrios", () => {
-    assert.strictEqual(NIVEL_DE_MUNICIPIOS, 11);
+  it("en el 11 son zona los que caben en la pantalla; en el 12, solo los que siguen cabiendo", () => {
     assert.deepStrictEqual(
-      Array.from({ length: 18 }, (_, n) => n).filter(esNivelDeMunicipios),
-      [11, 12],
+      municipiosDe(agrupador.escena(NIVEL_DE_MUNICIPIOS, MUNDO)).map((m) => m.clave),
+      ["m:08101", "m:08015"],
+    );
+    assert.deepStrictEqual(
+      municipiosDe(agrupador.escena(NIVEL_DE_MUNICIPIOS + 1, MUNDO)).map((m) => m.clave),
+      ["m:08101"],
     );
   });
 
-  it("cada emplazamiento va en su municipio; los que no tienen ninguno, en hexágonos aparte", () => {
-    for (const nivel of [NIVEL_DE_MUNICIPIOS, NIVEL_DE_BARRIOS - 1]) {
+  it("cada emplazamiento está una vez: en su zona o, si no es zona, en hexágonos o suelto", () => {
+    for (const nivel of NIVELES_DE_MUNICIPIOS) {
       const escena = agrupador.escena(nivel, MUNDO);
-      assert.deepStrictEqual(
-        municipiosDe(escena).map((m) => m.clave),
-        ["m:08101", "m:08019", "m:08015", "m:08200", "m:08300"],
-      );
-      let suma = 0;
+      const zonas = new Set(municipiosDe(escena).map((m) => m.resumen.municipio.codigo));
+      const vistos = new Set<string>();
       for (const e of escena.elementos.values()) {
         const suyos = agrupador.emplazamientosDe(e);
         if (e.tipo === "municipio") {
           assert.strictEqual(e.resumen.emplazamientos, suyos.length, e.clave);
           assert.isTrue(suyos.every((s) => s.municipio === e.resumen.municipio.codigo));
-          suma += suyos.length;
         } else {
           assert.isTrue(
-            suyos.every((s) => s.municipio === null),
-            `${e.clave} mezcla emplazamientos con municipio`,
+            suyos.every((s) => !zonas.has(s.municipio ?? "")),
+            `${e.clave} mezcla emplazamientos de una zona`,
           );
-          suma += suyos.length;
+        }
+        for (const s of suyos) {
+          assert.isFalse(vistos.has(s.clave), `${s.clave} dos veces en el nivel ${nivel}`);
+          vistos.add(s.clave);
         }
       }
-      assert.strictEqual(suma, EMPLAZAMIENTOS.length);
+      assert.strictEqual(vistos.size, EMPLAZAMIENTOS.length, `nivel ${nivel}`);
+    }
+  });
+
+  it("los pequeños, los vacíos y los que no caben en la pantalla nunca son zona", () => {
+    for (const nivel of NIVELES_DE_MUNICIPIOS) {
+      const claves = municipiosDe(agrupador.escena(nivel, MUNDO)).map((m) => m.clave);
+      for (const clave of ["m:08200", "m:08300", "m:08019"]) assert.notInclude(claves, clave);
     }
   });
 
@@ -506,15 +531,9 @@ describe("niveles de municipios", () => {
         m.resumen,
       ]),
     );
-    assert.isAtLeast(porCodigo.get("08015")?.emplazamientos ?? 0, UMBRAL_DE_AUSENCIAS);
-    assert.deepStrictEqual(porCodigo.get("08015")?.ausentes, ["vodafone"]);
-    assert.deepStrictEqual(porCodigo.get("08019")?.ausentes, []);
-    // Pequeño solo tiene de Movistar, pero con menos de 10 no se dice que falte Vodafone.
-    assert.isBelow(porCodigo.get("08200")?.emplazamientos ?? 99, UMBRAL_DE_AUSENCIAS);
-    assert.isAbove(porCodigo.get("08200")?.emplazamientos ?? 0, 0);
-    assert.deepStrictEqual(porCodigo.get("08200")?.ausentes, []);
-    assert.strictEqual(porCodigo.get("08300")?.emplazamientos, 0);
-    assert.deepStrictEqual(porCodigo.get("08300")?.ausentes, []);
+    assert.isAtLeast(porCodigo.get("08101")?.emplazamientos ?? 0, UMBRAL_DE_AUSENCIAS);
+    assert.deepStrictEqual(porCodigo.get("08101")?.ausentes, ["vodafone"]);
+    assert.deepStrictEqual(porCodigo.get("08015")?.ausentes, []);
   });
 
   it("fuera de los niveles de municipios, la agrupación y los barrios son los de siempre", () => {
@@ -527,12 +546,12 @@ describe("niveles de municipios", () => {
     assert.lengthOf(municipiosDe(sinMunicipios.escena(NIVEL_DE_MUNICIPIOS, MUNDO)), 0);
   });
 
-  it("al alejar desde los barrios, cada barrio va a su municipio; al acercar, sale de él", () => {
+  it("al alejar desde los barrios, cada barrio va al hexágono con más de los suyos", () => {
     const barrios = agrupador.escena(NIVEL_DE_BARRIOS, MUNDO);
     const municipios = agrupador.escena(NIVEL_DE_BARRIOS - 1, MUNDO);
     const alejar = agrupador.transicion(barrios, municipios);
-    assert.strictEqual(alejar.destino.get("b:02"), "m:08019");
-    assert.strictEqual(alejar.destino.get("b:03"), "m:08019");
+    // Barcelona no es zona en el 12: sus barrios van a sus hexágonos, no a una zona.
+    assert.match(alejar.destino.get("b:02") ?? "", /^s12:/u);
     comprobarSaltoDeZonas(agrupador, NIVEL_DE_BARRIOS, NIVEL_DE_BARRIOS - 1);
     comprobarSaltoDeZonas(agrupador, 17, NIVEL_DE_MUNICIPIOS);
   });
@@ -542,53 +561,55 @@ describe("niveles de municipios", () => {
     comprobarSaltoDeZonas(agrupador, NIVEL_DE_BARRIOS - 1, 8);
   });
 
-  it("entre los dos niveles de municipios, los municipios no se mueven", () => {
-    const t = agrupador.transicion(
-      agrupador.escena(NIVEL_DE_MUNICIPIOS, MUNDO),
-      agrupador.escena(NIVEL_DE_MUNICIPIOS + 1, MUNDO),
-    );
-    const claves = [...t.origen.keys(), ...t.origen.values()];
-    assert.isFalse(claves.some((clave) => clave.startsWith("m:")));
-    // Solo cambian los hexágonos de los que no tienen municipio.
-    assert.isTrue(claves.every((clave) => /^[se]:/u.test(clave)));
+  it("del 11 al 12, la zona que deja de caber se abre en hexágonos y la que cabe no se mueve", () => {
+    const once = agrupador.escena(NIVEL_DE_MUNICIPIOS, MUNDO);
+    const doce = agrupador.escena(NIVEL_DE_MUNICIPIOS + 1, MUNDO);
+    const acercar = agrupador.transicion(once, doce);
+    assert.isTrue(doce.elementos.has("m:08101"));
+    assert.notInclude([...acercar.origen.keys()], "m:08101");
+    const deMediano = [...acercar.origen].filter(([, desde]) => desde === "m:08015");
+    assert.isAbove(deMediano.length, 0);
     comprobarSaltoDeZonas(agrupador, NIVEL_DE_MUNICIPIOS + 1, NIVEL_DE_MUNICIPIOS);
   });
 
-  it("pulsar un municipio acerca hasta el nivel de barrios", () => {
-    const barcelona = municipiosDe(agrupador.escena(NIVEL_DE_MUNICIPIOS, MUNDO)).find(
-      (m) => m.resumen.municipio.codigo === "08019",
-    );
-    assert.isDefined(barcelona);
-    if (barcelona === undefined) return;
-    const zoom = agrupador.zoomDeApertura(barcelona);
-    assert.strictEqual(zoom, NIVEL_DE_BARRIOS);
-    assert.lengthOf(municipiosDe(agrupador.escena(nivelDeZoom(zoom), MUNDO)), 0);
+  it("pulsar una zona acerca hasta el primer nivel en que deja de serlo", () => {
+    const once = municipiosDe(agrupador.escena(NIVEL_DE_MUNICIPIOS, MUNDO));
+    const compacto = once.find((m) => m.clave === "m:08101");
+    const mediano = once.find((m) => m.clave === "m:08015");
+    assert.isDefined(compacto);
+    assert.isDefined(mediano);
+    if (compacto === undefined || mediano === undefined) return;
+    assert.strictEqual(agrupador.zoomDeApertura(compacto), NIVEL_DE_BARRIOS);
+    assert.strictEqual(agrupador.zoomDeApertura(mediano), NIVEL_DE_MUNICIPIOS + 1);
   });
 
-  it("un municipio con emplazamientos a la vista y la etiqueta fuera se ve dentro de lo que se ve", () => {
-    // Un trozo de Este al sur de su etiqueta.
+  it("una zona con emplazamientos a la vista y la etiqueta fuera se ve dentro de lo que se ve", () => {
+    // La mitad este de Mediano, sin su etiqueta.
     const caja: Rectangulo = {
-      suroeste: { longitud: 2.2, latitud: 41.32 },
-      noreste: { longitud: 2.26, latitud: 41.4 },
+      suroeste: { longitud: 2.285, latitud: 41.38 },
+      noreste: { longitud: 2.33, latitud: 41.46 },
     };
-    const este = municipiosDe(agrupador.escena(NIVEL_DE_MUNICIPIOS, caja)).find(
+    const mediano = municipiosDe(agrupador.escena(NIVEL_DE_MUNICIPIOS, caja)).find(
       (m) => m.clave === "m:08015",
     );
-    assert.isDefined(este);
-    const { longitud, latitud } = este?.posicion ?? { longitud: 0, latitud: 0 };
-    assert.isTrue(longitud >= 2.2 && longitud <= 2.26 && latitud >= 41.32 && latitud <= 41.4);
-    // Vacío no tiene emplazamientos: solo se ve si su etiqueta cae en la caja.
-    assert.isFalse(agrupador.escena(NIVEL_DE_MUNICIPIOS, caja).elementos.has("m:08300"));
+    assert.isDefined(mediano);
+    const { longitud, latitud } = mediano?.posicion ?? { longitud: 0, latitud: 0 };
+    assert.isTrue(longitud >= 2.285 && longitud <= 2.33 && latitud >= 41.38 && latitud <= 41.46);
   });
 });
 
 describe("índice construido en un Worker y rehidratado aquí", () => {
-  // Los mismos emplazamientos con barrios y municipios que arriba: así pasa también por el índice
-  // de los de fuera de Barcelona y por el de los que no tienen municipio.
+  // Los mismos emplazamientos con barrios y municipios: así pasa también por el índice de los de
+  // fuera de Barcelona y por el de los que no van en zona. Oeste es el núcleo denso de 2,13° E,
+  // que cabe en la pantalla y es zona; Barcelona, el resto, que no cabe.
   const barrioDe = (longitud: number, latitud: number): string | null =>
     latitud < 41.36 ? null : longitud < 2.15 ? "01" : "02";
   const municipioDe = (longitud: number, latitud: number): string | null =>
-    latitud < 41.34 ? null : longitud < 2.15 ? "08101" : "08019";
+    latitud < 41.34
+      ? null
+      : Math.abs(longitud - 2.13) < 0.006 && Math.abs(latitud - 41.38) < 0.005
+        ? "08101"
+        : "08019";
   const CON_BARRIO: ReadonlyArray<EmplazamientoLeido> = SINTETICOS.map((e, i) => ({
     ...e,
     barrio: barrioDe(e.posicion.longitud, e.posicion.latitud),
@@ -600,7 +621,7 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
       {
         codigo: "08101",
         nombre: "Oeste",
-        etiqueta: { longitud: 2.1, latitud: 41.4 },
+        etiqueta: { longitud: 2.13, latitud: 41.38 },
         habitantes: 1000,
         areaKm2: 10,
         emplazamientos: 0,
@@ -631,11 +652,12 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
   };
 
   const enHilo = crearAgrupador(CON_BARRIO, BARRIOS, { prefijo: "08:", municipios: MUNICIPIOS });
-  const construidos = indexarCapa(CON_BARRIO, true);
-  const posiciones = indicesDeCapa(CON_BARRIO, true);
-  const { fuera: deFuera, sinMunicipio } = construidos;
+  const etiquetas = MUNICIPIOS.map((m) => m.municipio);
+  const construidos = indexarCapa(CON_BARRIO, true, etiquetas);
+  const posiciones = indicesDeCapa(CON_BARRIO, true, etiquetas);
+  const { fuera: deFuera, fueraDeZonas } = construidos;
   assert.isDefined(deFuera);
-  assert.isDefined(sinMunicipio);
+  assert.isTrue(fueraDeZonas.some((indice) => indice !== undefined));
   const rehidratado = crearAgrupador(CON_BARRIO, BARRIOS, {
     prefijo: "08:",
     municipios: MUNICIPIOS,
@@ -645,10 +667,11 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
         deFuera === undefined
           ? undefined
           : rehidratarIndice(porElWorker(deFuera), posiciones.fuera ?? []),
-      sinMunicipio:
-        sinMunicipio === undefined
+      fueraDeZonas: fueraDeZonas.map((indice, i) =>
+        indice === undefined
           ? undefined
-          : rehidratarIndice(porElWorker(sinMunicipio), posiciones.sinMunicipio ?? []),
+          : rehidratarIndice(porElWorker(indice), posiciones.fueraDeZonas[i] ?? []),
+      ),
     },
   });
 
@@ -698,7 +721,7 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
     assert.isTrue(claves.every((clave) => clave.startsWith("a:08:") || clave.startsWith("e:")));
     assert.isTrue(rehidratado.escena(NIVEL_DE_BARRIOS, MUNDO).elementos.has("b:08:01"));
     const municipios = [...rehidratado.escena(NIVEL_DE_MUNICIPIOS, MUNDO).elementos.keys()];
-    assert.include(municipios, "m:08:08019");
-    assert.isTrue(municipios.some((clave) => clave.startsWith("s:08:")));
+    assert.isTrue(municipios.some((clave) => clave.startsWith("m:08:")));
+    assert.isTrue(municipios.some((clave) => clave.startsWith("s11:08:")));
   });
 });
