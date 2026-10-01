@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import { motivoDeFallo } from "./cliente.ts";
+import { esperaPedida, motivoDeFallo } from "./cliente.ts";
 
 /** Un fallo de la conexión como lo da Node: un `Error` con su código de OpenSSL o del sistema. */
 const falloDeNode = (mensaje: string, code: string) => Object.assign(new Error(mensaje), { code });
@@ -38,5 +38,25 @@ describe("motivoDeFallo", () => {
 
   it("sin causa, deja el tipo de fallo", () => {
     assert.strictEqual(motivoDeFallo("TransportError", undefined), "TransportError");
+  });
+});
+
+describe("esperaPedida", () => {
+  const AHORA = Date.UTC(2026, 9, 1, 2, 0, 0);
+
+  it("lee los segundos de `Retry-After`", () => {
+    assert.strictEqual(esperaPedida("120", AHORA), 120_000);
+    assert.strictEqual(esperaPedida(" 0 ", AHORA), 0);
+  });
+
+  it("lee una fecha HTTP y cuenta desde ahora, sin bajar de cero", () => {
+    assert.strictEqual(esperaPedida("Thu, 01 Oct 2026 02:00:30 GMT", AHORA), 30_000);
+    assert.strictEqual(esperaPedida("Thu, 01 Oct 2026 01:00:00 GMT", AHORA), 0);
+  });
+
+  it("sin cabecera o con algo que no se entiende, no sabe cuánto", () => {
+    assert.isUndefined(esperaPedida(undefined, AHORA));
+    assert.isUndefined(esperaPedida("", AHORA));
+    assert.isUndefined(esperaPedida("pronto", AHORA));
   });
 });

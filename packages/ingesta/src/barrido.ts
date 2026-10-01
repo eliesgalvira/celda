@@ -78,11 +78,12 @@ const describirFallo = (fallo: FalloDeZona): string =>
 
 /**
  * Fallos tras los que no tiene sentido pedir nada más a la fuente esta noche: el tope de
- * peticiones, `robots.txt`, una fuente que no responde ni tras los reintentos o una que bloquea
- * a Celda.
+ * peticiones, `robots.txt`, una fuente que no responde ni tras los reintentos, una que pide
+ * esperar o una que bloquea a Celda.
  */
 const PARAN_LA_NOCHE: ReadonlySet<FalloDeZona["_tag"]> = new Set([
   "FuenteBloqueada",
+  "FuentePideEsperar",
   "LimiteDePeticiones",
   "ProhibidoPorRobots",
   "FuenteNoDisponible",

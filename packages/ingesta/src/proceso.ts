@@ -158,7 +158,8 @@ export const leerFichas = Effect.fn("Ingesta.leerFichas")(function* (lectura: Le
       if (
         fallos >= lectura.fallosSeguidos ||
         bandas.failure._tag === "LimiteDePeticiones" ||
-        bandas.failure._tag === "FuenteBloqueada"
+        bandas.failure._tag === "FuenteBloqueada" ||
+        bandas.failure._tag === "FuentePideEsperar"
       ) {
         errores.push("Fichas pendientes para la próxima ejecución");
         break;

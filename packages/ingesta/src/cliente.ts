@@ -13,6 +13,7 @@ import type * as Headers from "effect/unstable/http/Headers";
 import {
   type ErrorDeExtractor,
   FuenteNoDisponible,
+  FuentePideEsperar,
   LimiteDePeticiones,
   ProhibidoPorRobots,
 } from "./extractor.ts";
@@ -40,13 +41,52 @@ export interface Respuesta {
   readonly cabeceras: Headers.Headers;
 }
 
-/** Un fallo que puede desaparecer al repetir: red, tiempo agotado, 408, 429 o 5xx. */
+/**
+ * Un fallo que puede desaparecer al repetir: red, tiempo agotado, 408 o 5xx. Un 429, o un 503
+ * con `Retry-After`, es la fuente pidiendo que se espere (`PideEsperar`).
+ */
 class FalloPasajero extends Schema.TaggedError<FalloPasajero>()("FalloPasajero", {
   url: Schema.String,
   motivo: Schema.String,
 }) {}
 
-const ESTADOS_PASAJEROS = new Set([408, 429, 500, 502, 503, 504]);
+const ESTADOS_PASAJEROS = new Set([408, 500, 502, 503, 504]);
+
+/**
+ * Un 429, o un 503 con `Retry-After`: la fuente pide que se espere. `espera` es lo que pide en
+ * milisegundos, si lo dice.
+ */
+class PideEsperar extends Schema.TaggedError<PideEsperar>()("PideEsperar", {
+  url: Schema.String,
+  estado: Schema.Int,
+  espera: Schema.UndefinedOr(Schema.Number),
+}) {}
+
+/**
+ * Lo más que se espera cuando la fuente lo pide con `Retry-After`, antes de repetir la petición.
+ * Si pide más, o un 429 no dice cuánto, se deja de pedir sin insistir.
+ */
+export const ESPERA_PEDIDA_MAXIMA = Duration.minutes(1);
+
+/**
+ * Lo que pide esperar `Retry-After`, en segundos o con una fecha HTTP, en milisegundos desde
+ * `ahora`.
+ */
+export const esperaPedida = (valor: string | undefined, ahora: number): number | undefined => {
+  const texto = valor?.trim() ?? "";
+  if (/^\d+$/u.test(texto)) return Number(texto) * 1000;
+  const fecha = texto === "" ? Number.NaN : Date.parse(texto);
+  return Number.isNaN(fecha) ? undefined : Math.max(fecha - ahora, 0);
+};
+
+/** Si la fuente pide esperar y cuánto aguanta el cliente: hasta `ESPERA_PEDIDA_MAXIMA`. */
+const esperaCorta = (error: PideEsperar): boolean =>
+  error.espera !== undefined && error.espera <= Duration.toMillis(ESPERA_PEDIDA_MAXIMA);
+
+const motivoDeEspera = (error: PideEsperar): string =>
+  error.espera === undefined
+    ? `HTTP ${error.estado}`
+    : `HTTP ${error.estado}, pide esperar ${Math.ceil(error.espera / 1000)} s`;
 
 /** Por qué no se pudo verificar un certificado, según el código de OpenSSL que da Node. */
 const CERTIFICADO_NO_VERIFICADO = new Map([
@@ -120,7 +160,30 @@ interface Conexion {
   readonly turno: Semaphore.Semaphore;
   /** Cuándo acabó la última respuesta de la fuente. */
   readonly ultima: Ref.Ref<Option.Option<number>>;
+  /** Hasta cuándo ha pedido la fuente que se espere con `Retry-After`. */
+  readonly esperarHasta: Ref.Ref<number>;
 }
+
+/**
+ * Un 429, o un 503 con `Retry-After`, falla con lo que pide esperar. Si es poco, la conexión no
+ * vuelve a pedir nada hasta entonces; si es más, la petición no se repite.
+ */
+const pideEsperar = Effect.fn("ClienteDeFuente.pideEsperar")(function* (
+  conexion: Conexion,
+  url: string,
+  respuesta: Respuesta,
+) {
+  const valor = respuesta.cabeceras["retry-after"];
+  if (respuesta.estado !== 429 && !(respuesta.estado === 503 && valor !== undefined)) return;
+  const ahora = yield* Clock.currentTimeMillis;
+  const espera = esperaPedida(valor, ahora);
+  const error = new PideEsperar({ url, estado: respuesta.estado, espera });
+  if (espera !== undefined && esperaCorta(error)) {
+    yield* Ref.update(conexion.esperarHasta, (hasta) => Math.max(hasta, ahora + espera));
+    yield* Effect.logWarning(`La fuente pide esperar: ${motivoDeEspera(error)} (${url})`);
+  }
+  return yield* error;
+});
 
 /** Espera su turno y hace una sola petición, sin pasar de `maxPeticiones` en `hechas`. */
 const unaPeticion = (conexion: Conexion, opciones: OpcionesCliente, hechas: Ref.Ref<number>) =>
@@ -130,8 +193,12 @@ const unaPeticion = (conexion: Conexion, opciones: OpcionesCliente, hechas: Ref.
     }
     const ultima = yield* Ref.get(conexion.ultima);
     const ahora = yield* Clock.currentTimeMillis;
-    const libre = Option.getOrElse(ultima, () => ahora) + Duration.toMillis(opciones.pausa);
-    if (Option.isSome(ultima) && libre > ahora) {
+    const trasLaPausa = Option.match(ultima, {
+      onNone: () => ahora,
+      onSome: (fin) => fin + Duration.toMillis(opciones.pausa),
+    });
+    const libre = Math.max(trasLaPausa, yield* Ref.get(conexion.esperarHasta));
+    if (libre > ahora) {
       yield* Effect.sleep(Duration.millis(libre - ahora));
     }
     yield* Ref.update(hechas, (n) => n + 1);
@@ -155,6 +222,7 @@ const unaPeticion = (conexion: Conexion, opciones: OpcionesCliente, hechas: Ref.
               motivo: motivoDeFallo(error.reason._tag, error.reason.cause),
             }),
       ),
+      Effect.tap((respuesta) => pideEsperar(conexion, url, respuesta)),
       Effect.filterOrFail(
         (respuesta) => !ESTADOS_PASAJEROS.has(respuesta.estado),
         (respuesta) => new FalloPasajero({ url, motivo: `HTTP ${respuesta.estado}` }),
@@ -168,19 +236,30 @@ const unaPeticion = (conexion: Conexion, opciones: OpcionesCliente, hechas: Ref.
     );
   }, conexion.turno.withPermits(1));
 
-/** Reintenta los fallos pasajeros con espera exponencial desde la pausa. */
+/**
+ * Reintenta los fallos pasajeros con espera exponencial desde la pausa, y una petición en la que
+ * la fuente pide esperar poco, tras esperar lo que pide. Si pide más, no se insiste.
+ */
 const conReintentos =
-  (peticion: (url: string) => Effect.Effect<Respuesta, ErrorDeExtractor | FalloPasajero>) =>
+  (
+    peticion: (
+      url: string,
+    ) => Effect.Effect<Respuesta, ErrorDeExtractor | FalloPasajero | PideEsperar>,
+  ) =>
   (opciones: OpcionesCliente) =>
   (url: string) =>
     peticion(url).pipe(
       Effect.retry({
         schedule: Schedule.exponential(opciones.pausa),
         times: opciones.reintentos,
-        while: (error) => error._tag === "FalloPasajero",
+        while: (error) =>
+          error._tag === "FalloPasajero" || (error._tag === "PideEsperar" && esperaCorta(error)),
       }),
       Effect.catchTag("FalloPasajero", (error) =>
         Effect.fail(new FuenteNoDisponible({ url: error.url, motivo: error.motivo })),
+      ),
+      Effect.catchTag("PideEsperar", (error) =>
+        Effect.fail(new FuentePideEsperar({ url: error.url, motivo: motivoDeEspera(error) })),
       ),
     );
 
@@ -222,6 +301,7 @@ export const clienteDeFuente = Effect.fn("ClienteDeFuente.crear")(function* (
     cliente: yield* HttpClient.HttpClient,
     turno: yield* Semaphore.make(1),
     ultima: yield* Ref.make(Option.none<number>()),
+    esperarHasta: yield* Ref.make(0),
   };
   const hechas = yield* Ref.make(0);
 

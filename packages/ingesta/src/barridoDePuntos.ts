@@ -124,6 +124,7 @@ export class BaseDePuntos extends Context.Service<
 /** Errores tras los que no tiene sentido pedir más detalles a la fuente esta noche. */
 const PARAN_LOS_DETALLES: ReadonlySet<string> = new Set([
   "LimiteDePeticiones",
+  "FuentePideEsperar",
   "FuenteNoDisponible",
   "ProhibidoPorRobots",
 ]);

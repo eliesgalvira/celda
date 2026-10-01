@@ -590,7 +590,8 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       assert.strictEqual(Duration.toDays(cambiada.noche.proceso.fichas.relectura), 14);
       assert.deepStrictEqual(cambiada.noche.proceso.fichas.prioridad, ["08", "17"]);
       assert.strictEqual(Duration.toSeconds(cambiada.fichasDelRegistro.pausa), 5);
-      assert.strictEqual(cambiada.fichasDelRegistro.maxPeticiones, 2400);
+      // Las que caben en 120 minutos a una cada 5 s.
+      assert.strictEqual(cambiada.fichasDelRegistro.maxPeticiones, 1440);
       assert.strictEqual(Duration.toMinutes(cambiada.noche.reintento), 30);
       // Nunca por debajo de 3 s entre peticiones.
       assert.strictEqual(Duration.toSeconds(cambiada.registroOficial.pausa), 3);
@@ -609,12 +610,19 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       );
       assert.include(mal.message, "zonas de barrido desconocidas: catalunya");
 
-      // El mínimo de 3 s entre fichas se mantiene, y una provincia se escribe con su código INE.
-      const deprisa = yield* configuracion.parse(
+      // Las fichas pueden ir a una por segundo, nunca más deprisa, y una provincia se escribe con
+      // su código INE.
+      const aUnSegundo = yield* configuracion.parse(
         ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS: "1" } }),
       );
-      assert.strictEqual(Duration.toSeconds(deprisa.noche.proceso.fichas.ritmo), 3);
-      assert.strictEqual(Duration.toSeconds(deprisa.fichasDelRegistro.pausa), 3);
+      assert.strictEqual(Duration.toSeconds(aUnSegundo.noche.proceso.fichas.ritmo), 1);
+      assert.strictEqual(Duration.toSeconds(aUnSegundo.fichasDelRegistro.pausa), 1);
+      assert.strictEqual(aUnSegundo.fichasDelRegistro.maxPeticiones, 21_600);
+      const deprisa = yield* configuracion.parse(
+        ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS: "0" } }),
+      );
+      assert.strictEqual(Duration.toSeconds(deprisa.noche.proceso.fichas.ritmo), 1);
+      assert.strictEqual(Duration.toSeconds(deprisa.fichasDelRegistro.pausa), 1);
       const provincia = yield* Effect.flip(
         configuracion.parse(
           ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_PRIORIDAD: "Barcelona" } }),

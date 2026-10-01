@@ -54,6 +54,16 @@ export class FuenteBloqueada extends Schema.TaggedError<FuenteBloqueada>()("Fuen
   motivo: Schema.String,
 }) {}
 
+/**
+ * La fuente pide que se espere: un 429, o un 503 con `Retry-After`. Si pide poco, el cliente
+ * espera lo que pide y repite; si pide más, no lo dice o sigue pidiéndolo tras los reintentos,
+ * no se insiste: se deja de pedir hasta la noche siguiente.
+ */
+export class FuentePideEsperar extends Schema.TaggedError<FuentePideEsperar>()(
+  "FuentePideEsperar",
+  { url: Schema.String, motivo: Schema.String },
+) {}
+
 /** La ejecución ha gastado todas las peticiones que tiene permitidas hacia la fuente. */
 export class LimiteDePeticiones extends Schema.TaggedError<LimiteDePeticiones>()(
   "LimiteDePeticiones",
@@ -63,6 +73,7 @@ export class LimiteDePeticiones extends Schema.TaggedError<LimiteDePeticiones>()
 export type ErrorDeExtractor =
   | FuenteNoDisponible
   | FuenteBloqueada
+  | FuentePideEsperar
   | RespuestaInesperada
   | ProhibidoPorRobots
   | LimiteDePeticiones;
@@ -72,6 +83,7 @@ export const describirError = (error: ErrorDeExtractor): string => {
   switch (error._tag) {
     case "FuenteNoDisponible":
     case "FuenteBloqueada":
+    case "FuentePideEsperar":
     case "RespuestaInesperada":
       return `${error._tag}: ${error.motivo} (${error.url})`;
     case "ProhibidoPorRobots":
