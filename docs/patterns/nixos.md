@@ -149,7 +149,7 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `registroOficial.motivo` | `apagado en la configuración de la ingesta` | Lo que se apunta si está apagado |
 | `registroOficial.pausa` | 3 | Segundos entre peticiones del listado, entre 3 y 3600 |
 | `registroOficial.maxPeticiones` | 400 | Tope de peticiones del listado por noche; deja barrer toda España en una |
-| `registroOficial.fichas.ritmo` | 3 | Segundos entre una ficha y la siguiente, entre 3 y 3600 |
+| `registroOficial.fichas.ritmo` | 3 | Segundos entre una ficha y la siguiente, entre 1 y 3600 |
 | `registroOficial.fichas.ventana` | 360 | Minutos de fichas desde que empieza la noche |
 | `registroOficial.fichas.relectura` | 30 | Días tras los que se vuelve a leer una ficha |
 | `registroOficial.fichas.prioridad` | `[ "08" "17" "25" "43" ]` | Provincias, por código INE, cuyas fichas van primero |
@@ -187,6 +187,14 @@ Las fichas se leen a una cada `fichas.ritmo` segundos hasta que pasan `fichas.ve
 ```nix
 services.celda-nocturna.registroOficial.fichas.ritmo = 10;
 ```
+
+El mínimo es 1 s. Para leer las fichas a una por segundo, pon en la configuración del host:
+
+```nix
+services.celda-nocturna.registroOficial.fichas.ritmo = 1;
+```
+
+y aplícalo con `nixos-rebuild switch`. La noche siguiente lo usa; `systemctl show celda-nocturna.service --property=Environment` debe decir `CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS=1`. Siguen yendo de una en una: el segundo cuenta desde el final de una ficha hasta la petición de la siguiente, así que con un geoportal que tarda casi un segundo sale una cada 1,9 s, unas 11.000 en 6 horas. El ministerio podría bloquear ese ritmo (ADR 0014): si responde 401, 403, 429, un 503 que pide esperar más de un minuto o una página que no es una ficha, la noche deja de pedir fichas y lo apunta en los errores. Las primeras noches, mira `sudo --user=celda-nocturna celda-nocturna estado` y el diario, y al primer rechazo vuelve a 3.
 
 `tiempoMaximo` sigue a la ventana. Si lo pones a mano, que cubra la ventana, la hora de espera antes de repetir una publicación y la copia.
 
