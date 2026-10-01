@@ -73,6 +73,7 @@ El usuario vio en los niveles 11 y 12, alrededor de Zaragoza, solo dos textos (�
   | Teruel, 1400 px | 86 | 22 | 330 | 0 |
 
   Entre dos niveles de hexágonos el desplazamiento suele quedar entre 40 y 60 px.
+- **Fluidez.** En Chromium con GPU, la CPU a ×4 y una ventana de 390 px, acercando del zoom 9,5 al 14,5 y alejando otra vez, un nivel cada 1,5 s, con la publicación de toda España; medianas de seis rondas alternadas con `celda/v1`. Alrededor de Zaragoza, 58,8 fps ahora y 58,9 antes, con 13 y 10 fotogramas de más de 20 ms. Alrededor de Barcelona, 57,9 y 58,9, con 18 y 10. La diferencia de Barcelona está en los niveles 11 y 12: antes Barcelona era una sola etiqueta en toda la pantalla, y ahora son unos 40 hexágonos, lo mismo que cuesta el nivel 10. Quitar la sombra de la cinta del nombre y de las ausencias no cambió nada medible.
 - **Pruebas.** `apps/web/src/mapa/CapaAgrupada.test.tsx` recorre los zooms del 5 al 18 con una España de prueba (una ciudad que no cabe, un pueblo compacto, uno con un solo emplazamiento, barrios) y falla si algún emplazamiento no está en un hexágono que enseñe su número o en un logo, si al acercar algo aparece sin salir de lo que se veía o si al alejar algo se apaga sin destino. `zonas.test.ts` prueba el criterio y `MarcadorZona.test.tsx`, el marcador.
 
 ## Consecuencias
