@@ -55,7 +55,7 @@ Terreno que el IGN no asigna a ningún municipio porque lo comparten varios, com
 _Evitar_: mancomunidad, comunidad (son solo parte del nombre de algunos)
 
 **Zona**:
-Barrio, municipio o provincia: lo que el mapa recoge con su nombre, su número de emplazamientos y, donde dice algo, sus ausencias. Provincias de lejos, municipios a media distancia y barrios dentro del municipio de Barcelona. El ejercicio de emplazamientos se hace sobre un barrio de Barcelona o un municipio.
+Barrio, municipio o provincia: lo que el mapa recoge en un hexágono con su número de emplazamientos, su nombre y, donde dice algo, sus ausencias. Provincias de lejos, municipios a media distancia y barrios dentro del municipio de Barcelona. En el mapa, un municipio es zona solo si tiene 4 emplazamientos o más y cabe en la pantalla; si no, sus emplazamientos van en agrupaciones o sueltos. El ejercicio de emplazamientos se hace sobre un barrio de Barcelona o un municipio.
 _Evitar_: área, región, zona de barrido (esa es la de la ingesta)
 
 **Ausencia**:
