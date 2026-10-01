@@ -186,7 +186,7 @@ describe("orden de la cola de fichas", () => {
     assert.deepStrictEqual(dias, [1, 2, 4, 8, 16, 30, 30]);
   });
 
-  it("el cliente de las fichas va a su ritmo, nunca a menos de 3 s, con un tope que cabe en la ventana", () => {
+  it("el cliente de las fichas va a su ritmo, 3 s por defecto y nunca menos de 1 s, con un tope que cabe en la ventana", () => {
     const cliente = opcionesClienteDeFichas(OPCIONES, OPCIONES_FICHAS);
     assert.strictEqual(Duration.toSeconds(cliente.pausa), 3);
     assert.strictEqual(cliente.maxPeticiones, 7200);
@@ -196,11 +196,15 @@ describe("orden de la cola de fichas", () => {
       ritmo: Duration.seconds(10),
     });
     assert.strictEqual(Duration.toSeconds(despacio.pausa), 10);
+    assert.strictEqual(despacio.maxPeticiones, 2160);
+    const aUnSegundo = opcionesClienteDeFichas(OPCIONES, A_UN_SEGUNDO);
+    assert.strictEqual(Duration.toSeconds(aUnSegundo.pausa), 1);
+    assert.strictEqual(aUnSegundo.maxPeticiones, 21_600);
     const deprisa = opcionesClienteDeFichas(OPCIONES, {
       ...OPCIONES_FICHAS,
-      ritmo: Duration.seconds(1),
+      ritmo: Duration.millis(200),
     });
-    assert.strictEqual(Duration.toSeconds(deprisa.pausa), 3);
+    assert.strictEqual(Duration.toSeconds(deprisa.pausa), 1);
   });
 });
 
@@ -212,6 +216,9 @@ interface Apuntado {
 }
 
 /** `n` fichas nuevas de Barcelona. */
+/** Las fichas al ritmo más rápido que se permite, una por segundo. */
+const A_UN_SEGUNDO: OpcionesFichas = { ...OPCIONES_FICHAS, ritmo: Duration.seconds(1) };
+
 const colaDe = (n: number) =>
   Array.from({ length: n }, (_, i) => ficha(String(800_000 + i), BARCELONA));
 
@@ -348,26 +355,145 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
     120_000,
   );
 
-  it.effect("un 403 para las fichas de la noche sin insistir y queda en los errores", () =>
+  it.effect(
+    "a una por segundo, cada ficha espera 1 s desde el final de la anterior, de una en una",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* fichaGrabada;
+        // El geoportal tarda 0,9 s en contestar: una ficha empieza 1,9 s después de la anterior.
+        const { hechas, peticiones } = yield* leerContraElGeoportal(
+          colaDe(100),
+          geoportal(html),
+          { ...A_UN_SEGUNDO, ventana: Duration.minutes(1) },
+          Duration.millis(900),
+        );
+        const instantes = peticiones.map((p) => p.en);
+        assert.deepStrictEqual(
+          instantes,
+          Array.from({ length: instantes.length }, (_, i) => 1900 + i * 1900),
+        );
+        assert.strictEqual(hechas.leidas, 31);
+        assert.strictEqual(hechas.pendientes, 69);
+        assert.strictEqual(hechas.parada, "ventana cerrada a las 00:01:00 UTC");
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    "un 401 o un 403 paran las fichas de la noche sin insistir y quedan en los errores",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* fichaGrabada;
+        for (const estado of [401, 403]) {
+          const { hechas, peticiones, apuntado } = yield* leerContraElGeoportal(
+            colaDe(10),
+            geoportal(html, (codigo) =>
+              codigo === "800002" ? () => ({ estado, cuerpo: "Forbidden" }) : undefined,
+            ),
+            A_UN_SEGUNDO,
+          );
+          assert.strictEqual(peticiones.length, 3);
+          assert.strictEqual(hechas.leidas, 2);
+          assert.strictEqual(hechas.pendientes, 7);
+          assert.include(hechas.parada ?? "", `FuenteBloqueada: HTTP ${estado}`);
+          assert.deepStrictEqual(hechas.errores, [
+            `Fichas paradas hasta la próxima noche: FuenteBloqueada: HTTP ${estado} ` +
+              "(https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=800002)",
+          ]);
+          // El bloqueo no es culpa de esa ficha: no se la hace esperar.
+          assert.deepStrictEqual(apuntado.fallos, []);
+        }
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("un 429 para las fichas de la noche sin reintentar y queda en los errores", () =>
     Effect.gen(function* () {
       const html = yield* fichaGrabada;
       const { hechas, peticiones, apuntado } = yield* leerContraElGeoportal(
         colaDe(10),
         geoportal(html, (codigo) =>
-          codigo === "800002" ? () => ({ estado: 403, cuerpo: "Forbidden" }) : undefined,
+          codigo === "800002" ? () => ({ estado: 429, cuerpo: "" }) : undefined,
         ),
-        OPCIONES_FICHAS,
+        A_UN_SEGUNDO,
       );
       assert.strictEqual(peticiones.length, 3);
       assert.strictEqual(hechas.leidas, 2);
       assert.strictEqual(hechas.pendientes, 7);
-      assert.include(hechas.parada ?? "", "FuenteBloqueada: HTTP 403");
       assert.deepStrictEqual(hechas.errores, [
-        "Fichas paradas hasta la próxima noche: FuenteBloqueada: HTTP 403 " +
+        "Fichas paradas hasta la próxima noche: FuentePideEsperar: HTTP 429 " +
           "(https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=800002)",
       ]);
-      // El bloqueo no es culpa de esa ficha: no se la hace esperar.
       assert.deepStrictEqual(apuntado.fallos, []);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("un 503 que pide esperar una hora para las fichas de la noche sin reintentar", () =>
+    Effect.gen(function* () {
+      const html = yield* fichaGrabada;
+      const { hechas, peticiones } = yield* leerContraElGeoportal(
+        colaDe(10),
+        geoportal(html, (codigo) =>
+          codigo === "800000"
+            ? () => ({ estado: 503, cuerpo: "", cabeceras: { "retry-after": "3600" } })
+            : undefined,
+        ),
+        A_UN_SEGUNDO,
+      );
+      assert.strictEqual(peticiones.length, 1);
+      assert.strictEqual(hechas.leidas, 0);
+      assert.strictEqual(hechas.pendientes, 9);
+      assert.strictEqual(
+        hechas.parada,
+        "FuentePideEsperar: HTTP 503, pide esperar 3600 s " +
+          "(https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=800000)",
+      );
+      assert.strictEqual(hechas.errores.length, 1);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("si pide esperar poco, espera lo que pide y sigue al mismo ritmo", () =>
+    Effect.gen(function* () {
+      const html = yield* fichaGrabada;
+      const { hechas, peticiones } = yield* leerContraElGeoportal(
+        colaDe(4),
+        geoportal(html, (codigo) =>
+          codigo === "800001"
+            ? (_, intento) =>
+                intento === 0
+                  ? { estado: 429, cuerpo: "", cabeceras: { "retry-after": "20" } }
+                  : { estado: 200, cuerpo: html }
+            : undefined,
+        ),
+        A_UN_SEGUNDO,
+      );
+      // 800000 a 1 s; 800001 a 2 s pide esperar 20 s, se repite a 22 s y las demás siguen a 1 s.
+      assert.deepStrictEqual(
+        peticiones.map((p) => p.en),
+        [1000, 2000, 22_000, 23_000, 24_000],
+      );
+      assert.strictEqual(hechas.leidas, 4);
+      assert.strictEqual(hechas.parada, undefined);
+      assert.deepStrictEqual(hechas.errores, []);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("si sigue pidiendo esperar tras los reintentos, para las fichas de la noche", () =>
+    Effect.gen(function* () {
+      const html = yield* fichaGrabada;
+      const { hechas, peticiones } = yield* leerContraElGeoportal(
+        colaDe(5),
+        geoportal(html, () => () => ({
+          estado: 429,
+          cuerpo: "",
+          cabeceras: { "retry-after": "30" },
+        })),
+        A_UN_SEGUNDO,
+      );
+      assert.strictEqual(peticiones.length, 1 + OPCIONES.reintentos);
+      // Cada reintento, 30 s después del anterior: lo que pide, más que la espera exponencial.
+      const huecos = peticiones.slice(1).map((p, i) => p.en - (peticiones[i]?.en ?? 0));
+      assert.deepStrictEqual(huecos, [30_000, 30_000, 30_000]);
+      assert.strictEqual(hechas.leidas, 0);
+      assert.include(hechas.parada ?? "", "FuentePideEsperar: HTTP 429, pide esperar 30 s");
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
@@ -380,7 +506,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
           estado: 200,
           cuerpo: "<html><body>Su petición ha sido bloqueada</body></html>",
         })),
-        OPCIONES_FICHAS,
+        A_UN_SEGUNDO,
       );
       assert.strictEqual(peticiones.length, 1);
       assert.strictEqual(hechas.leidas, 0);
@@ -400,7 +526,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
         geoportal(html, (codigo) =>
           malas.has(codigo) ? () => ({ estado: 200, cuerpo: noValido }) : undefined,
         ),
-        OPCIONES_FICHAS,
+        A_UN_SEGUNDO,
       );
       // 800001 falla y 800002 se lee: el fallo no era seguido. 800003, 800004 y 800005, sí.
       assert.strictEqual(hechas.leidas, 2);
@@ -437,7 +563,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
       const { hechas, peticiones, apuntado } = yield* leerContraElGeoportal(
         colaDe(5),
         (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 503, cuerpo: "" }),
-        OPCIONES_FICHAS,
+        A_UN_SEGUNDO,
       );
       // Tres fichas, cada una con su petición y sus tres reintentos.
       assert.strictEqual(peticiones.length, 3 * (1 + OPCIONES.reintentos));

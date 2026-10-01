@@ -181,6 +181,7 @@ export const opcionesProcesoDePuntosDesdeConfig: Config.Config<OpcionesProcesoDe
 /** Errores tras los que no tiene sentido pedir más detalles a la fuente esta noche. */
 const PARAN_LOS_DETALLES: ReadonlySet<string> = new Set([
   "LimiteDePeticiones",
+  "FuentePideEsperar",
   "FuenteNoDisponible",
   "ProhibidoPorRobots",
 ]);

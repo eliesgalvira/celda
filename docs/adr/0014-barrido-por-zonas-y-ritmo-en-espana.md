@@ -33,7 +33,7 @@ El usuario decidió que los correos al ministerio (`emisionesysalud@economia.gob
 ## Alternativas descartadas
 
 - **Provincias como unidad de petición.** Sus cajas se solapan, así que el borde se pediría dos veces. Las provincias se usan para agrupar celdas, no para pedir.
-- **Fichas a una cada 5 s**, la propuesta de la investigación. El usuario prefirió 3 s, el mínimo que ya impone el extractor.
+- **Fichas a una cada 5 s**, la propuesta de la investigación. El usuario prefirió 3 s, el mínimo que entonces imponía el extractor.
 - **Esperar la respuesta del ministerio antes de subir el ritmo.** El usuario la deja para antes de publicar.
 
 ## Cómo quedó el listado (ticket 40, 29/09/2026)
@@ -78,3 +78,13 @@ La ingesta nocturna lee antenasmoviles.es con las mismas zonas de barrido. Sigue
 - **Pasada real de la zona `centro`**, el 29/09/2026 de 01:07:52 a 01:10:08 UTC, con los valores por defecto del listado y sin fichas: 40 peticiones (`robots.txt` y 39 de listado), 12,0 MB, 12.528 registros (un 2,4 % más de los 12.230 previstos) y 24 cajas guardadas. Publicó 6.333 emplazamientos.
 
 Las cifras y cómo se midieron están en la investigación 08, «Toda España en la ingesta nocturna».
+
+## El mínimo de las fichas baja a 1 s (01/10/2026)
+
+El 01/10/2026 el usuario pidió poder leer las fichas a una por segundo en lugar de a una cada 3, para acabar antes las unas 50.000 que quedan.
+
+- **Mínimo de 1 s.** `RITMO_MINIMO` pasa de 3 s a 1 s en `packages/ingesta/src/fichas.ts`, y `registroOficial.fichas.ritmo` admite de 1 a 3600 en el módulo de NixOS. El valor por defecto sigue en 3 s: el segundo hay que ponerlo en la configuración del host ([nixos.md](../patterns/nixos.md)). El listado no cambia: sigue a 3 s como mínimo.
+- **Siempre de una en una.** El ritmo sigue siendo la pausa entre el final de una ficha y la petición de la siguiente, sobre una sola conexión que hace una petición cada vez. Con un geoportal que tarda 0,9 s, sale una ficha cada 1,9 s en lugar de cada 3,9 s: unas 11.000 por noche de 6 horas en lugar de 5.500. Las 50.000 tardan unas cinco noches en lugar de nueve: la mitad y no un tercio, porque la respuesta tarda lo mismo.
+- **Tope.** El de peticiones de las fichas son las que caben en la ventana al ritmo configurado: 7.200 a 3 s y 21.600 a 1 s.
+- **Salvaguardas.** Siguen las de antes: un 401 o un 403, o una página que no es una ficha, paran las fichas en el acto, y tres fallos seguidos también. Se añade la fuente que pide esperar: un 429, o un 503 con `Retry-After`. Si pide un minuto o menos, la conexión espera lo que pide y repite, dentro de los reintentos; si pide más, si un 429 no dice cuánto o si lo sigue pidiendo, las fichas paran hasta la noche siguiente y queda en los errores (`FuentePideEsperar`). Antes un 429 se reintentaba tres veces como un fallo pasajero. El cambio está en el cliente común, así que vale también para el listado y para antenasmoviles.es. Las pruebas comprueban cada una a 1 s.
+- **Riesgo.** El ministerio podría bloquear este ritmo. A favor solo hay lo visto hasta ahora: unas 27.000 fichas leídas a 3 s sin ningún rechazo. El usuario acepta el riesgo. Si aparece un rechazo, la noche para sola y se vuelve a 3 s cambiando la configuración.

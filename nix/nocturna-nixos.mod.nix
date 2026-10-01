@@ -208,9 +208,10 @@
         };
 
         registroOficial.fichas.ritmo = mkOption {
-          type = ints.between 3 3600;
+          type = ints.between 1 3600;
           default = 3;
-          description = "Segundos entre el final de una ficha y la petición de la siguiente (ADR 0014). Nunca menos de 3. Si el ministerio pide menos peticiones, se sube aquí.";
+          example = 1;
+          description = "Segundos entre el final de una ficha y la petición de la siguiente (ADR 0014). Nunca menos de 1, y siempre de una en una. Si el ministerio pide menos peticiones, se sube aquí.";
         };
 
         registroOficial.fichas.ventana = mkOption {

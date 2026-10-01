@@ -22,8 +22,14 @@ import { describirError, type ErrorDeExtractor, type Registro } from "./extracto
  * siguiente sigue por donde iba porque el orden sale siempre igual de la base.
  */
 
-/** Nunca se piden fichas más deprisa que esto: una cada 3 s (ADR 0014). */
-export const RITMO_MINIMO = Duration.seconds(3);
+/**
+ * Nunca se piden fichas más deprisa que esto: una cada segundo, y siempre de una en una (ADR
+ * 0014). Bajó de 3 s a 1 s a petición del usuario el 01/10/2026.
+ */
+export const RITMO_MINIMO = Duration.seconds(1);
+
+/** El ritmo si la configuración no dice otro: una ficha cada 3 s (ADR 0014). */
+export const RITMO_POR_DEFECTO = Duration.seconds(3);
 
 /**
  * Tras un fallo de una ficha concreta, como el aviso de código no válido, espera esto antes de
@@ -62,7 +68,7 @@ export interface OpcionesFichas {
  * Tarragona) y después el resto de España, por zonas de barrido.
  */
 export const OPCIONES_FICHAS: OpcionesFichas = {
-  ritmo: RITMO_MINIMO,
+  ritmo: RITMO_POR_DEFECTO,
   ventana: Duration.hours(6),
   relectura: Duration.days(30),
   prioridad: ["08", "17", "25", "43"],
@@ -93,7 +99,7 @@ const ListaDeProvincias = Schema.String.check(
 /**
  * Las opciones desde variables de entorno:
  *
- * - `CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS`: segundos entre fichas (3, y nunca menos).
+ * - `CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS`: segundos entre fichas (3, y nunca menos de 1).
  * - `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS`: minutos de fichas desde que empieza la noche (360).
  * - `CELDA_REGISTRO_FICHAS_RELECTURA_DIAS`: días tras los que se vuelve a leer una ficha (30).
  * - `CELDA_REGISTRO_FICHAS_PRIORIDAD`: provincias que van primero, por su código INE y
@@ -127,17 +133,19 @@ export const opcionesFichasDesdeConfig: Config.Config<OpcionesFichas> = Config.a
 
 /**
  * Las opciones del cliente de las fichas a partir de las del listado: su pausa es el ritmo, y su
- * tope, las peticiones que caben en la ventana al ritmo mínimo, así que nunca corta antes que
- * ella.
+ * tope, las peticiones que caben en la ventana a ese ritmo, así que nunca corta antes que ella.
  */
 export const opcionesClienteDeFichas = (
   cliente: OpcionesCliente,
   fichas: OpcionesFichas,
-): OpcionesCliente => ({
-  ...cliente,
-  pausa: Duration.max(fichas.ritmo, RITMO_MINIMO),
-  maxPeticiones: Math.ceil(Duration.toMillis(fichas.ventana) / Duration.toMillis(RITMO_MINIMO)),
-});
+): OpcionesCliente => {
+  const pausa = Duration.max(fichas.ritmo, RITMO_MINIMO);
+  return {
+    ...cliente,
+    pausa,
+    maxPeticiones: Math.ceil(Duration.toMillis(fichas.ventana) / Duration.toMillis(pausa)),
+  };
+};
 
 /** Una ficha que toca leer, tal como la guarda la base. */
 export interface FichaEnCola {
@@ -315,6 +323,7 @@ export const PublicacionAMitad = Context.Reference<{ readonly publicar: Effect.E
 /** Fallos tras los que no se pide ninguna ficha más esta noche, sin insistir. */
 const PARAN_LAS_FICHAS: ReadonlySet<ErrorDeExtractor["_tag"]> = new Set([
   "FuenteBloqueada",
+  "FuentePideEsperar",
   "LimiteDePeticiones",
   "ProhibidoPorRobots",
 ]);
@@ -371,9 +380,10 @@ const hora = (milisegundos: number): string =>
  * - Una ficha que no se puede leer (`RespuestaInesperada`) apunta su fallo y espera un día, el
  *   doble con cada fallo seguido. Una fuente que no responde ni tras los reintentos del cliente
  *   cuenta como fallo, pero no hace esperar a la ficha.
- * - Tras `fallosSeguidos` fallos seguidos, o si la fuente bloquea a Celda (un 403, una página que
- *   no es una ficha), el tope de peticiones o `robots.txt`, se deja de pedir esta noche sin
- *   insistir, y queda en los errores.
+ * - Tras `fallosSeguidos` fallos seguidos, o si la fuente bloquea a Celda (un 401 o un 403, una
+ *   página que no es una ficha), pide esperar (un 429, o un 503 con `Retry-After` que pide más de
+ *   lo que el cliente aguanta), el tope de peticiones o `robots.txt`, se deja de pedir esta noche
+ *   sin insistir, y queda en los errores.
  * - Al pasar la mitad de la ventana con alguna ficha leída, lanza `aMitad` una vez.
  */
 export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(function* (

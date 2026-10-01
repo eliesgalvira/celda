@@ -163,10 +163,10 @@ describe("extractor de antenasmoviles.es", () => {
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("reintenta un 429 con espera y, si sigue, deja la fuente como no disponible", () =>
+  it.effect("reintenta un 503 con espera y, si sigue, deja la fuente como no disponible", () =>
     Effect.gen(function* () {
       const { salida, peticiones } = yield* conExtractor(
-        (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 429, cuerpo: "" }),
+        (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 503, cuerpo: "" }),
         (extractor) => extractor.puntos,
       );
       assert.strictEqual(peticiones.length, 1 + 1 + OPCIONES.reintentos);
@@ -174,6 +174,18 @@ describe("extractor de antenasmoviles.es", () => {
       assert.isAtLeast((segunda ?? 0) - (primera ?? 0), 5000);
       assert.isTrue(Exit.isFailure(salida));
       assert.include(motivoDe(salida), "FuenteNoDisponible");
+    }),
+  );
+
+  it.effect("un 429 que no dice cuánto esperar no se reintenta: la fuente pide esperar", () =>
+    Effect.gen(function* () {
+      const { salida, peticiones } = yield* conExtractor(
+        (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 429, cuerpo: "" }),
+        (extractor) => extractor.puntos,
+      );
+      assert.strictEqual(peticiones.length, 2);
+      assert.isTrue(Exit.isFailure(salida));
+      assert.include(motivoDe(salida), "FuentePideEsperar: HTTP 429");
     }),
   );
 });
