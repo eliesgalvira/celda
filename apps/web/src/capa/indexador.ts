@@ -57,7 +57,8 @@ export type RespuestaDeIndice =
       readonly capa: CapaDeProvincia;
       readonly todos: IndiceSerializado;
       readonly fuera: IndiceSerializado | undefined;
-      readonly sinMunicipio: IndiceSerializado | undefined;
+      /** Por nivel de municipios, el de los que no van en zona (`IndicesDeCapa`). */
+      readonly fueraDeZonas: ReadonlyArray<IndiceSerializado | undefined>;
     }
   | { readonly numero: number; readonly tipo: "fallo"; readonly motivo: string };
 
@@ -80,11 +81,12 @@ export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar
     };
   }
   const capa = leida.success;
-  const indices = indexarCapa(capa.emplazamientos, capa.barrios.length > 0);
+  const indices = indexarCapa(capa.emplazamientos, capa.barrios.length > 0, capa.municipios);
   const todos = serializarIndice(indices.todos);
   const fuera = indices.fuera === undefined ? undefined : serializarIndice(indices.fuera);
-  const sinMunicipio =
-    indices.sinMunicipio === undefined ? undefined : serializarIndice(indices.sinMunicipio);
+  const fueraDeZonas = indices.fueraDeZonas.map((indice) =>
+    indice === undefined ? undefined : serializarIndice(indice),
+  );
   return {
     respuesta: {
       numero: solicitud.numero,
@@ -92,12 +94,12 @@ export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar
       capa,
       todos: todos.serializado,
       fuera: fuera?.serializado,
-      sinMunicipio: sinMunicipio?.serializado,
+      fueraDeZonas: fueraDeZonas.map((indice) => indice?.serializado),
     },
     transferibles: [
       ...todos.transferibles,
       ...(fuera?.transferibles ?? []),
-      ...(sinMunicipio?.transferibles ?? []),
+      ...fueraDeZonas.flatMap((indice) => indice?.transferibles ?? []),
     ],
   };
 };
@@ -107,7 +109,11 @@ const indexadaDe = (
   respuesta: Extract<RespuestaDeIndice, { readonly tipo: "lista" }>,
 ): ProvinciaIndexada => {
   const { capa } = respuesta;
-  const posiciones = indicesDeCapa(capa.emplazamientos, respuesta.fuera !== undefined);
+  const posiciones = indicesDeCapa(
+    capa.emplazamientos,
+    respuesta.fuera !== undefined,
+    capa.municipios,
+  );
   return {
     capa,
     indices: {
@@ -116,10 +122,11 @@ const indexadaDe = (
         respuesta.fuera === undefined
           ? undefined
           : rehidratarIndice(respuesta.fuera, posiciones.fuera ?? []),
-      sinMunicipio:
-        respuesta.sinMunicipio === undefined
+      fueraDeZonas: respuesta.fueraDeZonas.map((serializado, i) =>
+        serializado === undefined
           ? undefined
-          : rehidratarIndice(respuesta.sinMunicipio, posiciones.sinMunicipio ?? []),
+          : rehidratarIndice(serializado, posiciones.fueraDeZonas[i] ?? []),
+      ),
     },
   };
 };
@@ -140,7 +147,7 @@ export const indexadorEnHilo = Layer.succeed(
         const capa = leida.success;
         return Effect.succeed({
           capa,
-          indices: indexarCapa(capa.emplazamientos, capa.barrios.length > 0),
+          indices: indexarCapa(capa.emplazamientos, capa.barrios.length > 0, capa.municipios),
         });
       }),
   }),

@@ -4,8 +4,10 @@ import type { ResumenDeMunicipio } from "@celda/dominio/zona";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import { textoDeAusencias } from "@celda/ui/marcadores/Ausencias.tsx";
-import { textoDeEmplazamientos } from "@celda/ui/marcadores/MarcadorBarrio.tsx";
-import type { CoberturaDeProvincia } from "@celda/ui/marcadores/MarcadorProvincia.tsx";
+import {
+  type CoberturaDeProvincia,
+  textoDeEmplazamientos,
+} from "@celda/ui/marcadores/MarcadorZona.tsx";
 
 import type { ElementoProvincia } from "./agrupacion.ts";
 

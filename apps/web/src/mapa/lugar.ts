@@ -11,7 +11,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { createEffect, createMemo, createSignal } from "solid-js";
 
-import { NIVEL_DE_MUNICIPIOS } from "../capa/agrupacion.ts";
+import { NIVEL_DE_MUNICIPIOS } from "../capa/zonas.ts";
 import type { Vista } from "../capa/marcadores.ts";
 import { NIVEL_DE_PROVINCIAS } from "../capa/nacional.ts";
 import type { ZonasNoCargadas } from "../ejercicio/zona.ts";

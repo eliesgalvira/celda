@@ -79,8 +79,7 @@ const DE_MUNICIPIO: ExpressionSpecification = [
 
 /**
  * El filtro de los rótulos de ciudades y pueblos del mapa base, sin los de `nombres`: los
- * municipios que ya llevan la etiqueta de Celda, con su número y sus ausencias. Los dos rótulos se
- * pisarían. Se comparan en minúsculas, porque el mapa base escribe «l'Hospitalet» y el IGN,
+ * municipios que son zona de Celda, con su nombre bajo el hexágono. Los dos nombres se pisarían. Se comparan en minúsculas, porque el mapa base escribe «l'Hospitalet» y el IGN,
  * «L'Hospitalet». Un nombre que no coincide deja los dos rótulos, que es lo menos malo: quitar el
  * del mapa base donde Celda no pone etiqueta dejaría esa parte del mapa sin nombres.
  */
@@ -284,8 +283,8 @@ export const estiloMapa = (color: ColorDeToken): StyleSpecification => ({
       type: "symbol",
       source: FUENTE_MAPA_BASE,
       "source-layer": "place",
-      // Del 13 al 14 los barrios de Barcelona llevan la etiqueta de Celda (`MarcadorBarrio`), con
-      // su número y sus ausencias; los rótulos del mapa base se pisarían con ella.
+      // Del 13 al 14 los barrios de Barcelona son zonas de Celda (`MarcadorZona`), con su nombre,
+      // su número y sus ausencias; los rótulos del mapa base se pisarían con ellas.
       minzoom: 14,
       filter: deClase(["suburb", "quarter", "neighbourhood"]),
       layout: {

@@ -8,6 +8,13 @@ import type { ResumenDeMunicipio } from "@celda/dominio/zona";
 
 import { type Indice, type IndicesDeCapa, indexarCapa, NIVEL_MAXIMO } from "./indice.ts";
 import { cajaVisible } from "./marcadores.ts";
+import {
+  esNivelDeMunicipios,
+  NIVEL_DE_BARRIOS,
+  NIVEL_DE_MUNICIPIOS,
+  NIVELES_DE_MUNICIPIOS,
+  zonasDeMunicipios,
+} from "./zonas.ts";
 
 /**
  * Agrupación por zoom de los emplazamientos de la capa (ADR 0004). A cada nivel de zoom, los
@@ -16,29 +23,12 @@ import { cajaVisible } from "./marcadores.ts";
  * emplazamiento al alejar y de cuál sale al acercar.
  *
  * En los niveles de municipios, los emplazamientos de una provincia cubierta se recogen por
- * municipio, con su nombre, su número y, si tiene 10 o más, sus ausencias (ADR 0017). En el nivel
- * de barrios, los de Barcelona se recogen por barrio. Los que no tienen municipio o barrio siguen
- * sueltos o agrupados en hexágonos. Las transiciones que entran o salen de esos niveles se
- * calculan por los emplazamientos que recoge cada elemento: cada uno va al elemento que se queda
- * con la mayoría de los suyos.
+ * municipio, con su nombre, su número y, si tiene 10 o más, sus ausencias (ADR 0017), pero solo los
+ * municipios que en ese nivel son zona (`zonasDeMunicipios`). En el nivel de barrios, los de
+ * Barcelona se recogen por barrio. El resto siguen sueltos o agrupados en hexágonos. Las
+ * transiciones que entran o salen de esos niveles se calculan por los emplazamientos que recoge
+ * cada elemento: cada uno va al elemento que se queda con la mayoría de los suyos.
  */
-
-/**
- * Nivel en que los emplazamientos de Barcelona se agrupan por barrio: del zoom 13 al 14. Más
- * lejos, las etiquetas de los 73 barrios no caben en la pantalla, y las agrupaciones del nivel 12
- * ya son más grandes que un barrio. Más cerca, las del nivel 14 son más pequeñas. Así, al alejar,
- * cada paso recoge lo del anterior.
- */
-export const NIVEL_DE_BARRIOS = 13;
-
-/**
- * Primer nivel en que los emplazamientos se recogen por municipio: los del zoom 11 al 13, justo
- * antes del de barrios. En el 10, con los datos de Cataluña, se verían unas 180 etiquetas en la
- * pantalla de un móvil alrededor de Barcelona; en el 11, unas 60, como los barrios en el suyo.
- * Así, al alejar, los barrios de Barcelona van a su municipio y los municipios, a los hexágonos
- * del nivel 10, que son más grandes que casi todos.
- */
-export const NIVEL_DE_MUNICIPIOS = 11;
 
 /** Tope de pasos al bajar por la jerarquía en un salto de muchos niveles. */
 const TOPE_DE_PASOS = 4000;
@@ -225,16 +215,12 @@ export const interseccion = (a: Rectangulo, b: Rectangulo): Rectangulo => ({
   },
 });
 
-/** Si un nivel es de municipios: del `NIVEL_DE_MUNICIPIOS` al de barrios, sin él. */
-export const esNivelDeMunicipios = (nivel: number): boolean =>
-  nivel >= NIVEL_DE_MUNICIPIOS && nivel < NIVEL_DE_BARRIOS;
-
 /**
  * Agrupa los emplazamientos de una capa. Indexar 1300 emplazamientos cuesta unos milisegundos.
  * Con `barrios`, el nivel `NIVEL_DE_BARRIOS` recoge por barrio los emplazamientos que tienen uno;
- * sin ellos, ese nivel es uno más de hexágonos. Con `municipios`, los niveles de municipios los
- * recogen por municipio, y los que no tienen ninguno (un territorio compartido, el mar) van en
- * hexágonos de su propio índice.
+ * sin ellos, ese nivel es uno más de hexágonos. Con `municipios`, los niveles de municipios
+ * recogen por municipio los de las zonas de ese nivel, y el resto (un municipio pequeño o muy
+ * grande en la pantalla, un territorio compartido, el mar) van en hexágonos de un índice por nivel.
  */
 export const crearAgrupador = (
   emplazamientos: ReadonlyArray<EmplazamientoLeido>,
@@ -247,10 +233,12 @@ export const crearAgrupador = (
   const PREFIJO_AGRUPACION_FUERA = `f:${prefijo}`;
   const PREFIJO_BARRIO = `b:${prefijo}`;
   const PREFIJO_MUNICIPIO = `m:${prefijo}`;
-  // Las agrupaciones de los que no tienen municipio en los niveles de municipios.
-  const PREFIJO_SIN_MUNICIPIO = `s:${prefijo}`;
+  // Las agrupaciones de los que no van en zona en un nivel de municipios, con su nivel.
+  const prefijoFueraDeZonas = (nivel: number) => `s${nivel}:${prefijo}`;
   const idDeClave = (clave: string): number | undefined => idConPrefijo(clave, PREFIJO_AGRUPACION);
-  const indices = opciones.indices ?? indexarCapa(emplazamientos, barrios.length > 0);
+  const resumidos = opciones.municipios ?? [];
+  const etiquetas = resumidos.map((resumen) => resumen.municipio);
+  const indices = opciones.indices ?? indexarCapa(emplazamientos, barrios.length > 0, etiquetas);
   const indice = indices.todos;
   // Los de fuera de Barcelona se agrupan aparte en el nivel de barrios. Sin barrios no hace falta.
   const fuera = indices.fuera ?? indice;
@@ -271,14 +259,19 @@ export const crearAgrupador = (
   );
   const esDeBarrios = (nivel: number): boolean => hayBarrios && nivel === NIVEL_DE_BARRIOS;
 
-  const sinMunicipioIndice = indices.sinMunicipio;
-  const municipios = (opciones.municipios ?? []).map((resumen): ElementoMunicipio => ({
+  const municipios = resumidos.map((resumen): ElementoMunicipio => ({
     tipo: "municipio",
     clave: `${PREFIJO_MUNICIPIO}${resumen.municipio.codigo}`,
     posicion: resumen.municipio.etiqueta,
     resumen,
   }));
   const hayMunicipios = municipios.length > 0;
+  // Las zonas de cada nivel de municipios, las mismas con que el Worker hizo `fueraDeZonas`.
+  const zonasPorNivel = hayMunicipios ? zonasDeMunicipios(emplazamientos, etiquetas) : [];
+  const zonasEn = (nivel: number): ReadonlySet<string> | undefined =>
+    esNivelDeMunicipios(nivel) ? zonasPorNivel[nivel - NIVEL_DE_MUNICIPIOS] : undefined;
+  const fueraDeZonasEn = (nivel: number): Indice | undefined =>
+    indices.fueraDeZonas[nivel - NIVEL_DE_MUNICIPIOS];
   const deMunicipio = new Map<string, Array<number>>();
   if (hayMunicipios) {
     for (const [i, emplazamiento] of emplazamientos.entries()) {
@@ -289,7 +282,8 @@ export const crearAgrupador = (
       deMunicipio.set(codigo, suyos);
     }
   }
-  const esDeMunicipios = (nivel: number): boolean => hayMunicipios && esNivelDeMunicipios(nivel);
+  /** Un nivel de municipios con alguna zona; sin ninguna, es uno más de hexágonos. */
+  const esDeMunicipios = (nivel: number): boolean => (zonasEn(nivel)?.size ?? 0) > 0;
   /** Los niveles en que las zonas recogen los emplazamientos, sin jerarquía de supercluster. */
   const esDeZonas = (nivel: number): boolean => esDeBarrios(nivel) || esDeMunicipios(nivel);
 
@@ -299,9 +293,14 @@ export const crearAgrupador = (
    * ellos. Si no, en un municipio grande se verían sus calles sin nada que diga que tiene
    * emplazamientos.
    */
-  const municipiosEn = (caja: Rectangulo, elementos: Map<string, Elemento>): void => {
+  const municipiosEn = (
+    caja: Rectangulo,
+    zonas: ReadonlySet<string>,
+    elementos: Map<string, Elemento>,
+  ): void => {
     const visible = cajaVisible(caja);
     for (const municipio of municipios) {
+      if (!zonas.has(municipio.resumen.municipio.codigo)) continue;
       if (contiene(caja, municipio.posicion)) {
         elementos.set(municipio.clave, municipio);
         continue;
@@ -350,10 +349,12 @@ export const crearAgrupador = (
     if (id !== undefined) return [indice, id];
     const idFuera = idConPrefijo(clave, PREFIJO_AGRUPACION_FUERA);
     if (idFuera !== undefined) return [fuera, idFuera];
-    const idSin = idConPrefijo(clave, PREFIJO_SIN_MUNICIPIO);
-    return idSin === undefined || sinMunicipioIndice === undefined
-      ? [indice, undefined]
-      : [sinMunicipioIndice, idSin];
+    for (const nivel of NIVELES_DE_MUNICIPIOS) {
+      const idDeNivel = idConPrefijo(clave, prefijoFueraDeZonas(nivel));
+      const suyo = fueraDeZonasEn(nivel);
+      if (idDeNivel !== undefined && suyo !== undefined) return [suyo, idDeNivel];
+    }
+    return [indice, undefined];
   };
 
   // Las escenas de este agrupador: las claves de agrupación de otro no valen en este índice.
@@ -369,10 +370,11 @@ export const crearAgrupador = (
       caja.noreste.longitud,
       caja.noreste.latitud,
     ];
-    if (esDeMunicipios(nivel)) {
-      municipiosEn(caja, elementos);
-      for (const punto of sinMunicipioIndice?.getClusters(bbox, nivel) ?? []) {
-        const elemento = elementoDe(punto, PREFIJO_SIN_MUNICIPIO);
+    const zonas = zonasEn(nivel);
+    if (zonas !== undefined && zonas.size > 0) {
+      municipiosEn(caja, zonas, elementos);
+      for (const punto of fueraDeZonasEn(nivel)?.getClusters(bbox, nivel) ?? []) {
+        const elemento = elementoDe(punto, prefijoFueraDeZonas(nivel));
         if (elemento !== undefined) elementos.set(elemento.clave, elemento);
       }
     } else {
@@ -512,9 +514,15 @@ export const crearAgrupador = (
 
   const zoomDeApertura = (elemento: ElementoAbrible): number => {
     if (elemento.tipo === "barrio") return NIVEL_DE_BARRIOS + 1;
-    // Un municipio se abre en el nivel siguiente a los de municipios: barrios en Barcelona y
-    // hexágonos pequeños en el resto.
-    if (elemento.tipo === "municipio") return NIVEL_DE_BARRIOS;
+    // Un municipio se abre en el primer nivel en que deja de ser zona: el 12 si en él ya mide
+    // demasiado, y si no el de barrios (barrios en Barcelona, hexágonos pequeños en el resto).
+    if (elemento.tipo === "municipio") {
+      const codigo = elemento.resumen.municipio.codigo;
+      return (
+        NIVELES_DE_MUNICIPIOS.find((nivel) => zonasEn(nivel)?.has(codigo) !== true) ??
+        NIVEL_DE_BARRIOS
+      );
+    }
     if (elemento.tipo === "provincia") return NIVEL_MAXIMO + 1;
     const [origen, cual] = indiceDeAgrupacion(elemento.clave);
     const expansion = cual === undefined ? NIVEL_MAXIMO + 1 : origen.getClusterExpansionZoom(cual);

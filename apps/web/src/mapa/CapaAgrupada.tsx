@@ -1,8 +1,7 @@
 import type { Compania } from "@celda/dominio/compania";
 import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { MarcadorAgrupacion } from "@celda/ui/marcadores/MarcadorAgrupacion.tsx";
-import { type FormaDeBarrio, MarcadorBarrio } from "@celda/ui/marcadores/MarcadorBarrio.tsx";
-import { MarcadorProvincia } from "@celda/ui/marcadores/MarcadorProvincia.tsx";
+import { type FormaDeZona, MarcadorZona } from "@celda/ui/marcadores/MarcadorZona.tsx";
 import {
   CapaDeMarcadores,
   MarcadorEmplazamiento,
@@ -47,7 +46,7 @@ export interface CapaAgrupadaProps {
   /** La preferencia de reducir movimiento: sin transiciones. */
   readonly movimientoReducido: boolean;
   /** Qué forma toma la etiqueta de cada zona; la que no esté aquí va completa. */
-  readonly formas: ReadonlyMap<string, FormaDeBarrio>;
+  readonly formas: ReadonlyMap<string, FormaDeZona>;
   /** Clave del emplazamiento con la ficha abierta: su marcador se resalta. */
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento: se abre su ficha. */
@@ -57,11 +56,10 @@ export interface CapaAgrupadaProps {
 }
 
 /**
- * Los marcadores de la escena: logos para los emplazamientos sueltos, hexágonos con número para
- * las agrupaciones y las provincias del resumen, y etiquetas para los barrios y los municipios. Al
- * alejar, cada marcador que se agrupa se desliza hacia su hexágono o su zona; al acercar, sale de
- * él. Lo que se va sigue en el DOM mientras
- * dura la transición y luego se quita.
+ * Los marcadores de la escena: logos para los emplazamientos sueltos y hexágonos con número para
+ * las agrupaciones y las zonas (provincias, municipios y barrios), que llevan además su nombre.
+ * Al alejar, cada marcador que se agrupa se desliza hacia su hexágono; al acercar, sale de él. Lo
+ * que se va sigue en el DOM mientras dura la transición y luego se quita.
  */
 export function CapaAgrupada(props: CapaAgrupadaProps) {
   const [pintados, setPintados] = createSignal<ReadonlyArray<Pintado>>([]);
@@ -148,7 +146,7 @@ function MarcadorPintado(props: {
   readonly pintado: Pintado;
   readonly fotograma: number;
   readonly proyectar: Proyectar;
-  readonly formas: ReadonlyMap<string, FormaDeBarrio>;
+  readonly formas: ReadonlyMap<string, FormaDeZona>;
   readonly seleccionada: string | null;
   readonly alSeleccionar: (clave: string) => void;
   readonly alAbrir: (elemento: ElementoAbrible) => void;
@@ -208,11 +206,12 @@ function MarcadorPintado(props: {
       </Match>
       <Match when={barrio()}>
         {(elegido) => (
-          <MarcadorBarrio
+          <MarcadorZona
             x={punto().x}
             y={punto().y}
+            zona="barrio"
             forma={props.formas.get(elegido().clave) ?? "completa"}
-            barrio={elegido().resumen.barrio.nombre}
+            nombreDeZona={elegido().resumen.barrio.nombre}
             emplazamientos={elegido().resumen.emplazamientos}
             ausentes={elegido().resumen.ausentes}
             nombre={nombreDeBarrio(elegido().resumen)}
@@ -223,12 +222,12 @@ function MarcadorPintado(props: {
       </Match>
       <Match when={municipio()}>
         {(elegido) => (
-          <MarcadorBarrio
+          <MarcadorZona
             x={punto().x}
             y={punto().y}
             zona="municipio"
             forma={props.formas.get(elegido().clave) ?? "completa"}
-            barrio={elegido().resumen.municipio.nombre}
+            nombreDeZona={elegido().resumen.municipio.nombre}
             emplazamientos={elegido().resumen.emplazamientos}
             ausentes={elegido().resumen.ausentes}
             nombre={nombreDeMunicipio(elegido().resumen)}
@@ -239,11 +238,12 @@ function MarcadorPintado(props: {
       </Match>
       <Match when={provincia()}>
         {(hexagono) => (
-          <MarcadorProvincia
+          <MarcadorZona
             x={punto().x}
             y={punto().y}
+            zona="provincia"
             forma={props.formas.get(hexagono().clave) ?? "completa"}
-            provincia={hexagono().provincia.nombre}
+            nombreDeZona={hexagono().provincia.nombre}
             emplazamientos={hexagono().provincia.emplazamientos}
             cobertura={coberturaDe(hexagono())}
             carga={hexagono().carga}

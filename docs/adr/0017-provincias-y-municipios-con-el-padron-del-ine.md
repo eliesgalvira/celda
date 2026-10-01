@@ -1,6 +1,6 @@
 # Provincias y municipios del IGN como zonas, con el padrón del INE
 
-Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El #44 lleva los niveles de zona al mapa y el #47, el ejercicio a los municipios. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
+Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El #44 lleva los niveles de zona al mapa y el #47, el ejercicio a los municipios. El #53 da a todas las zonas el hexágono de las agrupaciones y decide qué municipios son zona en cada nivel. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
 
 ## Contexto
 
@@ -53,6 +53,28 @@ Las fuentes, medidas el 28/09/2026:
 - **Transiciones.** Entre un nivel de zonas y cualquier otro, cada elemento va al que se queda con la mayoría de sus emplazamientos, como ya pasaba con los barrios. Entre el 11 y el 12 los municipios no se mueven; solo se reagrupan los hexágonos de los que no tienen municipio. Desde el resumen, cada municipio sale del hexágono de su provincia.
 - **Rótulos del mapa base.** Mientras un municipio lleva la etiqueta de Celda, la web quita su rótulo de ciudad o pueblo del mapa base (`quitarRotulosDeMunicipios` en `packages/ui/src/mapa/estilo.ts`), comparando nombres en minúsculas. Si el nombre del IGN y el de OpenStreetMap no coinciden se ven los dos, y fuera de las provincias cubiertas el mapa base sigue rotulando.
 - **Créditos.** El del IGN va a pie de mapa desde el #43. El del INE no: el mapa no enseña habitantes; los cita el ejercicio (#47).
+
+## Cómo quedó la corrección de las zonas (#53)
+
+El usuario vio en los niveles 11 y 12, alrededor de Zaragoza, solo dos textos («PINSEQUE 1 emplazamiento», «UTEBO 8 emplazamientos») donde un zoom antes y un zoom después había hexágonos y logos. Cambia lo que dicen los puntos «Niveles», «Municipios sin emplazamientos» y «Transiciones» del apartado anterior.
+
+- **Un solo aspecto para las zonas.** Provincias, municipios y barrios son el mismo `MarcadorZona` (`packages/ui/src/marcadores`): el hexágono oscuro con su número de las agrupaciones y, debajo, el nombre en una cinta clara con la letra de las etiquetas, monoespaciada. Las ausencias van a la derecha del hexágono. Al cambiar de nivel un hexágono se desliza a otro, como entre agrupaciones. Los rótulos del mapa base van en Noto Sans, sin fondo y con halo: el nombre de Celda se distingue por la cinta, la letra y por ir pegado a su hexágono. Sustituye a `MarcadorBarrio` y `MarcadorProvincia`.
+- **No todo municipio es zona.** En cada nivel de municipios, un municipio de una provincia cubierta es zona si tiene 4 emplazamientos o más (`MINIMO_DE_ZONA`) y, con su etiqueta, no mide más de 240 px en ese nivel (`LADO_MAXIMO_DE_ZONA`), en `apps/web/src/capa/zonas.ts`. Al acercar todo mide el doble, así que las zonas del 12 son parte de las del 11. Los emplazamientos de los demás van en hexágonos de un índice por nivel, que el Worker construye con los otros (`fueraDeZonas`, que sustituye a `sinMunicipio`). Pulsar una zona acerca hasta el primer nivel en que deja de serlo.
+- **Por qué 240 px.** Es lo que mide una agrupación del nivel anterior (dos veces el radio de 60 px) llevado al zoom siguiente. Una zona más grande junta lo que un zoom antes estaba separado. Zaragoza mide unos 1000 px a zoom 11, Barcelona unos 300 y Madrid más de 1000: antes, alrededor de Zaragoza, un móvil veía 27 elementos a zoom 10, 3 a zoom 11, 1 a zoom 12 y otra vez 6 de cerca. Probé 120, 240, 360 y 480 px. El desplazamiento medio de lo que representa a cada emplazamiento al cruzar un nivel casi no cambia entre ellos; lo que cambia es cuántos municipios grandes quedan como zona. Con 120 px, solo 46 de los 585 municipios con 10 emplazamientos o más son zona en el nivel 11, y las ausencias de municipio casi no se verían; con 240 son 203.
+- **Por qué 4 emplazamientos.** De los 6.407 municipios con alguno, 4.696 tienen de 1 a 3. Como zona, un pueblo con un emplazamiento tapaba su logo con un hexágono con un «1» en el centro del pueblo, que al acercar saltaba a donde está la antena. Como hexágono de agrupación o logo, su emplazamiento se queda donde está, y el mapa base sigue escribiendo el nombre del pueblo. En una vista de 1400 px del campo de Teruel, el desplazamiento medio al pasar del zoom 10 al 11 baja de 86 a 22 px. Un municipio sin emplazamientos tampoco es zona: ya no se ve «ningún emplazamiento». Un barrio de Barcelona sí, con un hexágono claro con un 0.
+- **Los barrios no cambian de criterio.** Siguen en el nivel 13, todos. Barcelona no es zona en los niveles 11 y 12 (no cabe), así que al alejar sus barrios van a hexágonos y no a un único hexágono de Barcelona.
+- **Medido con la publicación de toda España del 30/09/2026** (35.667 emplazamientos), en vistas de 390 y 1400 px alrededor de Zaragoza, Barcelona, Madrid, Huesca y el campo de Teruel. Desplazamiento medio, en píxeles, de lo que representa a cada emplazamiento al cruzar un nivel:
+
+  | Vista | 10 → 11 antes | 10 → 11 ahora | 12 → 13 antes | 12 → 13 ahora |
+  |---|---|---|---|---|
+  | Zaragoza, 390 px | 197 | 59 | 346 | 49 |
+  | Madrid, 390 px | 206 | 43 | 658 | 60 |
+  | Barcelona, 1400 px | 88 | 61 | 329 | 97 |
+  | Teruel, 1400 px | 86 | 22 | 330 | 0 |
+
+  Entre dos niveles de hexágonos el desplazamiento suele quedar entre 40 y 60 px.
+- **Fluidez.** En Chromium con GPU, la CPU a ×4 y una ventana de 390 px, acercando del zoom 9,5 al 14,5 y alejando otra vez, un nivel cada 1,5 s, con la publicación de toda España; medianas de seis rondas alternadas con `celda/v1`. Alrededor de Zaragoza, 58,8 fps ahora y 58,9 antes, con 13 y 10 fotogramas de más de 20 ms. Alrededor de Barcelona, 57,9 y 58,9, con 18 y 10. La diferencia de Barcelona está en los niveles 11 y 12: antes Barcelona era una sola etiqueta en toda la pantalla, y ahora son unos 40 hexágonos, lo mismo que cuesta el nivel 10. Quitar la sombra de la cinta del nombre y de las ausencias no cambió nada medible.
+- **Pruebas.** `apps/web/src/mapa/CapaAgrupada.test.tsx` recorre los zooms del 5 al 18 con una España de prueba (una ciudad que no cabe, un pueblo compacto, uno con un solo emplazamiento, barrios) y falla si algún emplazamiento no está en un hexágono que enseñe su número o en un logo, si al acercar algo aparece sin salir de lo que se veía o si al alejar algo se apaga sin destino. `zonas.test.ts` prueba el criterio y `MarcadorZona.test.tsx`, el marcador.
 
 ## Consecuencias
 
