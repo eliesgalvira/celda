@@ -1,6 +1,6 @@
 # Convex como fuente canónica, con funciones Effect mediante Confect v10
 
-Estado: aceptada (26/09/2026), tras la exploración técnica 02. Revisada el 28/09/2026 con el ADR 0008: Convex deja de estar expuesto al público y la web ya no tiene cliente de Convex.
+Estado: aceptada (26/09/2026), tras la exploración técnica 02. Revisada el 28/09/2026 con el ADR 0008: Convex deja de estar expuesto al público y la web ya no tiene cliente de Convex. Revisada el 02/10/2026 con el ADR 0020: cuando la ingesta salga de Convex (#51), Convex solo es el buzón de las aportaciones compartidas, con funciones públicas para enviarlas.
 
 ## Contexto
 

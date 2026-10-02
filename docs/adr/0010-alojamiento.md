@@ -1,6 +1,6 @@
 # La web en Vercel, las capas y las fichas en R2 con copia en Vercel, y aviso ante bloqueos
 
-Estado: aceptada el 28/09/2026, tras la exploración técnica 05 (issue #7, rama `spike/celda-cloudflare`). Sustituye la decisión 10 de `../arquitectura.md`, que ponía la web en Cloudflare Pages. Falta la parte con cuentas reales, que es el ticket #14. Revisada el mismo día con la retención de versiones que decidió el #14, y el 29/09/2026 con la copia de reserva que se construye en Vercel desde R2 (#46).
+Estado: aceptada el 28/09/2026, tras la exploración técnica 05 (issue #7, rama `spike/celda-cloudflare`). Sustituye la decisión 10 de `../arquitectura.md`, que ponía la web en Cloudflare Pages. Falta la parte con cuentas reales, que es el ticket #14. Revisada el mismo día con la retención de versiones que decidió el #14, y el 29/09/2026 con la copia de reserva que se construye en Vercel desde R2 (#46). Sustituida en parte por el [ADR 0018](0018-capas-solo-desde-vercel.md) (02/10/2026): las capas y las fichas se sirven solo desde Vercel, R2 es un almacén privado y desaparecen el Worker, la copia de reserva y el cliente con dos orígenes. Siguen valiendo el contexto de los bloqueos, las cabeceras, la publicación con `AlmacenDeFicheros` y la retención en R2.
 
 ## Contexto
 

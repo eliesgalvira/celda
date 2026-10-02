@@ -65,7 +65,7 @@ _Evitar_: hueco, falta de cobertura
 ### Procedencia de los datos
 
 **Fuente**:
-Origen externo de datos sobre emplazamientos: el registro oficial, antenasmoviles.es o un mapa colaborativo como OpenCelliD.
+Origen de las observaciones sobre emplazamientos: el registro oficial o la comunidad de Celda, con sus correcciones. Celda no toma datos de otras webs de antenas (ADR 0019).
 _Evitar_: proveedor, dataset, origen
 
 **Registro oficial**:
@@ -76,8 +76,12 @@ _Evitar_: Infoantenas, base oficial, catastro
 Lo que una fuente dice de un emplazamiento en una fecha, con enlace a su origen.
 _Evitar_: registro, entrada, dato
 
+**Sin ficha en el registro**:
+Estación base que el listado del registro oficial incluye pero cuya página de detalle el registro da por no válida («Código de emplazamiento no válido»). La ficha lo dice, con la fecha en que se comprobó, en lugar de darla por pendiente.
+_Evitar_: ficha pendiente, ficha rota, error de ficha
+
 **Corrección**:
-Observación de la comunidad que contradice al registro oficial.
+Observación de la comunidad de Celda que contradice al registro oficial: una corrección propuesta que la moderación ha aceptado. Se publica al lado de lo que dice el registro, con su procedencia, y nunca lo sustituye.
 _Evitar_: enmienda, parche, edición
 
 **Fusión**:
@@ -145,10 +149,6 @@ _Evitar_: provincia completa, provincia cargada (esa es la que ya ha llegado al 
 **Publicación**:
 Paso que, al acabar cada ingesta, escribe la capa y las fichas de la instantánea en una misma versión y después cambia la versión vigente. Sin cambios en los datos no escribe nada; con un barrido nuevo y los mismos datos, solo el resumen nacional con su fecha.
 _Evitar_: despliegue, exportación, subida
-
-**Copia de reserva**:
-Copia de la versión vigente, y solo de esa, junto a la web y fuera de Cloudflare. La web la lee cuando el sitio principal de las capas no contesta, por ejemplo durante un bloqueo de LaLiga. Se rehace tras cada publicación que cambia la versión vigente, y nunca dice tener una versión que no tiene entera.
-_Evitar_: espejo, mirror, backup (la copia de seguridad es la de la base de la ingesta)
 
 **Mapa base**:
 Callejero de fondo sobre el que se dibujan las capas. No lo produce Celda.
@@ -237,16 +237,28 @@ Pantalla oculta del móvil, que se abre marcando un código, con los datos de la
 _Evitar_: modo servicio, field test, modo ingeniero
 
 **Captura**:
-Imagen de la pantalla del modo de información de la que sale una medida propia.
+Imagen de la pantalla del modo de información de la que sale una medida propia. Se lee en el dispositivo y nunca sale de él.
 _Evitar_: screenshot, foto
 
 **Aportación**:
-Dato que la persona crea en su dispositivo: una medida propia, un punto elegido o una corrección propuesta.
+Dato que la persona crea en su dispositivo: una medida propia, un punto elegido, una corrección propuesta o una corroboración.
 _Evitar_: contribución, envío, subida
 
 **Corrección propuesta**:
-Aportación que contradice un dato del mapa. Mientras no se comparta solo existe en el dispositivo y no es una corrección.
+Aportación que contradice un dato del mapa: dónde está un emplazamiento, si una compañía está en él, si sigue existiendo o si falta uno. Solo pasa a ser corrección si se comparte y la moderación la acepta.
 _Evitar_: corrección, sugerencia
+
+**Corroboración**:
+Aportación que respalda una corrección que la ficha ya enseña («yo también lo veo»). Suma una persona a las que la sostienen.
+_Evitar_: voto, me gusta, confirmación
+
+**Aportación compartida**:
+Aportación que la persona ha enviado a Celda. Espera la moderación y, mientras, no cambia nada de lo publicado.
+_Evitar_: envío, subida, contribución
+
+**Moderación**:
+Revisión a mano de cada aportación compartida, que acaba aceptada o rechazada, con su motivo. Solo lo aceptado llega a publicarse.
+_Evitar_: aprobación, validación (esa es la comprobación automática al recibirla), revisión
 
 ### Simulaciones
 
@@ -317,7 +329,9 @@ _Evitar_: clientes, carga
 - Una **zona de barrido** tiene uno o varios **cuadros**, y cada cuadro es de una sola zona. Un **barrido** recorre los cuadros de una zona y solo cuenta ausencias a las **observaciones** que caen en ellos.
 - Una **capa** sale de una instantánea de emplazamientos y tiene una **versión de capa**. La **publicación** escribe con ella la **ficha** de cada uno de sus emplazamientos. La ficha lleva además la fecha en que cambió su emplazamiento, y la **marca de agua** de cada vista deja ver si es más reciente que el mapa.
 - Una **medida propia** queda unida al emplazamiento y al sector que daban servicio donde se tomó.
-- Las **aportaciones** viven en el dispositivo. Una **corrección propuesta** solo pasaría a ser **corrección** si se compartiera.
+- Las **aportaciones** viven en el dispositivo hasta que la persona comparte una. Una **corrección propuesta** compartida pasa a ser **corrección** solo si la **moderación** la acepta. La **captura** y el **punto elegido** nunca se comparten.
+- Una **medida propia** compartida solo se publica dentro de un agregado, nunca suelta.
+- Una **corrección** se enseña junto a la **observación** del **registro oficial** que contradice, con cuántas personas la sostienen.
 - Una **simulación** nunca es una **observación** ni una **medida**.
 - Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.
 - El **ejercicio de emplazamientos** se hace sobre una **zona**: un barrio de Barcelona o un municipio. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
@@ -332,5 +346,5 @@ _Evitar_: clientes, carga
 - El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. Queda por decidir si los textos de primer uso lo aceptan como palabra de entrada.
 - Los ADR 0014 y 0015 y la investigación 08 llaman «celdas de 1°» a los cuadros y «grupos» a las zonas de barrido. Se escribieron antes de fijar estas palabras; «celda» ya era la de un emplazamiento.
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.
-- La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer. En la interfaz, ficha es solo la del panel.
+- La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer. En la interfaz, ficha es solo la del panel, con una excepción: «el registro no tiene ficha para este emplazamiento», que se dice de una estación base sin ficha en el registro.
 - Falta decidir si una marca que usa la red de otra empresa aparece como compañía.

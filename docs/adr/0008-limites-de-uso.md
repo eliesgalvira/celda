@@ -1,6 +1,6 @@
 # Límites de uso: el público solo lee ficheros estáticos
 
-Estado: aceptada el 28/09/2026, tras la exploración técnica 04 (issue #6, rama `spike/celda-limites`).
+Estado: aceptada el 28/09/2026, tras la exploración técnica 04 (issue #6, rama `spike/celda-limites`). Revisada el 02/10/2026: el límite de la función que sirve R2 ya no existe, porque el ADR 0018 sirve las capas solo desde Vercel; y las escrituras del público, con sus límites, las fija el ADR 0020.
 
 ## Contexto
 

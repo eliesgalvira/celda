@@ -1,6 +1,6 @@
 # Fusión: observaciones a 15 m o menos, de cualquier compañía
 
-Estado: aceptada el 26/09/2026. Sustituye la regla de fusión del ADR 0009 («mismo operador a menos de 60 m»). Ampliada el mismo día con la unión por código, y el 28/09/2026 con la misma estación y la misma dirección para Madrid (las dos al final).
+Estado: aceptada el 26/09/2026. Sustituye la regla de fusión del ADR 0009 («mismo operador a menos de 60 m»). Ampliada el mismo día con la unión por código, y el 28/09/2026 con la misma estación y la misma dirección para Madrid (las dos al final). La unión por código con la comunidad era para antenasmoviles.es, que el [ADR 0019](0019-fuentes-registro-y-aportaciones-propias.md) retira (02/10/2026).
 
 ## Contexto
 

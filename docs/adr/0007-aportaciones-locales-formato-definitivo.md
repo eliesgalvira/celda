@@ -1,6 +1,6 @@
 # Las aportaciones se guardan en el dispositivo con su formato definitivo
 
-Estado: aceptada el 24/09/2026.
+Estado: aceptada el 24/09/2026. Ampliada el 02/10/2026 con el ADR 0020: las medidas propias y las correcciones propuestas se pueden compartir; el punto elegido y los ajustes, no.
 
 La v1 no tiene cuentas. Las medidas propias, los puntos elegidos y las correcciones propuestas se guardan en IndexedDB mediante un servicio Effect, `AlmacenLocal`, y la persona puede borrarlas cuando quiera. Aun así se guardan con el mismo esquema versionado que tendrán en el backend: identificador, fecha de creación, versión del esquema y origen.
 

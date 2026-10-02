@@ -1,6 +1,6 @@
 # Ingesta automática por fuente, con la procedencia de cada dato
 
-Estado: aceptada el 24/09/2026. La regla de fusión la sustituye el [ADR 0012](0012-fusion-a-15-metros.md) (26/09/2026).
+Estado: aceptada el 24/09/2026. La regla de fusión la sustituye el [ADR 0012](0012-fusion-a-15-metros.md) (26/09/2026). La decisión de extraer antenasmoviles.es la sustituye el [ADR 0019](0019-fuentes-registro-y-aportaciones-propias.md) (02/10/2026): las fuentes son el registro oficial y las aportaciones propias.
 
 Ninguna fuente basta sola: el registro oficial está desactualizado y las demás lo corrigen sin explicarlo. Celda las junta y enseña de dónde sale cada dato y cuándo.
 

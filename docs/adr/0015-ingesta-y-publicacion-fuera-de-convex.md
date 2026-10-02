@@ -1,6 +1,6 @@
 # La ingesta y la publicación, fuera de Convex: un servicio de NixOS con su estado en SQLite
 
-Estado: propuesta (28/09/2026), con las decisiones del usuario del mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 2). Si se acepta, cambia el ADR 0003 (Convex deja de ser la fuente canónica de los emplazamientos) y la parte del ADR 0010 que dice dónde corre la publicación.
+Estado: propuesta (28/09/2026), con las decisiones del usuario del mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 2). Si se acepta, cambia el ADR 0003 (Convex deja de ser la fuente canónica de los emplazamientos) y la parte del ADR 0010 que dice dónde corre la publicación. Revisada el 02/10/2026: el ADR 0019 retira antenasmoviles.es de la base y del módulo de NixOS, el ADR 0018 lleva las copias de la base también a R2 y el 0020 fija qué hace Convex con las aportaciones.
 
 ## Contexto
 

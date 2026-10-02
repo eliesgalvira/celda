@@ -1,6 +1,6 @@
 # Barrido del registro oficial por zonas: Cataluña primero, luego toda España, y fichas a una cada 3 s
 
-Estado: propuesta (28/09/2026), con las decisiones del usuario del mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 1). Cambia el barrido del glosario y el ritmo del ADR 0009 y de la investigación del registro.
+Estado: propuesta (28/09/2026), con las decisiones del usuario del mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 1). Cambia el barrido del glosario y el ritmo del ADR 0009 y de la investigación del registro. El apartado «antenasmoviles.es por zonas» y el correo a antenasmoviles.es los retira el [ADR 0019](0019-fuentes-registro-y-aportaciones-propias.md) (02/10/2026), que también rehace los cuadros con el registro.
 
 ## Contexto
 
