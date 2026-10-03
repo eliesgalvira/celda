@@ -1,9 +1,12 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import type { CorreccionPropuesta, Corroboracion } from "@celda/dominio/aportacion";
-import type { AportacionEnCola, PaginaDeCola } from "@celda/dominio/moderacion";
+import type {
+  AceptadaParaPublicar,
+  AportacionEnCola,
+  PaginaParaPublicar,
+} from "@celda/dominio/moderacion";
 import { capaGrabadaPorCajas, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
-import { BuzonAdministrado, BuzonNoDisponible } from "@celda/moderacion/buzon";
 import { LoPublicado, loPublicadoEnCarpeta } from "@celda/moderacion/publicado";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
@@ -15,6 +18,7 @@ import * as Ref from "effect/Ref";
 import { TestClock } from "effect/testing";
 
 import { BaseNocturna } from "./base.ts";
+import { AceptadasDelBuzon, BuzonNoDisponible } from "./buzon.ts";
 import { conBase, conEntorno, type Entorno, unaNoche } from "./pruebas/entorno.ts";
 
 const NOCHE = Date.UTC(2026, 9, 3, 2, 15);
@@ -25,23 +29,24 @@ const CAMPUS_NORD = { longitud: 2.113628, latitud: 41.388344 };
 type Buzon = Ref.Ref<ReadonlyArray<AportacionEnCola>>;
 
 /**
- * Un buzón de prueba que da lo aceptado como `moderacion:aceptadas`: después de `despuesDe`, por
- * hora de aceptación y de `limite` en `limite`. Contesta en otra tarea. Con `caido` a `true`, no
- * contesta. Con `olvidaElCursor`, da siempre todo lo aceptado, como si leyera dos veces lo mismo.
+ * Un buzón de prueba que da lo aceptado como la acción HTTP de la publicación: solo lo aceptado,
+ * después de `despuesDe` y por hora de aceptación, con un seudónimo en lugar de la identidad y
+ * sin la nota. Contesta en otra tarea. Con `caido` a `true`, no contesta. Con `olvidaElCursor`, da
+ * siempre todo lo aceptado, como si leyera dos veces lo mismo.
  */
 const buzonDePrueba = (
   buzon: Buzon,
   caido: Ref.Ref<boolean>,
   olvidaElCursor = false,
-): Layer.Layer<BuzonAdministrado> =>
+): Layer.Layer<AceptadasDelBuzon> =>
   Layer.succeed(
-    BuzonAdministrado,
-    BuzonAdministrado.of({
-      aceptadas: (despuesDe, limite) =>
+    AceptadasDelBuzon,
+    AceptadasDelBuzon.of({
+      leer: (despuesDe) =>
         Effect.gen(function* () {
           yield* Effect.yieldNow;
           if (yield* Ref.get(caido)) {
-            return yield* new BuzonNoDisponible({ motivo: "moderacion:aceptadas: fetch failed" });
+            return yield* new BuzonNoDisponible({ motivo: "fetch failed" });
           }
           const aceptadas = (yield* Ref.get(buzon))
             .filter(
@@ -50,18 +55,21 @@ const buzonDePrueba = (
                 (olvidaElCursor || despuesDe === null || (a.moderadaEl ?? 0) > despuesDe),
             )
             .toSorted((a, b) => (a.moderadaEl ?? 0) - (b.moderadaEl ?? 0))
-            .slice(0, limite);
-          const pagina: PaginaDeCola = {
-            aportaciones: aceptadas,
-            ultima: aceptadas.length < limite ? null : (aceptadas.at(-1)?.moderadaEl ?? null),
-          };
+            .flatMap((a): ReadonlyArray<AceptadaParaPublicar> =>
+              a.contenido.tipo === "propia"
+                ? []
+                : [
+                    {
+                      id: a.id,
+                      persona: `persona-de-${a.identidad}`,
+                      aceptadaEl: a.moderadaEl ?? 0,
+                      contenido: a.contenido,
+                    },
+                  ],
+            );
+          const pagina: PaginaParaPublicar = { aportaciones: aceptadas, ultima: null };
           return pagina;
         }),
-      pendientes: () => Effect.die("la noche no lee las pendientes"),
-      contexto: () => Effect.die("la noche no pide el contexto"),
-      aceptar: () => Effect.die("la noche no modera"),
-      rechazar: () => Effect.die("la noche no modera"),
-      vetar: () => Effect.die("la noche no veta"),
     }),
   );
 

@@ -17,13 +17,13 @@
   "dependencies": {
     "@celda/dominio": "workspace:*",
     "@celda/ingesta": "workspace:*",
-    "@celda/moderacion": "workspace:*",
     "@celda/publicacion": "workspace:*",
     "@effect/platform-node": "catalog:",
     "@effect/sql-sqlite-node": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@celda/moderacion": "workspace:*",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "vite": "catalog:",

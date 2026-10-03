@@ -33,8 +33,9 @@
       # y apunta la firma de cada petición; no contesta nada sin firma ni deja escribir con la clave
       # de solo lectura del build. Vercel construye un despliegue con la orden `capas`, con esa
       # clave, en cada llamada al deploy hook y, si acaba bien, lo sirve en `celda.prueba/capas`;
-      # si falla, sigue sirviendo el anterior. El buzón de Convex contesta a `moderacion:aceptadas`,
-      # solo con la clave de la credencial de la noche, con una página sin nada aceptado.
+      # si falla, sigue sirviendo el anterior. El buzón de Convex contesta a su acción HTTP de lo
+      # aceptado, solo con la clave de publicación de la credencial de la noche, con una página sin
+      # nada aceptado.
       fuentesDePrueba =
         pkgs.writers.writePython3Bin "fuentes-de-prueba" { flakeIgnore = singleton "E501"; }
           /* python */ ''
@@ -71,12 +72,12 @@
                     return dict(linea.strip().split("=", 1) for linea in fichero if "=" in linea)
 
 
-            def clave_de_convex():
+            def clave_de_publicacion():
                 if not os.path.exists(CONEXION_CON_CONVEX):
                     return None
                 with open(CONEXION_CON_CONVEX) as fichero:
                     variables = dict(linea.strip().split("=", 1) for linea in fichero if "=" in linea)
-                return variables.get("CELDA_CONVEX_CLAVE")
+                return variables.get("CELDA_PUBLICACION_CLAVE")
 
 
             def es_del_build(firma):
@@ -137,6 +138,12 @@
 
                 def do_GET(self):
                     host, ruta, firma = self.apuntar()
+                    if host == "buzon.convex.prueba":
+                        if ruta != "/aportaciones/aceptadas":
+                            return self.responder(404)
+                        if firma != f"Bearer {clave_de_publicacion()}":
+                            return self.responder(401)
+                        return self.responder(200, b'{"aportaciones":[],"ultima":null}', "application/json")
                     if host == "geoportal.minetur.gob.es":
                         if ruta == "/robots.txt":
                             return self.responder(200, b"User-agent: *\nAllow: /\n")
@@ -178,15 +185,7 @@
                     return self.responder(200, leer(fichero), "application/json")
 
                 def do_POST(self):
-                    host, ruta, firma = self.apuntar()
-                    if host == "buzon.convex.prueba":
-                        self.rfile.read(int(self.headers.get("Content-Length", "0")))
-                        if ruta != "/api/query":
-                            return self.responder(404)
-                        if firma != f"Convex {clave_de_convex()}":
-                            return self.responder(401, b'{"code":"BadAdminKey"}', "application/json")
-                        pagina = {"status": "success", "value": {"aportaciones": [], "ultima": None}}
-                        return self.responder(200, json.dumps(pagina).encode(), "application/json")
+                    host, ruta, _ = self.apuntar()
                     if host != "api.vercel.com" or not ruta.startswith("/v1/integrations/deploy/"):
                         return self.responder(404)
                     os.makedirs(VERCEL, exist_ok=True)
@@ -317,15 +316,15 @@
                   )
                   id_de_lectura = maquina.succeed("sed --quiet 's/^CELDA_R2_ID_CLAVE=//p' /run/secretos/vercel-r2.env").strip()
                   secreto_de_lectura = maquina.succeed("sed --quiet 's/^CELDA_R2_SECRETO=//p' /run/secretos/vercel-r2.env").strip()
-                  # La clave de despliegue del buzón de Convex, con la forma de las de verdad.
+                  # La clave de publicación del buzón de Convex: solo abre lo aceptado.
                   maquina.succeed(
                       "umask 077; {"
-                      " echo CELDA_CONVEX_URL=https://buzon.convex.prueba;"
-                      " echo CELDA_CONVEX_CLAVE=prod:prueba\\|convex$(od --address-radix=n --format=x1 --read-bytes=24 /dev/urandom | tr --delete ' \\n');"
+                      " echo CELDA_CONVEX_SITE_URL=https://buzon.convex.prueba;"
+                      " echo CELDA_PUBLICACION_CLAVE=publicacion$(od --address-radix=n --format=x1 --read-bytes=24 /dev/urandom | tr --delete ' \\n');"
                       " } > /run/secretos/celda-convex.env",
                   )
-                  clave_de_convex = maquina.succeed("sed --quiet 's/^CELDA_CONVEX_CLAVE=//p' /run/secretos/celda-convex.env").strip()
-                  assert clave_de_convex.startswith("prod:prueba|convex"), clave_de_convex
+                  clave_de_publicacion_convex = maquina.succeed("sed --quiet 's/^CELDA_PUBLICACION_CLAVE=//p' /run/secretos/celda-convex.env").strip()
+                  assert len(clave_de_publicacion_convex) > 32, clave_de_publicacion_convex
 
               with subtest("el temporizador recupera las noches perdidas y dispara la noche a su hora"):
                   assert maquina.succeed("systemctl show celda-nocturna.timer --property=Persistent --value").strip() == "yes"
@@ -359,11 +358,11 @@
                   )
                   assert "Copia de la base en R2: " in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
 
-              with subtest("la noche lee del buzón de Convex con la clave de su credencial"):
+              with subtest("la noche lee lo aceptado del buzón con la clave de publicación de su credencial"):
                   diario = maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
                   assert "Buzón de Convex: 0 aceptadas leídas, 0 nuevas" in diario, diario
                   maquina.succeed(
-                      f"grep --fixed-strings 'POST buzon.convex.prueba /api/query Convex {clave_de_convex}'"
+                      f"grep --fixed-strings 'GET buzon.convex.prueba /aportaciones/aceptadas Bearer {clave_de_publicacion_convex}'"
                       " /var/lib/fuentes-de-prueba/peticiones.log"
                   )
 
@@ -535,7 +534,7 @@
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))
 
               with subtest("ningún secreto acaba en el almacén de Nix"):
-                  for valor in (secreto, secreto_del_hook, clave_de_convex):
+                  for valor in (secreto, secreto_del_hook, clave_de_publicacion_convex):
                       maquina.fail(f"systemctl show celda-nocturna.service | grep --fixed-strings '{valor}'")
                   assert "CELDA_RESERVA_ORIGEN" not in entorno, entorno
                   assert "CELDA_ALMACEN_ORIGEN=https://celda.prueba/capas" in entorno, entorno
@@ -553,7 +552,7 @@
 
                   # La búsqueda encuentra lo que sí está en el almacén: la configuración del servicio.
                   assert buscar("Celda (ingesta; contacto en celda.elies.site)").returncode == 0
-                  for valor in (id_clave, secreto, secreto_del_hook, id_de_lectura, secreto_de_lectura, clave_de_convex):
+                  for valor in (id_clave, secreto, secreto_del_hook, id_de_lectura, secreto_de_lectura, clave_de_publicacion_convex):
                       encontrado = buscar(valor)
                       assert encontrado.returncode == 1, f"secreto en el almacén: {encontrado.stdout}"
             '';

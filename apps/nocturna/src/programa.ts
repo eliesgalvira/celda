@@ -1,13 +1,7 @@
 import { type IndiceDeMunicipios, municipioDelPunto } from "@celda/dominio/municipio";
 import type { Fuente } from "@celda/dominio/observacion";
-import {
-  type AportacionAceptada,
-  type AportacionEnCola,
-  PAGINA_MAXIMA,
-  type PaginaDeCola,
-} from "@celda/dominio/moderacion";
+import type { PaginaParaPublicar } from "@celda/dominio/moderacion";
 import { SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
-import { BuzonAdministrado } from "@celda/moderacion/buzon";
 import {
   BaseDeBarrido,
   ejecutarBarrido,
@@ -46,6 +40,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import { BaseNocturna } from "./base.ts";
+import { AceptadasDelBuzon } from "./buzon.ts";
 import { describirResumen, type Turno } from "./estado.ts";
 
 /**
@@ -57,10 +52,10 @@ export class Extractores extends Context.Service<
   {
     readonly registroOficial: Layer.Layer<ExtractorPorCajas>;
     /**
-     * El buzón de Convex con la clave de administración, del que la noche lee lo aceptado en la
-     * moderación (la comunidad, ADR 0020). `None` sin la conexión configurada.
+     * Lo aceptado en la moderación, por la acción HTTP del buzón con la clave de publicación (la
+     * comunidad, ADR 0020). `None` sin la conexión configurada.
      */
-    readonly comunidad: Option.Option<Layer.Layer<BuzonAdministrado>>;
+    readonly comunidad: Option.Option<Layer.Layer<AceptadasDelBuzon>>;
   }
 >()("@celda/nocturna/programa/Extractores") {}
 
@@ -333,14 +328,6 @@ const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<
     ),
   );
 
-/** Una aportación aceptada del buzón, con lo que la publicación necesita de ella. */
-const aceptadaDe = (aportacion: AportacionEnCola): AportacionAceptada => ({
-  id: aportacion.id,
-  identidad: aportacion.identidad,
-  aceptadaEl: aportacion.moderadaEl ?? aportacion.recibidaEl,
-  contenido: aportacion.contenido,
-});
-
 /**
  * Lee del buzón lo aceptado en la moderación desde la última vez y lo guarda en la base, página a
  * página, como una ejecución de la comunidad (ADR 0020). Sigue desde la última aceptada que tiene
@@ -349,7 +336,7 @@ const aceptadaDe = (aportacion: AportacionEnCola): AportacionAceptada => ({
  * diario y la noche sigue: lo que falte llega la noche siguiente.
  */
 export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function* (
-  buzon: Layer.Layer<BuzonAdministrado>,
+  buzon: Layer.Layer<AceptadasDelBuzon>,
 ) {
   const base = yield* BaseDeBarrido;
   const nocturna = yield* BaseNocturna;
@@ -367,15 +354,12 @@ export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function*
   }
   const cuentas = { leidas: 0, nuevas: 0 };
   const recogida = Effect.gen(function* () {
-    const cliente = yield* BuzonAdministrado;
+    const cliente = yield* AceptadasDelBuzon;
     let despuesDe = yield* nocturna.ultimaAceptada;
     for (;;) {
-      const pagina: PaginaDeCola = yield* cliente.aceptadas(despuesDe, PAGINA_MAXIMA);
+      const pagina: PaginaParaPublicar = yield* cliente.leer(despuesDe);
       cuentas.leidas += pagina.aportaciones.length;
-      cuentas.nuevas += yield* nocturna.guardarAceptadas(
-        pagina.aportaciones.map(aceptadaDe),
-        inicio,
-      );
+      cuentas.nuevas += yield* nocturna.guardarAceptadas(pagina.aportaciones, inicio);
       if (pagina.ultima === null) return;
       despuesDe = pagina.ultima;
     }

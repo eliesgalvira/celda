@@ -18,7 +18,7 @@ export const INTERRUPTOR_POR_DEFECTO: Readonly<Record<Fuente, Interruptor>> = {
   comunidad: {
     activo: false,
     motivo:
-      "apagado por defecto: sin la conexión con el buzón (CELDA_CONVEX_URL y CELDA_CONVEX_CLAVE)",
+      "apagado por defecto: sin la conexión con el buzón (CELDA_CONVEX_SITE_URL y CELDA_PUBLICACION_CLAVE)",
   },
   opencellid: { activo: false, motivo: "apagado por defecto: aún no tiene extractor" },
 };

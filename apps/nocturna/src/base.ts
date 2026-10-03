@@ -1,12 +1,11 @@
 import { Caja as CajaEsquema, Cuadro, cuadroDe, ZONAS_DE_BARRIDO } from "@celda/dominio/barrido";
 import { compararTexto } from "@celda/dominio/banda";
 import { type EmplazamientoDeCapa, emplazamientoDeCapa } from "@celda/dominio/capa";
-import { AportacionCompartible } from "@celda/dominio/aportacion";
 import { Emplazamiento, type Estado } from "@celda/dominio/emplazamiento";
 import { fichaDe } from "@celda/dominio/ficha";
 import { fusionar } from "@celda/dominio/fusion";
 import {
-  type AportacionAceptada,
+  AceptadaParaPublicar,
   correccionesDeFicha,
   emplazamientoDe,
 } from "@celda/dominio/moderacion";
@@ -89,9 +88,10 @@ export interface OpcionesBase {
  * apagado, solo eran ejecuciones omitidas.
  *
  * La versión 6 trae lo aceptado en la moderación (ADR 0020, #57): `aportaciones_aceptadas`, con
- * cada aportación aceptada que la noche ha leído del buzón, su emplazamiento, la identidad que la
- * envió (para contar a cada persona una vez), cuándo se aceptó y la fecha de la ejecución que la
- * trajo. La huella de la IP no sale nunca del buzón.
+ * cada corrección propuesta o corroboración aceptada que la noche ha leído del buzón, su
+ * emplazamiento, el seudónimo de quien la envió (para contar a cada persona una vez), cuándo se
+ * aceptó y la fecha de la ejecución que la trajo. Ni la identidad ni la huella de la IP salen del
+ * buzón.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -219,7 +219,7 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
       id TEXT PRIMARY KEY,
       tipo TEXT NOT NULL,
       emplazamiento TEXT,
-      identidad TEXT NOT NULL,
+      persona TEXT NOT NULL,
       aceptada_en INTEGER NOT NULL,
       importada_en INTEGER NOT NULL,
       datos TEXT NOT NULL
@@ -245,16 +245,16 @@ const FilaDeCola = Schema.Struct({
   ficha_espera_hasta: Schema.NullOr(Schema.Finite),
   datos: Schema.fromJsonString(Registro),
 });
-const AportacionEnJson = Schema.fromJsonString(AportacionCompartible);
-const codificarAportacion = Schema.encodeEffect(AportacionEnJson);
+const ContenidoEnJson = Schema.fromJsonString(AceptadaParaPublicar.fields.contenido);
+const codificarAportacion = Schema.encodeEffect(ContenidoEnJson);
 
 /** Una aportación aceptada tal como la guarda la base. */
 const FilaAceptada = Schema.Struct({
   id: Schema.String,
-  identidad: Schema.String,
+  persona: Schema.String,
   aceptada_en: Schema.Finite,
   importada_en: Schema.Finite,
-  datos: AportacionEnJson,
+  datos: ContenidoEnJson,
 });
 
 /** Las correcciones de la ficha que salen de las filas aceptadas de su emplazamiento. */
@@ -262,7 +262,7 @@ const correccionesDeFilas = (filas: ReadonlyArray<typeof FilaAceptada.Type>) =>
   correccionesDeFicha(
     filas.map((f) => ({
       id: f.id,
-      identidad: f.identidad,
+      persona: f.persona,
       aceptadaEl: f.aceptada_en,
       contenido: f.datos,
     })),
@@ -430,7 +430,7 @@ export class BaseNocturna extends Context.Service<
      * ejecución que las trae. Las que ya tenía no cambian. Devuelve cuántas eran nuevas.
      */
     readonly guardarAceptadas: (
-      aceptadas: ReadonlyArray<AportacionAceptada>,
+      aceptadas: ReadonlyArray<AceptadaParaPublicar>,
       fecha: number,
     ) => Effect.Effect<number>;
   }
@@ -888,7 +888,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         );
         const ficha = fichaDe(fila.datos, fila.version, estaciones);
         const aceptadas = yield* decodificar(FilaAceptada)(
-          yield* sql`SELECT id, identidad, aceptada_en, importada_en, datos
+          yield* sql`SELECT id, persona, aceptada_en, importada_en, datos
             FROM aportaciones_aceptadas WHERE emplazamiento = ${clave} AND tipo <> 'propia'`,
         );
         const correcciones = correccionesDeFilas(aceptadas).get(clave) ?? [];
@@ -919,7 +919,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           const corregidos = new Set(
             correccionesDeFilas(
               yield* decodificar(FilaAceptada)(
-                yield* sql`SELECT id, identidad, aceptada_en, importada_en, datos
+                yield* sql`SELECT id, persona, aceptada_en, importada_en, datos
                   FROM aportaciones_aceptadas
                   WHERE emplazamiento IS NOT NULL AND tipo <> 'propia'`,
               ),
@@ -1069,7 +1069,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                     id: aceptada.id,
                     tipo: aceptada.contenido.tipo,
                     emplazamiento: emplazamientoDe(aceptada.contenido),
-                    identidad: aceptada.identidad,
+                    persona: aceptada.persona,
                     aceptada_en: aceptada.aceptadaEl,
                     importada_en: fecha,
                     datos: yield* codificarAportacion(aceptada.contenido),

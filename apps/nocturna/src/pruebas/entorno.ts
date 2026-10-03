@@ -11,7 +11,6 @@ import { type AlmacenDeCopias, AlmacenDeFicheros } from "@celda/publicacion/alma
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import type { SitioEnVercel } from "@celda/publicacion/vercel";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
-import type { BuzonAdministrado } from "@celda/moderacion/buzon";
 import { NodeServices } from "@effect/platform-node";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import * as Duration from "effect/Duration";
@@ -24,6 +23,7 @@ import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { baseNocturna } from "../base.ts";
+import type { AceptadasDelBuzon } from "../buzon.ts";
 import { COPIAS_CONSERVADAS, REINTENTO_DE_PUBLICACION } from "../configuracion.ts";
 import {
   Extractores,
@@ -129,7 +129,7 @@ export interface Variante {
    * El buzón de Convex del que se lee lo aceptado. Con él, la comunidad tiene el interruptor
    * encendido, salvo si `interruptores` dice otra cosa.
    */
-  readonly buzon?: Layer.Layer<BuzonAdministrado>;
+  readonly buzon?: Layer.Layer<AceptadasDelBuzon>;
   readonly reintento?: Duration.Duration;
   readonly proceso?: OpcionesBarrido;
 }

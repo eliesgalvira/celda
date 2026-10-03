@@ -159,9 +159,6 @@ importers:
       '@celda/ingesta':
         specifier: workspace:*
         version: link:../../packages/ingesta
-      '@celda/moderacion':
-        specifier: workspace:*
-        version: link:../moderacion
       '@celda/publicacion':
         specifier: workspace:*
         version: link:../../packages/publicacion
@@ -175,6 +172,9 @@ importers:
         specifier: 'catalog:'
         version: 4.0.0-rc.117
     devDependencies:
+      '@celda/moderacion':
+        specifier: workspace:*
+        version: link:../moderacion
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.0-rc.117(effect@4.0.0-rc.117)(vitest@5.0.1)
