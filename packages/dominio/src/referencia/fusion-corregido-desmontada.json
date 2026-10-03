@@ -14,7 +14,7 @@
         "tipo": "desmontada",
         "compania": "movistar",
         "procedencia": {
-          "fuente": "antenasmoviles",
+          "fuente": "comunidad",
           "clave": "MOVISTAR - 0802314"
         },
         "fecha": 1790467200000
@@ -33,7 +33,7 @@
             "clave": "MOVISTAR - 0802314"
           },
           {
-            "fuente": "antenasmoviles",
+            "fuente": "comunidad",
             "clave": "MOVISTAR - 0802314"
           }
         ]
@@ -53,7 +53,7 @@
       }
     ],
     "fuentes": [
-      "antenasmoviles",
+      "comunidad",
       "registro-oficial"
     ],
     "datosDel": 1790467200000

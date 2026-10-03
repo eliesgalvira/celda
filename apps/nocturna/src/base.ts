@@ -1,10 +1,4 @@
-import {
-  Caja as CajaEsquema,
-  Cuadro,
-  cuadroDe,
-  ZONAS_DE_BARRIDO,
-  type ZonaDeBarrido,
-} from "@celda/dominio/barrido";
+import { Caja as CajaEsquema, Cuadro, cuadroDe, ZONAS_DE_BARRIDO } from "@celda/dominio/barrido";
 import { compararTexto } from "@celda/dominio/banda";
 import { type EmplazamientoDeCapa, emplazamientoDeCapa } from "@celda/dominio/capa";
 import { Emplazamiento } from "@celda/dominio/emplazamiento";
@@ -27,21 +21,14 @@ import {
 import type { FichaEnCola } from "@celda/ingesta/fichas";
 import { Registro } from "@celda/ingesta/extractor";
 import {
-  BARRIDOS_PARA_RETIRAR,
   ObservacionGuardada,
   observacionDe,
-  PuntoGuardado,
-  puntoDe,
   registroDe,
   trasAusencia,
-  trasDetalle,
   trasFicha,
   trasListado,
-  trasPunto,
   trasSinFicha,
 } from "@celda/ingesta/guardado";
-import { PRIORIDAD } from "@celda/ingesta/antenasmoviles/normalizar";
-import { BaseDePuntos } from "@celda/ingesta/barridoDePuntos";
 import { zonasBarridas } from "@celda/publicacion/cobertura";
 import {
   DatosNoDisponibles,
@@ -86,12 +73,14 @@ export interface OpcionesBase {
  *   recorrido, para retomar uno cortado;
  * - en `ejecuciones`, lo que hizo cada zona.
  *
- * La versión 3 trae antenasmoviles.es (#48): `puntos`, los marcadores de su listado
- * (`PuntoGuardado` en `datos`), con su cuadro, cuándo se leyó su detalle, cuándo lo vio un listado
- * por última vez y si está retirado. Sus barridos van en `barridos`, como los del registro.
+ * La versión 3 trajo `puntos`, los marcadores de una web de antenas que el ADR 0019 retira.
  *
  * La versión 4 trae la cola de fichas en la ventana (ticket 41): en `observaciones`, los fallos
  * seguidos de la ficha, hasta cuándo espera antes de volver a pedirla y el último error.
+ *
+ * La versión 5 retira esa web (ADR 0019, #55): borra la tabla `puntos` y las observaciones, los
+ * barridos y las ejecuciones de las fuentes que ya no están en `Fuente`. Con su interruptor siempre
+ * apagado, solo eran ejecuciones omitidas.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -102,6 +91,9 @@ const sueloDe = (eje: "longitud" | "latitud") => {
   const valor = `json_extract(datos, '$.posicion.${eje}')`;
   return `(CAST(${valor} AS INTEGER) - (${valor} < CAST(${valor} AS INTEGER)))`;
 };
+
+/** Las fuentes de hoy, como lista de SQL: `('registro-oficial', …)`. */
+const FUENTES = `(${Fuente.literals.map((fuente) => `'${fuente}'`).join(", ")})`;
 
 export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
   [
@@ -203,16 +195,22 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
     `ALTER TABLE observaciones ADD COLUMN ficha_espera_hasta INTEGER`,
     `ALTER TABLE observaciones ADD COLUMN ficha_error TEXT`,
   ],
+  [
+    `DELETE FROM observaciones WHERE fuente NOT IN ${FUENTES}`,
+    `DELETE FROM cuadros_barridos
+      WHERE barrido IN (SELECT id FROM barridos WHERE fuente NOT IN ${FUENTES})`,
+    `DELETE FROM barridos WHERE fuente NOT IN ${FUENTES}`,
+    `DELETE FROM ejecuciones WHERE fuente NOT IN ${FUENTES}`,
+    `DROP TABLE puntos`,
+  ],
 ];
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
-const PuntoEnJson = Schema.fromJsonString(PuntoGuardado);
 const ZonasEnJson = Schema.fromJsonString(Schema.Array(ZonaEnLaEjecucion));
 const EmplazamientoEnJson = Schema.fromJsonString(Emplazamiento);
 const decodificarEmplazamiento = Schema.decodeEffect(EmplazamientoEnJson);
 
 const FilaObservacion = Schema.Struct({ id: Schema.Int, datos: ObservacionEnJson });
-const FilaPunto = Schema.Struct({ id: Schema.Int, datos: PuntoEnJson });
 /** Una ficha de la cola: solo lo que dice el listado de su observación, sin las bandas. */
 const FilaDeCola = Schema.Struct({
   id: Schema.Int,
@@ -285,7 +283,6 @@ const Maximo = Schema.Struct({ v: Schema.NullOr(Schema.Finite) });
 const decodificar = <S extends Schema.Top>(esquema: S) =>
   Schema.decodeUnknownEffect(Schema.Array(esquema));
 const codificarObservacion = Schema.encodeEffect(ObservacionEnJson);
-const codificarPunto = Schema.encodeEffect(PuntoEnJson);
 const codificarEmplazamiento = Schema.encodeEffect(EmplazamientoEnJson);
 const codificarCambios = Schema.encodeEffect(Schema.fromJsonString(Cambios));
 const codificarErrores = Schema.encodeEffect(Schema.fromJsonString(Schema.Array(Schema.String)));
@@ -334,10 +331,6 @@ export interface ResumenDeFuente {
   readonly primerasEnEspera: ReadonlyArray<FichaEnEspera>;
   /** Las zonas que ha barrido alguna vez, por nombre. */
   readonly zonas: ReadonlyArray<ResumenDeZona>;
-  /** En las fuentes que listan puntos, los que no se han retirado. */
-  readonly puntos: number;
-  /** ER5 cuyo detalle no se ha leído nunca, o que cambiaron en el listado. */
-  readonly detallesPendientes: number;
 }
 
 /** Lo que el mantenedor quiere saber de una zona de barrido. */
@@ -799,271 +792,6 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         }, Effect.orDie),
       });
 
-      const puntosDe = Effect.fn("BaseNocturna.puntosDe")(function* (
-        fuente: Fuente,
-        claves: ReadonlyArray<string>,
-      ) {
-        if (claves.length === 0) return new Map<string, typeof FilaPunto.Type>();
-        const filas = yield* decodificar(FilaPunto)(
-          yield* sql`SELECT id, datos FROM puntos
-            WHERE fuente = ${fuente} AND clave IN ${sql.in(claves)}`,
-        );
-        return new Map(filas.map((fila) => [fila.datos.clave, fila]));
-      });
-
-      const guardarPunto = Effect.fn("BaseNocturna.guardarPunto")(function* (
-        id: number | undefined,
-        fuente: Fuente,
-        p: PuntoGuardado,
-      ) {
-        const datos = yield* codificarPunto(p);
-        if (id === undefined) {
-          yield* sql`INSERT INTO puntos ${sql.insert({
-            fuente,
-            clave: p.clave,
-            cuadro: cuadroDe(p.posicion),
-            prioridad: p.prioridad,
-            detalle_leido_en: p.detalleLeidoEn,
-            retirado_en: p.retiradoEn,
-            datos,
-          })}`;
-          return;
-        }
-        yield* sql`UPDATE puntos
-          SET cuadro = ${cuadroDe(p.posicion)}, prioridad = ${p.prioridad},
-            detalle_leido_en = ${p.detalleLeidoEn}, retirado_en = ${p.retiradoEn}, datos = ${datos}
-          WHERE id = ${id}`;
-      });
-
-      /**
-       * Retira las observaciones de `claves` que siguen siendo del punto: si la fuente ha
-       * reagrupado códigos, otro punto puede habérselas quedado.
-       */
-      const retirarObservacionesDe = Effect.fn("BaseNocturna.retirarObservacionesDe")(function* (
-        fuente: Fuente,
-        punto: string,
-        claves: ReadonlyArray<string>,
-        fecha: number,
-      ) {
-        let retiradas = 0;
-        for (const previa of (yield* observacionesDe(fuente, claves)).values()) {
-          if (previa.datos.retiradaEn !== null || previa.datos.punto !== punto) continue;
-          yield* guardarObservacion(previa.id, { ...previa.datos, retiradaEn: fecha });
-          retiradas++;
-        }
-        return retiradas;
-      });
-
-      /** Da por fallido un barrido que se cortó antes de cerrarse: no cuenta ausencias. */
-      const cortarEnCurso = (fuente: Fuente, zona: string, fecha: number) =>
-        sql`UPDATE barridos SET estado = 'fallido', fin = ${fecha},
-            error = 'cortado antes de cerrarse'
-          WHERE fuente = ${fuente} AND zona = ${zona} AND estado = 'en curso'`;
-
-      const deBarrido = (ejecucion: string, fuente: Fuente, zona: ZonaDeBarrido, fecha: number) =>
-        Effect.map(codificarCuadros(zona.cuadros), (cuadros) => ({
-          fuente,
-          zona: zona.nombre,
-          cuadros,
-          inicio: fecha,
-          ejecucion: Number(ejecucion),
-        }));
-
-      const conPuntos = BaseDePuntos.of({
-        vigentesEn: Effect.fn("BaseNocturna.puntosVigentesEn")(function* (fuente, cuadros) {
-          if (cuadros.length === 0) return 0;
-          const [fila] = yield* decodificar(Cuenta)(
-            yield* sql`SELECT count(*) AS n FROM puntos
-                WHERE fuente = ${fuente} AND cuadro IN ${sql.in(cuadros)} AND retirado_en IS NULL`,
-          );
-          return fila?.n ?? 0;
-        }, Effect.orDie),
-
-        aplicarZona: Effect.fn("BaseNocturna.aplicarZona")(function* (
-          ejecucion,
-          fuente,
-          zona,
-          fecha,
-          puntos,
-        ) {
-          return yield* sql.withTransaction(
-            Effect.gen(function* () {
-              yield* cortarEnCurso(fuente, zona.nombre, fecha);
-              const [fila] = yield* sql<{ readonly id: number }>`INSERT INTO barridos ${sql.insert({
-                ...(yield* deBarrido(ejecucion, fuente, zona, fecha)),
-                fin: null,
-                estado: "en curso",
-                error: null,
-              })} RETURNING id`;
-              let creados = 0;
-              let cambiados = 0;
-              let observacionesRetiradas = 0;
-              for (const lote of trozos(puntos, LOTE)) {
-                const claves = lote.map((punto) => punto.clave);
-                const previos = yield* puntosDe(fuente, claves);
-                for (const punto of lote) {
-                  const previo = previos.get(punto.clave);
-                  const { guardar, cuenta } = trasPunto(previo?.datos, punto);
-                  let guardado = guardar ?? previo?.datos;
-                  // El detalle de un punto que copia el registro no se lee: lo que salió de él
-                  // cuando era una ER5 ya no vale.
-                  if (
-                    guardado !== undefined &&
-                    punto.prioridad >= PRIORIDAD.registro &&
-                    guardado.observaciones.length > 0
-                  ) {
-                    observacionesRetiradas += yield* retirarObservacionesDe(
-                      fuente,
-                      punto.clave,
-                      guardado.observaciones,
-                      fecha,
-                    );
-                    guardado = { ...guardado, observaciones: [] };
-                  }
-                  if (guardado !== undefined && guardado !== previo?.datos) {
-                    yield* guardarPunto(previo?.id, fuente, guardado);
-                  }
-                  creados += cuenta === "creado" ? 1 : 0;
-                  cambiados += cuenta === "cambiado" ? 1 : 0;
-                }
-                yield* sql`UPDATE puntos SET vista_en = ${fecha}
-                    WHERE fuente = ${fuente} AND clave IN ${sql.in(claves)}`;
-              }
-              return {
-                barrido: String(fila?.id ?? 0),
-                creados,
-                cambiados,
-                observacionesRetiradas,
-              };
-            }),
-          );
-        }, Effect.orDie),
-
-        cerrarZona: Effect.fn("BaseNocturna.cerrarZona")(function* (barrido, fecha, fin) {
-          return yield* sql.withTransaction(
-            Effect.gen(function* () {
-              const [fila] = yield* decodificar(FilaBarrido)(
-                yield* sql`SELECT id, fuente, inicio, cuadros FROM barridos
-                    WHERE id = ${Number(barrido)} AND estado = 'en curso'`,
-              );
-              const cuentas = { puntos: 0, observaciones: 0 };
-              if (fila === undefined) return cuentas;
-              const ausentes =
-                fila.cuadros.length === 0
-                  ? []
-                  : yield* decodificar(FilaPunto)(
-                      yield* sql`SELECT id, datos FROM puntos
-                          WHERE fuente = ${fila.fuente} AND retirado_en IS NULL
-                            AND cuadro IN ${sql.in(fila.cuadros)}
-                            AND (vista_en IS NULL OR vista_en < ${fila.inicio})`,
-                    );
-              for (const { id, datos } of ausentes) {
-                const ausencias = datos.ausencias + 1;
-                const retirado = ausencias >= BARRIDOS_PARA_RETIRAR;
-                yield* guardarPunto(id, fila.fuente, {
-                  ...datos,
-                  ausencias,
-                  retiradoEn: retirado ? fecha : null,
-                });
-                if (!retirado) continue;
-                cuentas.puntos++;
-                cuentas.observaciones += yield* retirarObservacionesDe(
-                  fila.fuente,
-                  datos.clave,
-                  datos.observaciones,
-                  fecha,
-                );
-              }
-              yield* sql`UPDATE barridos SET estado = 'completado', fin = ${fin}
-                  WHERE id = ${fila.id}`;
-              return cuentas;
-            }),
-          );
-        }, Effect.orDie),
-
-        fallarZona: Effect.fn("BaseNocturna.fallarZona")(function* (
-          ejecucion,
-          fuente,
-          zona,
-          fecha,
-          motivo,
-        ) {
-          yield* sql.withTransaction(
-            Effect.gen(function* () {
-              yield* cortarEnCurso(fuente, zona.nombre, fecha);
-              yield* sql`INSERT INTO barridos ${sql.insert({
-                ...(yield* deBarrido(ejecucion, fuente, zona, fecha)),
-                fin: fecha,
-                estado: "fallido",
-                error: motivo,
-              })}`;
-            }),
-          );
-        }, Effect.orDie),
-
-        pendientesDeDetalle: Effect.fn("BaseNocturna.pendientesDeDetalle")(function* (
-          fuente,
-          cuadros,
-          limite,
-        ) {
-          if (cuadros.length === 0) return [];
-          // Como el índice `por_detalle` de Convex: por prioridad y, dentro, por antigüedad.
-          const filas = yield* decodificar(FilaPunto)(
-            yield* sql`SELECT id, datos FROM puntos
-                WHERE fuente = ${fuente} AND detalle_leido_en IS NULL AND retirado_en IS NULL
-                  AND prioridad < ${PRIORIDAD.registro} AND cuadro IN ${sql.in(cuadros)}
-                ORDER BY prioridad ASC, id ASC
-                LIMIT ${limite}`,
-          );
-          return filas.map((fila) => puntoDe(fila.datos));
-        }, Effect.orDie),
-
-        aplicarDetalle: Effect.fn("BaseNocturna.aplicarDetalle")(function* (
-          fuente,
-          clavePunto,
-          fecha,
-          observaciones,
-        ) {
-          return yield* sql.withTransaction(
-            Effect.gen(function* () {
-              const cuentas = { creados: 0, cambiados: 0, retirados: 0 };
-              const punto = (yield* puntosDe(fuente, [clavePunto])).get(clavePunto);
-              if (punto === undefined || punto.datos.retiradoEn !== null) return cuentas;
-              const previas = yield* observacionesDe(
-                fuente,
-                observaciones.map((o) => o.clave),
-              );
-              for (const observacion of observaciones) {
-                const previa = previas.get(observacion.clave);
-                const { guardar, cuenta } = trasDetalle(
-                  previa?.datos,
-                  observacion,
-                  fuente,
-                  clavePunto,
-                  fecha,
-                );
-                if (guardar !== undefined) yield* guardarObservacion(previa?.id, guardar);
-                cuentas.creados += cuenta === "creada" ? 1 : 0;
-                cuentas.cambiados += cuenta === "cambiada" ? 1 : 0;
-              }
-              const vigentes = new Set(observaciones.map((o) => o.clave));
-              cuentas.retirados = yield* retirarObservacionesDe(
-                fuente,
-                clavePunto,
-                punto.datos.observaciones.filter((clave) => !vigentes.has(clave)),
-                fecha,
-              );
-              yield* guardarPunto(punto.id, fuente, {
-                ...punto.datos,
-                detalleLeidoEn: fecha,
-                observaciones: [...vigentes],
-              });
-              return cuentas;
-            }),
-          );
-        }, Effect.orDie),
-      });
-
       const noDisponible = (error: { readonly message: string }) =>
         new DatosNoDisponibles({ motivo: `la base SQLite: ${error.message}` });
 
@@ -1198,11 +926,6 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 zonas: [...(yield* base.estadoDeZonas(fuente))]
                   .map(([zona, estado]) => ({ zona, ...estado }))
                   .sort((a, b) => compararTexto(a.zona, b.zona)),
-                puntos: yield* cuenta(sql`SELECT count(*) AS n FROM puntos
-                    WHERE fuente = ${fuente} AND retirado_en IS NULL`),
-                detallesPendientes: yield* cuenta(sql`SELECT count(*) AS n FROM puntos
-                    WHERE fuente = ${fuente} AND retirado_en IS NULL AND detalle_leido_en IS NULL
-                      AND prioridad < ${PRIORIDAD.registro}`),
               };
               return resumen;
             }),
@@ -1229,7 +952,6 @@ export const baseNocturna = (opciones: OpcionesBase) =>
       });
 
       return Context.make(BaseDeBarrido, base).pipe(
-        Context.add(BaseDePuntos, conPuntos),
         Context.add(DatosPublicables, datos),
         Context.add(BaseNocturna, nocturna),
       );

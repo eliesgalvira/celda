@@ -11,7 +11,7 @@
     }:
     let
       inherit (lib.attrsets) filterAttrs;
-      inherit (lib.lists) optional singleton unique;
+      inherit (lib.lists) optional singleton;
       inherit (lib.meta) getExe;
       inherit (lib.modules) mkIf mkRemovedOptionModule mkRenamedOptionModule;
       inherit (lib.options) literalExpression mkEnableOption mkOption;
@@ -60,7 +60,7 @@
       ];
 
       options.services.celda-nocturna = {
-        enable = mkEnableOption "la ingesta nocturna de Celda: el registro oficial, antenasmoviles.es si se enciende, la publicación y la copia de la base, una vez por noche";
+        enable = mkEnableOption "la ingesta nocturna de Celda: el registro oficial, la publicación y la copia de la base, una vez por noche";
 
         package = mkOption {
           type = package;
@@ -308,62 +308,6 @@
           example = "Celda (ingesta; contacto en ejemplo.org)";
           description = "Se envía en cada petición. Su primer producto es el nombre con el que se busca a la ingesta en `robots.txt`. Si montas tu propia ingesta, pon tu contacto.";
         };
-
-        antenasmoviles.enable = mkEnableOption ''
-          antenasmoviles.es: su listado una vez por noche y el detalle de las ER5 pendientes. Déjalo
-          apagado hasta escribir a su administrador (docs/investigacion/fuentes-comunitarias.md);
-          apagado, la noche apunta su ejecución como omitida y no le pide nada
-        '';
-
-        antenasmoviles.motivo = mkOption {
-          type = str;
-          default = "apagado por defecto hasta escribir a su administrador antes de publicar sus datos";
-          description = "Lo que se apunta en la ejecución si antenasmoviles.es está apagado.";
-        };
-
-        antenasmoviles.pausa = mkOption {
-          type = ints.between 5 3600;
-          default = 5;
-          description = "Segundos entre el final de una respuesta y la petición siguiente. Nunca menos de 5: es una web sin ánimo de lucro.";
-        };
-
-        antenasmoviles.maxDetalles = mkOption {
-          type = ints.unsigned;
-          default = 100;
-          description = ''
-            Detalles de ER5 que se leen cada noche, como mucho. Solo se leen los de las ER5 nuevas o
-            cambiadas en el listado, sin repaso de las ya leídas. Con 0 solo se lee el listado.
-          '';
-        };
-
-        antenasmoviles.maxPeticiones = mkOption {
-          type = ints.positive;
-          default = config.services.celda-nocturna.antenasmoviles.maxDetalles + 10;
-          defaultText = literalExpression "config.services.celda-nocturna.antenasmoviles.maxDetalles + 10";
-          description = "Tope de peticiones por noche, `robots.txt`, el listado y reintentos incluidos.";
-        };
-
-        antenasmoviles.zonas = mkOption {
-          type = listOf zonaDeBarrido;
-          default = unique (
-            config.services.celda-nocturna.registroOficial.zonas
-            ++ config.services.celda-nocturna.registroOficial.zonasEnTurno
-          );
-          defaultText = literalExpression "unique (config.services.celda-nocturna.registroOficial.zonas ++ config.services.celda-nocturna.registroOficial.zonasEnTurno)";
-          example = singleton "cataluna";
-          description = ''
-            Zonas de barrido cuyos marcadores se guardan. El listado es de toda España y se pide una
-            vez por noche, así que todas se barren cada noche. Un marcador que falta en dos barridos
-            seguidos de su zona se retira.
-          '';
-        };
-
-        antenasmoviles.userAgent = mkOption {
-          type = str;
-          default = config.services.celda-nocturna.registroOficial.userAgent;
-          defaultText = literalExpression "config.services.celda-nocturna.registroOficial.userAgent";
-          description = "Se envía en cada petición a antenasmoviles.es.";
-        };
       };
 
       config = {
@@ -427,13 +371,6 @@
             CELDA_ALMACEN_ORIGEN = mkIf (
               config.services.celda-nocturna.origenPublico != null
             ) config.services.celda-nocturna.origenPublico;
-            CELDA_ANTENASMOVILES_ACTIVO = boolToString config.services.celda-nocturna.antenasmoviles.enable;
-            CELDA_ANTENASMOVILES_MAX_DETALLES = toString config.services.celda-nocturna.antenasmoviles.maxDetalles;
-            CELDA_ANTENASMOVILES_MAX_PETICIONES = toString config.services.celda-nocturna.antenasmoviles.maxPeticiones;
-            CELDA_ANTENASMOVILES_MOTIVO = config.services.celda-nocturna.antenasmoviles.motivo;
-            CELDA_ANTENASMOVILES_PAUSA_SEGUNDOS = toString config.services.celda-nocturna.antenasmoviles.pausa;
-            CELDA_ANTENASMOVILES_USER_AGENT = config.services.celda-nocturna.antenasmoviles.userAgent;
-            CELDA_ANTENASMOVILES_ZONAS = listaDelPrograma config.services.celda-nocturna.antenasmoviles.zonas;
             CELDA_INGESTA_BASE = "/var/lib/${config.services.celda-nocturna.directorioDeEstado}/ingesta.sqlite";
             CELDA_INGESTA_COPIAS = config.services.celda-nocturna.copias.directorio;
             CELDA_INGESTA_COPIAS_CONSERVADAS = toString config.services.celda-nocturna.copias.conservar;

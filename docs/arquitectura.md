@@ -20,7 +20,7 @@ Fuentes consultadas: un proyecto previo del autor sobre reactividad y el gist `e
 ```
                  ┌──────────── ingesta (programada) ────────────┐
 Registro oficial │  extractores  →  fusión  →  emplazamientos   │  Convex
-antenasmoviles.es│  (con límite)    (dominio)   canónicos       │  (tablas, crons,
+Comunidad Celda  │  (con límite)    (dominio)   canónicos       │  (tablas, crons,
 OpenCelliD       └──────────────────────┬───────────────────────┘   límites de uso)
                                         │ instantánea versionada
                                         ▼
@@ -129,7 +129,7 @@ interface Simulacion<Params, Resultado> {
 ### ▸ 9. Ingesta y procedencia
 
 - Cada fuente tiene su extractor en `packages/ingesta`, un servicio Effect con reintentos y un `Schedule`, que produce **observaciones** con fuente, fecha y URL. La fusión es una función pura del dominio: une las observaciones que están a menos de 60 m y son del mismo operador, calcula la confianza y detecta conflictos. Ya estaba descrita en `celda-ux.html`.
-- antenasmoviles.es se extrae, como decidimos. Cada corrección enlaza a su página de origen y la ficha lo atribuye. El extractor queda aislado para poder apagarlo sin tocar nada más.
+- Las correcciones salen de la comunidad de Celda, aceptadas en la moderación, y la ficha enseña cada una con su procedencia al lado del registro (ADR 0019 y 0020). Esta propuesta extraía otra web de antenas; el ADR 0019 la retiró. Cada extractor queda aislado para poder apagarlo sin tocar nada más.
 - Los datos de OpenCelliD tienen licencia CC BY-SA 4.0. Si se redistribuyen en las capas públicas, esas capas heredan la licencia. Queda anotado para el ADR de licencias.
 
 ### ▸ 10. Alojamiento en Cloudflare, con plan de contingencia para los bloqueos de LaLiga
@@ -159,7 +159,7 @@ interface Simulacion<Params, Resultado> {
    3. Límites de uso en consultas anónimas de Convex.
    4. Cloudflare Pages y R2 con el dominio en Vercel, y el origen de reserva ante los bloqueos.
 1. **Primer recorrido completo con datos reales:** registro oficial de Barcelona → Convex → PMTiles → mapa con logos y agrupación → ficha en vivo.
-2. Correcciones de antenasmoviles.es y procedencia en la ficha.
+2. Correcciones de la comunidad y procedencia en la ficha.
 3. `packages/sim`: radiación, degradado del sector y SINR en un Worker.
 4. Ubicación y medidas en el dispositivo.
 5. Guía de primer uso y ejercicios de clase («modo estudiante»).

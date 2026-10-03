@@ -1,8 +1,9 @@
 import type { Coordenada } from "@celda/dominio/area";
 import type { Banda } from "@celda/dominio/banda";
-import { type Cuadro, cuadroDe, ZONAS_DE_BARRIDO } from "@celda/dominio/barrido";
+import { type Cuadro, cajaDeCuadro, cuadroDe } from "@celda/dominio/barrido";
 import type { Compania } from "@celda/dominio/compania";
-import { municipiosConHabitantes } from "@celda/dominio/municipio";
+import { cuadrosDelRegistro } from "@celda/dominio/cuadrosDelRegistro";
+import { type MunicipioConHabitantes, municipiosConHabitantes } from "@celda/dominio/municipio";
 import {
   type FuenteGrabada,
   geoportalGrabado,
@@ -23,34 +24,27 @@ import * as Schema from "effect/Schema";
  * un sufijo para no repetirse, y la dirección, el municipio y la provincia de su sitio nuevo.
  * Todo pasa después por el normalizador del extractor, como un listado de verdad.
  *
- * Los registros de cada zona de barrido son los previstos en la investigación 08, con la
- * corrección de su muestreo, y los de Cataluña los de su primera pasada real. Dentro de cada zona
- * se reparten por municipios, con un peso que crece con los habitantes del padrón más despacio que
- * ellos: las ciudades tienen más emplazamientos pero menos por habitante, como en el registro. Con
- * el exponente elegido, el cuadro de Barcelona (`2,41`) lleva la mitad de los de Cataluña, como en
- * la pasada real. Cada ficha da las bandas de una ficha grabada del Campus Nord de su compañía.
+ * Cada cuadro de 1° lleva los registros que tiene en el listado propio del registro oficial de
+ * toda España (`cuadrosDelRegistro`, 69.612 el 29/09/2026), así que cada zona de barrido lleva los
+ * suyos. Dentro de cada cuadro se reparten por los municipios cuya etiqueta cae en él, con un peso
+ * que crece con los habitantes del padrón más despacio que ellos: las ciudades tienen más
+ * emplazamientos pero menos por habitante, como en el registro. Un cuadro sin ninguna etiqueta,
+ * como el del norte de Menorca, usa los municipios más cercanos de sus provincias y pone sus
+ * emplazamientos en su borde. Cada ficha da las bandas de una ficha grabada del Campus Nord de su
+ * compañía.
  */
-
-/**
- * Registros del listado por zona de barrido: los de Cataluña salen de su primera pasada real
- * (29/09/2026); los demás, de la densidad de antenasmoviles.es con el 0,7 % de más que dio el
- * muestreo del 28/09 (investigación 08). Suman unos 69.800.
- */
-export const REGISTROS_POR_ZONA = new Map([
-  ["cataluna", 10_305],
-  ["centro", 12_316],
-  ["andalucia", 11_430],
-  ["levante", 10_784],
-  ["norte", 9_554],
-  ["ebro-y-duero", 10_115],
-  ["oeste-y-canarias", 5_266],
-]);
 
 /** Cómo crece el peso de un municipio con sus habitantes (ver arriba). */
 const EXPONENTE = 0.8;
 
 /** Kilómetros en un grado de latitud. */
 const KM_POR_GRADO = 111.195;
+
+/** Municipios que usa un cuadro sin ninguna etiqueta: los más cercanos de sus provincias. */
+const CERCANOS = 3;
+
+/** Grados que se aparta del borde un punto que se mete en un cuadro desde fuera. */
+const MARGEN = 0.01;
 
 /** Un emplazamiento de los listados grabados: sus elementos, tal como llegaron, en un punto. */
 interface Plantilla {
@@ -150,14 +144,39 @@ export const espanaSintetica = (
     const nombreDeProvincia = (codigo: string) =>
       zonas.municipios.provincias.get(codigo)?.nombre.toUpperCase() ?? "";
 
+    const porEtiqueta = new Map<Cuadro, Array<MunicipioConHabitantes>>();
+    for (const municipio of habitantes) {
+      const cuadro = cuadroDe(municipio.etiqueta);
+      const suyos = porEtiqueta.get(cuadro) ?? [];
+      suyos.push(municipio);
+      porEtiqueta.set(cuadro, suyos);
+    }
+
     const elementos: Array<ElementoCrudo> = [];
     const porZona = new Map<string, number>();
     let sitio = 0;
-    for (const zona of ZONAS_DE_BARRIDO) {
-      const suyos = new Set<Cuadro>(zona.cuadros);
-      const municipios = habitantes.filter((m) => suyos.has(cuadroDe(m.etiqueta)));
+    for (const cuadro of (yield* cuadrosDelRegistro).cuadros) {
+      const [oeste, sur, este, norte] = cajaDeCuadro(cuadro.cuadro);
+      // Dentro del cuadro, a `MARGEN` de su borde.
+      const meter = ({ longitud, latitud }: Coordenada): Coordenada => ({
+        longitud: Math.min(Math.max(longitud, oeste + MARGEN), este - MARGEN),
+        latitud: Math.min(Math.max(latitud, sur + MARGEN), norte - MARGEN),
+      });
+      const distancia = (m: MunicipioConHabitantes) => {
+        const dentro = meter(m.etiqueta);
+        return Math.hypot(
+          dentro.longitud - m.etiqueta.longitud,
+          dentro.latitud - m.etiqueta.latitud,
+        );
+      };
+      const municipios =
+        porEtiqueta.get(cuadro.cuadro) ??
+        habitantes
+          .filter((m) => m.provincia in cuadro.porProvincia)
+          .toSorted((a, b) => distancia(a) - distancia(b))
+          .slice(0, CERCANOS);
       const elegir = eleccionPonderada(municipios.map((m) => (m.habitantes ?? 50) ** EXPONENTE));
-      const objetivo = Math.round((REGISTROS_POR_ZONA.get(zona.nombre) ?? 0) * escala);
+      const objetivo = Math.round(cuadro.registros * escala);
       let cuantos = 0;
       while (cuantos < objetivo) {
         const municipio = municipios[elegir(azar())];
@@ -165,16 +184,16 @@ export const espanaSintetica = (
         if (municipio === undefined || plantilla === undefined) break;
         // Alrededor del centro del municipio, más lejos cuanto más grande es.
         const km = Math.max(0.3, Math.sqrt(municipio.areaKm2) / 4);
-        let posicion: Coordenada = municipio.etiqueta;
+        const centro = meter(municipio.etiqueta);
+        let posicion: Coordenada = centro;
         for (let intento = 0; intento < 5; intento++) {
           const candidata = {
             longitud:
-              municipio.etiqueta.longitud +
-              (gauss() * km) /
-                (KM_POR_GRADO * Math.cos((municipio.etiqueta.latitud * Math.PI) / 180)),
-            latitud: municipio.etiqueta.latitud + (gauss() * km) / KM_POR_GRADO,
+              centro.longitud +
+              (gauss() * km) / (KM_POR_GRADO * Math.cos((centro.latitud * Math.PI) / 180)),
+            latitud: centro.latitud + (gauss() * km) / KM_POR_GRADO,
           };
-          if (suyos.has(cuadroDe(candidata))) {
+          if (cuadroDe(candidata) === cuadro.cuadro) {
             posicion = candidata;
             break;
           }
@@ -200,7 +219,7 @@ export const espanaSintetica = (
         }
         sitio++;
       }
-      porZona.set(zona.nombre, cuantos);
+      porZona.set(cuadro.zona, (porZona.get(cuadro.zona) ?? 0) + cuantos);
     }
 
     const listado = listadoDeElementos(elementos);

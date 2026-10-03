@@ -3,7 +3,7 @@ import type { Conflicto } from "@celda/dominio/emplazamiento";
 import type { EstacionDeFicha, Ficha, OrigenDeFicha } from "@celda/dominio/ficha";
 import { llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
-import { fechaCorta } from "./textos.ts";
+import { ENLACE_FUENTE, fechaCorta, NOMBRE_FUENTE } from "./textos.ts";
 
 /** Lo que dice una fuente de una estación base, ya escrito para la ficha. */
 export interface TextosLado {
@@ -14,7 +14,7 @@ export interface TextosLado {
   readonly textoEnlace?: string;
 }
 
-/** Una estación base en la que el registro oficial y la comunidad no coinciden. */
+/** Una estación base en la que el registro oficial y otra fuente no coinciden. */
 export interface TextosContraste {
   readonly tono: "corregido" | "nuevo";
   readonly compania: Compania;
@@ -29,17 +29,9 @@ export interface TextosCorrecciones {
   readonly resumen: TextoMarcado;
   readonly contrastes: ReadonlyArray<TextosContraste>;
   readonly conflictos: ReadonlyArray<string>;
-  /** El crédito de antenasmoviles.es, si algo sale de su web. */
-  readonly credito: string | undefined;
 }
 
 const esOficial = (origen: OrigenDeFicha) => origen.fuente === "registro-oficial";
-
-const NOMBRE_COMUNIDAD: Readonly<Record<OrigenDeFicha["fuente"], string>> = {
-  "registro-oficial": "Registro oficial",
-  antenasmoviles: "antenasmoviles.es",
-  opencellid: "OpenCelliD",
-};
 
 const desde = (fecha: number) => `desde el ${fechaCorta(fecha)}`;
 
@@ -59,17 +51,18 @@ const ladoOficial = (oficiales: ReadonlyArray<OrigenDeFicha>): TextosLado => {
       };
 };
 
+/** Lo que dice la otra fuente, sea cual sea: su nombre y su enlace salen de la fuente. */
 const ladoComunidad = (origen: OrigenDeFicha, dice: string): TextosLado => ({
-  fuente: NOMBRE_COMUNIDAD[origen.fuente],
+  fuente: NOMBRE_FUENTE[origen.fuente],
   dice,
   fecha: desde(origen.fecha),
   enlace: origen.url,
-  textoEnlace: `Ver en ${NOMBRE_COMUNIDAD[origen.fuente]}`,
+  textoEnlace: ENLACE_FUENTE[origen.fuente],
 });
 
 /**
- * La estación base, si las fuentes no coinciden en ella: la comunidad la da por desmontada, o
- * la conoce y el registro oficial no.
+ * La estación base, si las fuentes no coinciden en ella: otra fuente la da por desmontada, o la
+ * conoce y el registro oficial no.
  */
 const contrasteDe = (ficha: Ficha, estacion: EstacionDeFicha): TextosContraste | undefined => {
   const oficiales = estacion.origenes.filter((o) => esOficial(o) && o.afirma === "presente");
@@ -92,7 +85,7 @@ const contrasteDe = (ficha: Ficha, estacion: EstacionDeFicha): TextosContraste |
       tono: nuevo ? "nuevo" : "corregido",
       // Si el emplazamiento sí está en el registro, lo que falta es esta compañía allí.
       oficial: { fuente: "Registro oficial", dice: nuevo ? "No la tiene" : "No la tiene aquí" },
-      comunidad: ladoComunidad(presente, "La han añadido sus usuarios"),
+      comunidad: ladoComunidad(presente, "La sitúa aquí"),
     };
   }
   return undefined;
@@ -137,10 +130,6 @@ const RESUMEN: Readonly<Record<Ficha["estado"], TextoMarcado>> = {
   nuevo: marcado`El ${REGISTRO} no tiene este ${EMPLAZAMIENTO}: lo han añadido los usuarios de la comunidad.`,
 };
 
-const CREDITO_ANTENASMOVILES =
-  "Correcciones de la comunidad de antenasmoviles.es. Su web no tiene una página por " +
-  "emplazamiento: el enlace abre su mapa aquí y hay que pulsar el marcador.";
-
 /**
  * Las correcciones y los conflictos de la ficha, o nada si todas las fuentes coinciden. Cada
  * corrección lleva lo que dice el registro oficial y lo que dice la comunidad, con su fecha y
@@ -162,13 +151,5 @@ export const textosCorrecciones = (ficha: Ficha): TextosCorrecciones | undefined
   if (contrastes.length === 0 && conflictos.length === 0) {
     return undefined;
   }
-  const deAntenasMoviles = ficha.estaciones.some((e) =>
-    e.origenes.some((o) => o.fuente === "antenasmoviles"),
-  );
-  return {
-    resumen: RESUMEN[ficha.estado],
-    contrastes,
-    conflictos,
-    credito: deAntenasMoviles ? CREDITO_ANTENASMOVILES : undefined,
-  };
+  return { resumen: RESUMEN[ficha.estado], contrastes, conflictos };
 };

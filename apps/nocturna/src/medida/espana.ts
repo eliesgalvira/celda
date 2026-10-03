@@ -4,9 +4,7 @@ import { ZONAS_DE_BARRIDO } from "@celda/dominio/barrido";
 import { OPCIONES_ZONAS, type OpcionesBarrido } from "@celda/ingesta/barrido";
 import { INTERRUPTOR_POR_DEFECTO } from "@celda/ingesta/ejecucion";
 import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
-import { capaDePuntosGrabada } from "@celda/ingesta/pruebas/antenasmoviles";
 import { capaGrabadaPorCajas, type FuenteGrabada } from "@celda/ingesta/pruebas/grabado";
-import { OPCIONES_PUNTOS } from "@celda/ingesta/barridoDePuntos";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -116,13 +114,7 @@ const medir = Effect.gen(function* () {
     ),
     Layer.succeed(
       Extractores,
-      Extractores.of({
-        registroOficial: capaGrabadaPorCajas("registro-oficial", espana),
-        antenasMoviles: capaDePuntosGrabada({
-          listado: { puntos: [], avisos: [] },
-          detalles: new Map(),
-        }),
-      }),
+      Extractores.of({ registroOficial: capaGrabadaPorCajas("registro-oficial", espana) }),
     ),
     Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
   ).pipe(
@@ -138,7 +130,6 @@ const medir = Effect.gen(function* () {
   const inicio = performance.now();
   const hecha = yield* noche({
     proceso,
-    puntos: OPCIONES_PUNTOS,
     reintento: REINTENTO_DE_PUBLICACION,
     copias: { carpeta: path.join(raiz, "copias"), conservar: COPIAS_CONSERVADAS },
   }).pipe(Effect.provide(entorno));

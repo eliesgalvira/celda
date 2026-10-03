@@ -18,11 +18,11 @@ describe("ContrasteFicha", () => {
           textoEnlace: "Ver en el registro oficial",
         }}
         comunidad={{
-          fuente: "antenasmoviles.es",
+          fuente: "Comunidad de Celda",
           dice: "La da por desmontada",
           fecha: "desde el 27 sept 2026",
-          enlace: "https://antenasmoviles.es/#19/41.388342/2.113628",
-          textoEnlace: "Ver en antenasmoviles.es",
+          enlace: "https://comunidad.example/correccion/1",
+          textoEnlace: "Ver la corrección",
         }}
       />
     ));
@@ -31,11 +31,8 @@ describe("ContrasteFicha", () => {
     assert.strictEqual(lista?.getAttribute("aria-label"), "Qué dice cada fuente de Vodafone");
     assert.isNotNull(getByText("La tiene dada de alta"));
     assert.isNotNull(getByText("desde el 27 sept 2026"));
-    const comunidad = getByRole("link", { name: /Ver en antenasmoviles\.es/u });
-    assert.strictEqual(
-      comunidad.getAttribute("href"),
-      "https://antenasmoviles.es/#19/41.388342/2.113628",
-    );
+    const comunidad = getByRole("link", { name: /Ver la corrección/u });
+    assert.strictEqual(comunidad.getAttribute("href"), "https://comunidad.example/correccion/1");
     assert.strictEqual(comunidad.getAttribute("target"), "_blank");
     assert.strictEqual(
       getByText("La da por desmontada").closest("[data-tono]")?.getAttribute("data-tono"),
@@ -51,11 +48,11 @@ describe("ContrasteFicha", () => {
         nombre="Movistar"
         oficial={{ fuente: "Registro oficial", dice: "No la tiene" }}
         comunidad={{
-          fuente: "antenasmoviles.es",
-          dice: "La han añadido sus usuarios",
+          fuente: "Comunidad de Celda",
+          dice: "La sitúa aquí",
           fecha: "desde el 27 sept 2026",
-          enlace: "https://antenasmoviles.es/#19/41.379580/2.143060",
-          textoEnlace: "Ver en antenasmoviles.es",
+          enlace: "https://comunidad.example/correccion/2",
+          textoEnlace: "Ver la corrección",
         }}
       />
     ));

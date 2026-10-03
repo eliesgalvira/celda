@@ -1,7 +1,7 @@
 import { Banda } from "@celda/dominio/banda";
 import { Emplazamiento } from "@celda/dominio/emplazamiento";
 import { Fuente, Observacion } from "@celda/dominio/observacion";
-import { ObservacionDePunto, Punto, Registro } from "@celda/ingesta/extractor";
+import { Registro } from "@celda/ingesta/extractor";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
@@ -87,49 +87,6 @@ export default GroupSpec.make()
     }),
   )
   .addFunction(
-    FunctionSpec.internalMutation({
-      name: "aplicarPuntos",
-      args: () => ({ fuente: Fuente, puntos: Schema.Array(Punto) }),
-      returns: () => Escritos,
-    }),
-  )
-  .addFunction(
-    FunctionSpec.internalQuery({
-      name: "pendientesDeDetalle",
-      args: () => ({
-        fuente: Fuente,
-        /** Los detalles leídos antes de esta fecha se vuelven a leer. */
-        leidosAntesDe: Schema.Finite,
-        limite: Schema.Int,
-      }),
-      returns: () => Schema.Array(Punto),
-    }),
-  )
-  .addFunction(
-    FunctionSpec.internalMutation({
-      name: "aplicarDetalle",
-      args: () => ({
-        fuente: Fuente,
-        /** Clave del punto. */
-        punto: Schema.String,
-        fecha: Schema.Finite,
-        observaciones: Schema.Array(ObservacionDePunto),
-      }),
-      returns: () => Schema.Struct({ ...Escritos.fields, retirados: Schema.Int }),
-    }),
-  )
-  .addFunction(
-    FunctionSpec.internalMutation({
-      name: "cerrarBarridoDePuntos",
-      args: () => ({
-        ejecucion: Id("ejecuciones"),
-        /** Todas las claves de punto que ha traído el listado en esta ejecución. */
-        vistos: Schema.Array(Schema.String),
-      }),
-      returns: () => Schema.Struct({ puntos: Schema.Int, observaciones: Schema.Int }),
-    }),
-  )
-  .addFunction(
     FunctionSpec.internalQuery({
       name: "observacionesVigentes",
       args: () => ({ fuente: Fuente, ...argumentosDePagina }),
@@ -200,12 +157,6 @@ export default GroupSpec.make()
   .addFunction(
     FunctionSpec.internalAction({
       name: "registroOficial",
-      returns: () => ejecuciones.Doc,
-    }),
-  )
-  .addFunction(
-    FunctionSpec.internalAction({
-      name: "antenasMoviles",
       returns: () => ejecuciones.Doc,
     }),
   )

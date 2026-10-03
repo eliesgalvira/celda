@@ -62,42 +62,38 @@ export interface ZonaDeBarrido {
   readonly nombre: string;
   /** Cómo se lee: las comunidades autónomas que cubre. */
   readonly titulo: string;
+  /** Las comunidades autónomas de `titulo`, por su código del INE. */
+  readonly comunidades: ReadonlyArray<string>;
   readonly cuadros: ReadonlyArray<Cuadro>;
 }
 
 /**
- * Las siete zonas de barrido de España, con los 94 cuadros de 1° en los que antenasmoviles.es
- * tenía algún marcador el 28/09/2026. Cada cuadro va a la comunidad con más registros previstos
- * en él, salvo los que tocan Cataluña, que van todos a Cataluña para barrerla entera en una
- * noche. Registros previstos con la densidad de antenasmoviles.es (investigación 08):
- * Cataluña 9.859, centro 12.230, Andalucía 11.351, levante 10.709, norte 9.488, Ebro y Duero
- * 10.045, y oeste y Canarias 5.229.
+ * Las siete zonas de barrido de España, con los 94 cuadros de 1° en los que el listado propio del
+ * registro oficial tiene algún registro (ADR 0019). Salen de su listado de toda España, los 69.612
+ * registros barridos el 29/09/2026, que guarda `cuadrosDelRegistro` con los registros de cada
+ * cuadro; la pasada por los cuadros de borde, que tocan España y no están aquí, aún no se ha hecho.
+ * Cada cuadro va a la comunidad con más registros en él, salvo los que tocan Cataluña, que van
+ * todos a Cataluña para barrerla entera en una noche (`zonaDelCuadro`, ADR 0014). Registros por
+ * zona: Cataluña 10.305, centro 11.007, Andalucía 11.578, levante 10.947, norte 9.287, Ebro y
+ * Duero 10.993, y oeste y Canarias 5.495.
  */
 export const ZONAS_DE_BARRIDO: ReadonlyArray<ZonaDeBarrido> = [
   {
     nombre: "cataluna",
     titulo: "Cataluña",
+    comunidades: ["09"],
     cuadros: ["0,40", "0,41", "1,41", "2,41", "3,41", "0,42", "1,42", "2,42", "3,42"],
   },
   {
     nombre: "centro",
     titulo: "Madrid y Castilla-La Mancha",
-    cuadros: [
-      "-5,38",
-      "-4,38",
-      "-3,38",
-      "-5,39",
-      "-4,39",
-      "-3,39",
-      "-2,39",
-      "-5,40",
-      "-4,40",
-      "-3,40",
-    ],
+    comunidades: ["13", "08"],
+    cuadros: ["-4,38", "-3,38", "-5,39", "-4,39", "-3,39", "-2,39", "-4,40", "-3,40"],
   },
   {
     nombre: "andalucia",
     titulo: "Andalucía, Ceuta y Melilla",
+    comunidades: ["01", "18", "19"],
     cuadros: [
       "-6,35",
       "-3,35",
@@ -113,11 +109,13 @@ export const ZONAS_DE_BARRIDO: ReadonlyArray<ZonaDeBarrido> = [
       "-5,37",
       "-4,37",
       "-3,37",
+      "-5,38",
     ],
   },
   {
     nombre: "levante",
     titulo: "Comunitat Valenciana, Región de Murcia e Illes Balears",
+    comunidades: ["10", "14", "04"],
     cuadros: [
       "-2,37",
       "-1,37",
@@ -138,6 +136,7 @@ export const ZONAS_DE_BARRIDO: ReadonlyArray<ZonaDeBarrido> = [
   {
     nombre: "norte",
     titulo: "Galicia, Asturias, Cantabria y País Vasco",
+    comunidades: ["12", "03", "06", "16"],
     cuadros: [
       "-9,41",
       "-8,41",
@@ -158,8 +157,10 @@ export const ZONAS_DE_BARRIDO: ReadonlyArray<ZonaDeBarrido> = [
   {
     nombre: "ebro-y-duero",
     titulo: "Castilla y León, Aragón, Navarra y La Rioja",
+    comunidades: ["07", "02", "15", "17"],
     cuadros: [
       "-6,40",
+      "-5,40",
       "-2,40",
       "-1,40",
       "-7,41",
@@ -181,6 +182,7 @@ export const ZONAS_DE_BARRIDO: ReadonlyArray<ZonaDeBarrido> = [
   {
     nombre: "oeste-y-canarias",
     titulo: "Extremadura y Canarias",
+    comunidades: ["11", "05"],
     cuadros: [
       "-19,27",
       "-18,27",
@@ -205,3 +207,65 @@ export const ZONAS_DE_BARRIDO: ReadonlyArray<ZonaDeBarrido> = [
 /** La zona de barrido con ese nombre, si la hay. */
 export const zonaDeBarrido = (nombre: string): ZonaDeBarrido | undefined =>
   ZONAS_DE_BARRIDO.find((zona) => zona.nombre === nombre);
+
+/** La comunidad autónoma de cada provincia, por los códigos del INE de las dos. */
+export const COMUNIDAD_DE_PROVINCIA: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    "01": ["04", "11", "14", "18", "21", "23", "29", "41"],
+    "02": ["22", "44", "50"],
+    "03": ["33"],
+    "04": ["07"],
+    "05": ["35", "38"],
+    "06": ["39"],
+    "07": ["05", "09", "24", "34", "37", "40", "42", "47", "49"],
+    "08": ["02", "13", "16", "19", "45"],
+    "09": ["08", "17", "25", "43"],
+    "10": ["03", "12", "46"],
+    "11": ["06", "10"],
+    "12": ["15", "27", "32", "36"],
+    "13": ["28"],
+    "14": ["30"],
+    "15": ["31"],
+    "16": ["01", "20", "48"],
+    "17": ["26"],
+    "18": ["51"],
+    "19": ["52"],
+  }).flatMap(([comunidad, provincias]) => provincias.map((p) => [p, comunidad] as const)),
+);
+
+/** Cataluña, por su código del INE: un cuadro que la toca va a su zona. */
+const CATALUNA = "09";
+
+/** Lo que el listado del registro oficial dice de un cuadro, para elegir su zona de barrido. */
+export interface RegistrosDelCuadro {
+  /** Sus registros por provincia, por código del INE. */
+  readonly porProvincia: Readonly<Record<string, number>>;
+  /** Las provincias cuyos límites toca, por código del INE. */
+  readonly toca: ReadonlyArray<string>;
+}
+
+/**
+ * La zona de barrido de un cuadro con la regla del ADR 0014: la de la comunidad con más registros
+ * en él, salvo si toca Cataluña, que va a Cataluña para barrerla entera en una noche. A igualdad
+ * de registros gana la comunidad de código menor. Un cuadro sin registros con provincia va con la
+ * primera provincia que toca, y uno que no toca ninguna no es de ninguna zona.
+ */
+export const zonaDelCuadro = (cuadro: RegistrosDelCuadro): ZonaDeBarrido | undefined => {
+  const comunidadDe = (provincia: string) => COMUNIDAD_DE_PROVINCIA.get(provincia);
+  if (cuadro.toca.some((provincia) => comunidadDe(provincia) === CATALUNA)) {
+    return zonaDeBarrido("cataluna");
+  }
+  const porComunidad = new Map<string, number>();
+  for (const [provincia, registros] of Object.entries(cuadro.porProvincia)) {
+    const comunidad = comunidadDe(provincia);
+    if (comunidad === undefined) continue;
+    porComunidad.set(comunidad, (porComunidad.get(comunidad) ?? 0) + registros);
+  }
+  const [mayor] = [...porComunidad]
+    .filter(([, registros]) => registros > 0)
+    .sort(([a, ra], [b, rb]) => rb - ra || (a < b ? -1 : 1));
+  const comunidad = mayor?.[0] ?? cuadro.toca.map(comunidadDe).find((c) => c !== undefined);
+  return ZONAS_DE_BARRIDO.find(
+    (zona) => comunidad !== undefined && zona.comunidades.includes(comunidad),
+  );
+};

@@ -9,8 +9,8 @@ import * as Layer from "effect/Layer";
 
 /**
  * Una España sintética para medir la capa por provincias (ADR 0016): `n` emplazamientos repartidos
- * como en la investigación de la ampliación (`docs/investigacion/muestras/espana/generar-espana.mjs`,
- * con la misma semilla), la mayoría alrededor de las ciudades y el resto al azar por la península.
+ * como el conjunto sintético de la exploración 03 (`sitiosEspana`) que midió la investigación de
+ * la ampliación, con la misma semilla: la mayoría alrededor de las ciudades y el resto al azar.
  * Todas las zonas de barrido están barridas, así que todas las provincias están cubiertas.
  */
 

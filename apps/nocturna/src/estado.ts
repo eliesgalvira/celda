@@ -17,15 +17,10 @@ import type {
 const fecha = (milisegundos: number): string =>
   `${DateTime.formatIso(DateTime.makeUnsafe(milisegundos)).slice(0, 19).replace("T", " ")} UTC`;
 
-const describirCambios = ({ observaciones, fichas, emplazamientos, puntos }: Cambios): string =>
+const describirCambios = ({ observaciones, fichas, emplazamientos }: Cambios): string =>
   [
-    ...(puntos === undefined
-      ? []
-      : [`puntos +${puntos.creados} ~${puntos.cambiados} -${puntos.retirados}`]),
     `observaciones +${observaciones.creados} ~${observaciones.cambiados} -${observaciones.retirados}`,
-    puntos === undefined
-      ? `fichas ${fichas.leidas} leídas (${fichas.cambiadas} cambiadas)`
-      : `detalles ${fichas.leidas} leídos (${fichas.cambiadas} cambiados)`,
+    `fichas ${fichas.leidas} leídas (${fichas.cambiadas} cambiadas)`,
     `emplazamientos +${emplazamientos.creados} ~${emplazamientos.cambiados} -${emplazamientos.retirados}`,
   ].join(", ");
 
@@ -150,18 +145,13 @@ const describirFichasEnEspera = (f: ResumenDeFuente): ReadonlyArray<string> =>
 const describirFuente = (f: ResumenDeFuente, turno?: Turno): ReadonlyArray<string> => [
   `${f.fuente}: ${f.interruptor.activo ? "encendida" : `apagada (${f.interruptor.motivo})`}`,
   ...(f.ultima === undefined ? ["  Ninguna ejecución todavía"] : describirEjecucion(f.ultima)),
-  ...(f.puntos > 0
-    ? [
-        `  Puntos vigentes: ${f.puntos}; detalles de ER5 pendientes: ${f.detallesPendientes}; ` +
-          `observaciones vigentes: ${f.vigentes}`,
-      ]
-    : f.vigentes === 0
-      ? []
-      : [
-          `  Observaciones vigentes: ${f.vigentes}; fichas pendientes: ${f.sinLeer} sin leer y ` +
-            `${f.porReleer} por releer`,
-          ...describirFichasEnEspera(f),
-        ]),
+  ...(f.vigentes === 0
+    ? []
+    : [
+        `  Observaciones vigentes: ${f.vigentes}; fichas pendientes: ${f.sinLeer} sin leer y ` +
+          `${f.porReleer} por releer`,
+        ...describirFichasEnEspera(f),
+      ]),
   ...(turno !== undefined
     ? describirZonasEnTurno(f.zonas, turno)
     : f.zonas.length === 0

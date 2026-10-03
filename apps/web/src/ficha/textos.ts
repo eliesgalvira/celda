@@ -41,8 +41,8 @@ export const antetituloDe = (ficha: Ficha): TextoMarcado =>
 /**
  * El título de la ficha. Ninguna fuente da un nombre a los emplazamientos, así que es la calle
  * y el número tal como los publica la fuente, sin el municipio ni la provincia del final. El
- * registro escribe «CL X, 1. MUNICIPIO, PROVINCIA»; las ER5 de antenasmoviles.es traen la
- * dirección de OpenStreetMap, «Carrer de X, 1, Barrio, 08014 Barcelona».
+ * registro escribe «CL X, 1. MUNICIPIO, PROVINCIA»; una dirección de OpenStreetMap, como la de un
+ * emplazamiento que solo conoce la comunidad, es «Carrer de X, 1, Barrio, 08014 Barcelona».
  */
 export const tituloDe = (ficha: Ficha): string => {
   const direccion = ficha.direccion.trim();
@@ -133,13 +133,13 @@ export const sinBandasDe = (estacion: EstacionDeFicha): string => {
 
 export const NOMBRE_FUENTE: Readonly<Record<Fuente, string>> = {
   "registro-oficial": "Registro oficial",
-  antenasmoviles: "antenasmoviles.es",
+  comunidad: "Comunidad de Celda",
   opencellid: "OpenCelliD",
 };
 
-const ENLACE_FUENTE: Readonly<Record<Fuente, string>> = {
+export const ENLACE_FUENTE: Readonly<Record<Fuente, string>> = {
   "registro-oficial": "Ver en el registro oficial",
-  antenasmoviles: "Ver en antenasmoviles.es",
+  comunidad: "Ver la corrección",
   opencellid: "Ver en OpenCelliD",
 };
 

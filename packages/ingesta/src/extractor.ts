@@ -2,7 +2,7 @@ import { Coordenada } from "@celda/dominio/area";
 import type { Banda } from "@celda/dominio/banda";
 import type { Caja } from "@celda/dominio/barrido";
 import { Compania } from "@celda/dominio/compania";
-import { Afirmacion, type Fuente } from "@celda/dominio/observacion";
+import type { Fuente } from "@celda/dominio/observacion";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -152,54 +152,3 @@ export class ExtractorPorCajas extends Context.Service<
     readonly peticiones: Effect.Effect<number>;
   }
 >()("@celda/ingesta/extractor/ExtractorPorCajas") {}
-
-/**
- * Un punto del listado de una fuente que agrupa estaciones base, como un marcador de
- * antenasmoviles.es. El listado solo da los códigos y la posición; lo demás está en su detalle.
- */
-export const Punto = Schema.Struct({
-  /** Los códigos del punto, ordenados y separados por comas. */
-  clave: Schema.String,
-  codigos: Schema.Array(Schema.String),
-  posicion: Coordenada,
-  /** Huella de lo que dice el listado del punto: si cambia, hay que volver a leer su detalle. */
-  huella: Schema.String,
-  /** Orden de lectura del detalle entre los pendientes: 0 antes que 1. */
-  prioridad: Schema.Int,
-});
-export type Punto = typeof Punto.Type;
-
-/** Los puntos de la zona en el listado de una fuente. */
-export interface ListadoDePuntos {
-  readonly puntos: ReadonlyArray<Punto>;
-  /** Filas que no se han podido leer, con el motivo. No paran la ejecución. */
-  readonly avisos: ReadonlyArray<string>;
-}
-
-/** Una observación que sale del detalle de un punto: una estación base y lo que dice de ella. */
-export const ObservacionDePunto = Schema.Struct({
-  ...Registro.fields,
-  afirma: Afirmacion,
-});
-export type ObservacionDePunto = typeof ObservacionDePunto.Type;
-
-/** Lo que dice el detalle de un punto. */
-export interface DetalleDePunto {
-  readonly observaciones: ReadonlyArray<ObservacionDePunto>;
-  readonly avisos: ReadonlyArray<string>;
-}
-
-/**
- * Extractor de una fuente que lista puntos y da el detalle de cada uno aparte, como
- * antenasmoviles.es. Igual que `Extractor`, vive lo que dura una ejecución.
- */
-export class ExtractorDePuntos extends Context.Service<
-  ExtractorDePuntos,
-  {
-    readonly fuente: Fuente;
-    /** Los puntos de la zona. Si falla, la ejecución no sabe qué ha desaparecido. */
-    readonly puntos: Effect.Effect<ListadoDePuntos, ErrorDeExtractor>;
-    /** Las observaciones del detalle de un punto. */
-    readonly detalle: (punto: Punto) => Effect.Effect<DetalleDePunto, ErrorDeExtractor>;
-  }
->()("@celda/ingesta/extractor/ExtractorDePuntos") {}

@@ -1,6 +1,6 @@
-import * as AntenasMoviles from "@celda/ingesta/antenasmoviles/extractor";
-import { enLosCuadros } from "@celda/ingesta/antenasmoviles/normalizar";
 import { Provincias } from "@celda/ingesta/fichas";
+import { PasadaDeBorde } from "@celda/dominio/cuadrosDelRegistro";
+import { municipioDelPunto } from "@celda/dominio/municipio";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
@@ -13,11 +13,11 @@ import {
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { baseNocturna } from "./base.ts";
 import { montarCapasEn } from "./capas.ts";
@@ -35,6 +35,7 @@ import {
   sinAlmacen,
   subirCopia,
 } from "./programa.ts";
+import { cuadrosDeBorde, pasadaDeBorde } from "./cuadros.ts";
 
 /**
  * La ingesta nocturna fuera de Convex (ADR 0015). Cuatro órdenes sobre la misma base:
@@ -46,8 +47,14 @@ import {
  *   build de Vercel si no sirve la versión vigente.
  * - `copia`: copia la base a la carpeta de copias y, con un cubo de R2, también allí.
  *
- * Y una que no abre la base: `capas <carpeta>`, que monta en una carpeta la versión vigente del
- * almacén de la configuración y las dos anteriores. La lanza el build de Vercel (ADR 0018).
+ * Y dos que no abren la base:
+ *
+ * - `capas <carpeta>`, que monta en una carpeta la versión vigente del almacén de la configuración
+ *   y las dos anteriores. La lanza el build de Vercel (ADR 0018).
+ * - `cuadros-de-borde <fichero>`, que pide una vez al registro oficial, con el ritmo, el
+ *   `User-Agent` y el tope del extractor, cada cuadro que toca alguna provincia y no está en ninguna
+ *   zona de barrido, y escribe en `<fichero>` lo que trae cada uno (`pasadaDeBorde`). Con ese
+ *   fichero, `pnpm run cuadros` pone al día los cuadros de las zonas (#55).
  *
  * La configuración va en variables de entorno (`configuracion.ts`). Los secretos pueden llegar
  * también como credenciales de systemd (`credenciales.ts`).
@@ -57,7 +64,7 @@ class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesc
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «noche», «estado», «publicar», «copia» o «capas».`;
+    return `Orden desconocida «${this.orden}». Usa «noche», «estado», «publicar», «copia», «capas» o «cuadros-de-borde».`;
   }
 }
 
@@ -72,6 +79,15 @@ class FaltanArgumentos extends Schema.TaggedError<FaltanArgumentos>()("FaltanArg
 class SinAlmacen extends Schema.TaggedError<SinAlmacen>()("SinAlmacen", {}) {
   override get message() {
     return "No hay almacén del que montar las capas: faltan las variables de R2 (CELDA_R2_CUENTA, CELDA_R2_CUBO, CELDA_R2_ID_CLAVE y CELDA_R2_SECRETO) o CELDA_ALMACEN_CARPETA.";
+  }
+}
+
+const codificarPasada = Schema.encodeEffect(Schema.fromJsonString(PasadaDeBorde));
+
+/** `cuadros-de-borde` sin el fichero en el que escribir. */
+class FaltaElFichero extends Schema.TaggedError<FaltaElFichero>()("FaltaElFichero", {}) {
+  override get message() {
+    return "Uso: cuadros-de-borde <fichero>. El fichero es el JSON que lee `pnpm run cuadros`.";
   }
 }
 
@@ -95,9 +111,31 @@ const principal = Effect.gen(function* () {
     return;
   }
   const c = yield* configuracion;
+  const zonas = yield* zonasDePublicacion;
+  const extractorDelRegistro = RegistroOficial.capaPorCajas(
+    c.registroOficial,
+    c.fichasDelRegistro,
+  ).pipe(Layer.provide(clienteHttpDelRegistro()));
+  if (orden === "cuadros-de-borde") {
+    const [fichero] = argumentos;
+    if (fichero === undefined) return yield* new FaltaElFichero();
+    const pasar = pasadaDeBorde(
+      cuadrosDeBorde(zonas.municipios),
+      (posicion) => municipioDelPunto(posicion, zonas.municipios).provincia?.codigo,
+    );
+    // Como la orden `capas`, monta aquí su extractor, una vez, y no abre la base ni el almacén.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    const pasada = yield* pasar.pipe(Effect.provide(extractorDelRegistro));
+    const fs = yield* FileSystem.FileSystem;
+    yield* fs.writeFileString(fichero, `${yield* codificarPasada(pasada)}\n`);
+    yield* Effect.logInfo(
+      `Pasada de borde en ${fichero}: ${pasada.cuadros.length} cuadros, ` +
+        `${pasada.peticiones} peticiones, ${pasada.errores.length} errores`,
+    );
+    return;
+  }
   const base = baseNocturna({ fichero: c.base, interruptores: c.interruptores });
   const almacen = yield* almacenDesdeConfig;
-  const zonas = yield* zonasDePublicacion;
   const vercel = yield* vercelDesdeConfig;
   const copias = yield* copiasDesdeConfig;
   const publicador = Option.match(almacen, {
@@ -114,15 +152,7 @@ const principal = Effect.gen(function* () {
   });
   const extractores = Layer.succeed(
     Extractores,
-    Extractores.of({
-      registroOficial: RegistroOficial.capaPorCajas(c.registroOficial, c.fichasDelRegistro).pipe(
-        Layer.provide(clienteHttpDelRegistro()),
-      ),
-      antenasMoviles: AntenasMoviles.capa({
-        ...c.antenasMoviles,
-        dentro: enLosCuadros(c.noche.puntos.zonas.flatMap((zona) => zona.cuadros)),
-      }).pipe(Layer.provide(FetchHttpClient.layer)),
-    }),
+    Extractores.of({ registroOficial: extractorDelRegistro }),
   );
   const entorno = Layer.mergeAll(
     publicador,

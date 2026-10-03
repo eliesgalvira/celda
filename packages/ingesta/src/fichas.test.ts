@@ -34,9 +34,24 @@ const DIA = 86_400_000;
 const AHORA = Date.UTC(2026, 8, 30, 2, 15);
 
 /** Tres zonas de un cuadro cada una, como las de barrido. */
-const CATALUNA: ZonaDeBarrido = { nombre: "cataluna", titulo: "Cataluña", cuadros: ["2,41"] };
-const CENTRO: ZonaDeBarrido = { nombre: "centro", titulo: "Centro", cuadros: ["-4,40"] };
-const LEVANTE: ZonaDeBarrido = { nombre: "levante", titulo: "Levante", cuadros: ["-1,39"] };
+const CATALUNA: ZonaDeBarrido = {
+  nombre: "cataluna",
+  titulo: "Cataluña",
+  comunidades: ["09"],
+  cuadros: ["2,41"],
+};
+const CENTRO: ZonaDeBarrido = {
+  nombre: "centro",
+  titulo: "Centro",
+  comunidades: ["13"],
+  cuadros: ["-4,40"],
+};
+const LEVANTE: ZonaDeBarrido = {
+  nombre: "levante",
+  titulo: "Levante",
+  comunidades: ["10"],
+  cuadros: ["-1,39"],
+};
 
 /** Provincias de mentira: al este de 2,5° es Girona (17) y al oeste, Barcelona (08). */
 const provinciaDe = ({ longitud, latitud }: Coordenada): string | undefined =>

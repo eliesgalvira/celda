@@ -213,11 +213,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
 
         assert.deepStrictEqual(
           hecha.ejecuciones.map((e) => [e.fuente, e.estado]),
-          [
-            ["registro-oficial", "completada"],
-            // antenasmoviles.es empieza apagado.
-            ["antenasmoviles", "omitida"],
-          ],
+          [["registro-oficial", "completada"]],
         );
         assert.strictEqual(hecha.publicacion.tipo, "publicada");
         // Los lotes y las capas, el manifiesto, el resumen y, al final, vigente.json.
@@ -563,7 +559,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
 
         assert.deepStrictEqual(
           apagada.ejecuciones.map((e) => e.estado),
-          ["omitida", "omitida"],
+          ["omitida"],
         );
         assert.strictEqual(yield* Ref.get(llamadas), 0);
         assert.strictEqual(apagada.publicacion.tipo, "al-dia");
@@ -627,7 +623,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           assert.include(texto, "Errores (4):");
           assert.include(texto, "Fichas paradas hasta la próxima noche: 3 fallos seguidos");
           assert.include(texto, `Última versión publicada: ${VERSION}`);
-          assert.include(texto, "antenasmoviles: apagada");
+          assert.include(texto, "comunidad: apagada");
         }),
       ),
   );

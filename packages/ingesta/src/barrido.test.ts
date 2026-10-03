@@ -45,7 +45,7 @@ interface Teselado {
   readonly hojas: ReadonlyArray<Caja>;
 }
 
-/** La división en cuatro de `teselas.mjs` (investigación 08) sobre unos puntos. */
+/** La división en cuatro que simuló la investigación 08, sobre unos puntos. */
 const simular = (puntos: ReadonlyArray<Punto>, caja: Caja, tope: number): Teselado => {
   const dentro = puntos.filter((p) => enCaja(caja, p.longitud, p.latitud));
   if (dentro.length < tope) return { peticiones: 1, hojas: [caja] };
@@ -184,7 +184,12 @@ describe("recorrido de un cuadro con listados grabados que llegan al tope de 100
 });
 
 describe("zonas de una noche", () => {
-  const zona = (nombre: string): ZonaDeBarrido => ({ nombre, titulo: nombre, cuadros: [] });
+  const zona = (nombre: string): ZonaDeBarrido => ({
+    nombre,
+    titulo: nombre,
+    comunidades: [],
+    cuadros: [],
+  });
   const [a, b, c, d] = [zona("a"), zona("b"), zona("c"), zona("d")];
   const nombres = (zonas: ReadonlyArray<ZonaDeBarrido>) => zonas.map((z) => z.nombre);
 

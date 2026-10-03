@@ -1,5 +1,7 @@
 # Investigación 06 · Registro oficial (Infoantenas)
 
+> **Nota (03/10/2026).** Lo que aquí se dice de antenasmoviles.es queda como historia: Celda ya no la lee ([ADR 0019](../adr/0019-fuentes-registro-y-aportaciones-propias.md)). Las correcciones salen ahora de la comunidad de Celda (ADR 0020).
+
 Consultado el 26/09/2026. Todas las peticiones se hicieron a mano o con los scripts de `muestras/herramientas/`, en serie, con al menos 2 o 3 segundos entre peticiones y el `User-Agent` «Celda (investigación; contacto en celda.elies.site)». En total fueron unas 65 peticiones a `geoportal.minetur.gob.es` en unos 15 minutos. Ese dominio no tiene `robots.txt` (devuelve 404), así que no hay ninguna ruta prohibida. Los `robots.txt` de `digital.gob.es`, `datos.gob.es` y `boe.es` no prohíben las páginas consultadas.
 
 Cada apartado separa lo **comprobado** (visto en una respuesta o en un texto oficial, con enlace) de lo **inferido** (mi interpretación, pendiente de confirmar).

@@ -12,7 +12,7 @@
       inherit (lib.meta) getExe;
       inherit (lib.modules) mkIf;
 
-      # Una autoridad y un certificado para el geoportal, antenasmoviles.es, el R2 y el Vercel de mentira. Son de la
+      # Una autoridad y un certificado para el geoportal, el R2 y el Vercel de mentira. Son de la
       # prueba: no protegen nada.
       certificados =
         pkgs.runCommand "celda-nocturna-certificados-de-prueba"
@@ -23,15 +23,13 @@
               -days 36500 -subj "/CN=Autoridad de prueba" -keyout ca.key -out "$out/ca.pem"
             openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
               -subj "/CN=Fuentes de prueba" -keyout "$out/servidor.key" -out servidor.csr
-            printf "subjectAltName=DNS:geoportal.minetur.gob.es,DNS:antenasmoviles.es,DNS:cuenta.r2.cloudflarestorage.com,DNS:api.vercel.com,DNS:celda.prueba" > san
+            printf "subjectAltName=DNS:geoportal.minetur.gob.es,DNS:cuenta.r2.cloudflarestorage.com,DNS:api.vercel.com,DNS:celda.prueba" > san
             openssl x509 -req -in servidor.csr -CA "$out/ca.pem" -CAkey ca.key -CAcreateserial \
               -days 36500 -extfile san -out "$out/servidor.pem"
           '';
 
       # El geoportal contesta el listado de cada caja con los elementos grabados en el Campus Nord
-      # que caen en ella, y cada ficha con una grabada. antenasmoviles.es da como listado los
-      # marcadores grabados en el Campus Nord, las ER5 grabadas de Barcelona y una ER5 de Madrid, y
-      # el detalle grabado de cada marcador que lo tiene. R2 guarda lo que le llega en una carpeta
+      # que caen en ella, y cada ficha con una grabada. R2 guarda lo que le llega en una carpeta
       # y apunta la firma de cada petición; no contesta nada sin firma ni deja escribir con la clave
       # de solo lectura del build. Vercel construye un despliegue con la orden `capas`, con esa
       # clave, en cada llamada al deploy hook y, si acaba bien, lo sirve en `celda.prueba/capas`;
@@ -50,7 +48,7 @@
             import urllib.parse
             from xml.sax.saxutils import escape
 
-            LISTADO, FICHA, ANTENAS, CERTIFICADO, CLAVE, CARPETA, CELDA = sys.argv[1:8]
+            LISTADO, FICHA, CERTIFICADO, CLAVE, CARPETA, CELDA = sys.argv[1:7]
             CUBOS = os.path.join(CARPETA, "r2")
             PETICIONES = os.path.join(CARPETA, "peticiones.log")
             # Con este fichero, R2 contesta 503 a la clave del build: el build de Vercel no llega.
@@ -108,21 +106,6 @@
                 return json.dumps({"type": "FeatureCollection", "features": dentro}, ensure_ascii=False).encode("latin-1")
 
 
-            def showf():
-                marcadores = []
-                for nombre in ("v1-showf-er5_extracto-campus-nord.json", "v1-showf-er5_extracto-er5-barcelona.json"):
-                    marcadores.extend(json.loads(leer(os.path.join(ANTENAS, nombre))))
-                # Una ER5 sin compañía fuera de Cataluña: nunca se pide su detalle.
-                marcadores.append([40.4168, -3.7038, ["MV-MADRID-PRUEBA"], "er5", ""])
-                # Sin espacios, como la respuesta real.
-                return json.dumps(marcadores, ensure_ascii=False, separators=(",", ":")).encode()
-
-
-            def detalle(consulta):
-                ruta = os.path.join(ANTENAS, f"v1-markers_{consulta['id'][0]}.json")
-                return leer(ruta) if os.path.isfile(ruta) else b"[]"
-
-
             class Fuentes(http.server.BaseHTTPRequestHandler):
                 protocol_version = "HTTP/1.1"
 
@@ -157,15 +140,6 @@
                         if not ruta.startswith("/capas/") or not os.path.isfile(fichero):
                             return self.responder(404)
                         return self.responder(200, leer(fichero), "application/json")
-                    if host == "antenasmoviles.es":
-                        if ruta == "/robots.txt":
-                            return self.responder(200, leer(os.path.join(ANTENAS, "robots.txt")))
-                        if ruta == "/v1/showf":
-                            return self.responder(200, showf(), "application/json")
-                        if ruta == "/v1/markers":
-                            consulta = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-                            return self.responder(200, detalle(consulta), "application/json")
-                        return self.responder(404)
                     if firma == "":
                         return self.responder(403)
                     if es_del_build(firma) and os.path.exists(R2_CAIDO):
@@ -255,9 +229,6 @@
               # defecto, las de toda España: la primera noche barre Cataluña.
               registroOficial.fichas.ritmo = 4;
               registroOficial.fichas.ventana = 2;
-              antenasmoviles.enable = true;
-              antenasmoviles.maxDetalles = 4;
-              antenasmoviles.zonas = singleton "cataluna";
             };
 
             # La prueba mueve el reloj para disparar el temporizador.
@@ -265,7 +236,6 @@
 
             networking.hosts."127.0.0.1" = [
               "geoportal.minetur.gob.es"
-              "antenasmoviles.es"
               "cuenta.r2.cloudflarestorage.com"
               "api.vercel.com"
               "celda.prueba"
@@ -280,7 +250,7 @@
               environment.NODE_EXTRA_CA_CERTS = "${certificados}/ca.pem";
 
               serviceConfig = {
-                ExecStart = "${getExe fuentesDePrueba} ${../docs/investigacion/muestras/geojson-campus-nord.iso-8859-1.json} ${../docs/investigacion/muestras/detalle-telefonica-0800942.iso-8859-1.html} ${../docs/investigacion/muestras/antenasmoviles} ${certificados}/servidor.pem ${certificados}/servidor.key /var/lib/fuentes-de-prueba ${getExe config.packages.celda-nocturna}";
+                ExecStart = "${getExe fuentesDePrueba} ${../docs/investigacion/muestras/geojson-campus-nord.iso-8859-1.json} ${../docs/investigacion/muestras/detalle-telefonica-0800942.iso-8859-1.html} ${certificados}/servidor.pem ${certificados}/servidor.key /var/lib/fuentes-de-prueba ${getExe config.packages.celda-nocturna}";
                 StateDirectory = "fuentes-de-prueba";
               };
             };
@@ -289,6 +259,7 @@
           testScript =
             { nodes, ... }:
             /* python */ ''
+              import json
               import subprocess
 
               maquina.wait_for_unit("multi-user.target")
@@ -398,21 +369,6 @@
                       ).strip())
                   assert limite(1024) - limite(512) == 512 * 1024 * 1024, (limite(512), limite(1024))
 
-              with subtest("antenasmoviles.es: un listado y el detalle de las ER5 pendientes de Cataluña, hasta el tope"):
-                  assert "antenasmoviles: encendida" in estado, estado
-                  assert "- cataluna: completado, 9 cuadros, 4 peticiones, 0 kB, 83 registros" in estado, estado
-                  listados = maquina.succeed("grep --count 'GET antenasmoviles.es /v1/showf' /var/lib/fuentes-de-prueba/peticiones.log").strip()
-                  assert listados == "1", listados
-                  detalles = [
-                      linea.split()[3].removeprefix("/v1/markers?id=")
-                      for linea in maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
-                      if " GET antenasmoviles.es /v1/markers?" in linea
-                  ]
-                  # Primero las dos ER5 sin compañía de Barcelona; nunca la de Madrid ni las copias del registro.
-                  assert detalles == ["ER5-08033-1", "MIC-08902-1", "CATR2888X", "CATR6031A"], detalles
-                  # La ER5 de Orange de Urquinaona se publica citando antenasmoviles.es con su enlace.
-                  maquina.succeed("grep --recursive --fixed-strings --quiet 'https://antenasmoviles.es/#19/41.389648/2.173639' /var/lib/fuentes-de-prueba/r2/celda")
-
               with subtest("las fichas van a su ritmo y paran al cerrar la ventana, dejando el resto en la cola"):
                   entorno = maquina.succeed("systemctl show celda-nocturna.service --property=Environment")
                   for variable in (
@@ -517,6 +473,25 @@
                   maquina.succeed(f"cmp {servida}/vigente.json {r2}/vigente.json")
                   assert "Vercel ya sirve sitios@" in publicar_a_mano()
                   assert len(llamadas_al_hook()) == 3, llamadas_al_hook()
+
+              with subtest("la pasada por los cuadros de borde pide cada uno una vez y no toca la base"):
+                  base = "/var/lib/celda-nocturna/ingesta.sqlite"
+                  antes = maquina.succeed(f"sha256sum {base}")
+                  listados = int(maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log"))
+                  print(maquina.succeed(
+                      "systemd-run --wait --pipe --collect --quiet"
+                      " --uid=celda-nocturna --gid=celda-nocturna"
+                      " --setenv=NODE_EXTRA_CA_CERTS=${certificados}/ca.pem"
+                      " /run/current-system/sw/bin/celda-nocturna cuadros-de-borde /var/lib/celda-nocturna/cuadros-de-borde.json 2>&1"
+                  ))
+                  pasada = json.loads(maquina.succeed("cat /var/lib/celda-nocturna/cuadros-de-borde.json"))
+                  # Los cuatro cuadros que tocan España fuera de las zonas; en el Campus Nord no cae ninguno.
+                  assert [c["cuadro"] for c in pasada["cuadros"]] == ["-17,27", "-19,28", "-4,35", "-8,40"], pasada
+                  assert all(c["registros"] == 0 for c in pasada["cuadros"]), pasada
+                  assert pasada["errores"] == [], pasada
+                  despues = int(maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log"))
+                  assert despues - listados == 4, (listados, despues)
+                  assert maquina.succeed(f"sha256sum {base}") == antes
 
               with subtest("el servicio corre endurecido"):
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))
