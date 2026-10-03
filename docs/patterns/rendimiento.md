@@ -205,6 +205,15 @@ Medido el 03 y el 04/10/2026 en Chromium con SwiftShader contra la build local, 
 
 Con vuelos, cuántas teselas se piden depende de los fotogramas de cada vuelo, como ya pasaba con el callejero: la diferencia con el prototipo es de recorrido y de ronda. Las teselas canceladas son las que MapLibre deja de esperar al seguir volando. En la primera ronda de Barcelona a z12 la mediana hasta tener la tesela entera fue de 1,3 s con la CloudFront fría; en las siguientes, de 80 ms.
 
+## Nombres de lugar en una sola forma (#63)
+
+Medido el 04/10/2026 con `gzip -9`, contra `celda/v1` construida igual.
+
+- **Primera pantalla:** 211.431 → 216.158 bytes, 4,7 KB más: la tabla de nombres de lugar (`packages/dominio/datos/nombres-de-lugar.json`, 9.030 bytes, 2.818 con gzip por sí sola), la regla y lo nuevo del buscador.
+- **Worker de la capa:** 33.445 → 36.805 bytes, por la misma tabla: pasa los municipios al nombre de lugar al leer la capa.
+- **Contorno de la Comunitat Valenciana:** 3.599 bytes con gzip, en su propio trozo. Lo importa `mapaBase.ts` y el buscador lo pide con `import()` al llegar su primera respuesta. Solo importa `poligono.ts`, sin dependencias: con `barrio.ts`, Vite sacaba a otro trozo lo que comparte con la primera pantalla y abrir costaba 7,1 KB, no 4,7.
+- **Estilo.** La expresión del nombre, con el contorno de 506 vértices, va en el `text-field` y en el filtro de las capas de lugares y en el `text-field` de los barrios. `within` solo se evalúa para los `name` con «/».
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.
