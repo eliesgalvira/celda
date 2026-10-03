@@ -12,7 +12,7 @@ import {
   remarcarCelda,
   ZOOM_CELDAS,
 } from "./celdas.ts";
-import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
+import { COMUNITAT_DE_PRUEBA, CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { conLaFoto } from "../pruebas/foto.ts";
 import { estiloMapa } from "./estilo.ts";
 
@@ -51,7 +51,7 @@ describe("capas de las celdas", () => {
   });
 
   it("van en el estilo del mapa con su fuente vacía, por debajo de los nombres de las calles", () => {
-    const estilo = estiloMapa((token) => `token:${token}`, CONTORNO_DE_PRUEBA);
+    const estilo = estiloMapa((token) => `token:${token}`, CONTORNO_DE_PRUEBA, COMUNITAT_DE_PRUEBA);
     const ids = estilo.layers.map((capa: LayerSpecification) => capa.id);
     const calles = ids.indexOf("nombres-de-calles");
     for (const capa of capas) {

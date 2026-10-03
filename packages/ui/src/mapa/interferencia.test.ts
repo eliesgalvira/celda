@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import type { FilterSpecification, LayerSpecification } from "maplibre-gl";
 
 import { remarcarCelda } from "./celdas.ts";
-import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
+import { COMUNITAT_DE_PRUEBA, CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { estiloMapa } from "./estilo.ts";
 import { FUENTE_INTERFERENCIA, mostrarInterferencia } from "./interferencia.ts";
 
@@ -26,7 +26,7 @@ const mapaDePrueba = () => {
 };
 
 describe("capa de la vista de interferencia", () => {
-  const estilo = estiloMapa((token) => `token:${token}`, CONTORNO_DE_PRUEBA);
+  const estilo = estiloMapa((token) => `token:${token}`, CONTORNO_DE_PRUEBA, COMUNITAT_DE_PRUEBA);
   const ids = estilo.layers.map((capa: LayerSpecification) => capa.id);
 
   it("va en el estilo, escondida, con su fuente vacía y por debajo de las celdas", () => {

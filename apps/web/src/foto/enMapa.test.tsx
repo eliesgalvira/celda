@@ -1,5 +1,6 @@
 import type { Coordenada } from "@celda/dominio/area";
 import { desdePlano } from "@celda/dominio/plano";
+import { CONTORNO_DE_LA_COMUNITAT_VALENCIANA } from "@celda/dominio/comunitatValenciana";
 import { assert, describe, it } from "@effect/vitest";
 import { render, waitFor } from "@solidjs/testing-library";
 import { estiloMapa } from "@celda/ui/mapa/estilo.ts";
@@ -235,7 +236,11 @@ interface MapaQueNoSeToca {
  * cualquier llamada que cambie el estilo entero o sus capas.
  */
 const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa>>>) => {
-  const estilo: StyleSpecification = estiloMapa((token) => `token:${token}`, CONTORNO_DE_ESPANA);
+  const estilo: StyleSpecification = estiloMapa(
+    (token) => `token:${token}`,
+    CONTORNO_DE_ESPANA,
+    CONTORNO_DE_LA_COMUNITAT_VALENCIANA,
+  );
   const capasAntes = JSON.stringify(estilo.layers);
   const fuentesAntes = Object.keys(estilo.sources);
   const estado: EstadoConFoto = {};
