@@ -35,6 +35,7 @@
               # pnpm lee el manifiesto de cada paquete del espacio de trabajo
               (fileFilter (fichero: fichero.name == "package.json") ../.)
 
+              ../apps/moderacion
               ../apps/nocturna
               ../packages/dominio
               ../packages/ingesta
