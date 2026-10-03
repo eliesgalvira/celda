@@ -288,6 +288,14 @@ _Evitar_: IP, hash de la IP
 Revisión a mano de cada aportación compartida, que acaba aceptada o rechazada, con su motivo. Solo lo aceptado llega a publicarse.
 _Evitar_: aprobación, validación (esa es la comprobación automática al recibirla), revisión
 
+**Veredicto propuesto**:
+Lo que la herramienta de moderación sugiere hacer con una aportación compartida: aceptarla, rechazarla o mirarla con calma, con sus razones. No cambia nada: cuenta solo el veredicto que confirma el usuario, con su motivo.
+_Evitar_: decisión, recomendación, voto
+
+**Veto**:
+Lo que impide a una identidad del dispositivo o a una huella de la IP enviar nada más, con su motivo. Lo que tenía pendiente sale marcado en la moderación. El de una huella dura lo que ella, 24 horas.
+_Evitar_: bloqueo, ban
+
 ### Simulaciones
 
 **Simulación**:

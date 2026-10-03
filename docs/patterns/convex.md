@@ -11,6 +11,7 @@ Dónde corre cada cosa:
 
 ```
 apps/nocturna/             la ingesta nocturna: base SQLite, noche, estado y órdenes
+apps/moderacion/           la herramienta de moderación del buzón y su cliente de Convex con la clave de administración
 packages/ingesta/          el extractor del registro oficial (registro-oficial/), el cliente de las fuentes y la cola de fichas
 packages/ingesta/src/barrido.ts   el barrido por zonas y la noche sobre una BaseDeBarrido
 packages/ingesta/src/guardado.ts  qué cambia en una observación con el listado, la ficha o un barrido
@@ -77,6 +78,8 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_REGISTRO_REINTENTOS` | 3 | Reintentos de un fallo pasajero |
 | `CELDA_REGISTRO_ESPERA_SEGUNDOS` | 10 | Tiempo máximo de una respuesta |
 | `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
+| `CELDA_CONVEX_URL` | | La URL del buzón de Convex del que se lee lo aceptado en la moderación |
+| `CELDA_CONVEX_CLAVE` | | Su clave de despliegue. Con las dos, la comunidad tiene el interruptor encendido; sin ellas, apagado. Ver [Moderar](#moderar) |
 
 Las zonas son `cataluna`, `centro` (Madrid y Castilla-La Mancha), `andalucia` (con Ceuta y Melilla), `levante` (Comunitat Valenciana, Murcia e Illes Balears), `norte` (Galicia, Asturias, Cantabria y País Vasco), `ebro-y-duero` (Castilla y León, Aragón, Navarra y La Rioja) y `oeste-y-canarias` (Extremadura y Canarias), con sus cuadros en `ZONAS_DE_BARRIDO` (`packages/dominio/src/barrido.ts`). Un nombre que no está ahí para el programa al arrancar. De las que se turnan va primero la que quedó a medias, luego las que nunca se han completado, en el orden de la configuración, y luego las que llevan más tiempo sin completarse.
 
@@ -106,7 +109,8 @@ La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sq
 - `emplazamientos`: los de la última fusión, con la fecha en que cambió cada uno;
 - `ejecuciones`: cada pasada de un extractor, con sus cambios, sus errores, lo que hizo cada zona (cuadros, peticiones, bytes, registros y cambios) y cómo acabó la publicación de su noche;
 - `publicaciones`: cada intento de publicar;
-- `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero.
+- `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero;
+- `aportaciones_aceptadas`: lo aceptado en la moderación que la noche ha leído del buzón, con su emplazamiento, la identidad que lo envió, cuándo se aceptó y la fecha de la ejecución que lo trajo (versión 6 del esquema, #57). La huella de la IP no sale del buzón.
 
 El esquema lleva su versión en `PRAGMA user_version`, y una base vieja se pone al día al abrirla. La versión 5 borra la tabla `puntos` de la web de antenas que retiró el ADR 0019, y las observaciones, los barridos y las ejecuciones de las fuentes que ya no están en `Fuente`. Cada paso de la noche escribe en su propia transacción. Si la noche se corta, su ejecución queda en curso; la siguiente la da por interrumpida y rehace el trabajo, y acaba igual que si no se hubiera cortado.
 
@@ -202,6 +206,8 @@ Para ver lo que cabe, `node --max-old-space-size=512 src/medida/espana.ts /tmp/e
 `apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord, que contesta cada caja como el geoportal (`capaGrabadaPorCajas`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, también las comprimidas en un R2 de prueba, que una subida fallida no tumba la noche, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
 
 `apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/fichas.test.ts` prueba el orden de la cola y la lectura en la ventana con el extractor real, fichas grabadas y el reloj de prueba: el ritmo, el cierre de la ventana con el resto pendiente, la publicación a mitad, unas 5.500 fichas con los valores por defecto y respuestas de 0,9 s, una ficha cada segundo desde el final de la anterior y, a ese ritmo, el bloqueo por 401, 403 o una página que no es una ficha, el 429 y el 503 con `Retry-After`, los tres fallos seguidos, la espera tras un fallo y el tope. `apps/nocturna/src/fichas.test.ts` hace lo mismo con la base SQLite: una noche que cierra la ventana y la siguiente que sigue por donde iba, la provincia con prioridad, un bloqueo que queda en la ejecución, una ficha que espera un día tras fallar y una base de la versión 3 del esquema que se pone al día sin perder su cola, y sin la tabla `puntos` ni nada de las fuentes retiradas. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la división en cuatro simulada en la prueba, la de la investigación 08.
+
+`apps/nocturna/src/comunidad.test.ts` prueba lo aceptado con un buzón de prueba: que una corrección aceptada aparece en la ficha la noche siguiente, con el registro igual al lado, y una rechazada nunca; que leer dos veces lo mismo no duplica nada y una corroboración suma una persona; y que la noche sin Convex publica igual, queda fallida en la ejecución de la comunidad, lo dice el diario y la siguiente recoge lo que faltaba. Lee lo publicado con el mismo lector que la herramienta de moderación.
 
 `apps/nocturna/src/espana.test.ts` prueba toda España con la España sintética, que copia emplazamientos de los listados grabados de Barcelona y Valencia y los reparte por los municipios del padrón con los registros de cada cuadro en el listado propio del registro (`cuadros-del-registro.json`). Comprueba que por defecto se barre una zona cada noche, en su orden; que una provincia queda cubierta en el resumen cuando se han barrido todos sus cuadros, y antes no; que toda España cabe en una noche con `CELDA_REGISTRO_ZONAS_POR_NOCHE=7` y dentro del tope de peticiones; el orden de las fichas, y lo que dice `estado` de cada zona. Con los listados grabados de Barcelona y del centro de Madrid, la primera noche barre Cataluña, la segunda `centro`, y publican los 1.294 y 1.331 emplazamientos de la revisión de la fusión. Tarda unos 30 s.
 
@@ -319,6 +325,8 @@ Lo que decide el ADR 0020 y cómo quedó, en su apartado «Cómo quedó en el #5
 |---|---|
 | Las cuatro mutaciones públicas y sus errores tipados | `confect/buzon.spec.ts` y `buzon.impl.ts` |
 | Lo que necesita la moderación (#57) | `confect/moderacion.spec.ts` y `moderacion.impl.ts`, todas internas |
+| Los esquemas de la moderación, el veredicto propuesto y cómo lo aceptado llega a la ficha | `packages/dominio/src/moderacion.ts` |
+| La herramienta de moderación y su cliente de Convex | `apps/moderacion/src/` |
 | La limpieza de las huellas de más de 24 horas, cada hora | `confect/limpieza.*.ts` y `confect/crons.ts` |
 | La clave del despliegue y el HMAC | `src/claves.ts` |
 | La sal del día y la huella de la IP | `src/huella.ts` |
@@ -346,6 +354,57 @@ Esto lo hace el usuario: el #56 no despliega nada.
 4. Despliega con `pnpm exec convex deploy` desde `convex/`.
 5. Comprueba `X-Forwarded-For`: llama dos veces a `buzon:pedirIdentidad` por HTTP (`POST https://<nombre>.convex.cloud/api/mutation` con `{"path":"buzon:pedirIdentidad","args":{},"format":"json"}`), una con `X-Forwarded-For: 198.51.100.66` y otra sin ella, y mira en `huellasDeIp` si sale una huella o dos. Anótalo en el ADR 0020 y borra esas dos identidades.
 6. Pon `VITE_CELDA_CONVEX_URL` en las variables de build de Vercel y vuelve a construir la web.
+7. Para moderar (#57), crea en el panel de Convex una clave de despliegue de producción (*Settings → Deploy keys*) y guárdala en tu gestor de contraseñas. Es la `CELDA_CONVEX_CLAVE` de [Moderar](#moderar). Crea otra para la ingesta nocturna y ponla, con la URL, en el fichero de `credenciales.convex` de su máquina ([nixos.md](nixos.md#credenciales)): así se puede revocar una sin tocar la otra.
+
+### Moderar
+
+Modera el usuario solo, con la ayuda de Claude (ADR 0020). La herramienta es `apps/moderacion`, y se lanza desde la raíz de Celda, dentro de `nix develop`:
+
+```sh
+pnpm -s moderar pendientes                 # las pendientes, con su contexto
+pnpm -s moderar pendientes --tipo correccion-propuesta --limite 20
+pnpm -s moderar ver <id>…                   # unas concretas, estén como estén
+pnpm -s moderar proponer                   # un veredicto propuesto para cada pendiente, sin cambiar nada
+pnpm -s moderar aceptar <id>… --motivo "Se ve en la foto aérea"
+pnpm -s moderar rechazar <id>… --motivo "El punto cae en el mar"
+pnpm -s moderar vetar identidad <_id> --motivo "Envía puntos en el mar"
+pnpm -s moderar vetar ip <huella> --motivo "Cientos de envíos en una hora"
+pnpm -s moderar aceptadas [--despues-de <ms>]   # exporta lo aceptado, como lo lee la noche
+```
+
+`-s` quita las líneas que añade pnpm, así que la salida es solo la de la orden. `--help` en cada orden dice sus opciones.
+
+De cada aportación, la lista da:
+
+- lo que propone, con la nota si la tiene;
+- la ficha publicada de su emplazamiento en la versión vigente: lo que dice el registro oficial de cada compañía, con su fecha y su enlace, y las correcciones ya publicadas;
+- la distancia de la posición publicada al punto propuesto (la posición nueva o la medida); de un emplazamiento que falta, los publicados a menos de 300 m y la distancia al más cercano;
+- la identidad y la huella de la IP que la enviaron, con cuántas aportaciones suyas se han aceptado, rechazado o esperan, y si están vetadas;
+- las demás correcciones propuestas y corroboraciones del mismo emplazamiento, en cualquier estado (de uno que falta, las que dicen que falta uno a menos de 60 m).
+
+**Para un agente.** Con `--json`, cada orden escribe un solo objeto JSON con `formato: 1` y los esquemas de `packages/dominio/src/moderacion.ts` (`AportacionConContexto`, `VeredictoPropuesto`, `AportacionEnCola`). `proponer --json` da cada pendiente con su contexto, un veredicto (`aceptar`, `rechazar` o `mirar`) y sus razones, y no cambia nada. El agente lo lee, lo explica al usuario y, si el usuario lo confirma, lanza `aceptar` o `rechazar` con el motivo. Los errores salen por la salida de errores, con código 1. `aceptar` y `rechazar` con varios identificadores siguen con los demás si uno falla, dicen cuál en `resultados` y acaban con código 1.
+
+**Reglas.** Aceptar, rechazar y vetar piden siempre un motivo con texto. Un veredicto no se cambia: aceptar otra vez una aceptada no hace nada, y rechazar una aceptada falla con `AportacionYaModerada`, porque puede haber salido ya en la publicación. El veto de una identidad no caduca; el de una huella dura lo que ella, 24 horas. Una corroboración se acepta como una corrección propuesta y cuenta una persona más (ADR 0020).
+
+**Conexión.** La herramienta habla con las funciones internas `moderacion:*` por la API HTTP de Convex (`POST <url>/api/query` y `/api/mutation`), con la clave en la cabecera `Authorization: Convex <clave>`, como el cliente de Convex con `setAdminAuth`. No usa el paquete de Convex. Lee:
+
+| Variable | Qué |
+|---|---|
+| `CELDA_CONVEX_URL` | La URL del despliegue, la misma que `VITE_CELDA_CONVEX_URL`: `https://<nombre>.convex.cloud` |
+| `CELDA_CONVEX_CLAVE` | Una clave de despliegue de producción (panel de Convex, *Settings → Deploy keys*). Da acceso a todo el despliegue: no se guarda en ningún fichero del repositorio |
+| `CELDA_MODERACION_CAPAS` | De dónde lee lo publicado: una URL o una carpeta. Por defecto, `https://celda.elies.site/capas` |
+
+Para no escribirla a mano en cada terminal, guárdala en un gestor de contraseñas y cárgala al empezar, por ejemplo `export CELDA_CONVEX_CLAVE="$(pass celda/convex-deploy-key)"`. Con el backend local, la clave de administración está en `convex/.convex/local/default/config.json` (`adminKey`):
+
+```sh
+export CELDA_CONVEX_URL=http://127.0.0.1:3240
+export CELDA_CONVEX_CLAVE="$(jq -r .adminKey convex/.convex/local/default/config.json)"
+export CELDA_MODERACION_CAPAS=$PWD/tools/capas/salida
+```
+
+**Hacia la publicación.** Cada noche, antes del registro oficial, la ingesta nocturna lee `moderacion:aceptadas` desde la última aceptada que tiene su base y guarda lo nuevo en `aportaciones_aceptadas`, página a página, como una ejecución de la fuente `comunidad` (`recogerAceptadas` en `apps/nocturna/src/programa.ts`). El buzón da a cada aceptada una hora propia, posterior a la de la anterior, así que seguir desde la última no se salta ninguna; y una que ya estaba no se guarda dos veces. La publicación pone en la ficha de cada emplazamiento sus correcciones (`correccionesDeFicha`): las propuestas que dicen lo mismo son una, con la clave de la primera, y cuentan cada identidad una vez, con las corroboraciones que la citan. El emplazamiento pasa de verificado a corregido, el registro sigue igual al lado y la ficha toma la fecha de la noche que trajo la corrección. Las medidas se guardan pero no se publican (solo se publicarán agregados), y un emplazamiento que falta tampoco: aún no hay dónde enseñarlo, porque no tiene ficha.
+
+Si Convex no contesta, la ejecución de la comunidad queda fallida con el motivo, el diario dice «El buzón de Convex no está disponible: …. La noche publica lo demás» y la noche sigue. Lo que falte llega la noche siguiente. En la máquina de la ingesta, la conexión es la credencial `credenciales.convex` del módulo de NixOS ([nixos.md](nixos.md#credenciales)).
 
 ### Pruebas de Convex
 
@@ -356,7 +415,8 @@ El limitador lee la hora con `Date.now()`, que el `TestClock` de Effect no mueve
 - `despliegue.test.ts`: las tablas, que las únicas funciones públicas son las cuatro mutaciones y que solo devuelven un token o si era nueva.
 - `buzon.test.ts`: la identidad, cada límite de la tabla del ADR 0020, la idempotencia, la validación y los vetos.
 - `huellas.test.ts`: que la IP no está en claro en ninguna tabla, la sal de cada día y la limpieza a las 24 horas.
-- `moderacion.test.ts`: que nada llega a lo que lee la noche sin aceptarlo, y las funciones de la moderación.
+- `moderacion.test.ts`: que nada llega a lo que lee la noche sin aceptarlo, y las funciones de la moderación: el contexto, el motivo obligatorio también saltándose el cliente, que un veredicto no se cambia, que dos aceptadas en el mismo milisegundo no se saltan y los vetos.
+- `herramienta.test.ts`: la herramienta de moderación entera, con su cliente HTTP, contra el Convex en memoria. Un `HttpClient` de prueba hace de la API HTTP de Convex: lleva cada petición a la función interna que nombra, solo con la clave de prueba. Lanza las órdenes como desde la terminal (`@celda/moderacion/pruebas/orden`): la lista con su contexto, el veredicto propuesto sin cambiar nada, aceptar y rechazar sin motivo, aceptar, rechazar, vetar, exportar y una clave que no vale.
 
 `pnpm run test:repetido` (desde `convex/`) pasa las pruebas de Convex cinco veces con semillas seguidas a partir de una al azar, y la CI lo hace en cada push.
 
