@@ -120,6 +120,14 @@
   --mapa-autovia-borde: oklch(82.8% 0.126 88.6);
   --mapa-autopista: oklch(88.8% 0.135 91.5);
   --mapa-autopista-borde: oklch(76.6% 0.138 78.6);
+  /*
+   * Los límites, más oscuros cuanto más importantes: el país, las comunidades, las provincias y,
+   * de cerca, los municipios (mapa/limites.ts).
+   */
+  --mapa-limite-pais: oklch(58.3% 0 0);
+  --mapa-limite-comunidad: oklch(68.6% 0 0);
+  --mapa-limite-provincia: oklch(75.7% 0 0);
+  --mapa-limite-municipio: oklch(82% 0 0);
   /* Los rótulos llevan un halo blanco; cada color cumple AA sobre él (mapa/color.test.ts). */
   --mapa-halo: oklch(100% 0 0);
   --mapa-rotulo-capital: oklch(24.8% 0.006 271.2);
@@ -248,6 +256,10 @@
   --mapa-autovia-borde: oklch(32% 0.05 80);
   --mapa-autopista: oklch(60% 0.1 85);
   --mapa-autopista-borde: oklch(38% 0.07 75);
+  --mapa-limite-pais: oklch(64% 0 0);
+  --mapa-limite-comunidad: oklch(54% 0 0);
+  --mapa-limite-provincia: oklch(46% 0 0);
+  --mapa-limite-municipio: oklch(39% 0 0);
   --mapa-halo: oklch(23% 0.006 100);
   --mapa-rotulo-capital: oklch(96% 0.005 90);
   --mapa-rotulo-ciudad: oklch(91% 0.006 90);

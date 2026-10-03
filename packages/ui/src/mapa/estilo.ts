@@ -14,6 +14,7 @@ import {
   fuenteFoto,
 } from "./foto.ts";
 import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
+import { capasLimites, FUENTE_LIMITES } from "./limites.ts";
 import {
   capasRotulos,
   type ContornoDeEspana,
@@ -59,11 +60,13 @@ export const FUENTE_MAPA_BASE = "openmaptiles";
 
 /**
  * El estilo del mapa base de OpenFreeMap (esquema OpenMapTiles) con la paleta A del tema (ADR
- * 0022): el suelo, las vías por clase y los rótulos por importancia. No lleva ningún color
- * escrito: todos salen de `color`. Lleva también las capas de las celdas, del sector que da
- * servicio, de la vista de interferencia y de la zona del ejercicio, con sus fuentes vacías hasta
- * que la web las llena (`FUENTE_CELDAS`, `FUENTE_SERVICIO`, `FUENTE_SERVICIO_LINEA`,
- * `FUENTE_INTERFERENCIA` y `FUENTE_ZONA`), entre las vías y los rótulos.
+ * 0022): el suelo, los límites, las vías por clase y los rótulos por importancia. No lleva ningún
+ * color escrito: todos salen de `color`. Los límites de comunidades y provincias van en
+ * `FUENTE_LIMITES`, vacía hasta que la web la llena después del primer pintado (ADR 0023). Lleva
+ * también las capas de las celdas, del sector que da servicio, de la vista de interferencia y de
+ * la zona del ejercicio, con sus fuentes vacías hasta que la web las llena (`FUENTE_CELDAS`,
+ * `FUENTE_SERVICIO`, `FUENTE_SERVICIO_LINEA`, `FUENTE_INTERFERENCIA` y `FUENTE_ZONA`), entre las
+ * vías y los rótulos.
  *
  * La foto aérea (ADR 0022) va en el mismo estilo, apagada: la ortofoto sobre la tierra, el
  * edificio que resalta «Ver el edificio» bajo los rótulos, y en cada capa del mapa base cómo se ve
@@ -97,9 +100,11 @@ export const estiloMapa = (
       data: { type: "FeatureCollection", features: [] },
     },
     [FUENTE_ZONA]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+    [FUENTE_LIMITES]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   },
   layers: [
     ...capasSuelo(FUENTE_MAPA_BASE, color, [capaFoto()]),
+    ...capasLimites(FUENTE_MAPA_BASE, color),
     ...capasVias(FUENTE_MAPA_BASE, color),
     ...capasInterferencia([
       color("mapa-sinr-1"),
