@@ -459,7 +459,8 @@ export const baseNocturna = (opciones: OpcionesBase) =>
 
       const versionDeLosDatos = Effect.gen(function* () {
         // Un emplazamiento retirado se borra y no deja versión: cuenta la fecha de la ejecución
-        // que lo retiró, como en `datos:version` de Convex.
+        // que lo retiró. Si no, una noche que solo retirase emplazamientos daría el mismo nombre
+        // de capa con otro contenido.
         const [cambiado] = yield* decodificar(Maximo)(
           yield* sql`SELECT max(version) AS v FROM emplazamientos`,
         );

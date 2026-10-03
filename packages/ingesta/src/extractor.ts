@@ -106,21 +106,6 @@ export const describirError = (error: ErrorDeExtractor): string => {
   }
 };
 
-/**
- * Parte de la ingesta que lee una sola fuente. Cada instancia vive lo que dura una ejecución:
- * su límite de peticiones cuenta desde que se construye la capa.
- */
-export class Extractor extends Context.Service<
-  Extractor,
-  {
-    readonly fuente: Fuente;
-    /** Recorre el listado completo. Si falla, la ejecución no sabe qué ha desaparecido. */
-    readonly listado: Effect.Effect<Listado, ErrorDeExtractor>;
-    /** Lee las bandas de la ficha de un registro. */
-    readonly ficha: (registro: Registro) => Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor>;
-  }
->()("@celda/ingesta/extractor") {}
-
 /** Lo que devuelve una fuente al pedirle el listado de una caja, en una sola petición. */
 export interface ListadoDeCaja {
   /** Sin repetir y ordenados por clave. */
@@ -137,8 +122,8 @@ export interface ListadoDeCaja {
 
 /**
  * Extractor de una fuente cuyo listado se pide por cajas y corta en un tope, como el registro
- * oficial. Qué cajas se piden lo decide el barrido por zonas (`barrido.ts`). Igual que
- * `Extractor`, vive lo que dura una ejecución.
+ * oficial. Qué cajas se piden lo decide el barrido por zonas (`barrido.ts`). Cada instancia vive
+ * lo que dura una ejecución: su límite de peticiones cuenta desde que se construye la capa.
  */
 export class ExtractorPorCajas extends Context.Service<
   ExtractorPorCajas,

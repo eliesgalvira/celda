@@ -10,7 +10,6 @@ import * as Schema from "effect/Schema";
 
 import {
   type ErrorDeExtractor,
-  Extractor,
   ExtractorPorCajas,
   type Listado,
   type ListadoDeCaja,
@@ -42,20 +41,9 @@ export interface FuenteGrabada {
 }
 
 /**
- * Extractor de prueba que devuelve una fuente grabada sin hacer peticiones. Una ficha que no
- * está grabada falla como fallaría una ficha ilegible de la fuente real; `muestraCampusNord`
- * graba todas.
+ * La ficha de un registro en una fuente grabada. Una ficha que no está grabada falla como
+ * fallaría una ficha ilegible de la fuente real; `muestraCampusNord` graba todas.
  */
-export const capaGrabada = (fuente: Fuente, grabada: FuenteGrabada): Layer.Layer<Extractor> =>
-  Layer.succeed(
-    Extractor,
-    Extractor.of({
-      fuente,
-      listado: Effect.succeed(grabada.listado),
-      ficha: fichaGrabada(grabada),
-    }),
-  );
-
 const fichaGrabada =
   (grabada: FuenteGrabada) =>
   (registro: Registro): Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor> => {
