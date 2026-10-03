@@ -34,6 +34,10 @@ export default defineConfig({
       "apps/web/src/ejercicio/zonas/**",
       // Contorno de España que escribe `pnpm run espana`, con un polígono por línea.
       "packages/ui/src/mapa/espana.json",
+      // Tabla de nombres de lugar y contorno de la Comunitat Valenciana que escribe
+      // `pnpm run nombres`, con una fila o un polígono por línea.
+      "packages/dominio/datos/nombres-de-lugar.json",
+      "packages/dominio/datos/comunitat-valenciana.json",
       // Código que generan Confect y Convex.
       "convex/convex/**",
       "convex/confect/_generated/**",

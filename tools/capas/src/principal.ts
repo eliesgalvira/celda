@@ -20,11 +20,13 @@ import * as NodeHttp from "node:http";
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
 import { descargarMunicipios } from "./descargaDeMunicipios.ts";
 import { escribirEspana } from "./espana.ts";
+import { FORMAS_CASTELLANAS } from "./formasCastellanas.ts";
+import { escribirNombres } from "./nombres.ts";
 import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
 import { escribirZonas } from "./zonas.ts";
 
 /**
- * Generador de capas. Siete órdenes:
+ * Generador de capas. Ocho órdenes:
  *
  * - `servir`: sirve una carpeta publicada como origen estático local, con las cabeceras de la
  *   CDN. La publica la ingesta nocturna (`pnpm run ingesta publicar`) o `sintetica`.
@@ -37,6 +39,8 @@ import { escribirZonas } from "./zonas.ts";
  *   contorno de cada provincia que la web descarga al abrir el ejercicio de emplazamientos.
  * - `espana`: escribe desde esos límites, sin descargar nada, el contorno de España con que el
  *   mapa base esconde de lejos los rótulos de fuera (ADR 0024).
+ * - `nombres`: escribe desde esos límites, sin descargar nada, la tabla de nombres de lugar de los
+ *   oficiales bilingües y el contorno de la Comunitat Valenciana (ADR 0025).
  * - `sintetica`: publica en la carpeta una España sintética de `CELDA_SINTETICOS` emplazamientos
  *   (100.000 por defecto), con la publicación de verdad, para medir el mapa (ADR 0016).
  */
@@ -88,6 +92,19 @@ const configZonas = Config.String("CELDA_ZONAS").pipe(
 const configEspana = Config.String("CELDA_ESPANA").pipe(
   Config.withDefault("../../packages/ui/src/mapa/espana.json"),
 );
+
+/**
+ * Dónde escribe `nombres` la tabla y el contorno: el dominio los lee de su carpeta de datos, y de
+ * allí la web, el mapa base y el buscador.
+ */
+const configNombres = Config.all({
+  tabla: Config.String("CELDA_NOMBRES").pipe(
+    Config.withDefault("../../packages/dominio/datos/nombres-de-lugar.json"),
+  ),
+  contorno: Config.String("CELDA_COMUNITAT_VALENCIANA").pipe(
+    Config.withDefault("../../packages/dominio/datos/comunitat-valenciana.json"),
+  ),
+});
 
 /** Pausa entre dos peticiones al mismo sitio de la orden `municipios`. */
 const PAUSA_MUNICIPIOS = Duration.seconds(5);
@@ -199,11 +216,33 @@ const espana = Effect.gen(function* () {
   );
 });
 
+const nombres = Effect.gen(function* () {
+  const { municipios } = yield* configMunicipios;
+  const destino = yield* configNombres;
+  const escritos = yield* escribirNombres(
+    municipios,
+    FORMAS_CASTELLANAS,
+    destino.tabla,
+    destino.contorno,
+  );
+  const { provincias, municipios: bilingues } = escritos.tabla;
+  const vertices = escritos.contorno.coordinates.reduce(
+    (suma, [anillo = []]) => suma + anillo.length,
+    0,
+  );
+  yield* Effect.log(
+    `${Object.keys(provincias).length} provincias y ${Object.keys(bilingues).length} municipios bilingües, ${escritos.bytesTabla} bytes, escritos en ${destino.tabla}`,
+  );
+  yield* Effect.log(
+    `${escritos.contorno.coordinates.length} polígonos y ${vertices} vértices de la Comunitat Valenciana, ${escritos.bytesContorno} bytes, escritos en ${destino.contorno}`,
+  );
+});
+
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas», «espana» o «sintetica».`;
+    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas», «espana», «nombres» o «sintetica».`;
   }
 }
 
@@ -215,6 +254,7 @@ const principal = Effect.gen(function* () {
   if (orden === "municipios") return yield* municipios;
   if (orden === "zonas") return yield* zonas;
   if (orden === "espana") return yield* espana;
+  if (orden === "nombres") return yield* nombres;
   if (orden === "sintetica") return yield* sintetica;
   return yield* new OrdenDesconocida({ orden });
 });
