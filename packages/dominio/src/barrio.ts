@@ -2,6 +2,9 @@ import * as Schema from "effect/Schema";
 
 import { Coordenada } from "./area.ts";
 import { Compania } from "./compania.ts";
+import { dentroDelPoligono } from "./poligono.ts";
+
+export { dentroDelPoligono };
 
 /** Un vértice en grados WGS84, en el orden de GeoJSON: longitud y latitud. */
 const Vertice = Schema.Tuple([Schema.Finite, Schema.Finite]);
@@ -48,40 +51,6 @@ export const LimitesDeBarrios = Schema.Struct({
   barrios: Schema.Array(LimiteDeBarrio),
 });
 export type LimitesDeBarrios = typeof LimitesDeBarrios.Type;
-
-/**
- * Si el punto cae dentro del anillo, por el número de cruces de un rayo hacia el este. Los
- * bordes son semiabiertos: un punto sobre el lado que comparten dos anillos vecinos cae en uno
- * solo de ellos. El corte con cada lado se calcula siempre desde su vértice más al sur, así que
- * da el mismo número aunque cada vecino recorra el lado en un sentido.
- */
-const dentroDelAnillo = (x: number, y: number, anillo: Anillo): boolean => {
-  let dentro = false;
-  for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i, i++) {
-    const [xi = 0, yi = 0] = anillo[i] ?? [];
-    const [xj = 0, yj = 0] = anillo[j] ?? [];
-    if (yi > y !== yj > y) {
-      const surEsI = yi < yj;
-      const xa = surEsI ? xi : xj;
-      const ya = surEsI ? yi : yj;
-      const xb = surEsI ? xj : xi;
-      const yb = surEsI ? yj : yi;
-      if (x < ((xb - xa) * (y - ya)) / (yb - ya) + xa) dentro = !dentro;
-    }
-  }
-  return dentro;
-};
-
-/** Si el punto cae dentro del polígono: en su anillo exterior y fuera de sus agujeros. */
-export const dentroDelPoligono = (punto: Coordenada, poligono: Poligono): boolean => {
-  const [exterior, ...agujeros] = poligono;
-  const { longitud: x, latitud: y } = punto;
-  return (
-    exterior !== undefined &&
-    dentroDelAnillo(x, y, exterior) &&
-    !agujeros.some((agujero) => dentroDelAnillo(x, y, agujero))
-  );
-};
 
 /**
  * El barrio en que cae un punto, o `undefined` si no cae en ninguno, como un emplazamiento de

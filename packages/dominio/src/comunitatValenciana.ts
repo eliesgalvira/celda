@@ -1,5 +1,5 @@
 import type { Coordenada } from "./area.ts";
-import { dentroDelPoligono, type Poligono } from "./barrio.ts";
+import { dentroDelPoligono, type PoligonoEnGrados } from "./poligono.ts";
 import fichero from "../datos/comunitat-valenciana.json" with { type: "json" };
 
 /**
@@ -11,7 +11,9 @@ import fichero from "../datos/comunitat-valenciana.json" with { type: "json" };
  * cambia de lado al simplificar.
  *
  * Pesa unos 3,5 KB con gzip: lo importan el código del mapa (`apps/web/src/mapa/mapaBase.ts`) y el
- * buscador al llegar su primera respuesta, no la primera pantalla.
+ * buscador al llegar su primera respuesta, no la primera pantalla. Por eso solo importa
+ * `poligono.ts`, que no depende de nada: con más, la web partiría lo que comparte con la primera
+ * pantalla en otro trozo, que se pide al abrir.
  */
 
 /** Un contorno como la geometría `MultiPolygon` de GeoJSON, en grados, como lo pide MapLibre. */
@@ -26,7 +28,7 @@ export const CONTORNO_DE_LA_COMUNITAT_VALENCIANA: Contorno = {
 };
 
 /** Los polígonos de un contorno, con cada vértice como `[longitud, latitud]`. */
-export const poligonosDe = (contorno: Contorno): ReadonlyArray<Poligono> =>
+export const poligonosDe = (contorno: Contorno): ReadonlyArray<PoligonoEnGrados> =>
   contorno.coordinates.map((poligono) =>
     poligono.map((anillo) =>
       anillo.map(([longitud = 0, latitud = 0]) => [longitud, latitud] as const),
