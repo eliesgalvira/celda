@@ -1,20 +1,17 @@
-import type { Compania } from "@celda/dominio/compania";
 import type { JSX } from "@solidjs/web";
 import { cva } from "class-variance-authority";
 import { Show } from "solid-js";
 
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
-import { Ausencias, MarcaDeAusencia } from "./Ausencias.tsx";
 import { Deslizable, type Movimiento } from "./Deslizable.tsx";
 
 /** Qué zona es: se ven igual, pero las pruebas y el DOM las distinguen (`data-zona`). */
 export type TipoDeZona = "provincia" | "municipio" | "barrio";
 
 /**
- * - `completa`: el hexágono con el número, el nombre debajo y, al lado, las ausencias.
- * - `compacta`: solo el hexágono, con la marca de ausencia si falta alguna compañía. Es para
- *   cuando la completa pisaría otra zona o un marcador.
+ * - `completa`: el hexágono con el número y el nombre debajo.
+ * - `compacta`: solo el hexágono. Es para cuando la completa pisaría otra zona o un marcador.
  */
 export type FormaDeZona = "completa" | "compacta";
 
@@ -114,36 +111,24 @@ const RELLENO_NOMBRE = 20;
 /** Alto de una línea del nombre, `leading-4`, y el relleno de arriba y abajo de la cinta. */
 const LINEA = 16;
 const RELLENO_VERTICAL = 4;
-/** Separación entre el hexágono y lo que va debajo o al lado. */
+/** Separación entre el hexágono y lo que va debajo. */
 const HUECO = 2;
-/** Alto y ancho de la cinta de ausencias con logos de 20 px: «sin» y 30 px por compañía. */
-const ALTO_AUSENCIAS = 32;
-const anchoDeAusencias = (cuantas: number) => 44 + 30 * cuantas;
 
 /**
  * Lo que ocupa una zona en la pantalla respecto al centro de su hexágono, para decidir si cabe
  * entera sin pisar otra. Es una estimación por arriba con las clases de este fichero: el hexágono,
- * el nombre en una o dos líneas debajo, lo que se sabe de una provincia y las ausencias a la
- * derecha.
+ * el nombre en una o dos líneas debajo y lo que se sabe de una provincia.
  */
-export const cajaDeZona = (
-  forma: FormaDeZona,
-  nombre: string,
-  ausentes: number,
-  conEstado = false,
-): CajaDeZona => {
+export const cajaDeZona = (forma: FormaDeZona, nombre: string, conEstado = false): CajaDeZona => {
   if (forma === "compacta") return HEXAGONO;
   const largo = nombre.length * LETRA + RELLENO_NOMBRE;
   const lineas = largo > ANCHO_NOMBRE ? 2 : 1;
   const ancho = Math.min(ANCHO_NOMBRE, largo);
   const alto = lineas * LINEA + RELLENO_VERTICAL + (conEstado ? LINEA : 0);
-  const derecha =
-    ausentes === 0 ? ancho / 2 : Math.max(ancho / 2, 25 + HUECO + anchoDeAusencias(ausentes));
   return {
-    izquierda: Math.min(-25, -ancho / 2),
-    // Las ausencias van centradas en el hexágono, y son más bajas que él.
-    arriba: Math.min(HEXAGONO.arriba, -ALTO_AUSENCIAS / 2),
-    derecha: Math.max(25, derecha),
+    izquierda: Math.min(HEXAGONO.izquierda, -ancho / 2),
+    arriba: HEXAGONO.arriba,
+    derecha: Math.max(HEXAGONO.derecha, ancho / 2),
     abajo: HEXAGONO.abajo + HUECO + alto,
   };
 };
@@ -158,13 +143,11 @@ export interface MarcadorZonaProps {
   readonly nombreDeZona: string;
   /** Cuántos emplazamientos tiene. Una provincia sin cubrir no lo enseña. */
   readonly emplazamientos: number;
-  /** Compañías sin ningún emplazamiento en la zona. En un municipio pequeño, ninguna. */
-  readonly ausentes: ReadonlyArray<Compania>;
   /** Solo en una provincia; el resto va siempre `entera`. */
   readonly cobertura?: CoberturaDeProvincia;
   /** Solo en una provincia: si su capa se está pidiendo o no ha llegado. */
   readonly carga?: CargaDelMarcador;
-  /** Nombre accesible: la zona, su número, sus ausencias y qué hace al pulsarla. */
+  /** Nombre accesible: la zona, su número y qué hace al pulsarla. */
   readonly nombre: string;
   /** Cómo aparece o se va al cambiar de nivel. Sin él, aparece sin transición. */
   readonly movimiento?: Movimiento;
@@ -177,8 +160,9 @@ const QUIETO: Movimiento = { tipo: "quieto" };
  * Una zona en el mapa (una provincia, un municipio o un barrio): el mismo hexágono oscuro con su
  * número que las agrupaciones, para que al cambiar de nivel un hexágono se deslice a otro y nunca
  * queden solo letras. En la forma completa lleva debajo el nombre en una cinta, con la letra de
- * las etiquetas (monoespaciada), que no se confunde con los rótulos del mapa base, y a la derecha
- * las ausencias. Una provincia a medias lleva el borde discontinuo y lo dice; una sin cubrir y un
+ * las etiquetas (monoespaciada), que no se confunde con los rótulos del mapa base. No dice qué
+ * compañías faltan: que una no tenga emplazamientos en la zona no quiere decir que no dé servicio
+ * en ella (ADR 0024). Una provincia a medias lleva el borde discontinuo y lo dice; una sin cubrir y un
  * barrio vacío van en claro. Es un botón del tamaño del hexágono que acerca el mapa a la zona.
  */
 export function MarcadorZona(props: MarcadorZonaProps) {
@@ -247,12 +231,6 @@ export function MarcadorZona(props: MarcadorZonaProps) {
                 {String(props.emplazamientos)}
               </span>
             </Show>
-            <Show when={!completa() && props.ausentes.length > 0}>
-              {/* En el borde de abajo a la derecha del hexágono, como una insignia. */}
-              <span class="absolute right-[9px] bottom-[11px] size-0">
-                <MarcaDeAusencia />
-              </span>
-            </Show>
           </span>
           <Show when={completa()}>
             <span
@@ -268,11 +246,6 @@ export function MarcadorZona(props: MarcadorZonaProps) {
                 </span>
               </Show>
             </span>
-            <Show when={props.ausentes.length > 0}>
-              <span class="absolute top-1/2 left-full ml-0.5 -translate-y-1/2 drop-shadow-marcador">
-                <Ausencias companias={props.ausentes} />
-              </span>
-            </Show>
           </Show>
         </span>
       </Deslizable>

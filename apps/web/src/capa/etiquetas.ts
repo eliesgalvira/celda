@@ -58,9 +58,6 @@ const nombreDe = (e: ConEtiqueta): string =>
       ? e.resumen.municipio.nombre
       : e.provincia.nombre;
 
-const ausentesDe = (e: ConEtiqueta): number =>
-  e.tipo === "provincia" ? e.ausentes.length : e.resumen.ausentes.length;
-
 /** Una provincia que no está cubierta entera o cuya capa está en camino lleva una línea más. */
 const conEstado = (e: ConEtiqueta): boolean =>
   e.tipo === "provincia" && (!e.provincia.cubierta || e.carga !== "resumen");
@@ -70,12 +67,12 @@ const porPrioridad = (a: ConEtiqueta, b: ConEtiqueta): number =>
   emplazamientosDe(b) - emplazamientosDe(a) || (codigoDe(a) < codigoDe(b) ? -1 : 1);
 
 const cajaDe = (e: ConEtiqueta, punto: Salto, forma: FormaDeZona): Caja =>
-  cajaEn(punto, cajaDeZona(forma, nombreDe(e), ausentesDe(e), conEstado(e)));
+  cajaEn(punto, cajaDeZona(forma, nombreDe(e), conEstado(e)));
 
 /**
  * Qué forma toma cada zona de `elementos` en la pantalla. Las agrupaciones y los emplazamientos
  * sueltos se colocan primero, porque su sitio no se puede cambiar. Después, las zonas de más a
- * menos emplazamientos: cada una va completa, con su nombre y sus ausencias, si no pisa nada de lo
+ * menos emplazamientos: cada una va completa, con su nombre, si no pisa nada de lo
  * ya colocado, y compacta, solo el hexágono, si no. La compacta se dibuja aunque pise otra, porque
  * esconder una zona haría creer que no tiene emplazamientos.
  */

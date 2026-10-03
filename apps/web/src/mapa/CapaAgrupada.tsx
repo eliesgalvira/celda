@@ -213,7 +213,6 @@ function MarcadorPintado(props: {
             forma={props.formas.get(elegido().clave) ?? "completa"}
             nombreDeZona={elegido().resumen.barrio.nombre}
             emplazamientos={elegido().resumen.emplazamientos}
-            ausentes={elegido().resumen.ausentes}
             nombre={nombreDeBarrio(elegido().resumen)}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(elegido())}
@@ -229,7 +228,6 @@ function MarcadorPintado(props: {
             forma={props.formas.get(elegido().clave) ?? "completa"}
             nombreDeZona={elegido().resumen.municipio.nombre}
             emplazamientos={elegido().resumen.emplazamientos}
-            ausentes={elegido().resumen.ausentes}
             nombre={nombreDeMunicipio(elegido().resumen)}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(elegido())}
@@ -247,7 +245,6 @@ function MarcadorPintado(props: {
             emplazamientos={hexagono().provincia.emplazamientos}
             cobertura={coberturaDe(hexagono())}
             carga={hexagono().carga}
-            ausentes={hexagono().ausentes}
             nombre={nombreDeProvincia(hexagono())}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(hexagono())}

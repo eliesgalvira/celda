@@ -1,7 +1,15 @@
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { assert, describe, it } from "@effect/vitest";
 
-import { cajaConMargen, nombreDeAgrupacion, nombreDeMarcador } from "./marcadores.ts";
+import type { ElementoProvincia } from "./agrupacion.ts";
+import {
+  cajaConMargen,
+  nombreDeAgrupacion,
+  nombreDeMarcador,
+  nombreDeProvincia,
+} from "./marcadores.ts";
+import { crearAgrupadorNacional } from "./nacional.ts";
+import { estados, MUNDO, RESUMEN, resumenConBarcelona } from "./pruebasNacional.ts";
 
 const en = (clave: string, longitud: number, latitud: number): EmplazamientoDeCapa => ({
   clave,
@@ -44,5 +52,34 @@ describe("nombre accesible de un marcador", () => {
 describe("nombre accesible de una agrupación", () => {
   it("empieza por el número que se ve y dice qué hace al pulsarla", () => {
     assert.strictEqual(nombreDeAgrupacion(12), "12 emplazamientos, acercar");
+  });
+});
+
+describe("nombre accesible de una provincia", () => {
+  const hexagonos = (resumen = RESUMEN) =>
+    [...crearAgrupadorNacional(resumen, estados()).escena(6, MUNDO).elementos.values()].filter(
+      (e): e is ElementoProvincia => e.tipo === "provincia",
+    );
+
+  it("dice su número y qué hace al pulsarla, no qué compañías faltan aunque las tenga", () => {
+    const [barcelona, , lleida] = hexagonos();
+    // A Barcelona le falta Vodafone en sus datos; el nombre no lo dice.
+    assert.deepStrictEqual(barcelona?.ausentes, ["vodafone"]);
+    assert.strictEqual(
+      barcelona && nombreDeProvincia(barcelona),
+      "Barcelona, 40 emplazamientos, acercar",
+    );
+    assert.strictEqual(
+      lleida && nombreDeProvincia(lleida),
+      "Lleida, Celda aún no tiene sus emplazamientos, acercar",
+    );
+  });
+
+  it("una provincia a medias dice que su número es solo de una parte", () => {
+    const [barcelona] = hexagonos(resumenConBarcelona(false));
+    assert.strictEqual(
+      barcelona && nombreDeProvincia(barcelona),
+      "Barcelona, 40 emplazamientos en la parte que Celda ya tiene, acercar",
+    );
   });
 });
