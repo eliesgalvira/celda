@@ -79,8 +79,7 @@ export const fuenteEdificio = (): GeoJSONSourceSpecification => ({
 
 /**
  * El edificio resaltado: un relleno tenue y un contorno del color de las celdas sobre un casco
- * claro, y su número de portal en negrita, en tinta sobre blanco. El número no se aparta por nada
- * ni aparta a nadie.
+ * claro. Van encima de las celdas y bajo los rótulos; el número va aparte (`capaNumeroDelEdificio`).
  */
 export const capasEdificio = (color: ColorDeToken): ReadonlyArray<LayerSpecification> => [
   {
@@ -106,22 +105,27 @@ export const capasEdificio = (color: ColorDeToken): ReadonlyArray<LayerSpecifica
     layout: { "line-join": "round" },
     paint: { "line-color": color("mapa-celda"), "line-width": 2.2 },
   },
-  {
-    id: "edificio-numero",
-    type: "symbol",
-    source: FUENTE_EDIFICIO,
-    filter: ["==", ["geometry-type"], "Point"],
-    layout: {
-      "text-field": ["get", "numero"],
-      "text-font": ["Noto Sans Bold"],
-      "text-size": 15,
-      "text-allow-overlap": true,
-      "text-ignore-placement": true,
-    },
-    paint: {
-      "text-color": color("mapa-foto-tinta"),
-      "text-halo-color": color("mapa-foto-rotulo"),
-      "text-halo-width": 2.4,
-    },
-  },
 ];
+
+/**
+ * El número de portal del edificio resaltado, en negrita, en tinta sobre blanco. Va justo encima de
+ * la capa de portales: MapLibre lo coloca antes y el mismo número de esa capa, que no se puede
+ * pisar con otro, deja de pintarse debajo. No se aparta por nada.
+ */
+export const capaNumeroDelEdificio = (color: ColorDeToken): LayerSpecification => ({
+  id: "edificio-numero",
+  type: "symbol",
+  source: FUENTE_EDIFICIO,
+  filter: ["==", ["geometry-type"], "Point"],
+  layout: {
+    "text-field": ["get", "numero"],
+    "text-font": ["Noto Sans Bold"],
+    "text-size": 15,
+    "text-allow-overlap": true,
+  },
+  paint: {
+    "text-color": color("mapa-foto-tinta"),
+    "text-halo-color": color("mapa-foto-rotulo"),
+    "text-halo-width": 2.4,
+  },
+});

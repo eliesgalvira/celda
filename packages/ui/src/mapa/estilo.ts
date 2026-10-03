@@ -5,6 +5,7 @@ import { comoRgb, leerOklch } from "./color.ts";
 import { FOTO_AEREA } from "./expresiones.ts";
 import {
   capaFoto,
+  capaNumeroDelEdificio,
   capasEdificio,
   FUENTE_EDIFICIO,
   FUENTE_FOTO,
@@ -107,7 +108,7 @@ export const estiloMapa = (color: ColorDeToken, espana: ContornoDeEspana): Style
     ...capasServicioEncima(color("mapa-celda"), color("mapa-referencia")),
     ...capasZona(color("mapa-referencia")),
     ...capasEdificio(color),
-    ...capasRotulos(FUENTE_MAPA_BASE, color, espana),
+    ...capasRotulos(FUENTE_MAPA_BASE, color, espana, [capaNumeroDelEdificio(color)]),
   ],
 });
 

@@ -435,16 +435,19 @@ const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecifi
 });
 
 /**
- * Las capas de rótulos, de abajo arriba: los nombres, los números de portal y después los
- * lugares, de menos a más importantes.
+ * Las capas de rótulos, de abajo arriba: los nombres, los números de portal, lo que tenga que ir
+ * `sobreLosPortales` (el número del edificio resaltado) y después los lugares, de menos a más
+ * importantes.
  */
 export const capasRotulos = (
   fuente: string,
   color: ColorDeToken,
   espana: ContornoDeEspana,
+  sobreLosPortales: ReadonlyArray<LayerSpecification> = [],
 ): ReadonlyArray<LayerSpecification> => [
   ...capasDeNombres(fuente, color),
   capaDePortales(fuente, color),
+  ...sobreLosPortales,
   ...LUGARES.toReversed().map((capa) => capaDeLugares(fuente, color, espana, capa)),
 ];
 
