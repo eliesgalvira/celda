@@ -1,5 +1,7 @@
 # Investigación 08 · Ampliación a toda España
 
+> **Nota (03/10/2026).** Celda ya no lee antenasmoviles.es ([ADR 0019](../adr/0019-fuentes-registro-y-aportaciones-propias.md)). Las cifras de aquí que salen de su densidad, como los 87 cuadros, los registros previstos por zona y la simulación del teselado, quedan como historia. El #55 rehízo los cuadros y las densidades con el listado propio de toda España (apartado «Los cuadros con el registro», al final) y borró los guiones de `muestras/espana/` que leían `showf`.
+
 Qué cambia al pasar de la caja de Barcelona a toda España, con cifras. Es un plan: no hay nada implementado. Las decisiones que salen de aquí están en los ADR 0014 a 0017, en estado «propuesta».
 
 Consultas y medidas del 28/09/2026. Cada cifra lleva una de dos marcas:

@@ -19,20 +19,19 @@ nix flake check
 
 Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias/` del directorio desde el que se lanza, como `pnpm run ingesta`. La configuración y sus variables están en [convex.md](convex.md#configuración).
 
-`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal, un antenasmoviles.es, un R2 y un Vercel de mentira que contestan por HTTPS. El R2 es privado, como el de verdad (ADR 0018): no contesta nada sin firma, y con la clave de solo lectura del build no deja escribir ni borrar. El Vercel, en cada llamada al deploy hook, construye un despliegue con `celda-nocturna capas <carpeta>` y las variables de R2 del build, con esa clave, y si acaba bien lo sirve en `celda.prueba/capas`; si falla, sigue sirviendo el anterior. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. antenasmoviles.es da como listado los marcadores grabados en el Campus Nord, las 42 ER5 grabadas de Barcelona y una ER5 de Madrid, y los detalles grabados. La prueba enciende antenasmoviles.es con 4 detalles por noche y:
+`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal, un R2 y un Vercel de mentira que contestan por HTTPS. El R2 es privado, como el de verdad (ADR 0018): no contesta nada sin firma, y con la clave de solo lectura del build no deja escribir ni borrar. El Vercel, en cada llamada al deploy hook, construye un despliegue con `celda-nocturna capas <carpeta>` y las variables de R2 del build, con esa clave, y si acaba bien lo sirve en `celda.prueba/capas`; si falla, sigue sirviendo el anterior. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. La prueba:
 
 1. crea los ficheros de credenciales de R2 y del deploy hook con valores al azar;
 2. adelanta el reloj hasta la hora del temporizador y espera a que la noche acabe bien;
 3. comprueba que la base está en `/var/lib/celda-nocturna`, que la copia está en el directorio de copias y que `vigente.json` y la capa llegaron al cubo, firmados con la clave del fichero, y que la copia también llegó al cubo, comprimida, bajo `copias/`;
 4. lanza `celda-nocturna estado` como el usuario del servicio;
 5. comprueba que, con las zonas por defecto, la primera noche barrió Cataluña con una petición por cuadro, y que la orden de estado dice, por zona, cuándo se barrió y cuántas fichas le faltan, y que la siguiente barre `centro`;
-6. comprueba que antenasmoviles.es recibió un solo `showf` y cuatro detalles, los de las dos ER5 sin compañía de Barcelona primero, ninguno de Madrid ni de una copia del registro, y que la ER5 de Urquinaona se publicó con su enlace a antenasmoviles.es;
-7. comprueba que las fichas llegaron a una cada 4 s como mínimo, que pararon al cerrarse su ventana de 2 minutos con las demás en la cola, y que se publicó a mitad de la ventana y al cerrarla;
-8. comprueba que la noche llamó una vez al deploy hook y que Vercel monta las dos versiones de la noche, la vigente y su anterior, igual byte a byte que R2, leyendo con la clave de solo lectura y sin escribir nada con ella;
-9. publica a mano con `systemd-run`, como el servicio, y comprueba que con Vercel al día no se llama al hook;
-10. deja servido un despliegue de otra versión y hace que R2 no conteste al build: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo el anterior. Con R2 de vuelta, la siguiente publicación lo pone al día;
-11. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
-12. busca las dos claves de R2, sus secretos y el hook en todo el almacén de Nix de la máquina y no los encuentra.
+6. comprueba que las fichas llegaron a una cada 4 s como mínimo, que pararon al cerrarse su ventana de 2 minutos con las demás en la cola, y que se publicó a mitad de la ventana y al cerrarla;
+7. comprueba que la noche llamó una vez al deploy hook y que Vercel monta las dos versiones de la noche, la vigente y su anterior, igual byte a byte que R2, leyendo con la clave de solo lectura y sin escribir nada con ella;
+8. publica a mano con `systemd-run`, como el servicio, y comprueba que con Vercel al día no se llama al hook;
+9. deja servido un despliegue de otra versión y hace que R2 no conteste al build: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo el anterior. Con R2 de vuelta, la siguiente publicación lo pone al día;
+10. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
+11. busca las dos claves de R2, sus secretos y el hook en todo el almacén de Nix de la máquina y no los encuentra.
 
 Con todo construido, la máquina virtual tarda unos 2 min 30 s en arrancar y pasar la prueba. Casi todo es la ventana de fichas.
 
@@ -161,13 +160,6 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `registroOficial.zonasEnTurno` | las siete, de `cataluna` a `oeste-y-canarias` | Zonas de barrido que se turnan |
 | `registroOficial.zonasPorNoche` | 1 | Cuántas de las que se turnan se barren cada noche |
 | `registroOficial.userAgent` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición. Si montas tu propia ingesta, pon tu contacto |
-| `antenasmoviles.enable` | `false` | Interruptor de antenasmoviles.es. Déjalo apagado hasta escribir a su administrador |
-| `antenasmoviles.motivo` | `apagado por defecto hasta escribir a su administrador…` | Lo que se apunta si está apagado |
-| `antenasmoviles.pausa` | 5 | Segundos entre peticiones, entre 5 y 3600 |
-| `antenasmoviles.maxDetalles` | 100 | Detalles de ER5 nuevas o cambiadas por noche |
-| `antenasmoviles.maxPeticiones` | `maxDetalles` + 10 | Tope de peticiones por noche |
-| `antenasmoviles.zonas` | `registroOficial.zonas` y `zonasEnTurno` | Zonas de barrido cuyos marcadores se guardan, todas cada noche |
-| `antenasmoviles.userAgent` | `registroOficial.userAgent` | Se envía en cada petición |
 
 Las zonas de barrido son `cataluna`, `centro`, `andalucia`, `levante`, `norte`, `ebro-y-duero` y `oeste-y-canarias` (la guía de la ingesta, en [convex.md](convex.md), dice qué comunidades lleva cada una). Por defecto se turnan las siete, una por noche: toda España en siete noches, con unas 31 peticiones de listado cada una y Cataluña la primera. Para barrer Cataluña todas las noches y las demás por turnos, unas 61 peticiones y toda España en seis noches:
 
@@ -180,8 +172,6 @@ Y toda España cada noche, unas 215 peticiones y 15 minutos de listado:
 ```nix
 services.celda-nocturna.registroOficial.zonasPorNoche = 7;
 ```
-
-El listado de antenasmoviles.es es de toda España y se pide una vez por noche, así que sus zonas se barren todas cada noche, también las que el registro turna. Qué hace cada noche está en [convex.md](convex.md#antenasmovileses-en-la-noche).
 
 Las fichas se leen a una cada `fichas.ritmo` segundos hasta que pasan `fichas.ventana` minutos desde que empezó la noche: con los valores por defecto, unas 5.500. Primero van las de las provincias de `fichas.prioridad` (Barcelona y el resto de Cataluña), luego las de cada zona de barrido en el orden de `zonas` y `zonasEnTurno`, y al final las demás. Cómo funciona la cola está en [convex.md](convex.md#las-fichas). Si el ministerio pide menos peticiones, basta con subir el ritmo:
 

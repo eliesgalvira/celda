@@ -94,7 +94,7 @@ La web (`apps/web/src/interferencia/`) usa un plano con el origen en la casilla 
 
 ## Diagrama de sector y orientación
 
-El registro oficial no publica el azimut de los sectores, y antenasmoviles.es tampoco (`docs/investigacion/registro-oficial.md`). Los ángulos de las medidas de exposición del ministerio son rumbos de puntos de medida y no sirven. Por eso el panel dibuja siempre una orientación que no es un dato:
+Ninguna fuente de Celda publica el azimut de los sectores: el registro oficial no lo da (`docs/investigacion/registro-oficial.md`). Los ángulos de las medidas de exposición del ministerio son rumbos de puntos de medida y no sirven. Por eso el panel dibuja siempre una orientación que no es un dato:
 
 - si hay azimuts estimados, con su margen de ±15°, en la leyenda y en el dibujo;
 - si no hay ninguno, que hoy es siempre, tres sectores supuestos a 0°, 120° y 240°, con trazo discontinuo y una nota que dice que la orientación es supuesta y por qué.

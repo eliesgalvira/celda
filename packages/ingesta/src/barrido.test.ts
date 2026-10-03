@@ -45,7 +45,7 @@ interface Teselado {
   readonly hojas: ReadonlyArray<Caja>;
 }
 
-/** La división en cuatro de `teselas.mjs` (investigación 08) sobre unos puntos. */
+/** La división en cuatro que simuló la investigación 08, sobre unos puntos. */
 const simular = (puntos: ReadonlyArray<Punto>, caja: Caja, tope: number): Teselado => {
   const dentro = puntos.filter((p) => enCaja(caja, p.longitud, p.latitud));
   if (dentro.length < tope) return { peticiones: 1, hojas: [caja] };

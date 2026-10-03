@@ -11,11 +11,11 @@ convex/confect/tables/     una tabla por fichero, con esquema Effect
 convex/confect/*.spec.ts   la API de cada grupo (ingesta, datos)
 convex/confect/*.impl.ts   su implementación
 convex/confect/crons.ts    el cron nocturno de la ingesta
-convex/src/proceso.ts      la BaseDeIngesta sobre Convex y el proceso por puntos
+convex/src/proceso.ts      la BaseDeIngesta sobre Convex
 convex/src/publicacion.ts  los datos de la publicación sacados de Convex
 tools/capas/               la publicación a mano y el origen estático local
 convex/convex/             generado por Confect y Convex; no se edita
-packages/ingesta/          extractores (registro-oficial/, antenasmoviles/), sin nada de Convex
+packages/ingesta/          el extractor del registro oficial (registro-oficial/), sin nada de Convex
 packages/ingesta/src/proceso.ts   el proceso de una ejecución sobre una BaseDeIngesta
 packages/ingesta/src/guardado.ts  qué cambia en una observación con el listado, la ficha o un barrido
 packages/publicacion/      la publicación, el almacén en carpeta o en R2 y la retención
@@ -33,7 +33,7 @@ La acción `ingesta:registroOficial` es fina: lee la configuración, monta el ex
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (una de las siete de España cada noche, por defecto), antenasmoviles.es si está encendido, la publicación, el build de Vercel si aún no sirve la versión vigente y una copia de la base, en el disco y en R2. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (una de las siete de España cada noche, por defecto), la publicación, el build de Vercel si aún no sirve la versión vigente y una copia de la base, en el disco y en R2. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
 
 ### Lanzarla en local
 
@@ -83,13 +83,6 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_REGISTRO_REINTENTOS` | 3 | Reintentos de un fallo pasajero |
 | `CELDA_REGISTRO_ESPERA_SEGUNDOS` | 10 | Tiempo máximo de una respuesta |
 | `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
-| `CELDA_ANTENASMOVILES_ACTIVO` | `false` | Interruptor de antenasmoviles.es |
-| `CELDA_ANTENASMOVILES_MOTIVO` | `apagado por defecto hasta escribir…` | Lo que se apunta si está apagado |
-| `CELDA_ANTENASMOVILES_ZONAS` | las del registro | Zonas cuyos marcadores se guardan, o `ninguna`. Sin poner, las de `CELDA_REGISTRO_ZONAS` y `CELDA_REGISTRO_ZONAS_EN_TURNO` |
-| `CELDA_ANTENASMOVILES_MAX_DETALLES` | 100 | Detalles de ER5 por noche |
-| `CELDA_ANTENASMOVILES_PAUSA_SEGUNDOS` | 5 | Pausa entre peticiones; nunca baja de 5 |
-| `CELDA_ANTENASMOVILES_MAX_PETICIONES` | los detalles más 10 | Tope de peticiones por noche |
-| `CELDA_ANTENASMOVILES_USER_AGENT` | el del registro | Se envía en cada petición |
 
 Las zonas son `cataluna`, `centro` (Madrid y Castilla-La Mancha), `andalucia` (con Ceuta y Melilla), `levante` (Comunitat Valenciana, Murcia e Illes Balears), `norte` (Galicia, Asturias, Cantabria y País Vasco), `ebro-y-duero` (Castilla y León, Aragón, Navarra y La Rioja) y `oeste-y-canarias` (Extremadura y Canarias), con sus cuadros en `ZONAS_DE_BARRIDO` (`packages/dominio/src/barrido.ts`). Un nombre que no está ahí para el programa al arrancar. De las que se turnan va primero la que quedó a medias, luego las que nunca se han completado, en el orden de la configuración, y luego las que llevan más tiempo sin completarse.
 
@@ -119,10 +112,9 @@ La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sq
 - `emplazamientos`: los de la última fusión, con la fecha en que cambió cada uno;
 - `ejecuciones`: cada pasada de un extractor, con sus cambios, sus errores, lo que hizo cada zona (cuadros, peticiones, bytes, registros y cambios) y cómo acabó la publicación de su noche;
 - `publicaciones`: cada intento de publicar;
-- `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero;
-- `puntos`: los marcadores de antenasmoviles.es, con su huella, su cuadro, cuándo se leyó su detalle y cuándo los vio el listado por última vez. Sus barridos van en `barridos`, con la fuente `antenasmoviles`.
+- `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero.
 
-El esquema lleva su versión en `PRAGMA user_version`, y una base vieja se pone al día al abrirla. Cada paso de la noche escribe en su propia transacción. Si la noche se corta, su ejecución queda en curso; la siguiente la da por interrumpida y rehace el trabajo, y acaba igual que si no se hubiera cortado.
+El esquema lleva su versión en `PRAGMA user_version`, y una base vieja se pone al día al abrirla. La versión 5 borra la tabla `puntos` de la web de antenas que retiró el ADR 0019, y las observaciones, los barridos y las ejecuciones de las fuentes que ya no están en `Fuente`. Cada paso de la noche escribe en su propia transacción. Si la noche se corta, su ejecución queda en curso; la siguiente la da por interrumpida y rehace el trabajo, y acaba igual que si no se hubiera cortado.
 
 ### El barrido por zonas
 
@@ -149,7 +141,7 @@ Las fichas usan su propio cliente sobre la misma conexión que el listado: su pa
 - una ficha que no se puede leer apunta el fallo y espera un día antes de volver a la cola; dos días si falla otra vez, luego cuatro, y así hasta 30;
 - una ficha con el aviso «Código de emplazamiento no válido» espera igual, y además deja la estación base sin ficha en el registro, con la fecha de la noche (`SinFichaEnElRegistro`). La ficha publicada lo dice. La siguiente lectura buena quita la marca;
 - un fallo pasajero (red, 408, 5xx) se reintenta tres veces con espera exponencial. Si sigue, cuenta como fallo pero no hace esperar a la ficha;
-- un 429, o un 503 con `Retry-After`, es la fuente pidiendo que se espere. Si `Retry-After` pide un minuto o menos, la conexión espera lo que pide y repite, dentro de los mismos tres reintentos. Si pide más, si un 429 no dice cuánto o si lo sigue pidiendo tras los reintentos, se deja de pedir en el acto (`FuentePideEsperar`). Vale para todas las fuentes: en el listado para las zonas que quedan, y en antenasmoviles.es, los detalles;
+- un 429, o un 503 con `Retry-After`, es la fuente pidiendo que se espere. Si `Retry-After` pide un minuto o menos, la conexión espera lo que pide y repite, dentro de los mismos tres reintentos. Si pide más, si un 429 no dice cuánto o si lo sigue pidiendo tras los reintentos, se deja de pedir en el acto (`FuentePideEsperar`). Vale también para el listado: se deja de pedir el de las zonas que quedan;
 - tres fallos seguidos paran las fichas de la noche. Una ficha sin ficha en el registro no cuenta ni corta la cuenta, porque es lo que dice el registro y no un fallo; pero 20 seguidas (`SIN_FICHA_SEGUIDAS`) también las paran, y el diario dice que puede haber cambiado la URL de la ficha. Entonces ninguna de esas 20 queda marcada: esperan y se reintentan como cualquier fallo;
 - un 401 o un 403, una página que no es una ficha del geoportal (todas llevan la tabla `tablaDetalleEstacion`) o un listado en HTML son la fuente bloqueando a Celda (`FuenteBloqueada`). Se deja de pedir en el acto, sin reintentos.
 
@@ -162,20 +154,6 @@ Ficha fallida, intento 1: VODAFONE ESPAÑA, S.A.U. - 061723 (https://geoportal.m
 Al final dice cuántas se leyeron, cuántas fallaron y cuáles, con su motivo, cuántas quedan y por qué pararon. La orden `estado` dice cuántas quedan en cada parte de la cola: sin leer, por releer y esperando tras fallar. De las que esperan tras un fallo enseña las diez primeras en volver a pedirse, con su motivo y su próximo intento, así que no hace falta abrir la base para leer `ficha_error`. También las da por zona de barrido, junto a la fecha de su último barrido completo, contando las de sus provincias con prioridad, y dice qué zonas barre la noche siguiente.
 
 Al pasar la mitad de la ventana con alguna ficha leída, la noche fusiona y publica, sin esperar ni repetir si falla. Si la noche se corta después, lo leído hasta entonces ya está publicado. La primera fusión lleva la fecha de inicio de la ejecución, como todos sus datos; la del cierre lleva la hora a la que se hace, para que la versión de los datos avance. Así una noche con fichas publica dos versiones, y las ocho que se conservan cubren unas cuatro noches.
-
-### antenasmoviles.es en la noche
-
-Va después del registro oficial y empieza apagado, como en Convex (ver [antenasmoviles.es](#antenasmovileses)). Encendido, hace esto (`ejecutarBarridoDePuntos`, `packages/ingesta/src/barridoDePuntos.ts`):
-
-1. Pide `robots.txt` y `showf?er5` una vez. El extractor se queda con los marcadores de los cuadros de sus zonas.
-2. Guarda los marcadores de cada zona en una transacción. Uno nuevo, o con otra huella, queda pendiente. Una zona que vuelve sin marcadores cuando la base tiene alguno falla y no cuenta ausencias.
-3. Cierra los barridos: un marcador que falta en dos barridos seguidos de su zona se retira con sus observaciones. Una zona que no está en la configuración de esa noche no cuenta ausencias.
-4. Lee el detalle de las ER5 pendientes, primero las que no dicen su compañía en el listado, 100 como mucho y a una petición cada 5 s. No lee el de los marcadores que copian el registro ni repasa los ya leídos, así que la nocturna no ve las fotos de desmontaje (investigación 08, apartado 5). Un marcador que deja de ser ER5 pierde las observaciones que dio su detalle.
-5. Fusiona.
-
-Un 403 o una página HTML en el listado es la fuente bloqueando a Celda: la ejecución queda fallida, sus zonas fallidas y nada se retira. En un detalle, para los detalles y deja el resto para la noche siguiente. Con Cataluña, la primera noche son `robots.txt`, `showf` y 100 detalles, unos 9 minutos.
-
-Para una prueba en local, `CELDA_ANTENASMOVILES_ACTIVO=true CELDA_ANTENASMOVILES_MAX_DETALLES=0 pnpm run ingesta noche` pide solo `robots.txt` y `showf`. No lo dejes encendido en ninguna máquina hasta que el usuario haya escrito a su administrador (#39).
 
 `node:sqlite` es síncrono. Si una conexión espera el cerrojo de otra del mismo proceso, bloquea el bucle de eventos y la otra no puede soltarlo. Por eso abrir una base al día no toma el cerrojo de escritura, y `estado` se puede lanzar en mitad de una noche desde otro proceso.
 
@@ -221,13 +199,11 @@ Para ver lo que cabe, `node --max-old-space-size=512 src/medida/espana.ts /tmp/e
 
 `apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord, que contesta cada caja como el geoportal (`capaGrabadaPorCajas`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, también las comprimidas en un R2 de prueba, que una subida fallida no tumba la noche, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
 
-`apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/fichas.test.ts` prueba el orden de la cola y la lectura en la ventana con el extractor real, fichas grabadas y el reloj de prueba: el ritmo, el cierre de la ventana con el resto pendiente, la publicación a mitad, unas 5.500 fichas con los valores por defecto y respuestas de 0,9 s, una ficha cada segundo desde el final de la anterior y, a ese ritmo, el bloqueo por 401, 403 o una página que no es una ficha, el 429 y el 503 con `Retry-After`, los tres fallos seguidos, la espera tras un fallo y el tope. `apps/nocturna/src/fichas.test.ts` hace lo mismo con la base SQLite: una noche que cierra la ventana y la siguiente que sigue por donde iba, la provincia con prioridad, un bloqueo que queda en la ejecución, una ficha que espera un día tras fallar y una base de la versión 3 del esquema que se pone al día sin perder sus puntos ni su cola. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la simulación de `muestras/espana/teselas.mjs`.
+`apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/fichas.test.ts` prueba el orden de la cola y la lectura en la ventana con el extractor real, fichas grabadas y el reloj de prueba: el ritmo, el cierre de la ventana con el resto pendiente, la publicación a mitad, unas 5.500 fichas con los valores por defecto y respuestas de 0,9 s, una ficha cada segundo desde el final de la anterior y, a ese ritmo, el bloqueo por 401, 403 o una página que no es una ficha, el 429 y el 503 con `Retry-After`, los tres fallos seguidos, la espera tras un fallo y el tope. `apps/nocturna/src/fichas.test.ts` hace lo mismo con la base SQLite: una noche que cierra la ventana y la siguiente que sigue por donde iba, la provincia con prioridad, un bloqueo que queda en la ejecución, una ficha que espera un día tras fallar y una base de la versión 3 del esquema que se pone al día sin perder su cola, y sin la tabla `puntos` ni nada de las fuentes retiradas. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la división en cuatro simulada en la prueba, la de la investigación 08.
 
 `apps/nocturna/src/espana.test.ts` prueba toda España con la España sintética, que copia emplazamientos de los listados grabados de Barcelona y Valencia y los reparte por los municipios del padrón con los registros por zona de la investigación 08. Comprueba que por defecto se barre una zona cada noche, en su orden; que una provincia queda cubierta en el resumen cuando se han barrido todos sus cuadros, y antes no; que toda España cabe en una noche con `CELDA_REGISTRO_ZONAS_POR_NOCHE=7` y dentro del tope de peticiones; el orden de las fichas, y lo que dice `estado` de cada zona. Con los listados grabados de Barcelona y del centro de Madrid, la primera noche barre Cataluña, la segunda `centro`, y publican los 1.294 y 1.331 emplazamientos de la revisión de la fusión. Tarda unos 30 s.
 
-`apps/nocturna/src/antenasmoviles.test.ts` lanza noches con el extractor real de antenasmoviles.es sobre un cliente HTTP de prueba que apunta cada petición. Comprueba que apagado no pide nada, que con Cataluña solo guarda sus marcadores y nunca lee más de 100 detalles ni el de una copia del registro, que sin cambios solo pide `robots.txt` y `showf`, que un 403 o una página HTML no retiran nada, que retirar pide dos barridos de la zona, que una ER5 cambiada se relee, que una noche cortada en los detalles se retoma igual, el estado y la configuración.
-
-`convex/test/nocturna.test.ts` comprueba que las dos ingestas publican lo mismo. Hace las mismas noches en Convex en memoria y en la nocturna, con las mismas respuestas grabadas y a la misma hora, y tras cada noche compara byte a byte el manifiesto, las capas de provincia y los lotes de las dos carpetas: con cambios, una baja, una alta, las fichas repartidas en varias noches y antenasmoviles.es con una ER5 nueva, una movida y una que se retira. Convex lee el detalle de todos los marcadores y la nocturna solo el de las ER5; con los detalles reales, que no dan ninguna estación por desmontada, publican lo mismo. Del resumen y de `vigente.json` compara los datos y deja fuera la cobertura (qué zonas se han barrido, si cada provincia está cubierta, su último barrido y la huella que eso da al nombre del resumen): Convex lee la caja de Barcelona y la nocturna barre Cataluña por cuadros (#40), así que la cobertura de cada una es distinta por diseño. Se borra con la ingesta de Convex (#51).
+`convex/test/nocturna.test.ts` comprueba que las dos ingestas publican lo mismo. Hace las mismas noches en Convex en memoria y en la nocturna, con las mismas respuestas grabadas y a la misma hora, y tras cada noche compara byte a byte el manifiesto, las capas de provincia y los lotes de las dos carpetas: con cambios, una baja, una alta, y las fichas repartidas en varias noches. Del resumen y de `vigente.json` compara los datos y deja fuera la cobertura (qué zonas se han barrido, si cada provincia está cubierta, su último barrido y la huella que eso da al nombre del resumen): Convex lee la caja de Barcelona y la nocturna barre Cataluña por cuadros (#40), así que la cobertura de cada una es distinta por diseño. Se borra con la ingesta de Convex (#51).
 
 ## Backend local
 
@@ -268,30 +244,7 @@ Una descarga real del registro oficial hace unas 11 peticiones con 5 fichas: `ro
 - Convex corta una función que lee más de 4096 documentos. Por eso la fusión lee las observaciones y las claves por páginas de 1000 y escribe los emplazamientos en lotes de 100. `cerrarBarrido` lee de una vez las observaciones de una fuente (unas 2400 en la caja de Barcelona); para una zona más grande habría que repartirlo.
 - La primera descarga real, sin el parámetro `zoom` y con las coordenadas tal cual, recibió `{}`. Con `zoom=4` y seis decimales, como el visor y los scripts de la investigación, llegaron los 2380 registros. Por eso una zona entera vacía cuenta como fallo de la fuente y no como «no hay estaciones».
 - `TextDecoder` en el runtime de Convex solo garantiza UTF-8; el Latin-1 del geoportal se decodifica a mano (`packages/ingesta/src/texto.ts`).
-
-## antenasmoviles.es
-
-> **El interruptor de antenasmoviles.es empieza apagado y así tiene que quedarse.** La investigación de fuentes comunitarias recomienda escribir a `admin@antenasmoviles.es` antes de publicar nada suyo, y el autor aún no ha decidido. Hasta entonces no lo enciendas en ningún despliegue público. En local, enciéndelo solo para una prueba y apágalo después.
-
-El extractor y la fusión están completos. Sin fila en `interruptores`, `INTERRUPTOR_POR_DEFECTO` (`confect/tables/interruptores.ts`) deja el registro oficial encendido y antenasmoviles.es y OpenCelliD apagados. El cron `ingesta de antenasmoviles.es` corre a las 3:15 UTC, una hora después del registro, y con el interruptor apagado solo apunta una ejecución omitida.
-
-```sh
-pnpm exec convex run ingesta:cambiarInterruptor '{"fuente":"antenasmoviles","activo":true,"motivo":"prueba local"}'
-pnpm exec convex run ingesta:antenasMoviles     # una ejecución ahora, con peticiones reales
-pnpm exec convex run ingesta:cambiarInterruptor '{"fuente":"antenasmoviles","activo":false,"motivo":"apagado tras la prueba"}'
-```
-
-Cómo funciona:
-
-- La fuente no tiene una ficha por estación sino puntos, los marcadores de su mapa. `GET /v1/showf?er5` da todos los de España de una vez (4 MB). El extractor busca con una expresión regular el principio de cada fila y solo analiza las de la caja de Barcelona, porque el runtime de Convex tiene poca memoria. La descarga del 26/09/2026 dio 42.851 filas y 1309 puntos en la caja.
-- La fuente no manda `ETag`. Cada punto guarda la huella FNV-1a de su fila (`packages/ingesta/src/huella.ts`) en la tabla `puntos`. Un punto nuevo o con otra huella queda pendiente de leer su detalle (`GET /v1/markers?id=<códigos>`).
-- Cada noche se leen como mucho 100 detalles (`CELDA_ANTENASMOVILES_MAX_DETALLES`), a una petición cada 5 s: unos 8 minutos, dentro del límite de una acción. Primero los nuevos o cambiados, con las ER5 sin compañía delante, luego las demás ER5 y los que copian el registro, y después los leídos hace más de 14 días. Las fotos nuevas no cambian la huella, y esa vuelta cada 14 días es lo que las encuentra. El tope de peticiones por ejecución es 110 (`CELDA_ANTENASMOVILES_MAX_PETICIONES`).
-- Del detalle solo se guardan las correcciones: cada ER5 como observación `presente` y cada estación del registro cuya foto más reciente lleva `desmantelada` como `desmontada`. Lo demás copia el registro y no se guarda. Tampoco se copian fotos ni historial: `/archive` está en `Disallow` y no hacen falta para el estado.
-- Un 403 o una página HTML donde debería haber JSON cuenta como fuente bloqueada. Si pasa en el listado, la ejecución queda fallida sin tocar nada. Si pasa en un detalle, se deja de pedir y los pendientes quedan para la noche siguiente.
-- Un punto que falta en dos barridos seguidos se retira con sus observaciones. Cada observación apunta el punto del que salió (`punto`), así que si la fuente reagrupa códigos y otro punto se la queda, retirar el viejo no la borra.
-- La ejecución apunta los puntos creados, cambiados y retirados en `cambios.puntos`, y los detalles leídos en `cambios.fichas`.
-
-Recuento con la descarga del 26/09/2026 y el registro oficial de ese día, en la caja de Barcelona: 42 ER5, dos sin compañía (`er5` a secas) y 40 con ella. Con la fusión salen 1354 emplazamientos: 1317 verificados, 36 nuevos (tres compartidos por dos compañías) y uno corregido, Urquinaona, donde una ER5 de Orange queda a 7 m de Movistar. No hay conflictos. Las fotos «desmantelada» no se pueden contar sin leer los ~1300 detalles, y en los cinco detalles grabados no hay ninguna.
+- Desde el #55, `Fuente` ya no tiene la web de antenas que retiró el ADR 0019 y el esquema no tiene la tabla `puntos`. Un despliegue con datos de antes guarda ejecuciones omitidas y quizá un interruptor de esa fuente, que el esquema nuevo ya no admite: antes de desplegarlo, borra esas filas de `ejecuciones` e `interruptores` y vacía `puntos` desde el panel de Convex.
 
 ## Publicación
 
@@ -312,7 +265,7 @@ El resumen dice, de cada provincia, si está cubierta: si se han barrido todos l
 
 El paso 8 (`retirarVersionesViejas`) lista el almacén entero y mira el sello de lo que es de una sola versión (`resumen@<fecha>…`, `ficheros@<fecha>.json` y, del formato 4, `sitios@<fecha>.json` y `fichas@<fecha>/<lote>.json`). Nunca borra la vigente ni una versión posterior, que puede ser otra publicación a medias. De cada versión retirada va primero lo que la abre (su resumen), después las capas y los lotes de su manifiesto que no lista ninguna versión que se queda, y al final el manifiesto. Si el manifiesto de una versión que se queda no se entiende, no borra nada compartido. Un fallo al borrar no hace fallar la publicación: sale como aviso en el registro. Por qué siete, en el ADR 0010.
 
-La publicación es automática. `ejecutarIngesta` y `ejecutarIngestaDePuntos` llaman al servicio `Publicacion` al acabar cada ejecución completada (no las omitidas ni las fallidas), y `ingesta:recalcularFusion` también. En las acciones, ese servicio lanza `publicacion:publicar`, una acción de Node. Un fallo al publicar no deshace la ejecución: se apunta en el registro y la siguiente ingesta lo repite.
+La publicación es automática. `ejecutarIngesta` llama al servicio `Publicacion` al acabar cada ejecución completada (no las omitidas ni las fallidas), y `ingesta:recalcularFusion` también. En las acciones, ese servicio lanza `publicacion:publicar`, una acción de Node. Un fallo al publicar no deshace la ejecución: se apunta en el registro y la siguiente ingesta lo repite.
 
 Dónde escribe lo dicen las variables de entorno del despliegue:
 
@@ -375,8 +328,6 @@ Las de Convex tienen tres niveles, todos con `@effect/vitest` y sin mocks de mó
 **Dominio.** La fusión se compara con ficheros de referencia en `packages/dominio/src/referencia/` y `packages/ingesta/src/registro-oficial/referencia/` (`toMatchFileSnapshot`). Si cambias la regla a propósito, regenera con `pnpm exec vp test run -u` en el paquete y revisa el diff de los JSON en el commit.
 
 **Extractor.** `packages/ingesta/src/registro-oficial/extractor.test.ts` monta el extractor real sobre un `HttpClient` de prueba (una `Layer`) que apunta cada petición con la hora del `TestClock`. Así se comprueban el `User-Agent`, `robots.txt`, la pausa entre peticiones, los reintentos con espera exponencial y el tope de peticiones. Las esperas se encadenan tras respuestas asíncronas, y un solo `TestClock.adjust` no las ve todas; `esperarConReloj` (`packages/ingesta/src/pruebas/reloj.ts`) adelanta el reloj de segundo en segundo hasta que la fibra termina.
-
-**antenasmoviles.es.** Las muestras de `docs/investigacion/muestras/antenasmoviles/` pasan por el analizador real en `packages/ingesta/src/antenasmoviles/`. No hay ninguna foto real con `desmantelada` puesta, así que `desmantelar` (`src/pruebas/antenasmoviles.ts`) añade una a un detalle grabado. `muestraAntenasMoviles` junta los 41 puntos de Campus Nord, el detalle real de la entrada del campus con Vodafone desmontada y dos ER5 reales. `convex/test/antenasmoviles.test.ts` la usa con `ejecutarDePuntos` para probar el interruptor, la idempotencia, la huella, el tope de detalles y la retirada.
 
 **API de Convex.** `convex/test/` usa `@confect/test` (convex-test en memoria). `ejecutar(extractor)` en `convex/test/ayudas.ts` lanza `ejecutarIngesta` con `MutationRunner` y `QueryRunner` sacados del `TestConfect`, y el extractor que se le pase. El de prueba es `capaGrabada` con `muestraCampusNord`, el registro grabado en la investigación. Para comprobar que una ejecución no escribe nada, adelanta el reloj un día y compara `instantanea` antes y después: cualquier escritura por cambio habría movido una fecha.
 
