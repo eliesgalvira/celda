@@ -1,10 +1,7 @@
 import { AportacionCompartible } from "@celda/dominio/aportacion";
+import { EstadoDeModeracion } from "@celda/dominio/moderacion";
 import { GenericId, Table } from "@confect/core";
 import * as Schema from "effect/Schema";
-
-/** En qué punto de la moderación está una aportación compartida. */
-export const EstadoDeModeracion = Schema.Literals(["pendiente", "aceptada", "rechazada"]);
-export type EstadoDeModeracion = typeof EstadoDeModeracion.Type;
 
 /**
  * Una aportación compartida: la cola de moderación (ADR 0020). Llega pendiente y solo la
@@ -21,6 +18,11 @@ export default Table.make(() =>
     huellaIp: Schema.NullOr(Schema.String),
     recibidaEl: Schema.Finite,
     contenido: AportacionCompartible,
+    /**
+     * El emplazamiento al que se refiere (`emplazamientoDe`), o `null` si dice que falta uno. Va
+     * fuera del contenido para buscar las demás aportaciones del mismo emplazamiento.
+     */
+    emplazamiento: Schema.NullOr(Schema.String),
     estado: EstadoDeModeracion,
     /** Cuándo la aceptó o la rechazó la moderación. */
     moderadaEl: Schema.NullOr(Schema.Finite),
@@ -32,4 +34,5 @@ export default Table.make(() =>
   .index("por_estado", ["estado", "recibidaEl"])
   .index("por_moderacion", ["estado", "moderadaEl"])
   .index("por_identidad", ["identidad", "recibidaEl"])
+  .index("por_emplazamiento", ["emplazamiento", "recibidaEl"])
   .index("por_huella", ["huellaIp"]);

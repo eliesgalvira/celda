@@ -1,5 +1,6 @@
 import { AportacionCompartible, type TipoCompartible } from "@celda/dominio/aportacion";
 import { motivoNoAceptable } from "@celda/dominio/buzon";
+import { emplazamientoDe } from "@celda/dominio/moderacion";
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
@@ -105,6 +106,7 @@ const recibir = Effect.fn("Buzon.recibir")(function* (token: string, forma: Form
     huellaIp,
     recibidaEl: ahora,
     contenido: aportacion,
+    emplazamiento: emplazamientoDe(aportacion),
     estado: "pendiente",
     moderadaEl: null,
     motivo: null,
