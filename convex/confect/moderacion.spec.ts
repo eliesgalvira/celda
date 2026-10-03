@@ -7,6 +7,7 @@ import {
   Motivo,
   PAGINA_MAXIMA,
   PaginaDeCola,
+  PaginaParaPublicar,
   TipoDeVeto,
 } from "@celda/dominio/moderacion";
 import { FunctionSpec, GroupSpec } from "@confect/core";
@@ -58,6 +59,19 @@ export default GroupSpec.make()
       name: "aceptadas",
       args: () => ({ despuesDe: Schema.NullOr(Schema.Finite), limite: Limite }),
       returns: () => PaginaDeCola,
+    }),
+  )
+  .addFunction(
+    /**
+     * Lo aceptado para la publicación nocturna, como `aceptadas` pero con lo mínimo: solo
+     * correcciones propuestas y corroboraciones, sin la nota, sin la huella de la IP y con un
+     * seudónimo en lugar de la identidad (`AceptadaParaPublicar`). La llama la acción HTTP de
+     * `confect/http.ts`, que es lo único que ve la noche.
+     */
+    FunctionSpec.internalQuery({
+      name: "publicables",
+      args: () => ({ despuesDe: Schema.NullOr(Schema.Finite), limite: Limite }),
+      returns: () => PaginaParaPublicar,
     }),
   )
   .addFunction(

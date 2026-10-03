@@ -10,6 +10,7 @@
 
 import type * as buzon from "../buzon.js";
 import type * as crons from "../crons.js";
+import type * as http from "../http.js";
 import type * as limpieza from "../limpieza.js";
 import type * as moderacion from "../moderacion.js";
 
@@ -22,6 +23,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   buzon: typeof buzon;
   crons: typeof crons;
+  http: typeof http;
   limpieza: typeof limpieza;
   moderacion: typeof moderacion;
 }>;

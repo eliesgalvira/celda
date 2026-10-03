@@ -1,5 +1,6 @@
 import { distanciaMetros } from "@celda/dominio/area";
 import {
+  type AceptadaParaPublicar,
   type AportacionEnCola,
   type ContextoEnElBuzon,
   DISTANCIA_FALTA_RELACIONADA_M,
@@ -11,6 +12,9 @@ import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import type * as Redacted from "effect/Redacted";
+
+import { claveDelBuzon, hmac } from "../src/claves";
 
 import databaseSchema from "./_generated/schema";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
@@ -179,6 +183,53 @@ const aceptadas = FunctionImpl.make(
 );
 
 /**
+ * El seudónimo de una identidad para la publicación: su HMAC con la clave del buzón y su propio
+ * prefijo. Es el mismo para todo lo que envía la identidad, y sin la clave no se puede volver a
+ * ella ni calcularlo para otra.
+ */
+const personaDe = (clave: Redacted.Redacted<string>, identidad: string) =>
+  hmac(clave, `persona:${identidad}`);
+
+const publicables = FunctionImpl.make(
+  databaseSchema,
+  moderacion,
+  "publicables",
+  ({ despuesDe, limite }) =>
+    Effect.gen(function* () {
+      const reader = yield* DatabaseReader;
+      const clave = yield* claveDelBuzon;
+      const filas = yield* reader
+        .table("aportaciones")
+        .index("por_moderacion", (q) => {
+          const aceptada = q.eq("estado", "aceptada");
+          return despuesDe === null ? aceptada : aceptada.gt("moderadaEl", despuesDe);
+        })
+        .take(limite);
+      const aportaciones = yield* Effect.forEach(
+        filas.flatMap((fila) => {
+          const { contenido } = fila;
+          if (contenido.tipo === "propia") return [];
+          const sinNota =
+            contenido.tipo === "correccion-propuesta" ? { ...contenido, nota: null } : contenido;
+          return [{ fila, contenido: sinNota }];
+        }),
+        ({ fila, contenido }) =>
+          Effect.map(personaDe(clave, fila.identidad), (persona): AceptadaParaPublicar => ({
+            id: fila.id,
+            persona,
+            aceptadaEl: fila.moderadaEl ?? fila.recibidaEl,
+            contenido,
+          })),
+      );
+      const ultima = filas.at(-1);
+      return {
+        aportaciones,
+        ultima: ultima === undefined || filas.length < limite ? null : ultima.moderadaEl,
+      };
+    }).pipe(Effect.orDie),
+);
+
+/**
  * La hora del veredicto. La de una aceptada es siempre posterior a la de la última aceptada, aunque
  * el reloj no haya avanzado: la noche sigue desde la última que leyó (`aceptadas`), y dos con la
  * misma hora en el corte de una página harían que se saltara una. Las mutaciones de Convex son
@@ -253,6 +304,7 @@ export default GroupImpl.make(databaseSchema, moderacion).pipe(
   Layer.provide(pendientes),
   Layer.provide(contexto),
   Layer.provide(aceptadas),
+  Layer.provide(publicables),
   Layer.provide(aceptar),
   Layer.provide(rechazar),
   Layer.provide(vetar),

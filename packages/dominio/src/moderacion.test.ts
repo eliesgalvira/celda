@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
 import type { CorreccionPropuesta, Corroboracion } from "./aportacion.ts";
 import type { Ficha } from "./ficha.ts";
 import {
-  type AportacionAceptada,
+  type AceptadaParaPublicar,
   type AportacionConContexto,
   type AportacionEnCola,
   correccionesDeFicha,
@@ -49,10 +49,10 @@ const corroboracion = (cita: string): Corroboracion => ({
 });
 
 const aceptada = (
-  contenido: AportacionAceptada["contenido"],
-  identidad: string,
+  contenido: AceptadaParaPublicar["contenido"],
+  persona: string,
   aceptadaEl = ACEPTADA,
-): AportacionAceptada => ({ id: contenido.id, identidad, aceptadaEl, contenido });
+): AceptadaParaPublicar => ({ id: contenido.id, persona, aceptadaEl, contenido });
 
 const enCola = (
   contenido: AportacionEnCola["contenido"],
@@ -128,7 +128,7 @@ describe("Motivo", () => {
 });
 
 describe("correccionesDeFicha", () => {
-  it("junta las propuestas que dicen lo mismo y cuenta cada identidad una vez", () => {
+  it("junta las propuestas que dicen lo mismo y cuenta cada persona una vez", () => {
     const primera = correccion();
     const igual = correccion({ cambio: { tipo: "posicion", posicion: AL_ESTE_Y_UN_POCO } });
     const repetida = correccion();
@@ -138,7 +138,7 @@ describe("correccionesDeFicha", () => {
     const aceptadas = [
       aceptada(primera, "a"),
       aceptada(igual, "b", ACEPTADA + 1000),
-      // La misma identidad otra vez no suma.
+      // La misma persona otra vez no suma.
       aceptada(repetida, "a", ACEPTADA + 2000),
       aceptada(otra, "c", ACEPTADA + 3000),
       aceptada(respaldo, "d", ACEPTADA + 4000),
@@ -166,7 +166,7 @@ describe("correccionesDeFicha", () => {
     assert.deepStrictEqual(correccionesDeFicha(aceptadas.toReversed()), porEmplazamiento);
   });
 
-  it("deja fuera las medidas y los emplazamientos que faltan", () => {
+  it("deja fuera los emplazamientos que faltan", () => {
     const falta = correccion({
       emplazamiento: null,
       cambio: { tipo: "falta", posicion: AL_ESTE, companias: ["orange"] },

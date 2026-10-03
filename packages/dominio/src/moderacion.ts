@@ -3,8 +3,8 @@ import * as Schema from "effect/Schema";
 import {
   AportacionCompartible,
   type Cambio,
-  type CorreccionPropuesta,
-  type Corroboracion,
+  CorreccionPropuesta,
+  Corroboracion,
 } from "./aportacion.ts";
 import { Coordenada, distanciaMetros } from "./area.ts";
 import { Compania, NOMBRE_COMPANIA } from "./compania.ts";
@@ -445,19 +445,34 @@ export const proponerVeredicto = (contexto: AportacionConContexto): VeredictoPro
   };
 };
 
-/** Una aportación aceptada, con lo que hace falta para publicarla: quién y cuándo. */
-export interface AportacionAceptada {
-  readonly id: string;
-  readonly identidad: string;
-  readonly aceptadaEl: number;
-  readonly contenido: AportacionCompartible;
-}
+/**
+ * Una aportación aceptada tal como sale del buzón hacia la publicación nocturna (ADR 0020, #57): lo
+ * mínimo para llevarla a la ficha. Solo las correcciones propuestas y las corroboraciones (las
+ * medidas solo se publicarán como agregados), sin la nota, sin la huella de la IP y sin la
+ * identidad: en su lugar, `persona`, un seudónimo que es el mismo para todo lo que envía una
+ * identidad y del que no se puede volver a ella.
+ */
+export const AceptadaParaPublicar = Schema.Struct({
+  id: Schema.String,
+  /** HMAC de la identidad con la clave del buzón: cuenta a cada persona una vez. */
+  persona: Schema.String,
+  aceptadaEl: Schema.Finite,
+  contenido: Schema.Union([CorreccionPropuesta, Corroboracion]),
+});
+export type AceptadaParaPublicar = typeof AceptadaParaPublicar.Type;
+
+/** Una página de lo aceptado para publicar: sigue después de `ultima` mientras no sea nula. */
+export const PaginaParaPublicar = Schema.Struct({
+  aportaciones: Schema.Array(AceptadaParaPublicar),
+  ultima: Schema.NullOr(Schema.Finite),
+});
+export type PaginaParaPublicar = typeof PaginaParaPublicar.Type;
 
 interface Grupo {
   readonly clave: string;
   readonly cambio: Cambio;
   readonly aceptadaEl: number;
-  readonly identidades: Set<string>;
+  readonly personas: Set<string>;
 }
 
 /**
@@ -468,20 +483,19 @@ interface Grupo {
  *   sola corrección. Su clave y su cambio son los de la primera que se aceptó.
  * - Una corroboración suma a la corrección cuya clave cita, si es del mismo emplazamiento. Si no
  *   hay ninguna con esa clave, no cuenta.
- * - `personas` cuenta cada identidad una vez por corrección (ADR 0020).
- * - Las medidas no salen aquí (solo se publicarán agregados), y tampoco un emplazamiento que falta:
- *   no tiene ficha a la que ir.
+ * - `personas` cuenta cada `persona` una vez por corrección (ADR 0020).
+ * - Un emplazamiento que falta no sale aquí: no tiene ficha a la que ir.
  *
  * Cada lista va por fecha de aceptación y luego por clave.
  */
 export const correccionesDeFicha = (
-  aceptadas: ReadonlyArray<AportacionAceptada>,
+  aceptadas: ReadonlyArray<AceptadaParaPublicar>,
 ): ReadonlyMap<string, ReadonlyArray<CorreccionDeFicha>> => {
   const ordenadas = aceptadas.toSorted(
     (a, b) => a.aceptadaEl - b.aceptadaEl || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
   const porEmplazamiento = new Map<string, Array<Grupo>>();
-  for (const { id, identidad, aceptadaEl, contenido } of ordenadas) {
+  for (const { id, persona, aceptadaEl, contenido } of ordenadas) {
     if (contenido.tipo !== "correccion-propuesta" || contenido.emplazamiento === null) continue;
     const grupos = porEmplazamiento.get(contenido.emplazamiento) ?? [];
     const grupo = grupos.find((g) => mismoCambio(g.cambio, contenido.cambio));
@@ -490,19 +504,19 @@ export const correccionesDeFicha = (
         clave: id,
         cambio: contenido.cambio,
         aceptadaEl,
-        identidades: new Set([identidad]),
+        personas: new Set([persona]),
       });
     } else {
-      grupo.identidades.add(identidad);
+      grupo.personas.add(persona);
     }
     porEmplazamiento.set(contenido.emplazamiento, grupos);
   }
-  for (const { identidad, contenido } of ordenadas) {
+  for (const { persona, contenido } of ordenadas) {
     if (contenido.tipo !== "corroboracion") continue;
     const grupo = porEmplazamiento
       .get(contenido.emplazamiento)
       ?.find((g) => g.clave === contenido.correccion);
-    grupo?.identidades.add(identidad);
+    grupo?.personas.add(persona);
   }
   return new Map(
     [...porEmplazamiento].map(([emplazamiento, grupos]) => [
@@ -510,7 +524,7 @@ export const correccionesDeFicha = (
       grupos.map((g): CorreccionDeFicha => ({
         clave: g.clave,
         cambio: g.cambio,
-        personas: g.identidades.size,
+        personas: g.personas.size,
         aceptadaEl: g.aceptadaEl,
         licencia: "CC0-1.0",
       })),
