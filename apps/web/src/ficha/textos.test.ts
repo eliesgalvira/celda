@@ -66,6 +66,29 @@ describe("textos de la ficha", () => {
       lugarDe(en({ municipio: null, provincia: { codigo: "31", nombre: "Navarra" } })),
       "Territorio compartido entre municipios, provincia de Navarra",
     );
+    // Los oficiales bilingües, en una sola forma (ADR 0025).
+    assert.strictEqual(
+      lugarDe(
+        en({
+          municipio: { codigo: "03065", nombre: "Elx/Elche" },
+          provincia: { codigo: "03", nombre: "Alacant/Alicante" },
+        }),
+      ),
+      "Elx, provincia de Alacant",
+    );
+    assert.strictEqual(
+      lugarDe(
+        en({
+          municipio: { codigo: "20055", nombre: "Arrasate/Mondragón" },
+          provincia: { codigo: "20", nombre: "Gipuzkoa" },
+        }),
+      ),
+      "Mondragón, provincia de Gipuzkoa",
+    );
+    assert.strictEqual(
+      lugarDe(en({ municipio: null, provincia: { codigo: "01", nombre: "Araba/Álava" } })),
+      "Territorio compartido entre municipios, provincia de Álava",
+    );
     // Sin lugar del IGN, o lejos de todo municipio, lo que escribe la fuente.
     assert.strictEqual(lugarDe(en(undefined)), "BARCELONA");
     assert.strictEqual(lugarDe(en({ municipio: null, provincia: null })), "BARCELONA");

@@ -1,4 +1,8 @@
-import { type CapaDeProvincia, leerCapaDeProvincia } from "@celda/dominio/provincias";
+import {
+  type CapaDeProvincia,
+  capaConNombresDeLugar,
+  leerCapaDeProvincia,
+} from "@celda/dominio/provincias";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -68,12 +72,16 @@ export interface RespuestaParaEnviar {
   readonly transferibles: ReadonlyArray<ArrayBuffer>;
 }
 
+/** Lee la capa de una provincia con el nombre de lugar de sus municipios, el que se enseña. */
+const leerCapa = (texto: string, provincia: string) =>
+  Result.map(leerCapaDeProvincia(texto, provincia), capaConNombresDeLugar);
+
 /**
  * Lo que hace el Worker con una solicitud: leer la capa, indexarla y serializar los índices. Los
  * búferes de `transferibles` se transfieren con la respuesta.
  */
 export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar => {
-  const leida = leerCapaDeProvincia(solicitud.texto, solicitud.provincia);
+  const leida = leerCapa(solicitud.texto, solicitud.provincia);
   if (Result.isFailure(leida)) {
     return {
       respuesta: { numero: solicitud.numero, tipo: "fallo", motivo: leida.failure.motivo },
@@ -140,7 +148,7 @@ export const indexadorEnHilo = Layer.succeed(
   IndexadorDeProvincias.of({
     indexar: (provincia, texto) =>
       Effect.suspend(() => {
-        const leida = leerCapaDeProvincia(texto, provincia);
+        const leida = leerCapa(texto, provincia);
         if (Result.isFailure(leida)) {
           return Effect.fail(new IndiceFallido({ provincia, motivo: leida.failure.motivo }));
         }

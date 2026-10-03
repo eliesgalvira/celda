@@ -37,6 +37,7 @@ import {
   type MunicipioConHabitantes,
   municipioDelPunto,
 } from "./municipio.ts";
+import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "./nombreDeLugar.ts";
 import { FuenteDePoblacion } from "./poblacion.ts";
 
 /**
@@ -507,6 +508,18 @@ export const leerCapaDeProvincia = (
     ),
   );
 
+/**
+ * La capa de una provincia con el nombre de lugar de cada municipio en lugar del oficial (ADR
+ * 0025): «Elx», no «Elx/Elche». Es lo que enseña la web; el código INE no cambia.
+ */
+export const capaConNombresDeLugar = (capa: CapaDeProvincia): CapaDeProvincia => ({
+  ...capa,
+  municipios: capa.municipios.map((municipio) => ({
+    ...municipio,
+    nombre: nombreDeLugarDeMunicipio(municipio.codigo, municipio.nombre),
+  })),
+});
+
 // ── Índice de claves ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -805,6 +818,19 @@ export const leerResumen = (
 };
 
 // ── Manifiesto ──────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * El resumen con el nombre de lugar de cada provincia en lugar del oficial (ADR 0025): «València»,
+ * no «València/Valencia». Es lo que enseña la web. La publicación no lo usa: rehace el resumen con
+ * lo que lee, y los datos publicados guardan el oficial.
+ */
+export const resumenConNombresDeLugar = (resumen: ResumenLeido): ResumenLeido => ({
+  ...resumen,
+  provincias: resumen.provincias.map((provincia) => ({
+    ...provincia,
+    nombre: nombreDeLugarDeProvincia(provincia.codigo, provincia.nombre),
+  })),
+});
 
 /** Los ficheros con nombre por contenido de una versión: sus capas de provincia y sus lotes. */
 export const Manifiesto = Schema.Struct({

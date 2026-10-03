@@ -2,6 +2,7 @@ import type { Banda } from "@celda/dominio/banda";
 import type { Estado } from "@celda/dominio/emplazamiento";
 import type { EstacionDeFicha, Ficha, OrigenDeFicha } from "@celda/dominio/ficha";
 import { bloque, llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
+import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "@celda/dominio/nombreDeLugar";
 import type { Fuente } from "@celda/dominio/observacion";
 
 import type { ComparacionConCapa } from "./marcaDeAgua.ts";
@@ -58,19 +59,24 @@ export const tituloDe = (ficha: Ficha): string => {
 const CIUDADES_AUTONOMAS = new Set(["51", "52"]);
 
 /**
- * Dónde está, bajo el título: el municipio y la provincia del IGN que pone el publicador,
- * «Sant Cugat del Vallès, provincia de Barcelona». En un territorio compartido por varios
+ * Dónde está, bajo el título: el municipio y la provincia del IGN que pone el publicador, con su
+ * nombre de lugar (ADR 0025): «Sant Cugat del Vallès, provincia de Barcelona», «Elx, provincia de
+ * Alacant». En un territorio compartido por varios
  * municipios, solo la provincia. Si la ficha no los trae, porque se publicó antes o porque el
  * emplazamiento cae lejos de todo municipio, el municipio tal como lo escribe la fuente.
  */
 export const lugarDe = (ficha: Ficha): string => {
   const { municipio, provincia } = ficha.lugar ?? { municipio: null, provincia: null };
-  if (provincia === null) return municipio?.nombre ?? ficha.municipio;
-  if (municipio === null)
-    return `Territorio compartido entre municipios, provincia de ${provincia.nombre}`;
+  const deMunicipio =
+    municipio === null ? null : nombreDeLugarDeMunicipio(municipio.codigo, municipio.nombre);
+  if (provincia === null) return deMunicipio ?? ficha.municipio;
+  const deProvincia = nombreDeLugarDeProvincia(provincia.codigo, provincia.nombre);
+  if (deMunicipio === null) {
+    return `Territorio compartido entre municipios, provincia de ${deProvincia}`;
+  }
   return CIUDADES_AUTONOMAS.has(provincia.codigo)
-    ? municipio.nombre
-    : `${municipio.nombre}, provincia de ${provincia.nombre}`;
+    ? deMunicipio
+    : `${deMunicipio}, provincia de ${deProvincia}`;
 };
 
 /**

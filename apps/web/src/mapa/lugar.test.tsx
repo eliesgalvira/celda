@@ -36,6 +36,10 @@ const TORDERA = [2.719, 41.699] as const;
 const QUERALBS = [2.165, 42.35] as const;
 const PUERTA_DEL_SOL = [-3.7038, 40.4168] as const;
 const SORIA = [-2.468, 41.764] as const;
+const ELX = [-0.6982, 38.2669] as const;
+const PAMPLONA = [-1.6432, 42.8169] as const;
+const DONOSTIA = [-1.9812, 43.3128] as const;
+const VITORIA = [-2.6727, 42.8467] as const;
 /** En Francia, fuera de la caja de todas las provincias. */
 const CARCASONA = [2.35, 43.21] as const;
 
@@ -112,6 +116,22 @@ describe("cabecera del mapa", () => {
     await waitFor(() => assert.strictEqual(lugar(), "Madrid"));
     mover(vistaEn(...SORIA, 8.5));
     await waitFor(() => assert.strictEqual(lugar(), "Soria"));
+  });
+
+  it("los oficiales bilingües, en una sola forma: la local en la Comunitat y la castellana fuera", async () => {
+    const { cargas } = cargasDePrueba();
+    const { lugar, mover } = montar(vistaEn(...ELX, 12), cargas);
+    await waitFor(() => assert.strictEqual(lugar(), "Elx"));
+    mover(vistaEn(...ELX, 9));
+    assert.strictEqual(lugar(), "Alacant");
+    mover(vistaEn(...PAMPLONA, 12));
+    await waitFor(() => assert.strictEqual(lugar(), "Pamplona"));
+    mover(vistaEn(...DONOSTIA, 12));
+    await waitFor(() => assert.strictEqual(lugar(), "San Sebastián"));
+    mover(vistaEn(...VITORIA, 12));
+    await waitFor(() => assert.strictEqual(lugar(), "Vitoria-Gasteiz"));
+    mover(vistaEn(...VITORIA, 9));
+    assert.strictEqual(lugar(), "Álava");
   });
 
   it("mientras llega el contorno sigue diciendo lo de antes, sin quedarse en blanco", async () => {

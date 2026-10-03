@@ -5,6 +5,7 @@ import { Caja } from "./barrido.ts";
 import type { Poligono } from "./barrio.ts";
 import type { ZonaBarrida } from "./cobertura.ts";
 import { FuenteDeMunicipios } from "./municipio.ts";
+import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "./nombreDeLugar.ts";
 
 /**
  * La zona del ejercicio de emplazamientos: un barrio de Barcelona o cualquier municipio de España
@@ -79,18 +80,27 @@ export type ProvinciasDeZonas = typeof ProvinciasDeZonas.Type;
 /** Una zona que se puede elegir, con lo que se lee de ella en la lista. */
 export interface ZonaNombrada {
   readonly zona: ZonaDelEjercicio;
+  /** Su nombre de lugar, en una sola forma: «Elx» (ADR 0025). */
   readonly nombre: string;
   /** Dónde está: la provincia de un municipio o «Barrio de Barcelona». */
   readonly lugar: string;
+  /** El nombre oficial de un municipio, «Elx/Elche». La búsqueda también lo mira. */
+  readonly oficial?: string | undefined;
 }
 
-/** Los municipios del índice como zonas, con el nombre de su provincia. */
+/**
+ * Los municipios del índice como zonas, con su nombre de lugar y el de su provincia. El índice
+ * guarda el oficial, y la zona lo lleva para buscar: «Elche» encuentra Elx.
+ */
 export const municipiosDelIndice = (indice: IndiceDeZonas): ReadonlyArray<ZonaNombrada> => {
-  const provincias = new Map(indice.provincias.map((p) => [p.codigo, p.nombre]));
-  return indice.municipios.map(([codigo, nombre]) => ({
+  const provincias = new Map(
+    indice.provincias.map((p) => [p.codigo, nombreDeLugarDeProvincia(p.codigo, p.nombre)]),
+  );
+  return indice.municipios.map(([codigo, oficial]) => ({
     zona: { tipo: "municipio", codigo },
-    nombre,
+    nombre: nombreDeLugarDeMunicipio(codigo, oficial),
     lugar: provincias.get(codigo.slice(0, 2)) ?? "",
+    oficial,
   }));
 };
 
@@ -115,12 +125,19 @@ const parecido = (nombre: string, buscado: string): number | undefined => {
   return nombre.includes(buscado) ? 3 : undefined;
 };
 
+/** El mejor de unos parecidos, el más bajo, o `undefined` si ninguno casa. */
+const elMejor = (parecidos: ReadonlyArray<number | undefined>): number | undefined =>
+  parecidos.reduce<number | undefined>(
+    (mejor, otro) => (otro === undefined || (mejor !== undefined && mejor <= otro) ? mejor : otro),
+    undefined,
+  );
+
 /**
  * Las zonas cuyo nombre casa con lo buscado, sin mirar tildes, mayúsculas ni apóstrofos: primero
  * las que se llaman así, luego las que empiezan así, las que tienen una palabra que empieza así y
  * las que lo contienen. Dentro de cada grupo, el nombre más corto y después por orden alfabético.
  * El nombre de la provincia también cuenta, así que «Soria» da la capital antes que los pueblos
- * de la provincia.
+ * de la provincia, y el oficial también: «Elche» y «Elx» dan Elx.
  */
 export const buscarZonas = (
   consulta: string,
@@ -131,8 +148,11 @@ export const buscarZonas = (
   if (buscado === "") return [];
   const encontradas: Array<{ readonly zona: ZonaNombrada; readonly orden: number }> = [];
   for (const zona of zonas) {
-    const propio = parecido(normalizar(zona.nombre), buscado);
-    const conLugar = parecido(normalizar(`${zona.nombre} ${zona.lugar}`), buscado);
+    const nombres = zona.oficial === undefined ? [zona.nombre] : [zona.nombre, zona.oficial];
+    const propio = elMejor(nombres.map((nombre) => parecido(normalizar(nombre), buscado)));
+    const conLugar = elMejor(
+      nombres.map((nombre) => parecido(normalizar(`${nombre} ${zona.lugar}`), buscado)),
+    );
     const orden = propio ?? (conLugar === undefined ? undefined : conLugar + 4);
     if (orden !== undefined) encontradas.push({ zona, orden });
   }

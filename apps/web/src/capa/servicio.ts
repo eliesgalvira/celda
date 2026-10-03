@@ -9,6 +9,7 @@ import {
   leerParteDelIndice,
   leerResumen,
   parteDeClave,
+  resumenConNombresDeLugar,
   type ResumenLeido,
 } from "@celda/dominio/provincias";
 import * as Config from "effect/Config";
@@ -123,7 +124,10 @@ export const descargarFichero = (http: HttpClient.HttpClient, origen: string, fi
     );
   });
 
-/** Descarga el resumen de la versión vigente y comprueba que es esa. */
+/**
+ * Descarga el resumen de la versión vigente y comprueba que es esa. Cada provincia lleva su nombre
+ * de lugar, el que se enseña (ADR 0025).
+ */
 export const descargarResumen = (http: HttpClient.HttpClient, origen: string, vigente: Vigente) =>
   Effect.gen(function* () {
     if (vigente.resumen === undefined) {
@@ -135,7 +139,9 @@ export const descargarResumen = (http: HttpClient.HttpClient, origen: string, vi
     if (Option.isNone(contenido)) {
       return yield* new CapaNoDescargada({ url, motivo: "el origen no lo tiene" });
     }
-    return yield* Effect.fromResult(leerResumen(contenido.value, vigente.version));
+    return resumenConNombresDeLugar(
+      yield* Effect.fromResult(leerResumen(contenido.value, vigente.version)),
+    );
   });
 
 /** Lo que se guarda para la visita: una vez leído, no se vuelve a pedir. */
