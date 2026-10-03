@@ -158,6 +158,35 @@ Medianas de tres rondas del 29/09/2026 con la CPU a ×4, 390 px y GPU, con el es
 
 Las seis peticiones de Cubelles son `vigente.json`, el resumen, una parte del índice de claves (1,2 KB), la capa de Barcelona, un lote de fichas y la de Tarragona, que piden las celdas. El primer marcador sale a 1,5 s, como sin el índice: la parte se pide a la vez que el mapa base. El peor Long Animation Frame de la vista, unos 55 ms, es pasar la trama calculada a GeoJSON al llegar del Worker, en el hilo principal; no llega a perder un fotograma de 50 ms.
 
+## Mapa base con la paleta A (#61)
+
+Medido el 03/10/2026 en Chromium con GPU, contra `celda/v1` en las mismas condiciones, con OpenFreeMap de verdad.
+
+- **JavaScript.** El trozo de la primera pantalla crece 2,4 KB con gzip (206,0 → 208,4 KB con `gzip -9`): las capas del estilo, que están en `estilo.ts` y lo importa `precarga.ts`. El contorno de España (`mapa/espana.json`, 72 KB, 24 KB con gzip, 30 polígonos y 4.075 vértices) no va ahí: lo importa `mapaBase.ts`, así que va en el trozo del mapa, que se descarga en paralelo con MapLibre y crece 26,6 KB con gzip (270,3 → 296,9 KB).
+- **Teselas.** Las mismas URL en cada vista: de 2 a 12 teselas de OpenFreeMap por vista, en el móvil y en 1400 px. Cambiar `zoomLevelsToOverscale` no pide teselas nuevas: las del 15 salen de partir las del 14.
+- **Glifos.** Se precargan tres ficheros en lugar de uno (regular, negrita y cursiva, del rango 0-255), porque de lejos ya salen las capitales en negrita y los mares en cursiva. En la sesión entera se piden menos: sin los rótulos de Marruecos, Argelia y Portugal de lejos no hacen falta los rangos árabe, tifinagh ni otros.
+- **Sesión de móvil**, 390 × 844 a DPR 3, de España (z5,5) al tejado de un emplazamiento del Eixample (z18,5) y vuelta, por Cataluña y Barcelona, con la caché HTTP de verdad (contado con el registro de red de Chromium, solo lo que sale a la red):
+
+| | `celda/v1` | #61 |
+|---|---|---|
+| Saltando de vista en vista: mapa base | 4,36 o 5,92 MB | 4,35 o 5,92 MB |
+| Con vuelos animados: mapa base, de ronda en ronda | 7,03 a 8,60 MB | 6,15 a 7,71 MB |
+| Glifos en la sesión con vuelos | 486 KB en 10 ficheros | 344 KB en 7 |
+
+  Con saltos se piden exactamente las mismas URL de teselas; los dos valores de cada lado dependen de si las dos teselas del zoom 4 del oeste (unos 1,5 MB) llegan a pedirse antes del primer salto, y salen igual en las dos ramas. Con vuelos el número de teselas depende de los fotogramas del vuelo y varía de una ronda a otra en los dos lados; la diferencia constante son los glifos. El prototipo midió 5,2 MB con otro recorrido.
+- **Quieto.** Al abrir y tras acercar y alejar (z9,5 → 18 → 5,5), 20 s quieto en el móvil y en 1400 px: 0 peticiones, 0 `render` de MapLibre y 0 llamadas a `fetch`, XHR, `requestAnimationFrame`, `setTimeout`, `setInterval` y `postMessage`, igual que `celda/v1`.
+- **Fluidez.** `pnpm run medir` no llega a medir con la capa publicada de hoy, ni en `celda/v1`: con la vista inicial de toda España, el hexágono de Barcelona queda fuera de los 390 px y la medida no lo encuentra para tocarlo. Se midió aparte, con la CPU a ×4 y 390 × 844 a DPR 2,6, cinco vuelos de 2,5 s (España → Cataluña → Barcelona z12 → Eixample z17 → Barcelona z11 → España), siete rondas alternadas. Medianas de fps:
+
+| Vuelo | `celda/v1` | #61 |
+|---|---|---|
+| España → Cataluña z8 | 55,5 | 54,2 |
+| Cataluña → Barcelona z12 | 57,4 | 54,8 |
+| Barcelona → Eixample z17 | 57,7 | 55,8 |
+| Eixample → Barcelona z11 | 57,6 | 50,9 |
+| Barcelona → España z5,5 | 55,6 | 53,3 |
+
+  El hilo principal gasta un 25-30 % más de JavaScript en los vuelos: casi todo es recibir y deserializar lo que mandan los workers de MapLibre (`receive`), porque cada tesela trae más cosas que dibujar. Se reparte entre los rótulos nuevos (pueblos y aldeas, puntos de interés, avenidas, números de carretera, ríos), el suelo nuevo (usos, verdes, ríos) y el corte de las teselas en el 15: quitando cualquiera de los tres se recupera una parte, ninguno solo lo explica. Lo que sí se arregló: las vías van en dos capas (bordes y rellenos, con el color, el grosor y el orden por clase) y no en catorce, el suelo en dos y no en seis, y los municipios que son zona se quitan con un estado del estilo (`setGlobalStateProperty`) y no con `setFilter`, que mandaba a los workers el contorno de España de cada capa de lugares. Queda abierto: al alejar desde la calle se pierden de 1 a 7 fps según el tramo, y donde más, al alejar desde la calle.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.

@@ -2,34 +2,76 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Predicate from "effect/Predicate";
 import type { StyleSpecification } from "maplibre-gl";
 
+import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { tokensDelTema } from "../pruebas/tema.ts";
 import { leerOklch } from "./color.ts";
 import {
   estiloMapa,
-  filtroDeRotulosDeMunicipios,
   FUENTE_MAPA_BASE,
+  quitarRotulosDeMunicipios,
   RECURSOS_INICIALES_MAPA_BASE,
-  ROTULOS_DE_MUNICIPIOS,
   TOKENS_MAPA,
 } from "./estilo.ts";
+import {
+  CAPAS_DE_LUGARES,
+  type MapaConRotulos,
+  MUNICIPIOS_DE_CELDA,
+  ZOOM_DE_FUERA,
+} from "./rotulos.ts";
 
 const MARCA = "token:";
 
 /**
- * Los valores de todas las propiedades de color (`*-color`) de las capas del estilo. De una
- * expresión `step`, el color de cada tramo: las posiciones pares desde la segunda.
+ * Los colores que puede dar una expresión: de un `step`, el de cada tramo; de un `match` y de un
+ * `case`, el de cada caso y el de por defecto, que pueden ser otra expresión.
  */
+const salidas = (
+  valor:
+    | StyleSpecification["layers"][number]["paint"]
+    | ReadonlyArray<unknown>
+    | string
+    | number
+    | boolean
+    | null
+    | undefined,
+): ReadonlyArray<unknown> => {
+  if (!Array.isArray(valor)) return [valor];
+  const [operador] = valor;
+  const indices =
+    operador === "step"
+      ? valor.flatMap((_, i) => (i >= 2 && i % 2 === 0 ? [i] : []))
+      : operador === "match"
+        ? valor.flatMap((_, i) => ((i >= 3 && i % 2 === 1) || i === valor.length - 1 ? [i] : []))
+        : operador === "case"
+          ? valor.flatMap((_, i) => ((i >= 2 && i % 2 === 0) || i === valor.length - 1 ? [i] : []))
+          : undefined;
+  return indices === undefined ? [valor] : indices.flatMap((i) => salidas(valor[i]));
+};
+
+/** Los valores de todas las propiedades de color (`*-color`) de las capas del estilo. */
 const coloresDelEstilo = (estilo: StyleSpecification) =>
   estilo.layers.flatMap((capa) =>
     Object.entries(capa.paint ?? {})
       .filter(([propiedad]) => propiedad.endsWith("-color"))
       .flatMap(([propiedad, valor]) =>
-        (Array.isArray(valor) && valor[0] === "step"
-          ? valor.filter((_, i) => i >= 2 && i % 2 === 0)
-          : [valor]
-        ).map((color) => ({ capa: capa.id, propiedad, valor: color })),
+        salidas(valor).map((color) => ({ capa: capa.id, propiedad, valor: color })),
       ),
   );
+
+const estiloDePrueba = () => estiloMapa(() => "#000", CONTORNO_DE_PRUEBA);
+
+/** Un mapa de prueba con las capas del estilo: guarda el estado como MapLibre. */
+const mapaDePrueba = (estilo: StyleSpecification | undefined) => {
+  const capas = new Set((estilo?.layers ?? []).map((capa) => capa.id));
+  const estado = new Map<string, ReadonlyArray<string>>();
+  const mapa: MapaConRotulos = {
+    getLayer: (capa) => (capas.has(capa) ? {} : undefined),
+    setGlobalStateProperty: (nombre, valor) => {
+      estado.set(nombre, valor);
+    },
+  };
+  return { mapa, estado };
+};
 
 describe("estiloMapa", () => {
   it("pinta el mapa solo con tokens del tema", () => {
@@ -37,7 +79,7 @@ describe("estiloMapa", () => {
     const estilo = estiloMapa((token) => {
       pedidos.add(token);
       return `${MARCA}${token}`;
-    });
+    }, CONTORNO_DE_PRUEBA);
 
     const colores = coloresDelEstilo(estilo);
     assert.isAbove(colores.length, 0);
@@ -62,7 +104,7 @@ describe("estiloMapa", () => {
   });
 
   it("pide por adelantado el TileJSON y los glifos que usa la vista inicial", () => {
-    const estilo = estiloMapa(() => "#000");
+    const estilo = estiloDePrueba();
     const fuente = estilo.sources[FUENTE_MAPA_BASE];
     assert.isTrue(
       fuente?.type === "vector" && RECURSOS_INICIALES_MAPA_BASE.includes(fuente.url ?? ""),
@@ -80,26 +122,73 @@ describe("estiloMapa", () => {
     }
   });
 
-  it("los rótulos de ciudades y pueblos dejan fuera, sin mirar mayúsculas, los que lleva Celda", () => {
-    const capa = estiloMapa(() => "red").layers.find((c) => c.id === ROTULOS_DE_MUNICIPIOS);
-    assert.isDefined(capa);
-    assert.deepStrictEqual(
-      capa !== undefined && "filter" in capa ? capa.filter : undefined,
-      filtroDeRotulosDeMunicipios([]),
-    );
-    const deMunicipio = ["in", ["get", "class"], ["literal", ["city", "town"]]];
-    assert.deepStrictEqual<unknown>(filtroDeRotulosDeMunicipios([]), deMunicipio);
-    assert.deepStrictEqual<unknown>(filtroDeRotulosDeMunicipios(["L'Hospitalet de Llobregat"]), [
-      "all",
-      deMunicipio,
-      [
-        "!",
-        [
-          "in",
-          ["downcase", ["to-string", ["get", "name"]]],
-          ["literal", ["l'hospitalet de llobregat"]],
-        ],
-      ],
+  it("rotula los lugares por importancia: la capa más importante, la última, se coloca antes", () => {
+    const ids = estiloDePrueba().layers.map((capa) => capa.id);
+    assert.deepStrictEqual(ids.slice(-CAPAS_DE_LUGARES.length), CAPAS_DE_LUGARES.toReversed());
+    assert.deepStrictEqual(CAPAS_DE_LUGARES, [
+      "lugares-capitales",
+      "lugares-grandes",
+      "lugares-ciudades",
+      "lugares-pueblos-grandes",
+      "lugares-pueblos",
+      "lugares-aldeas",
     ]);
+    const desde = new Map(
+      estiloDePrueba().layers.map((capa) => [capa.id, capa.minzoom ?? 0] as const),
+    );
+    assert.deepStrictEqual(
+      CAPAS_DE_LUGARES.map((id) => desde.get(id)),
+      [4, 4.5, 7, 8, 10, 12],
+    );
+  });
+
+  it("los rótulos de lugar no salen de fuera de España hasta el zoom 9 y Gibraltar, nunca", () => {
+    const soloDeEspana = [
+      "all",
+      ["!=", ["get", "name"], "Gibraltar"],
+      ["any", [">=", ["zoom"], ZOOM_DE_FUERA], ["within", CONTORNO_DE_PRUEBA]],
+    ];
+    assert.strictEqual(ZOOM_DE_FUERA, 9);
+    for (const capa of estiloDePrueba().layers) {
+      if (!CAPAS_DE_LUGARES.includes(capa.id)) continue;
+      const filtro = "filter" in capa ? capa.filter : undefined;
+      assert.deepStrictEqual<unknown>(
+        Array.isArray(filtro) ? filtro.slice(0, 2) : undefined,
+        ["all", soloDeEspana],
+        capa.id,
+      );
+    }
+  });
+
+  it("las capas de lugares dejan fuera, sin mirar mayúsculas, los municipios que lleva Celda", () => {
+    const estilo = estiloDePrueba();
+    const sinLosDeCelda = [
+      "!",
+      ["in", ["downcase", ["to-string", ["get", "name"]]], ["global-state", MUNICIPIOS_DE_CELDA]],
+    ];
+    assert.deepStrictEqual<unknown>(estilo.state, { [MUNICIPIOS_DE_CELDA]: { default: [] } });
+    for (const capa of estilo.layers) {
+      if (!CAPAS_DE_LUGARES.includes(capa.id)) continue;
+      const filtro = "filter" in capa ? capa.filter : undefined;
+      assert.deepStrictEqual<unknown>(
+        Array.isArray(filtro) ? filtro.at(-1) : undefined,
+        sinLosDeCelda,
+      );
+    }
+
+    const { mapa, estado } = mapaDePrueba(estilo);
+    quitarRotulosDeMunicipios(mapa, ["L'Hospitalet de Llobregat", "Badalona"]);
+    assert.deepStrictEqual(estado.get(MUNICIPIOS_DE_CELDA), [
+      "l'hospitalet de llobregat",
+      "badalona",
+    ]);
+    quitarRotulosDeMunicipios(mapa, []);
+    assert.deepStrictEqual(estado.get(MUNICIPIOS_DE_CELDA), []);
+  });
+
+  it("antes de que el estilo tenga sus capas, quitar rótulos no hace nada", () => {
+    const { mapa, estado } = mapaDePrueba(undefined);
+    quitarRotulosDeMunicipios(mapa, ["Badalona"]);
+    assert.strictEqual(estado.size, 0);
   });
 });

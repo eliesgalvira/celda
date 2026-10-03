@@ -50,6 +50,20 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   // Las etiquetas de barrio, escritas sobre el mapa con un halo del color de su fondo.
   ["tinta", "mapa-halo"],
   ["primario-texto", "mapa-halo"],
+  // Los rótulos del mapa base, con su halo.
+  ["mapa-rotulo-capital", "mapa-halo"],
+  ["mapa-rotulo-ciudad", "mapa-halo"],
+  ["mapa-rotulo-pueblo", "mapa-halo"],
+  ["mapa-rotulo-aldea", "mapa-halo"],
+  ["mapa-rotulo-barrio", "mapa-halo"],
+  ["mapa-rotulo-calle", "mapa-halo"],
+  ["mapa-rotulo-agua", "mapa-halo"],
+  ["mapa-pdi-transporte", "mapa-halo"],
+  ["mapa-pdi-salud", "mapa-halo"],
+  ["mapa-pdi-parque", "mapa-halo"],
+  ["mapa-pdi-otro", "mapa-halo"],
+  // El número de una autopista, con su amarillo de halo.
+  ["mapa-rotulo-carretera", "mapa-autopista"],
   // Las etiquetas y los iconos de los controles claros.
   ["control-tinta", "control"],
   ["control-tinta", "control-hover"],
@@ -58,12 +72,15 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
 /** Los fondos del mapa base sobre los que puede quedar un control. */
 const FONDOS_DEL_MAPA = [
   "mapa-fondo",
+  "mapa-urbano",
+  "mapa-bosque",
   "mapa-parque",
   "mapa-agua",
   "mapa-edificio",
   "mapa-camino",
   "mapa-calle",
-  "mapa-avenida",
+  "mapa-autovia",
+  "mapa-autopista",
 ] as const;
 
 /**

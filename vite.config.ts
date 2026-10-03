@@ -32,6 +32,8 @@ export default defineConfig({
       "packages/dominio/datos/cuadros-del-registro.json",
       // Índice y contornos del ejercicio que escribe `pnpm run zonas`, con un elemento por línea.
       "apps/web/src/ejercicio/zonas/**",
+      // Contorno de España que escribe `pnpm run espana`, con un polígono por línea.
+      "packages/ui/src/mapa/espana.json",
       // Código que generan Confect y Convex.
       "convex/convex/**",
       "convex/confect/_generated/**",

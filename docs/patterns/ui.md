@@ -17,7 +17,7 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - `packages/ui/src/tema.css`: los tokens OKLCH con nombres semánticos (`--superficie`, `--tinta`, `--primario`, `--corregido`, `--mapa-agua`...), el puente `@theme inline` hacia las utilidades de Tailwind y las formas del tema (`hexagono`, `cinta`, `chaflan`).
 - `:root` es el tema claro. `[data-tema="oscuro"]` tiene los mismos nombres con otros valores; la v1 no lo activa.
 - `packages/ui/src/*.tsx`: los componentes. Cada uno lleva sus variantes con `cva` y refleja la variante en un `data-*`.
-- `packages/ui/src/mapa/estilo.ts`: el estilo de MapLibre. No lleva ningún color; `coloresDelTema` lee los `--mapa-*` del documento y los pasa a `rgb()`, porque MapLibre no entiende `oklch()`.
+- `packages/ui/src/mapa/estilo.ts`: el estilo de MapLibre. No lleva ningún color; `coloresDelTema` lee los `--mapa-*` del documento y los pasa a `rgb()`, porque MapLibre no entiende `oklch()`. Junta las capas del mapa base (`suelo.ts`, `vias.ts` y `rotulos.ts`) con las de Celda; los nombres de los tokens que usa están en `mapa/tokens.ts`.
 
 ## Añadir algo que se ve
 
@@ -35,6 +35,20 @@ Con CSS y variables haría falta una convención de nombres de clase y una regla
 - Lo que dura poco no se ve: el aviso de espera aparece tras medio segundo (`animate-aparecer`).
 - Un fallo se dice con `Aviso tono="fallo"`: qué ha pasado, por qué si se sabe y qué hacer.
 - Lo que Celda aún no tiene se dice con `Aviso tono="limite"`: qué falta y que no por eso deja de existir. Sin alarma y sin rol de alerta.
+
+## Mapa base
+
+El mapa base se parece a Google Maps: es la paleta A «Google literal» del ADR 0022. La identidad de Celda va en la interfaz (cabecera, hexágonos, panel, botones), no en el mapa.
+
+- **Paleta.** Tierra gris claro (`--mapa-fondo`), zonas urbanas algo más oscuras, vías blancas, autovías en amarillo claro y autopistas en amarillo con borde ámbar, agua azul y tres verdes: bosque, hierba y parque. Desde el zoom 12 se tiñen hospitales, centros de enseñanza y cementerios. Los rótulos van con halo blanco (`--mapa-halo`) y son más oscuros cuanto más importante es el lugar: `--mapa-rotulo-capital`, `-ciudad`, `-pueblo`, `-aldea` y `-barrio`, más los de calle, agua y número de carretera. `mapa/color.test.ts` exige AA de cada rótulo sobre su halo; por eso el de barrio es algo más oscuro que en el prototipo.
+- **Vías por clase** (`vias.ts`): autopista, autovía, principal, secundaria, terciaria, calle, servicio, camino y tren, cada una con su grosor y su zoom de entrada. Las autopistas salen desde el 4 y las calles desde el 12. Todos los bordes van debajo y los rellenos encima, de la menos importante a la más (`line-sort-key`), para que un cruce no quede cortado por un borde. Bordes y rellenos son una capa cada uno, con el color y el grosor por clase: con una capa por clase el mapa gastaba más JavaScript en cada fotograma. Por lo mismo el suelo va en dos capas, `usos` y `verdes`. El borde aparece un nivel después que la vía: de lejos una carretera es solo su color. Las calles peatonales llegan como caminos y se pintan como calles. Los números de autopistas y autovías (A-2, AP-7) van de 7 a 14, en negrita sobre su amarillo.
+- **Rótulos de lugar por importancia** (`rotulos.ts`). Madrid y las capitales de comunidad, en negrita, desde el zoom 4; las capitales de provincia y las ciudades grandes, desde el 4,5; las demás ciudades, desde el 7; los pueblos grandes (`town`), desde el 8; los pueblos (`village`), desde el 10, y las aldeas, desde el 12. A más importancia, letra más grande y halo más ancho. MapLibre coloca antes los rótulos de las capas de encima, así que la capa más importante va la última y una capital gana a un pueblo.
+- **Pocos puntos de interés**, desde el 14: estaciones (azul), hospitales (rojo), parques (verde), y ayuntamientos, museos, estadios y atracciones (gris). Con más, competían con los logos de Celda. Los aeropuertos con código IATA salen desde el 9.
+- **Agua.** Los nombres de mares van en cursiva a cualquier zoom, los de ríos desde el 12 a lo largo del cauce y los de lagos y embalses desde el 10.
+- **Sin rótulos de fuera de España por debajo del zoom 9** (ADR 0024). Cada capa de lugares lleva un filtro `within` con el contorno de España del IGN (`mapa/espana.json`): fuera de él no se rotula hasta el 9. «Gibraltar» no sale en ningún zoom. El contorno es la unión de todos los recintos de `packages/publicacion/datos/municipios.json`, con las islas de 1 km² o más y simplificada a 400 m. Lo escribe `pnpm run espana` en `tools/capas`, sin red; no se copia a mano, y `espanaReal.test.ts` falla si está desfasado o si algún lugar de la frontera (Tui y Valença, Puigcerdà y Bourg-Madame, Ceuta y Fnideq…) cambia de lado. El estilo lo recibe de `mapaBase.ts`, no de un `import`, para que vaya con el código del mapa y no con el de la primera pantalla.
+- **Los municipios que son zona** pierden su rótulo del mapa base en todas las capas de lugares: un municipio puede ser ciudad, pueblo o aldea en OpenStreetMap. El filtro de cada capa no cambia: lee la lista del estado del estilo `municipiosDeCelda` (`["global-state", …]`), y `quitarRotulosDeMunicipios` la cambia con `setGlobalStateProperty`. Con `setFilter` se volvía a mandar a los workers el contorno de España de cada capa.
+- **Nombres de calle por encima del zoom 17.** MapLibre 6 deja de partir las teselas vectoriales en `maxZoom − zoomLevelsToOverscale`, con 4 por defecto. Con el zoom máximo de Celda, 18,5, el corte caía en 14,5: como no es entero, los rótulos de línea de las teselas del 15 se estiraban y dejaban de caber. `mapaBase.ts` pasa `zoomsSinPartir(zoomMaximo)` (`mapa/teselas.ts`), que da 3,5 y pone el corte en 15. No pide más teselas: OpenFreeMap llega al 14 y las del 15 salen de partir esas.
+- El tema oscuro tiene los mismos tokens con otros valores; la v1 no lo activa.
 
 ## Marcadores y logos
 
