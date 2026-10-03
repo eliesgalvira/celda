@@ -23,7 +23,7 @@ Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias
 
 1. crea los ficheros de credenciales de R2, del deploy hook y del buzón de Convex con valores al azar;
 2. adelanta el reloj hasta la hora del temporizador y espera a que la noche acabe bien;
-3. comprueba que la noche leyó del buzón de Convex de mentira con la clave de su credencial, y que la base está en `/var/lib/celda-nocturna`, que la copia está en el directorio de copias y que `vigente.json` y la capa llegaron al cubo, firmados con la clave del fichero, y que la copia también llegó al cubo, comprimida, bajo `copias/`;
+3. comprueba que la noche leyó lo aceptado del buzón de Convex de mentira con la clave de publicación de su credencial, y que la base está en `/var/lib/celda-nocturna`, que la copia está en el directorio de copias y que `vigente.json` y la capa llegaron al cubo, firmados con la clave del fichero, y que la copia también llegó al cubo, comprimida, bajo `copias/`;
 4. lanza `celda-nocturna estado` como el usuario del servicio;
 5. comprueba que, con las zonas por defecto, la primera noche barrió Cataluña con una petición por cuadro, y que la orden de estado dice, por zona, cuándo se barrió y cuántas fichas le faltan, y que la siguiente barre `centro`;
 6. comprueba que las fichas llegaron a una cada 4 s como mínimo, que pararon al cerrarse su ventana de 2 minutos con las demás en la cola, y que se publicó a mitad de la ventana y al cerrarla;
@@ -32,7 +32,7 @@ Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias
 9. deja servido un despliegue de otra versión y hace que R2 no conteste al build: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo el anterior. Con R2 de vuelta, la siguiente publicación lo pone al día;
 10. lanza `celda-nocturna cuadros-de-borde` como el usuario del servicio y comprueba que pide una vez cada uno de los cuatro cuadros de borde, que en el Campus Nord no traen nada, y que no toca la base;
 11. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
-12. busca las dos claves de R2, sus secretos, el hook y la clave de Convex en todo el almacén de Nix de la máquina y no los encuentra.
+12. busca las dos claves de R2, sus secretos, el hook y la clave de publicación en todo el almacén de Nix de la máquina y no los encuentra.
 
 Con todo construido, la máquina virtual tarda unos 2 min 30 s en arrancar y pasar la prueba. Casi todo es la ventana de fichas.
 
@@ -127,11 +127,11 @@ CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/prj_…/�
 `credenciales.convex` también, con la conexión con el buzón de Convex (ADR 0020):
 
 ```sh
-CELDA_CONVEX_URL=https://nombre-del-despliegue.convex.cloud
-CELDA_CONVEX_CLAVE=prod:nombre-del-despliegue|…
+CELDA_CONVEX_SITE_URL=https://nombre-del-despliegue.convex.site
+CELDA_PUBLICACION_CLAVE=la-misma-que-en-el-despliegue
 ```
 
-La clave es una clave de despliegue de producción del panel de Convex (*Settings → Deploy keys*), distinta de la que usa quien modera. Con ella, cada noche lee lo aceptado en la moderación desde la última vez y lo publica en las fichas ([convex.md](convex.md#moderar)). El diario dice «Buzón de Convex: N aceptadas leídas, M nuevas» o, si Convex no contesta, que no está disponible y que la noche publica lo demás. Sin el fichero, la comunidad queda apagada.
+La clave es la clave de publicación, la variable `CELDA_PUBLICACION_CLAVE` del despliegue ([convex.md](convex.md#antes-del-primer-despliegue-del-buzón)). Solo abre la acción HTTP que da lo aceptado para publicar, sin identidades ni huellas de IP. **Nunca pongas aquí una clave de despliegue de Convex**: lo puede todo (desplegar código, leer todas las aportaciones y las huellas, vetar), y esta máquina no la necesita. La clave de despliegue se queda en el portátil de quien modera. Con la de publicación, cada noche lee lo aceptado en la moderación desde la última vez y lo publica en las fichas ([convex.md](convex.md#moderar)). El diario dice «Buzón de Convex: N aceptadas leídas, M nuevas» o, si Convex no contesta, que no está disponible y que la noche publica lo demás. Sin el fichero, la comunidad queda apagada.
 
 Con el hook y `origenPublico`, la noche compara tras publicar el `vigente.json` de R2, leído por la API S3, con el que sirve Vercel en `origenPublico` y, si no coinciden, llama al hook. El build de Vercel monta entonces las capas desde R2 (ADR 0018). El diario lo dice en los dos casos: «Vercel no sirve sitios@…: build lanzado» o «Vercel ya sirve sitios@…: no hace falta otro build». Sin `origenPublico`, llama al hook en cada noche.
 
@@ -151,7 +151,7 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `copias.conservar` | 14 | Copias que se conservan, en el disco y en R2 |
 | `credenciales.r2` | `null` | Fichero de credenciales de R2, con la clave que escribe; sin él no se publica ni se sube la copia |
 | `credenciales.vercel` | `null` | Fichero del deploy hook de Vercel; sin él no se lanza ningún build |
-| `credenciales.convex` | `null` | Fichero con la URL y la clave de despliegue del buzón de Convex; sin él no se publica lo aceptado en la moderación |
+| `credenciales.convex` | `null` | Fichero con la URL de las acciones HTTP del buzón y su clave de publicación (nunca una clave de despliegue); sin él no se publica lo aceptado en la moderación |
 | `origenPublico` | `null` | URL pública de las capas en Vercel, `https://celda.elies.site/capas` (`CELDA_ALMACEN_ORIGEN`) |
 | `reintentoDePublicacion` | 60 | Minutos antes de repetir una publicación fallida |
 | `memoria.monton` | 512 | Megabytes del montón de V8 (`NODE_OPTIONS=--max-old-space-size`) |
