@@ -24,21 +24,21 @@ export interface LineaDeLimite {
   readonly properties: { readonly limite: TipoDeLimite };
   readonly geometry: {
     readonly type: "LineString";
-    readonly coordinates: ReadonlyArray<readonly [number, number]>;
+    readonly coordinates: Array<[number, number]>;
   };
 }
 
 /** Lo que va en `FUENTE_LIMITES`. */
 export interface LineasDeLimites {
   readonly type: "FeatureCollection";
-  readonly features: ReadonlyArray<LineaDeLimite>;
+  readonly features: Array<LineaDeLimite>;
 }
 
 /** Las líneas del fichero de límites, en grados, cada una con su tipo. */
 export const lineasDeLimites = (limites: LimitesDeComunidadesYProvincias): LineasDeLimites => {
   const lineas = (de: ReadonlyArray<ReadonlyArray<number>>, limite: TipoDeLimite) =>
     de.map((linea): LineaDeLimite => {
-      const coordinates: Array<readonly [number, number]> = [];
+      const coordinates: Array<[number, number]> = [];
       let x = 0;
       let y = 0;
       for (let k = 0; k + 1 < linea.length; k += 2) {

@@ -2,10 +2,15 @@ import type { Area } from "@celda/dominio/area";
 import { CONTORNO_DE_LA_COMUNITAT_VALENCIANA } from "@celda/dominio/comunitatValenciana";
 import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
 import { coloresDelTema, estiloMapa } from "@celda/ui/mapa/estilo.ts";
-import { Map as MapaMapLibre, prewarm, setWorkerUrl } from "maplibre-gl";
+import { FUENTE_LIMITES } from "@celda/ui/mapa/limites.ts";
+import * as Effect from "effect/Effect";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import { type GeoJSONSource, Map as MapaMapLibre, prewarm, setWorkerUrl } from "maplibre-gl";
 import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
 import { type Avisos, vigilarCallejero } from "./callejero.ts";
+import { leerLimites, limitesDeLaVisita } from "./limites.ts";
+import urlDeLimites from "./limites.json?url";
 import { zoomsSinPartir } from "./teselas.ts";
 import { type Relleno, ZOOM_MAXIMO_AL_ABRIR } from "./vistaInicial.ts";
 
@@ -15,6 +20,17 @@ setWorkerUrl(urlDelTrabajador);
 // Los workers descargan su código (medio mega) y arrancan ya, mientras se monta la pantalla: el
 // mapa pide las teselas a través de ellos (ver `precarga.ts`).
 prewarm();
+
+/**
+ * Los límites de comunidades y provincias, del mismo origen que la web (ADR 0018 y 0023): el
+ * fichero va con la huella en el nombre, fuera del JavaScript, y se pide una vez por visita.
+ */
+const ponerLimites = limitesDeLaVisita(
+  leerLimites(new URL(urlDeLimites, globalThis.location.href).href).pipe(
+    // Los límites no pasan por el runtime de la pantalla: este módulo monta su cliente HTTP.
+    Effect.provide(FetchHttpClient.layer),
+  ),
+);
 
 const TEXTOS_MAPLIBRE = {
   "Map.Title": "Mapa. Muévete con las flechas y acerca o aleja con + y −.",
@@ -63,5 +79,17 @@ export const crearMapaBase = (
   mapa.keyboard.disableRotation();
 
   vigilarCallejero(mapa, avisos);
+  // Después del primer pintado completo: no compiten con el mapa base ni con los marcadores.
+  ponerLimites({
+    trasElPrimerPintado: (escuchar) => {
+      mapa.once("idle", escuchar);
+    },
+    alQuitarse: (escuchar) => {
+      mapa.once("remove", escuchar);
+    },
+    dibujar: (lineas) => {
+      mapa.getSource<GeoJSONSource>(FUENTE_LIMITES)?.setData(lineas);
+    },
+  });
   return mapa;
 };
