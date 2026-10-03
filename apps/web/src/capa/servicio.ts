@@ -76,8 +76,10 @@ export class CapaEmplazamientos extends Context.Service<
 >()("@celda/web/capa/servicio/CapaEmplazamientos") {}
 
 /**
- * De dónde se leen las capas y las fichas publicadas: `VITE_CAPAS_ORIGEN`, o `/capas` en el mismo
- * origen que la web. Siempre como URL absoluta y sin barra final.
+ * De dónde se leen las capas y las fichas publicadas: `/capas`, en el mismo origen que la web, sin
+ * CORS ni peticiones previas (ADR 0018). En desarrollo, `VITE_CAPAS_ORIGEN` apunta al origen
+ * estático local de `tools/capas`; el build de Vercel la quita. Siempre como URL absoluta y sin
+ * barra final.
  */
 export const origenDeCapas: Config.Config<string> = Config.String("VITE_CAPAS_ORIGEN").pipe(
   Config.withDefault("/capas"),

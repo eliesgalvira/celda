@@ -1,25 +1,20 @@
 #!/usr/bin/env bash
 # Monta en una carpeta el sitio estático como lo sirve Vercel: la web construida y, en /capas, la
-# versión vigente de lo publicado, con las cabeceras de vercel.json. El despliegue de verdad lo
-# hace el build de Vercel (scripts/vercel.sh); esto sirve para verlo en local o para subirlo a
-# mano si el deploy hook falla (ADR 0010).
+# versión vigente de lo publicado y las dos anteriores, con las cabeceras de vercel.json. El
+# despliegue de verdad lo hace el build de Vercel (scripts/vercel.sh); esto sirve para verlo en
+# local (ADR 0018).
 #
-#   ./scripts/sitio.sh <carpeta o URL de lo publicado> <carpeta de destino>
-#   npx vercel deploy <carpeta de destino>
+#   ./scripts/sitio.sh <carpeta de lo publicado> <carpeta de destino>
 set -euo pipefail
-publicado="$1"
+publicado="$(realpath "$1")"
 destino="$(realpath -m "$2")"
 cd "$(dirname "$0")/.."
-case "$publicado" in
-  http://* | https://*) ;;
-  *) publicado="$(realpath "$publicado")" ;;
-esac
-pnpm run build
+env --unset=VITE_CAPAS_ORIGEN pnpm run build
 rm -rf "$destino"
 mkdir -p "$destino"
 cp -r dist/. "$destino/"
-pnpm --filter @celda/nocturna run reserva "$publicado" "$destino/capas"
-# Lo que se sube ya está construido: sin las órdenes de build del proyecto.
+CELDA_ALMACEN_CARPETA="$publicado" pnpm --filter @celda/nocturna run capas "$destino/capas"
+# Lo que se sirve ya está construido: sin las órdenes de build del proyecto.
 node --eval '
   const fs = require("node:fs");
   const { buildCommand, installCommand, outputDirectory, framework, ...sitio } =

@@ -15,7 +15,7 @@ import {
   PublicacionAMitad,
   resumirCola,
 } from "@celda/ingesta/fichas";
-import type { AlmacenDeFicheros } from "@celda/publicacion/almacen";
+import { AlmacenDeCopias, type AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import {
   DatosPublicables,
   describirFallo,
@@ -23,11 +23,7 @@ import {
   publicar,
   type ResultadoPublicacion,
 } from "@celda/publicacion/publicar";
-import {
-  actualizarReserva,
-  CopiaDeReserva,
-  type ResultadoReserva,
-} from "@celda/publicacion/reserva";
+import { ponerAlDiaVercel, type ResultadoVercel, SitioEnVercel } from "@celda/publicacion/vercel";
 import type { ZonasDePublicacion } from "@celda/publicacion/zonas";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
@@ -39,6 +35,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 
 import { BaseNocturna } from "./base.ts";
 import { describirResumen, type Turno } from "./estado.ts";
@@ -62,15 +60,15 @@ export interface Intento {
 }
 
 /**
- * Publica la base en el almacén de la configuración, o no hace nada si no hay almacén, y pone al
- * día la copia de reserva de Vercel.
+ * Publica la base en el almacén de la configuración, o no hace nada si no hay almacén, y lanza el
+ * build de Vercel si aún no sirve la versión vigente.
  */
 export class Publicador extends Context.Service<
   Publicador,
   {
     readonly publicar: Effect.Effect<Intento>;
-    /** Pide un despliegue de la copia de reserva si no sirve ya la versión vigente (ADR 0010). */
-    readonly actualizarReserva: Effect.Effect<ResultadoReserva>;
+    /** Lanza el build de Vercel si no sirve ya la versión vigente del almacén (ADR 0018). */
+    readonly ponerAlDiaVercel: Effect.Effect<ResultadoVercel>;
   }
 >()("@celda/nocturna/programa/Publicador") {}
 
@@ -84,18 +82,18 @@ const PASAJEROS: ReadonlySet<FalloPublicacion["_tag"]> = new Set([
   "InstantaneaMovida",
 ]);
 
-const SIN_RESERVA: Effect.Effect<ResultadoReserva> = Effect.succeed({ tipo: "sin-reserva" });
+const SIN_HOOK: Effect.Effect<ResultadoVercel> = Effect.succeed({ tipo: "sin-hook" });
 
 /**
- * El publicador sobre los `DatosPublicables` de la base y el almacén del contexto, con la copia de
- * reserva si el contexto la tiene.
+ * El publicador sobre los `DatosPublicables` de la base y el almacén del contexto, con Vercel si
+ * el contexto lo tiene.
  */
 export const publicadorEn = (zonas: ZonasDePublicacion, porLote?: number) =>
   Layer.effect(
     Publicador,
     Effect.gen(function* () {
       const contexto = yield* Effect.context<DatosPublicables | AlmacenDeFicheros>();
-      const reserva = yield* Effect.serviceOption(CopiaDeReserva);
+      const sitio = yield* Effect.serviceOption(SitioEnVercel);
       return Publicador.of({
         publicar: publicar(zonas, porLote).pipe(
           Effect.map((publicada): Intento => ({ resultado: publicada, reintentar: false })),
@@ -107,11 +105,11 @@ export const publicadorEn = (zonas: ZonasDePublicacion, porLote?: number) =>
           ),
           Effect.provideContext(contexto),
         ),
-        actualizarReserva: Option.match(reserva, {
-          onNone: () => SIN_RESERVA,
-          onSome: (copia) =>
-            actualizarReserva.pipe(
-              Effect.provideService(CopiaDeReserva, copia),
+        ponerAlDiaVercel: Option.match(sitio, {
+          onNone: () => SIN_HOOK,
+          onSome: (vercel) =>
+            ponerAlDiaVercel.pipe(
+              Effect.provideService(SitioEnVercel, vercel),
               Effect.provideContext(contexto),
             ),
         }),
@@ -124,7 +122,7 @@ export const sinAlmacen = Layer.succeed(
   Publicador,
   Publicador.of({
     publicar: Effect.succeed({ resultado: { tipo: "sin-almacen" }, reintentar: false }),
-    actualizarReserva: SIN_RESERVA,
+    ponerAlDiaVercel: SIN_HOOK,
   }),
 );
 
@@ -156,9 +154,10 @@ export interface EjecucionDeLaNoche {
 export interface Noche {
   readonly ejecuciones: ReadonlyArray<EjecucionDeLaNoche>;
   readonly publicacion: ResultadoPublicacion;
-  readonly reserva: ResultadoReserva;
+  readonly vercel: ResultadoVercel;
   /** La copia de seguridad que se ha hecho, o `undefined` si ha fallado. */
   readonly copia: string | undefined;
+  readonly copiaEnR2: CopiaEnR2;
 }
 
 const COPIA = /^ingesta-.+\.sqlite$/u;
@@ -193,6 +192,85 @@ export const copiarBase = Effect.fn("Nocturna.copiarBase")(function* (opciones: 
   return destino;
 });
 
+/** Lo que ha pasado con la copia de la base en R2. Nunca es un fallo de la noche. */
+export type CopiaEnR2 =
+  /** No hay cubo de R2 configurado, o no hay copia local que subir. */
+  | { readonly tipo: "sin-subir" }
+  | { readonly tipo: "subida"; readonly nombre: string; readonly retiradas: number }
+  | { readonly tipo: "fallida"; readonly motivo: string };
+
+/** La copia no se ha podido leer o comprimir para subirla. */
+class CopiaIlegible extends Schema.TaggedError<CopiaIlegible>()("CopiaIlegible", {
+  motivo: Schema.String,
+}) {}
+
+const COPIA_COMPRIMIDA = /^ingesta-.+\.sqlite\.gz$/u;
+
+/** Una copia de la base comprimida con gzip, leída a trozos del disco. */
+const comprimir = (ruta: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    // Cada trozo en su propio búfer, que es lo que acepta `CompressionStream`.
+    const legible = yield* Stream.toReadableStreamEffect(
+      Stream.map(fs.stream(ruta), (trozo) => new Uint8Array(trozo)),
+    );
+    return yield* Effect.tryPromise({
+      try: async () =>
+        new Uint8Array(
+          await new Response(legible.pipeThrough(new CompressionStream("gzip"))).arrayBuffer(),
+        ),
+      catch: (causa) => new CopiaIlegible({ motivo: `${ruta}: ${String(causa)}` }),
+    });
+  });
+
+/**
+ * Sube a R2 la copia de la base que acaba de hacer `copiarBase`, comprimida
+ * (`ingesta-<fecha>.sqlite.gz`), y borra allí las más viejas hasta dejar `conservar`, como en el
+ * disco (ADR 0018). Sin cubo de R2 no hace nada. Si algo falla, lo apunta en el diario y la noche
+ * sigue.
+ */
+export const subirCopia = Effect.fn("Nocturna.subirCopia")(function* (
+  ruta: string,
+  conservar: number,
+) {
+  const almacen = yield* Effect.serviceOption(AlmacenDeCopias);
+  if (Option.isNone(almacen)) {
+    const sinSubir: CopiaEnR2 = { tipo: "sin-subir" };
+    return sinSubir;
+  }
+  const copias = almacen.value;
+  const path = yield* Path.Path;
+  const nombre = `${path.basename(ruta)}.gz`;
+  const subida = yield* Effect.gen(function* () {
+    yield* copias.guardar(nombre, yield* comprimir(ruta));
+    // El nombre lleva la fecha ISO: en orden alfabético, las más nuevas van al final.
+    const viejas = (yield* copias.listar)
+      .filter((guardada) => COPIA_COMPRIMIDA.test(guardada))
+      .toSorted()
+      .toReversed()
+      .slice(Math.max(conservar, 1));
+    yield* Effect.forEach(viejas, copias.borrar, { discard: true });
+    const hecha: CopiaEnR2 = { tipo: "subida", nombre, retiradas: viejas.length };
+    return hecha;
+  }).pipe(
+    Effect.catchTags({
+      AlmacenNoDisponible: (error) =>
+        Effect.succeed<CopiaEnR2>({ tipo: "fallida", motivo: error.motivo }),
+      CopiaIlegible: (error) =>
+        Effect.succeed<CopiaEnR2>({ tipo: "fallida", motivo: error.motivo }),
+    }),
+  );
+  if (subida.tipo === "subida") {
+    yield* Effect.logInfo(
+      `Copia de la base en R2: ${subida.nombre}` +
+        (subida.retiradas === 0 ? "" : `, ${subida.retiradas} retiradas`),
+    );
+  } else if (subida.tipo === "fallida") {
+    yield* Effect.logWarning(`No se ha podido subir la copia de la base a R2: ${subida.motivo}`);
+  }
+  return subida;
+});
+
 /** Publica una vez y lo apunta en la base, con las ejecuciones de su noche. */
 const publicarYApuntar = Effect.fn("Nocturna.publicar")(function* (
   ejecuciones: ReadonlyArray<string>,
@@ -214,29 +292,29 @@ const publicarYApuntar = Effect.fn("Nocturna.publicar")(function* (
   return intento;
 });
 
-/** Pone al día la copia de reserva y lo apunta en el diario. */
-const actualizarYApuntarReserva = Effect.gen(function* () {
+/** Lanza el build de Vercel si hace falta y lo apunta en el diario, haya hecho falta o no. */
+const ponerAlDiaYApuntarVercel = Effect.gen(function* () {
   const publicador = yield* Publicador;
-  const reserva = yield* publicador.actualizarReserva;
-  switch (reserva.tipo) {
-    case "sin-reserva":
-      yield* Effect.logInfo("Sin deploy hook de Vercel: la copia de reserva no se toca");
+  const vercel = yield* publicador.ponerAlDiaVercel;
+  switch (vercel.tipo) {
+    case "sin-hook":
+      yield* Effect.logInfo("Sin deploy hook de Vercel: no se lanza ningún build");
       break;
     case "sin-publicar":
-      yield* Effect.logInfo("Copia de reserva: no hay nada publicado que copiar");
+      yield* Effect.logInfo("Vercel: no hay nada publicado que montar");
       break;
     case "al-dia":
-      yield* Effect.logInfo(`Copia de reserva: ya sirve ${reserva.version}`);
+      yield* Effect.logInfo(`Vercel ya sirve ${vercel.version}: no hace falta otro build`);
       break;
     case "desplegada":
-      yield* Effect.logInfo(`Copia de reserva: despliegue pedido para ${reserva.version}`);
+      yield* Effect.logInfo(`Vercel no sirve ${vercel.version}: build lanzado`);
       break;
     case "fallida":
-      yield* Effect.logWarning(`Copia de reserva sin actualizar: ${reserva.motivo}`);
+      yield* Effect.logWarning(`Vercel sin poner al día: ${vercel.motivo}`);
       break;
   }
-  return reserva;
-}).pipe(Effect.withSpan("Nocturna.actualizarReserva"));
+  return vercel;
+}).pipe(Effect.withSpan("Nocturna.ponerAlDiaVercel"));
 
 /** Una ejecución con el extractor que da `capa`, construido para ella sola. */
 const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<A, E, R>) =>
@@ -270,10 +348,11 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
  *    publicar, lo hace ahora. Si falla por algo pasajero, lo apunta, espera `reintento` y lo
  *    intenta otra vez; si vuelve a fallar, queda para la noche siguiente. Los datos ya están en
  *    la base.
- * 3. Si la copia de reserva de Vercel no sirve la versión vigente del almacén, pide un despliegue
- *    con el deploy hook. Se hace también si la publicación ha fallado: la copia sigue a lo que
- *    haya en el almacén.
- * 4. Copia la base a la carpeta de copias y deja las `conservar` últimas.
+ * 3. Si Vercel no sirve la versión vigente del almacén, lanza su build con el deploy hook, y el
+ *    build monta las capas desde R2 (ADR 0018). Se hace también si la publicación ha fallado:
+ *    Vercel sigue a lo que haya en el almacén.
+ * 4. Copia la base a la carpeta de copias y deja las `conservar` últimas. Con un cubo de R2,
+ *    sube también la copia comprimida y deja allí otras tantas.
  *
  * Una noche cortada a mitad deja su ejecución en curso; la siguiente la da por interrumpida y la
  * rehace, porque cada paso es idempotente. Un barrido de zona cortado se retoma por el primer
@@ -313,7 +392,7 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
     yield* Effect.sleep(opciones.reintento);
     intento = yield* publicarYApuntar(completadas);
   }
-  const reserva = yield* actualizarYApuntarReserva;
+  const vercel = yield* ponerAlDiaYApuntarVercel;
 
   const copia = yield* copiarBase(opciones.copias).pipe(
     Effect.tap((destino) => Effect.logInfo(`Copia de la base en ${destino}`)),
@@ -321,15 +400,19 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
       Effect.as(Effect.logWarning(`No se ha podido copiar la base: ${fallo.message}`), undefined),
     ),
   );
-  const hecha: Noche = { ejecuciones, publicacion: intento.resultado, reserva, copia };
+  const copiaEnR2: CopiaEnR2 =
+    copia === undefined
+      ? { tipo: "sin-subir" }
+      : yield* subirCopia(copia, opciones.copias.conservar);
+  const hecha: Noche = { ejecuciones, publicacion: intento.resultado, vercel, copia, copiaEnR2 };
   return hecha;
 });
 
-/** Publica a mano, sin ingerir nada, lo apunta en la base y pone al día la copia de reserva. */
+/** Publica a mano, sin ingerir nada, lo apunta en la base y lanza el build de Vercel si hace falta. */
 export const publicarAMano = Effect.gen(function* () {
   const { resultado } = yield* publicarYApuntar([]);
-  const reserva = yield* actualizarYApuntarReserva;
-  return { publicacion: resultado, reserva };
+  const vercel = yield* ponerAlDiaYApuntarVercel;
+  return { publicacion: resultado, vercel };
 });
 
 /**

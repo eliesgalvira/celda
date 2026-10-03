@@ -33,17 +33,17 @@ La acción `ingesta:registroOficial` es fina: lee la configuración, monta el ex
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (una de las siete de España cada noche, por defecto), antenasmoviles.es si está encendido, la publicación, el aviso a la copia de reserva de Vercel y una copia de la base. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (una de las siete de España cada noche, por defecto), antenasmoviles.es si está encendido, la publicación, el build de Vercel si aún no sirve la versión vigente y una copia de la base, en el disco y en R2. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
 
 ### Lanzarla en local
 
 Desde la raíz de Celda, dentro de `nix develop`:
 
 ```sh
-pnpm run ingesta noche      # ingesta, publicación, copia de reserva y copia de seguridad
+pnpm run ingesta noche      # ingesta, publicación, build de Vercel y copia de seguridad
 pnpm run ingesta estado     # última ejecución de cada fuente, fichas en cola, errores y lo publicado
 pnpm run ingesta publicar   # publica lo que haya en la base, sin pedir nada a las fuentes
-pnpm run ingesta copia      # copia la base a la carpeta de copias
+pnpm run ingesta copia      # copia la base a la carpeta de copias y, con R2, también allí
 ```
 
 Cada orden construye `apps/nocturna/dist/nocturna.js`, un solo fichero, y lo ejecuta en `apps/nocturna`. Las rutas relativas de la configuración cuentan desde ahí: sin tocar nada, la base es `apps/nocturna/datos/ingesta.sqlite` y las copias van a `apps/nocturna/datos/copias/`, las dos fuera de git.
@@ -176,7 +176,7 @@ Para una prueba en local, `CELDA_ANTENASMOVILES_ACTIVO=true CELDA_ANTENASMOVILES
 
 Al final de la noche se publica siempre, además de a mitad de la ventana de fichas: sin cambios no se escribe nada, y si la noche anterior no pudo publicar, esta lo hace. Si falla porque el almacén o la base no responden, o porque los datos se movieron a mitad, se apunta en `publicaciones` y en las ejecuciones de la noche, se espera una hora y se intenta otra vez. Si vuelve a fallar, queda para la noche siguiente. Los datos ya están en la base.
 
-Después, `VACUUM INTO` copia la base a `ingesta-<fecha>.sqlite` en la carpeta de copias, y se borran las más viejas hasta dejar catorce. Para restaurar, para la ingesta y copia una de ellas encima de la base:
+Después, `VACUUM INTO` copia la base a `ingesta-<fecha>.sqlite` en la carpeta de copias, y se borran las más viejas hasta dejar catorce. Con un cubo de R2 configurado, la copia se sube también, comprimida con gzip, a `copias/ingesta-<fecha>.sqlite.gz` del mismo cubo, y allí se borran las más viejas hasta dejar otras tantas (`subirCopia`, ADR 0018). Si la subida falla, lo dice el diario y la noche sigue. Para restaurar, para la ingesta y copia una de ellas encima de la base (una de R2, descomprimida con `gzip --decompress`):
 
 ```sh
 cp datos/copias/ingesta-2026-09-28T21-40-45.318Z.sqlite datos/ingesta.sqlite
@@ -212,7 +212,7 @@ Para ver lo que cabe, `node --max-old-space-size=512 src/medida/espana.ts /tmp/e
 
 ### Pruebas
 
-`apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord, que contesta cada caja como el geoportal (`capaGrabadaPorCajas`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
+`apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord, que contesta cada caja como el geoportal (`capaGrabadaPorCajas`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, también las comprimidas en un R2 de prueba, que una subida fallida no tumba la noche, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
 
 `apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/fichas.test.ts` prueba el orden de la cola y la lectura en la ventana con el extractor real, fichas grabadas y el reloj de prueba: el ritmo, el cierre de la ventana con el resto pendiente, la publicación a mitad, unas 5.500 fichas con los valores por defecto y respuestas de 0,9 s, una ficha cada segundo desde el final de la anterior y, a ese ritmo, el bloqueo por 401, 403 o una página que no es una ficha, el 429 y el 503 con `Retry-After`, los tres fallos seguidos, la espera tras un fallo y el tope. `apps/nocturna/src/fichas.test.ts` hace lo mismo con la base SQLite: una noche que cierra la ventana y la siguiente que sigue por donde iba, la provincia con prioridad, un bloqueo que queda en la ejecución, una ficha que espera un día tras fallar y una base de la versión 3 del esquema que se pone al día sin perder sus puntos ni su cola. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la simulación de `muestras/espana/teselas.mjs`.
 
@@ -312,7 +312,7 @@ Dónde escribe lo dicen las variables de entorno del despliegue:
 ```sh
 pnpm exec convex env set CELDA_ALMACEN_CARPETA /ruta/absoluta/capas   # backend local: una carpeta
 pnpm exec convex env set CELDA_ALMACEN_ORIGEN http://127.0.0.1:8852    # URL pública de esa carpeta
-# producción: CELDA_R2_CUENTA, CELDA_R2_CUBO, CELDA_R2_ID_CLAVE y CELDA_R2_SECRETO (ADR 0010)
+# producción: CELDA_R2_CUENTA, CELDA_R2_CUBO, CELDA_R2_ID_CLAVE y CELDA_R2_SECRETO (ADR 0018)
 pnpm exec convex run publicacion:publicar                             # publicar ahora, a mano
 ```
 
@@ -325,7 +325,7 @@ pnpm run publicar:local   # construye, lee la URL y la clave del backend local y
 pnpm run servir           # sirve salida/ en http://127.0.0.1:8852, déjalo abierto
 ```
 
-`servir` da a `vigente.json` una caché de cero segundos y al resto un año, como la CDN. La web en desarrollo lee de `VITE_CAPAS_ORIGEN`, que `apps/web/.env.development` pone en ese puerto; en la build, sin la variable, lee de `/capas` en su mismo origen.
+`servir` da a `vigente.json` una caché de cero segundos y al resto un año, como Vercel. La web en desarrollo lee de `VITE_CAPAS_ORIGEN`, que `apps/web/.env.development` pone en ese puerto; en la build, sin la variable, lee de `/capas` en su mismo origen, como en producción (ADR 0018).
 
 Para otro despliegue, `pnpm run publicar` con `CELDA_CONVEX_URL`, `CELDA_CONVEX_CLAVE_ADMIN`, `CELDA_CAPAS_ORIGEN` (la URL desde la que la web descargará los ficheros) y `CELDA_CAPAS_CARPETA`. `servir` escucha en el puerto de `CELDA_CAPAS_ORIGEN`.
 
@@ -337,19 +337,23 @@ Después de `municipios`, lanza `pnpm run zonas`, también desde `tools/capas`. 
 
 `datos:version` es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la consulta también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
 
-### La copia de reserva
+### Las capas en Vercel
 
-Tras publicar, la noche y `pnpm run ingesta publicar` comparan el `vigente.json` del almacén con el de la copia de Vercel (`CELDA_RESERVA_ORIGEN`) y, si no coinciden, llaman al deploy hook (`CELDA_VERCEL_DEPLOY_HOOK`). Sin el hook no tocan la copia. El build de Vercel (`apps/web/scripts/vercel.sh`) monta la copia con la orden `reserva`, que no abre la base:
+La web, las capas y las fichas se sirven solo desde Vercel, en el mismo origen (ADR 0018). El almacén de producción es un cubo privado de R2: la noche publica ahí, y el build de Vercel (`apps/web/scripts/vercel.sh`) monta las capas en `dist/capas` con la orden `capas`, que no abre la base:
 
 ```sh
-pnpm --filter @celda/nocturna run reserva <URL o carpeta de lo publicado> <carpeta vacía>
+pnpm --filter @celda/nocturna run capas <carpeta vacía>
 ```
 
-Copia solo la versión vigente, comprueba la huella de cada fichero y escribe `vigente.json` el último; si falta algo, falla sin escribirlo. Cómo encaja con Vercel: ADR 0010, «La copia de reserva». Las pruebas están en `apps/nocturna/src/reserva.test.ts`, con un Vercel de mentira que construye cada despliegue con la misma orden.
+Lee del almacén de la configuración, el cubo de R2 por la API S3 (en Vercel, con una clave de solo lectura) o `CELDA_ALMACEN_CARPETA`. Monta la versión vigente y los ficheros de las dos anteriores, según sus manifiestos (`ANTERIORES_EN_VERCEL` en `packages/publicacion/src/vercel.ts`), para que una pestaña abierta con un `vigente.json` viejo siga encontrando sus provincias y sus lotes. Comprueba la huella de cada fichero nombrado por su contenido, reintenta tres veces un fallo del almacén y escribe `vigente.json` el último; si falta algo, falla sin escribirlo, y Vercel sigue sirviendo el despliegue anterior. Una versión posterior a la vigente, que puede ser otra publicación a medias, no se monta.
+
+Tras publicar, la noche y `pnpm run ingesta publicar` comparan el `vigente.json` del almacén con el que sirve Vercel en `CELDA_ALMACEN_ORIGEN` (`https://celda.elies.site/capas`) y, si no coinciden o Vercel no contesta, llaman al deploy hook (`CELDA_VERCEL_DEPLOY_HOOK`). Sin el hook no lanzan ningún build. El diario lo dice en los dos casos.
+
+Las pruebas están en `apps/nocturna/src/vercel.test.ts`, con un Vercel de mentira que construye cada despliegue con la misma orden: que monta la vigente y las dos anteriores y nada de la cuarta, que una pestaña con cualquiera de los resúmenes que ha servido encuentra sus provincias, sus lotes y su índice de claves, que falta un fichero de la vigente o de una anterior y el build falla sin `vigente.json`, y que `vigente.json` es lo último que escribe. Qué pone quien administra las cuentas de R2 y Vercel: [nixos.md](nixos.md#las-cuentas-de-r2-y-vercel).
 
 ### Vista previa
 
-`apps/web/scripts/sitio.sh <publicado> <destino>` construye la web y monta en `<destino>` el sitio como lo sirve Vercel: la web, la versión vigente de lo publicado en `/capas` y las cabeceras de `apps/web/vercel.json`. `<publicado>` es una carpeta o una URL. Después, `npx vercel deploy <destino>` lo sube como vista previa. El primer despliegue de un proyecto nuevo de Vercel va a producción aunque no se pida; para una vista previa en un proyecto nuevo, despliega con `--target preview` desde el principio.
+`apps/web/scripts/sitio.sh <carpeta publicada> <destino>` construye la web y monta en `<destino>` el sitio como lo sirve Vercel: la web, las capas de lo publicado en `/capas` (la vigente y las dos anteriores) y las cabeceras de `apps/web/vercel.json`. `tools/rendimiento` sirve una carpeta así con esas cabeceras. Subirla con `npx vercel deploy <destino>` solo cabe con capas pequeñas, como las de Barcelona: una subida por la CLI admite 100 MB, y las fichas de toda España son unos 135 MB. El primer despliegue de un proyecto nuevo de Vercel va a producción aunque no se pida; para una vista previa en un proyecto nuevo, despliega con `--target preview` desde el principio.
 
 ## Ficha
 

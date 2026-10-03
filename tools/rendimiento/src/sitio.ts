@@ -7,8 +7,9 @@ import * as NodePath from "node:path";
 import * as NodeZlib from "node:zlib";
 
 /**
- * Un servidor local que imita el sitio de Vercel (ADR 0010): la web construida, lo publicado en
- * `/capas`, las cabeceras de `apps/web/vercel.json` y la compresión de la CDN. Así la medida ve los
+ * Un servidor local que imita el sitio de Vercel (ADR 0018): la web construida, lo publicado en
+ * `/capas`, en el mismo origen y sin CORS, las cabeceras de `apps/web/vercel.json` y la compresión
+ * de la CDN. Así la medida ve los
  * mismos bytes y la misma caché que un teléfono.
  */
 
@@ -79,7 +80,6 @@ export const servirSitio = async (web: string, capas: string, aislado = false): 
       const cabeceras: NodeHttp.OutgoingHttpHeaders = {
         "content-type": TIPOS.get(extension) ?? "application/octet-stream",
         "cache-control": encontrado.fichero.endsWith("index.html") ? SIN_CACHE : cacheDe(ruta),
-        "access-control-allow-origin": "*",
       };
       if (aislado) {
         cabeceras["cross-origin-opener-policy"] = "same-origin";

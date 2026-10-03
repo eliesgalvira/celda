@@ -8,19 +8,28 @@ import * as Redacted from "effect/Redacted";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
-import { AlmacenDeFicheros, AlmacenNoDisponible, FicheroInmutable } from "../almacen.ts";
-import { codificarConsulta, codificarRuta, firmarV4, sha256 } from "./firma.ts";
+import {
+  AlmacenDeCopias,
+  AlmacenDeFicheros,
+  AlmacenNoDisponible,
+  FicheroInmutable,
+} from "../almacen.ts";
+import { codificarConsulta, codificarRuta, firmarV4, sha256DeBytes } from "./firma.ts";
 
-export interface OpcionesR2 {
+/** Un cubo de R2 y la clave con la que se firma cada petición. */
+export interface OpcionesCubo {
   /** Identificador de la cuenta de Cloudflare: el punto de entrada es `<cuenta>.r2.cloudflarestorage.com`. */
   readonly cuenta: string;
   readonly cubo: string;
   readonly idClave: string;
   readonly secreto: Redacted.Redacted<string>;
-  /** URL pública desde la que la web lee los ficheros (el Worker o la Pages Function), sin barra final. */
-  readonly origen: string;
   /** Otro punto de entrada compatible con S3, para las pruebas. */
   readonly puntoDeEntrada?: string;
+}
+
+export interface OpcionesR2 extends OpcionesCubo {
+  /** URL pública desde la que la web lee los ficheros, la de Vercel (`…/capas`), sin barra final. */
+  readonly origen: string;
 }
 
 /** Un año e inmutable: cada versión es un fichero distinto que no cambia nunca (ADR 0004). */
@@ -65,83 +74,133 @@ export const leerListado = (xml: string): PaginaDeListado => {
   };
 };
 
+type Metodo = "GET" | "PUT" | "DELETE";
+
+const SIN_CUERPO = new Uint8Array(0);
+const codificador = new TextEncoder();
+
+/**
+ * Las peticiones firmadas a un cubo de R2, por su API compatible con S3. Lo comparten el almacén
+ * de lo publicado y el de las copias de la base.
+ */
+const cuboEnR2 = (opciones: OpcionesCubo) =>
+  Effect.gen(function* () {
+    const http = yield* HttpClient.HttpClient;
+    const base = opciones.puntoDeEntrada ?? `https://${opciones.cuenta}.r2.cloudflarestorage.com`;
+    const host = new URL(base).host;
+    const credenciales = {
+      idClave: opciones.idClave,
+      secreto: Redacted.value(opciones.secreto),
+      region: "auto",
+      servicio: "s3",
+    };
+
+    /**
+     * Una petición firmada al cubo. `clave` vacía es el propio cubo (para listarlo), y `consulta`,
+     * sus parámetros. El cuerpo va entero en la firma.
+     */
+    const pedir = (
+      metodo: Metodo,
+      clave: string,
+      extra: Readonly<Record<string, string>> = {},
+      cuerpo: { readonly bytes: Uint8Array<ArrayBuffer>; readonly tipo: string } = {
+        bytes: SIN_CUERPO,
+        tipo: "application/octet-stream",
+      },
+      consulta: ReadonlyArray<readonly [string, string]> = [],
+    ) =>
+      Effect.gen(function* () {
+        const ruta = codificarRuta(
+          clave === "" ? `/${opciones.cubo}` : `/${opciones.cubo}/${clave}`,
+        );
+        const cadena = codificarConsulta(consulta);
+        const hashCuerpo = yield* sha256DeBytes(cuerpo.bytes);
+        const firmadas = {
+          host,
+          "x-amz-content-sha256": hashCuerpo,
+          "x-amz-date": fechaAmz(yield* Clock.currentTimeMillis),
+        };
+        const autorizacion = yield* firmarV4(
+          { metodo, ruta, consulta: cadena, cabeceras: firmadas, hashCuerpo },
+          credenciales,
+        );
+        const cabeceras = { ...firmadas, ...extra, authorization: autorizacion };
+        const url = `${base}${ruta}${cadena === "" ? "" : `?${cadena}`}`;
+        const peticion =
+          metodo === "PUT"
+            ? HttpClientRequest.put(url).pipe(
+                HttpClientRequest.setHeaders(cabeceras),
+                HttpClientRequest.bodyUint8Array(cuerpo.bytes, cuerpo.tipo),
+              )
+            : (metodo === "GET" ? HttpClientRequest.get(url) : HttpClientRequest.delete(url)).pipe(
+                HttpClientRequest.setHeaders(cabeceras),
+              );
+        const respuesta = yield* http.execute(peticion);
+        return { estado: respuesta.status, texto: yield* respuesta.text };
+      }).pipe(
+        Effect.catchTags({
+          FirmaFallida: (error) => Effect.fail(new AlmacenNoDisponible({ motivo: error.motivo })),
+          HttpClientError: (error) =>
+            Effect.fail(new AlmacenNoDisponible({ motivo: error.message })),
+        }),
+      );
+
+    const fallo = (metodo: string, clave: string, estado: number, texto: string) =>
+      new AlmacenNoDisponible({
+        motivo: `${metodo} ${clave}: ${estado} ${texto.slice(0, 200)}`,
+      });
+
+    /** ListObjectsV2 de las claves que empiezan por `prefijo`, de mil en mil, hasta la última. */
+    const listar = (prefijo: string) =>
+      Effect.gen(function* () {
+        const claves: Array<string> = [];
+        let siguiente: string | undefined;
+        do {
+          const consulta: Array<readonly [string, string]> = [["list-type", "2"]];
+          if (prefijo !== "") consulta.push(["prefix", prefijo]);
+          if (siguiente !== undefined) consulta.push(["continuation-token", siguiente]);
+          const { estado, texto } = yield* pedir("GET", "", {}, undefined, consulta);
+          if (estado !== 200) return yield* fallo("LIST", opciones.cubo, estado, texto);
+          const pagina = leerListado(texto);
+          claves.push(...pagina.claves);
+          siguiente = pagina.siguiente;
+        } while (siguiente !== undefined);
+        return claves;
+      });
+
+    const borrar = (clave: string) =>
+      Effect.gen(function* () {
+        const { estado, texto } = yield* pedir("DELETE", clave);
+        // S3 contesta 204 aunque la clave no exista.
+        if (estado !== 204 && estado !== 200 && estado !== 404) {
+          return yield* fallo("DELETE", clave, estado, texto);
+        }
+      });
+
+    return { pedir, fallo, listar, borrar };
+  });
+
 /**
  * El almacén de ficheros en un cubo de R2, por su API compatible con S3 y firmando cada petición.
- * Es el de producción (ADR 0010): la web lee el cubo a través de un Worker o una Pages Function.
- * Un fichero inmutable se sube con `If-None-Match: *`, que R2 rechaza con 412 si ya existe; en
- * ese caso se lee y se compara, y solo se da por bueno si es igual.
+ * Es el de producción (ADR 0018): un cubo privado, sin acceso público. La ingesta escribe con su
+ * clave, y el build de Vercel lee con una de solo lectura y monta las capas en `/capas`. Un
+ * fichero inmutable se sube con `If-None-Match: *`, que R2 rechaza con 412 si ya existe; en ese
+ * caso se lee y se compara, y solo se da por bueno si es igual.
  */
 export const almacenEnR2 = (opciones: OpcionesR2) =>
   Layer.effect(
     AlmacenDeFicheros,
     Effect.gen(function* () {
-      const http = yield* HttpClient.HttpClient;
-      const base = opciones.puntoDeEntrada ?? `https://${opciones.cuenta}.r2.cloudflarestorage.com`;
-      const host = new URL(base).host;
-      const credenciales = {
-        idClave: opciones.idClave,
-        secreto: Redacted.value(opciones.secreto),
-        region: "auto",
-        servicio: "s3",
-      };
-
-      /**
-       * Una petición firmada al cubo. `fichero` vacío es el propio cubo (para listarlo), y
-       * `consulta`, sus parámetros.
-       */
-      const pedir = (
-        metodo: "GET" | "PUT" | "DELETE",
-        fichero: string,
-        contenido: string,
-        extra: Readonly<Record<string, string>>,
-        consulta: ReadonlyArray<readonly [string, string]> = [],
-      ) =>
-        Effect.gen(function* () {
-          const ruta = codificarRuta(
-            fichero === "" ? `/${opciones.cubo}` : `/${opciones.cubo}/${fichero}`,
-          );
-          const cadena = codificarConsulta(consulta);
-          const hashCuerpo = yield* sha256(contenido);
-          const firmadas = {
-            host,
-            "x-amz-content-sha256": hashCuerpo,
-            "x-amz-date": fechaAmz(yield* Clock.currentTimeMillis),
-          };
-          const autorizacion = yield* firmarV4(
-            { metodo, ruta, consulta: cadena, cabeceras: firmadas, hashCuerpo },
-            credenciales,
-          );
-          const cabeceras = { ...firmadas, ...extra, authorization: autorizacion };
-          const url = `${base}${ruta}${cadena === "" ? "" : `?${cadena}`}`;
-          const peticion =
-            metodo === "PUT"
-              ? HttpClientRequest.put(url).pipe(
-                  HttpClientRequest.setHeaders(cabeceras),
-                  HttpClientRequest.bodyText(contenido, "application/json"),
-                )
-              : (metodo === "GET"
-                  ? HttpClientRequest.get(url)
-                  : HttpClientRequest.delete(url)
-                ).pipe(HttpClientRequest.setHeaders(cabeceras));
-          const respuesta = yield* http.execute(peticion);
-          return { estado: respuesta.status, texto: yield* respuesta.text };
-        }).pipe(
-          Effect.catchTags({
-            FirmaFallida: (error) => Effect.fail(new AlmacenNoDisponible({ motivo: error.motivo })),
-            HttpClientError: (error) =>
-              Effect.fail(new AlmacenNoDisponible({ motivo: error.message })),
-          }),
-        );
-
-      const fallo = (metodo: string, fichero: string, estado: number, texto: string) =>
-        new AlmacenNoDisponible({
-          motivo: `${metodo} ${fichero}: ${estado} ${texto.slice(0, 200)}`,
-        });
+      const cubo = yield* cuboEnR2(opciones);
+      const json = (contenido: string) => ({
+        bytes: new Uint8Array(codificador.encode(contenido)),
+        tipo: "application/json",
+      });
 
       const leer = Effect.fn("AlmacenEnR2.leer")(function* (fichero: string) {
-        const { estado, texto } = yield* pedir("GET", fichero, "", {});
+        const { estado, texto } = yield* cubo.pedir("GET", fichero);
         if (estado === 404) return Option.none<string>();
-        if (estado !== 200) return yield* fallo("GET", fichero, estado, texto);
+        if (estado !== 200) return yield* cubo.fallo("GET", fichero, estado, texto);
         return Option.some(texto);
       });
 
@@ -149,55 +208,77 @@ export const almacenEnR2 = (opciones: OpcionesR2) =>
         fichero: string,
         contenido: string,
       ) {
-        const { estado, texto } = yield* pedir("PUT", fichero, contenido, {
-          "if-none-match": "*",
-          "cache-control": CACHE_INMUTABLE,
-        });
+        const { estado, texto } = yield* cubo.pedir(
+          "PUT",
+          fichero,
+          { "if-none-match": "*", "cache-control": CACHE_INMUTABLE },
+          json(contenido),
+        );
         if (estado === 200) return true;
-        if (estado !== 412) return yield* fallo("PUT", fichero, estado, texto);
+        if (estado !== 412) return yield* cubo.fallo("PUT", fichero, estado, texto);
         const guardado = yield* leer(fichero);
         if (Option.isSome(guardado) && guardado.value === contenido) return false;
         return yield* new FicheroInmutable({ fichero });
       });
 
       const cambiarVigente = Effect.fn("AlmacenEnR2.cambiarVigente")(function* (contenido: string) {
-        const { estado, texto } = yield* pedir("PUT", FICHERO_VIGENTE, contenido, {
-          "cache-control": CACHE_VIGENTE,
-        });
-        if (estado !== 200) return yield* fallo("PUT", FICHERO_VIGENTE, estado, texto);
-      });
-
-      /** ListObjectsV2, de mil en mil claves, hasta que el cubo dice que no hay más. */
-      const listar = Effect.gen(function* () {
-        const claves: Array<string> = [];
-        let siguiente: string | undefined;
-        do {
-          const consulta: Array<readonly [string, string]> = [["list-type", "2"]];
-          if (siguiente !== undefined) consulta.push(["continuation-token", siguiente]);
-          const { estado, texto } = yield* pedir("GET", "", "", {}, consulta);
-          if (estado !== 200) return yield* fallo("LIST", opciones.cubo, estado, texto);
-          const pagina = leerListado(texto);
-          claves.push(...pagina.claves);
-          siguiente = pagina.siguiente;
-        } while (siguiente !== undefined);
-        return claves;
-      }).pipe(Effect.withSpan("AlmacenEnR2.listar"));
-
-      const borrar = Effect.fn("AlmacenEnR2.borrar")(function* (fichero: string) {
-        const { estado, texto } = yield* pedir("DELETE", fichero, "", {});
-        // S3 contesta 204 aunque la clave no exista.
-        if (estado !== 204 && estado !== 200 && estado !== 404) {
-          return yield* fallo("DELETE", fichero, estado, texto);
-        }
+        const { estado, texto } = yield* cubo.pedir(
+          "PUT",
+          FICHERO_VIGENTE,
+          { "cache-control": CACHE_VIGENTE },
+          json(contenido),
+        );
+        if (estado !== 200) return yield* cubo.fallo("PUT", FICHERO_VIGENTE, estado, texto);
       });
 
       return AlmacenDeFicheros.of({
         guardar,
         leer,
         cambiarVigente,
-        listar,
-        borrar,
+        listar: cubo.listar("").pipe(Effect.withSpan("AlmacenEnR2.listar")),
+        borrar: Effect.fn("AlmacenEnR2.borrar")(cubo.borrar),
         url: (fichero) => `${opciones.origen}/${fichero}`,
+      });
+    }),
+  );
+
+/** El prefijo de las copias de la base en el cubo, aparte de lo publicado. */
+export const PREFIJO_COPIAS = "copias/";
+
+/**
+ * Las copias de la base de la ingesta en el mismo cubo de R2 que lo publicado, bajo
+ * `PREFIJO_COPIAS` (ADR 0018). Cada copia se sube entera en una sola petición, firmada con su
+ * contenido.
+ */
+export const copiasEnR2 = (opciones: OpcionesCubo) =>
+  Layer.effect(
+    AlmacenDeCopias,
+    Effect.gen(function* () {
+      const cubo = yield* cuboEnR2(opciones);
+
+      const guardar = Effect.fn("CopiasEnR2.guardar")(function* (
+        nombre: string,
+        contenido: Uint8Array<ArrayBuffer>,
+      ) {
+        const clave = `${PREFIJO_COPIAS}${nombre}`;
+        const { estado, texto } = yield* cubo.pedir(
+          "PUT",
+          clave,
+          {},
+          { bytes: contenido, tipo: "application/gzip" },
+        );
+        if (estado !== 200) return yield* cubo.fallo("PUT", clave, estado, texto);
+      });
+
+      return AlmacenDeCopias.of({
+        guardar,
+        listar: cubo.listar(PREFIJO_COPIAS).pipe(
+          Effect.map((claves) => claves.map((clave) => clave.slice(PREFIJO_COPIAS.length))),
+          Effect.withSpan("CopiasEnR2.listar"),
+        ),
+        borrar: Effect.fn("CopiasEnR2.borrar")((nombre: string) =>
+          cubo.borrar(`${PREFIJO_COPIAS}${nombre}`),
+        ),
       });
     }),
   );
