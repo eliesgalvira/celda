@@ -23,6 +23,7 @@ import {
   ordenarFichas,
   type Prioridad,
   resumirCola,
+  SIN_FICHA_SEGUIDAS,
 } from "./fichas.ts";
 import { leerMuestra } from "./pruebas/grabado.ts";
 import { clienteDePrueba, NO_HAY_ROBOTS, type Peticion, type Respondedor } from "./pruebas/http.ts";
@@ -523,7 +524,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
   );
 
   it.effect(
-    "tres fichas sin ficha en el registro seguidas paran la noche, y cada una espera un día",
+    "tres fichas sin ficha en el registro seguidas no paran la noche, y cada una espera un día",
     () =>
       Effect.gen(function* () {
         const html = yield* fichaGrabada;
@@ -540,10 +541,11 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
           ),
           A_UN_SEGUNDO,
         );
-        // 800001 falla y 800002 se lee: el fallo no era seguido. 800003, 800004 y 800005, sí.
-        assert.strictEqual(hechas.leidas, 2);
-        assert.strictEqual(hechas.pendientes, 4);
-        assert.strictEqual(hechas.parada, "3 fallos seguidos");
+        // 800003, 800004 y 800005 van seguidas, pero lo que dice el registro no es un fallo de la
+        // fuente: la noche sigue y lee las demás.
+        assert.strictEqual(hechas.leidas, 6);
+        assert.strictEqual(hechas.pendientes, 0);
+        assert.strictEqual(hechas.parada, undefined);
         const motivo = "SinFichaEnElRegistro: La ficha dice «Código de emplazamiento no válido»";
         assert.deepStrictEqual(
           hechas.fallidas.map((f) => [f.clave.slice(-6), f.motivo, f.intento]),
@@ -555,15 +557,11 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
           ],
         );
         // Los errores de la ejecución nombran cada ficha con su motivo.
-        assert.strictEqual(hechas.errores.length, 5);
+        assert.strictEqual(hechas.errores.length, 4);
         assert.strictEqual(
           hechas.errores[0],
           `Ficha TELEFONICA MOVILES ESPAÑA, S.A.U. - 800001: ${motivo} ` +
             "(https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=800001)",
-        );
-        assert.strictEqual(
-          hechas.errores.at(-1),
-          "Fichas paradas hasta la próxima noche: 3 fallos seguidos",
         );
         assert.deepStrictEqual(
           apuntado.fallos.map(([clave, fallo]) => [
@@ -595,6 +593,60 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
         assert.isAtLeast(primero[1].esperaHasta, DIA);
         assert.isBelow(primero[1].esperaHasta, DIA + 60_000);
       }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect(
+    `${SIN_FICHA_SEGUIDAS} fichas seguidas sin ficha en el registro paran la noche: puede que haya cambiado la URL`,
+    () =>
+      Effect.gen(function* () {
+        const noValido = new Uint8Array(
+          yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"),
+        );
+        const { hechas, peticiones } = yield* leerContraElGeoportal(
+          colaDe(SIN_FICHA_SEGUIDAS + 5),
+          geoportal(noValido),
+          A_UN_SEGUNDO,
+        );
+        assert.strictEqual(peticiones.length, SIN_FICHA_SEGUIDAS);
+        assert.strictEqual(hechas.fallidas.length, SIN_FICHA_SEGUIDAS);
+        assert.strictEqual(hechas.pendientes, 5);
+        const motivo =
+          `${SIN_FICHA_SEGUIDAS} fichas seguidas dicen «Código de emplazamiento no válido»: ` +
+          "puede que haya cambiado la URL de la ficha del registro o el formato de sus códigos";
+        assert.strictEqual(hechas.parada, motivo);
+        assert.strictEqual(
+          hechas.errores.at(-1),
+          `Fichas paradas hasta la próxima noche: ${motivo}`,
+        );
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("una ficha sin ficha en el registro entre dos fallos ni los suma ni los corta", () =>
+    Effect.gen(function* () {
+      const html = yield* fichaGrabada;
+      const noValido = new Uint8Array(
+        yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"),
+      );
+      const ilegible = "<table id=tablaDetalleEstacion></table>";
+      const respuestas = new Map<string, string | Uint8Array<ArrayBuffer>>([
+        ["800000", ilegible],
+        ["800001", noValido],
+        ["800002", ilegible],
+        ["800003", ilegible],
+      ]);
+      const { hechas, peticiones } = yield* leerContraElGeoportal(
+        colaDe(10),
+        geoportal(html, (codigo) => {
+          const cuerpo = respuestas.get(codigo);
+          return cuerpo === undefined ? undefined : () => ({ estado: 200, cuerpo });
+        }),
+        A_UN_SEGUNDO,
+      );
+      // Ilegible, sin ficha, ilegible: dos fallos seguidos, y la noche sigue. El tercero, para.
+      assert.strictEqual(peticiones.length, 4);
+      assert.strictEqual(hechas.leidas, 0);
+      assert.strictEqual(hechas.parada, "3 fallos seguidos");
+    }).pipe(Effect.provide(NodeServices.layer)),
   );
 
   it.effect("una ficha ilegible espera, pero no se da por sin ficha en el registro", () =>

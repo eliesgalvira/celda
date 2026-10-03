@@ -37,6 +37,14 @@ export const RITMO_POR_DEFECTO = Duration.seconds(3);
  */
 export const ESPERA_TRAS_FALLO = Duration.days(1);
 
+/**
+ * Fichas seguidas con el aviso «Código de emplazamiento no válido» tras las que se dejan las
+ * fichas para la noche siguiente. Una sola es lo que dice el registro de esa estación base y no
+ * cuenta como fallo, pero el 02/10/2026 eran 2 de unas 69.600: veinte seguidas querrían decir que
+ * ha cambiado la URL de la ficha o el formato de los códigos, no que todas sean de verdad.
+ */
+export const SIN_FICHA_SEGUIDAS = 20;
+
 /** Cómo se leen las fichas en una noche. */
 export interface OpcionesFichas {
   /**
@@ -421,6 +429,9 @@ const describirFichaFallida = (f: FichaFallida): string =>
  *   tras los reintentos del cliente cuenta como fallo, pero no hace esperar a la ficha.
  * - Cada ficha que falla deja en el diario una línea de aviso con su clave, su URL, el motivo, el
  *   intento y cuándo se vuelve a pedir, y el resumen del final las nombra con su motivo.
+ * - Una que el registro no tiene no cuenta para los fallos seguidos ni los corta: es lo que dice
+ *   el registro, no un fallo de la fuente. Tras `SIN_FICHA_SEGUIDAS` así seguidas, se paran las
+ *   fichas, porque lo probable es que haya cambiado la URL de la ficha.
  * - Tras `fallosSeguidos` fallos seguidos, o si la fuente bloquea a Celda (un 401 o un 403, una
  *   página que no es una ficha), pide esperar (un 429, o un 503 con `Retry-After` que pide más de
  *   lo que el cliente aguanta), el tope de peticiones o `robots.txt`, se deja de pedir esta noche
@@ -440,6 +451,7 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
   let cambiadas = 0;
   const fallidas: Array<FichaFallida> = [];
   let seguidos = 0;
+  let sinFichaSeguidas = 0;
   let finAnterior: number | undefined;
   let parada: string | undefined;
   const parar = (motivo: string) => {
@@ -468,12 +480,19 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
         parar(motivo);
         break;
       }
-      seguidos++;
+      const sinFicha = fallo._tag === "SinFichaEnElRegistro";
+      // Una ficha que el registro no tiene no es un fallo de la fuente: ni suma ni corta los
+      // fallos seguidos. Las demás cortan las que no tiene seguidas.
+      if (sinFicha) sinFichaSeguidas++;
+      else {
+        seguidos++;
+        sinFichaSeguidas = 0;
+      }
       const { clave, url } = enCola.registro;
       errores.push(`Ficha ${clave}: ${motivo}`);
       const intento = enCola.fallos + 1;
       // Una ficha ilegible, o una que el registro no tiene, espera; un fallo pasajero, no.
-      const espera = fallo._tag === "RespuestaInesperada" || fallo._tag === "SinFichaEnElRegistro";
+      const espera = sinFicha || fallo._tag === "RespuestaInesperada";
       const esperaHasta = espera
         ? finAnterior + Duration.toMillis(esperaTrasFallos(intento, opciones.relectura))
         : undefined;
@@ -482,12 +501,20 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
           fallos: intento,
           esperaHasta,
           motivo,
-          sinFichaEnRegistro: fallo._tag === "SinFichaEnElRegistro" ? lectura.inicio : undefined,
+          sinFichaEnRegistro: sinFicha ? lectura.inicio : undefined,
         });
       }
       const fallida: FichaFallida = { clave, url, motivo: motivoDe(fallo), intento, esperaHasta };
       fallidas.push(fallida);
       yield* Effect.logWarning(describirFichaFallida(fallida));
+      if (sinFichaSeguidas >= SIN_FICHA_SEGUIDAS) {
+        const motivoDeParar =
+          `${sinFichaSeguidas} fichas seguidas dicen «Código de emplazamiento no válido»: ` +
+          "puede que haya cambiado la URL de la ficha del registro o el formato de sus códigos";
+        yield* Effect.logError(`Fichas paradas: ${motivoDeParar}`);
+        parar(motivoDeParar);
+        break;
+      }
       if (seguidos >= opciones.fallosSeguidos) {
         parar(`${seguidos} fallos seguidos`);
         break;
@@ -495,6 +522,7 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
       continue;
     }
     seguidos = 0;
+    sinFichaSeguidas = 0;
     const cambiada = yield* lectura.aplicar(enCola.registro.clave, bandas.success);
     leidas++;
     cambiadas += cambiada ? 1 : 0;
