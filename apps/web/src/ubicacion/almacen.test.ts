@@ -4,6 +4,7 @@ import type { Aportacion, ContenidoAportacion } from "@celda/dominio/aportacion"
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import { TestClock } from "effect/testing";
 import { IDBFactory } from "fake-indexeddb";
 
@@ -175,5 +176,50 @@ describe("AlmacenLocal en IndexedDB", () => {
       yield* Effect.flip(aportaciones.leer("punto-elegido"));
       yield* Effect.flip(aportaciones.leerAjustes);
     }).pipe(Effect.provide(almacen(undefined))),
+  );
+});
+
+describe("AlmacenLocal: lo que el dispositivo sabe del buzón", () => {
+  it.effect(
+    "guarda varias aportaciones del mismo tipo y sustituye la del mismo identificador",
+    () =>
+      Effect.gen(function* () {
+        const aportaciones = yield* AlmacenLocal;
+        const primera = yield* nuevaAportacion(EN_EL_MAPA);
+        const segunda = yield* nuevaAportacion(BUSCADO);
+        yield* aportaciones.guardar(primera);
+        yield* aportaciones.guardar(segunda);
+        yield* aportaciones.guardar({ ...primera, origen: "busqueda" });
+        const leidas = yield* aportaciones.leer("punto-elegido");
+        assert.deepStrictEqual(
+          leidas.map((a) => [a.id, a.origen]),
+          [
+            [primera.id, "busqueda"],
+            [segunda.id, "busqueda"],
+          ],
+        );
+      }).pipe(Effect.provide(almacen(new IDBFactory()))),
+  );
+
+  it.effect("apunta qué se ha compartido y guarda y olvida la identidad", () =>
+    Effect.gen(function* () {
+      const aportaciones = yield* AlmacenLocal;
+      assert.deepStrictEqual(yield* aportaciones.leerCompartidas, new Map());
+      assert.isTrue(Option.isNone(yield* aportaciones.leerIdentidad));
+      yield* aportaciones.guardarIdentidad(Option.some("id.firma"));
+      yield* aportaciones.apuntarCompartida("a", MEDIODIA);
+      yield* aportaciones.apuntarCompartida("b", MEDIODIA + 1);
+      assert.deepStrictEqual(
+        yield* aportaciones.leerCompartidas,
+        new Map([
+          ["a", MEDIODIA],
+          ["b", MEDIODIA + 1],
+        ]),
+      );
+      assert.deepStrictEqual(yield* aportaciones.leerIdentidad, Option.some("id.firma"));
+      yield* aportaciones.guardarIdentidad(Option.none());
+      assert.isTrue(Option.isNone(yield* aportaciones.leerIdentidad));
+      assert.strictEqual((yield* aportaciones.leerCompartidas).size, 2);
+    }).pipe(Effect.provide(almacen(new IDBFactory()))),
   );
 });

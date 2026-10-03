@@ -8,6 +8,7 @@ import * as Layer from "effect/Layer";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { App } from "./App.tsx";
+import { sincronizacionDelNavegador } from "./buzon/sincronizacion.ts";
 import { indexadorDelNavegador } from "./capa/navegador.ts";
 import { capaDelOrigen } from "./capa/servicio.ts";
 import { fichasDelOrigen } from "./ficha/servicio.ts";
@@ -22,6 +23,8 @@ import { geolocalizacionDelNavegador } from "./ubicacion/geolocalizacion.ts";
 
 const dispositivo = detectarDispositivo(leerNavegador()).tipo;
 
+const almacen = almacenEnIndexedDb(globalThis.indexedDB);
+
 /** Los servicios reales, con la configuración de las variables `VITE_*` del build. */
 const servicios = Layer.mergeAll(
   Layer.mergeAll(
@@ -32,7 +35,9 @@ const servicios = Layer.mergeAll(
   simuladorDelNavegador,
   geolocalizacionDelNavegador(navigator, dispositivo),
   brujulaDelNavegador(window, dispositivo),
-  almacenEnIndexedDb(globalThis.indexedDB),
+  almacen,
+  // El buzón de las aportaciones (ADR 0020). Su cliente se descarga al compartir la primera vez.
+  sincronizacionDelNavegador(import.meta.env["VITE_CELDA_CONVEX_URL"]).pipe(Layer.provide(almacen)),
   criptoDelNavegador,
 ).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown(import.meta.env))));
 

@@ -8,6 +8,7 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Stream from "effect/Stream";
 import { createContext, untrack, useContext } from "solid-js";
 
+import type { Sincronizacion } from "./buzon/sincronizacion.ts";
 import type { CapaEmplazamientos } from "./capa/servicio.ts";
 import type { FichasPublicadas } from "./ficha/servicio.ts";
 import type { Brujula } from "./mejorar/brujula.ts";
@@ -17,7 +18,7 @@ import type { Geolocalizacion } from "./ubicacion/geolocalizacion.ts";
 
 /**
  * Los servicios de la interfaz: los datos del mapa, el simulador, el GPS, la brújula, lo guardado
- * en el dispositivo y el buscador. En las pruebas se sustituyen por capas de prueba, y el simulador, por
+ * en el dispositivo, el buscador y el envío de aportaciones al buzón. En las pruebas se sustituyen por capas de prueba, y el simulador, por
  * el que calcula en el mismo hilo.
  */
 export type ServiciosDeDatos =
@@ -28,6 +29,7 @@ export type ServiciosDeDatos =
   | Brujula
   | AlmacenLocal
   | BuscadorDeDirecciones
+  | Sincronizacion
   | Crypto.Crypto;
 
 const Datos = createContext<ManagedRuntime.ManagedRuntime<ServiciosDeDatos, never>>();

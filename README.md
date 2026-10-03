@@ -35,7 +35,7 @@ El entorno trae Node 24, pnpm 10, tippecanoe y pmtiles.
 ```
 apps/web/                 la web, una SPA de Solid 2
 apps/nocturna/            la ingesta nocturna fuera de Convex, con su estado en SQLite
-convex/                   Convex con Confect, sin tablas ni funciones hasta el buzón de aportaciones (#56)
+convex/                   Convex con Confect: el buzón de las aportaciones compartidas (ADR 0020)
 packages/dominio/         tipos y esquemas del dominio y la fusión, sin E/S
 packages/ingesta/         extractores de las fuentes, el barrido por zonas y la cola de fichas
 packages/publicacion/     publicación de la capa y las fichas en una carpeta o en R2

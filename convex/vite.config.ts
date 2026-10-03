@@ -7,6 +7,7 @@ export default defineConfig({
     // Solo `test/`: los `*.spec.ts` de Confect son la especificación de la API, no pruebas.
     include: ["test/**/*.test.ts"],
     sequence: { shuffle: true },
-    server: { deps: { inline: ["convex-test"] } },
+    // convex-test y el componente de límites usan `import.meta.glob`, que solo resuelve Vite.
+    server: { deps: { inline: ["convex-test", /@convex-dev\//] } },
   },
 });

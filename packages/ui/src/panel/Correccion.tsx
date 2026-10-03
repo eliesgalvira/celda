@@ -73,27 +73,35 @@ function Lado(props: { readonly lado: LadoContraste; readonly tono: Tono }) {
 
 export interface ContrasteFichaProps {
   readonly tono: "corregido" | "nuevo";
-  readonly compania: Compania;
+  /** La compañía de la estación base, o nada si la corrección es de todo el emplazamiento. */
+  readonly compania?: Compania | undefined;
   readonly nombre: string;
   readonly oficial: LadoContraste;
   readonly comunidad: LadoContraste;
+  /** Lo que se puede hacer con la corrección, como respaldarla. */
+  readonly acciones?: JSX.Element;
 }
 
 /**
- * Una estación base en la que las fuentes no coinciden: a la izquierda el registro oficial y a
- * la derecha la comunidad, cada uno con su fecha y su enlace.
+ * Una estación base, o el emplazamiento entero, en el que las fuentes no coinciden: a la
+ * izquierda el registro oficial y a la derecha la comunidad, cada uno con su fecha y su enlace.
  */
 export function ContrasteFicha(props: ContrasteFichaProps) {
   return (
     <article data-tono={props.tono} class="flex flex-col gap-2">
-      <div class="flex items-center gap-2">
-        <LogoCompanias companias={[props.compania]} tamano={24} />
+      <div class="flex min-h-6 items-center gap-2">
+        <Show when={props.compania}>
+          {(compania) => <LogoCompanias companias={[compania()]} tamano={24} />}
+        </Show>
         <h4 class="font-semibold">{props.nombre}</h4>
       </div>
       <dl aria-label={`Qué dice cada fuente de ${props.nombre}`} class="grid grid-cols-2 gap-2">
         <Lado lado={props.oficial} tono="oficial" />
         <Lado lado={props.comunidad} tono={props.tono} />
       </dl>
+      <Show when={props.acciones}>
+        <div class="flex flex-wrap gap-2">{props.acciones}</div>
+      </Show>
     </article>
   );
 }

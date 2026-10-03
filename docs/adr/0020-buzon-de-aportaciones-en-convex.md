@@ -1,6 +1,6 @@
 # Buzón de aportaciones en Convex, con límites, sin captcha y sin imágenes
 
-Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Cambia el ADR 0003 (Convex deja de guardar los emplazamientos y pasa a ser solo el buzón), el 0007 (las aportaciones se pueden compartir) y el apartado «Escrituras del público» del 0008. Lo llevan a cabo el #56 (el buzón) y el #57 (la herramienta de moderación).
+Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Cambia el ADR 0003 (Convex deja de guardar los emplazamientos y pasa a ser solo el buzón), el 0007 (las aportaciones se pueden compartir) y el apartado «Escrituras del público» del 0008. Lo llevan a cabo el #56 (el buzón) y el #57 (la herramienta de moderación). Completada el 03/10/2026 con el #56: ver [Cómo quedó en el #56](#cómo-quedó-en-el-56).
 
 ## Contexto
 
@@ -71,7 +71,20 @@ Una corrección aceptada se enseña con su procedencia al lado del valor del reg
 
 Modera el usuario solo, con la ayuda de Claude, desde una herramienta de línea de órdenes del repositorio (#57). La herramienta enseña cada aportación pendiente con su contexto y está hecha para que un agente pueda clasificarla y proponer un veredicto que el usuario confirma. Lo aceptado sale de ahí hacia la publicación nocturna.
 
-Queda por decidir en el #56 si una corroboración pasa por la moderación como una corrección propuesta o cuenta directamente en el número de personas.
+Una corroboración pasa por la moderación igual que una corrección propuesta (decidido en el #56). Solo cambia un número, pero ese número es lo que convence a quien lee la ficha, y sin captcha un script con muchas identidades lo podría inflar. La herramienta de moderación las puede aceptar de golpe, y en el número de personas cuenta cada identidad una vez por corrección.
+
+## Cómo quedó en el #56
+
+- **Identidad.** Un token firmado y no Convex Auth: el proveedor anónimo está en beta y pide claves JWT y rutas HTTP. `buzon:pedirIdentidad` crea una fila en `identidades` y devuelve su `_id` con un HMAC-SHA-256 de ese `_id`. El buzón no guarda el token; lo vuelve a firmar para comprobarlo. La clave es la variable de entorno `CELDA_BUZON_CLAVE` del despliegue, de 32 caracteres como mínimo. Sin ella el buzón está cerrado, y quitarla es la forma de cerrarlo sin tocar el código.
+- **Huella de la IP.** Es el HMAC de la IP con esa clave y con una sal aleatoria del día UTC, que se guarda en `salesDeIp` y se borra en cuanto cambia el día. La misma IP da otra huella al día siguiente, y sin la sal ni con la clave se puede volver a calcular la de ayer. La huella se guarda en `huellasDeIp`, en la aportación y en la identidad. Un cron borra cada hora las de más de 24 horas, con sus vetos y sus cubos de límites por IP, y deja `huellaIp` a `null` donde estaba. Un veto por IP dura, por tanto, lo que dura su huella; el veto por identidad no caduca.
+- **Límites.** Los de la tabla, sin repartir en fragmentos, en `convex/src/limites.ts`. Su clave es la `_id` de la identidad o la huella de la IP. Un envío rechazado deshace también las fichas que ya había gastado, y una aportación que ya estaba no gasta ninguna. El rechazo dice `reintentarEn` en milisegundos; en los límites del buzón entero lleva hasta 30 s de más. La web no vuelve a llamar antes de esa hora.
+- **Funciones públicas.** Cuatro mutaciones: `buzon:pedirIdentidad`, `buzon:enviarMedida`, `buzon:enviarCorreccion` y `buzon:enviarCorroboracion`. Devuelven el token o si la aportación era nueva. Sus argumentos tienen la forma de cada aportación sin las comprobaciones, para que un valor fuera de rango dé `AportacionNoValida` y no un error sin tipo. Ninguna tiene un campo de bytes ni de fichero.
+- **Funciones internas.** Para el #57: `moderacion:pendientes`, `moderacion:aceptadas` (lo que lee la noche, por la hora de aceptación), `moderacion:aceptar`, `moderacion:rechazar` y `moderacion:vetar`, más `limpieza:huellas`, que lanza el cron.
+- **En la ficha.** Una corrección aceptada llega en `Ficha.correcciones` (`packages/dominio/src/ficha.ts`): la clave de la corrección, el cambio, cuántas personas la sostienen, la fecha de aceptación y `CC0-1.0`. La ficha la enseña en el contraste de «Registro oficial y comunidad», con el registro al lado.
+- **En la web.** El cliente de Convex va en su propio trozo (`apps/web/src/buzon/convex.ts`) y se descarga al pulsar «Enviar» la primera vez. Es el cliente HTTP, no el de WebSocket: sin envíos no hay ninguna conexión abierta. La dirección del buzón es `VITE_CELDA_CONVEX_URL`; sin ella, el buzón está cerrado y la aportación se queda en el dispositivo.
+- **`X-Forwarded-For`.** El backend local se la cree, también con el buzón: una petición con la cabecera dio otra huella el 03/10/2026. En la nube sigue sin comprobar, porque el #56 no despliega nada. Si la nube también se la cree, un script puede saltarse los límites por IP, pero no los de identidad ni los del buzón entero. Pendiente del usuario: llamar a `buzon:pedirIdentidad` en el despliegue con y sin la cabecera y ver si sale otra huella en `huellasDeIp`.
+- **Región.** Sin comprobar si Convex tiene región en la UE para el plan gratuito. Pendiente del usuario, al crear el despliegue.
+- **Umbrales del despliegue.** Se ponen en el panel de Convex, no en el código: ver «Antes del primer despliegue del buzón» en `docs/patterns/convex.md`.
 
 ## Consecuencias
 

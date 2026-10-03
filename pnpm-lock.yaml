@@ -18,6 +18,9 @@ catalogs:
     '@confect/test':
       specifier: 10.0.0-next.24
       version: 10.0.0-next.24
+    '@convex-dev/rate-limiter':
+      specifier: 0.4.0
+      version: 0.4.0
     '@effect/platform-node':
       specifier: 4.0.0-rc.117
       version: 4.0.0-rc.117
@@ -159,6 +162,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@celda/convex':
+        specifier: workspace:*
+        version: link:../../convex
       '@celda/dominio':
         specifier: workspace:*
         version: link:../../packages/dominio
@@ -168,9 +174,15 @@ importers:
       '@celda/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@confect/core':
+        specifier: 'catalog:'
+        version: 10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)
       '@solidjs/web':
         specifier: 'catalog:'
         version: 2.0.0-rc.9(solid-js@2.0.0-rc.9)
+      convex:
+        specifier: 'catalog:'
+        version: 1.46.0
       effect:
         specifier: 'catalog:'
         version: 4.0.0-rc.117
@@ -217,12 +229,18 @@ importers:
 
   convex:
     dependencies:
+      '@celda/dominio':
+        specifier: workspace:*
+        version: link:../packages/dominio
       '@confect/core':
         specifier: 'catalog:'
         version: 10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)
       '@confect/server':
         specifier: 'catalog:'
         version: 10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(@effect/platform-node@4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1))(convex@1.46.0)(effect@4.0.0-rc.117)
+      '@convex-dev/rate-limiter':
+        specifier: 'catalog:'
+        version: 0.4.0(convex@1.46.0)(typescript@7.0.2)
       convex:
         specifier: 'catalog:'
         version: 1.46.0
@@ -570,6 +588,20 @@ packages:
       convex: ^1.32.0
       convex-test: '>=0.0.50 <0.1.0'
       effect: ^4.0.0-rc.117
+
+  '@convex-dev/batch-worker@0.3.4':
+    resolution: {integrity: sha512-CKeOrPFsPoIKozMNP/qKExSwE6vd63QDKbZIbchK+P3S7fyGuFjRLbTg6+QmC/mzOjn6I5N8zo+k/SdXqeaA2g==}
+    peerDependencies:
+      convex: ^1.43.0
+
+  '@convex-dev/rate-limiter@0.4.0':
+    resolution: {integrity: sha512-AEXbo8+pMT1bPlOJiofmue55EoiFp9ygCcEnckx+RENoPjRYEg5jiihAtaD5TKDwdmHJyvLwNQ1h+MbhgvMyOA==}
+    peerDependencies:
+      convex: ^1.43.0
+      react: ^18.2.0 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@effect/ai-openai-compat@4.0.0-rc.117':
     resolution: {integrity: sha512-TJFO5CGOks+y9d6Fbj3/lfWO4FHWMIS0h+8MOMEcNyDau/BTZYIYP/Ab9OID0Rwsbvq3Wi7kxJKpA88QgaVqkw==}
@@ -2022,6 +2054,28 @@ packages:
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
+  convex-helpers@0.1.126:
+    resolution: {integrity: sha512-CTcQueOxQOOo6dFHYJ3xqBoqcoUboxIETdeBSMIMFXC+aUQBu/2tipjpEy1oHU++pwVrrOJUNR4AlymhwYyMsA==}
+    hasBin: true
+    peerDependencies:
+      '@standard-schema/spec': ^1.0.0
+      convex: ^1.46.0
+      hono: ^4.0.5
+      react: ^17.0.2 || ^18.0.0 || ^19.0.0
+      typescript: ^5.5 || ^6.0.0 || ^7.0.0
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@standard-schema/spec':
+        optional: true
+      hono:
+        optional: true
+      react:
+        optional: true
+      typescript:
+        optional: true
+      zod:
+        optional: true
+
   convex-test@0.0.60:
     resolution: {integrity: sha512-qCAFx+CO6bmpXNc9s1jZvw8NJPS4yM074ib87PUY675FsiaRRW4ALotEB+RbVCYDRMYxh623KMnYZBlrMJIv1Q==}
     peerDependencies:
@@ -2840,6 +2894,27 @@ snapshots:
       convex: 1.46.0
       convex-test: 0.0.60(convex@1.46.0)
       effect: 4.0.0-rc.117
+
+  '@convex-dev/batch-worker@0.3.4(convex@1.46.0)(typescript@7.0.2)':
+    dependencies:
+      convex: 1.46.0
+      convex-helpers: 0.1.126(convex@1.46.0)(typescript@7.0.2)
+    transitivePeerDependencies:
+      - '@standard-schema/spec'
+      - hono
+      - react
+      - typescript
+      - zod
+
+  '@convex-dev/rate-limiter@0.4.0(convex@1.46.0)(typescript@7.0.2)':
+    dependencies:
+      '@convex-dev/batch-worker': 0.3.4(convex@1.46.0)(typescript@7.0.2)
+      convex: 1.46.0
+    transitivePeerDependencies:
+      - '@standard-schema/spec'
+      - hono
+      - typescript
+      - zod
 
   '@effect/ai-openai-compat@4.0.0-rc.117(effect@4.0.0-rc.117)':
     dependencies:
@@ -3800,6 +3875,12 @@ snapshots:
   code-block-writer@13.0.3: {}
 
   convert-source-map@2.0.0: {}
+
+  convex-helpers@0.1.126(convex@1.46.0)(typescript@7.0.2):
+    dependencies:
+      convex: 1.46.0
+    optionalDependencies:
+      typescript: 7.0.2
 
   convex-test@0.0.60(convex@1.46.0):
     dependencies:

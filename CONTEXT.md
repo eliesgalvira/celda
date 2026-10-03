@@ -272,6 +272,18 @@ _Evitar_: voto, me gusta, confirmación
 Aportación que la persona ha enviado a Celda. Espera la moderación y, mientras, no cambia nada de lo publicado.
 _Evitar_: envío, subida, contribución
 
+**Buzón**:
+Donde llegan las aportaciones compartidas, en Convex, a esperar la moderación. El mapa nunca lee de él: lo aceptado se publica con la capa (ADR 0020).
+_Evitar_: servidor, backend, bandeja
+
+**Identidad del dispositivo**:
+Token anónimo que el buzón da a un dispositivo la primera vez que comparte algo. No dice nada de la persona; sirve para los límites, los vetos y para contar a cada uno una vez.
+_Evitar_: cuenta, usuario, sesión
+
+**Huella de la IP**:
+HMAC de la IP con la clave del buzón y una sal que cambia cada día. Es lo único que el buzón guarda de la IP, y lo borra a las 24 horas.
+_Evitar_: IP, hash de la IP
+
 **Moderación**:
 Revisión a mano de cada aportación compartida, que acaba aceptada o rechazada, con su motivo. Solo lo aceptado llega a publicarse.
 _Evitar_: aprobación, validación (esa es la comprobación automática al recibirla), revisión
@@ -347,6 +359,7 @@ _Evitar_: clientes, carga
 - Una **medida propia** queda unida al emplazamiento y al sector que daban servicio donde se tomó.
 - Las **aportaciones** viven en el dispositivo hasta que la persona comparte una. Una **corrección propuesta** compartida pasa a ser **corrección** solo si la **moderación** la acepta. La **captura** y el **punto elegido** nunca se comparten.
 - Una **medida propia** compartida solo se publica dentro de un agregado, nunca suelta.
+- Una **aportación compartida** llega al **buzón** con la **identidad del dispositivo** y la **huella de la IP**. Una **corroboración** pasa por la **moderación** como una **corrección propuesta**, y cada identidad cuenta una vez por **corrección**.
 - Una **corrección** se enseña junto a la **observación** del **registro oficial** que contradice, con cuántas personas la sostienen.
 - Una **simulación** nunca es una **observación** ni una **medida**.
 - Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.

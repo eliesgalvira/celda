@@ -4,10 +4,13 @@ import * as Cause from "effect/Cause";
 import type * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
+import { type BuzonDePrueba, buzonDePrueba } from "../buzon/pruebas.ts";
+import { type Sincronizacion, sincronizacionCon } from "../buzon/sincronizacion.ts";
 import { criptoDePrueba } from "../lib/cripto.ts";
 import { enOtraTarea } from "../lib/pruebas.ts";
 import type { Brujula } from "../mejorar/brujula.ts";
@@ -128,6 +131,10 @@ export interface AlmacenDePrueba {
   readonly capa: Layer.Layer<AlmacenLocal>;
   /** Lo que hay guardado ahora. */
   readonly guardadas: () => ReadonlyArray<Aportacion>;
+  /** Cuándo se compartió cada aportación, por su identificador. */
+  readonly compartidas: () => ReadonlyMap<string, number>;
+  /** El token de identidad del buzón que guarda el dispositivo. */
+  readonly identidad: () => string | undefined;
   /** Los ajustes guardados ahora. */
   readonly ajustes: () => Ajustes;
 }
@@ -143,6 +150,8 @@ export const almacenDePrueba = (
 ): AlmacenDePrueba => {
   let guardadas = [...iniciales];
   let ajustes = ajustesIniciales;
+  const compartidas = new Map<string, number>();
+  let identidad: string | undefined;
   const disponible: Effect.Effect<void, AlmacenNoDisponible> = Effect.andThen(
     enOtraTarea,
     roto ? Effect.fail(new AlmacenNoDisponible({ motivo: "almacén de prueba roto" })) : Effect.void,
@@ -156,6 +165,10 @@ export const almacenDePrueba = (
           Effect.map(disponible, () => {
             guardadas = [...guardadas.filter((a) => a.tipo !== nueva.tipo), nueva];
           }),
+        guardar: (nueva) =>
+          Effect.map(disponible, () => {
+            guardadas = [...guardadas.filter((a) => a.id !== nueva.id), nueva];
+          }),
         borrar: (tipo) =>
           Effect.map(disponible, () => {
             guardadas = guardadas.filter((a) => a.tipo !== tipo);
@@ -165,10 +178,22 @@ export const almacenDePrueba = (
           Effect.map(disponible, () => {
             ajustes = nuevos;
           }),
+        leerCompartidas: Effect.map(disponible, () => new Map(compartidas)),
+        apuntarCompartida: (id, compartidaEl) =>
+          Effect.map(disponible, () => {
+            compartidas.set(id, compartidaEl);
+          }),
+        leerIdentidad: Effect.map(disponible, () => Option.fromNullishOr(identidad)),
+        guardarIdentidad: (nueva) =>
+          Effect.map(disponible, () => {
+            identidad = Option.getOrUndefined(nueva);
+          }),
       }),
     ),
     guardadas: () => guardadas,
     ajustes: () => ajustes,
+    compartidas: () => compartidas,
+    identidad: () => identidad,
   };
 };
 
@@ -220,32 +245,50 @@ export interface OpcionesDeUbicacion {
   readonly busquedas?: ReadonlyMap<string, ReadonlyArray<Direccion> | BusquedaFallida>;
   /** La brújula del dispositivo: por defecto, la de un ordenador, que no tiene. */
   readonly brujula?: OpcionesDeBrujula;
+  /** El buzón de las aportaciones: por defecto, uno que lo recibe todo. */
+  readonly buzon?: BuzonDePrueba;
 }
 
 export interface UbicacionDePrueba {
   readonly capa: Layer.Layer<
-    Geolocalizacion | Brujula | AlmacenLocal | BuscadorDeDirecciones | Crypto.Crypto
+    | Geolocalizacion
+    | Brujula
+    | AlmacenLocal
+    | BuscadorDeDirecciones
+    | Sincronizacion
+    | Crypto.Crypto
   >;
   readonly gps: GeolocalizacionDePrueba;
   readonly brujula: BrujulaDePrueba;
   readonly almacen: AlmacenDePrueba;
   readonly buscador: BuscadorDePrueba;
+  readonly buzon: BuzonDePrueba;
 }
 
 /**
  * Los servicios del dispositivo de prueba para montar la app: por defecto, el navegador aún no ha
- * preguntado por el permiso, no hay brújula, no hay nada guardado y el buscador no encuentra nada.
+ * preguntado por el permiso, no hay brújula, no hay nada guardado, el buscador no encuentra nada y
+ * el buzón lo recibe todo.
  */
 export const ubicacionDePrueba = (opciones: OpcionesDeUbicacion = {}): UbicacionDePrueba => {
   const gps = geolocalizacionDePrueba(opciones.permiso ?? "preguntar", opciones.enCache);
   const almacen = almacenDePrueba(opciones.guardadas, opciones.almacenRoto, opciones.ajustes);
   const buscador = buscadorDePrueba(opciones.busquedas ?? new Map());
   const brujula = brujulaDePrueba(opciones.brujula);
+  const buzon = opciones.buzon ?? buzonDePrueba();
   return {
-    capa: Layer.mergeAll(gps.capa, brujula.capa, almacen.capa, buscador.capa, criptoDePrueba),
+    capa: Layer.mergeAll(
+      gps.capa,
+      brujula.capa,
+      almacen.capa,
+      buscador.capa,
+      sincronizacionCon(Effect.succeed(buzon.remoto)).pipe(Layer.provide(almacen.capa)),
+      criptoDePrueba,
+    ),
     gps,
     brujula,
     almacen,
     buscador,
+    buzon,
   };
 };

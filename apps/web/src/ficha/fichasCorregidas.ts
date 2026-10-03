@@ -137,3 +137,62 @@ export const FICHA_COMPANIA_ANADIDA: Ficha = {
     },
   ],
 };
+
+/** 3 oct 2026: la moderación acepta las correcciones de la comunidad (ADR 0020). */
+const ACEPTADA = Date.UTC(2026, 9, 3, 9, 0);
+
+/**
+ * Campus Nord con correcciones aceptadas en el buzón, con el formato que les da la publicación:
+ * dos personas sitúan el emplazamiento 120 m al este y una dice que Vodafone ya no está. El
+ * registro sigue diciendo lo suyo.
+ */
+export const FICHA_CON_CORRECCIONES_ACEPTADAS: Ficha = {
+  ...FICHA_CORREGIDA,
+  conflictos: [],
+  estaciones: [
+    {
+      compania: "movistar",
+      codigos: ["0802532"],
+      bandas: [],
+      origenes: [
+        {
+          fuente: "registro-oficial",
+          clave: "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802532",
+          url: `${GEOPORTAL}0802532`,
+          fecha: REGISTRO,
+          afirma: "presente",
+        },
+      ],
+    },
+    {
+      compania: "vodafone",
+      codigos: ["086040"],
+      bandas: [],
+      origenes: [
+        {
+          fuente: "registro-oficial",
+          clave: "VODAFONE ESPAÑA, S.A.U. - 086040",
+          url: `${GEOPORTAL}086040`,
+          fecha: REGISTRO,
+          afirma: "presente",
+        },
+      ],
+    },
+  ],
+  correcciones: [
+    {
+      clave: "5d8a7c4e-1b2f-4a3c-9e8d-7f6a5b4c3d2e",
+      cambio: { tipo: "posicion", posicion: { longitud: 2.115068, latitud: 41.388344 } },
+      personas: 2,
+      aceptadaEl: ACEPTADA,
+      licencia: "CC0-1.0",
+    },
+    {
+      clave: "6e9b8d5f-2c3a-4b4d-8f9e-8a7b6c5d4e3f",
+      cambio: { tipo: "compania", compania: "vodafone", esta: false },
+      personas: 1,
+      aceptadaEl: ACEPTADA,
+      licencia: "CC0-1.0",
+    },
+  ],
+};

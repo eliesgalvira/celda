@@ -290,3 +290,99 @@ export function CampoNumero(props: CampoNumeroProps) {
     </div>
   );
 }
+
+export interface AreaDeTextoProps {
+  /** Etiqueta visible encima del campo. */
+  readonly etiqueta: string;
+  readonly valor: string;
+  /** Lo más largo que se puede escribir, en caracteres. Se ve lo que queda. */
+  readonly maximo: number;
+  readonly alCambiar: (valor: string) => void;
+  /** Una frase bajo el campo, como qué no escribir. */
+  readonly ayuda?: JSX.Element;
+}
+
+/**
+ * Un texto de varias líneas con su etiqueta, su ayuda y los caracteres que quedan a la vista. No
+ * deja escribir más de `maximo`.
+ */
+export function AreaDeTexto(props: AreaDeTextoProps) {
+  const id = createUniqueId();
+  const idAyuda = createUniqueId();
+  return (
+    <div class="flex min-w-0 flex-col gap-1.5">
+      <div class="flex items-baseline justify-between gap-2">
+        <label for={id} class="font-mono text-xs font-semibold tracking-wider text-tinta-suave">
+          {props.etiqueta}
+        </label>
+        <span class="font-mono text-xs text-tinta-suave">
+          quedan {props.maximo - props.valor.length}
+        </span>
+      </div>
+      <textarea
+        id={id}
+        rows={3}
+        maxlength={props.maximo}
+        value={props.valor}
+        aria-describedby={props.ayuda === undefined ? undefined : idAyuda}
+        onInput={(evento) => props.alCambiar(evento.currentTarget.value)}
+        class={
+          "min-h-24 w-full resize-y bg-superficie-alta px-3 py-2 text-base text-tinta " +
+          "shadow-[inset_0_0_0_1.5px_var(--linea-fuerte)] hover:bg-fondo"
+        }
+      />
+      <Show when={props.ayuda}>
+        <p id={idAyuda} class="text-xs leading-snug text-tinta-suave">
+          {props.ayuda}
+        </p>
+      </Show>
+    </div>
+  );
+}
+
+export interface CasillasProps<Valor extends string> {
+  /** Pregunta visible que agrupa las casillas. */
+  readonly leyenda: string;
+  readonly opciones: ReadonlyArray<OpcionDeEleccion<Valor>>;
+  readonly marcadas: ReadonlyArray<Valor>;
+  readonly alCambiar: (marcadas: ReadonlyArray<Valor>) => void;
+}
+
+/** Varias opciones que se pueden marcar a la vez, como casillas nativas de toda la fila. */
+export function Casillas<Valor extends string>(props: CasillasProps<Valor>) {
+  const cambiar = (valor: Valor, marcada: boolean) =>
+    props.alCambiar(
+      props.opciones
+        .map((opcion) => opcion.valor)
+        .filter((v) => (v === valor ? marcada : props.marcadas.includes(v))),
+    );
+  return (
+    <fieldset class="flex min-w-0 flex-col gap-1.5">
+      <legend class="mb-1.5 font-mono text-xs font-semibold tracking-wider text-tinta-suave">
+        {props.leyenda}
+      </legend>
+      <div class="flex flex-wrap gap-1">
+        <For each={props.opciones}>
+          {(opcion) => (
+            <label
+              class={
+                "relative inline-flex min-h-11 cursor-pointer items-center gap-2 px-3 " +
+                "bg-superficie-alta text-sm font-semibold text-tinta shadow-[inset_0_0_0_1.5px_var(--linea-fuerte)] " +
+                "hover:bg-fondo has-checked:shadow-[inset_0_0_0_2px_var(--primario)] " +
+                "has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-foco"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={props.marcadas.includes(opcion.valor)}
+                onChange={(evento) => cambiar(opcion.valor, evento.currentTarget.checked)}
+                class="size-4 accent-primario"
+              />
+              {opcion.etiqueta}
+            </label>
+          )}
+        </For>
+      </div>
+    </fieldset>
+  );
+}

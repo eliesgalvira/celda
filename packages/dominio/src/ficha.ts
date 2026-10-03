@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { Cambio } from "./aportacion.ts";
 import { Coordenada } from "./area.ts";
 import { Banda, compararBandas, compararTexto } from "./banda.ts";
 import { Compania } from "./compania.ts";
@@ -42,6 +43,30 @@ export const EstacionDeFicha = Schema.Struct({
 export type EstacionDeFicha = typeof EstacionDeFicha.Type;
 
 /**
+ * Una corrección de la comunidad aceptada por la moderación, tal como llega a la ficha (ADR 0020):
+ * lo que cambia, cuántas personas la sostienen y desde cuándo. Se enseña al lado de lo que dice el
+ * registro oficial y nunca lo sustituye. Es dato propio de Celda, con la dedicación CC0 (ADR 0021).
+ * La escribe la ingesta nocturna con lo aceptado (#57).
+ */
+export const CorreccionDeFicha = Schema.Struct({
+  /**
+   * Identificador estable de la corrección publicada: el de la primera corrección propuesta
+   * aceptada que la sostiene. Una corroboración lo cita.
+   */
+  clave: Schema.String,
+  cambio: Cambio,
+  /**
+   * Cuántas personas la sostienen: identidades distintas con una corrección propuesta igual o una
+   * corroboración aceptadas. Al menos una.
+   */
+  personas: Schema.Int.pipe(Schema.check(Schema.isGreaterThanOrEqualTo(1))),
+  /** Cuándo se aceptó la primera, en milisegundos. */
+  aceptadaEl: Schema.Finite,
+  licencia: Schema.Literal("CC0-1.0"),
+});
+export type CorreccionDeFicha = typeof CorreccionDeFicha.Type;
+
+/**
  * Lo que el panel cuenta de un emplazamiento al seleccionarlo. Se publica con la capa, en un lote
  * de fichas de la misma versión. `version` es su marca de agua: nunca es posterior a la capa de
  * la que sale, pero la web puede acabar leyendo la de una capa más reciente que la del mapa.
@@ -62,6 +87,11 @@ export const Ficha = Schema.Struct({
   confianza: Confianza,
   conflictos: Schema.Array(Conflicto),
   estaciones: Schema.Array(EstacionDeFicha),
+  /**
+   * Las correcciones de la comunidad aceptadas en este emplazamiento (ADR 0020). Opcional: las
+   * fichas publicadas antes del buzón no la llevan, y sin correcciones tampoco.
+   */
+  correcciones: Schema.optionalKey(Schema.Array(CorreccionDeFicha)),
   /** Fecha más reciente de sus observaciones. */
   datosDel: Schema.Finite,
   /** Fecha de la ejecución de ingesta que cambió el emplazamiento por última vez. */

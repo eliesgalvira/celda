@@ -1,6 +1,6 @@
 # Límites de uso: el público solo lee ficheros estáticos
 
-Estado: aceptada el 28/09/2026, tras la exploración técnica 04 (issue #6, rama `spike/celda-limites`). Revisada el 02/10/2026: el límite de la función que sirve R2 ya no existe, porque el ADR 0018 sirve las capas solo desde Vercel; y las escrituras del público, con sus límites, las fija el ADR 0020. Revisada el 03/10/2026: desde el #51 la ingesta y la publicación ya no corren en Convex, sino en la ingesta nocturna (ADR 0015), y Convex no tiene funciones hasta el buzón.
+Estado: aceptada el 28/09/2026, tras la exploración técnica 04 (issue #6, rama `spike/celda-limites`). Revisada el 02/10/2026: el límite de la función que sirve R2 ya no existe, porque el ADR 0018 sirve las capas solo desde Vercel; y las escrituras del público, con sus límites, las fija el ADR 0020. Revisada el 03/10/2026: desde el #51 la ingesta y la publicación ya no corren en Convex, sino en la ingesta nocturna (ADR 0015), y Convex no tiene funciones hasta el buzón. Revisada otra vez el 03/10/2026 con el #56: el buzón tiene cuatro mutaciones públicas con límites de cubos de fichas (ADR 0020), y la web carga el cliente HTTP de Convex solo al compartir.
 
 ## Contexto
 
