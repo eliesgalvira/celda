@@ -143,6 +143,8 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 | `ui/termino/Termino.tsx` | `pointerdown`, `keydown`, `resize`, `scroll` y fotogramas | fija | `onSettled` | seguro | `recursoFijo` |
 | `ui/panel/PanelEmplazamiento.tsx` | `resize` de la ventana | fija | `onSettled` | seguro | `recursoFijo` |
 | `ui/DisposicionMapa.tsx` | `setTimeout` que pliega los créditos | fija | `onSettled` | seguro | `recursoFijo` |
+| `foto/enMapa.ts`, foto aérea | el estado `fotoAerea` del estilo y, con él, las teselas del PNOA | el lienzo y si está encendida, por `mismosCampos` | nuevo (#64) | seguro | `recurso("mapa:foto")`; no cierra nada: apagar es otra clave |
+| `foto/enMapa.ts`, «Ver el edificio» | `flyTo`, `moveend` y un `idle`, y el edificio resaltado | el lienzo y el pedido de la pulsación, un objeto nuevo por pulsación; otro emplazamiento lo borra | nuevo (#64) | seguro | `recurso("mapa:edificio")`; el cierre quita los escuchadores y, si no hay otro pedido, el resaltado |
 | `ui/Dialogo.tsx` | `showModal` y el foco | fija | `onSettled` | seguro | `recursoFijo` |
 
 ### Efectos y memos que no abren nada
@@ -178,4 +180,4 @@ Se abre una vez por lo que lo crea, no por una reejecución:
 - Escuchadores en el propio nodo desde un `ref` (`Dialogo`, `MenuDeControles`, `MenuUbicacion`, `PanelEmplazamiento`, `MarcadorReferencia`): uno por nodo, y mueren con él.
 - Manejadores de eventos (usar la ubicación, elegir, quitar, pedir permiso a la brújula): los abre la persona. Buscar una dirección solo escribe la búsqueda pedida, y la abre `recurso("buscador:busqueda")`.
 
-Resumen: 31 sitios abren algo desde Solid (29 en la auditoría y los dos del #45); el resto de efectos y memos, en la segunda tabla, no abren nada. Cuatro tenían el fallo: el GPS y la brújula (ya arreglados en 480e670 y 119001f) y la vista de interferencia y el sector que da servicio, que recalculaban con cada lectura del GPS en el mismo sitio. La precarga de fichas era un riesgo sin fallo visible. Todos abren ahora con `recurso()` o `recursoFijo()`.
+Resumen: 33 sitios abren algo desde Solid (29 en la auditoría, los dos del #45 y los dos de la foto aérea del #64); el resto de efectos y memos, en la segunda tabla, no abren nada. Cuatro tenían el fallo: el GPS y la brújula (ya arreglados en 480e670 y 119001f) y la vista de interferencia y el sector que da servicio, que recalculaban con cada lectura del GPS en el mismo sitio. La precarga de fichas era un riesgo sin fallo visible. Todos abren ahora con `recurso()` o `recursoFijo()`.
