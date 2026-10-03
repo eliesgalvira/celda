@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 
 import type { LimitesDeBarrios } from "./barrio.ts";
 import { type EmplazamientoDeCapa, versionDeCapa } from "./capa.ts";
@@ -10,7 +11,7 @@ import {
   distanciaALosDatos,
   type ZonaBarrida,
 } from "./cobertura.ts";
-import type { Ficha } from "./ficha.ts";
+import { EstacionDeFicha, Ficha } from "./ficha.ts";
 import {
   indexarMunicipios,
   type LimitesDeMunicipios,
@@ -34,6 +35,7 @@ import {
   leerLoteDeProvincia,
   leerParteDelIndice,
   leerResumen,
+  LoteDeProvincia,
   parteDeClave,
   PARTES_DEL_INDICE,
   situarEmplazamientos,
@@ -193,6 +195,16 @@ const ficha = (e: EmplazamientoDeCapa): Ficha => ({
   datosDel: NOCHE,
   version: NOCHE,
 });
+
+/** El lote tal como lo lee la web de antes de la marca de sin ficha en el registro. */
+const { sinFichaEnRegistro: _sinFicha, ...estacionDeAntes } = EstacionDeFicha.fields;
+const LoteDeAntes = Schema.Struct({
+  ...LoteDeProvincia.fields,
+  fichas: Schema.Array(
+    Schema.Struct({ ...Ficha.fields, estaciones: Schema.Array(Schema.Struct(estacionDeAntes)) }),
+  ),
+});
+const leerLoteDeAntes = Schema.decodeUnknownResult(Schema.fromJsonString(LoteDeAntes));
 
 const CATALUNA: ZonaBarrida = {
   nombre: "cataluna",
@@ -383,6 +395,52 @@ describe("lote de fichas de una provincia", () => {
   it("un lote de otra provincia no se da por bueno", () => {
     const contenido = generarLoteDeProvincia("08", [ficha(EN_PEDRALBES)], lugares, FUENTE_IGN);
     assert.isTrue(Result.isFailure(leerLoteDeProvincia(contenido, "17")));
+  });
+
+  // La marca de sin ficha en el registro no sube el formato (ADR 0016): la web de antes la
+  // ignora y la de ahora lee los lotes de antes, que no la llevan.
+  const orange: EstacionDeFicha = {
+    compania: "orange",
+    codigos: ["CLMR6422A"],
+    bandas: [],
+    origenes: [],
+  };
+  const conEstaciones = (sinFicha: boolean): Ficha => ({
+    ...ficha(EN_PEDRALBES),
+    estaciones: [
+      { compania: "movistar", codigos: ["0802532"], bandas: [], origenes: [] },
+      sinFicha ? { ...orange, sinFichaEnRegistro: NOCHE } : orange,
+    ],
+  });
+
+  it("la web de antes lee un lote con una estación base sin ficha en el registro", () => {
+    const contenido = generarLoteDeProvincia("08", [conEstaciones(true)], lugares, FUENTE_IGN);
+    assert.include(contenido, `"sinFichaEnRegistro":${NOCHE}`);
+    const leido = leerLoteDeAntes(contenido);
+    if (Result.isFailure(leido)) return assert.fail(leido.failure.message);
+    assert.deepStrictEqual(
+      leido.success.fichas[0]?.estaciones.map((e) => [e.compania, Object.keys(e).length]),
+      [
+        ["movistar", 4],
+        ["orange", 4],
+      ],
+    );
+  });
+
+  it("la web de ahora lee los lotes de antes, sin la marca, y los nuevos con ella", () => {
+    const deAntes = leerLoteDeProvincia(
+      generarLoteDeProvincia("08", [conEstaciones(false)], lugares, FUENTE_IGN),
+      "08",
+    );
+    const nuevo = leerLoteDeProvincia(
+      generarLoteDeProvincia("08", [conEstaciones(true)], lugares, FUENTE_IGN),
+      "08",
+    );
+    if (Result.isFailure(deAntes) || Result.isFailure(nuevo)) return assert.fail("ilegible");
+    const marcas = (fichas: ReadonlyArray<Ficha>) =>
+      fichas[0]?.estaciones.map((e) => e.sinFichaEnRegistro);
+    assert.deepStrictEqual(marcas(deAntes.success), [undefined, undefined]);
+    assert.deepStrictEqual(marcas(nuevo.success), [undefined, NOCHE]);
   });
 });
 

@@ -32,6 +32,12 @@ export const EstacionDeFicha = Schema.Struct({
   codigos: Schema.Array(Schema.String),
   bandas: Schema.Array(Banda),
   origenes: Schema.Array(OrigenDeFicha),
+  /**
+   * Si el registro oficial no tiene ficha de ella («Código de emplazamiento no válido»), la fecha
+   * en que se comprobó. Es opcional, como `lugar`: las fichas publicadas antes no lo llevan, y la
+   * web de antes ignora la clave (ADR 0016).
+   */
+  sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
 });
 export type EstacionDeFicha = typeof EstacionDeFicha.Type;
 
@@ -91,18 +97,22 @@ export const fichaDe = (
   conflictos: emplazamiento.conflictos,
   estaciones: estaciones
     .toSorted((a, b) => compararTexto(a.estacion.compania, b.estacion.compania))
-    .map(({ estacion, observaciones }) => ({
-      compania: estacion.compania,
-      codigos: estacion.codigos,
-      bandas: estacion.bandas.toSorted(compararBandas),
-      origenes: observaciones.map(({ fuente, clave, url, fecha, afirma }) => ({
-        fuente,
-        clave,
-        url,
-        fecha,
-        afirma,
-      })),
-    })),
+    .map(({ estacion, observaciones }) => {
+      const deFicha: EstacionDeFicha = {
+        compania: estacion.compania,
+        codigos: estacion.codigos,
+        bandas: estacion.bandas.toSorted(compararBandas),
+        origenes: observaciones.map(({ fuente, clave, url, fecha, afirma }) => ({
+          fuente,
+          clave,
+          url,
+          fecha,
+          afirma,
+        })),
+      };
+      const { sinFichaEnRegistro } = estacion;
+      return sinFichaEnRegistro === undefined ? deFicha : { ...deFicha, sinFichaEnRegistro };
+    }),
   datosDel: emplazamiento.datosDel,
   version,
 });
