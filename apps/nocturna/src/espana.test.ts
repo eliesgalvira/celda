@@ -181,14 +181,15 @@ describe("toda España en la ingesta nocturna (#50)", () => {
             ZONAS.map((zona) => [zona, "completado"]),
           );
           // La primera pasada de cada zona es la de su noche con la configuración por defecto:
-          // unas 34 peticiones de media, y unas 31 las siguientes, con las cajas guardadas.
+          // unas 35 peticiones de media, y unas 29 las siguientes, con las cajas guardadas. La
+          // primera noche real, el 29/09/2026, levante necesitó 46.
           for (const zona of registro.zonas) {
             assert.isAtLeast(zona.peticiones, 15, zona.zona);
-            assert.isAtMost(zona.peticiones, 45, zona.zona);
+            assert.isAtMost(zona.peticiones, 50, zona.zona);
             assert.strictEqual(zona.registros, espana.porZona.get(zona.zona), zona.zona);
           }
           const peticiones = registro.zonas.reduce((suma, z) => suma + z.peticiones, 0);
-          // Unas 250 estimadas en la investigación 08; la España sintética da 238.
+          // 247 en la primera noche real de toda España; la España sintética da 242.
           assert.isAtLeast(peticiones, 200);
           assert.isAtMost(peticiones, 280);
           // Con `robots.txt` y margen para reintentos, dentro del tope por defecto.
