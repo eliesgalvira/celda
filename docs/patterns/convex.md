@@ -5,7 +5,7 @@ Cómo están montados la ingesta, la publicación y Convex, cómo se arrancan en
 Dónde corre cada cosa:
 
 - **La ingesta y la publicación** corren en la ingesta nocturna de `apps/nocturna`, un programa de Node 24 con su estado en SQLite que lanza cada noche un temporizador de systemd ([nixos.md](nixos.md)). Publica en R2, y el build de Vercel sirve lo publicado (ADR 0018).
-- **Convex** no tiene tablas, ni funciones, ni crons desde el #51. Le queda un solo papel, el buzón de las aportaciones compartidas (#56, ADR 0020), que aún no está. Ver [Convex](#convex).
+- **Convex** tiene un solo papel desde el #51: el buzón de las aportaciones compartidas (#56, ADR 0020). El mapa no lee de él. Ver [Convex](#convex).
 
 ## Dónde está cada cosa
 
@@ -19,7 +19,8 @@ packages/publicacion/datos/  los límites de barrio y de municipios y el padrón
 packages/publicacion/datos/barrios.json   los límites de barrio que usa la publicación
 packages/dominio/          esquemas y la fusión, sin E/S
 tools/capas/               los límites de barrio y de municipios, la España sintética y el origen estático local
-convex/confect/            tablas (tables/) y API (*.spec.ts y *.impl.ts) de Confect; hoy vacío, hasta el buzón (#56)
+convex/confect/            tablas (tables/), API (*.spec.ts y *.impl.ts) y crons de Confect: el buzón
+convex/src/                la clave, la huella de la IP, el token de identidad y los límites del buzón
 convex/convex/             generado por Confect y Convex; no se edita
 ```
 
@@ -283,10 +284,10 @@ Todas corren en orden aleatorio. Si una falla, el registro dice la semilla; `pnp
 
 ## Convex
 
-Desde el #51, Convex no tiene tablas, ni funciones, ni crons: la ingesta y la publicación que corrían en él están en la nocturna (ADR 0015). Lo que queda en `convex/` es la base del buzón de aportaciones (#56, ADR 0020): Confect, su codegen, el backend local y el Convex en memoria de las pruebas, listos para la primera tabla y la primera función.
+Desde el #51 la ingesta y la publicación corren en la nocturna (ADR 0015). En Convex solo está el buzón de las aportaciones compartidas (#56, ADR 0020).
 
-- Las tablas van en `convex/confect/tables/`, una por fichero con esquema Effect, y la API en pares `*.spec.ts`/`*.impl.ts` por grupo (ADR 0003). Los crons, si hacen falta, en `convex/confect/crons.ts`.
-- `convex/convex/` y `convex/confect/_generated/` son código generado y se guardan en git: las pruebas en memoria los necesitan. `pnpm run typecheck` ejecuta `confect codegen` antes de `tsc`, así que un cambio en una spec sin regenerar sale en los tipos. Mientras no haya tablas, codegen avisa de que genera un esquema vacío: es lo esperado.
+- Las tablas van en `convex/confect/tables/`, una por fichero con esquema Effect, y la API en pares `*.spec.ts`/`*.impl.ts` por grupo (ADR 0003). Los crons, en `convex/confect/crons.ts`.
+- `convex/convex/` y `convex/confect/_generated/` son código generado y se guardan en git: las pruebas en memoria los necesitan. `pnpm run typecheck` ejecuta `confect codegen` antes de `tsc`, así que un cambio en una spec sin regenerar sale en los tipos. La excepción es `convex/convex/convex.config.ts`, que se escribe a mano: instala el componente `@convex-dev/rate-limiter`, y Confect lo lee para tipar `confect/_generated/components.ts`.
 - `convex/convex/_generated/` lo escribe `convex dev`, no Confect, y `convex codegen` necesita un despliegue. Tras añadir o quitar un grupo de funciones, regenéralo con el backend local de una vez: `CELDA_CONVEX_PUERTO=3290 pnpm run backend --once`.
 
 Codegen se lanza siempre con `convex/scripts/codegen.sh` (`pnpm run codegen`, `typecheck` y `backend` lo usan). Confect importa cada fichero de `confect/` escribiendo antes su bundle al lado, `<fichero>.bundled_<id>.mjs`, y lo borra al acabar. Un codegen matado con SIGKILL justo entonces lo deja, sobre todo el de la impl que más tarde en importarse. El script borra los restos, y `.gitignore`, el lint y el formateador no los miran.
@@ -302,9 +303,60 @@ CELDA_CONVEX_PUERTO=3250 pnpm run backend   # en 3250 y 3251, si 3240 está ocup
 
 Guarda el estado en `.convex/` y la URL en `.env.local`, los dos fuera de git. Para empezar de cero, para el backend y borra `.convex/local` y `.env.local`. `convex dev` no siempre vuelve a desplegar cuando cambian los paquetes del monorepo. Si el log no dice «Convex functions ready» con la hora nueva, toca un fichero de `convex/convex/` o reinicia el backend.
 
+Para probar el buzón en local hace falta su clave. En el backend local, y nunca en uno de la nube desde aquí:
+
+```sh
+pnpm exec convex env set CELDA_BUZON_CLAVE "$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+```
+
+La web lo usa si se construye con `VITE_CELDA_CONVEX_URL=http://127.0.0.1:3240` (la URL de `convex/.env.local`).
+
+### El buzón
+
+Lo que decide el ADR 0020 y cómo quedó, en su apartado «Cómo quedó en el #56». Dónde está cada cosa:
+
+| Qué | Dónde |
+|---|---|
+| Las cuatro mutaciones públicas y sus errores tipados | `confect/buzon.spec.ts` y `buzon.impl.ts` |
+| Lo que necesita la moderación (#57) | `confect/moderacion.spec.ts` y `moderacion.impl.ts`, todas internas |
+| La limpieza de las huellas de más de 24 horas, cada hora | `confect/limpieza.*.ts` y `confect/crons.ts` |
+| La clave del despliegue y el HMAC | `src/claves.ts` |
+| La sal del día y la huella de la IP | `src/huella.ts` |
+| El token de identidad y los vetos | `src/identidad.ts` |
+| Los límites, con sus números | `src/limites.ts` |
+| Lo que comprueba el buzón además del esquema | `packages/dominio/src/buzon.ts` |
+| El servicio `Sincronizacion` de la web y su cliente de Convex | `apps/web/src/buzon/sincronizacion.ts` y `convex.ts` |
+
+Un envío pasa, en este orden, por la clave, el token, la huella, los vetos, el esquema del dominio, si ya estaba, si es verosímil y los tres límites. Un rechazo deshace todo lo anterior, también las fichas gastadas.
+
+Variables de entorno:
+
+| Variable | Dónde | Qué |
+|---|---|---|
+| `CELDA_BUZON_CLAVE` | El despliegue de Convex (`convex env set`) | Firma los tokens y calcula las huellas. 32 caracteres o más. Sin ella el buzón está cerrado. Cambiarla deja sin valor los tokens de todos los dispositivos, que piden otro solos, y cambia las huellas del día. |
+| `VITE_CELDA_CONVEX_URL` | El build de la web (Vercel) | La URL del despliegue, `https://<nombre>.convex.cloud`. Sin ella la web dice que el buzón está cerrado. |
+
+### Antes del primer despliegue del buzón
+
+Esto lo hace el usuario: el #56 no despliega nada.
+
+1. Crea el despliegue de producción y anota su región. Si Convex ofrece región en la UE, elígela; si no, anótalo en el ADR 0020.
+2. Pon la clave: `pnpm exec convex env set CELDA_BUZON_CLAVE "$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')" --prod`. No la guardes en ningún fichero del repositorio.
+3. En el panel de Convex, en el uso del equipo, pon los umbrales del despliegue por debajo de los topes del plan gratuito, para que se apague el buzón antes que el plan: llamadas a funciones, E/S de base de datos y transferencia de salida al 80 % del tope del mes, y almacenamiento de base de datos al 50 %. Comprueba que al pasarlos el panel desactiva el despliegue y no solo avisa, y apunta en el ADR 0020 qué permite el plan gratuito.
+4. Despliega con `pnpm exec convex deploy` desde `convex/`.
+5. Comprueba `X-Forwarded-For`: llama dos veces a `buzon:pedirIdentidad` por HTTP (`POST https://<nombre>.convex.cloud/api/mutation` con `{"path":"buzon:pedirIdentidad","args":{},"format":"json"}`), una con `X-Forwarded-For: 198.51.100.66` y otra sin ella, y mira en `huellasDeIp` si sale una huella o dos. Anótalo en el ADR 0020 y borra esas dos identidades.
+6. Pon `VITE_CELDA_CONVEX_URL` en las variables de build de Vercel y vuelve a construir la web.
+
 ### Pruebas de Convex
 
-`convex/test/despliegue.test.ts` arranca el Convex en memoria (`@confect/test`, que monta convex-test) con el esquema y los módulos generados, y comprueba que no hay tablas, ni funciones, ni crons. El buzón la cambia por las suyas. El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8; `convex/test/TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
+Las pruebas usan el Convex en memoria de convex-test con el esquema, los módulos generados y el componente de límites (`@convex-dev/rate-limiter/test`). `@confect/test` no deja registrar componentes ni fijar la IP, así que `convex/test/TestConfect.ts` repite su envoltorio (`Ref.runWithCodec` y `mutationLayer`) sobre un convex-test que sí lo hace, con la misma interfaz y `desde(ip)` para la IP de la petición. El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8; `TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
+
+El limitador lee la hora con `Date.now()`, que el `TestClock` de Effect no mueve. `convex/test/ayudas.ts` falsea solo `Date` con `vi.useFakeTimers({ toFake: ["Date"] })` y la mueve con `vi.setSystemTime`, así convex-test sigue con sus temporizadores de verdad. La clave de prueba se pone con `vi.stubEnv`. Llenar un cubo de cientos de fichas con envíos tarda en convex-test, así que las pruebas de los límites grandes envían uno, gastan las demás de golpe con el limitador y comprueban que el siguiente envío pasa y el de después no.
+
+- `despliegue.test.ts`: las tablas, que las únicas funciones públicas son las cuatro mutaciones y que solo devuelven un token o si era nueva.
+- `buzon.test.ts`: la identidad, cada límite de la tabla del ADR 0020, la idempotencia, la validación y los vetos.
+- `huellas.test.ts`: que la IP no está en claro en ninguna tabla, la sal de cada día y la limpieza a las 24 horas.
+- `moderacion.test.ts`: que nada llega a lo que lee la noche sin aceptarlo, y las funciones de la moderación.
 
 `pnpm run test:repetido` (desde `convex/`) pasa las pruebas de Convex cinco veces con semillas seguidas a partir de una al azar, y la CI lo hace en cada push.
 

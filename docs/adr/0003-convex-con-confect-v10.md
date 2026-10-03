@@ -1,6 +1,6 @@
 # Convex como fuente canónica, con funciones Effect mediante Confect v10
 
-Estado: aceptada (26/09/2026), tras la exploración técnica 02. Revisada el 28/09/2026 con el ADR 0008: Convex deja de estar expuesto al público y la web ya no tiene cliente de Convex. Revisada el 02/10/2026 con el ADR 0020: cuando la ingesta salga de Convex (#51), Convex solo es el buzón de las aportaciones compartidas, con funciones públicas para enviarlas. Revisada el 03/10/2026 con el #51: la ingesta y la publicación corren en la ingesta nocturna (ADR 0015), y Convex se queda sin tablas, sin funciones y sin crons hasta el buzón (#56).
+Estado: aceptada (26/09/2026), tras la exploración técnica 02. Revisada el 28/09/2026 con el ADR 0008: Convex deja de estar expuesto al público y la web ya no tiene cliente de Convex. Revisada el 02/10/2026 con el ADR 0020: cuando la ingesta salga de Convex (#51), Convex solo es el buzón de las aportaciones compartidas, con funciones públicas para enviarlas. Revisada el 03/10/2026 con el #51: la ingesta y la publicación corren en la ingesta nocturna (ADR 0015), y Convex se queda sin tablas, sin funciones y sin crons hasta el buzón (#56). Revisada el 03/10/2026 con el #56: Convex tiene el buzón, y la web lleva el cliente HTTP de Convex en un trozo que solo se descarga al compartir una aportación.
 
 ## Contexto
 
@@ -25,7 +25,8 @@ contra un backend local real (código en `spikes/confect/`).
 - Hasta el #51, todas las funciones eran internas. Las llamaban los crons de la ingesta, la
   publicación (una acción de Node al final de cada ingesta) y quien administraba el despliegue con
   la clave de administración.
-- La web no tiene cliente de Convex. Hasta el 28/09/2026 leía la ficha con el `WebSocketClient` de
+- Desde el #56, la web solo habla con Convex al compartir una aportación: el cliente HTTP de Convex y las referencias de Confect van en un trozo aparte que se carga con `import()` (ADR 0020). Los errores tipados del buzón llegan a la web con `Ref.runWithCodec`. El mapa no lee de Convex.
+- Antes del buzón la web no tenía cliente de Convex. Hasta el 28/09/2026 leía la ficha con el `WebSocketClient` de
   `@confect/js`; lo que queda de aquel diseño es el puente entre Effect y Solid: una lectura es un
   `Stream` convertido con `Stream.toAsyncIterable` (`leerEnSolid`) y devuelto desde `createMemo`.
   Solid la cancela al cambiar los argumentos o al desmontar.

@@ -150,6 +150,17 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 ## Correcciones de la comunidad
 
 - `panel/Correccion.tsx` enseña las correcciones, en la sección «Registro oficial y comunidad», justo bajo la marca de agua. `ContrasteFicha` pone lado a lado lo que dice el registro oficial y lo que dice la comunidad de una estación base, cada uno con su fecha y su enlace; el borde de la comunidad lleva el color de su estado. `ConflictosFicha` lista los conflictos entre fuentes con el tono de aviso, y `NotaFicha` es un párrafo del cuerpo, normal o de crédito. El texto sale de `apps/web/src/ficha/correcciones.ts`.
+- Una corrección aceptada en el buzón (`Ficha.correcciones`, ADR 0020) sale primero, con `ContrasteFicha`: a la izquierda lo que dice el registro y a la derecha «Comunidad de Celda · CC0», cuántas personas la sostienen y cuándo se aceptó. Sin `compania`, el contraste es del emplazamiento entero (su posición, que ya no existe o que falta). Su botón «Yo también lo veo» abre el diálogo de respaldarla. De una compañía con una corrección aceptada no se repite el contraste que sale de sus observaciones.
+
+## Compartir aportaciones
+
+Las piezas están en `buzon/Compartir.tsx`; cuándo se usan, en `apps/web/src/buzon`.
+
+- Se comparte siempre en un `Dialogo`: «Tus aportaciones» (`?aportaciones`, desde «Funciones»), «Proponer una corrección» y «Yo también lo veo» (desde la ficha). Proponer un emplazamiento que falta se hace desde «Tus aportaciones».
+- El paso de enviar (`PasoCompartir`) enseña, por este orden, `QueSale` (cada dato que sale del dispositivo con su valor tal como se envía, y debajo lo que no sale y lo que guarda el buzón), `DedicacionCc0` y los botones. La dedicación va en el mismo paso y antes de «Enviar con CC0», como pide el ADR 0021.
+- `ResultadoDelEnvio` reserva 7,5 rem bajo los botones: el aviso de «Enviando…», el de «Recibida» (`Aviso tono="hecho"`) o el de fallo aparecen sin mover nada. Un fallo dice qué ha pasado, cuándo reintentar si es un límite, y que la aportación sigue en el dispositivo.
+- `FilaAportacion` y `GrupoDeAportaciones` hacen la lista de «Tus aportaciones», con `Etiqueta tono="compartida"` o `tono="local"`. En un ordenador, el grupo de medidas propias explica con `Nota tono="aviso"` por qué no hay ninguna: se registran en el móvil y se quedan en él.
+- El formulario de proponer usa `Segmentado`, `Selector`, `Casillas` (casillas nativas en filas de 44 px) y `AreaDeTexto`, con los caracteres que quedan a la vista. El punto propuesto es el punto de referencia; sin él, una nota lo dice con un botón que cierra el diálogo y empieza a elegir el punto en el mapa.
 
 ## Celdas en el mapa
 
