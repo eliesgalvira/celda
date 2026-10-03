@@ -1,35 +1,27 @@
 # Convex e ingesta
 
-Cómo está montado el backend, cómo se arranca en local y cómo se prueba. Las decisiones están en los ADR 0003 (Confect), 0009 (ingesta), 0012 (fusión) y 0015 (ingesta fuera de Convex).
+Cómo están montados la ingesta, la publicación y Convex, cómo se arrancan en local y cómo se prueban. Las decisiones están en los ADR 0003 (Confect), 0009 (ingesta), 0012 (fusión), 0015 (ingesta fuera de Convex) y 0020 (buzón de aportaciones).
 
-La ingesta corre hoy en dos sitios que publican lo mismo: en Convex, con sus crons, y en la ingesta nocturna de `apps/nocturna`, un programa de Node con su estado en SQLite. Convex se retira cuando la nocturna lleve una semana publicando lo mismo (#51). Mientras tanto, cualquier cambio en el proceso o en la publicación vale para las dos, porque comparten el código.
+Dónde corre cada cosa:
+
+- **La ingesta y la publicación** corren en la ingesta nocturna de `apps/nocturna`, un programa de Node 24 con su estado en SQLite que lanza cada noche un temporizador de systemd ([nixos.md](nixos.md)). Publica en R2, y el build de Vercel sirve lo publicado (ADR 0018).
+- **Convex** no tiene tablas, ni funciones, ni crons desde el #51. Le queda un solo papel, el buzón de las aportaciones compartidas (#56, ADR 0020), que aún no está. Ver [Convex](#convex).
 
 ## Dónde está cada cosa
 
 ```
-convex/confect/tables/     una tabla por fichero, con esquema Effect
-convex/confect/*.spec.ts   la API de cada grupo (ingesta, datos)
-convex/confect/*.impl.ts   su implementación
-convex/confect/crons.ts    el cron nocturno de la ingesta
-convex/src/proceso.ts      la BaseDeIngesta sobre Convex
-convex/src/publicacion.ts  los datos de la publicación sacados de Convex
-tools/capas/               la publicación a mano y el origen estático local
-convex/convex/             generado por Confect y Convex; no se edita
-packages/ingesta/          el extractor del registro oficial (registro-oficial/), sin nada de Convex
-packages/ingesta/src/proceso.ts   el proceso de una ejecución sobre una BaseDeIngesta
+apps/nocturna/             la ingesta nocturna: base SQLite, noche, estado y órdenes
+packages/ingesta/          el extractor del registro oficial (registro-oficial/), el cliente de las fuentes y la cola de fichas
+packages/ingesta/src/barrido.ts   el barrido por zonas y la noche sobre una BaseDeBarrido
 packages/ingesta/src/guardado.ts  qué cambia en una observación con el listado, la ficha o un barrido
 packages/publicacion/      la publicación, el almacén en carpeta o en R2 y la retención
 packages/publicacion/datos/  los límites de barrio y de municipios y el padrón del INE, en git
 packages/publicacion/datos/barrios.json   los límites de barrio que usa la publicación
 packages/dominio/          esquemas y la fusión, sin E/S
-apps/nocturna/             la ingesta nocturna: base SQLite, noche, estado y órdenes
+tools/capas/               los límites de barrio y de municipios, la España sintética y el origen estático local
+convex/confect/            tablas (tables/) y API (*.spec.ts y *.impl.ts) de Confect; hoy vacío, hasta el buzón (#56)
+convex/convex/             generado por Confect y Convex; no se edita
 ```
-
-`convex/convex/` y `convex/confect/_generated/` se guardan en git: las pruebas en memoria los necesitan. `pnpm run typecheck` ejecuta `confect codegen` antes de `tsc`, así que un cambio en una spec sin regenerar sale en los tipos.
-
-Codegen se lanza siempre con `convex/scripts/codegen.sh` (`pnpm run codegen`, `typecheck` y `backend` lo usan). Confect importa cada fichero de `confect/` escribiendo antes su bundle al lado, `<fichero>.bundled_<id>.mjs`, y lo borra al acabar. Un codegen matado con SIGKILL justo entonces lo deja, casi siempre el de `publicacion.impl.ts` (2,3 MB, la importación más lenta). El script borra los restos, y `.gitignore`, el lint y el formateador no los miran.
-
-La acción `ingesta:registroOficial` es fina: lee la configuración, monta el extractor real sobre `FetchHttpClient` y llama a `ejecutarIngesta`. El proceso (`packages/ingesta/src/proceso.ts`) no sabe dónde guarda: pide cada paso a una `BaseDeIngesta`. En Convex, esa base son sus funciones internas (`MutationRunner` y `QueryRunner` de Confect), y así se prueba igual en memoria que en el backend real. En la ingesta nocturna es la base SQLite.
 
 ## Ingesta nocturna
 
@@ -99,7 +91,7 @@ CELDA_REGISTRO_ZONAS_POR_NOCHE=7 pnpm run ingesta noche
 
 Por qué siete noches y no todas cada noche: el listado entero son 43 MB por noche, casi tanto como las 5.500 fichas (unos 50 MB), para un registro que cambia poco de un día para otro, y las bandas de cada ficha ya se releen solo cada 30 días. Las cifras están en la investigación 08, «Toda España en la ingesta nocturna».
 
-`robots.txt` se respeta siempre. El grupo que se aplica es el del primer producto del `User-Agent`, así que cambiarlo cambia también con qué nombre se busca a Celda en él. El almacén se elige como en Convex: `CELDA_ALMACEN_CARPETA` o las cuatro de R2, con `CELDA_ALMACEN_ORIGEN` (`almacenDesdeConfig` en `packages/publicacion`). Sin almacén, la noche ingiere y apunta `sin-almacen`.
+`robots.txt` se respeta siempre. El grupo que se aplica es el del primer producto del `User-Agent`, así que cambiarlo cambia también con qué nombre se busca a Celda en él. El almacén se elige con `CELDA_ALMACEN_CARPETA` o con las cuatro de R2 (`CELDA_R2_CUENTA`, `CELDA_R2_CUBO`, `CELDA_R2_ID_CLAVE` y `CELDA_R2_SECRETO`), y `CELDA_ALMACEN_ORIGEN` (`almacenDesdeConfig` en `packages/publicacion`). Sin almacén, la noche ingiere y apunta `sin-almacen`.
 
 Las variables también pueden llegar como credenciales de systemd: el programa lee cada fichero de `$CREDENTIALS_DIRECTORY` en formato `.env`, detrás de las variables de entorno (`apps/nocturna/src/credenciales.ts`). Así pasa el módulo de NixOS los secretos de R2 sin ponerlos en el entorno.
 
@@ -212,91 +204,38 @@ Para ver lo que cabe, `node --max-old-space-size=512 src/medida/espana.ts /tmp/e
 
 `apps/nocturna/src/espana.test.ts` prueba toda España con la España sintética, que copia emplazamientos de los listados grabados de Barcelona y Valencia y los reparte por los municipios del padrón con los registros de cada cuadro en el listado propio del registro (`cuadros-del-registro.json`). Comprueba que por defecto se barre una zona cada noche, en su orden; que una provincia queda cubierta en el resumen cuando se han barrido todos sus cuadros, y antes no; que toda España cabe en una noche con `CELDA_REGISTRO_ZONAS_POR_NOCHE=7` y dentro del tope de peticiones; el orden de las fichas, y lo que dice `estado` de cada zona. Con los listados grabados de Barcelona y del centro de Madrid, la primera noche barre Cataluña, la segunda `centro`, y publican los 1.294 y 1.331 emplazamientos de la revisión de la fusión. Tarda unos 30 s.
 
-`convex/test/nocturna.test.ts` comprueba que las dos ingestas publican lo mismo. Hace las mismas noches en Convex en memoria y en la nocturna, con las mismas respuestas grabadas y a la misma hora, y tras cada noche compara byte a byte el manifiesto, las capas de provincia y los lotes de las dos carpetas: con cambios, una baja, una alta, y las fichas repartidas en varias noches. Del resumen y de `vigente.json` compara los datos y deja fuera la cobertura (qué zonas se han barrido, si cada provincia está cubierta, su último barrido y la huella que eso da al nombre del resumen): Convex lee la caja de Barcelona y la nocturna barre Cataluña por cuadros (#40), así que la cobertura de cada una es distinta por diseño. Se borra con la ingesta de Convex (#51).
-
-## Backend local
-
-Sin cuenta, con el modo anónimo de Convex, en los puertos 3240 (API) y 3241 (acciones HTTP). Desde `convex/`, dentro de `nix develop`:
-
-```sh
-pnpm run backend        # codegen + convex dev; déjalo en otra terminal
-CELDA_CONVEX_PUERTO=3250 pnpm run backend   # en 3250 y 3251, si 3240 está ocupado
-```
-
-Guarda el estado en `.convex/` y la URL en `.env.local`, los dos fuera de git. Para empezar de cero, para el backend y borra `.convex/local` y `.env.local`.
-
-Nada más desplegar, el cron queda programado para las 2:15 UTC. Si no quieres que el backend local descargue de verdad esa noche, apaga el interruptor:
-
-```sh
-pnpm exec convex run ingesta:cambiarInterruptor '{"fuente":"registro-oficial","activo":false,"motivo":"backend local"}'
-```
-
-Otras órdenes útiles:
-
-```sh
-pnpm exec convex env set CELDA_INGESTA_MAX_FICHAS 5   # pocas fichas en una prueba real
-pnpm exec convex run ingesta:registroOficial          # una ejecución ahora, con descarga real
-pnpm exec convex run ingesta:estado                   # interruptores y últimas ejecuciones
-pnpm exec convex run datos:version                    # versión de los datos y «consultado el»
-pnpm exec convex run datos:ficha '{"clave":"movistar-0802532"}'
-pnpm exec convex run ingesta:recalcularFusion         # vuelve a fusionar sin descargar nada, y publica
-pnpm exec convex export --path /tmp/celda.zip         # todas las tablas en JSONL
-```
-
-`unzip` rechaza el zip de `convex export` como posible bomba; se abre con `UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip`. Para no volver a descargar el registro oficial, un backend nuevo se puede llenar con la exportación de otro: `pnpm exec convex import --replace -y /tmp/celda.zip`.
-
-Una descarga real del registro oficial hace unas 11 peticiones con 5 fichas: `robots.txt`, 5 de listado y las fichas, con 3 s entre cada una. Hazla solo cuando haga falta y con el interruptor apagado después.
-
-### Lo que hay que saber
-
-- `convex dev` no siempre vuelve a desplegar cuando cambian `src/` o los paquetes del monorepo. Si el log no dice «Convex functions ready» con la hora nueva, toca un fichero de `convex/convex/` o reinicia el backend.
-- Convex corta una función que lee más de 4096 documentos. Por eso la fusión lee las observaciones y las claves por páginas de 1000 y escribe los emplazamientos en lotes de 100. `cerrarBarrido` lee de una vez las observaciones de una fuente (unas 2400 en la caja de Barcelona); para una zona más grande habría que repartirlo.
-- La primera descarga real, sin el parámetro `zoom` y con las coordenadas tal cual, recibió `{}`. Con `zoom=4` y seis decimales, como el visor y los scripts de la investigación, llegaron los 2380 registros. Por eso una zona entera vacía cuenta como fallo de la fuente y no como «no hay estaciones».
-- `TextDecoder` en el runtime de Convex solo garantiza UTF-8; el Latin-1 del geoportal se decodifica a mano (`packages/ingesta/src/texto.ts`).
-- Desde el #55, `Fuente` ya no tiene la web de antenas que retiró el ADR 0019 y el esquema no tiene la tabla `puntos`. Un despliegue con datos de antes guarda ejecuciones omitidas y quizá un interruptor de esa fuente, que el esquema nuevo ya no admite: antes de desplegarlo, borra esas filas de `ejecuciones` e `interruptores` y vacía `puntos` desde el panel de Convex.
+`apps/nocturna/src/publicacion.test.ts` publica a mano lo que una noche ha dejado en la base, con límites de prueba que parten la muestra del Campus Nord entre dos provincias. Comprueba lo que escribe la publicación y en qué orden, el índice de claves, el manifiesto, la tabla de municipios y que cada emplazamiento tiene su ficha en su lote, igual que la da la base y con su lugar; que sin cambios no escribe nada y que una provincia sin cambios reutiliza su capa y sus lotes; que no pisa un fichero con otro contenido, no retrocede ante una vigente posterior y vuelve a publicar una vigente del formato 4; el contenido de la ficha, y la retención.
 
 ## Publicación
 
-La web no lee nada de Convex: descarga `vigente.json`, el resumen nacional, la capa de cada provincia que ve y sus lotes de fichas de un almacén de ficheros estático (ADR 0004, 0008, 0010 y 0016). Los escribe `publicar` (`packages/publicacion/src/publicar.ts`), que lee la instantánea de un servicio `DatosPublicables`: Convex en `convex/src/publicacion.ts` y la base SQLite en la ingesta nocturna. Así:
+La web no lee nada de Convex: descarga `vigente.json`, el resumen nacional, la capa de cada provincia que ve y sus lotes de fichas de un almacén de ficheros estático (ADR 0004, 0008, 0010 y 0016). Los escribe `publicar` (`packages/publicacion/src/publicar.ts`), que lee la instantánea de un servicio `DatosPublicables`: la base SQLite de la ingesta nocturna, o la España sintética de `tools/capas`. Así:
 
-1. Lee `datos:version` y la cobertura: las zonas de barrido con la fecha de su último barrido completo. Si `vigente.json` del almacén ya apunta a esa versión, rehace su resumen con la cobertura de ahora sin leer la instantánea: si sale el mismo fichero, no escribe nada (`al-dia`); si no, por ejemplo porque hay un barrido nuevo sin cambios en los datos, escribe el resumen nuevo y `vigente.json` (`barrido`). Si `vigente.json` apunta a una versión posterior, falla (`VigentePosterior`): no retrocede.
-2. Lee la instantánea (en Convex, con `capas:instantanea`, por páginas de 250 emplazamientos) con sus compañías y las bandas conocidas de cada una, y vuelve a leer `datos:version`. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
+1. Lee la versión de los datos y la cobertura: las zonas de barrido con la fecha de su último barrido completo. Si `vigente.json` del almacén ya apunta a esa versión, rehace su resumen con la cobertura de ahora sin leer la instantánea: si sale el mismo fichero, no escribe nada (`al-dia`); si no, por ejemplo porque hay un barrido nuevo sin cambios en los datos, escribe el resumen nuevo y `vigente.json` (`barrido`). Si `vigente.json` apunta a una versión posterior, falla (`VigentePosterior`): no retrocede.
+2. Lee la instantánea (la base la lee por páginas de 2.000 emplazamientos) con sus compañías y las bandas conocidas de cada una, y vuelve a leer la versión. Si ha cambiado entre medias, falla sin escribir nada (`InstantaneaMovida`) y basta con repetir.
 3. Sitúa cada emplazamiento en su municipio y su provincia con `packages/publicacion/datos/municipios.json` (`situarEmplazamientos`). Uno sin provincia, en el mar lejos de la costa o en un territorio sin provincia, va a la capa de la provincia de etiqueta más cercana, pero su ficha no dice ninguna.
-4. En cada provincia, reparte sus emplazamientos en lotes de 128 por la curva de Hilbert, lee las fichas de cada lote con `capas:fichas`, les pone su lugar y escribe `fichas/<provincia>/<huella>.json`, cuatro lotes a la vez. La huella es la de su contenido (SHA-256, 16 cifras). Si falta alguna ficha, los datos han cambiado.
+4. En cada provincia, reparte sus emplazamientos en lotes de 128 por la curva de Hilbert, lee las fichas de cada lote, les pone su lugar y escribe `fichas/<provincia>/<huella>.json`, cuatro lotes a la vez. La huella es la de su contenido (SHA-256, 16 cifras). Si falta alguna ficha, los datos han cambiado.
 5. Escribe la capa de cada provincia, `provincias/<provincia>/<huella>.json`: las columnas de siempre, el municipio de cada emplazamiento con la tabla de municipios de la provincia (habitantes, área, número de emplazamientos y compañías) y, en Barcelona, sus barrios. Un fichero que ya está en el almacén no se vuelve a escribir: una provincia sin cambios reutiliza su capa y sus lotes.
-6. Vuelve a comprobar la versión, escribe el manifiesto `ficheros@<fecha>.json` con las capas y los lotes de la versión, el resumen `resumen@<fecha>.<huella>.json` y lo registra con `capas:registrar`.
+6. Vuelve a comprobar la versión, escribe el manifiesto `ficheros@<fecha>.json` con las capas y los lotes de la versión, el resumen `resumen@<fecha>.<huella>.json` y lo registra en la base (tablas `versiones` y `ficheros_publicados`).
 7. Escribe `vigente.json`, el último, con el nombre del resumen.
 8. Borra las versiones que sobran: se quedan la vigente y las 7 anteriores (`VERSIONES_ANTERIORES`). Lo hace también cuando no había nada que publicar, así que un borrado fallido se repite la noche siguiente sin más.
 
 Ningún fichero se pisa con otro contenido: si existe distinto, falla con `FicheroInmutable` y `vigente.json` no cambia. La fecha es la de la versión de los datos, al segundo.
 
-El resumen dice, de cada provincia, si está cubierta: si se han barrido todos los cuadros con datos que la tocan (`coberturaDeProvincia`, con los 94 cuadros de `ZONAS_DE_BARRIDO`), y la fecha del último barrido de lo que se sabe de ella. La nocturna da las zonas que ha empezado a barrer (tabla `barridos`). Convex, que sigue leyendo la caja de Barcelona, da esa caja como una zona que no barre entero ningún cuadro, así que con Convex ninguna provincia sale cubierta.
+El resumen dice, de cada provincia, si está cubierta: si se han barrido todos los cuadros con datos que la tocan (`coberturaDeProvincia`, con los 94 cuadros de `ZONAS_DE_BARRIDO`), y la fecha del último barrido de lo que se sabe de ella. La nocturna da las zonas que ha empezado a barrer (tabla `barridos`).
 
 El paso 8 (`retirarVersionesViejas`) lista el almacén entero y mira el sello de lo que es de una sola versión (`resumen@<fecha>…`, `ficheros@<fecha>.json` y, del formato 4, `sitios@<fecha>.json` y `fichas@<fecha>/<lote>.json`). Nunca borra la vigente ni una versión posterior, que puede ser otra publicación a medias. De cada versión retirada va primero lo que la abre (su resumen), después las capas y los lotes de su manifiesto que no lista ninguna versión que se queda, y al final el manifiesto. Si el manifiesto de una versión que se queda no se entiende, no borra nada compartido. Un fallo al borrar no hace fallar la publicación: sale como aviso en el registro. Por qué siete, en el ADR 0010.
 
-La publicación es automática. `ejecutarIngesta` llama al servicio `Publicacion` al acabar cada ejecución completada (no las omitidas ni las fallidas), y `ingesta:recalcularFusion` también. En las acciones, ese servicio lanza `publicacion:publicar`, una acción de Node. Un fallo al publicar no deshace la ejecución: se apunta en el registro y la siguiente ingesta lo repite.
+Publica la noche, a mitad de la ventana de fichas y al final, y `pnpm run ingesta publicar` a mano ([Publicar y copias](#publicar-y-copias)). Dónde escribe lo dice su configuración: `CELDA_ALMACEN_CARPETA` o el cubo de R2. Sin almacén, `publicar` devuelve `sin-almacen` y no escribe nada.
 
-Dónde escribe lo dicen las variables de entorno del despliegue:
-
-```sh
-pnpm exec convex env set CELDA_ALMACEN_CARPETA /ruta/absoluta/capas   # backend local: una carpeta
-pnpm exec convex env set CELDA_ALMACEN_ORIGEN http://127.0.0.1:8852    # URL pública de esa carpeta
-# producción: CELDA_R2_CUENTA, CELDA_R2_CUBO, CELDA_R2_ID_CLAVE y CELDA_R2_SECRETO (ADR 0018)
-pnpm exec convex run publicacion:publicar                             # publicar ahora, a mano
-```
-
-Sin ninguna, `publicar` devuelve `sin-almacen` y no escribe nada. La carpeta solo tiene sentido con el backend local, porque la acción de Node corre en tu máquina.
-
-Para publicar desde un despliegue sin configurarle almacén, `tools/capas` hace lo mismo por la API HTTP de Convex con la clave de administración. En local, desde `tools/capas`:
+Para la web en desarrollo, publica en `tools/capas/salida` y sírvela desde `tools/capas`:
 
 ```sh
-pnpm run publicar:local   # construye, lee la URL y la clave del backend local y publica en salida/
-pnpm run servir           # sirve salida/ en http://127.0.0.1:8852, déjalo abierto
+CELDA_ALMACEN_CARPETA=$PWD/tools/capas/salida pnpm run ingesta publicar   # lo que haya en la base
+pnpm --filter @celda/capas run sintetica   # o una España sintética, sin base ni red
+pnpm --filter @celda/capas run servir      # sirve salida/ en http://127.0.0.1:8852, déjalo abierto
 ```
 
-`servir` da a `vigente.json` una caché de cero segundos y al resto un año, como Vercel. La web en desarrollo lee de `VITE_CAPAS_ORIGEN`, que `apps/web/.env.development` pone en ese puerto; en la build, sin la variable, lee de `/capas` en su mismo origen, como en producción (ADR 0018).
-
-Para otro despliegue, `pnpm run publicar` con `CELDA_CONVEX_URL`, `CELDA_CONVEX_CLAVE_ADMIN`, `CELDA_CAPAS_ORIGEN` (la URL desde la que la web descargará los ficheros) y `CELDA_CAPAS_CARPETA`. `servir` escucha en el puerto de `CELDA_CAPAS_ORIGEN`.
+`servir` da a `vigente.json` una caché de cero segundos y al resto un año, como Vercel. La web en desarrollo lee de `VITE_CAPAS_ORIGEN`, que `apps/web/.env.development` pone en ese puerto; en la build, sin la variable, lee de `/capas` en su mismo origen, como en producción (ADR 0018). `CELDA_CAPAS_CARPETA` y `CELDA_CAPAS_ORIGEN` cambian la carpeta y el puerto de `servir` y de `sintetica`.
 
 Los límites de barrio se descargan de Open Data BCN con `pnpm run barrios`, también desde `tools/capas`. Son dos peticiones con 10 s entre ellas; hazlo solo cuando el Ayuntamiento publique límites nuevos y revisa el diff de `packages/publicacion/datos/barrios.json` antes del commit. `CELDA_BARRIOS` cambia la ruta del fichero. Por qué se guardan en git y no van en la ingesta: ADR 0004.
 
@@ -304,7 +243,7 @@ Los municipios, las provincias y el padrón se descargan con `pnpm run municipio
 
 Después de `municipios`, lanza `pnpm run zonas`, también desde `tools/capas`. No pide nada a la red: escribe desde `municipios.json` el índice de municipios y el contorno de cada provincia a 200 m que la web descarga al abrir el ejercicio de emplazamientos, en `apps/web/src/ejercicio/zonas` (o en `CELDA_ZONAS`). `tools/capas/src/zonasReales.test.ts` falla si esos ficheros no son los que escribiría la orden.
 
-`datos:version` es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la consulta también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
+La versión de los datos es la fecha de la última ejecución que cambió los emplazamientos. Un emplazamiento retirado se borra y no deja versión, así que la base también mira la última ejecución completada con retiradas. Sin eso, una noche que solo retirase emplazamientos daría el mismo nombre de capa con otro contenido.
 
 ### Las capas en Vercel
 
@@ -326,24 +265,53 @@ Las pruebas están en `apps/nocturna/src/vercel.test.ts`, con un Vercel de menti
 
 ## Ficha
 
-`datos:ficha` (interna) y `capas:fichas` dan la `Ficha` de `packages/dominio/src/ficha.ts`, que sale de `leerFicha` (`convex/src/lecturas.ts`). La ficha lleva la dirección y el municipio tal como los escribe la fuente, cada estación base con sus bandas ordenadas por frecuencia y, por cada código, la observación de la que sale, con su fuente, su enlace y desde cuándo lo dice. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. No lleva los `_id` de Convex. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene. El municipio y la provincia del IGN (`lugar`) no salen de Convex: los pone la publicación, y el lote cita su fuente una vez.
+La publicación pide a la base la `Ficha` de `packages/dominio/src/ficha.ts` de cada emplazamiento, que sale de `fichaDe` con el emplazamiento y las observaciones de sus estaciones. La ficha lleva la dirección y el municipio tal como los escribe la fuente, cada estación base con sus bandas ordenadas por frecuencia y, por cada código, la observación de la que sale, con su fuente, su enlace y desde cuándo lo dice. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene. El municipio y la provincia del IGN (`lugar`) no salen de la base: los pone la publicación, y el lote cita su fuente una vez.
 
 La web la lee con el servicio `FichasPublicadas` (`apps/web/src/ficha/servicio.ts`): busca el lote en la capa del mapa, lo descarga una vez por visita y, si el origen ya no tiene esa versión, lee la vigente. Así la marca de agua solo es posterior al mapa en ese caso (ADR 0004).
 
 ## Pruebas
 
-Las de Convex tienen tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
+Las de la ingesta y la publicación tienen tres niveles, todos con `@effect/vitest` y sin mocks de módulos.
 
 **Dominio.** La fusión se compara con ficheros de referencia en `packages/dominio/src/referencia/` y `packages/ingesta/src/registro-oficial/referencia/` (`toMatchFileSnapshot`). Si cambias la regla a propósito, regenera con `pnpm exec vp test run -u` en el paquete y revisa el diff de los JSON en el commit.
 
-**Extractor.** `packages/ingesta/src/registro-oficial/extractor.test.ts` monta el extractor real sobre un `HttpClient` de prueba (una `Layer`) que apunta cada petición con la hora del `TestClock`. Así se comprueban el `User-Agent`, `robots.txt`, la pausa entre peticiones, los reintentos con espera exponencial y el tope de peticiones. Las esperas se encadenan tras respuestas asíncronas, y un solo `TestClock.adjust` no las ve todas; `esperarConReloj` (`packages/ingesta/src/pruebas/reloj.ts`) adelanta el reloj de segundo en segundo hasta que la fibra termina.
+**Extractor.** `packages/ingesta/src/registro-oficial/extractor.test.ts` monta el extractor real sobre un `HttpClient` de prueba (una `Layer`) que apunta cada petición con la hora del `TestClock`. Así se comprueban el `User-Agent`, `robots.txt`, la pausa entre peticiones, los reintentos con espera exponencial, el tope de peticiones y los bloqueos del geoportal. Las esperas se encadenan tras respuestas asíncronas, y un solo `TestClock.adjust` no las ve todas; `esperarConReloj` (`packages/ingesta/src/pruebas/reloj.ts`) adelanta el reloj de segundo en segundo hasta que la fibra termina.
 
-**API de Convex.** `convex/test/` usa `@confect/test` (convex-test en memoria). `ejecutar(extractor)` en `convex/test/ayudas.ts` lanza `ejecutarIngesta` con `MutationRunner` y `QueryRunner` sacados del `TestConfect`, y el extractor que se le pase. El de prueba es `capaGrabada` con `muestraCampusNord`, el registro grabado en la investigación. Para comprobar que una ejecución no escribe nada, adelanta el reloj un día y compara `instantanea` antes y después: cualquier escritura por cambio habría movido una fecha.
+**La noche y la publicación.** Las de `apps/nocturna`, sobre una base SQLite y un almacén en carpetas temporales, con el registro grabado de la investigación (`muestraCampusNord`) servido por `capaGrabadaPorCajas`: ver [Pruebas](#pruebas) de la ingesta nocturna. Las versiones viejas de las pruebas de retención se escriben a mano en la carpeta, sin publicarlas. `packages/publicacion/src/almacenes/r2.test.ts` prueba la firma con dos casos de la batería de AWS (uno con consulta) y el almacén de R2 contra un cubo S3 de prueba en memoria, que lista de dos en dos claves para obligar a pedir varias páginas.
 
-El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8. `convex/test/TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
+Todas corren en orden aleatorio. Si una falla, el registro dice la semilla; `pnpm exec vp test run --sequence.seed=<semilla>` repite ese orden. Una carrera no siempre sale con la misma semilla: la de la retención (dos borrados que quitaban a la vez la carpeta de lotes, septiembre de 2026) necesitaba carga, y salió con cuatro bucles de la suite a la vez y `--pool=threads` o `--no-file-parallelism`. Si una prueba falla una vez y luego pasa, búscala así antes de repetirla.
 
-`convex/test/publicacion.test.ts` publica sobre el Convex en memoria y el almacén en una carpeta temporal, envuelto para apuntar cada fichero que escribe. Comprueba que cada clave de la capa tiene su ficha en su lote, que publicar sin cambios no escribe nada, que la ingesta publica sola tras cada ejecución completada y no tras una omitida, que un fichero ocupado con otro contenido para la publicación sin tocar `vigente.json`, y que la retención deja la vigente, sus siete anteriores y las posteriores. Las versiones viejas de esa prueba se escriben a mano en la carpeta, sin publicarlas. `packages/publicacion/src/almacenes/r2.test.ts` prueba la firma con dos casos de la batería de AWS (uno con consulta) y el almacén de R2 contra un cubo S3 de prueba en memoria, que lista de dos en dos claves para obligar a pedir varias páginas.
+## Convex
 
-Las pruebas de Convex corren en orden aleatorio. `pnpm run test:repetido` (desde `convex/`) las pasa cinco veces con semillas seguidas a partir de una al azar, y la CI lo hace en cada push. Si falla, el registro dice la semilla; `pnpm exec vp test run --sequence.seed=<semilla>` repite ese orden. Una carrera no siempre sale con la misma semilla: la de la retención (dos borrados que quitaban a la vez la carpeta de lotes, septiembre de 2026) necesitaba carga, y salió con cuatro bucles de la suite a la vez y `--pool=threads` o `--no-file-parallelism`. Si una prueba falla una vez y luego pasa, búscala así antes de repetirla.
+Desde el #51, Convex no tiene tablas, ni funciones, ni crons: la ingesta y la publicación que corrían en él están en la nocturna (ADR 0015). Lo que queda en `convex/` es la base del buzón de aportaciones (#56, ADR 0020): Confect, su codegen, el backend local y el Convex en memoria de las pruebas, listos para la primera tabla y la primera función.
 
-La prueba de carga `convex/scripts/prueba-de-carga.sh` mete 2400 observaciones falsas en el backend local y fusiona dos veces. Deja basura: úsala en un backend que vayas a borrar.
+- Las tablas van en `convex/confect/tables/`, una por fichero con esquema Effect, y la API en pares `*.spec.ts`/`*.impl.ts` por grupo (ADR 0003). Los crons, si hacen falta, en `convex/confect/crons.ts`.
+- `convex/convex/` y `convex/confect/_generated/` son código generado y se guardan en git: las pruebas en memoria los necesitan. `pnpm run typecheck` ejecuta `confect codegen` antes de `tsc`, así que un cambio en una spec sin regenerar sale en los tipos. Mientras no haya tablas, codegen avisa de que genera un esquema vacío: es lo esperado.
+- `convex/convex/_generated/` lo escribe `convex dev`, no Confect, y `convex codegen` necesita un despliegue. Tras añadir o quitar un grupo de funciones, regenéralo con el backend local de una vez: `CELDA_CONVEX_PUERTO=3290 pnpm run backend --once`.
+
+Codegen se lanza siempre con `convex/scripts/codegen.sh` (`pnpm run codegen`, `typecheck` y `backend` lo usan). Confect importa cada fichero de `confect/` escribiendo antes su bundle al lado, `<fichero>.bundled_<id>.mjs`, y lo borra al acabar. Un codegen matado con SIGKILL justo entonces lo deja, sobre todo el de la impl que más tarde en importarse. El script borra los restos, y `.gitignore`, el lint y el formateador no los miran.
+
+### Backend local
+
+Sin cuenta, con el modo anónimo de Convex, en los puertos 3240 (API) y 3241 (acciones HTTP). Desde `convex/`, dentro de `nix develop`:
+
+```sh
+pnpm run backend        # codegen + convex dev; déjalo en otra terminal
+CELDA_CONVEX_PUERTO=3250 pnpm run backend   # en 3250 y 3251, si 3240 está ocupado
+```
+
+Guarda el estado en `.convex/` y la URL en `.env.local`, los dos fuera de git. Para empezar de cero, para el backend y borra `.convex/local` y `.env.local`. `convex dev` no siempre vuelve a desplegar cuando cambian los paquetes del monorepo. Si el log no dice «Convex functions ready» con la hora nueva, toca un fichero de `convex/convex/` o reinicia el backend.
+
+### Pruebas de Convex
+
+`convex/test/despliegue.test.ts` arranca el Convex en memoria (`@confect/test`, que monta convex-test) con el esquema y los módulos generados, y comprueba que no hay tablas, ni funciones, ni crons. El buzón la cambia por las suyas. El glob de la documentación de Confect no encuentra `convex/_generated` con Vite 8; `convex/test/TestConfect.ts` usa `import.meta.glob(["../convex/**/*.ts", "../convex/**/*.js", "!../convex/**/*.d.ts"])`.
+
+`pnpm run test:repetido` (desde `convex/`) pasa las pruebas de Convex cinco veces con semillas seguidas a partir de una al azar, y la CI lo hace en cada push.
+
+### Un despliegue que tuvo la ingesta
+
+Un despliegue de Convex en la nube con la ingesta de antes del #51 guarda sus tablas (`observaciones`, `emplazamientos`, `estacionesBase`, `ejecuciones`, `interruptores`, `versionesCapa` y, si es de antes del #55, `puntos`), su cron y sus variables de entorno. Nada de eso hace falta: la nocturna tiene su propio estado en SQLite y publica lo mismo. El cron desaparece al desplegar el código nuevo. Antes de desplegarlo, o justo después:
+
+1. Si se quieren guardar los datos, `pnpm exec convex export --path ~/celda-convex.zip`. `unzip` rechaza ese zip como posible bomba; se abre con `UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip`.
+2. Borra esas tablas desde el panel de Convex. El esquema nuevo no las describe y nadie las lee.
+3. Borra las variables de entorno del despliegue que eran de la ingesta y la publicación (`pnpm exec convex env list`): `CELDA_R2_*`, que es una clave de escritura del cubo de R2, `CELDA_ALMACEN_*`, `CELDA_INGESTA_*` y `CELDA_REGISTRO_*`.

@@ -1,6 +1,6 @@
 # Límites de uso: el público solo lee ficheros estáticos
 
-Estado: aceptada el 28/09/2026, tras la exploración técnica 04 (issue #6, rama `spike/celda-limites`). Revisada el 02/10/2026: el límite de la función que sirve R2 ya no existe, porque el ADR 0018 sirve las capas solo desde Vercel; y las escrituras del público, con sus límites, las fija el ADR 0020.
+Estado: aceptada el 28/09/2026, tras la exploración técnica 04 (issue #6, rama `spike/celda-limites`). Revisada el 02/10/2026: el límite de la función que sirve R2 ya no existe, porque el ADR 0018 sirve las capas solo desde Vercel; y las escrituras del público, con sus límites, las fija el ADR 0020. Revisada el 03/10/2026: desde el #51 la ingesta y la publicación ya no corren en Convex, sino en la ingesta nocturna (ADR 0015), y Convex no tiene funciones hasta el buzón.
 
 ## Contexto
 
@@ -26,7 +26,7 @@ Convex deja de estar expuesto al público. Solo lo usan la ingesta, por sus cron
 | Qué versión cargar | `vigente.json`, en la CDN, con caché corta | El de la CDN |
 | Búsqueda de emplazamientos | En el navegador, sobre la capa | Ninguno |
 | Búsqueda de direcciones | Nominatim público (ADR 0013) | El suyo, una petición por segundo |
-| Estado de la ingesta | Consulta interna, con la clave de administración | No es pública |
+| Estado de la ingesta | La orden `estado` de la ingesta nocturna, en su máquina (ADR 0015) | No es pública |
 
 Todas las funciones de Convex son internas: `datos:version`, `datos:ficha`, `capas:vigente` e `ingesta:estado` dejaron de ser públicas con esta decisión. La web ya no abre ningún WebSocket con Convex, y su paquete no lleva el cliente de Convex ni el de Confect. La publicación corre dentro de Convex, al final de cada ingesta, y escribe los ficheros en el almacén (ADR 0010).
 

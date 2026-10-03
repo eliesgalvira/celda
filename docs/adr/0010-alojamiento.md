@@ -1,6 +1,6 @@
 # La web en Vercel, las capas y las fichas en R2 con copia en Vercel, y aviso ante bloqueos
 
-Estado: aceptada el 28/09/2026, tras la exploración técnica 05 (issue #7, rama `spike/celda-cloudflare`). Sustituye la decisión 10 de `../arquitectura.md`, que ponía la web en Cloudflare Pages. Falta la parte con cuentas reales, que es el ticket #14. Revisada el mismo día con la retención de versiones que decidió el #14, y el 29/09/2026 con la copia de reserva que se construye en Vercel desde R2 (#46). Sustituida en parte por el [ADR 0018](0018-capas-solo-desde-vercel.md) (02/10/2026): las capas y las fichas se sirven solo desde Vercel, R2 es un almacén privado y desaparecen el Worker, la copia de reserva y el cliente con dos orígenes. Siguen valiendo el contexto de los bloqueos, las cabeceras, la publicación con `AlmacenDeFicheros` y la retención en R2.
+Estado: aceptada el 28/09/2026, tras la exploración técnica 05 (issue #7, rama `spike/celda-cloudflare`). Sustituye la decisión 10 de `../arquitectura.md`, que ponía la web en Cloudflare Pages. Falta la parte con cuentas reales, que es el ticket #14. Revisada el mismo día con la retención de versiones que decidió el #14, y el 29/09/2026 con la copia de reserva que se construye en Vercel desde R2 (#46). Sustituida en parte por el [ADR 0018](0018-capas-solo-desde-vercel.md) (02/10/2026): las capas y las fichas se sirven solo desde Vercel, R2 es un almacén privado y desaparecen el Worker, la copia de reserva y el cliente con dos orígenes. Siguen valiendo el contexto de los bloqueos, las cabeceras, la publicación con `AlmacenDeFicheros` y la retención en R2. Revisada el 03/10/2026 con el #51: publica la ingesta nocturna, y ya no Convex.
 
 ## Contexto
 
@@ -23,14 +23,12 @@ Desde el ADR 0008, lo que se publica son ficheros JSON inmutables, no PMTiles: l
 
 ## Cómo se publica
 
-La publicación es automática: al acabar cada ejecución de ingesta completada, la acción de la ingesta llama a `publicacion:publicar`, una acción de Node de Convex. Si los datos no han cambiado desde la versión de `vigente.json`, no escribe nada; si la anterior falló, la repite. Detrás hay un servicio `AlmacenDeFicheros` con dos implementaciones:
+La publicación es automática y la hace la ingesta nocturna (ADR 0015), un programa de Node que corre cada noche en una máquina con NixOS: publica a mitad de la ventana de fichas y al final de la noche, y `celda-nocturna publicar` publica a mano. Hasta el #51 (03/10/2026) publicaba `publicacion:publicar`, una acción de Node de Convex, al acabar cada ejecución de ingesta completada. Si los datos no han cambiado desde la versión de `vigente.json`, no escribe nada; si la anterior falló, la repite. Detrás hay un servicio `AlmacenDeFicheros` con dos implementaciones:
 
-- `almacenEnCarpeta`, para el backend local, las pruebas y la vista previa. Se activa con `CELDA_ALMACEN_CARPETA`.
+- `almacenEnCarpeta`, para el desarrollo en local, las pruebas y la vista previa. Se activa con `CELDA_ALMACEN_CARPETA`.
 - `almacenEnR2`, para producción. Se activa con `CELDA_R2_CUENTA`, `CELDA_R2_CUBO`, `CELDA_R2_ID_CLAVE` y `CELDA_R2_SECRETO`. Sube cada fichero con `If-None-Match: *`; si R2 contesta 412, lo lee y solo lo da por bueno si es igual.
 
-`CELDA_ALMACEN_ORIGEN` es la URL pública de lo publicado. Sin almacén, la publicación no hace nada y lo apunta en el registro.
-
-Desde el ADR 0015 publica la ingesta nocturna, con el mismo `AlmacenDeFicheros`.
+`CELDA_ALMACEN_ORIGEN` es la URL pública de lo publicado. Sin almacén, la publicación no hace nada y lo apunta en el registro. Las variables son de la configuración de la ingesta nocturna; las credenciales de R2 le llegan como credenciales de systemd (`docs/patterns/nixos.md`).
 
 ## La copia de reserva (#46, 29/09/2026)
 

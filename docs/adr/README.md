@@ -6,7 +6,7 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 |---|---|
 | [0001](0001-monorepo-pnpm-autocontenido.md) | Monorepo pnpm autocontenido con las herramientas de Moli |
 | [0002](0002-solid-2-spa-sin-ssr.md) | Solid 2 como SPA, sin SSR |
-| [0003](0003-convex-con-confect-v10.md) | Convex como fuente canónica, con funciones Effect mediante Confect v10 |
+| [0003](0003-convex-con-confect-v10.md) | Convex como fuente canónica, con funciones Effect mediante Confect v10 (desde el 0015 y el 0020, solo el buzón de aportaciones) |
 | [0004](0004-mapa-desde-capas-estaticas.md) | El mapa y las fichas se leen de ficheros estáticos versionados (JSON, desde el formato 5 por provincias; fichas en lotes de 128), con marca de agua por vista |
 | [0005](0005-simulaciones-puras-interfaz-fija.md) | Simulaciones como funciones puras detrás de una interfaz fija, sin Bend en la v1 |
 | [0006](0006-libreria-de-componentes-unico-sitio-con-estilos.md) | La librería de componentes es el único sitio con estilos, y lo impone el lint |

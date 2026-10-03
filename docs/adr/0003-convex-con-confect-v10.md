@@ -1,6 +1,6 @@
 # Convex como fuente canónica, con funciones Effect mediante Confect v10
 
-Estado: aceptada (26/09/2026), tras la exploración técnica 02. Revisada el 28/09/2026 con el ADR 0008: Convex deja de estar expuesto al público y la web ya no tiene cliente de Convex. Revisada el 02/10/2026 con el ADR 0020: cuando la ingesta salga de Convex (#51), Convex solo es el buzón de las aportaciones compartidas, con funciones públicas para enviarlas.
+Estado: aceptada (26/09/2026), tras la exploración técnica 02. Revisada el 28/09/2026 con el ADR 0008: Convex deja de estar expuesto al público y la web ya no tiene cliente de Convex. Revisada el 02/10/2026 con el ADR 0020: cuando la ingesta salga de Convex (#51), Convex solo es el buzón de las aportaciones compartidas, con funciones públicas para enviarlas. Revisada el 03/10/2026 con el #51: la ingesta y la publicación corren en la ingesta nocturna (ADR 0015), y Convex se queda sin tablas, sin funciones y sin crons hasta el buzón (#56).
 
 ## Contexto
 
@@ -17,9 +17,14 @@ contra un backend local real (código en `spikes/confect/`).
   declaran en la spec (`Schema.TaggedError`) y llegan tipados a cada cliente.
 - `convex/` y `confect/_generated/` son código generado (`confect codegen`/`confect dev`) y no se
   editan a mano.
-- Todas las funciones son internas. Las llaman los crons de la ingesta, la publicación (que corre
-  en una acción de Node al final de cada ingesta) y quien administra el despliegue con la clave de
-  administración. El público lee la capa y las fichas publicadas en la CDN (ADR 0004 y 0008).
+- Dónde corre cada cosa desde el #51 (03/10/2026): la ingesta, la fusión y la publicación, en la
+  ingesta nocturna de `apps/nocturna`, con su estado en SQLite (ADR 0015); Convex no tiene tablas,
+  ni funciones, ni crons. Sus primeras funciones serán las públicas del buzón, para enviar
+  aportaciones y pedir una identidad (ADR 0020). El público lee la capa y las fichas publicadas
+  (ADR 0004, 0008 y 0018).
+- Hasta el #51, todas las funciones eran internas. Las llamaban los crons de la ingesta, la
+  publicación (una acción de Node al final de cada ingesta) y quien administraba el despliegue con
+  la clave de administración.
 - La web no tiene cliente de Convex. Hasta el 28/09/2026 leía la ficha con el `WebSocketClient` de
   `@confect/js`; lo que queda de aquel diseño es el puente entre Effect y Solid: una lectura es un
   `Stream` convertido con `Stream.toAsyncIterable` (`leerEnSolid`) y devuelto desde `createMemo`.

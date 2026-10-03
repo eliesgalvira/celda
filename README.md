@@ -26,7 +26,7 @@ pnpm run test
 pnpm run build
 ```
 
-El backend de Convex y el origen local de las capas se arrancan aparte; ver [docs/patterns/convex.md](docs/patterns/convex.md). Sin ellos la web enseña el mapa base y dice que no ha podido cargar los emplazamientos.
+El origen local de las capas se arranca aparte, con lo que haya publicado la ingesta nocturna o con una España sintética; ver [docs/patterns/convex.md](docs/patterns/convex.md#publicación). Sin ellos la web enseña el mapa base y dice que no ha podido cargar los emplazamientos.
 
 El entorno trae Node 24, pnpm 10, tippecanoe y pmtiles.
 
@@ -35,13 +35,13 @@ El entorno trae Node 24, pnpm 10, tippecanoe y pmtiles.
 ```
 apps/web/                 la web, una SPA de Solid 2
 apps/nocturna/            la ingesta nocturna fuera de Convex, con su estado en SQLite
-convex/                   backend de Convex con Confect: tablas, ingesta y API pública
+convex/                   Convex con Confect, sin tablas ni funciones hasta el buzón de aportaciones (#56)
 packages/dominio/         tipos y esquemas del dominio y la fusión, sin E/S
-packages/ingesta/         extractores de las fuentes y el proceso de una ejecución
+packages/ingesta/         extractores de las fuentes, el barrido por zonas y la cola de fichas
 packages/publicacion/     publicación de la capa y las fichas en una carpeta o en R2
 packages/sim/             simulaciones puras con su versión y sus resultados de referencia
 packages/ui/              componentes y tema: el único sitio con estilos
-tools/capas/              generador de la capa de emplazamientos y origen estático local
+tools/capas/              límites de barrio y de municipios, España sintética y origen estático local
 tools/oxlint-plugin-celda reglas de lint propias
 docs/                     arquitectura, ADR y patrones
 nix/                      módulos del flake: entorno, paquete y módulo de NixOS de la ingesta
