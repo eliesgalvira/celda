@@ -94,7 +94,7 @@ export class Sincronizacion extends Context.Service<
       aportacion: AportacionCompartible,
     ) => Effect.Effect<Compartida, FalloAlCompartir>;
   }
->()("@celda/web/buzon/sincronizacion/Sincronizacion") {}
+>()("@celda/web/buzon/sincronizacion") {}
 
 /**
  * La sincronización sobre un buzón. `remoto` se pide la primera vez que se comparte: en la web,

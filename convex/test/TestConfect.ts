@@ -1,3 +1,9 @@
+// El doble de `@confect/test`: repite su interfaz, con `finishInProgressScheduledFunctions` como
+// la escribe la librería, y cada `run` es un punto de entrada que monta sus capas y no tipa sus
+// errores, como el original.
+// @effect-diagnostics lazyEffect:off
+// @effect-diagnostics strictEffectProvide:off
+// @effect-diagnostics anyUnknownInErrorContext:off
 import { Ref } from "@confect/core";
 import { RegisteredConvexFunction } from "@confect/server";
 import { TestConfect as TestConfect_ } from "@confect/test";

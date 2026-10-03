@@ -6,6 +6,7 @@ import { makeFunctionReference } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 
 import refs from "../confect/_generated/refs";
 import { DatabaseReader, MutationCtx } from "../confect/_generated/services";
@@ -72,12 +73,13 @@ const gastarDeGolpe = (limite: NombreDeLimite, cuantas: number, clave?: string) 
     );
   });
 
+const esLimite = Schema.is(LimiteAlcanzado);
+
 /** El límite con que se rechaza un envío, o un fallo de la prueba si no es ese el error. */
 const limiteDe = <A, E extends { readonly _tag: string }, R>(envio: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
     const error = yield* Effect.flip(envio);
-    if (!(error instanceof LimiteAlcanzado))
-      return assert.fail(`se esperaba un límite, no ${error._tag}`);
+    if (!esLimite(error)) return assert.fail(`se esperaba un límite, no ${error._tag}`);
     return error;
   });
 
@@ -203,6 +205,8 @@ describe("buzón: envíos", () => {
           medida({ punto: { longitud: 2.1701, latitud: 41.75 } }),
           medida({ unidaA: { ...base.unidaA, azimut: 300 } }),
           medida({ id: "no-es-un-uuid" }),
+          // Una hora por delante del reloj del sistema, que las pruebas mueven con `vi`.
+          // @effect-diagnostics-next-line globalDateInEffect:off
           medida({ creada: Date.now() + HOUR }),
         ];
         for (const mala of malas) {
@@ -232,6 +236,8 @@ describe("buzón: envíos", () => {
       const crudo = convex.crudo.withRequestMetadata({ ip: IP });
       const conCaptura = { ...correccion(), captura: imagen };
       const enviarCorreccion = makeFunctionReference<"mutation">("buzon:enviarCorreccion");
+      // El rechazo de Convex, sin tipar: solo se mira su texto.
+      // @effect-diagnostics-next-line anyUnknownInErrorContext:off
       const rechazo = yield* Effect.flip(
         Effect.tryPromise(() =>
           crudo.mutation(enviarCorreccion, { identidad, correccion: conCaptura }),

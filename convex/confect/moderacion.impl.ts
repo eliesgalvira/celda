@@ -13,6 +13,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 
 import { claveDelBuzon, hmac } from "../src/claves";
 
@@ -21,6 +22,9 @@ import { DatabaseReader, DatabaseWriter } from "./_generated/services";
 import moderacion, { AportacionDesconocida, AportacionYaModerada } from "./moderacion.spec";
 
 type Fila = typeof import("./_generated/tables/aportaciones").default.Doc.Type;
+
+const esAportacionDesconocida = Schema.is(AportacionDesconocida);
+const esAportacionYaModerada = Schema.is(AportacionYaModerada);
 
 /**
  * Cuántas aportaciones de una identidad se leen para su historial, y cuántas del mismo
@@ -159,7 +163,7 @@ const contexto = FunctionImpl.make(databaseSchema, moderacion, "contexto", ({ id
     }),
   ).pipe(
     Effect.catch((error) =>
-      error instanceof AportacionDesconocida ? Effect.fail(error) : Effect.die(error),
+      esAportacionDesconocida(error) ? Effect.fail(error) : Effect.die(error),
     ),
   ),
 );
@@ -271,7 +275,7 @@ const moderar = Effect.fn("Moderacion.moderar")(function* (
 
 const soloDeLaModeracion = <A, E, R>(efecto: Effect.Effect<A, E, R>) =>
   Effect.catch(efecto, (error) =>
-    error instanceof AportacionDesconocida || error instanceof AportacionYaModerada
+    esAportacionDesconocida(error) || esAportacionYaModerada(error)
       ? Effect.fail(error)
       : Effect.die(error),
   );

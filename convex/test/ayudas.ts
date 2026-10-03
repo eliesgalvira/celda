@@ -1,5 +1,8 @@
 // Cada prueba es su propio punto de entrada y monta sus capas.
 // @effect-diagnostics strictEffectProvide:off
+// Las pruebas mueven el reloj del sistema con `vi.setSystemTime`, y las aportaciones de prueba se
+// fechan con él, como las del navegador.
+// @effect-diagnostics globalDate:off
 import type { CorreccionPropuesta, Corroboracion } from "@celda/dominio/aportacion";
 import type { MedidaPropia } from "@celda/dominio/medida";
 import { afterEach, beforeEach, vi } from "@effect/vitest";

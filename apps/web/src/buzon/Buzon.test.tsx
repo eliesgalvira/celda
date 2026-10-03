@@ -205,6 +205,8 @@ describe("Tus aportaciones", () => {
 
   it("si el buzón rechaza por un límite lo dice, y la medida sigue en el dispositivo", async () => {
     const buzon = buzonDePrueba();
+    // El aviso cuenta lo que falta desde la hora del navegador, como en la web.
+    // @effect-diagnostics-next-line globalDate:off
     buzon.fallar(new LimiteDelBuzon({ ambito: "ip", reintentarA: Date.now() + 5 * 60_000 }));
     const pantalla = await abrirAportaciones(buzon);
     fireEvent.click(await within(pantalla.abierto).findByRole("button", { name: "Compartir" }));

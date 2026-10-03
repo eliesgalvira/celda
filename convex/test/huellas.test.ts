@@ -1,5 +1,7 @@
 // Cada prueba es su propio punto de entrada y monta sus capas.
 // @effect-diagnostics strictEffectProvide:off
+// Las tablas se pasan a texto para buscar en ellas la IP o la huella, sin leer su forma.
+// @effect-diagnostics preferSchemaOverJson:off
 import { HOUR } from "@convex-dev/rate-limiter";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";

@@ -363,6 +363,8 @@ export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function*
       if (pagina.ultima === null) return;
       despuesDe = pagina.ultima;
     }
+    // La conexión con el buzón se monta solo para la recogida: si falla, la noche publica lo demás.
+    // @effect-diagnostics-next-line strictEffectProvide:off
   }).pipe(Effect.provide(buzon));
   const fallo = yield* recogida.pipe(
     Effect.match({

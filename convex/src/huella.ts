@@ -1,4 +1,5 @@
 import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Encoding from "effect/Encoding";
 import * as Option from "effect/Option";
@@ -18,7 +19,7 @@ import { hmac } from "./claves";
 export const VIDA_DE_UNA_HUELLA_MS = 24 * 60 * 60 * 1000;
 
 /** El día UTC de una hora, como «2026-10-03»: el de la sal que le toca. */
-export const diaUtc = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+export const diaUtc = (ms: number): string => DateTime.formatIsoDateUtc(DateTime.makeUnsafe(ms));
 
 /** La sal de hoy, o una nueva si es la primera petición del día. */
 const salDelDia = Effect.fn("Huella.salDelDia")(function* (ahora: number) {

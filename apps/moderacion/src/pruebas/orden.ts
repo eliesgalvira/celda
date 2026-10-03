@@ -54,6 +54,9 @@ export const lanzar = (argumentos: ReadonlyArray<string>) =>
       }),
     );
     const fin = yield* Effect.exit(
+      // Es el punto de entrada de la orden en la prueba, como `moderar` desde la terminal: aquí se
+      // montan sus capas, una vez.
+      // @effect-diagnostics-next-line strictEffectProvide:off
       lanzarModerar(argumentos, false).pipe(Effect.provide(Layer.merge(capturada, ENTORNO))),
     );
     return {

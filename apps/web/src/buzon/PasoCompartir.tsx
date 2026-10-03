@@ -68,7 +68,9 @@ export function PasoCompartir(props: PasoCompartirProps) {
                   titulo: "No se ha podido enviar",
                   texto: "Algo ha fallado en Celda. Se queda guardada en este dispositivo.",
                 }
-              : textosDelFallo(fallo, Date.now()),
+              : // Fuera de Effect, en el manejador: la hora del navegador al llegar el fallo.
+                // @effect-diagnostics-next-line globalDate:off
+                textosDelFallo(fallo, Date.now()),
         });
       });
   };
