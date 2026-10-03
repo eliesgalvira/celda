@@ -6,6 +6,6 @@
     "lib": ["ES2023", "DOM"],
     "types": ["vite/client"]
   },
-  "include": ["confect", "src", "test", "vite.config.ts"],
+  "include": ["confect", "test", "vite.config.ts"],
   "exclude": ["convex/_generated"]
 }

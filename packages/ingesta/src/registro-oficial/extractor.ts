@@ -1,4 +1,3 @@
-import { dividir } from "@celda/dominio/barrido";
 import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -9,8 +8,6 @@ import type * as HttpClient from "effect/unstable/http/HttpClient";
 
 import { type ClienteDeFuente, clienteDeFuente, type OpcionesCliente } from "../cliente.ts";
 import {
-  type ErrorDeExtractor,
-  Extractor,
   ExtractorPorCajas,
   FuenteBloqueada,
   type ListadoDeCaja,
@@ -19,7 +16,7 @@ import {
   SinFichaEnElRegistro,
 } from "../extractor.ts";
 import { decodificarLatin1 } from "../texto.ts";
-import { type Caja, ZONA_BARCELONA } from "../zona.ts";
+import type { Caja } from "../zona.ts";
 import {
   AVISO_SIN_FICHA,
   bandasDeFicha,
@@ -32,23 +29,17 @@ import {
   urlDeListado,
 } from "./normalizar.ts";
 
-/** Cómo se comporta el extractor con el geoportal. Ver `docs/investigacion/registro-oficial.md`. */
-export interface Opciones extends OpcionesCliente {
-  /** Caja que se recorre, en grados ETRS89. */
-  readonly zona: Caja;
-}
-
 /**
+ * Cómo se comporta el extractor con el geoportal. Ver `docs/investigacion/registro-oficial.md`.
  * El tope de peticiones deja barrer toda España en una noche (#50): la primera pasada son unas
  * 250 peticiones de listado y las siguientes, unas 215, más `robots.txt` y los reintentos.
  */
-export const OPCIONES: Opciones = {
+export const OPCIONES: OpcionesCliente = {
   userAgent: "Celda (ingesta; contacto en celda.elies.site)",
   pausa: Duration.seconds(3),
   maxPeticiones: 400,
   espera: Duration.seconds(10),
   reintentos: 3,
-  zona: ZONA_BARCELONA,
 };
 
 /**
@@ -77,15 +68,6 @@ export const opcionesClienteDesdeConfig: Config.Config<OpcionesCliente> = Config
     pausa: Duration.seconds(Math.max(pausaSegundos, 3)),
   })),
 );
-
-/** Las opciones del cliente y la caja de Barcelona, para la ingesta de Convex. */
-export const opcionesDesdeConfig: Config.Config<Opciones> = Config.map(
-  opcionesClienteDesdeConfig,
-  (cliente) => ({ ...cliente, zona: OPCIONES.zona }),
-);
-
-/** Profundidad máxima al dividir cajas. A 6 niveles la caja de Barcelona mide unos 300 m. */
-const PROFUNDIDAD_MAXIMA = 6;
 
 /** Estados con los que el geoportal estaría negando el paso a Celda. */
 const ESTADOS_DE_BLOQUEO: ReadonlySet<number> = new Set([401, 403]);
@@ -164,59 +146,8 @@ const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
           ([deListado, deFichas]) => deListado + deFichas,
         );
 
-  return { elementos, listadoDeCaja, ficha, peticiones };
+  return { listadoDeCaja, ficha, peticiones };
 };
-
-/**
- * Extractor del registro oficial (Infoantenas) para la ingesta de Convex: recorre el listado de
- * `zona` por cajas que divide en cuatro al llegar al tope de 1000 elementos.
- */
-export const capa = (opciones: Opciones): Layer.Layer<Extractor, never, HttpClient.HttpClient> =>
-  Layer.effect(
-    Extractor,
-    Effect.gen(function* () {
-      const cliente = yield* clienteDeFuente(ORIGEN, opciones);
-      const fuente = geoportal(cliente, cliente);
-
-      const elementosDeCaja = (
-        caja: Caja,
-        profundidad: number,
-      ): Effect.Effect<ReadonlyArray<unknown>, ErrorDeExtractor> =>
-        Effect.gen(function* () {
-          const { elementos } = yield* fuente.elementos(caja);
-          if (elementos.length < TOPE_LISTADO) {
-            return elementos;
-          }
-          if (profundidad >= PROFUNDIDAD_MAXIMA) {
-            return yield* new RespuestaInesperada({
-              url: urlDeListado(caja),
-              motivo: "caja con 1000 elementos al máximo de divisiones",
-            });
-          }
-          const partes = yield* Effect.forEach(dividir(caja), (parte) =>
-            elementosDeCaja(parte, profundidad + 1),
-          );
-          return partes.flat();
-        });
-
-      /**
-       * Una zona entera sin elementos no es un dato sino un fallo de la fuente: guardarlo
-       * contaría todas las estaciones como ausentes y dos noches así las retirarían.
-       */
-      const listado = Effect.gen(function* () {
-        const resultado = listadoDeElementos(yield* elementosDeCaja(opciones.zona, 0));
-        if (resultado.registros.length === 0) {
-          return yield* new RespuestaInesperada({
-            url: urlDeListado(opciones.zona),
-            motivo: "el listado de toda la zona está vacío",
-          });
-        }
-        return resultado;
-      }).pipe(Effect.withSpan("RegistroOficial.listado"));
-
-      return Extractor.of({ fuente: "registro-oficial", listado, ficha: fuente.ficha });
-    }),
-  );
 
 /**
  * Extractor del registro oficial para el barrido por zonas de la ingesta nocturna: pide el

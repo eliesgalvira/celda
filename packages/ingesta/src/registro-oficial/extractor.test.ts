@@ -8,12 +8,11 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
+import type { OpcionesCliente } from "../cliente.ts";
 import {
-  Extractor,
   ExtractorPorCajas,
   FuenteBloqueada,
   type Registro,
-  RespuestaInesperada,
   SinFichaEnElRegistro,
 } from "../extractor.ts";
 import { leerMuestra } from "../pruebas/grabado.ts";
@@ -24,7 +23,7 @@ import {
   type Respondedor,
 } from "../pruebas/http.ts";
 import { esperarConReloj } from "../pruebas/reloj.ts";
-import { capa, capaPorCajas, OPCIONES, type Opciones } from "./extractor.ts";
+import { capaPorCajas, OPCIONES } from "./extractor.ts";
 import type { Caja } from "../zona.ts";
 
 const CAJA: Caja = [2.105, 41.382, 2.125, 41.392];
@@ -47,25 +46,31 @@ const elementos = (n: number, prefijo: string, [oeste, sur]: Caja) =>
     }),
   );
 
-const opciones = (cambios: Partial<Opciones> = {}): Opciones => ({
-  ...OPCIONES,
-  zona: CAJA,
-  ...cambios,
-});
+/** Opciones del listado y, si van aparte, de las fichas, sobre las de siempre. */
+interface Cambios {
+  readonly listado?: Partial<OpcionesCliente>;
+  readonly fichas?: Partial<OpcionesCliente>;
+}
 
-/** Ejecuta `programa` con el extractor real sobre el cliente de prueba y el reloj de prueba. */
+/**
+ * Ejecuta `programa` con el extractor real sobre el cliente de prueba y el reloj de prueba, con
+ * las fichas a otro ritmo que el listado si se le da `fichas`.
+ */
 const conExtractor = <A, E>(
   responder: Respondedor,
-  programa: (extractor: typeof Extractor.Service) => Effect.Effect<A, E>,
-  cambios: Partial<Opciones> = {},
+  programa: (extractor: typeof ExtractorPorCajas.Service) => Effect.Effect<A, E>,
+  cambios: Cambios = {},
 ) =>
   Effect.gen(function* () {
     const peticiones = yield* Ref.make<ReadonlyArray<Peticion>>([]);
     const fibra = yield* Effect.gen(function* () {
-      return yield* programa(yield* Extractor);
+      return yield* programa(yield* ExtractorPorCajas);
     }).pipe(
       Effect.provide(
-        capa(opciones(cambios)).pipe(Layer.provide(clienteDePrueba(peticiones, responder))),
+        capaPorCajas(
+          { ...OPCIONES, ...cambios.listado },
+          cambios.fichas === undefined ? undefined : { ...OPCIONES, ...cambios.fichas },
+        ).pipe(Layer.provide(clienteDePrueba(peticiones, responder))),
       ),
       Effect.exit,
       Effect.forkChild,
@@ -81,7 +86,7 @@ describe("extractor del registro oficial", () => {
       const { salida, peticiones } = yield* conExtractor(
         (url) =>
           url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 200, cuerpo: muestra },
-        (extractor) => extractor.listado,
+        (extractor) => extractor.caja(CAJA),
       );
       assert.strictEqual(salida._tag, "Success");
       assert.deepStrictEqual(
@@ -95,35 +100,6 @@ describe("extractor del registro oficial", () => {
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("divide la caja en cuatro cuando llega al tope de 1000 y quita los repetidos", () =>
-    Effect.gen(function* () {
-      const { salida, peticiones } = yield* conExtractor(
-        (url) => {
-          if (url.pathname === "/robots.txt") {
-            return NO_HAY_ROBOTS;
-          }
-          const caja = (url.searchParams.get("bbox") ?? "").split(",").map(Number);
-          const [oeste = 0, sur = 0, este = 0, norte = 0] = caja;
-          const raiz = caja.join(",") === CAJA.join(",");
-          // La caja entera llega al tope; cada cuarto tiene 300, y dos repiten un elemento.
-          return {
-            estado: 200,
-            cuerpo: raiz
-              ? elementos(1000, "R", [oeste, sur, este, norte])
-              : elementos(300, sur === CAJA[1] ? "S" : `N${oeste}-`, [oeste, sur, este, norte]),
-          };
-        },
-        (extractor) => extractor.listado,
-      );
-      assert.strictEqual(peticiones.length, 6);
-      assert.strictEqual(salida._tag, "Success");
-      if (salida._tag === "Success") {
-        // Los dos cuartos del sur comparten claves: 300 + 2 × 300 del norte.
-        assert.strictEqual(salida.value.registros.length, 900);
-      }
-    }),
-  );
-
   it.effect("deja al menos la pausa entre el final de una respuesta y la siguiente petición", () =>
     Effect.gen(function* () {
       const { peticiones } = yield* conExtractor(
@@ -131,7 +107,7 @@ describe("extractor del registro oficial", () => {
           url.pathname === "/robots.txt"
             ? NO_HAY_ROBOTS
             : { estado: 200, cuerpo: elementos(1, "A", CAJA) },
-        (extractor) => Effect.andThen(extractor.listado, extractor.listado),
+        (extractor) => Effect.andThen(extractor.caja(CAJA), extractor.caja(CAJA)),
       );
       const huecos = peticiones.slice(1).map((p, i) => p.en - (peticiones[i]?.en ?? 0));
       assert.strictEqual(peticiones.length, 3);
@@ -150,7 +126,7 @@ describe("extractor del registro oficial", () => {
             ? { estado: 503, cuerpo: "" }
             : { estado: 200, cuerpo: elementos(1, "A", CAJA) };
         },
-        (extractor) => extractor.listado,
+        (extractor) => extractor.caja(CAJA),
       );
       assert.strictEqual(salida._tag, "Success");
       const listados = peticiones.filter((p) => p.ruta !== "/robots.txt");
@@ -166,7 +142,7 @@ describe("extractor del registro oficial", () => {
     Effect.gen(function* () {
       const { salida, peticiones } = yield* conExtractor(
         (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 502, cuerpo: "" }),
-        (extractor) => extractor.listado,
+        (extractor) => extractor.caja(CAJA),
       );
       assert.strictEqual(peticiones.length, 1 + 1 + OPCIONES.reintentos);
       assert.strictEqual(salida._tag, "Failure");
@@ -180,9 +156,9 @@ describe("extractor del registro oficial", () => {
         (url) =>
           url.pathname === "/robots.txt"
             ? NO_HAY_ROBOTS
-            : { estado: 200, cuerpo: elementos(1000, "R", CAJA) },
-        (extractor) => extractor.listado,
-        { maxPeticiones: 3 },
+            : { estado: 200, cuerpo: elementos(1, "A", CAJA) },
+        (extractor) => Effect.forEach([CAJA, CAJA, CAJA], (caja) => extractor.caja(caja)),
+        { listado: { maxPeticiones: 3 } },
       );
       assert.strictEqual(peticiones.length, 3);
       assert.include(String(salida), "LimiteDePeticiones");
@@ -196,31 +172,13 @@ describe("extractor del registro oficial", () => {
           url.pathname === "/robots.txt"
             ? { estado: 200, cuerpo: "User-agent: Celda\nDisallow: /VCTEL/\n" }
             : { estado: 200, cuerpo: elementos(1, "A", CAJA) },
-        (extractor) => extractor.listado,
+        (extractor) => extractor.caja(CAJA),
       );
       assert.deepStrictEqual(
         peticiones.map((p) => p.ruta),
         ["/robots.txt"],
       );
       assert.include(String(salida), "ProhibidoPorRobots");
-    }),
-  );
-
-  it.effect("una zona entera vacía es un fallo de la fuente, no un listado sin estaciones", () =>
-    Effect.gen(function* () {
-      const { salida } = yield* conExtractor(
-        (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 200, cuerpo: "{}" }),
-        (extractor) => Effect.flip(extractor.listado),
-      );
-      assert.deepStrictEqual(
-        salida,
-        Exit.succeed(
-          new RespuestaInesperada({
-            url: "https://geoportal.minetur.gob.es/VCTEL/infoantenasGeoJSON.do?idCapa=null&zoom=4&bbox=2.105000,41.382000,2.125000,41.392000",
-            motivo: "el listado de toda la zona está vacío",
-          }),
-        ),
-      );
     }),
   );
 
@@ -267,37 +225,11 @@ const FICHA: Registro = {
   url: "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0800942",
 };
 
-/**
- * Ejecuta `programa` con el extractor por cajas real sobre el cliente de prueba, con las fichas
- * a otro ritmo que el listado si se le da `fichas`.
- */
-const conExtractorPorCajas = <A, E>(
-  responder: Respondedor,
-  programa: (extractor: typeof ExtractorPorCajas.Service) => Effect.Effect<A, E>,
-  fichas?: Partial<Opciones>,
-) =>
-  Effect.gen(function* () {
-    const peticiones = yield* Ref.make<ReadonlyArray<Peticion>>([]);
-    const fibra = yield* Effect.gen(function* () {
-      return yield* programa(yield* ExtractorPorCajas);
-    }).pipe(
-      Effect.provide(
-        capaPorCajas(OPCIONES, fichas === undefined ? undefined : { ...OPCIONES, ...fichas }).pipe(
-          Layer.provide(clienteDePrueba(peticiones, responder)),
-        ),
-      ),
-      Effect.exit,
-      Effect.forkChild,
-    );
-    const salida = yield* esperarConReloj(fibra);
-    return { salida, peticiones: yield* Ref.get(peticiones) };
-  });
-
 describe("fichas del registro oficial y bloqueos del geoportal", () => {
   it.effect("las fichas van a su pausa sobre la misma conexión que el listado", () =>
     Effect.gen(function* () {
       const html = new Uint8Array(yield* leerMuestra("detalle-telefonica-0800942.iso-8859-1.html"));
-      const { salida, peticiones } = yield* conExtractorPorCajas(
+      const { salida, peticiones } = yield* conExtractor(
         (url) => {
           if (url.pathname === "/robots.txt") return NO_HAY_ROBOTS;
           if (url.pathname === "/VCTEL/detalleEstacion.do") return { estado: 200, cuerpo: html };
@@ -310,7 +242,7 @@ describe("fichas del registro oficial y bloqueos del geoportal", () => {
             yield* extractor.ficha(FICHA);
             return yield* extractor.peticiones;
           }),
-        { pausa: Duration.seconds(5), maxPeticiones: 2 },
+        { fichas: { pausa: Duration.seconds(5), maxPeticiones: 2 } },
       );
       assert.deepStrictEqual(salida, Exit.succeed(4));
       // robots.txt una sola vez; la primera ficha espera sus 5 s desde la caja.
@@ -330,10 +262,10 @@ describe("fichas del registro oficial y bloqueos del geoportal", () => {
   it.effect("las fichas tienen su propio tope, aparte del del listado", () =>
     Effect.gen(function* () {
       const html = new Uint8Array(yield* leerMuestra("detalle-telefonica-0800942.iso-8859-1.html"));
-      const { salida } = yield* conExtractorPorCajas(
+      const { salida } = yield* conExtractor(
         (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 200, cuerpo: html }),
         (extractor) => Effect.flip(Effect.andThen(extractor.ficha(FICHA), extractor.ficha(FICHA))),
-        { maxPeticiones: 1 },
+        { fichas: { maxPeticiones: 1 } },
       );
       assert.include(String(salida), "LimiteDePeticiones");
     }).pipe(Effect.provide(NodeServices.layer)),
@@ -341,7 +273,7 @@ describe("fichas del registro oficial y bloqueos del geoportal", () => {
 
   it.effect("un 403 en una ficha es la fuente bloqueando a Celda: no se reintenta", () =>
     Effect.gen(function* () {
-      const { salida, peticiones } = yield* conExtractorPorCajas(
+      const { salida, peticiones } = yield* conExtractor(
         (url) =>
           url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 403, cuerpo: "Forbidden" },
         (extractor) => Effect.flip(extractor.ficha(FICHA)),
@@ -356,7 +288,7 @@ describe("fichas del registro oficial y bloqueos del geoportal", () => {
 
   it.effect("una página que no es una ficha del geoportal es la fuente bloqueando a Celda", () =>
     Effect.gen(function* () {
-      const { salida } = yield* conExtractorPorCajas(
+      const { salida } = yield* conExtractor(
         (url) =>
           url.pathname === "/robots.txt"
             ? NO_HAY_ROBOTS
@@ -377,7 +309,7 @@ describe("fichas del registro oficial y bloqueos del geoportal", () => {
 
   it.effect("un listado que llega en HTML es la fuente bloqueando a Celda", () =>
     Effect.gen(function* () {
-      const { salida } = yield* conExtractorPorCajas(
+      const { salida } = yield* conExtractor(
         (url) =>
           url.pathname === "/robots.txt"
             ? NO_HAY_ROBOTS

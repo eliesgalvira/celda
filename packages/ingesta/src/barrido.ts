@@ -1,4 +1,4 @@
-import { compararTexto } from "@celda/dominio/banda";
+import { type Banda, compararTexto } from "@celda/dominio/banda";
 import {
   Caja,
   cajaDeCuadro,
@@ -19,7 +19,7 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import { Cuentas } from "./ejecucion.ts";
+import { type Cambios, Cuentas } from "./ejecucion.ts";
 import {
   describirError,
   type ErrorDeExtractor,
@@ -36,7 +36,6 @@ import {
   Provincias,
   PublicacionAMitad,
 } from "./fichas.ts";
-import type { BaseDeIngesta, Cierre } from "./proceso.ts";
 
 /**
  * Veces que se puede dividir un cuadro. Tras 8 divisiones una caja mide 1/256° de lado, unos
@@ -181,17 +180,36 @@ export interface EstadoDeZona {
   readonly aMedias: boolean;
 }
 
-type Base = typeof BaseDeIngesta.Service;
+/** Cómo empieza una ejecución: omitida si el interruptor de su fuente está apagado. */
+export interface Arranque {
+  readonly tipo: "omitida" | "iniciada";
+  /** Identificador de la ejecución en la base. */
+  readonly ejecucion: string;
+}
+
+/** Lo que se apunta al cerrar una ejecución. */
+export interface Cierre {
+  /** Fin de la ejecución. Los datos llevan la fecha de su inicio. */
+  readonly fin: number;
+  readonly cambios: Cambios;
+  readonly errores: ReadonlyArray<string>;
+}
 
 /**
- * Donde guarda su estado el barrido por zonas: lo mismo que `BaseDeIngesta` para las fichas y la
- * fusión, y además los barridos de cada zona, los cuadros hechos de cada uno y las cajas de cada
- * cuadro. La implementa la base SQLite de la ingesta nocturna.
+ * Donde guarda su estado el barrido por zonas entre noches: las observaciones de cada fuente, los
+ * emplazamientos fusionados, el registro de ejecuciones, los barridos de cada zona, los cuadros
+ * hechos de cada uno y las cajas de cada cuadro. La implementa la base SQLite de la ingesta
+ * nocturna (ADR 0015). Cada operación es idempotente, así que una ejecución cortada se repite sin
+ * más.
  */
 export class BaseDeBarrido extends Context.Service<
   BaseDeBarrido,
   {
-    readonly iniciar: Base["iniciar"];
+    /**
+     * Abre una ejecución de `fuente`. Las que seguían en curso de esa fuente quedan
+     * interrumpidas. Con el interruptor apagado, queda omitida con el motivo en sus errores.
+     */
+    readonly iniciar: (fuente: Fuente, fecha: number) => Effect.Effect<Arranque>;
     readonly estadoDeZonas: (fuente: Fuente) => Effect.Effect<ReadonlyMap<string, EstadoDeZona>>;
     /**
      * Abre un barrido de `zona` para la ejecución. Si la zona tiene uno a medias de la misma
@@ -236,14 +254,23 @@ export class BaseDeBarrido extends Context.Service<
       leidasAntesDe: number,
     ) => Effect.Effect<ReadonlyArray<FichaEnCola>>;
     /** Guarda las bandas de una ficha (`trasFicha`) y borra sus fallos; `true` si han cambiado. */
-    readonly aplicarFicha: Base["aplicarFicha"];
+    readonly aplicarFicha: (
+      fuente: Fuente,
+      clave: string,
+      fecha: number,
+      bandas: ReadonlyArray<Banda>,
+    ) => Effect.Effect<boolean>;
     /** Apunta el fallo de una ficha: cuántos van seguidos y hasta cuándo espera. */
     readonly fallarFicha: (
       fuente: Fuente,
       clave: string,
       fallo: FalloDeFicha,
     ) => Effect.Effect<void>;
-    readonly fusionar: Base["fusionar"];
+    /**
+     * Vuelve a fusionar las observaciones vigentes de todas las fuentes y guarda solo los
+     * emplazamientos que cambian, con `fecha` como versión.
+     */
+    readonly fusionar: (fecha: number) => Effect.Effect<Cuentas>;
     readonly completar: (
       ejecucion: string,
       cierre: Cierre & {

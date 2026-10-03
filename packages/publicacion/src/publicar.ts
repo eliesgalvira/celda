@@ -105,9 +105,10 @@ export class DatosNoDisponibles extends Schema.TaggedError<DatosNoDisponibles>()
 ) {}
 
 /**
- * De dónde saca la publicación lo que publica: la base de la ingesta. La publicación no sabe si
- * es Convex o una base SQLite; solo le pide la versión de los datos, la instantánea, las fichas y
- * hasta dónde llegan.
+ * De dónde saca la publicación lo que publica: la base de la ingesta. La publicación no sabe
+ * cómo guarda sus datos; solo le pide la versión de los datos, la instantánea, las fichas y hasta
+ * dónde llegan. Es la base SQLite de la ingesta nocturna, o datos sintéticos en las pruebas y en
+ * `tools/capas`.
  */
 export class DatosPublicables extends Context.Service<
   DatosPublicables,

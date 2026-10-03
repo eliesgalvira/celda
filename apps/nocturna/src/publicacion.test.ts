@@ -22,30 +22,35 @@ import {
   PARTES_DEL_INDICE,
   type ResumenLeido,
 } from "@celda/dominio/provincias";
-import { capaGrabada, type FuenteGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
-import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
-import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
+import {
+  capaGrabadaPorCajas,
+  type FuenteGrabada,
+  muestraCampusNord,
+} from "@celda/ingesta/pruebas/grabado";
+import {
+  DatosPublicables,
+  publicar as publicarDatos,
+  retirarVersionesViejas,
+  VERSIONES_ANTERIORES,
+} from "@celda/publicacion/publicar";
 import { conCuadros } from "@celda/publicacion/zonas";
-import { retirarVersionesViejas, VERSIONES_ANTERIORES } from "@celda/publicacion/publicar";
-import { NodeServices } from "@effect/platform-node";
+import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Path from "effect/Path";
-import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import { TestClock } from "effect/testing";
+import * as SqlClient from "effect/unstable/sql/SqlClient";
 
-import refs from "../confect/_generated/refs";
-import {
-  Publicacion,
-  publicacionDirecta,
-  publicar as publicarInstantanea,
-} from "../src/publicacion";
-import { convexEnMemoria, ejecutar } from "./ayudas";
-import * as TestConfect from "./TestConfect";
+import { conBase, conEntorno, type Entorno, unaNoche } from "./pruebas/entorno.ts";
+
+/**
+ * La publicación compartida (`packages/publicacion`) sobre los datos de la base SQLite de la
+ * ingesta nocturna y el almacén en una carpeta temporal: qué escribe, en qué orden, qué reutiliza,
+ * cuándo se niega a escribir y qué versiones retira. La noche y cuándo publica se prueban en
+ * `programa.test.ts`; aquí la noche solo llena la base y se publica a mano.
+ */
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
@@ -130,6 +135,7 @@ const MUNICIPIOS: LimitesDeMunicipios = {
     [v(2.115), v(41), v(0.885), 0, 0, v(1), -v(0.885), 0],
   ],
 };
+
 const ZONAS = conCuadros({
   barrios: LIMITES,
   municipios: indexarMunicipios(MUNICIPIOS),
@@ -145,87 +151,25 @@ const ZONAS = conCuadros({
   },
 });
 
-interface Escrituras {
-  /** Ficheros escritos de nuevo, en orden, con `vigente.json` cada vez que cambia. */
-  readonly escritos: ReadonlyArray<string>;
-}
+/** Una noche que lee la fuente grabada y guarda en la base, sin publicar. */
+const ingerir = (entorno: Entorno, grabada: FuenteGrabada) =>
+  unaNoche(entorno, capaGrabadaPorCajas("registro-oficial", grabada), { sinPublicar: true });
 
-/**
- * El almacén en una carpeta temporal, como el de desarrollo, apuntando cada fichero que escribe.
- * Así se comprueba desde fuera que publicar sin cambios no escribe nada.
- */
-const almacenVigilado = (carpeta: string, registro: Ref.Ref<Escrituras>) =>
-  Layer.effect(
-    AlmacenDeFicheros,
-    Effect.map(AlmacenDeFicheros, (almacen) =>
-      AlmacenDeFicheros.of({
-        ...almacen,
-        guardar: (fichero, contenido) =>
-          Effect.tap(almacen.guardar(fichero, contenido), (nuevo) =>
-            nuevo
-              ? Ref.update(registro, (r) => ({ escritos: [...r.escritos, fichero] }))
-              : Effect.void,
-          ),
-        cambiarVigente: (contenido) =>
-          Effect.tap(almacen.cambiarVigente(contenido), () =>
-            Ref.update(registro, (r) => ({ escritos: [...r.escritos, FICHERO_VIGENTE] })),
-          ),
-      }),
-    ),
-  ).pipe(Layer.provide(almacenEnCarpeta({ carpeta, origen: ORIGEN })));
+/** Publica a mano lo que hay en la base, en el almacén vigilado del entorno. */
+const publicar = (entorno: Entorno) =>
+  conBase(
+    entorno.base,
+    publicarDatos(ZONAS, POR_LOTE).pipe(Effect.provide(entorno.almacenVigilado)),
+  );
 
-interface Entorno {
-  readonly carpeta: string;
-  readonly almacen: Layer.Layer<AlmacenDeFicheros>;
-  /** Lo escrito desde el principio de la prueba. */
-  readonly escritos: Effect.Effect<ReadonlyArray<string>>;
-  /** Lee un fichero del almacén, o `undefined` si no está. */
-  readonly leer: (fichero: string) => Effect.Effect<string | undefined>;
-}
-
-/** Un Convex en memoria y un almacén en una carpeta temporal nuevos para cada prueba. */
-const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<A, E, R>) =>
+/** Un fichero del almacén, o `undefined` si no está. */
+const leer = (entorno: Entorno, fichero: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const carpeta = path.join(yield* fs.makeTempDirectoryScoped(), "almacen");
-    const registro = yield* Ref.make<Escrituras>({ escritos: [] });
-    return yield* prueba({
-      carpeta,
-      almacen: almacenVigilado(carpeta, registro).pipe(Layer.provide(NodeServices.layer)),
-      escritos: Effect.map(Ref.get(registro), (r) => r.escritos),
-      leer: (fichero) =>
-        fs.readFileString(path.join(carpeta, fichero)).pipe(Effect.orElseSucceed(() => undefined)),
-    });
-  }).pipe(Effect.scoped, Effect.provide(Layer.merge(TestConfect.layer, NodeServices.layer)));
-
-/** Publica a mano, con el Convex en memoria y el almacén de la prueba. */
-const publicar = (entorno: Entorno) =>
-  Effect.gen(function* () {
-    return yield* publicarInstantanea(ZONAS, POR_LOTE).pipe(
-      Effect.provide(Layer.merge(entorno.almacen, yield* convexEnMemoria)),
-    );
-  });
-
-/** La publicación automática tras la ingesta, como la monta la acción, contando sus llamadas. */
-const publicacionContada = (entorno: Entorno, llamadas: Ref.Ref<number>) =>
-  Effect.gen(function* () {
-    const directa = yield* Effect.service(Publicacion).pipe(
-      Effect.provide(
-        publicacionDirecta(ZONAS, POR_LOTE).pipe(
-          Layer.provide(Layer.merge(entorno.almacen, yield* convexEnMemoria)),
-        ),
-      ),
-    );
-    return Layer.succeed(
-      Publicacion,
-      Publicacion.of({
-        publicar: Effect.andThen(
-          Ref.update(llamadas, (n) => n + 1),
-          directa.publicar,
-        ),
-      }),
-    );
+    return yield* fs
+      .readFileString(path.join(entorno.almacen, fichero))
+      .pipe(Effect.orElseSucceed(() => undefined));
   });
 
 /** Lo que la web leería del almacén: la vigente, su resumen y la capa de cada provincia. */
@@ -239,10 +183,10 @@ interface Leida {
 /** Lee la versión vigente como la leería la web, y falla la prueba si algo no se entiende. */
 const leerVigente = (entorno: Entorno) =>
   Effect.gen(function* () {
-    const vigente = decodificarVigente((yield* entorno.leer(FICHERO_VIGENTE)) ?? "");
+    const vigente = decodificarVigente((yield* leer(entorno, FICHERO_VIGENTE)) ?? "");
     if (Result.isFailure(vigente)) return assert.fail("vigente.json no se entiende");
     const resumen = leerResumen(
-      (yield* entorno.leer(vigente.success.resumen ?? "")) ?? "",
+      (yield* leer(entorno, vigente.success.resumen ?? "")) ?? "",
       vigente.success.version,
     );
     if (Result.isFailure(resumen)) return assert.fail(resumen.failure.message);
@@ -250,7 +194,7 @@ const leerVigente = (entorno: Entorno) =>
     for (const provincia of resumen.success.provincias) {
       if (provincia.fichero === undefined) continue;
       const capa = leerCapaDeProvincia(
-        (yield* entorno.leer(provincia.fichero)) ?? "",
+        (yield* leer(entorno, provincia.fichero)) ?? "",
         provincia.codigo,
       );
       if (Result.isFailure(capa)) return assert.fail(capa.failure.message);
@@ -270,7 +214,7 @@ const fichasDelLote = (entorno: Entorno, leida: Leida, e: EmplazamientoLeido) =>
   Effect.gen(function* () {
     const capa = leida.capas.get(e.provincia ?? "");
     const fichero = capa?.lotes[e.lote ?? -1] ?? "";
-    const fichas = leerLoteDeProvincia((yield* entorno.leer(fichero)) ?? "", e.provincia ?? "");
+    const fichas = leerLoteDeProvincia((yield* leer(entorno, fichero)) ?? "", e.provincia ?? "");
     if (Result.isFailure(fichas)) return assert.fail(`${e.clave}: ${fichas.failure.message}`);
     return fichas.success;
   });
@@ -289,58 +233,73 @@ const lugarEsperado = (e: EmplazamientoLeido) =>
         fuente: MUNICIPIOS.fuente,
       };
 
-/**
- * Cada emplazamiento publicado tiene su ficha en su lote, igual que la da Convex, con el lugar en
- * que cae y sin ser posterior a la noche de la ingesta.
- */
 /** El índice de claves dice la provincia de cada emplazamiento, en la parte que le toca. */
 const comprobarIndice = (entorno: Entorno, leida: Leida) =>
   Effect.gen(function* () {
     const partes = leida.resumen.claves ?? [];
     for (const e of leida.emplazamientos) {
       const parte = partes[parteDeClave(e.clave, partes.length)] ?? "";
-      const indice = leerParteDelIndice((yield* entorno.leer(parte)) ?? "");
+      const indice = leerParteDelIndice((yield* leer(entorno, parte)) ?? "");
       assert.strictEqual(Result.getOrUndefined(indice)?.get(e.clave), e.provincia, e.clave);
     }
   });
 
+/**
+ * Cada emplazamiento publicado tiene su ficha en su lote, igual que la da la base, con el lugar en
+ * que cae y sin ser posterior a la noche de la ingesta.
+ */
 const comprobarFichas = (entorno: Entorno, leida: Leida) =>
   Effect.gen(function* () {
-    const convex = yield* TestConfect.TestConfect;
+    const deLaBase = yield* conBase(
+      entorno.base,
+      Effect.gen(function* () {
+        const datos = yield* DatosPublicables;
+        return yield* datos.fichas(leida.emplazamientos.map((e) => e.clave));
+      }),
+    );
     for (const e of leida.emplazamientos) {
       const ficha = (yield* fichasDelLote(entorno, leida, e)).find((f) => f.clave === e.clave);
-      const deConvex = yield* convex.query(refs.internal.datos.ficha, { clave: e.clave });
-      assert.deepStrictEqual(
-        Option.some(ficha),
-        Option.map(deConvex, (f) => ({ ...f, lugar: lugarEsperado(e) })),
-        e.clave,
-      );
+      const guardada = deLaBase.find((f) => f.clave === e.clave);
+      assert.isDefined(guardada, e.clave);
+      assert.deepStrictEqual(ficha, guardada && { ...guardada, lugar: lugarEsperado(e) }, e.clave);
       assert.isAtMost(ficha?.version ?? Infinity, NOCHE, e.clave);
     }
   });
 
-/** Una estación de Orange se mueve 200 m: cambia un emplazamiento y sale otra versión. */
-const conOrangeMovida = (grabada: FuenteGrabada): FuenteGrabada => ({
+/** Las versiones que la base tiene apuntadas como publicadas, con su URL. */
+const versionesRegistradas = (entorno: Entorno) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    return yield* sql<{
+      readonly version: string;
+      readonly url: string;
+    }>`SELECT version, url FROM versiones ORDER BY fecha`;
+  }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
+
+/**
+ * Una estación de Orange se mueve hacia el norte, por defecto 0,0018° (unos 200 m): cambia un
+ * emplazamiento de Barcelona.
+ */
+const conOrangeMovida = (grabada: FuenteGrabada, grados = 0.0018): FuenteGrabada => ({
   ...grabada,
   listado: {
     ...grabada.listado,
     registros: grabada.listado.registros.map((r) =>
       r.clave === "ORANGE ESPAGNE, S.A.U. - CATR0508Z"
-        ? { ...r, posicion: { ...r.posicion, latitud: r.posicion.latitud + 0.0018 } }
+        ? { ...r, posicion: { ...r.posicion, latitud: r.posicion.latitud + grados } }
         : r,
     ),
   },
 });
 
-describe("publicación de la capa y las fichas (Convex en memoria, almacén en carpeta)", () => {
+describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta)", () => {
   it.effect(
     "publica el resumen, una capa y unos lotes por provincia, y vigente.json el último",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
-          const convex = yield* TestConfect.TestConfect;
           yield* TestClock.setTime(NOCHE);
-          yield* ejecutar(capaGrabada("registro-oficial", yield* muestraCampusNord));
+          yield* ingerir(entorno, yield* muestraCampusNord);
 
           yield* TestClock.adjust(60_000);
           const publicada = yield* publicar(entorno);
@@ -385,13 +344,15 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
               ["43", 0, false],
             ],
           );
-          // La caja del extractor no barre entera ninguna provincia: ninguna está cubierta, pero
-          // Barcelona y Lleida tienen la fecha del barrido de esa caja.
+          // La noche ha barrido Cataluña, y Lleida solo toca cuadros de Cataluña: está cubierta.
+          // El recinto de prueba de Barcelona llega por su esquina sureste al cuadro 3,40, el de
+          // Menorca, que es de `levante` y no se ha barrido: no está cubierta. Las dos llevan la
+          // fecha del barrido de Cataluña.
           assert.deepStrictEqual(
             leida.resumen.provincias.map((p) => [p.codigo, p.cubierta, p.barrido]),
             [
               ["08", false, NOCHE],
-              ["25", false, NOCHE],
+              ["25", true, NOCHE],
               ["43", false, null],
             ],
           );
@@ -416,13 +377,11 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
             leida.capas.get("08")?.emplazamientos.length,
           );
 
-          // Cada emplazamiento tiene su ficha en su lote, igual que la da Convex y con el
-          // municipio y la provincia en que cae.
           yield* comprobarFichas(entorno, leida);
 
           // El manifiesto lista las capas y los lotes, que no llevan la versión en el nombre.
           const manifiesto = decodificarManifiesto(
-            (yield* entorno.leer(ficheroDeManifiesto(version))) ?? "",
+            (yield* leer(entorno, ficheroDeManifiesto(version))) ?? "",
           );
           assert.deepStrictEqual(
             Result.getOrUndefined(manifiesto)?.ficheros,
@@ -436,11 +395,9 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
 
           yield* comprobarIndice(entorno, leida);
 
-          const registrada = yield* convex.query(refs.internal.capas.vigente);
-          assert.deepStrictEqual(
-            Option.map(registrada, (r) => [r.version, r.url]),
-            Option.some([version, `${ORIGEN}/${leida.vigente.resumen ?? ""}`]),
-          );
+          assert.deepStrictEqual(yield* versionesRegistradas(entorno), [
+            { version, url: `${ORIGEN}/${leida.vigente.resumen ?? ""}` },
+          ]);
         }),
       ),
   );
@@ -452,7 +409,7 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
         Effect.gen(function* () {
           const grabada = yield* muestraCampusNord;
           yield* TestClock.setTime(NOCHE);
-          yield* ejecutar(capaGrabada("registro-oficial", grabada));
+          yield* ingerir(entorno, grabada);
           const primera = yield* publicar(entorno);
           const antes = yield* entorno.escritos;
           const leidaAntes = yield* leerVigente(entorno);
@@ -465,7 +422,7 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
 
           // Orange se mueve dentro de Barcelona: Lleida no cambia.
           yield* TestClock.adjust(DIA);
-          yield* ejecutar(capaGrabada("registro-oficial", conOrangeMovida(grabada)));
+          yield* ingerir(entorno, conOrangeMovida(grabada));
           const segunda = yield* publicar(entorno);
           assert.strictEqual(segunda.version, versionDeCapa(NOCHE + DIA));
           assert.strictEqual(segunda.tipo, "publicada");
@@ -485,104 +442,32 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
             leidaAntes.resumen.provincias.find((p) => p.codigo === "08")?.fichero,
           );
           // La versión anterior sigue entera: las pestañas abiertas con ella pueden seguir leyendo.
-          assert.isDefined(yield* entorno.leer(leidaAntes.vigente.resumen ?? ""));
+          assert.isDefined(yield* leer(entorno, leidaAntes.vigente.resumen ?? ""));
           for (const capa of leidaAntes.capas.values()) {
-            for (const lote of capa.lotes) assert.isDefined(yield* entorno.leer(lote), lote);
+            for (const lote of capa.lotes) assert.isDefined(yield* leer(entorno, lote), lote);
           }
         }),
       ),
   );
 
-  it.effect(
-    "se publica sola tras cada ingesta completada; un barrido sin cambios solo rehace el resumen",
-    () =>
-      conEntorno((entorno) =>
-        Effect.gen(function* () {
-          const convex = yield* TestConfect.TestConfect;
-          const grabada = yield* muestraCampusNord;
-          const llamadas = yield* Ref.make(0);
-          const publicacion = yield* publicacionContada(entorno, llamadas);
-          const registro = capaGrabada("registro-oficial", grabada);
-          yield* TestClock.setTime(NOCHE);
-
-          yield* ejecutar(registro, undefined, publicacion);
-          assert.strictEqual(yield* Ref.get(llamadas), 1);
-          const primera = yield* leerVigente(entorno);
-          assert.strictEqual(primera.vigente.version, versionDeCapa(NOCHE));
-          const tras = (yield* entorno.escritos).length;
-
-          // La noche siguiente la fuente dice lo mismo: la versión de los datos es la misma, pero
-          // el barrido es de hoy. Solo se escriben un resumen nuevo y vigente.json.
-          yield* TestClock.adjust(DIA);
-          const igual = yield* ejecutar(registro, undefined, publicacion);
-          assert.strictEqual(igual.estado, "completada");
-          assert.strictEqual(yield* Ref.get(llamadas), 2);
-          const nuevos = (yield* entorno.escritos).slice(tras);
-          const segunda = yield* leerVigente(entorno);
-          assert.deepStrictEqual(nuevos, [segunda.vigente.resumen, FICHERO_VIGENTE]);
-          assert.strictEqual(segunda.vigente.version, versionDeCapa(NOCHE));
-          assert.strictEqual(segunda.resumen.provincias[0]?.barrido, NOCHE + DIA);
-          assert.deepStrictEqual(
-            segunda.resumen.provincias.map((p) => p.fichero),
-            primera.resumen.provincias.map((p) => p.fichero),
-          );
-
-          // Con el interruptor apagado la ejecución queda omitida y no publica.
-          yield* convex.mutation(refs.internal.ingesta.cambiarInterruptor, {
-            fuente: "registro-oficial",
-            activo: false,
-            motivo: "prueba",
-          });
-          yield* TestClock.adjust(DIA);
-          const omitida = yield* ejecutar(registro, undefined, publicacion);
-          assert.strictEqual(omitida.estado, "omitida");
-          assert.strictEqual(yield* Ref.get(llamadas), 2);
-
-          // Con cambios, la ejecución siguiente publica la versión nueva.
-          yield* convex.mutation(refs.internal.ingesta.cambiarInterruptor, {
-            fuente: "registro-oficial",
-            activo: true,
-            motivo: "prueba",
-          });
-          yield* ejecutar(
-            capaGrabada("registro-oficial", conOrangeMovida(grabada)),
-            undefined,
-            publicacion,
-          );
-          const nueva = decodificarVigente((yield* entorno.leer(FICHERO_VIGENTE)) ?? "");
-          assert.strictEqual(Result.getOrUndefined(nueva)?.version, versionDeCapa(NOCHE + 2 * DIA));
-        }),
-      ),
-  );
-
-  it.effect("no pisa un fichero con otro contenido, no cambia la vigente y la ingesta acaba", () =>
+  it.effect("no pisa un fichero con otro contenido y no cambia la vigente", () =>
     conEntorno((entorno) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const llamadas = yield* Ref.make(0);
-        const publicacion = yield* publicacionContada(entorno, llamadas);
-        const version = versionDeCapa(NOCHE);
-        const ocupado = path.join(entorno.carpeta, ficheroDeManifiesto(version));
-        yield* fs.makeDirectory(entorno.carpeta, { recursive: true });
+        const ocupado = path.join(entorno.almacen, ficheroDeManifiesto(versionDeCapa(NOCHE)));
+        yield* fs.makeDirectory(entorno.almacen, { recursive: true });
         yield* fs.writeFileString(ocupado, '{"version":"otra cosa"}');
 
         yield* TestClock.setTime(NOCHE);
-        const ejecucion = yield* ejecutar(
-          capaGrabada("registro-oficial", yield* muestraCampusNord),
-          undefined,
-          publicacion,
-        );
-        assert.strictEqual(ejecucion.estado, "completada");
-        assert.strictEqual(yield* Ref.get(llamadas), 1);
-        assert.strictEqual(yield* fs.readFileString(ocupado), '{"version":"otra cosa"}');
-        assert.isUndefined(yield* entorno.leer(FICHERO_VIGENTE));
-        assert.isFalse(
-          (yield* fs.readDirectory(entorno.carpeta)).some((f) => f.startsWith("resumen@")),
-        );
-
+        yield* ingerir(entorno, yield* muestraCampusNord);
         const fallo = yield* Effect.flip(publicar(entorno));
         assert.strictEqual(fallo._tag, "FicheroInmutable");
+        assert.strictEqual(yield* fs.readFileString(ocupado), '{"version":"otra cosa"}');
+        assert.isUndefined(yield* leer(entorno, FICHERO_VIGENTE));
+        assert.isFalse(
+          (yield* fs.readDirectory(entorno.almacen)).some((f) => f.startsWith("resumen@")),
+        );
       }),
     ),
   );
@@ -591,16 +476,16 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
     conEntorno((entorno) =>
       Effect.gen(function* () {
         yield* TestClock.setTime(NOCHE);
-        yield* ejecutar(capaGrabada("registro-oficial", yield* muestraCampusNord));
+        yield* ingerir(entorno, yield* muestraCampusNord);
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        yield* fs.makeDirectory(entorno.carpeta, { recursive: true });
+        yield* fs.makeDirectory(entorno.almacen, { recursive: true });
         const posterior = `{"version":"${versionDeCapa(NOCHE + DIA)}","fecha":${NOCHE + DIA},"emplazamientos":1,"lotes":1}`;
-        yield* fs.writeFileString(path.join(entorno.carpeta, FICHERO_VIGENTE), posterior);
+        yield* fs.writeFileString(path.join(entorno.almacen, FICHERO_VIGENTE), posterior);
 
         const fallo = yield* Effect.flip(publicar(entorno));
         assert.strictEqual(fallo._tag, "VigentePosterior");
-        assert.strictEqual(yield* entorno.leer(FICHERO_VIGENTE), posterior);
+        assert.strictEqual(yield* leer(entorno, FICHERO_VIGENTE), posterior);
         assert.lengthOf(yield* entorno.escritos, 0);
       }),
     ),
@@ -610,16 +495,16 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
     conEntorno((entorno) =>
       Effect.gen(function* () {
         yield* TestClock.setTime(NOCHE);
-        yield* ejecutar(capaGrabada("registro-oficial", yield* muestraCampusNord));
+        yield* ingerir(entorno, yield* muestraCampusNord);
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        yield* fs.makeDirectory(entorno.carpeta, { recursive: true });
+        yield* fs.makeDirectory(entorno.almacen, { recursive: true });
         const version = versionDeCapa(NOCHE);
         yield* fs.writeFileString(
-          path.join(entorno.carpeta, FICHERO_VIGENTE),
+          path.join(entorno.almacen, FICHERO_VIGENTE),
           `{"version":"${version}","fecha":${NOCHE},"emplazamientos":19,"lotes":3}`,
         );
-        yield* fs.writeFileString(path.join(entorno.carpeta, `${version}.json`), "{}");
+        yield* fs.writeFileString(path.join(entorno.almacen, `${version}.json`), "{}");
 
         const publicada = yield* publicar(entorno);
         assert.strictEqual(publicada.tipo, "publicada");
@@ -640,6 +525,84 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
     ),
   );
 
+  describe("ficha", () => {
+    it.effect(
+      "trae la dirección, cada compañía con sus bandas ordenadas y de dónde sale cada dato",
+      () =>
+        conEntorno((entorno) =>
+          Effect.gen(function* () {
+            yield* TestClock.setTime(NOCHE);
+            yield* ingerir(entorno, yield* muestraCampusNord);
+            yield* publicar(entorno);
+            const leida = yield* leerVigente(entorno);
+            const campusNord = leida.emplazamientos.find((e) => e.clave === "movistar-0802532");
+            assert.isDefined(campusNord);
+            if (campusNord === undefined) return;
+            const ficha = (yield* fichasDelLote(entorno, leida, campusNord)).find(
+              (f) => f.clave === campusNord.clave,
+            );
+            assert.isDefined(ficha);
+            if (ficha === undefined) return;
+
+            assert.strictEqual(ficha.direccion, "CL JORDI GIRONA, 1. BARCELONA, BARCELONA");
+            assert.strictEqual(ficha.municipio, "BARCELONA");
+            assert.strictEqual(ficha.estado, "verificado");
+            // La marca de agua: la noche que lo escribió.
+            assert.strictEqual(ficha.version, NOCHE);
+            assert.deepStrictEqual(
+              ficha.estaciones.map((e) => [e.compania, e.codigos]),
+              [
+                ["movistar", ["0802532"]],
+                ["orange", ["CATR0228A"]],
+                ["vodafone", ["086040", "86040"]],
+              ],
+            );
+            const movistar = ficha.estaciones[0];
+            assert.deepStrictEqual(
+              movistar?.bandas.map((b) => b.mhz),
+              [700, 800, 900, 900, 1800, 2100, 2600, 3500],
+            );
+            // Cada código tiene su observación, con la fecha en que la fuente empezó a decirlo y
+            // el enlace a su ficha en el registro.
+            assert.deepStrictEqual(
+              ficha.estaciones.map((e) => e.origenes.length),
+              [1, 1, 2],
+            );
+            for (const origen of ficha.estaciones.flatMap((e) => e.origenes)) {
+              assert.strictEqual(origen.fuente, "registro-oficial");
+              assert.strictEqual(origen.fecha, NOCHE);
+              assert.strictEqual(origen.afirma, "presente");
+              assert.isTrue(
+                origen.url.startsWith("https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?"),
+              );
+            }
+            assert.match(movistar?.origenes[0]?.clave ?? "", / - 0802532$/u);
+          }),
+        ),
+    );
+
+    it.effect("sin emplazamiento con esa clave exacta, no hay ficha", () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const fichas = (claves: ReadonlyArray<string>) =>
+            conBase(
+              entorno.base,
+              Effect.gen(function* () {
+                const datos = yield* DatosPublicables;
+                return yield* datos.fichas(claves);
+              }),
+            );
+          assert.lengthOf(yield* fichas(["movistar-0802532"]), 0);
+          yield* TestClock.setTime(NOCHE);
+          yield* ingerir(entorno, yield* muestraCampusNord);
+          assert.lengthOf(yield* fichas(["movistar-0802532"]), 1);
+          // Sin el cero no es la misma clave (ADR 0012).
+          assert.lengthOf(yield* fichas(["movistar-802532"]), 0);
+        }),
+      ),
+    );
+  });
+
   describe("retención", () => {
     /** Escribe a mano en el almacén una versión del formato 4, como si se hubiera publicado. */
     const versionEscrita = (entorno: Entorno, fecha: number) =>
@@ -647,13 +610,13 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const version = versionDeCapa(fecha);
-        yield* fs.makeDirectory(path.join(entorno.carpeta, carpetaDeFichas(version)), {
+        yield* fs.makeDirectory(path.join(entorno.almacen, carpetaDeFichas(version)), {
           recursive: true,
         });
-        yield* fs.writeFileString(path.join(entorno.carpeta, `${version}.json`), "{}");
+        yield* fs.writeFileString(path.join(entorno.almacen, `${version}.json`), "{}");
         for (const lote of [0, 1]) {
           yield* fs.writeFileString(
-            path.join(entorno.carpeta, `${carpetaDeFichas(version)}/${lote}.json`),
+            path.join(entorno.almacen, `${carpetaDeFichas(version)}/${lote}.json`),
             "{}",
           );
         }
@@ -666,7 +629,7 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
         const fs = yield* FileSystem.FileSystem;
         return [
           ...new Set(
-            (yield* fs.readDirectory(entorno.carpeta)).flatMap((f) => {
+            (yield* fs.readDirectory(entorno.almacen)).flatMap((f) => {
               const sello = /^(?:sitios|resumen)@([^.]+Z)/u.exec(f)?.[1];
               return sello === undefined ? [] : [`sitios@${sello}`];
             }),
@@ -692,13 +655,13 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
             const path = yield* Path.Path;
             const contenidoVigente = `{"version":"${vigente}","fecha":${NOCHE},"emplazamientos":1,"lotes":2}`;
             yield* fs.writeFileString(
-              path.join(entorno.carpeta, FICHERO_VIGENTE),
+              path.join(entorno.almacen, FICHERO_VIGENTE),
               contenidoVigente,
             );
 
             assert.strictEqual(VERSIONES_ANTERIORES, 7);
             const retiradas = yield* retirarVersionesViejas(vigente).pipe(
-              Effect.provide(entorno.almacen),
+              Effect.provide(entorno.almacenVigilado),
             );
             assert.sameMembers([...retiradas], viejas.slice(7));
             assert.deepStrictEqual(yield* versionesEnElAlmacen(entorno), [
@@ -708,17 +671,17 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
             ]);
             for (const retirada of viejas.slice(7)) {
               assert.isFalse(
-                yield* fs.exists(path.join(entorno.carpeta, carpetaDeFichas(retirada))),
+                yield* fs.exists(path.join(entorno.almacen, carpetaDeFichas(retirada))),
               );
             }
             for (const guardada of [aMedias, vigente, ...viejas.slice(0, 7)]) {
-              assert.isDefined(yield* entorno.leer(`${carpetaDeFichas(guardada)}/1.json`));
+              assert.isDefined(yield* leer(entorno, `${carpetaDeFichas(guardada)}/1.json`));
             }
-            assert.strictEqual(yield* entorno.leer(FICHERO_VIGENTE), contenidoVigente);
+            assert.strictEqual(yield* leer(entorno, FICHERO_VIGENTE), contenidoVigente);
 
             // Otra vez no hay nada que retirar.
             assert.deepStrictEqual(
-              yield* retirarVersionesViejas(vigente).pipe(Effect.provide(entorno.almacen)),
+              yield* retirarVersionesViejas(vigente).pipe(Effect.provide(entorno.almacenVigilado)),
               [],
             );
           }),
@@ -732,27 +695,13 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
           Effect.gen(function* () {
             const grabada = yield* muestraCampusNord;
             yield* TestClock.setTime(NOCHE - 8 * DIA);
-            yield* ejecutar(capaGrabada("registro-oficial", grabada));
+            yield* ingerir(entorno, grabada);
             yield* publicar(entorno);
             const primera = yield* leerVigente(entorno);
             // Ocho versiones más, cada una con Orange en otro sitio: Barcelona cambia y Lleida no.
             for (let noche = 1; noche <= 8; noche += 1) {
               yield* TestClock.adjust(DIA);
-              const movida: FuenteGrabada = {
-                ...grabada,
-                listado: {
-                  ...grabada.listado,
-                  registros: grabada.listado.registros.map((r) =>
-                    r.clave === "ORANGE ESPAGNE, S.A.U. - CATR0508Z"
-                      ? {
-                          ...r,
-                          posicion: { ...r.posicion, latitud: r.posicion.latitud + noche * 0.0018 },
-                        }
-                      : r,
-                  ),
-                },
-              };
-              yield* ejecutar(capaGrabada("registro-oficial", movida));
+              yield* ingerir(entorno, conOrangeMovida(grabada, noche * 0.0018));
               yield* publicar(entorno);
             }
             const ultima = yield* leerVigente(entorno);
@@ -761,23 +710,23 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
               ...Array.from({ length: 7 }, (_, k) => versionDeCapa(NOCHE - (k + 1) * DIA)),
             ]);
             // La primera ya no está, ni su capa de Barcelona; la de Lleida es la misma y sigue.
-            assert.isUndefined(yield* entorno.leer(primera.vigente.resumen ?? ""));
-            assert.isUndefined(yield* entorno.leer(ficheroDeManifiesto(primera.vigente.version)));
+            assert.isUndefined(yield* leer(entorno, primera.vigente.resumen ?? ""));
+            assert.isUndefined(yield* leer(entorno, ficheroDeManifiesto(primera.vigente.version)));
             const barcelona = primera.resumen.provincias.find((p) => p.codigo === "08")?.fichero;
             const lleida = primera.resumen.provincias.find((p) => p.codigo === "25")?.fichero;
-            assert.isUndefined(yield* entorno.leer(barcelona ?? ""));
-            assert.isDefined(yield* entorno.leer(lleida ?? ""));
+            assert.isUndefined(yield* leer(entorno, barcelona ?? ""));
+            assert.isDefined(yield* leer(entorno, lleida ?? ""));
             for (const lote of primera.capas.get("25")?.lotes ?? []) {
-              assert.isDefined(yield* entorno.leer(lote), lote);
+              assert.isDefined(yield* leer(entorno, lote), lote);
             }
             // Lo que la vigente necesita sigue entero.
             for (const capa of ultima.capas.values()) {
-              for (const lote of capa.lotes) assert.isDefined(yield* entorno.leer(lote), lote);
+              for (const lote of capa.lotes) assert.isDefined(yield* leer(entorno, lote), lote);
             }
           }),
         ),
-      // Nueve publicaciones seguidas: con la máquina cargada pasa de los 5 s por defecto.
-      30_000,
+      // Nueve noches y nueve publicaciones seguidas: con la máquina cargada pasa de los 5 s.
+      60_000,
     );
 
     it.effect("publicar retira la más vieja cuando la nueva deja ocho anteriores", () =>
@@ -788,7 +737,7 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
             viejas.push(yield* versionEscrita(entorno, NOCHE - dias * DIA));
           }
           yield* TestClock.setTime(NOCHE);
-          yield* ejecutar(capaGrabada("registro-oficial", yield* muestraCampusNord));
+          yield* ingerir(entorno, yield* muestraCampusNord);
           const publicada = yield* publicar(entorno);
           assert.strictEqual(publicada.tipo, "publicada");
           assert.deepStrictEqual(yield* versionesEnElAlmacen(entorno), [

@@ -1,8 +1,7 @@
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import { CACHE_INMUTABLE, CACHE_VIGENTE } from "@celda/publicacion/almacenes/r2";
 import { publicar as publicarDatos } from "@celda/publicacion/publicar";
-import { conCuadros, zonasDePublicacion } from "@celda/publicacion/zonas";
-import { publicar as publicarInstantanea } from "@celda/convex/publicacion";
+import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import { NodeHttpServer, NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as Config from "effect/Config";
@@ -18,20 +17,16 @@ import * as HttpStaticServer from "effect/unstable/http/HttpStaticServer";
 // @effect-diagnostics-next-line nodeBuiltinImport:off
 import * as NodeHttp from "node:http";
 
-import { convexPorHttp } from "./convex.ts";
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
-import { descargarMunicipios, leerMunicipios, leerPadron } from "./descargaDeMunicipios.ts";
+import { descargarMunicipios } from "./descargaDeMunicipios.ts";
 import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
 import { escribirZonas } from "./zonas.ts";
 
 /**
- * Generador de capas. Siete órdenes:
+ * Generador de capas. Seis órdenes:
  *
- * - `publicar`: publica la instantánea de un despliegue de Convex en una carpeta, igual que la
- *   publicación automática tras cada ingesta: el resumen nacional, la capa y las fichas de cada
- *   provincia y `vigente.json`. Sirve para publicar desde otro despliegue sin configurarle un
- *   almacén.
- * - `servir`: sirve esa carpeta como origen estático local, con las cabeceras de la CDN.
+ * - `servir`: sirve una carpeta publicada como origen estático local, con las cabeceras de la
+ *   CDN. La publica la ingesta nocturna (`pnpm run ingesta publicar`) o `sintetica`.
  * - `barrios`: descarga de Open Data BCN los límites de barrio y los guarda en el repositorio.
  * - `poblacion`: descarga de Open Data BCN el padrón más reciente y guarda los habitantes de
  *   cada barrio, con su área y su límite, donde los lee la web.
@@ -50,8 +45,8 @@ const configCapas = Config.all({
 });
 
 /**
- * Los límites de barrio que usa `publicar` y que escribe `barrios`, guardados en git en el
- * paquete de la publicación, que también los lee.
+ * Los límites de barrio que escribe `barrios` y lee `poblacion`, guardados en git en el paquete
+ * de la publicación, que también los lee.
  */
 const configBarrios = Config.String("CELDA_BARRIOS").pipe(
   Config.withDefault("../../packages/publicacion/datos/barrios.json"),
@@ -88,38 +83,6 @@ const configZonas = Config.String("CELDA_ZONAS").pipe(
 
 /** Pausa entre dos peticiones al mismo sitio de la orden `municipios`. */
 const PAUSA_MUNICIPIOS = Duration.seconds(5);
-
-const configConvex = Config.all({
-  url: Config.String("CELDA_CONVEX_URL"),
-  claveAdmin: Config.Redacted("CELDA_CONVEX_CLAVE_ADMIN"),
-});
-
-const publicar = Effect.gen(function* () {
-  const capas = yield* configCapas;
-  const convex = yield* configConvex;
-  const limites = yield* leerLimites(yield* configBarrios);
-  const rutas = yield* configMunicipios;
-  const municipios = yield* leerMunicipios(rutas.municipios);
-  const padron = yield* leerPadron(rutas.padron);
-  const publicada = yield* publicarInstantanea(
-    conCuadros({ barrios: limites, municipios, padron }),
-  ).pipe(
-    // Punto de entrada de la orden: aquí se montan sus capas, una vez.
-    // @effect-diagnostics-next-line strictEffectProvide:off
-    Effect.provide(
-      Layer.merge(
-        almacenEnCarpeta({ carpeta: capas.carpeta, origen: capas.origen.replace(/\/$/u, "") }),
-        convexPorHttp(convex).pipe(Layer.provide(FetchHttpClient.layer)),
-      ),
-    ),
-  );
-  yield* Effect.log(
-    `${publicada.version} (${publicada.tipo}): ${publicada.emplazamientos} emplazamientos en ${publicada.lotes} lotes`,
-    `${publicada.escritos} ficheros escritos`,
-    `resumen y capas de provincia de ${publicada.bytesCapa} bytes, fichas de ${publicada.bytesFichas} bytes`,
-    `(el lote mayor, ${publicada.bytesLoteMayor})`,
-  );
-});
 
 const sintetica = Effect.gen(function* () {
   const capas = yield* configCapas;
@@ -222,13 +185,12 @@ class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesc
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «publicar», «servir», «barrios», «poblacion», «municipios», «zonas» o «sintetica».`;
+    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas» o «sintetica».`;
   }
 }
 
 const principal = Effect.gen(function* () {
   const orden = process.argv[2] ?? "";
-  if (orden === "publicar") return yield* publicar;
   if (orden === "servir") return yield* servir;
   if (orden === "barrios") return yield* barrios;
   if (orden === "poblacion") return yield* poblacion;
