@@ -7,6 +7,7 @@ import { Coordenada } from "./area.ts";
 import { Mhz } from "./banda.ts";
 import { type Barrio, FuenteDeBarrios } from "./barrio.ts";
 import { Compania } from "./compania.ts";
+import { Licencias } from "./licencias.ts";
 import { type Emplazamiento, Estado, type EstacionBase } from "./emplazamiento.ts";
 
 /** Las bandas en que emite la estación base de una compañía, de menor a mayor frecuencia. */
@@ -103,6 +104,11 @@ export const Vigente = Schema.Struct({
    * versión es de una capa entera del formato 4 o anterior.
    */
   resumen: Schema.optionalKey(Schema.String),
+  /**
+   * Qué parte de lo publicado es CC0 y de quién es el resto, con los créditos que piden los
+   * terceros (ADR 0021). Las publicaciones de antes del buzón (#56) no lo llevan.
+   */
+  licencias: Schema.optionalKey(Licencias),
 });
 export type Vigente = typeof Vigente.Type;
 

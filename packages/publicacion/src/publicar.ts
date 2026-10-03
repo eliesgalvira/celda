@@ -8,6 +8,7 @@ import {
 } from "@celda/dominio/capa";
 import type { ZonaBarrida } from "@celda/dominio/cobertura";
 import type { Ficha } from "@celda/dominio/ficha";
+import { LICENCIAS } from "@celda/dominio/licencias";
 import { EMPLAZAMIENTOS_POR_LOTE, repartirEnLotes } from "@celda/dominio/lotes";
 import { municipiosConHabitantes } from "@celda/dominio/municipio";
 import {
@@ -506,6 +507,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
         emplazamientos: emplazamientos.length,
         lotes: lotes.length,
         resumen: resumen.fichero,
+        licencias: LICENCIAS,
       }),
     );
     yield* Ref.update(escritos, (n) => n + 1);
@@ -557,7 +559,9 @@ const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
   const igual = resumen.fichero === vigente.resumen;
   if (!igual) {
     yield* almacen.guardar(resumen.fichero, resumen.contenido);
-    yield* almacen.cambiarVigente(codificarVigente({ ...vigente, resumen: resumen.fichero }));
+    yield* almacen.cambiarVigente(
+      codificarVigente({ ...vigente, resumen: resumen.fichero, licencias: LICENCIAS }),
+    );
   }
   const publicada: Publicada = {
     version: vigente.version,

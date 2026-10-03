@@ -35,6 +35,7 @@ import {
 } from "@celda/publicacion/publicar";
 import { conCuadros } from "@celda/publicacion/zonas";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
+import { LICENCIAS } from "@celda/dominio/licencias";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -328,6 +329,8 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
               emplazamientos: publicada.emplazamientos,
               lotes: publicada.lotes,
               resumen: undefined,
+              // Lo publicado dice qué es CC0 y lleva los créditos de terceros (ADR 0021).
+              licencias: LICENCIAS,
             },
           );
 
