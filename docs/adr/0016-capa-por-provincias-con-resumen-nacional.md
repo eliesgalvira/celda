@@ -89,6 +89,20 @@ La vista de interferencia pide las provincias con estaciones a 1,5 km de lo que 
 
 Medido con Cataluña real, la CPU a ×4 y 390 px, abriendo un enlace sin provincia junto al borde (escenario `borde` de `tools/rendimiento`): de 59,7 a 60 fps al cruzar el borde con las celdas y con la vista de interferencia, sin fotogramas de más de 50 ms. Las cifras están en `docs/patterns/rendimiento.md`.
 
+## Estación base sin ficha en el registro (#59, 03/10/2026)
+
+Algunas estaciones base del listado del registro no tienen ficha: su página de detalle dice «Código de emplazamiento no válido», como `061723` de Vodafone y `CLMR6422A` de Orange el 02/10/2026. La ficha publicada lo dice con `sinFichaEnRegistro` en la estación base de la ficha: la fecha en que se comprobó por última vez. La ficha conserva todo lo que sale del listado: la posición, la dirección, la compañía, los códigos y el enlace al registro.
+
+**El formato no cambia: sigue siendo el 5.** Es un campo opcional en la estación base, como `lugar` en la ficha (ADR 0017):
+
+- La web de antes lee los lotes con el esquema de Effect, que descarta las claves que no conoce. La estación base llega sin la marca y la ficha dice, como hasta ahora, que Celda aún no ha leído sus bandas. No falla nada.
+- La web nueva lee los lotes de antes, que no llevan la marca, igual que antes.
+- Lo comprueban dos pruebas de `packages/dominio/src/provincias.test.ts`: una lee un lote nuevo con el esquema de antes y otra lee con el de ahora un lote de antes y uno nuevo.
+
+La capa de provincia no lleva la marca: solo guarda las bandas conocidas, y una estación base sin ficha no tiene ninguna. El ejercicio de emplazamientos cuenta esas estaciones base aparte al leer las fichas.
+
+La marca sale de la fusión (`EstacionBase.sinFichaEnRegistro`), así que marcarla, cambiar su fecha o quitarla cambia el emplazamiento y su ficha sale en la versión siguiente. Las comprobaciones siguen la espera de los reintentos (ADR 0014): un día, dos, cuatro, y así hasta 30. Son pocas versiones más.
+
 ## Consecuencias
 
 - Abrir la web descarga el resumen (de 2 a 4 KB con gzip, según cuántas zonas lleve) y las provincias de la vista inicial, no toda España.
