@@ -1,6 +1,6 @@
 # Datos discretos: hexágonos más pequeños de lejos, rótulos por población, sin ausencias en el mapa
 
-Estado: aceptada el 03/10/2026, con las decisiones del usuario del 02 y el 03/10/2026. Sale del prototipo de la rama desechable `prototipo/mapa-base-ign`; su veredicto está en `PROTOTIPO.md` (e0b75de) y cada punto cita el commit que lo probó. Cambia del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) el zoom del resumen nacional (hasta z9 en lugar de z8) y el sitio del hexágono de cada provincia; del [ADR 0017](0017-provincias-y-municipios-con-el-padron-del-ine.md), qué municipios son zona en z9 y z10, y sustituye sus ausencias en el mapa (también las de los #44 y #53). Lo llevan a cabo dos tickets: la agrupación con los choques y el centro visual, y la retirada de las ausencias.
+Estado: aceptada el 03/10/2026, con las decisiones del usuario del 02 y el 03/10/2026. Sale del prototipo de la rama desechable `prototipo/mapa-base-ign`; su veredicto está en `PROTOTIPO.md` (e0b75de) y cada punto cita el commit que lo probó. Cambia del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) el zoom del resumen nacional (hasta z9 en lugar de z8) y el sitio del hexágono de cada provincia; del [ADR 0017](0017-provincias-y-municipios-con-el-padron-del-ine.md), qué municipios son zona en z9 y z10, y sustituye sus ausencias en el mapa (también las de los #44 y #53). La jerarquía tipográfica y que la capital no se esconda los decidió el usuario el 03/10/2026, después del último commit del prototipo. Lo llevan a cabo dos tickets: la agrupación con los choques y el centro visual, y la retirada de las ausencias.
 
 ## Contexto
 
@@ -29,7 +29,16 @@ Nada se aparta de su sitio para hacer hueco.
 
 - Va en el polo de inaccesibilidad (polylabel) de la provincia, calculado en Mercator, que es como se ve el mapa: el punto más alejado de sus bordes. El polígono sale de los límites del IGN del repositorio (ADR 0017), simplificados a 300 m para el cálculo, con 200 m de precisión.
 - Si la provincia tiene varios polígonos, se usa el más poblado, el que contiene más habitantes del padrón por la etiqueta de sus municipios: Mallorca, Tenerife y Gran Canaria (Fuerteventura es mayor, pero tiene 129.541 habitantes frente a 870.608). En A Coruña, Pontevedra y Cádiz, la península.
-- **El rótulo de la capital solo se esconde si se llama como su provincia y la cinta de la provincia se ve**: València, Alacant, Soria, Madrid, Zaragoza, Badajoz, Cáceres, Cádiz, A Coruña, Santa Cruz de Tenerife, Ceuta. Si la provincia va compacta, el rótulo vuelve si no pisa nada. Las demás capitales siguen la regla de la población: Pamplona, Vitoria-Gasteiz, Castelló de la Plana, Oviedo, Palma.
+- **El rótulo de la capital no se esconde nunca por llamarse como su provincia.** El prototipo lo escondía cuando la cinta de la provincia se veía (València, Alacant, Soria, Madrid, Zaragoza, Badajoz, Cáceres, Cádiz, A Coruña, Santa Cruz de Tenerife, Ceuta), para no escribir el mismo nombre dos veces. Con el hexágono en el centro visual eso deja la ciudad sin nombre: en València a z8 el hexágono de la provincia queda a unos 40 km tierra adentro y la ciudad de València no se nombra en ningún sitio. El usuario lo cambió el 03/10/2026, después del prototipo: la capital sigue la regla de la población como cualquier otra ciudad, y se aceptan los dos nombres en pantalla.
+
+### Jerarquía tipográfica: áreas y poblaciones (03/10/2026)
+
+Para que el mismo nombre dos veces no parezca un error, el nombre de un área y el de una población se escriben distinto:
+
+- **Los nombres de provincia y de zona son nombres de área**: en versalitas espaciadas, en la cinta de su hexágono. Sustituye la letra de la cinta del #53 (monoespaciada, seminegrita, sin pasar a mayúsculas).
+- **Los nombres de ciudad siguen como rótulos de población**: en caja normal, con su halo, como los pone el mapa base del ADR 0022.
+
+Así «VALÈNCIA» junto al hexágono de la provincia y «València» sobre la ciudad se leen como dos cosas: la provincia y su capital. La regla de choques no cambia: la cinta y el rótulo compiten por población como cualquier otro par.
 
 ### Sin ausencias en el mapa (54f3339)
 
@@ -46,10 +55,10 @@ En las seis vistas del móvil (390 × 844: España z5,5, Navarra z7, Valencia z8
 ## Consecuencias
 
 - **Lo que queda abierto en el prototipo:**
-  - En València a z8 la ciudad de València no tiene nombre. Su rótulo se esconde porque se llama como la provincia y la cinta de la provincia se ve, pero el hexágono de la provincia está en su centro visual, a unos 40 km tierra adentro. Arreglo recomendado, pendiente de que el usuario lo confirme: una jerarquía tipográfica en la que los nombres de provincia y de zona son nombres de área, en versalitas espaciadas, los de ciudad siguen como rótulos de población, y el rótulo de la capital no se esconde nunca.
   - En Barcelona a z12 no sale el rótulo «Barcelona»: lo pisan agrupaciones, que no ceden nunca.
   - A z5,5 Valladolid y Murcia van compactas y sin nombre: su cinta pisaría Segovia o Alacant, y su rótulo de ciudad también choca. Álava no se dibuja, porque Bizkaia tiene más habitantes. Todo sale al acercar.
   - Los rótulos que Celda copia en el DOM no esquivan el borde de la pantalla: en Canarias a z7 se lee «Las Palmas de Gran Canar».
+- Con las capitales siempre a la vista, el nombre de una provincia y el de su capital salen a la vez en pantalla (Soria, Madrid, València…). Es lo que el usuario aceptó a cambio de no dejar ninguna ciudad sin nombre; la jerarquía tipográfica los distingue.
 - Las zonas fronterizas se ven vacías de lejos: por debajo de z9 no hay nombres al otro lado de la frontera.
 - En z9 y z10 cambian los niveles de zona, y la prueba que recorre los zooms del 5 al 18 (`CapaAgrupada.test.tsx`, #53) tiene que seguir pasando: ningún emplazamiento fuera de un hexágono con su número o de un logo, y nada que aparezca al acercar sin salir de lo que se veía. En el prototipo, al entrar o salir de z9 y z10 lo nuevo aparece en su sitio sin deslizarse.
 - El punto de etiqueta de cada provincia en el resumen nacional también decide a qué provincia van los emplazamientos sin provincia (ADR 0016). El centro visual no lo sustituye ahí.
