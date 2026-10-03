@@ -184,7 +184,12 @@ describe("recorrido de un cuadro con listados grabados que llegan al tope de 100
 });
 
 describe("zonas de una noche", () => {
-  const zona = (nombre: string): ZonaDeBarrido => ({ nombre, titulo: nombre, cuadros: [] });
+  const zona = (nombre: string): ZonaDeBarrido => ({
+    nombre,
+    titulo: nombre,
+    comunidades: [],
+    cuadros: [],
+  });
   const [a, b, c, d] = [zona("a"), zona("b"), zona("c"), zona("d")];
   const nombres = (zonas: ReadonlyArray<ZonaDeBarrido>) => zonas.map((z) => z.nombre);
 

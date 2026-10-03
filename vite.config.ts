@@ -28,6 +28,8 @@ export default defineConfig({
       // Límites de municipios y padrón que escribe `pnpm run municipios`, con un elemento por línea.
       "packages/publicacion/datos/municipios.json",
       "packages/publicacion/datos/padron.json",
+      // Cuadros del registro que escribe `pnpm run cuadros`, en apps/nocturna, con uno por línea.
+      "packages/dominio/datos/cuadros-del-registro.json",
       // Índice y contornos del ejercicio que escribe `pnpm run zonas`, con un elemento por línea.
       "apps/web/src/ejercicio/zonas/**",
       // Código que generan Confect y Convex.

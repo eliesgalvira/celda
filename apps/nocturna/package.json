@@ -7,6 +7,7 @@
   },
   "scripts": {
     "build": "vp build",
+    "cuadros": "node src/cuadros/derivar.ts",
     "ingesta": "vp build && node dist/nocturna.js",
     "medir-espana": "node src/medida/espana.ts",
     "capas": "vp build && node dist/nocturna.js capas",

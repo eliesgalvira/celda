@@ -42,8 +42,8 @@ const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
 
 /** Dos zonas de un cuadro cada una: el de Barcelona y el de al lado, hacia el oeste. */
-const A: ZonaDeBarrido = { nombre: "a", titulo: "A", cuadros: ["2,41"] };
-const B: ZonaDeBarrido = { nombre: "b", titulo: "B", cuadros: ["1,41"] };
+const A: ZonaDeBarrido = { nombre: "a", titulo: "A", comunidades: ["09"], cuadros: ["2,41"] };
+const B: ZonaDeBarrido = { nombre: "b", titulo: "B", comunidades: ["09"], cuadros: ["1,41"] };
 
 const cadaNoche = (...zonas: ReadonlyArray<ZonaDeBarrido>): OpcionesZonas => ({
   cadaNoche: zonas,

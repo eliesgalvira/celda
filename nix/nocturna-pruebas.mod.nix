@@ -259,6 +259,7 @@
           testScript =
             { nodes, ... }:
             /* python */ ''
+              import json
               import subprocess
 
               maquina.wait_for_unit("multi-user.target")
@@ -472,6 +473,25 @@
                   maquina.succeed(f"cmp {servida}/vigente.json {r2}/vigente.json")
                   assert "Vercel ya sirve sitios@" in publicar_a_mano()
                   assert len(llamadas_al_hook()) == 3, llamadas_al_hook()
+
+              with subtest("la pasada por los cuadros de borde pide cada uno una vez y no toca la base"):
+                  base = "/var/lib/celda-nocturna/ingesta.sqlite"
+                  antes = maquina.succeed(f"sha256sum {base}")
+                  listados = int(maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log"))
+                  print(maquina.succeed(
+                      "systemd-run --wait --pipe --collect --quiet"
+                      " --uid=celda-nocturna --gid=celda-nocturna"
+                      " --setenv=NODE_EXTRA_CA_CERTS=${certificados}/ca.pem"
+                      " /run/current-system/sw/bin/celda-nocturna cuadros-de-borde /var/lib/celda-nocturna/cuadros-de-borde.json 2>&1"
+                  ))
+                  pasada = json.loads(maquina.succeed("cat /var/lib/celda-nocturna/cuadros-de-borde.json"))
+                  # Los cuatro cuadros que tocan España fuera de las zonas; en el Campus Nord no cae ninguno.
+                  assert [c["cuadro"] for c in pasada["cuadros"]] == ["-17,27", "-19,28", "-4,35", "-8,40"], pasada
+                  assert all(c["registros"] == 0 for c in pasada["cuadros"]), pasada
+                  assert pasada["errores"] == [], pasada
+                  despues = int(maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log"))
+                  assert despues - listados == 4, (listados, despues)
+                  assert maquina.succeed(f"sha256sum {base}") == antes
 
               with subtest("el servicio corre endurecido"):
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))
