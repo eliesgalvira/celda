@@ -22,11 +22,12 @@ import { descargarMunicipios } from "./descargaDeMunicipios.ts";
 import { escribirEspana } from "./espana.ts";
 import { FORMAS_CASTELLANAS } from "./formasCastellanas.ts";
 import { escribirNombres } from "./nombres.ts";
+import { escribirLimites } from "./limites.ts";
 import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
 import { escribirZonas } from "./zonas.ts";
 
 /**
- * Generador de capas. Ocho órdenes:
+ * Generador de capas. Nueve órdenes:
  *
  * - `servir`: sirve una carpeta publicada como origen estático local, con las cabeceras de la
  *   CDN. La publica la ingesta nocturna (`pnpm run ingesta publicar`) o `sintetica`.
@@ -41,6 +42,8 @@ import { escribirZonas } from "./zonas.ts";
  *   mapa base esconde de lejos los rótulos de fuera (ADR 0024).
  * - `nombres`: escribe desde esos límites, sin descargar nada, la tabla de nombres de lugar de los
  *   oficiales bilingües y el contorno de la Comunitat Valenciana (ADR 0025).
+ * - `limites`: escribe desde esos límites, sin descargar nada, los de comunidades autónomas y
+ *   provincias que la web pinta en el mapa (ADR 0023).
  * - `sintetica`: publica en la carpeta una España sintética de `CELDA_SINTETICOS` emplazamientos
  *   (100.000 por defecto), con la publicación de verdad, para medir el mapa (ADR 0016).
  */
@@ -105,6 +108,14 @@ const configNombres = Config.all({
     Config.withDefault("../../packages/dominio/datos/comunitat-valenciana.json"),
   ),
 });
+
+/**
+ * Dónde escribe `limites` los de comunidades y provincias: la web los sirve como recurso
+ * inmutable con la huella en el nombre.
+ */
+const configLimites = Config.String("CELDA_LIMITES").pipe(
+  Config.withDefault("../../apps/web/src/mapa/limites.json"),
+);
 
 /** Pausa entre dos peticiones al mismo sitio de la orden `municipios`. */
 const PAUSA_MUNICIPIOS = Duration.seconds(5);
@@ -238,11 +249,21 @@ const nombres = Effect.gen(function* () {
   );
 });
 
+const comunidadesYProvincias = Effect.gen(function* () {
+  const { municipios } = yield* configMunicipios;
+  const destino = yield* configLimites;
+  const { limites, fichero } = yield* escribirLimites(municipios, destino);
+  yield* Effect.log(
+    `${limites.comunidades.length} líneas de comunidad y ${limites.provincias.length} de provincia,`,
+    `${fichero.length} bytes, escritas en ${destino}`,
+  );
+});
+
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas», «espana», «nombres» o «sintetica».`;
+    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas», «espana», «nombres», «limites» o «sintetica».`;
   }
 }
 
@@ -255,6 +276,7 @@ const principal = Effect.gen(function* () {
   if (orden === "zonas") return yield* zonas;
   if (orden === "espana") return yield* espana;
   if (orden === "nombres") return yield* nombres;
+  if (orden === "limites") return yield* comunidadesYProvincias;
   if (orden === "sintetica") return yield* sintetica;
   return yield* new OrdenDesconocida({ orden });
 });

@@ -38,6 +38,8 @@ export default defineConfig({
       // `pnpm run nombres`, con una fila o un polígono por línea.
       "packages/dominio/datos/nombres-de-lugar.json",
       "packages/dominio/datos/comunitat-valenciana.json",
+      // Límites de comunidades y provincias que escribe `pnpm run limites`, con una línea por renglón.
+      "apps/web/src/mapa/limites.json",
       // Código que generan Confect y Convex.
       "convex/convex/**",
       "convex/confect/_generated/**",
