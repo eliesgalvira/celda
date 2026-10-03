@@ -94,6 +94,11 @@ export interface EntradaDelEjercicio {
   readonly todos: ReadonlyArray<EmplazamientoDelEjercicio>;
   /** Las bandas de los emplazamientos de la zona cuya ficha se ha leído, por clave. */
   readonly bandas: ReadonlyMap<string, BandasPorCompania>;
+  /**
+   * De los emplazamientos cuya ficha se ha leído, por clave, las compañías cuya estación base no
+   * tiene ficha en el registro: no tienen bandas, pero tampoco están por leer.
+   */
+  readonly sinFichaEnRegistro?: ReadonlyMap<string, ReadonlyArray<Compania>>;
   readonly parametros: ParametrosDelEjercicio;
 }
 
@@ -126,6 +131,11 @@ export interface ResultadoDeCompania {
   readonly conBandas: number;
   /** Estaciones de la zona cuya ficha no se ha leído. */
   readonly sinFicha: number;
+  /**
+   * Estaciones de la zona sin ficha en el registro: el registro las lista pero no tiene su ficha,
+   * así que no tienen bandas. Cuentan aparte de las que tienen y de las que no se han leído.
+   */
+  readonly sinFichaEnRegistro: number;
   /** Bandas en que emite en la zona, de menor a mayor. */
   readonly bandas: ReadonlyArray<Mhz>;
   readonly tecnologias: Readonly<Record<Generacion, Certeza>>;
@@ -235,10 +245,15 @@ export const resolverEjercicio = (entrada: EntradaDelEjercicio): ResultadoDelEje
     const bandas = new Set<Mhz>();
     let conBandas = 0;
     let sinFicha = 0;
+    let sinFichaEnRegistro = 0;
     for (const e of propias) {
       const leidas = entrada.bandas.get(e.clave);
       if (leidas === undefined) {
         sinFicha += 1;
+        continue;
+      }
+      if (entrada.sinFichaEnRegistro?.get(e.clave)?.includes(compania) === true) {
+        sinFichaEnRegistro += 1;
         continue;
       }
       const conocidas = (leidas[compania] ?? []).filter((mhz): mhz is Mhz => mhz !== null);
@@ -261,6 +276,7 @@ export const resolverEjercicio = (entrada: EntradaDelEjercicio): ResultadoDelEje
           : entre(lineasDelGrupo, estacionesDelGrupo(grupo)),
       conBandas,
       sinFicha,
+      sinFichaEnRegistro,
       bandas: ordenadas,
       tecnologias: tecnologiasDe(ordenadas),
     };
