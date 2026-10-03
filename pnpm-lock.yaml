@@ -159,6 +159,9 @@ importers:
       '@celda/ingesta':
         specifier: workspace:*
         version: link:../../packages/ingesta
+      '@celda/moderacion':
+        specifier: workspace:*
+        version: link:../moderacion
       '@celda/publicacion':
         specifier: workspace:*
         version: link:../../packages/publicacion

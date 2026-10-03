@@ -10,6 +10,7 @@ import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 
@@ -114,7 +115,10 @@ const medir = Effect.gen(function* () {
     ),
     Layer.succeed(
       Extractores,
-      Extractores.of({ registroOficial: capaGrabadaPorCajas("registro-oficial", espana) }),
+      Extractores.of({
+        registroOficial: capaGrabadaPorCajas("registro-oficial", espana),
+        comunidad: Option.none(),
+      }),
     ),
     Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
   ).pipe(

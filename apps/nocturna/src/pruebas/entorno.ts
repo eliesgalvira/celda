@@ -11,12 +11,14 @@ import { type AlmacenDeCopias, AlmacenDeFicheros } from "@celda/publicacion/alma
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import type { SitioEnVercel } from "@celda/publicacion/vercel";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
+import type { BuzonAdministrado } from "@celda/moderacion/buzon";
 import { NodeServices } from "@effect/platform-node";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
@@ -31,6 +33,12 @@ import {
   publicadorEn,
   sinAlmacen,
 } from "../programa.ts";
+
+/** Los interruptores por defecto con la comunidad encendida, como con el buzón configurado. */
+export const CON_COMUNIDAD: Readonly<Record<Fuente, Interruptor>> = {
+  ...INTERRUPTOR_POR_DEFECTO,
+  comunidad: { activo: true, motivo: "" },
+};
 
 /** Lotes pequeños, para que la muestra del Campus Nord ocupe varios. */
 export const POR_LOTE = 8;
@@ -117,6 +125,11 @@ export interface Variante {
   /** Las copias de la base en R2. Sin ellas, la copia se queda en el disco. */
   readonly copiasEnR2?: Layer.Layer<AlmacenDeCopias>;
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
+  /**
+   * El buzón de Convex del que se lee lo aceptado. Con él, la comunidad tiene el interruptor
+   * encendido, salvo si `interruptores` dice otra cosa.
+   */
+  readonly buzon?: Layer.Layer<BuzonAdministrado>;
   readonly reintento?: Duration.Duration;
   readonly proceso?: OpcionesBarrido;
 }
@@ -139,14 +152,22 @@ export const unaNoche = (
             Layer.provide(variante.almacen ?? entorno.almacenVigilado),
             Layer.provide(variante.vercel ?? Layer.empty),
           ),
-      Layer.succeed(Extractores, Extractores.of({ registroOficial: extractor })),
+      Layer.succeed(
+        Extractores,
+        Extractores.of({
+          registroOficial: extractor,
+          comunidad: Option.fromUndefinedOr(variante.buzon),
+        }),
+      ),
       Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
       variante.copiasEnR2 ?? Layer.empty,
     ).pipe(
       Layer.provideMerge(
         baseNocturna({
           fichero: entorno.base,
-          interruptores: variante.interruptores ?? INTERRUPTOR_POR_DEFECTO,
+          interruptores:
+            variante.interruptores ??
+            (variante.buzon === undefined ? INTERRUPTOR_POR_DEFECTO : CON_COMUNIDAD),
         }),
       ),
     );

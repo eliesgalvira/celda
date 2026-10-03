@@ -10,6 +10,7 @@ import {
   copiasDesdeConfig,
   vercelDesdeConfig,
 } from "@celda/publicacion/configuracion";
+import { buzonAdministrado } from "@celda/moderacion/buzon";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
@@ -18,6 +19,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { baseNocturna } from "./base.ts";
 import { montarCapasEn } from "./capas.ts";
@@ -152,7 +154,12 @@ const principal = Effect.gen(function* () {
   });
   const extractores = Layer.succeed(
     Extractores,
-    Extractores.of({ registroOficial: extractorDelRegistro }),
+    Extractores.of({
+      registroOficial: extractorDelRegistro,
+      comunidad: Option.map(c.buzon, (conexion) =>
+        buzonAdministrado(conexion).pipe(Layer.provide(FetchHttpClient.layer)),
+      ),
+    }),
   );
   const entorno = Layer.mergeAll(
     publicador,
