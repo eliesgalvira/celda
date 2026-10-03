@@ -18,12 +18,17 @@ const leerMedidas = Schema.decodeUnknownEffect(Schema.Array(Medida));
 
 const PROPIA: MedidaPropia = {
   tipo: "propia",
-  id: "0192a1b2-0000-7000-8000-000000000001",
-  version: 1,
-  creadaEl: Date.UTC(2026, 8, 26, 10, 30),
+  id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  esquema: 1,
+  creada: Date.UTC(2026, 8, 26, 10, 30),
   origen: "captura",
   punto: { longitud: 2.1134, latitud: 41.3893 },
   senal: { compania: "vodafone", red: "5g", mhz: 3500, rsrpDbm: -88, rsrqDb: -11, pci: 401 },
+  unidaA: {
+    emplazamiento: "vodafone-086040",
+    posicion: { longitud: 2.113628, latitud: 41.388344 },
+    azimut: 120,
+  },
 };
 
 describe("Medida", () => {

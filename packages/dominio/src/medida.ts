@@ -30,19 +30,45 @@ export const LecturaDeSenal = Schema.Struct({
 });
 export type LecturaDeSenal = typeof LecturaDeSenal.Type;
 
+/** Clave de un emplazamiento, como la publica la capa: «movistar-0802532». */
+export const ClaveEmplazamiento = Schema.String.pipe(
+  Schema.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+);
+
+/**
+ * A qué está unida una medida propia: el emplazamiento que le daba servicio, en la posición que
+ * publicaba su ficha al registrarla, y el azimut del sector que le daba servicio, si se sabía.
+ * La posición va con la medida porque el buzón no tiene los emplazamientos: con ella comprueba
+ * que la medida es verosímil, y la moderación la compara con lo publicado.
+ */
+export const UnidaA = Schema.Struct({
+  emplazamiento: ClaveEmplazamiento,
+  posicion: Coordenada,
+  /** Azimut del sector que daba servicio, en grados desde el norte, o `null` si no se sabía. */
+  azimut: Schema.NullOr(Schema.Finite.pipe(Schema.check(entre(0, 360)))),
+});
+export type UnidaA = typeof UnidaA.Type;
+
+/** Versión del esquema de la medida propia. */
+export const ESQUEMA_MEDIDA_PROPIA = 1;
+
 /**
  * Medida que la persona registra en su dispositivo a partir de una captura. Es una aportación,
- * así que lleva identificador, versión del esquema, fecha y origen (ADR 0007).
+ * así que lleva el mismo sobre que las demás (ADR 0007): identificador, versión del esquema,
+ * fecha de creación y origen. Solo tiene números: la captura nunca sale del dispositivo, ni
+ * siquiera en el formato (ADR 0020).
  */
 export const MedidaPropia = Schema.Struct({
   tipo: Schema.tag("propia"),
-  id: Schema.String,
-  version: Schema.Literal(1),
-  /** Cuándo se registró, en milisegundos. */
-  creadaEl: Schema.Finite,
+  /** UUID v4 creado en el dispositivo. Al compartirse es la clave idempotente. */
+  id: Schema.String.pipe(Schema.check(Schema.isUUID(4))),
+  esquema: Schema.Literal(ESQUEMA_MEDIDA_PROPIA),
+  /** Cuándo se registró, en milisegundos desde 1970. */
+  creada: Schema.Int,
   origen: Schema.Literal("captura"),
   punto: Coordenada,
   senal: LecturaDeSenal,
+  unidaA: UnidaA,
 });
 export type MedidaPropia = typeof MedidaPropia.Type;
 
