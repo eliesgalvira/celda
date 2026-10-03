@@ -147,6 +147,36 @@ describe("fraseDeResumen", () => {
     assert.include(leer([estacion("movistar", [null])]), "Aún no se conocen sus bandas");
   });
 
+  it("sin ficha en el registro: lo dice con la fecha y no la da por pendiente", () => {
+    const vodafone = { ...estacion("vodafone", []), sinFichaEnRegistro: NOCHE };
+    const sola = fraseDeResumen([vodafone]);
+    assert.strictEqual(
+      textoPlano(sola),
+      "Aquí emite Vodafone. El registro no tiene ficha para este emplazamiento " +
+        "(comprobado el 26 sept 2026). Sin sus bandas no se sabe si da 4G o 5G ni si llega " +
+        "lejos o da velocidad.",
+    );
+    assert.deepStrictEqual(terminosDe([sola]), ["registro-oficial", "banda", "4g", "5g"]);
+  });
+
+  it("en un emplazamiento compartido, solo de la compañía sin ficha en el registro", () => {
+    const orange = { ...estacion("orange", []), sinFichaEnRegistro: NOCHE };
+    assert.strictEqual(
+      leer([estacion("movistar", [800]), orange, estacion("vodafone", [])]),
+      "Movistar, Orange y Vodafone comparten este emplazamiento. Por las bandas que se " +
+        "conocen, probablemente da 4G. Llega lejos y entra bien en los edificios. " +
+        "De Vodafone aún no se conocen las bandas. El registro no tiene ficha de Orange para " +
+        "este emplazamiento (comprobado el 26 sept 2026).",
+    );
+    // Si ninguna tiene bandas, las demás siguen pendientes.
+    assert.strictEqual(
+      leer([orange, estacion("vodafone", [])]),
+      "Orange y Vodafone comparten este emplazamiento. Aún no se conocen sus bandas, así que " +
+        "no se sabe si da 4G o 5G ni si llega lejos o da velocidad. El registro no tiene ficha " +
+        "de Orange para este emplazamiento (comprobado el 26 sept 2026).",
+    );
+  });
+
   it("sin estaciones base no dice quién emite", () => {
     assert.strictEqual(leer([]), "Ninguna fuente dice qué compañía emite aquí.");
   });
@@ -166,6 +196,11 @@ describe("filasDelEje", () => {
         },
       ],
     );
+  });
+
+  it("la compañía sin ficha en el registro lo dice en su fila", () => {
+    const [orange] = filasDelEje([{ ...estacion("orange", []), sinFichaEnRegistro: NOCHE }]);
+    assert.strictEqual(orange?.nota, "El registro no tiene ficha para este emplazamiento");
   });
 });
 
@@ -194,6 +229,22 @@ describe("datosTecnicosDe", () => {
         fecha: "desde el 26 sept 2026",
       },
     ]);
+  });
+
+  it("sin expedientes dice si el registro no tiene la ficha o si aún no se ha leído", () => {
+    const [orange, vodafone] = datosTecnicosDe([
+      { ...estacion("orange", []), sinFichaEnRegistro: NOCHE },
+      estacion("vodafone", []),
+    ]);
+    assert.strictEqual(
+      orange?.sinExpedientes,
+      "El registro no tiene ficha para este emplazamiento (comprobado el 26 sept 2026), así " +
+        "que no se conocen sus bandas.",
+    );
+    assert.strictEqual(
+      vodafone?.sinExpedientes,
+      "Celda aún no ha leído sus bandas en el registro oficial.",
+    );
   });
 });
 

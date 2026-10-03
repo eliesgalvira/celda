@@ -364,6 +364,43 @@ describe("fusionar", () => {
     );
   });
 
+  it("sin ficha en el registro: solo la compañía cuyas observaciones del registro lo están todas", () => {
+    const sinFicha = (o: Observacion, fecha: number): Observacion => ({
+      ...o,
+      sinFichaEnRegistro: fecha,
+    });
+    const [emplazamiento] = fusionar([
+      sinFicha(observacion({ compania: "vodafone", codigo: "061723" }), FECHA),
+      sinFicha(observacion({ compania: "vodafone", codigo: "61723" }), FECHA + 1000),
+      observacion({
+        compania: "movistar",
+        codigo: "0802532",
+        bandas: [banda("movistar", "M", 800)],
+      }),
+      sinFicha(observacion({ compania: "orange", codigo: "CLMR6422A" }), FECHA),
+      observacion({ compania: "orange", codigo: "CLMR6422B" }),
+    ]);
+    const estacion = (compania: Compania) =>
+      emplazamiento?.estaciones.find((e) => e.compania === compania);
+    // Vodafone: sus dos registros sin ficha, con la comprobación más reciente.
+    assert.strictEqual(estacion("vodafone")?.sinFichaEnRegistro, FECHA + 1000);
+    // Movistar tiene bandas, y de Orange queda una ficha por leer: ninguna está sin ficha.
+    assert.notProperty(estacion("movistar"), "sinFichaEnRegistro");
+    assert.notProperty(estacion("orange"), "sinFichaEnRegistro");
+  });
+
+  it("una estación base con bandas no está sin ficha aunque otra observación suya lo esté", () => {
+    const [emplazamiento] = fusionar([
+      { ...observacion({ compania: "vodafone", codigo: "061723" }), sinFichaEnRegistro: FECHA },
+      observacion({
+        compania: "vodafone",
+        codigo: "61723",
+        bandas: [banda("vodafone", "V", 1800)],
+      }),
+    ]);
+    assert.notProperty(emplazamiento?.estaciones[0], "sinFichaEnRegistro");
+  });
+
   it("no depende del orden de la entrada", () => {
     const entrada = [
       observacion({ compania: "orange", codigo: "CATR0228A" }),

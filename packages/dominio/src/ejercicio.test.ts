@@ -148,6 +148,29 @@ describe("ejercicio de emplazamientos", () => {
     assert.strictEqual(vodafone.tecnologias["4G"], "no-consta");
   });
 
+  it("las estaciones sin ficha en el registro cuentan aparte de las que tienen bandas y de las que no se han leído", () => {
+    const resultado = resolverEjercicio({
+      ...ENTRADA,
+      bandas: new Map([...ENTRADA.bandas, ["c", { movistar: [] }]]),
+      sinFichaEnRegistro: new Map([
+        ["a", ["vodafone"]],
+        ["c", ["movistar"]],
+      ]),
+    });
+    const movistar = de(resultado, "movistar");
+    assert.deepStrictEqual(
+      [movistar.estaciones, movistar.conBandas, movistar.sinFicha, movistar.sinFichaEnRegistro],
+      [3, 2, 0, 1],
+    );
+    const vodafone = de(resultado, "vodafone");
+    assert.deepStrictEqual(
+      [vodafone.estaciones, vodafone.conBandas, vodafone.sinFicha, vodafone.sinFichaEnRegistro],
+      [2, 0, 0, 1],
+    );
+    // Sin el dato, ninguna.
+    assert.strictEqual(de(resolverEjercicio(ENTRADA), "movistar").sinFichaEnRegistro, 0);
+  });
+
   it("sin habitantes en el padrón no divide por cero: no hay nada por habitante", () => {
     const resultado = resolverEjercicio({ ...ENTRADA, habitantes: null });
     assert.isNull(resultado.habitantes);

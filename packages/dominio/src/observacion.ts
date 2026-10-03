@@ -31,6 +31,12 @@ export const Observacion = Schema.Struct({
   /** Desde cuándo dice la fuente esto, en milisegundos. Es la fecha de extracción, no la suya. */
   fecha: Schema.Finite,
   afirma: Afirmacion,
+  /**
+   * Si el registro oficial no tiene ficha de la estación base, aunque su listado la incluya, la
+   * fecha en que se comprobó por última vez: su página de detalle dice «Código de emplazamiento
+   * no válido». Una lectura buena de la ficha la quita.
+   */
+  sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
 });
 export type Observacion = typeof Observacion.Type;
 

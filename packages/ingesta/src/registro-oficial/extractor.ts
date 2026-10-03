@@ -16,12 +16,15 @@ import {
   type ListadoDeCaja,
   type Registro,
   RespuestaInesperada,
+  SinFichaEnElRegistro,
 } from "../extractor.ts";
 import { decodificarLatin1 } from "../texto.ts";
 import { type Caja, ZONA_BARCELONA } from "../zona.ts";
 import {
+  AVISO_SIN_FICHA,
   bandasDeFicha,
   esFichaDelGeoportal,
+  esFichaSinEmplazamiento,
   listadoDeElementos,
   ORIGEN,
   RespuestaListado,
@@ -92,7 +95,8 @@ const ESTADOS_DE_BLOQUEO: ReadonlySet<number> = new Set([401, 403]);
  * ficha de un registro, cada uno con su cliente de la fuente, que respeta `robots.txt`, deja su
  * pausa entre peticiones, no pasa de su tope y reintenta los fallos pasajeros con espera
  * exponencial. Un 401 o un 403, un listado en HTML o una página que no es una ficha son la fuente
- * bloqueando a Celda (`FuenteBloqueada`).
+ * bloqueando a Celda (`FuenteBloqueada`). La ficha con el aviso de código no válido es una
+ * estación base sin ficha en el registro (`SinFichaEnElRegistro`).
  */
 const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
   const obtener = Effect.fn("RegistroOficial.obtener")(function* (
@@ -141,6 +145,9 @@ const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
         url: registro.url,
         motivo: "una página que no es una ficha del geoportal",
       });
+    }
+    if (esFichaSinEmplazamiento(texto)) {
+      return yield* new SinFichaEnElRegistro({ url: registro.url, motivo: AVISO_SIN_FICHA });
     }
     const bandas = bandasDeFicha(texto);
     if (Result.isFailure(bandas)) {

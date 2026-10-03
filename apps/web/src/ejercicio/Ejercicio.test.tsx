@@ -198,4 +198,51 @@ describe("modo estudiante", () => {
     assert.strictEqual(celdas("900 MHz")[0], "no");
     assert.isNotNull(panel.querySelector("[data-termino='radio-de-cobertura']"));
   });
+
+  it("al leer las fichas, las estaciones base sin ficha en el registro cuentan aparte", async () => {
+    navegar("/?ejercicio=21", { reemplazar: true });
+    const { findByRole, findByText, queryByText, fichas } = montar(true);
+    const tabla = await findByRole("table", {
+      name: "Emplazamiento de estaciones base en Pedralbes",
+    });
+    fireEvent.click(await findByText("Leer las fichas de 2 emplazamientos"));
+    flush();
+    await waitFor(() => assert.sameMembers([...fichas.abiertas()], ["movistar-1", "movistar-2"]));
+    const conOrange = ficha("movistar-1", 800);
+    fichas.responder("movistar-1", {
+      ...conOrange,
+      estaciones: [
+        ...conOrange.estaciones,
+        {
+          compania: "orange",
+          codigos: ["CLMR6422A"],
+          bandas: [],
+          origenes: [],
+          sinFichaEnRegistro: NOCHE,
+        },
+      ],
+    });
+    const sinFicha = ficha("movistar-2", 3500);
+    fichas.responder("movistar-2", {
+      ...sinFicha,
+      estaciones: sinFicha.estaciones.map((e) => ({ ...e, bandas: [], sinFichaEnRegistro: NOCHE })),
+    });
+    await findByText(
+      "Leídas 2 de 2 fichas. 2 estaciones base no tienen ficha en el registro, aunque su " +
+        "listado las incluye (Movistar y Orange): cuentan aparte, y de sus bandas la tabla " +
+        "también dice «no consta».",
+    );
+    // No son fichas sin bandas conocidas ni fichas por leer.
+    assert.isNull(queryByText(/no traen ninguna banda conocida|no han llegado/u));
+    // De Movistar se conoce una de dos: de lo que no tiene no se afirma nada.
+    const celdas = (magnitud: string) =>
+      Array.from(
+        Array.from(tabla.querySelectorAll("tr"))
+          .find((tr) => tr.querySelector("th")?.firstChild?.textContent === magnitud)
+          ?.querySelectorAll("td") ?? [],
+        (td) => td.textContent,
+      );
+    await waitFor(() => assert.strictEqual(celdas("800 MHz")[0], "sí"));
+    assert.strictEqual(celdas("900 MHz")[0], "no consta");
+  });
 });

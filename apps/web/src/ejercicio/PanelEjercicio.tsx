@@ -1,6 +1,6 @@
 import type { Coordenada, Rectangulo } from "@celda/dominio/area";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
-import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import {
   FUENTE_DE_PARAMETROS,
   GRUPOS_DE_LINEAS,
@@ -119,6 +119,9 @@ const SIN_RESULTADO: ResultadoDelEjercicio = {
 
 const SIN_BORDE: ProvinciasDelBorde = { faltan: [], incompletas: [] };
 
+/** Antes de leer las fichas no se sabe de ninguna estación base sin ficha en el registro. */
+const SIN_MARCAS: ReadonlyMap<string, ReadonlyArray<Compania>> = new Map();
+
 /** Descarga unos bytes o un texto como fichero, sin pasar por ningún servidor. */
 const descargar = (contenido: BlobPart, tipo: string, nombre: string) => {
   const url = URL.createObjectURL(new Blob([contenido], { type: tipo }));
@@ -135,6 +138,20 @@ const enumerar = (nombres: ReadonlyArray<string>): string =>
   nombres.length <= 1
     ? (nombres[0] ?? "")
     : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1) ?? ""}`;
+
+/**
+ * Lo que se dice de las estaciones base sin ficha en el registro tras leer las fichas: cuántas y
+ * de qué compañías. No se dan por pendientes: el registro las lista pero no tiene su ficha.
+ */
+const textoSinFichaEnRegistro = (sinFicha: {
+  readonly estaciones: number;
+  readonly companias: ReadonlyArray<string>;
+}): string =>
+  sinFicha.estaciones === 0
+    ? ""
+    : ` ${sinFicha.estaciones === 1 ? "Una estación base no tiene" : `${entero(sinFicha.estaciones)} estaciones base no tienen`} ` +
+      `ficha en el registro, aunque su listado ${sinFicha.estaciones === 1 ? "la incluye" : "las incluye"} ` +
+      `(${enumerar(sinFicha.companias)}): ${sinFicha.estaciones === 1 ? "cuenta" : "cuentan"} aparte, y de sus bandas la tabla también dice «no consta».`;
 
 /**
  * El ejercicio de emplazamientos del modo estudiante, en el panel de la izquierda o en la hoja del
@@ -346,13 +363,22 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
     () => enZona().filter((e) => (e.bandas?.length ?? 0) > 0).length,
   );
 
-  /** Fichas leídas sin ninguna banda conocida de ninguna compañía. */
-  const sinBandas = createMemo(
-    () =>
-      [...(leidas()?.leidas.bandas.values() ?? [])].filter((porCompania) =>
-        Object.values(porCompania).every((bandas) => bandas.every((mhz) => mhz === null)),
-      ).length,
-  );
+  /**
+   * Fichas leídas sin ninguna banda conocida de ninguna compañía. Las estaciones base sin ficha en
+   * el registro no cuentan: se cuentan aparte.
+   */
+  const sinBandas = createMemo(() => {
+    const hecho = leidas()?.leidas;
+    if (hecho === undefined) return 0;
+    return [...hecho.bandas].filter(([clave, porCompania]) => {
+      const sinFicha = hecho.sinFichaEnRegistro.get(clave) ?? [];
+      const resto = Compania.literals.flatMap((compania) => {
+        const suyas = porCompania[compania];
+        return suyas === undefined || sinFicha.includes(compania) ? [] : [suyas];
+      });
+      return resto.length > 0 && resto.every((suyas) => suyas.every((mhz) => mhz === null));
+    }).length;
+  });
 
   const resultado = createMemo(() => {
     const actual = resuelta();
@@ -363,8 +389,18 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
       enZona: enZona(),
       todos: props.emplazamientos,
       bandas: leidas()?.leidas.bandas ?? bandasDeLaCapa(),
+      sinFichaEnRegistro: leidas()?.leidas.sinFichaEnRegistro ?? SIN_MARCAS,
       parametros: parametros(),
     });
+  });
+
+  /** Las estaciones base de la zona sin ficha en el registro, y de qué compañías son. */
+  const sinFichaEnRegistro = createMemo(() => {
+    const deLaZona = (resultado()?.companias ?? []).filter((c) => c.sinFichaEnRegistro > 0);
+    return {
+      estaciones: deLaZona.reduce((suma, c) => suma + c.sinFichaEnRegistro, 0),
+      companias: deLaZona.map((c) => NOMBRE_COMPANIA[c.compania]),
+    };
   });
 
   const presentes = createMemo(() => resultado()?.companias.filter((c) => c.estaciones > 0) ?? []);
@@ -872,6 +908,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                         {hecho().leidas.fallidas.length > 0
                           ? ` ${entero(hecho().leidas.fallidas.length)} no han llegado: de sus bandas la tabla dice «no consta».`
                           : ""}
+                        {textoSinFichaEnRegistro(sinFichaEnRegistro())}
                         {sinBandas() > 0
                           ? ` ${entero(sinBandas())} no traen ninguna banda conocida: de ellas la tabla también dice «no consta».`
                           : ""}

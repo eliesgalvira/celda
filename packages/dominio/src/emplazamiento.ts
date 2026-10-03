@@ -57,6 +57,11 @@ export const EstacionBase = Schema.Struct({
   codigos: Schema.Array(Schema.String),
   bandas: Schema.Array(Banda),
   observaciones: Schema.Array(Procedencia),
+  /**
+   * Si el registro oficial no tiene ficha de ella, la fecha en que se comprobó: la más reciente
+   * de sus observaciones del registro. Solo cuando ninguna tiene bandas y todas están sin ficha.
+   */
+  sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
 });
 export type EstacionBase = typeof EstacionBase.Type;
 

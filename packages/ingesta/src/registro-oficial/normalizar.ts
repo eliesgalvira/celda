@@ -185,16 +185,24 @@ const celdas = (fila: string): ReadonlyArray<string> =>
  */
 export const esFichaDelGeoportal = (html: string): boolean => html.includes("tablaDetalleEstacion");
 
+/** Lo que se apunta de una estación base cuya ficha dice que el registro no la tiene. */
+export const AVISO_SIN_FICHA = "La ficha dice «Código de emplazamiento no válido»";
+
+/**
+ * Si la ficha es el aviso de código no válido, que llega con HTTP 200: el registro no tiene
+ * ficha de esa estación base aunque su listado la incluya, como `061723` de Vodafone o
+ * `CLMR6422A` de Orange el 02/10/2026. No es una página ilegible: es lo que dice el registro.
+ */
+export const esFichaSinEmplazamiento = (html: string): boolean =>
+  /c&oacute;digo de emplazamiento no v&aacute;lido|código de emplazamiento no válido/iu.test(html);
+
 /**
  * Filas de «Características técnicas» de la ficha en HTML. Una ficha sin esa tabla, o con el
- * aviso de código no válido (que llega con HTTP 200), es un error de la fuente y no una
- * estación sin bandas.
+ * aviso de código no válido (`esFichaSinEmplazamiento`), no es una estación sin bandas.
  */
 export const filasDeFicha = (html: string): Result.Result<ReadonlyArray<FilaFicha>, string> => {
-  if (
-    /c&oacute;digo de emplazamiento no v&aacute;lido|código de emplazamiento no válido/iu.test(html)
-  ) {
-    return Result.fail("La ficha dice «Código de emplazamiento no válido»");
+  if (esFichaSinEmplazamiento(html)) {
+    return Result.fail(AVISO_SIN_FICHA);
   }
   const inicio = html.indexOf("CARACTERISTICAS");
   if (inicio < 0) {

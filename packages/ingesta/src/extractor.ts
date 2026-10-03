@@ -38,6 +38,17 @@ export class RespuestaInesperada extends Schema.TaggedError<RespuestaInesperada>
   { url: Schema.String, motivo: Schema.String },
 ) {}
 
+/**
+ * El registro oficial no tiene ficha de la estación base, aunque su listado la incluya: su
+ * página de detalle dice «Código de emplazamiento no válido». La estación base queda sin ficha en
+ * el registro, y la ficha se vuelve a pedir con la espera de siempre por si el ministerio lo
+ * arregla.
+ */
+export class SinFichaEnElRegistro extends Schema.TaggedError<SinFichaEnElRegistro>()(
+  "SinFichaEnElRegistro",
+  { url: Schema.String, motivo: Schema.String },
+) {}
+
 /** El `robots.txt` de la fuente prohíbe esa ruta a Celda. */
 export class ProhibidoPorRobots extends Schema.TaggedError<ProhibidoPorRobots>()(
   "ProhibidoPorRobots",
@@ -75,6 +86,7 @@ export type ErrorDeExtractor =
   | FuenteBloqueada
   | FuentePideEsperar
   | RespuestaInesperada
+  | SinFichaEnElRegistro
   | ProhibidoPorRobots
   | LimiteDePeticiones;
 
@@ -85,6 +97,7 @@ export const describirError = (error: ErrorDeExtractor): string => {
     case "FuenteBloqueada":
     case "FuentePideEsperar":
     case "RespuestaInesperada":
+    case "SinFichaEnElRegistro":
       return `${error._tag}: ${error.motivo} (${error.url})`;
     case "ProhibidoPorRobots":
       return `${error._tag}: ${error.url}`;

@@ -146,13 +146,20 @@ Dentro de cada grupo van primero las nuevas y las de listado cambiado, en el ord
 
 Las fichas usan su propio cliente sobre la misma conexión que el listado: su pausa es el ritmo, y su tope, las peticiones que caben en la ventana a ese ritmo: 7.200 a 3 s y 21.600 a 1 s. Comparten `robots.txt` y la hora de la última respuesta, así que la primera ficha también espera su pausa desde la última caja. Cuando algo falla:
 
-- una ficha que no se puede leer, como la del aviso «Código de emplazamiento no válido», apunta el fallo y espera un día antes de volver a la cola; dos días si falla otra vez, luego cuatro, y así hasta 30;
+- una ficha que no se puede leer apunta el fallo y espera un día antes de volver a la cola; dos días si falla otra vez, luego cuatro, y así hasta 30;
+- una ficha con el aviso «Código de emplazamiento no válido» espera igual, y además deja la estación base sin ficha en el registro, con la fecha de la noche (`SinFichaEnElRegistro`). La ficha publicada lo dice. La siguiente lectura buena quita la marca;
 - un fallo pasajero (red, 408, 5xx) se reintenta tres veces con espera exponencial. Si sigue, cuenta como fallo pero no hace esperar a la ficha;
 - un 429, o un 503 con `Retry-After`, es la fuente pidiendo que se espere. Si `Retry-After` pide un minuto o menos, la conexión espera lo que pide y repite, dentro de los mismos tres reintentos. Si pide más, si un 429 no dice cuánto o si lo sigue pidiendo tras los reintentos, se deja de pedir en el acto (`FuentePideEsperar`). Vale para todas las fuentes: en el listado para las zonas que quedan, y en antenasmoviles.es, los detalles;
-- tres fallos seguidos paran las fichas de la noche;
+- tres fallos seguidos paran las fichas de la noche. Una ficha sin ficha en el registro no cuenta ni corta la cuenta, porque es lo que dice el registro y no un fallo; pero 20 seguidas (`SIN_FICHA_SEGUIDAS`) también las paran, y el diario dice que puede haber cambiado la URL de la ficha. Entonces ninguna de esas 20 queda marcada: esperan y se reintentan como cualquier fallo;
 - un 401 o un 403, una página que no es una ficha del geoportal (todas llevan la tabla `tablaDetalleEstacion`) o un listado en HTML son la fuente bloqueando a Celda (`FuenteBloqueada`). Se deja de pedir en el acto, sin reintentos.
 
-Lo que para las fichas queda en los errores de la ejecución («Fichas paradas hasta la próxima noche: …»). El diario dice cuántas se leyeron, cuántas quedan y por qué pararon. La orden `estado` dice cuántas quedan en cada parte de la cola: sin leer, por releer y esperando tras fallar. También las da por zona de barrido, junto a la fecha de su último barrido completo, contando las de sus provincias con prioridad, y dice qué zonas barre la noche siguiente.
+Lo que para las fichas queda en los errores de la ejecución («Fichas paradas hasta la próxima noche: …»), y cada ficha que falla, con su clave y su motivo. El diario tiene una línea de aviso por ficha que falla, con su clave, su URL, el motivo, el intento y desde cuándo se vuelve a pedir, o que no espera si el fallo era pasajero:
+
+```
+Ficha fallida, intento 1: VODAFONE ESPAÑA, S.A.U. - 061723 (https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?…): SinFichaEnElRegistro: La ficha dice «Código de emplazamiento no válido»; se vuelve a pedir desde 2026-10-04 01:02:03 UTC
+```
+
+Al final dice cuántas se leyeron, cuántas fallaron y cuáles, con su motivo, cuántas quedan y por qué pararon. La orden `estado` dice cuántas quedan en cada parte de la cola: sin leer, por releer y esperando tras fallar. De las que esperan tras un fallo enseña las diez primeras en volver a pedirse, con su motivo y su próximo intento, así que no hace falta abrir la base para leer `ficha_error`. También las da por zona de barrido, junto a la fecha de su último barrido completo, contando las de sus provincias con prioridad, y dice qué zonas barre la noche siguiente.
 
 Al pasar la mitad de la ventana con alguna ficha leída, la noche fusiona y publica, sin esperar ni repetir si falla. Si la noche se corta después, lo leído hasta entonces ya está publicado. La primera fusión lleva la fecha de inicio de la ejecución, como todos sus datos; la del cierre lleva la hora a la que se hace, para que la versión de los datos avance. Así una noche con fichas publica dos versiones, y las ocho que se conservan cubren unas cuatro noches.
 

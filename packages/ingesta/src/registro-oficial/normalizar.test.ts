@@ -10,6 +10,7 @@ import { decodificarLatin1 } from "../texto.ts";
 import {
   bandasDeFicha,
   companiaDeTitular,
+  esFichaSinEmplazamiento,
   listadoDeElementos,
   municipioDeDireccion,
 } from "./normalizar.ts";
@@ -165,6 +166,13 @@ describe("ficha del registro oficial", () => {
       assert.deepStrictEqual(
         bandasDeFicha(html),
         Result.fail("La ficha dice «Código de emplazamiento no válido»"),
+      );
+      // Es su propio caso: el registro no tiene ficha de esa estación base.
+      assert.isTrue(esFichaSinEmplazamiento(html));
+      assert.isFalse(
+        esFichaSinEmplazamiento(
+          decodificarLatin1(yield* leerMuestra("detalle-digi-0800143.iso-8859-1.html")),
+        ),
       );
     }).pipe(conMuestras),
   );

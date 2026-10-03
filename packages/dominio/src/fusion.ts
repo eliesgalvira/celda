@@ -165,17 +165,38 @@ const unirBandas = (observaciones: ReadonlyArray<Observacion>): ReadonlyArray<Ba
   return [...porReferencia.values()].sort(compararBandas);
 };
 
+/**
+ * Cuándo se comprobó que el registro oficial no tiene ficha de una estación base: la fecha más
+ * reciente de sus observaciones del registro, si todas están sin ficha y ninguna da bandas. Si
+ * alguna aún no se ha leído o tiene bandas, no lo está.
+ */
+const sinFichaEnRegistroDe = (
+  presentes: ReadonlyArray<Observacion>,
+  bandas: ReadonlyArray<Banda>,
+): number | undefined => {
+  const oficiales = presentes.filter(esOficial);
+  const fechas = oficiales.flatMap((o) =>
+    o.sinFichaEnRegistro === undefined ? [] : [o.sinFichaEnRegistro],
+  );
+  return bandas.length === 0 && fechas.length > 0 && fechas.length === oficiales.length
+    ? Math.max(...fechas)
+    : undefined;
+};
+
 const estacionDe = (
   compania: Compania,
   observaciones: ReadonlyArray<Observacion>,
 ): EstacionBase => {
   const presentes = observaciones.filter((o) => o.afirma === "presente");
-  return {
+  const bandas = unirBandas(presentes);
+  const estacion: EstacionBase = {
     compania,
     codigos: unicos(presentes.map((o) => o.codigo.trim())),
-    bandas: unirBandas(presentes),
+    bandas,
     observaciones: observaciones.map(procedencia),
   };
+  const sinFichaEnRegistro = sinFichaEnRegistroDe(presentes, bandas);
+  return sinFichaEnRegistro === undefined ? estacion : { ...estacion, sinFichaEnRegistro };
 };
 
 /** Conflictos que se ven dentro de un grupo de observaciones. */

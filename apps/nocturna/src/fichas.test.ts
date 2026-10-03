@@ -1,14 +1,22 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
-import { FICHERO_VIGENTE } from "@celda/dominio/capa";
-import { ficheroDeManifiesto } from "@celda/dominio/provincias";
+import { decodificarVigente, FICHERO_VIGENTE } from "@celda/dominio/capa";
+import type { EstacionBase } from "@celda/dominio/emplazamiento";
+import type { Ficha } from "@celda/dominio/ficha";
+import { fusionar } from "@celda/dominio/fusion";
+import {
+  ficheroDeManifiesto,
+  leerCapaDeProvincia,
+  leerLoteDeProvincia,
+  leerResumen,
+} from "@celda/dominio/provincias";
 import {
   ExtractorPorCajas,
   FuenteBloqueada,
   type Registro,
   RespuestaInesperada,
 } from "@celda/ingesta/extractor";
-import { OPCIONES_FICHAS, type OpcionesFichas } from "@celda/ingesta/fichas";
+import { OPCIONES_FICHAS, type OpcionesFichas, SIN_FICHA_SEGUIDAS } from "@celda/ingesta/fichas";
 import { ObservacionGuardada, PuntoGuardado } from "@celda/ingesta/guardado";
 import {
   capaGrabadaPorCajas,
@@ -25,16 +33,19 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { TestClock } from "effect/testing";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 
 import { BaseNocturna, ESQUEMA } from "./base.ts";
+import { describirResumen } from "./estado.ts";
 import {
   CATALUNA_CADA_NOCHE,
   conBase,
   conEntorno,
+  contenidoDe,
   type Entorno,
   unaNoche,
 } from "./pruebas/entorno.ts";
@@ -43,6 +54,9 @@ const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
 
 const codificarObservacion = Schema.encodeEffect(Schema.fromJsonString(ObservacionGuardada));
+const decodificarObservacion = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(ObservacionGuardada),
+);
 const codificarPunto = Schema.encodeEffect(Schema.fromJsonString(PuntoGuardado));
 
 /** Las opciones de la noche con otras de fichas. */
@@ -154,6 +168,46 @@ const conGirona = (grabada: FuenteGrabada, cuantos: number): FuenteGrabada => ({
     ),
   },
 });
+
+/** Las fichas de la versión vigente del almacén, como las leería la web. */
+const fichasPublicadas = (entorno: Entorno) =>
+  Effect.gen(function* () {
+    const almacen = yield* contenidoDe(entorno.almacen);
+    const vigente = decodificarVigente(almacen.get(FICHERO_VIGENTE) ?? "");
+    if (Result.isFailure(vigente)) return assert.fail("vigente.json no se entiende");
+    const resumen = leerResumen(
+      almacen.get(vigente.success.resumen ?? "") ?? "",
+      vigente.success.version,
+    );
+    if (Result.isFailure(resumen)) return assert.fail(resumen.failure.message);
+    const fichas: Array<Ficha> = [];
+    for (const provincia of resumen.success.provincias) {
+      if (provincia.fichero === undefined) continue;
+      const capa = leerCapaDeProvincia(almacen.get(provincia.fichero) ?? "", provincia.codigo);
+      if (Result.isFailure(capa)) return assert.fail(capa.failure.message);
+      for (const lote of capa.success.lotes) {
+        const leidas = leerLoteDeProvincia(almacen.get(lote) ?? "", provincia.codigo);
+        if (Result.isFailure(leidas)) return assert.fail(leidas.failure.message);
+        fichas.push(...leidas.success);
+      }
+    }
+    return fichas;
+  });
+
+/** Lo que guarda la base de una observación del registro, con su cola de fichas. */
+const observacionEn = (entorno: Entorno, clave: string) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const [fila] = yield* sql<{
+      readonly datos: string;
+      readonly fallos: number;
+      readonly espera: number | null;
+    }>`SELECT datos, ficha_fallos AS fallos, ficha_espera_hasta AS espera
+      FROM observaciones WHERE fuente = 'registro-oficial' AND clave = ${clave}`;
+    assert.isDefined(fila);
+    const datos = yield* decodificarObservacion(fila.datos);
+    return { datos, fallos: fila.fallos, espera: fila.espera };
+  }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
 
 describe("fichas en la ventana de la noche (base SQLite y registro grabado)", () => {
   it.effect(
@@ -290,7 +344,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             registro.clave === primera.clave
               ? new RespuestaInesperada({
                   url: registro.url,
-                  motivo: "La ficha dice «Código de emplazamiento no válido»",
+                  motivo: "La ficha no tiene la tabla de características técnicas",
                 })
               : undefined,
         });
@@ -305,7 +359,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             fallos: 1,
             espera: NOCHE + DIA,
             error:
-              "RespuestaInesperada: La ficha dice «Código de emplazamiento no válido» " +
+              "RespuestaInesperada: La ficha no tiene la tabla de características técnicas " +
               `(${primera.url})`,
           },
         ]);
@@ -324,6 +378,152 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
         assert.deepStrictEqual(trasLeerla.fallidas, []);
       }),
     ),
+  );
+
+  it.effect(
+    "una estación base sin ficha en el registro se publica con la marca y su fecha, se vuelve a pedir con la espera de siempre y una lectura buena quita la marca",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          // Una estación base de un emplazamiento compartido, con una sola observación y una ficha
+          // con bandas cuando el registro la tiene.
+          const conBandas = (e: EstacionBase) =>
+            e.observaciones.length === 1 &&
+            (grabada.fichas.get(e.observaciones[0]?.clave ?? "")?.length ?? 0) > 0;
+          const compartido = fusionar(
+            grabada.listado.registros.map((r) => ({
+              ...r,
+              fuente: "registro-oficial" as const,
+              bandas: [],
+              fecha: NOCHE,
+              afirma: "presente" as const,
+            })),
+          ).find((e) => e.estaciones.length > 1 && e.estaciones.some(conBandas));
+          const afectada = compartido?.estaciones.find(conBandas);
+          const clave = afectada?.observaciones[0]?.clave;
+          assert.isDefined(compartido);
+          assert.isDefined(afectada);
+          assert.isDefined(clave);
+          const sinFicha = { ...grabada, sinFicha: new Set([clave]) };
+          const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
+
+          // Primera noche: el registro no tiene su ficha.
+          yield* TestClock.setTime(NOCHE);
+          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas));
+          const primera = yield* observacionEn(entorno, clave);
+          assert.strictEqual(primera.datos.sinFichaEnRegistro, NOCHE);
+          assert.deepStrictEqual(primera.datos.bandas, []);
+          assert.strictEqual(primera.fallos, 1);
+          assert.strictEqual(primera.espera, NOCHE + DIA);
+
+          // La ficha publicada lo dice solo de esa compañía, y conserva lo del listado.
+          const publicada = (yield* fichasPublicadas(entorno)).find(
+            (f) => f.clave === compartido.clave,
+          );
+          assert.isDefined(publicada);
+          assert.deepStrictEqual(publicada.posicion, compartido.posicion);
+          assert.strictEqual(publicada.direccion, compartido.direccion);
+          assert.deepStrictEqual(
+            publicada.estaciones.map((e) => [e.compania, e.sinFichaEnRegistro]),
+            compartido.estaciones.map((e) => [
+              e.compania,
+              e.compania === afectada.compania ? NOCHE : undefined,
+            ]),
+          );
+          const estacion = publicada.estaciones.find((e) => e.compania === afectada.compania);
+          assert.deepStrictEqual(estacion?.bandas, []);
+          assert.deepStrictEqual(
+            estacion?.origenes.map((o) => o.clave),
+            [clave],
+          );
+
+          // La orden `estado` la enseña esperando, con su motivo y su próximo intento.
+          const estado = describirResumen(
+            entorno.base,
+            yield* conBase(
+              entorno.base,
+              Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+            ),
+          );
+          assert.include(
+            estado,
+            "  Fichas esperando tras un fallo: 1, por orden de su próximo intento:",
+          );
+          assert.include(
+            estado,
+            `    - ${clave}: SinFichaEnElRegistro: La ficha dice «Código de emplazamiento no válido» ` +
+              `(${grabada.listado.registros.find((r) => r.clave === clave)?.url ?? ""}); ` +
+              "intento 2 desde 2026-09-27 02:15:00 UTC",
+          );
+
+          // Antes del día de espera no se pide. Después sí, y sigue sin ficha: dos días más, y la
+          // fecha de la comprobación es la de esta noche.
+          yield* Ref.set(pedidas, []);
+          yield* TestClock.setTime(NOCHE + DIA - 60_000);
+          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas));
+          assert.deepStrictEqual(yield* Ref.get(pedidas), []);
+          const segunda = NOCHE + DIA + 60_000;
+          yield* TestClock.setTime(segunda);
+          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas));
+          assert.deepStrictEqual(yield* Ref.get(pedidas), [clave]);
+          const trasLaSegunda = yield* observacionEn(entorno, clave);
+          assert.strictEqual(trasLaSegunda.datos.sinFichaEnRegistro, segunda);
+          assert.strictEqual(trasLaSegunda.fallos, 2);
+          assert.strictEqual(trasLaSegunda.espera, segunda + 2 * DIA);
+
+          // El ministerio lo arregla: la siguiente lectura buena quita la marca y la publica.
+          yield* Ref.set(pedidas, []);
+          yield* TestClock.setTime(segunda + 2 * DIA + 60_000);
+          yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas));
+          assert.deepStrictEqual(yield* Ref.get(pedidas), [clave]);
+          const arreglada = yield* observacionEn(entorno, clave);
+          assert.notProperty(arreglada.datos, "sinFichaEnRegistro");
+          assert.strictEqual(arreglada.fallos, 0);
+          assert.isNull(arreglada.espera);
+          assert.isAbove(arreglada.datos.bandas.length, 0);
+          const sinMarca = (yield* fichasPublicadas(entorno)).find(
+            (f) => f.clave === compartido.clave,
+          );
+          assert.isTrue(sinMarca?.estaciones.every((e) => e.sinFichaEnRegistro === undefined));
+          assert.isAbove(
+            sinMarca?.estaciones.find((e) => e.compania === afectada.compania)?.bandas.length ?? 0,
+            0,
+          );
+        }),
+      ),
+    30_000,
+  );
+
+  it.effect(
+    "veinte fichas seguidas sin ficha en el registro paran la noche y ninguna queda marcada",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          const todas = new Set(grabada.listado.registros.map((r) => r.clave));
+          const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
+          yield* TestClock.setTime(NOCHE);
+          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, sinFicha: todas }, pedidas));
+          const pedidasEnLaNoche = yield* Ref.get(pedidas);
+          assert.lengthOf(pedidasEnLaNoche, SIN_FICHA_SEGUIDAS);
+          for (const clave of pedidasEnLaNoche) {
+            const guardada = yield* observacionEn(entorno, clave);
+            // Esperan como cualquier fallo, pero sin la marca pública.
+            assert.notProperty(guardada.datos, "sinFichaEnRegistro");
+            assert.strictEqual(guardada.fallos, 1);
+            assert.strictEqual(guardada.espera, NOCHE + DIA);
+          }
+          assert.isTrue(
+            (yield* fichasPublicadas(entorno)).every((f) =>
+              f.estaciones.every((e) => e.sinFichaEnRegistro === undefined),
+            ),
+          );
+          const ejecucion = yield* ultimaDe(entorno);
+          assert.include(ejecucion?.errores.at(-1) ?? "", "puede que haya cambiado la URL");
+        }),
+      ),
+    30_000,
   );
 
   it.effect(

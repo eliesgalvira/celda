@@ -5,7 +5,13 @@ import type { GrupoDeCola, GrupoPendiente, Pendientes } from "@celda/ingesta/fic
 import type { ResultadoPublicacion } from "@celda/publicacion/publicar";
 import * as DateTime from "effect/DateTime";
 
-import type { EjecucionGuardada, Resumen, ResumenDeFuente, ResumenDeZona } from "./base.ts";
+import type {
+  EjecucionGuardada,
+  FichaEnEspera,
+  Resumen,
+  ResumenDeFuente,
+  ResumenDeZona,
+} from "./base.ts";
 
 /** Una fecha en UTC, al segundo: `2026-09-26 02:15:00 UTC`. */
 const fecha = (milisegundos: number): string =>
@@ -125,6 +131,22 @@ const describirPendiente = (
   `    - ${describirGrupo(grupo, nombreDe)}: ${nuevas} sin leer, ${porReleer} por releer` +
   (enEspera === 0 ? "" : `, ${enEspera} esperando tras fallar`);
 
+const describirEnEspera = (f: FichaEnEspera): string =>
+  `    - ${f.clave}: ${f.motivo ?? "sin motivo apuntado"}; ` +
+  `intento ${f.fallos + 1} desde ${fecha(f.esperaHasta)}`;
+
+/** Las fichas que esperan tras un fallo: cuántas y las primeras que se volverán a pedir. */
+const describirFichasEnEspera = (f: ResumenDeFuente): ReadonlyArray<string> =>
+  f.enEspera === 0
+    ? []
+    : [
+        `  Fichas esperando tras un fallo: ${f.enEspera}` +
+          (f.enEspera > f.primerasEnEspera.length
+            ? `; las ${f.primerasEnEspera.length} primeras en volver a pedirse:`
+            : ", por orden de su próximo intento:"),
+        ...f.primerasEnEspera.map(describirEnEspera),
+      ];
+
 const describirFuente = (f: ResumenDeFuente, turno?: Turno): ReadonlyArray<string> => [
   `${f.fuente}: ${f.interruptor.activo ? "encendida" : `apagada (${f.interruptor.motivo})`}`,
   ...(f.ultima === undefined ? ["  Ninguna ejecución todavía"] : describirEjecucion(f.ultima)),
@@ -138,6 +160,7 @@ const describirFuente = (f: ResumenDeFuente, turno?: Turno): ReadonlyArray<strin
       : [
           `  Observaciones vigentes: ${f.vigentes}; fichas pendientes: ${f.sinLeer} sin leer y ` +
             `${f.porReleer} por releer`,
+          ...describirFichasEnEspera(f),
         ]),
   ...(turno !== undefined
     ? describirZonasEnTurno(f.zonas, turno)

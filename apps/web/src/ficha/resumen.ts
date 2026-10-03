@@ -12,9 +12,11 @@ import type { EstacionTecnica } from "@celda/ui/panel/DatosTecnicos.tsx";
 import type { FilaEje } from "@celda/ui/panel/EjeFrecuencias.tsx";
 
 import {
+  comprobadoEl,
   enumerar,
   fechaCorta,
   NOMBRE_FUENTE,
+  SIN_FICHA_EN_REGISTRO,
   sinBandasDe,
   textoCodigos,
   textoTramo,
@@ -83,6 +85,20 @@ const mayuscula = (texto: string): string => texto.charAt(0).toUpperCase() + tex
 
 const BANDAS = termino("banda", "bandas");
 
+/** Si el registro no tiene la ficha de una estación base, y por eso no tiene bandas. */
+const sinFicha = (estacion: EstacionDeFicha): boolean =>
+  estacion.sinFichaEnRegistro !== undefined && bandasDe(estacion).length === 0;
+
+/**
+ * Que el registro no tiene la ficha de unas estaciones base, con la comprobación más reciente.
+ * En un emplazamiento compartido dice de qué compañías, si no son todas.
+ */
+const fraseSinFicha = (sinFichas: ReadonlyArray<EstacionDeFicha>, todas: number): TextoMarcado => {
+  const fecha = Math.max(...sinFichas.map((e) => e.sinFichaEnRegistro ?? 0));
+  const de = sinFichas.length === todas ? "" : ` de ${nombres(sinFichas)}`;
+  return marcado`El ${termino("registro-oficial", "registro")} no tiene ficha${de} para este emplazamiento (${comprobadoEl(fecha)}).`;
+};
+
 /**
  * La frase que abre la ficha (historia 13): quién emite, si da 4G o 5G y si llega lejos o da
  * velocidad. El registro oficial no publica la tecnología, así que se deduce de la banda y se
@@ -96,16 +112,22 @@ export const fraseDeResumen = (estaciones: ReadonlyArray<EstacionDeFicha>): Text
   const bandas = BANDAS_NOMINALES.filter((mhz) =>
     estaciones.some((e) => bandasDe(e).includes(mhz)),
   );
+  const sinFichas = estaciones.filter(sinFicha);
+  const deSinFicha: TextoMarcado | string =
+    sinFichas.length === 0 ? "" : marcado` ${fraseSinFicha(sinFichas, estaciones.length)}`;
   if (bandas.length === 0) {
-    return marcado`${quien} Aún no se conocen sus ${BANDAS}, así que no se sabe si da ${CUATRO_G} o ${CINCO_G} ni si llega lejos o da velocidad.`;
+    // Si el registro no tiene la ficha de ninguna, no se da por pendiente.
+    return sinFichas.length === estaciones.length
+      ? marcado`${quien}${deSinFicha} Sin sus ${BANDAS} no se sabe si da ${CUATRO_G} o ${CINCO_G} ni si llega lejos o da velocidad.`
+      : marcado`${quien} Aún no se conocen sus ${BANDAS}, así que no se sabe si da ${CUATRO_G} o ${CINCO_G} ni si llega lejos o da velocidad.${deSinFicha}`;
   }
 
   const completo = estaciones.every(conocidaDelTodo);
-  const sinBandas = estaciones.filter((e) => bandasDe(e).length === 0);
+  const pendientes = estaciones.filter((e) => bandasDe(e).length === 0 && !sinFicha(e));
   const segun = completo ? marcado`Por sus ${BANDAS}` : marcado`Por las ${BANDAS} que se conocen`;
   const falta =
-    sinBandas.length === 0 ? "" : ` De ${nombres(sinBandas)} aún no se conocen las bandas.`;
-  return marcado`${quien} ${segun}, probablemente da ${queGeneracion(estaciones)}. ${mayuscula(queAlcance(bandas, completo))}.${falta}`;
+    pendientes.length === 0 ? "" : ` De ${nombres(pendientes)} aún no se conocen las bandas.`;
+  return marcado`${quien} ${segun}, probablemente da ${queGeneracion(estaciones)}. ${mayuscula(queAlcance(bandas, completo))}.${falta}${deSinFicha}`;
 };
 
 /** El título del eje de frecuencias, con la frecuencia y los MHz explicados. */
@@ -122,7 +144,12 @@ export const filasDelEje = (estaciones: ReadonlyArray<EstacionDeFicha>): Readonl
       compania: estacion.compania,
       nombre: NOMBRE_COMPANIA[estacion.compania],
       bandas,
-      nota: bandas.length === 0 ? "Aún no se conocen sus bandas" : undefined,
+      nota:
+        bandas.length > 0
+          ? undefined
+          : sinFicha(estacion)
+            ? SIN_FICHA_EN_REGISTRO
+            : "Aún no se conocen sus bandas",
     };
   });
 
