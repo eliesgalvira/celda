@@ -1,17 +1,18 @@
 import type { Ficha } from "@celda/dominio/ficha";
 
 /**
- * Fichas de prueba con correcciones de la comunidad, como las deja la ingesta con las muestras
- * grabadas de antenasmoviles.es (`convex/test/antenasmoviles.test.ts`).
+ * Fichas de prueba con correcciones de la comunidad, con la forma que les da la fusión (ADR 0012).
+ * Cómo llega una corrección aceptada a la ficha lo decide el buzón (#56); el enlace es de prueba.
  */
 
 /** 04:15 en Barcelona: la ingesta del registro oficial. */
 const REGISTRO = Date.UTC(2026, 8, 26, 2, 15);
-/** Un día después, la de antenasmoviles.es. */
+/** Un día después, la corrección de la comunidad. */
 const COMUNIDAD = Date.UTC(2026, 8, 27, 3, 15);
 const GEOPORTAL = "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=";
+const CORRECCION = "https://comunidad.example/correccion/";
 
-/** Campus Nord con la estación de Vodafone dada por desmontada en antenasmoviles.es. */
+/** Campus Nord con la estación de Vodafone dada por desmontada por la comunidad. */
 export const FICHA_CORREGIDA: Ficha = {
   clave: "movistar-0802532",
   posicion: { longitud: 2.113628, latitud: 41.388344 },
@@ -23,7 +24,7 @@ export const FICHA_CORREGIDA: Ficha = {
     {
       tipo: "desmontada",
       compania: "vodafone",
-      procedencia: { fuente: "antenasmoviles", clave: "vodafone - 086040" },
+      procedencia: { fuente: "comunidad", clave: "vodafone - 086040" },
       fecha: COMUNIDAD,
     },
   ],
@@ -55,9 +56,9 @@ export const FICHA_CORREGIDA: Ficha = {
           afirma: "presente",
         },
         {
-          fuente: "antenasmoviles",
+          fuente: "comunidad",
           clave: "vodafone - 086040",
-          url: "https://antenasmoviles.es/#19/41.388342/2.113628",
+          url: `${CORRECCION}1`,
           fecha: COMUNIDAD,
           afirma: "desmontada",
         },
@@ -84,9 +85,9 @@ export const FICHA_NUEVA: Ficha = {
       bandas: [],
       origenes: [
         {
-          fuente: "antenasmoviles",
+          fuente: "comunidad",
           clave: "movistar - MV-BCN-82383",
-          url: "https://antenasmoviles.es/#19/41.379580/2.143060",
+          url: `${CORRECCION}2`,
           fecha: COMUNIDAD,
           afirma: "presente",
         },
@@ -126,9 +127,9 @@ export const FICHA_COMPANIA_ANADIDA: Ficha = {
       bandas: [],
       origenes: [
         {
-          fuente: "antenasmoviles",
+          fuente: "comunidad",
           clave: "orange - CATR6031A",
-          url: "https://antenasmoviles.es/#19/41.389648/2.173639",
+          url: `${CORRECCION}3`,
           fecha: COMUNIDAD,
           afirma: "presente",
         },

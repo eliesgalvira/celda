@@ -218,9 +218,6 @@ function ContenidoFicha(props: {
             <Show when={correcciones().conflictos.length > 0}>
               <ConflictosFicha conflictos={correcciones().conflictos} />
             </Show>
-            <Show when={correcciones().credito}>
-              {(credito) => <NotaFicha tono="credito">{credito()}</NotaFicha>}
-            </Show>
           </SeccionFicha>
         )}
       </Show>

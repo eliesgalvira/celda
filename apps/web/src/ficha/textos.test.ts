@@ -153,7 +153,7 @@ describe("textos de la ficha", () => {
     assert.strictEqual(textoPlano(presente.detalle), "086040, desde el 26 sept 2026");
     assert.strictEqual(presente.textoEnlace, "Ver en el registro oficial");
     assert.strictEqual(presente.tono, "presente");
-    const correccion = textosOrigen({ ...origen, fuente: "antenasmoviles", afirma: "desmontada" });
+    const correccion = textosOrigen({ ...origen, fuente: "comunidad", afirma: "desmontada" });
     assert.strictEqual(
       textoPlano(correccion.detalle),
       "086040, la da por desmontada desde el 26 sept 2026",
@@ -172,7 +172,7 @@ describe("textos de la ficha", () => {
     };
     const desmontada = {
       ...origen,
-      fuente: "antenasmoviles" as const,
+      fuente: "comunidad" as const,
       afirma: "desmontada" as const,
     };
     const estacion = (compania: "movistar" | "vodafone") => ({

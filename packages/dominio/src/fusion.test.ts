@@ -198,7 +198,7 @@ describe("fusionar", () => {
   it("verificado: el registro y la comunidad coinciden", async () => {
     const emplazamientos = fusionar([
       observacion({ compania: "movistar", codigo: "0802314" }),
-      observacion({ fuente: "antenasmoviles", compania: "movistar", codigo: "0802314" }),
+      observacion({ fuente: "comunidad", compania: "movistar", codigo: "0802314" }),
     ]);
     assert.strictEqual(emplazamientos[0]?.estado, "verificado");
     assert.strictEqual(emplazamientos[0]?.confianza, "alta");
@@ -210,7 +210,7 @@ describe("fusionar", () => {
       observacion({ compania: "movistar", codigo: "0802314" }),
       observacion({ compania: "orange", codigo: "CATR0377Z" }),
       observacion({
-        fuente: "antenasmoviles",
+        fuente: "comunidad",
         compania: "movistar",
         codigo: "0802314",
         afirma: "desmontada",
@@ -232,7 +232,7 @@ describe("fusionar", () => {
   it("corregido: la comunidad añade una compañía que el registro no tiene en ese sitio", () => {
     const emplazamientos = fusionar([
       observacion({ compania: "movistar", codigo: "0802314" }),
-      observacion({ fuente: "antenasmoviles", compania: "digi", codigo: "MV-BCN-1" }),
+      observacion({ fuente: "comunidad", compania: "digi", codigo: "MV-BCN-1" }),
     ]);
     assert.strictEqual(emplazamientos[0]?.estado, "corregido");
     assert.deepStrictEqual(emplazamientos[0]?.conflictos, []);
@@ -240,7 +240,7 @@ describe("fusionar", () => {
 
   it("nuevo: solo lo conoce una fuente de la comunidad", async () => {
     const emplazamientos = fusionar([
-      observacion({ fuente: "antenasmoviles", compania: "movistar", codigo: "MV-BCN-82383" }),
+      observacion({ fuente: "comunidad", compania: "movistar", codigo: "MV-BCN-82383" }),
     ]);
     assert.strictEqual(emplazamientos[0]?.estado, "nuevo");
     await expect(json(emplazamientos)).toMatchFileSnapshot(referencia("nuevo"));
@@ -250,7 +250,7 @@ describe("fusionar", () => {
     const emplazamientos = fusionar([
       observacion({ compania: "orange", codigo: "CATR0377Z" }),
       observacion({
-        fuente: "antenasmoviles",
+        fuente: "comunidad",
         compania: "movistar",
         codigo: "0802314",
         afirma: "desmontada",
@@ -264,7 +264,7 @@ describe("fusionar", () => {
     const lejos = alEste(PIUS_XII, 500);
     const emplazamientos = fusionar([
       observacion({ compania: "movistar", codigo: "0800977" }),
-      observacion({ fuente: "antenasmoviles", compania: "movistar", codigo: "MV-BCN-5" }),
+      observacion({ fuente: "comunidad", compania: "movistar", codigo: "MV-BCN-5" }),
       observacion({ compania: "orange", codigo: "CATR6046A" }),
       observacion({ compania: "orange", codigo: "CATR6046A", posicion: lejos }),
     ]);
@@ -309,7 +309,7 @@ describe("fusionar", () => {
     const emplazamientos = fusionar([
       observacion({ compania: "orange", codigo: "CATR6046A" }),
       observacion({
-        fuente: "antenasmoviles",
+        fuente: "comunidad",
         compania: "orange",
         codigo: "CATR6046A",
         posicion: alEste(PIUS_XII, 40),
@@ -330,7 +330,7 @@ describe("fusionar", () => {
     const emplazamientos = fusionar([
       observacion({ compania: "vodafone", codigo: "003248" }),
       observacion({
-        fuente: "antenasmoviles",
+        fuente: "comunidad",
         compania: "vodafone",
         codigo: "3248",
         posicion: alEste(PIUS_XII, 400),
@@ -349,7 +349,7 @@ describe("fusionar", () => {
     const emplazamientos = fusionar([
       observacion({ compania: "movistar", codigo: "0802314" }),
       observacion({
-        fuente: "antenasmoviles",
+        fuente: "comunidad",
         compania: "movistar",
         codigo: "0802314",
         afirma: "desmontada",

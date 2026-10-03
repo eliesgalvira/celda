@@ -200,10 +200,10 @@ export const GLOSARIO: Glosario = {
   correccion: {
     nombre: "Corrección",
     explicacion:
-      "Cuando otra fuente contradice al registro oficial, por ejemplo porque alguien ha visto " +
-      "que una antena ya no está. Celda enseña las dos versiones y marca el emplazamiento " +
-      "como corregido.",
-    tecnico: "corrección de la comunidad (antenasmoviles.es)",
+      "Cuando alguien de la comunidad de Celda contradice al registro oficial, por ejemplo " +
+      "porque ha visto que una antena ya no está, y la revisión de Celda le da la razón. Celda " +
+      "enseña las dos versiones y marca el emplazamiento como corregido.",
+    tecnico: "corrección aceptada en la moderación",
     relacionados: ["registro-oficial"],
   },
   "version-de-los-datos": {

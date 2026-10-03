@@ -35,7 +35,7 @@
         "bandas": [],
         "observaciones": [
           {
-            "fuente": "antenasmoviles",
+            "fuente": "comunidad",
             "clave": "MOVISTAR - MV-BCN-5"
           },
           {
@@ -59,7 +59,7 @@
       }
     ],
     "fuentes": [
-      "antenasmoviles",
+      "comunidad",
       "registro-oficial"
     ],
     "datosDel": 1790380800000

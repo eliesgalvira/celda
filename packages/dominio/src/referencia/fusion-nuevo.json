@@ -19,14 +19,14 @@
         "bandas": [],
         "observaciones": [
           {
-            "fuente": "antenasmoviles",
+            "fuente": "comunidad",
             "clave": "MOVISTAR - MV-BCN-82383"
           }
         ]
       }
     ],
     "fuentes": [
-      "antenasmoviles"
+      "comunidad"
     ],
     "datosDel": 1790380800000
   }

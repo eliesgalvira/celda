@@ -40,24 +40,23 @@ describe("correcciones en la ficha", () => {
           textoEnlace: "Ver en el registro oficial",
         },
         comunidad: {
-          fuente: "antenasmoviles.es",
+          fuente: "Comunidad de Celda",
           dice: "La da por desmontada",
           fecha: "desde el 27 sept 2026",
-          enlace: "https://antenasmoviles.es/#19/41.388342/2.113628",
-          textoEnlace: "Ver en antenasmoviles.es",
+          enlace: "https://comunidad.example/correccion/1",
+          textoEnlace: "Ver la corrección",
         },
       },
     ]);
     // La desmontada ya la cuenta su contraste: no se repite como conflicto.
     assert.deepStrictEqual(textos?.conflictos, []);
-    assert.match(textos?.credito ?? "", /^Correcciones de la comunidad de antenasmoviles\.es/u);
   });
 
   it("nuevo: el registro no la tiene y la comunidad la ha añadido", () => {
     const [contraste] = textosCorrecciones(FICHA_NUEVA)?.contrastes ?? [];
     assert.strictEqual(contraste?.tono, "nuevo");
     assert.deepStrictEqual(contraste?.oficial, { fuente: "Registro oficial", dice: "No la tiene" });
-    assert.strictEqual(contraste?.comunidad.dice, "La han añadido sus usuarios");
+    assert.strictEqual(contraste?.comunidad.dice, "La sitúa aquí");
     assert.strictEqual(
       textoPlano(textosCorrecciones(FICHA_NUEVA)?.resumen ?? []),
       "El registro oficial no tiene este emplazamiento: lo han añadido los usuarios de la comunidad.",
@@ -68,7 +67,7 @@ describe("correcciones en la ficha", () => {
     const textos = textosCorrecciones(FICHA_COMPANIA_ANADIDA);
     assert.deepStrictEqual(
       textos?.contrastes.map((c) => [c.nombre, c.tono, c.oficial.dice, c.comunidad.dice]),
-      [["Orange", "corregido", "No la tiene aquí", "La han añadido sus usuarios"]],
+      [["Orange", "corregido", "No la tiene aquí", "La sitúa aquí"]],
     );
   });
 
@@ -86,12 +85,11 @@ describe("correcciones en la ficha", () => {
       "Movistar aparece con códigos distintos según la fuente: 0800977 y MV-BCN-5. Puede ser la misma estación base contada dos veces.",
       "Las fuentes sitúan el código CATR6046A de Orange en sitios a 40 m uno de otro.",
     ]);
-    assert.isUndefined(textos?.credito);
     assert.isUndefined(
       textoConflicto({
         tipo: "desmontada",
         compania: "vodafone",
-        procedencia: { fuente: "antenasmoviles", clave: "x" },
+        procedencia: { fuente: "comunidad", clave: "x" },
         fecha: 0,
       }),
     );

@@ -623,7 +623,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           assert.include(texto, "Errores (4):");
           assert.include(texto, "Fichas paradas hasta la próxima noche: 3 fallos seguidos");
           assert.include(texto, `Última versión publicada: ${VERSION}`);
-          assert.include(texto, "antenasmoviles: apagada");
+          assert.include(texto, "comunidad: apagada");
         }),
       ),
   );

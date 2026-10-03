@@ -19,7 +19,7 @@
         "bandas": [],
         "observaciones": [
           {
-            "fuente": "antenasmoviles",
+            "fuente": "comunidad",
             "clave": "MOVISTAR - 0802314"
           },
           {
@@ -30,7 +30,7 @@
       }
     ],
     "fuentes": [
-      "antenasmoviles",
+      "comunidad",
       "registro-oficial"
     ],
     "datosDel": 1790380800000

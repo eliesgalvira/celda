@@ -53,7 +53,7 @@ const abrirCon = async (ficha: Ficha) => {
 
 describe("panel de un emplazamiento con correcciones de la comunidad", () => {
   it("corregido: la etiqueta de estado y las dos versiones, cada una con su fecha y su enlace", async () => {
-    const { findByRole, getByText, getByRole } = await abrirCon(FICHA_CORREGIDA);
+    const { findByRole, getByRole } = await abrirCon(FICHA_CORREGIDA);
     const panel = await findByRole("article", { name: "CL JORDI GIRONA, 1" });
 
     const etiqueta = within(panel).getByText("Corregido");
@@ -67,9 +67,9 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
     assert.isNotNull(within(vodafone).getByText("desde el 27 sept 2026"));
     assert.strictEqual(
       within(vodafone)
-        .getByRole("link", { name: /Ver en antenasmoviles\.es/u })
+        .getByRole("link", { name: /Ver la corrección/u })
         .getAttribute("href"),
-      "https://antenasmoviles.es/#19/41.388342/2.113628",
+      "https://comunidad.example/correccion/1",
     );
     // La sección subraya el registro oficial en su título y la corrección en su frase.
     const seccion = getByRole("heading", { name: /Registro oficial y comunidad/u }).closest(
@@ -80,8 +80,6 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
       "correccion",
       "emplazamiento",
     ]);
-    // Cita a antenasmoviles.es y explica adónde lleva el enlace (historia 61).
-    assert.isNotNull(getByText(/^Correcciones de la comunidad de antenasmoviles\.es/u));
   });
 
   it("nuevo: la etiqueta y que el registro oficial no lo tiene", async () => {
@@ -90,7 +88,7 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
     assert.strictEqual(within(panel).getByText("Nuevo").getAttribute("data-tono"), "nuevo");
     const movistar = within(panel).getByLabelText("Qué dice cada fuente de Movistar");
     assert.isNotNull(within(movistar).getByText("No la tiene"));
-    assert.isNotNull(within(movistar).getByText("La han añadido sus usuarios"));
+    assert.isNotNull(within(movistar).getByText("La sitúa aquí"));
     assert.isNotEmpty(within(panel).getAllByText(/no se conocen sus bandas/u));
   });
 

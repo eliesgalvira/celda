@@ -14,7 +14,7 @@ export interface Interruptor {
  */
 export const INTERRUPTOR_POR_DEFECTO: Readonly<Record<Fuente, Interruptor>> = {
   "registro-oficial": { activo: true, motivo: "" },
-  antenasmoviles: { activo: false, motivo: "retirada: Celda ya no la lee (ADR 0019)" },
+  comunidad: { activo: false, motivo: "apagado por defecto: aún no tiene extractor" },
   opencellid: { activo: false, motivo: "apagado por defecto: aún no tiene extractor" },
 };
 

@@ -4,8 +4,11 @@ import { Coordenada } from "./area.ts";
 import { Banda } from "./banda.ts";
 import { Compania } from "./compania.ts";
 
-/** Origen externo de datos sobre emplazamientos. */
-export const Fuente = Schema.Literals(["registro-oficial", "antenasmoviles", "opencellid"]);
+/**
+ * Origen de las observaciones sobre emplazamientos: el registro oficial, la comunidad de Celda con
+ * sus correcciones aceptadas (ADR 0019 y 0020) y OpenCelliD, que aún no se ha decidido (#21).
+ */
+export const Fuente = Schema.Literals(["registro-oficial", "comunidad", "opencellid"]);
 export type Fuente = typeof Fuente.Type;
 
 /**
