@@ -16,12 +16,16 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 | [0010](0010-alojamiento.md) | La web en Vercel, las capas y las fichas en R2 (servidas por un Worker o una Pages Function), con copia en Vercel y aviso ante bloqueos (en parte sustituida por el 0018) |
 | [0011](0011-castellano-en-interfaz-y-codigo.md) | Castellano en la interfaz y en los nombres del dominio en el código |
 | [0012](0012-fusion-a-15-metros.md) | Fusión: observaciones a 15 m o menos, de cualquier compañía, y hasta 60 m la misma estación y 30 m la misma dirección (sustituye la regla del 0009) |
-| [0013](0013-busqueda-de-direcciones-con-nominatim.md) | Búsqueda de direcciones en toda España con el Nominatim público, solo al pedirla y con su límite de una petición por segundo |
+| [0013](0013-busqueda-de-direcciones-con-nominatim.md) | Búsqueda de direcciones en toda España con el Nominatim público, solo al pedirla y con su límite de una petición por segundo (el 0025 amplía los topónimos) |
 | [0014](0014-barrido-por-zonas-y-ritmo-en-espana.md) | Propuesta: barrido del registro oficial por zonas, Cataluña primero y luego toda España, y fichas a una cada 3 s |
 | [0015](0015-ingesta-y-publicacion-fuera-de-convex.md) | Propuesta: la ingesta y la publicación, fuera de Convex, como servicio de NixOS con su estado en SQLite |
-| [0016](0016-capa-por-provincias-con-resumen-nacional.md) | Capa por provincias con resumen nacional, indexada en un Worker |
-| [0017](0017-provincias-y-municipios-con-el-padron-del-ine.md) | Provincias y municipios del IGN como zonas, con el padrón del INE |
+| [0016](0016-capa-por-provincias-con-resumen-nacional.md) | Capa por provincias con resumen nacional, indexada en un Worker (el 0024 cambia el zoom del resumen y el sitio de los hexágonos) |
+| [0017](0017-provincias-y-municipios-con-el-padron-del-ine.md) | Provincias y municipios del IGN como zonas, con el padrón del INE (en parte sustituida por el 0024: sin ausencias en el mapa) |
 | [0018](0018-capas-solo-desde-vercel.md) | Las capas y las fichas solo desde Vercel, montadas en su build desde un R2 privado, sin nada de Cloudflare en la ruta pública (sustituye parte del 0010) |
 | [0019](0019-fuentes-registro-y-aportaciones-propias.md) | Las fuentes son el registro oficial y las aportaciones propias; se retira antenasmoviles.es |
 | [0020](0020-buzon-de-aportaciones-en-convex.md) | Buzón de aportaciones en Convex, con límites por dispositivo, IP y en total, sin captcha, sin imágenes y con moderación |
 | [0021](0021-licencias.md) | CC0 para los datos y las aportaciones, 0BSD para el código, y los datos de terceros con su crédito |
+| [0022](0022-mapa-base-como-google-y-foto-aerea.md) | Mapa base al estilo de Google Maps (paleta A) y la foto aérea del PNOA como función aparte, con «Edificio» |
+| [0023](0023-limites-de-comunidades-y-provincias.md) | Límites de comunidades y provincias en un fichero propio de 8 KB, servido por la web |
+| [0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md) | Datos discretos: hexágonos más pequeños de lejos, rótulos por población, centro visual de cada provincia, sin ausencias en el mapa y sin rótulos extranjeros por debajo de z9 |
+| [0025](0025-nombres-de-lugar-oficiales-en-una-sola-forma.md) | Nombres de lugar: el oficial, en una sola forma (la local en la Comunitat Valenciana, la castellana en el resto) |

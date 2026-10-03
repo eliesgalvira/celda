@@ -1,6 +1,6 @@
 # Provincias y municipios del IGN como zonas, con el padrón del INE
 
-Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El #44 lleva los niveles de zona al mapa y el #47, el ejercicio a los municipios. El #53 da a todas las zonas el hexágono de las agrupaciones y decide qué municipios son zona en cada nivel. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos.
+Estado: aceptada el 28/09/2026 con el #37, que descarga los límites y el padrón y pone el municipio y la provincia en la ficha. El #44 lleva los niveles de zona al mapa y el #47, el ejercicio a los municipios. El #53 da a todas las zonas el hexágono de las agrupaciones y decide qué municipios son zona en cada nivel. El umbral de ausencias lo decidió el usuario el mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 4). Amplía la parte de barrios del ADR 0004 y la zona del ejercicio de emplazamientos. Sustituida en parte por el [ADR 0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md) (03/10/2026): el mapa ya no enseña ausencias en ningún zoom, aunque los datos se siguen calculando, y en z9 y z10 solo son zona los municipios de 50.000 y 20.000 habitantes o más. Los nombres que se ven siguen el [ADR 0025](0025-nombres-de-lugar-oficiales-en-una-sola-forma.md).
 
 ## Contexto
 

@@ -39,11 +39,11 @@ Hexágono con un número que recoge los emplazamientos cercanos cuando se aleja 
 _Evitar_: cluster, grupo, hexágono
 
 **Barrio**:
-Uno de los 73 barrios de Barcelona, con los límites que publica el Ayuntamiento. En el nivel de barrios del mapa, cada uno recoge sus emplazamientos con su número y sus ausencias. Los municipios de alrededor no tienen barrios.
+Uno de los 73 barrios de Barcelona, con los límites que publica el Ayuntamiento. En el nivel de barrios del mapa, cada uno recoge sus emplazamientos con su número. Los municipios de alrededor no tienen barrios.
 _Evitar_: zona, vecindario, distrito
 
 **Municipio**:
-Uno de los 8.132 municipios de España, con los límites del IGN y los habitantes del padrón del INE. Se identifica por su código INE de cinco cifras, nunca por su nombre. Cada emplazamiento cae en uno, salvo en un territorio compartido. En los niveles de municipios del mapa, los de una provincia cubierta recogen sus emplazamientos con su número y, si tienen 10 o más, sus ausencias.
+Uno de los 8.132 municipios de España, con los límites del IGN y los habitantes del padrón del INE. Se identifica por su código INE de cinco cifras, nunca por su nombre. Cada emplazamiento cae en uno, salvo en un territorio compartido. En los niveles de municipios del mapa, los de una provincia cubierta recogen sus emplazamientos con su número.
 _Evitar_: localidad, pueblo, ciudad, término municipal
 
 **Provincia**:
@@ -55,11 +55,11 @@ Terreno que el IGN no asigna a ningún municipio porque lo comparten varios, com
 _Evitar_: mancomunidad, comunidad (son solo parte del nombre de algunos)
 
 **Zona**:
-Barrio, municipio o provincia: lo que el mapa recoge en un hexágono con su número de emplazamientos, su nombre y, donde dice algo, sus ausencias. Provincias de lejos, municipios a media distancia y barrios dentro del municipio de Barcelona. En el mapa, un municipio es zona solo si tiene 4 emplazamientos o más y cabe en la pantalla; si no, sus emplazamientos van en agrupaciones o sueltos. El ejercicio de emplazamientos se hace sobre un barrio de Barcelona o un municipio.
+Barrio, municipio o provincia: lo que el mapa recoge en un hexágono con su número de emplazamientos y su nombre. Provincias de lejos, municipios a media distancia y barrios dentro del municipio de Barcelona. En el mapa, un municipio es zona solo si tiene 4 emplazamientos o más y cabe en la pantalla, y de lejos, además, solo si es grande; si no, sus emplazamientos van en agrupaciones o sueltos. El ejercicio de emplazamientos se hace sobre un barrio de Barcelona o un municipio.
 _Evitar_: área, región, zona de barrido (esa es la de la ingesta)
 
 **Ausencia**:
-Compañía que no tiene ningún emplazamiento en una zona. Solo cuenta si la compañía tiene algún emplazamiento en la capa: de una que no aparece en ninguna parte no se dice que falte. Se enseña en las provincias cubiertas, en los barrios y en los municipios con 10 emplazamientos o más. En un municipio con menos, que falten compañías no es un hueco de cobertura, y solo se da su número; en una provincia a medias, no se sabe.
+Compañía que no tiene ningún emplazamiento en una zona. Solo cuenta si la compañía tiene algún emplazamiento en la capa: de una que no aparece en ninguna parte no se dice que falte. No es un hueco de cobertura, porque una compañía puede dar servicio con la red de otra, y el mapa no la enseña (ADR 0024).
 _Evitar_: hueco, falta de cobertura
 
 ### Procedencia de los datos
@@ -151,8 +151,24 @@ Paso que, al acabar cada ingesta, escribe la capa y las fichas de la instantáne
 _Evitar_: despliegue, exportación, subida
 
 **Mapa base**:
-Callejero de fondo sobre el que se dibujan las capas. No lo produce Celda.
+Callejero de fondo sobre el que se dibujan las capas, con sus rótulos y sus límites. Celda le pone el estilo y los límites de comunidades y provincias, pero no produce sus teselas.
 _Evitar_: capa base, fondo
+
+**Foto aérea**:
+Ortofoto del IGN que la persona puede poner bajo el mapa base, con las vías y los rótulos encima. Va apagada al abrir.
+_Evitar_: satélite, vista de satélite, ortofoto (en la interfaz)
+
+**Rótulo**:
+Nombre que escribe el mapa base: el de un lugar, una calle o un río. El nombre de una zona lo escribe Celda junto a su hexágono y no es un rótulo.
+_Evitar_: etiqueta (es la de una zona), label
+
+**Nombre de lugar**:
+Nombre con que Celda escribe un municipio, una provincia o un lugar del mapa base: el oficial, en una sola forma. Si el oficial tiene dos, la local en la Comunitat Valenciana y la castellana en el resto (ADR 0025).
+_Evitar_: topónimo, exónimo, nombre local
+
+**Centro visual**:
+Punto de una provincia en el que el mapa pone su hexágono: el más alejado de sus bordes dentro de su parte más poblada. No es su capital ni su centro geométrico.
+_Evitar_: centroide, centro, capital
 
 **Versión de capa**:
 Fecha de la instantánea de emplazamientos de la que sale una capa.
@@ -334,6 +350,7 @@ _Evitar_: clientes, carga
 - Una **corrección** se enseña junto a la **observación** del **registro oficial** que contradice, con cuántas personas la sostienen.
 - Una **simulación** nunca es una **observación** ni una **medida**.
 - Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.
+- El hexágono de una **provincia** va en su **centro visual**. Los **rótulos** de ciudad van por encima de los hexágonos de **zona**; si se pisan, se dibuja el del sitio con más habitantes y el otro sale al acercar.
 - El **ejercicio de emplazamientos** se hace sobre una **zona**: un barrio de Barcelona o un municipio. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
 - Al abrir, el mapa encuadra la **provincia** del **punto elegido** que guarda el dispositivo o, sin él, las **provincias cubiertas** del **resumen nacional**. La **ubicación GPS** no cuenta: nunca se pide al abrir.
 - Con un **punto de referencia**, cada **emplazamiento** tiene un **rumbo** y los **consejos** dicen a qué rumbo apuntar una **antena exterior**. La **brújula** ayuda a alinearla.
@@ -348,3 +365,4 @@ _Evitar_: clientes, carga
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.
 - La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer. En la interfaz, ficha es solo la del panel, con una excepción: «el registro no tiene ficha para este emplazamiento», que se dice de una estación base sin ficha en el registro.
 - Falta decidir si una marca que usa la red de otra empresa aparece como compañía.
+- El INE escribe con barra los nombres oficiales con dos formas («Valencia/València», «Donostia/San Sebastián»), y OpenStreetMap a veces también. Los datos los guardan así; lo que se ve es el nombre de lugar, en una sola forma.

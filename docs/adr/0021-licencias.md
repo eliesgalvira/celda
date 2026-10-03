@@ -1,6 +1,6 @@
 # Licencias: CC0 para los datos y las aportaciones, 0BSD para el código y créditos de terceros
 
-Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Responde a la nota de licencias que dejaron el ADR 0009 y `../arquitectura.md`. Los ficheros `LICENSE` se añaden cuando Celda pase a su propio repositorio; hasta entonces este ADR es lo que vale.
+Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Responde a la nota de licencias que dejaron el ADR 0009 y `../arquitectura.md`. Los ficheros `LICENSE` se añaden cuando Celda pase a su propio repositorio; hasta entonces este ADR es lo que vale. Revisada el 03/10/2026 con el [ADR 0022](0022-mapa-base-como-google-y-foto-aerea.md): la tabla suma la ortofoto PNOA de la foto aérea.
 
 ## Contexto
 
@@ -19,6 +19,7 @@ Celda será abierta del todo, y el usuario pidió «la más abierta» para lo qu
 | Padrón del INE | CC BY 4.0 | «Elaboración propia con datos extraídos del sitio web del INE: www.ine.es», con la fecha |
 | Barrios y población de Open Data BCN | CC BY 4.0 | «Ajuntament de Barcelona», con la licencia y la fecha (ADR 0004) |
 | Mapa base y búsqueda de direcciones, sobre OpenStreetMap | ODbL | El crédito de OpenStreetMap, con el del servicio (ADR 0013) |
+| Ortofoto PNOA del IGN, en la foto aérea | CC BY 4.0 | «PNOA · CC BY 4.0 scne.es», la fórmula de su servicio, mientras la foto está encendida (ADR 0022) |
 
 - **Lo publicado lleva esos créditos** y dice qué parte es CC0 y cuál de quién.
 - **La dedicación CC0 se enseña al enviar una aportación**, en el mismo paso y antes de enviarla, no en una página aparte.
