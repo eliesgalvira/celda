@@ -27,10 +27,18 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import { TestClock } from "effect/testing";
 
 import { montarCapasEn } from "./capas.ts";
 import { conEntorno, contenidoDe, type Entorno, unaNoche } from "./pruebas/entorno.ts";
+
+/** Un manifiesto de publicación escrito a mano, para las publicaciones a medias. */
+const codificarManifiesto = Schema.encodeEffect(
+  Schema.fromJsonString(
+    Schema.Struct({ version: Schema.String, ficheros: Schema.Array(Schema.String) }),
+  ),
+);
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
@@ -485,13 +493,11 @@ describe("las capas en Vercel", () => {
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const medias = ficheroDeManifiesto("2099-01-01T00:00:00Z");
-          yield* fs.writeFileString(
-            path.join(almacen, medias),
-            JSON.stringify({
-              version: "sitios@2099-01-01T00:00:00Z",
-              ficheros: ["fichas/08/x.json"],
-            }),
-          );
+          const manifiesto = yield* codificarManifiesto({
+            version: "sitios@2099-01-01T00:00:00Z",
+            ficheros: ["fichas/08/x.json"],
+          });
+          yield* fs.writeFileString(path.join(almacen, medias), manifiesto);
           const montadas = yield* montar(almacen, destino);
           assert.lengthOf(montadas.anteriores, 1);
           assert.isFalse(yield* fs.exists(path.join(destino, medias)));

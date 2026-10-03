@@ -88,8 +88,8 @@ const principal = Effect.gen(function* () {
     // la carpeta en la que se monta.
     // @effect-diagnostics-next-line strictEffectProvide:off
     const origen = yield* Effect.service(AlmacenDeFicheros).pipe(Effect.provide(almacen.value));
-    // @effect-diagnostics-next-line strictEffectProvide:off
     yield* montarCapasEn(origen, destino).pipe(
+      // @effect-diagnostics-next-line strictEffectProvide:off
       Effect.provide(almacenEnCarpeta({ carpeta: destino, origen: "/capas" })),
     );
     return;

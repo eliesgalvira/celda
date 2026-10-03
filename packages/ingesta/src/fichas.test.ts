@@ -265,11 +265,13 @@ const leerContraElGeoportal = (
       });
     }).pipe(
       Effect.provide(
-        capaPorCajas(OPCIONES, cliente).pipe(
-          Layer.provide(clienteDePrueba(peticiones, responder, latencia)),
+        Layer.merge(
+          capaPorCajas(OPCIONES, cliente).pipe(
+            Layer.provide(clienteDePrueba(peticiones, responder, latencia)),
+          ),
+          Logger.layer([diario]),
         ),
       ),
-      Effect.provide(Logger.layer([diario])),
       Effect.forkChild,
     );
     const hechas = yield* esperarConReloj(fibra, segundos);
