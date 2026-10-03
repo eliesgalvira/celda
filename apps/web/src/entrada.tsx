@@ -9,7 +9,6 @@ import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { App } from "./App.tsx";
 import { indexadorDelNavegador } from "./capa/navegador.ts";
-import { conOrigenDeReserva, memoriaEnElNavegador } from "./capa/origenes.ts";
 import { capaDelOrigen } from "./capa/servicio.ts";
 import { fichasDelOrigen } from "./ficha/servicio.ts";
 import { criptoDelNavegador } from "./lib/cripto.ts";
@@ -26,12 +25,8 @@ const dispositivo = detectarDispositivo(leerNavegador()).tipo;
 /** Los servicios reales, con la configuración de las variables `VITE_*` del build. */
 const servicios = Layer.mergeAll(
   Layer.mergeAll(
-    fichasDelOrigen.pipe(
-      Layer.provideMerge(capaDelOrigen),
-      Layer.provide(indexadorDelNavegador),
-      // R2 y, si no contesta, la copia de reserva de Vercel (ADR 0010).
-      Layer.provide(conOrigenDeReserva.pipe(Layer.provide(memoriaEnElNavegador(window)))),
-    ),
+    // Las capas y las fichas, de `/capas` en el mismo origen que la web (ADR 0018).
+    fichasDelOrigen.pipe(Layer.provideMerge(capaDelOrigen), Layer.provide(indexadorDelNavegador)),
     buscadorNominatim,
   ).pipe(Layer.provide(FetchHttpClient.layer)),
   simuladorDelNavegador,

@@ -24,7 +24,7 @@ import {
   type SolicitudDeIndice,
 } from "./indexador.ts";
 import { type PublicacionDePrueba, publicacionDePrueba } from "./pruebas.ts";
-import { capaDelOrigen, CapaEmplazamientos, type FalloCapa } from "./servicio.ts";
+import { capaDelOrigen, CapaEmplazamientos, type FalloCapa, origenDeCapas } from "./servicio.ts";
 
 const ORIGEN = "http://capas.prueba";
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
@@ -99,6 +99,17 @@ const errorDe = <A>(salida: Exit.Exit<A, FalloCapa>) =>
   Exit.isFailure(salida)
     ? Option.getOrNull(Option.map(Cause.findErrorOption(salida.cause), (e) => e._tag))
     : null;
+
+describe("origen de las capas", () => {
+  it.effect("sin VITE_CAPAS_ORIGEN es /capas, en el mismo origen que la web (ADR 0018)", () =>
+    Effect.gen(function* () {
+      const origen = yield* origenDeCapas.pipe(
+        Effect.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
+      );
+      assert.strictEqual(origen, `${globalThis.location.origin}/capas`);
+    }),
+  );
+});
 
 describe("carga del resumen nacional", () => {
   it.effect("lee en el origen la versión vigente antes de descargar su resumen, sin Convex", () =>
