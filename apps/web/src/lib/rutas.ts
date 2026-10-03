@@ -123,6 +123,25 @@ export const conAjustes = (ubicacion: Ubicacion, abiertos: boolean): string => {
   return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
 };
 
+/** El parámetro de la URL que abre «Tus aportaciones». No lleva valor. */
+const APORTACIONES = "aportaciones";
+
+/** Si la ubicación tiene abiertas «Tus aportaciones». */
+export const aportacionesAbiertas = (ubicacion: Ubicacion): boolean =>
+  ubicacion.search.has(APORTACIONES);
+
+/** La misma ubicación con «Tus aportaciones» abiertas o cerradas; el resto de la URL no cambia. */
+export const conAportaciones = (ubicacion: Ubicacion, abiertas: boolean): string => {
+  const parametros = new URLSearchParams(ubicacion.search);
+  if (abiertas) {
+    parametros.set(APORTACIONES, "");
+  } else {
+    parametros.delete(APORTACIONES);
+  }
+  const busqueda = parametros.toString().replace(/(^|&)aportaciones=(?=&|$)/u, "$1aportaciones");
+  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
+};
+
 /** La clave del emplazamiento seleccionado en una ubicación, o `null` si no hay ninguno. */
 export const emplazamientoDe = (ubicacion: Ubicacion): string | null => {
   const clave = ubicacion.search.get(EMPLAZAMIENTO)?.trim() ?? "";
@@ -146,7 +165,9 @@ export const provinciaDe = (ubicacion: Ubicacion): string | null => {
 export const conProvincia = (ubicacion: Ubicacion, provincia: string): string => {
   const parametros = new URLSearchParams(ubicacion.search);
   parametros.set(PROVINCIA, provincia);
-  const busqueda = parametros.toString().replace(/(^|&)(medir|ajustes)=(?=&|$)/gu, "$1$2");
+  const busqueda = parametros
+    .toString()
+    .replace(/(^|&)(medir|ajustes|aportaciones)=(?=&|$)/gu, "$1$2");
   return `${ubicacion.pathname}?${busqueda}`;
 };
 

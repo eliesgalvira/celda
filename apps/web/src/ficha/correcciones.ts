@@ -1,9 +1,16 @@
+import { distanciaMetros } from "@celda/dominio/area";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import type { Conflicto } from "@celda/dominio/emplazamiento";
-import type { EstacionDeFicha, Ficha, OrigenDeFicha } from "@celda/dominio/ficha";
+import type {
+  CorreccionDeFicha,
+  EstacionDeFicha,
+  Ficha,
+  OrigenDeFicha,
+} from "@celda/dominio/ficha";
 import { llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
-import { ENLACE_FUENTE, fechaCorta, NOMBRE_FUENTE } from "./textos.ts";
+import { haciaDonde, textoCoordenada, textoDistancia } from "../buzon/textos.ts";
+import { ENLACE_FUENTE, enumerar, fechaCorta, NOMBRE_FUENTE } from "./textos.ts";
 
 /** Lo que dice una fuente de una estación base, ya escrito para la ficha. */
 export interface TextosLado {
@@ -14,13 +21,16 @@ export interface TextosLado {
   readonly textoEnlace?: string;
 }
 
-/** Una estación base en la que el registro oficial y otra fuente no coinciden. */
+/** Una estación base, o el emplazamiento, en el que el registro oficial y otra fuente no coinciden. */
 export interface TextosContraste {
   readonly tono: "corregido" | "nuevo";
-  readonly compania: Compania;
+  /** La compañía, o nada si la corrección es de todo el emplazamiento. */
+  readonly compania?: Compania;
   readonly nombre: string;
   readonly oficial: TextosLado;
   readonly comunidad: TextosLado;
+  /** Una corrección aceptada que se puede respaldar: su clave y lo que dice. */
+  readonly correccion?: { readonly clave: string; readonly dice: string };
 }
 
 /** Lo que la ficha cuenta de las correcciones y los conflictos de un emplazamiento. */
@@ -91,11 +101,6 @@ const contrasteDe = (ficha: Ficha, estacion: EstacionDeFicha): TextosContraste |
   return undefined;
 };
 
-const enumerar = (partes: ReadonlyArray<string>): string =>
-  partes.length <= 1
-    ? (partes[0] ?? "")
-    : `${partes.slice(0, -1).join(", ")} y ${partes.at(-1) ?? ""}`;
-
 /**
  * Un conflicto entre fuentes, en una frase. La estación desmontada no sale aquí: ya la cuenta
  * su contraste.
@@ -130,16 +135,110 @@ const RESUMEN: Readonly<Record<Ficha["estado"], TextoMarcado>> = {
   nuevo: marcado`El ${REGISTRO} no tiene este ${EMPLAZAMIENTO}: lo han añadido los usuarios de la comunidad.`,
 };
 
+/** «1 persona lo sitúa», «2 personas lo sitúan»: el sujeto con el verbo en su número. */
+const personas = (n: number, singular: string, plural: string): string =>
+  n === 1 ? `1 persona ${singular}` : `${n} personas ${plural}`;
+
+/** El registro oficial de una compañía en el emplazamiento, como lo cuenta la ficha. */
+const oficialDe = (ficha: Ficha, compania: Compania): TextosLado =>
+  ladoOficial(
+    ficha.estaciones
+      .filter((e) => e.compania === compania)
+      .flatMap((e) => e.origenes.filter((o) => esOficial(o) && o.afirma === "presente")),
+  );
+
+/** Lo que dice el registro de todo el emplazamiento: lo tiene, con su fecha y su enlace, o no. */
+const oficialDelEmplazamiento = (ficha: Ficha, dice: string): TextosLado => {
+  const oficial = ladoOficial(
+    ficha.estaciones.flatMap((e) =>
+      e.origenes.filter((o) => esOficial(o) && o.afirma === "presente"),
+    ),
+  );
+  return oficial.fecha === undefined ? oficial : { ...oficial, dice };
+};
+
+/**
+ * Una corrección de la comunidad aceptada (ADR 0020), al lado de lo que dice el registro: «el
+ * registro dice X; N personas lo sitúan en Y». Nunca sustituye al registro.
+ */
+const contrasteAceptado = (ficha: Ficha, correccion: CorreccionDeFicha): TextosContraste => {
+  const n = correccion.personas;
+  const comunidad = (dice: string): TextosLado => ({
+    fuente: "Comunidad de Celda · CC0",
+    dice,
+    fecha: `aceptada el ${fechaCorta(correccion.aceptadaEl)}`,
+  });
+  const base = { tono: "corregido" as const };
+  const { cambio } = correccion;
+  switch (cambio.tipo) {
+    case "posicion": {
+      const metros = distanciaMetros(ficha.posicion, cambio.posicion);
+      const dice = `${personas(n, "lo sitúa", "lo sitúan")} a ${textoDistancia(metros)} ${haciaDonde(ficha.posicion, cambio.posicion)}, en ${textoCoordenada(cambio.posicion)}`;
+      return {
+        ...base,
+        nombre: "Posición del emplazamiento",
+        oficial: oficialDelEmplazamiento(ficha, `Lo sitúa en ${textoCoordenada(ficha.posicion)}`),
+        comunidad: comunidad(dice),
+        correccion: { clave: correccion.clave, dice },
+      };
+    }
+    case "compania": {
+      const nombre = NOMBRE_COMPANIA[cambio.compania];
+      const dice = cambio.esta
+        ? `${personas(n, "sitúa", "sitúan")} aquí a ${nombre}`
+        : `${personas(n, "dice", "dicen")} que ${nombre} no está`;
+      return {
+        ...base,
+        compania: cambio.compania,
+        nombre,
+        oficial: oficialDe(ficha, cambio.compania),
+        comunidad: comunidad(dice),
+        correccion: { clave: correccion.clave, dice },
+      };
+    }
+    case "ya-no-existe": {
+      const dice = `${personas(n, "dice", "dicen")} que ya no existe`;
+      return {
+        ...base,
+        nombre: "El emplazamiento",
+        oficial: oficialDelEmplazamiento(ficha, "Lo tiene dado de alta"),
+        comunidad: comunidad(dice),
+        correccion: { clave: correccion.clave, dice },
+      };
+    }
+    case "falta": {
+      const dice = `${personas(n, "lo sitúa", "lo sitúan")} aquí, con ${enumerar(cambio.companias.map((c) => NOMBRE_COMPANIA[c]))}`;
+      return {
+        ...base,
+        tono: "nuevo",
+        nombre: "El emplazamiento",
+        oficial: { fuente: "Registro oficial", dice: "No lo tiene" },
+        comunidad: comunidad(dice),
+        correccion: { clave: correccion.clave, dice },
+      };
+    }
+  }
+};
+
 /**
  * Las correcciones y los conflictos de la ficha, o nada si todas las fuentes coinciden. Cada
  * corrección lleva lo que dice el registro oficial y lo que dice la comunidad, con su fecha y
- * su enlace (historias 18 y 61).
+ * su enlace (historias 18 y 61). Las aceptadas por la moderación van primero, con cuántas
+ * personas las sostienen; de una compañía con una aceptada no se repite lo que dicen sus
+ * observaciones.
  */
 export const textosCorrecciones = (ficha: Ficha): TextosCorrecciones | undefined => {
-  const contrastes = ficha.estaciones.flatMap((e) => {
-    const contraste = contrasteDe(ficha, e);
-    return contraste === undefined ? [] : [contraste];
-  });
+  const aceptadas = (ficha.correcciones ?? []).map((c) => contrasteAceptado(ficha, c));
+  const conAceptada = new Set(
+    aceptadas.flatMap((c) => (c.compania === undefined ? [] : [c.compania])),
+  );
+  const contrastes = [
+    ...aceptadas,
+    ...ficha.estaciones.flatMap((e) => {
+      const contraste = contrasteDe(ficha, e);
+      return contraste === undefined || conAceptada.has(e.compania) ? [] : [contraste];
+    }),
+  ];
   const conflictos = [
     ...new Set(
       ficha.conflictos.flatMap((c) => {

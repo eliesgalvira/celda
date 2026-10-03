@@ -25,11 +25,23 @@ import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
-import { createEffect, createMemo, createSignal, Errored, For, Loading, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  Errored,
+  For,
+  Loading,
+  Show,
+  useContext,
+} from "solid-js";
 
+import { DialogoCorroborar } from "../buzon/DialogoCorroborar.tsx";
+import { DialogoProponer } from "../buzon/DialogoProponer.tsx";
 import { leerEnSolid, usarDatos } from "../datos.tsx";
 import { MejorarSenal } from "../mejorar/MejorarSenal.tsx";
 import { TITULO_MEJORAR } from "../mejorar/textos.ts";
+import { UbicacionContexto } from "../ubicacion/controlador.ts";
 import { ReferenciaEnFicha } from "../ubicacion/Ubicacion.tsx";
 import { ComoEmite } from "./ComoEmite.tsx";
 import { TITULO_COMO_EMITE } from "./diagrama.ts";
@@ -175,6 +187,12 @@ function ContenidoFicha(props: {
     () => compararConCapa(props.fechaCapa, props.ficha.version).tipo === "posterior",
   );
   const origenes = createMemo(() => textosDeOrigenes(props.ficha.estaciones));
+  const ubicacion = useContext(UbicacionContexto);
+  /** El diálogo de la comunidad abierto desde la ficha: proponer o respaldar una corrección. */
+  const [comunidad, setComunidad] = createSignal<
+    | { readonly tipo: "proponer" }
+    | { readonly tipo: "corroborar"; readonly clave: string; readonly dice: string }
+  >();
   return (
     <article aria-label={tituloDe(props.ficha)}>
       <CabeceraFicha
@@ -212,6 +230,19 @@ function ContenidoFicha(props: {
                   nombre={contraste.nombre}
                   oficial={contraste.oficial}
                   comunidad={contraste.comunidad}
+                  acciones={
+                    <Show when={contraste.correccion}>
+                      {(correccion) => (
+                        <Boton
+                          variante="secundario"
+                          aria-haspopup="dialog"
+                          onClick={() => setComunidad({ tipo: "corroborar", ...correccion() })}
+                        >
+                          Yo también lo veo
+                        </Boton>
+                      )}
+                    </Show>
+                  }
                 />
               )}
             </For>
@@ -260,6 +291,19 @@ function ContenidoFicha(props: {
         <Show when={creditoDelLugar(props.ficha)}>
           {(credito) => <NotaFicha tono="credito">{credito()}</NotaFicha>}
         </Show>
+        <NotaFicha>
+          ¿Algo no cuadra con lo que ves? Propón una corrección: la revisa la moderación y, si la
+          acepta, sale aquí al lado de lo que dice el registro.
+        </NotaFicha>
+        <div>
+          <Boton
+            variante="secundario"
+            aria-haspopup="dialog"
+            onClick={() => setComunidad({ tipo: "proponer" })}
+          >
+            Proponer una corrección
+          </Boton>
+        </div>
       </SeccionFicha>
       <Desplegable titulo="Datos técnicos">
         <DatosTecnicos
@@ -267,6 +311,35 @@ function ContenidoFicha(props: {
           nota={<TextoConTerminos texto={NOTA_TECNICA} />}
         />
       </Desplegable>
+      <Show when={comunidad()?.tipo === "proponer"}>
+        <DialogoProponer
+          emplazamiento={{
+            clave: props.ficha.clave,
+            posicion: props.ficha.posicion,
+            companias: props.ficha.estaciones.map((e) => e.compania),
+          }}
+          alCerrar={() => setComunidad(undefined)}
+          alElegirPunto={() => {
+            setComunidad(undefined);
+            ubicacion?.elegirEnMapa();
+          }}
+        />
+      </Show>
+      <Show
+        when={(() => {
+          const actual = comunidad();
+          return actual?.tipo === "corroborar" ? actual : undefined;
+        })()}
+      >
+        {(corroborar) => (
+          <DialogoCorroborar
+            emplazamiento={props.ficha.clave}
+            correccion={corroborar().clave}
+            dice={corroborar().dice}
+            alCerrar={() => setComunidad(undefined)}
+          />
+        )}
+      </Show>
     </article>
   );
 }

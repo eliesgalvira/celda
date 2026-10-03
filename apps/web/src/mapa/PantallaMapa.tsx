@@ -15,6 +15,7 @@ import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
 import { IconoOndas } from "@celda/ui/interferencia/PanelInterferencia.tsx";
+import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
 import { IconoAjustes, IconoEjercicio } from "@celda/ui/ejercicio/Ejercicio.tsx";
 import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
 import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
@@ -57,6 +58,7 @@ import { pistaDeCeldas, type ProvinciaFuera, provinciasQueFaltan } from "../celd
 import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { AjustesContexto, crearAjustes } from "../ajustes/ajustes.ts";
 import { DialogoAjustes } from "../ajustes/DialogoAjustes.tsx";
+import { DialogoAportaciones } from "../buzon/DialogoAportaciones.tsx";
 import { usarDatos } from "../datos.tsx";
 import { PanelEjercicio } from "../ejercicio/PanelEjercicio.tsx";
 import {
@@ -90,6 +92,8 @@ import {
   conAjustes,
   conEjercicio,
   conMedir,
+  aportacionesAbiertas,
+  conAportaciones,
   conProvincia,
   ejercicioDe,
   emplazamientoDe,
@@ -100,6 +104,7 @@ import {
   ubicacion,
 } from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
+import { detectarDispositivo } from "../medir/dispositivo.ts";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
 import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
 import { posicionDe } from "../ubicacion/estado.ts";
@@ -1102,6 +1107,13 @@ export function PantallaMapa() {
                   />
                 </Show>
                 <ControlDelMapa
+                  etiqueta="Tus aportaciones"
+                  detalle="Tus medidas y correcciones, y compartirlas con Celda."
+                  icono={<IconoAportaciones />}
+                  aria-haspopup="dialog"
+                  onClick={() => navegar(conAportaciones(ubicacion(), true))}
+                />
+                <ControlDelMapa
                   etiqueta="Ajustes"
                   detalle="Las preferencias de Celda en este dispositivo."
                   icono={<IconoAjustes />}
@@ -1153,6 +1165,16 @@ export function PantallaMapa() {
               navegador={{ ...leerNavegador(), modelo: modelo() }}
               direccionMovil={new URL(ruta.medir, window.location.origin).href}
               alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+            />
+          </Show>
+          <Show when={aportacionesAbiertas(ubicacion())}>
+            <DialogoAportaciones
+              dispositivo={detectarDispositivo({ ...leerNavegador(), modelo: modelo() }).tipo}
+              alCerrar={() => navegar(conAportaciones(ubicacion(), false), { reemplazar: true })}
+              alElegirPunto={() => {
+                navegar(conAportaciones(ubicacion(), false), { reemplazar: true });
+                puntoDeReferencia.elegirEnMapa();
+              }}
             />
           </Show>
           <Show when={ajustesAbiertos(ubicacion())}>
