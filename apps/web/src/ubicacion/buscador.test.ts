@@ -13,8 +13,10 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import { BuscadorDeDirecciones, buscadorNominatim, type Direccion } from "./buscador.ts";
 import A_CORUNA from "./referencia/nominatim-a-coruna.json";
+import ALICANTE from "./referencia/nominatim-alicante.json";
 import CALLE_MAYOR from "./referencia/nominatim-calle-mayor.json";
 import GIRONA from "./referencia/nominatim-girona.json";
+import DONOSTIA from "./referencia/nominatim-donostia.json";
 import CON_NUMERO from "./referencia/nominatim-numero.json";
 import SAGRADA_FAMILIA from "./referencia/nominatim-sagrada-familia.json";
 import SORIA from "./referencia/nominatim-soria.json";
@@ -124,6 +126,8 @@ describe("búsqueda de direcciones con Nominatim", () => {
           q: "sagrada familia",
           format: "jsonv2",
           addressdetails: "1",
+          // El `name:es` de cada lugar, en la misma respuesta.
+          namedetails: "1",
           limit: "10",
           countrycodes: "es",
           // Ningún idioma: Nominatim da el nombre local de cada lugar, no el del navegador.
@@ -204,6 +208,70 @@ describe("búsqueda de direcciones con Nominatim", () => {
         ["Rúa Real", "Souto da Vila", "Pontedeume (A Coruña)"],
         ["Rúa Real", "As Saíñas", "Cedeira (A Coruña)"],
         ["Rúa Real", "A Ribeira", "Muxía (A Coruña)"],
+      ]);
+    }).pipe(Effect.provide(capa));
+  });
+
+  it.effect(
+    "un oficial bilingüe va en una sola forma: la local en la Comunitat y la castellana fuera",
+    () => {
+      const { capa, peticiones } = montar(
+        new Map([
+          ["alicante", [JSON_DE(ALICANTE)]],
+          ["donostia", [JSON_DE(DONOSTIA)]],
+        ]),
+      );
+      return Effect.gen(function* () {
+        // Respuestas de Nominatim del 03/10/2026: «Alacant / Alicante» y «Donostia / San Sebastián».
+        assert.deepStrictEqual(yield* buscarConTurno("Alicante"), [
+          ["Alacant", "", "Alacant (Alacant)"],
+          ["Alacant", "", "Provincia de Alacant"],
+        ]);
+        assert.deepStrictEqual(yield* buscarConTurno("Donostia"), [
+          ["San Sebastián", "", "San Sebastián (Gipuzkoa)"],
+        ]);
+        // Cada búsqueda, una sola petición: `namedetails` va en la misma.
+        assert.lengthOf(peticiones, 2);
+      }).pipe(Effect.provide(capa));
+    },
+  );
+
+  it.effect("un nombre con barra que no es un oficial va por su `name:es` según el lado", () => {
+    const plaza = {
+      lat: "43.3237",
+      lon: "-1.9849",
+      name: "Konstituzio Plaza / Plaza de la Constitución",
+      namedetails: {
+        name: "Konstituzio Plaza / Plaza de la Constitución",
+        "name:es": "Plaza de la Constitución",
+        "name:eu": "Konstituzio Plaza",
+      },
+      address: {
+        road: "Konstituzio plaza",
+        city: "Donostia / San Sebastián",
+        state_district: "Gipuzkoa",
+        state: "Euskadi",
+      },
+    };
+    const ayuntamiento = {
+      lat: "39.4697",
+      lon: "-0.3764",
+      name: "Plaça de l'Ajuntament / Plaza del Ayuntamiento",
+      namedetails: {
+        name: "Plaça de l'Ajuntament / Plaza del Ayuntamiento",
+        "name:es": "Plaza del Ayuntamiento",
+      },
+      address: {
+        city: "València",
+        state_district: "València / Valencia",
+        state: "Comunitat Valenciana",
+      },
+    };
+    const { capa } = montar(new Map([["plaza", [JSON_DE([plaza, ayuntamiento])]]]));
+    return Effect.gen(function* () {
+      assert.deepStrictEqual(yield* buscarConTurno("Plaza"), [
+        ["Plaza de la Constitución", "Konstituzio plaza", "San Sebastián (Gipuzkoa)"],
+        ["Plaça de l'Ajuntament", "", "València (València)"],
       ]);
     }).pipe(Effect.provide(capa));
   });
