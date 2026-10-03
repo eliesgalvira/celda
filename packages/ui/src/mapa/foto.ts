@@ -45,17 +45,24 @@ export const capaFoto = (): LayerSpecification => ({
   layout: { visibility: visibleConFoto },
 });
 
+/** Lo que dice de la foto el estado del estilo. */
+export interface EstadoConFoto {
+  [FOTO_AEREA]?: boolean;
+}
+
 /** Lo que hace falta del mapa de MapLibre para encender o apagar la foto. */
 export interface MapaConFoto {
+  readonly getGlobalState: () => Readonly<EstadoConFoto>;
   readonly setGlobalStateProperty: (nombre: string, valor: boolean) => void;
 }
 
 /**
  * Enciende o apaga la foto aérea. Solo cambia el estado del estilo: ni `setStyle` ni capas nuevas,
- * así que las capas de Celda, las celdas y la ficha abierta se quedan como estaban. MapLibre no
- * hace nada si el estado no cambia.
+ * así que las capas de Celda, las celdas y la ficha abierta se quedan como estaban. Si ya estaba
+ * así no toca el mapa, que con cualquier cambio de estado se vuelve a pintar.
  */
 export const ponerFotoAerea = (mapa: MapaConFoto, encendida: boolean): void => {
+  if ((mapa.getGlobalState()[FOTO_AEREA] ?? false) === encendida) return;
   mapa.setGlobalStateProperty(FOTO_AEREA, encendida);
 };
 

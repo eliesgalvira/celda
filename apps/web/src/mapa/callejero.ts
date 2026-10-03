@@ -20,7 +20,7 @@ export interface MapaConCallejero {
   readonly on: (
     evento: "sourcedata" | "error",
     escuchador: (evento: EventoDeFuente) => void,
-  ) => unknown;
+  ) => void;
 }
 
 /**

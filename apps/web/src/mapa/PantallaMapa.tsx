@@ -17,6 +17,7 @@ import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
 import { IconoOndas } from "@celda/ui/interferencia/PanelInterferencia.tsx";
 import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
 import { IconoAjustes, IconoEjercicio } from "@celda/ui/ejercicio/Ejercicio.tsx";
+import { IconoFotoAerea } from "@celda/ui/foto/FotoAerea.tsx";
 import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
 import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
 import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
@@ -67,7 +68,9 @@ import {
   SIN_ZONA,
   type ZonaEnMapa,
 } from "../ejercicio/zona.ts";
-import { desplazamientoParaVer } from "../ficha/enfoque.ts";
+import { centroLibre, desplazamientoParaVer } from "../ficha/enfoque.ts";
+import { crearFoto, FotoContexto, lienzoDeFoto } from "../foto/enMapa.ts";
+import { aPieDeCalle, CREDITO_FOTO_AEREA, pideVerFoto } from "../foto/foto.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
 import { type FichaPedida, FichasPublicadas } from "../ficha/servicio.ts";
@@ -172,6 +175,8 @@ export function PantallaMapa() {
   const listo = createMemo(() => estado().tipo === "listo");
   /** Si el mapa está al zoom de las celdas o más cerca. */
   const [cerca, setCerca] = createSignal(false);
+  /** Si el mapa está a pie de calle, donde la pista ofrece la foto aérea. */
+  const [calle, setCalle] = createSignal(false);
   /** Lo que se ve del mapa, puesto cada vez que se para. */
   const [encuadre, setEncuadre] = createSignal<Encuadre>();
   /** La vista de interferencia (historia 38) y lo que se ha elegido en ella. */
@@ -259,7 +264,10 @@ export function PantallaMapa() {
         },
         rellenoDeLaVista(escritorio()),
       );
-      const mirarZoom = () => setCerca(nuevo.getZoom() >= ZOOM_CELDAS);
+      const mirarZoom = () => {
+        setCerca(nuevo.getZoom() >= ZOOM_CELDAS);
+        setCalle(aPieDeCalle(nuevo.getZoom()));
+      };
       nuevo.on("zoom", mirarZoom);
       mirarZoom();
       const mirarEncuadre = () => {
@@ -520,6 +528,16 @@ export function PantallaMapa() {
   const seleccionada = createMemo(() => emplazamientoDe(ubicacion()));
   /** La provincia en cuya capa va, que también dice la URL, o `null` si no la dice. */
   const provinciaSeleccionada = createMemo(() => provinciaDe(ubicacion()));
+
+  /** La foto aérea (ADR 0022), apagada al abrir, y «Ver el edificio» de la ficha. */
+  const foto = crearFoto({
+    lienzo: createMemo(() => {
+      const actual = mapaListo();
+      return actual === undefined ? undefined : lienzoDeFoto(actual);
+    }),
+    seleccionada,
+    desplazamiento: () => centroLibre(escritorio()),
+  });
 
   // Un enlace sin provincia: se busca en el índice de claves del resumen y, si está, la dirección
   // pasa a llevarla y se pide su provincia. Si no está, la ficha dice que no existe.
@@ -894,9 +912,30 @@ export function PantallaMapa() {
     celda: (clave) => celdaDe(celdas.calculadas(), clave),
     orientacion: orientacionDe([]),
   });
+  /** Con un emplazamiento seleccionado a pie de calle, la pista ofrece la foto aérea. */
+  const conPistaDeFoto = createMemo(() =>
+    pideVerFoto({
+      encendida: foto.encendida(),
+      seleccionado: seleccionada() !== null,
+      aPieDeCalle: calle(),
+      vistaActiva: vistaActiva(),
+    }),
+  );
   const pista = createMemo(() => {
     // Con la vista de interferencia, su panel dice qué es cada cosa y las celdas no se ven.
     if (vistaActiva()) return undefined;
+    if (conPistaDeFoto()) {
+      return (
+        <Pista
+          texto="¿Cuál es el edificio? Míralo en la foto aérea."
+          accion={
+            <Boton variante="secundario" onClick={() => foto.encender()}>
+              Ver foto
+            </Boton>
+          }
+        />
+      );
+    }
     const actual = pistaDeCeldas(cerca(), celdas.calculo(), vecinasDeCeldas());
     if (actual === undefined) return undefined;
     const { reintentar } = actual;
@@ -990,198 +1029,214 @@ export function PantallaMapa() {
     <AjustesContexto value={ajustes}>
       <UbicacionContexto value={puntoDeReferencia}>
         <ServicioContexto value={servicio}>
-          <DisposicionMapa
-            nombre={`Mapa de ${ESPANA.nombre}`}
-            ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
-            lienzo={(elemento) => {
-              contenedor = elemento;
-            }}
-            cabecera={<Cabecera lugar={lugares.nombre()} />}
-            datos={
-              <EstadoDeLaCapa
-                estado={capa()}
-                vista={estadoVista()}
-                emplazamientos={resumen()?.provincias.reduce((n, p) => n + p.emplazamientos, 0)}
-                donde={donde()}
-                reintentar={cargarCapa}
-                reintentarProvincias={reintentarProvincias}
-              />
-            }
-            ubicacion={
-              <>
-                <AvisosDeUbicacion panelAbierto={panelAbierto()} cobertura={resumen()} />
-                <Show when={eligiendo()}>
-                  <EleccionConBuscador
-                    alUsarCentro={usarCentro}
-                    alIrA={irA}
-                    encuadre={encuadre()}
-                  />
-                </Show>
-              </>
-            }
-            eligiendo={eligiendo()}
-            pinCentral={<PinCentral />}
-            dialogo={<PasoPrevio />}
-            marcadores={
-              <Show when={mapaCreado()}>
-                {(actual) => (
-                  <>
-                    <Show when={resumen()}>
-                      {(leido) => (
-                        <Marcadores
-                          mapa={actual()}
-                          resumen={leido()}
-                          provincias={provincias()}
-                          seleccionada={seleccionada()}
-                          alSeleccionar={seleccionar}
-                          alVer={precargarFichas}
-                          alCambiarVista={alCambiarVista}
-                        />
-                      )}
-                    </Show>
-                    <ReferenciaEnMapa
-                      mapa={actual()}
-                      escritorio={escritorio()}
-                      conEtiqueta={!vistaActiva()}
+          <FotoContexto value={foto}>
+            <DisposicionMapa
+              nombre={`Mapa de ${ESPANA.nombre}`}
+              ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
+              lienzo={(elemento) => {
+                contenedor = elemento;
+              }}
+              cabecera={<Cabecera lugar={lugares.nombre()} />}
+              datos={
+                <EstadoDeLaCapa
+                  estado={capa()}
+                  vista={estadoVista()}
+                  emplazamientos={resumen()?.provincias.reduce((n, p) => n + p.emplazamientos, 0)}
+                  donde={donde()}
+                  reintentar={cargarCapa}
+                  reintentarProvincias={reintentarProvincias}
+                />
+              }
+              ubicacion={
+                <>
+                  <AvisosDeUbicacion panelAbierto={panelAbierto()} cobertura={resumen()} />
+                  <Show when={eligiendo()}>
+                    <EleccionConBuscador
+                      alUsarCentro={usarCentro}
+                      alIrA={irA}
+                      encuadre={encuadre()}
                     />
-                  </>
-                )}
-              </Show>
-            }
-            pista={pista()}
-            zoom={
-              <>
-                <ControlDelMapa
-                  etiqueta="Acercar"
-                  icono="+"
-                  disabled={!listo()}
-                  onClick={() => mapa?.zoomIn()}
+                  </Show>
+                </>
+              }
+              eligiendo={eligiendo()}
+              pinCentral={<PinCentral />}
+              dialogo={<PasoPrevio />}
+              marcadores={
+                <Show when={mapaCreado()}>
+                  {(actual) => (
+                    <>
+                      <Show when={resumen()}>
+                        {(leido) => (
+                          <Marcadores
+                            mapa={actual()}
+                            resumen={leido()}
+                            provincias={provincias()}
+                            seleccionada={seleccionada()}
+                            alSeleccionar={seleccionar}
+                            alVer={precargarFichas}
+                            alCambiarVista={alCambiarVista}
+                          />
+                        )}
+                      </Show>
+                      <ReferenciaEnMapa
+                        mapa={actual()}
+                        escritorio={escritorio()}
+                        conEtiqueta={!vistaActiva()}
+                      />
+                    </>
+                  )}
+                </Show>
+              }
+              pista={pista()}
+              zoom={
+                <>
+                  <ControlDelMapa
+                    etiqueta="Acercar"
+                    icono="+"
+                    disabled={!listo()}
+                    onClick={() => mapa?.zoomIn()}
+                  />
+                  <ControlDelMapa
+                    etiqueta="Alejar"
+                    icono="−"
+                    disabled={!listo()}
+                    onClick={() => mapa?.zoomOut()}
+                  />
+                </>
+              }
+              controles={
+                <>
+                  <ControlDelMapa
+                    etiqueta="Interferencia"
+                    detalle="Simula dónde se pisan las señales de una compañía."
+                    icono={<IconoOndas />}
+                    activo={vistaActiva()}
+                    disabled={!listo() || emplazamientos().length === 0}
+                    onClick={cambiarVista}
+                  />
+                  <ControlDelMapa
+                    etiqueta="Medir mi señal"
+                    detalle="Cómo leer en el móvil la señal que te llega."
+                    icono={<IconoSenal />}
+                    aria-haspopup="dialog"
+                    onClick={() => navegar(conMedir(ubicacion(), true))}
+                  />
+                </>
+              }
+              botonUbicacion={
+                <>
+                  <ControlDelMapa
+                    etiqueta="Foto aérea"
+                    detalle="La ortofoto del IGN bajo las calles y los datos."
+                    icono={<IconoFotoAerea />}
+                    activo={foto.encendida()}
+                    disabled={!listo()}
+                    onClick={() => foto.alternar()}
+                  />
+                  <MenuDeUbicacion
+                    puedeCentrar={listo()}
+                    alCentrar={() => {
+                      const referencia = puntoDeReferencia.referencia();
+                      if (referencia !== undefined) irA(posicionDe(referencia));
+                    }}
+                  />
+                </>
+              }
+              controlesSecundarios={
+                <>
+                  <Show when={ajustes.ajustes().modoEstudiante}>
+                    <ControlDelMapa
+                      etiqueta="Ejercicio"
+                      detalle="Los cálculos de un municipio o un barrio paso a paso, con sus fuentes."
+                      icono={<IconoEjercicio />}
+                      activo={ejercicio() !== null}
+                      onClick={() =>
+                        navegar(conEjercicio(ubicacion(), ejercicio() === null ? "" : null))
+                      }
+                    />
+                  </Show>
+                  <ControlDelMapa
+                    etiqueta="Tus aportaciones"
+                    detalle="Tus medidas y correcciones, y compartirlas con Celda."
+                    icono={<IconoAportaciones />}
+                    aria-haspopup="dialog"
+                    onClick={() => navegar(conAportaciones(ubicacion(), true))}
+                  />
+                  <ControlDelMapa
+                    etiqueta="Ajustes"
+                    detalle="Las preferencias de Celda en este dispositivo."
+                    icono={<IconoAjustes />}
+                    aria-haspopup="dialog"
+                    onClick={() => navegar(conAjustes(ubicacion(), true))}
+                  />
+                </>
+              }
+              atribucion={
+                <Atribucion
+                  creditos={foto.encendida() ? [...creditos(), CREDITO_FOTO_AEREA] : creditos()}
                 />
-                <ControlDelMapa
-                  etiqueta="Alejar"
-                  icono="−"
-                  disabled={!listo()}
-                  onClick={() => mapa?.zoomOut()}
-                />
-              </>
-            }
-            controles={
-              <>
-                <ControlDelMapa
-                  etiqueta="Interferencia"
-                  detalle="Simula dónde se pisan las señales de una compañía."
-                  icono={<IconoOndas />}
-                  activo={vistaActiva()}
-                  disabled={!listo() || emplazamientos().length === 0}
-                  onClick={cambiarVista}
-                />
-                <ControlDelMapa
-                  etiqueta="Medir mi señal"
-                  detalle="Cómo leer en el móvil la señal que te llega."
-                  icono={<IconoSenal />}
-                  aria-haspopup="dialog"
-                  onClick={() => navegar(conMedir(ubicacion(), true))}
-                />
-              </>
-            }
-            botonUbicacion={
-              <MenuDeUbicacion
-                puedeCentrar={listo()}
-                alCentrar={() => {
-                  const referencia = puntoDeReferencia.referencia();
-                  if (referencia !== undefined) irA(posicionDe(referencia));
+              }
+              aviso={aviso()}
+              panelAbierto={panelAbierto()}
+              panelAncho={seleccionada() === null && ejercicio() !== null}
+              vista={vista()}
+              panel={
+                <Switch>
+                  <Match when={seleccionada()}>
+                    {(clave) => (
+                      <PanelFicha
+                        clave={clave()}
+                        provincia={provinciaSeleccionada()}
+                        fechaCapa={fechaDeLaSeleccionada()}
+                        alCerrar={() => navegar(ruta.mapa)}
+                      />
+                    )}
+                  </Match>
+                  <Match when={ejercicio() !== null}>
+                    <PanelEjercicio
+                      zona={ejercicio() ?? ""}
+                      resumen={resumen()}
+                      provincias={provincias()}
+                      emplazamientos={emplazamientos()}
+                      alElegirZona={(codigo) =>
+                        navegar(conEjercicio(ubicacion(), codigo), { reemplazar: true })
+                      }
+                      alPedirProvincias={pedirProvincias}
+                      alReintentarProvincias={reintentarProvincias}
+                      alEsperarPunto={(alTocar) => {
+                        esperandoPunto = alTocar;
+                      }}
+                      alDibujar={(dibujo, encuadre) => setZona({ zona: dibujo, encuadre })}
+                      alCerrar={() => navegar(conEjercicio(ubicacion(), null))}
+                    />
+                  </Match>
+                </Switch>
+              }
+            />
+            <Show when={midiendo()}>
+              <DialogoMedir
+                navegador={{ ...leerNavegador(), modelo: modelo() }}
+                direccionMovil={new URL(ruta.medir, window.location.origin).href}
+                alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+              />
+            </Show>
+            <Show when={aportacionesAbiertas(ubicacion())}>
+              <DialogoAportaciones
+                dispositivo={detectarDispositivo({ ...leerNavegador(), modelo: modelo() }).tipo}
+                alCerrar={() => navegar(conAportaciones(ubicacion(), false), { reemplazar: true })}
+                alElegirPunto={() => {
+                  navegar(conAportaciones(ubicacion(), false), { reemplazar: true });
+                  puntoDeReferencia.elegirEnMapa();
                 }}
               />
-            }
-            controlesSecundarios={
-              <>
-                <Show when={ajustes.ajustes().modoEstudiante}>
-                  <ControlDelMapa
-                    etiqueta="Ejercicio"
-                    detalle="Los cálculos de un municipio o un barrio paso a paso, con sus fuentes."
-                    icono={<IconoEjercicio />}
-                    activo={ejercicio() !== null}
-                    onClick={() =>
-                      navegar(conEjercicio(ubicacion(), ejercicio() === null ? "" : null))
-                    }
-                  />
-                </Show>
-                <ControlDelMapa
-                  etiqueta="Tus aportaciones"
-                  detalle="Tus medidas y correcciones, y compartirlas con Celda."
-                  icono={<IconoAportaciones />}
-                  aria-haspopup="dialog"
-                  onClick={() => navegar(conAportaciones(ubicacion(), true))}
-                />
-                <ControlDelMapa
-                  etiqueta="Ajustes"
-                  detalle="Las preferencias de Celda en este dispositivo."
-                  icono={<IconoAjustes />}
-                  aria-haspopup="dialog"
-                  onClick={() => navegar(conAjustes(ubicacion(), true))}
-                />
-              </>
-            }
-            atribucion={<Atribucion creditos={creditos()} />}
-            aviso={aviso()}
-            panelAbierto={panelAbierto()}
-            panelAncho={seleccionada() === null && ejercicio() !== null}
-            vista={vista()}
-            panel={
-              <Switch>
-                <Match when={seleccionada()}>
-                  {(clave) => (
-                    <PanelFicha
-                      clave={clave()}
-                      provincia={provinciaSeleccionada()}
-                      fechaCapa={fechaDeLaSeleccionada()}
-                      alCerrar={() => navegar(ruta.mapa)}
-                    />
-                  )}
-                </Match>
-                <Match when={ejercicio() !== null}>
-                  <PanelEjercicio
-                    zona={ejercicio() ?? ""}
-                    resumen={resumen()}
-                    provincias={provincias()}
-                    emplazamientos={emplazamientos()}
-                    alElegirZona={(codigo) =>
-                      navegar(conEjercicio(ubicacion(), codigo), { reemplazar: true })
-                    }
-                    alPedirProvincias={pedirProvincias}
-                    alReintentarProvincias={reintentarProvincias}
-                    alEsperarPunto={(alTocar) => {
-                      esperandoPunto = alTocar;
-                    }}
-                    alDibujar={(dibujo, encuadre) => setZona({ zona: dibujo, encuadre })}
-                    alCerrar={() => navegar(conEjercicio(ubicacion(), null))}
-                  />
-                </Match>
-              </Switch>
-            }
-          />
-          <Show when={midiendo()}>
-            <DialogoMedir
-              navegador={{ ...leerNavegador(), modelo: modelo() }}
-              direccionMovil={new URL(ruta.medir, window.location.origin).href}
-              alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
-            />
-          </Show>
-          <Show when={aportacionesAbiertas(ubicacion())}>
-            <DialogoAportaciones
-              dispositivo={detectarDispositivo({ ...leerNavegador(), modelo: modelo() }).tipo}
-              alCerrar={() => navegar(conAportaciones(ubicacion(), false), { reemplazar: true })}
-              alElegirPunto={() => {
-                navegar(conAportaciones(ubicacion(), false), { reemplazar: true });
-                puntoDeReferencia.elegirEnMapa();
-              }}
-            />
-          </Show>
-          <Show when={ajustesAbiertos(ubicacion())}>
-            <DialogoAjustes
-              alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
-            />
-          </Show>
+            </Show>
+            <Show when={ajustesAbiertos(ubicacion())}>
+              <DialogoAjustes
+                alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
+              />
+            </Show>
+          </FotoContexto>
         </ServicioContexto>
       </UbicacionContexto>
     </AjustesContexto>

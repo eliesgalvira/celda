@@ -1,0 +1,251 @@
+import type { Coordenada } from "@celda/dominio/area";
+import { desdePlano } from "@celda/dominio/plano";
+import type { EstadoEdificio } from "@celda/ui/foto/FotoAerea.tsx";
+import { FUENTE_EDIFICIO, type MapaConFoto, ponerFotoAerea } from "@celda/ui/mapa/foto.ts";
+import { CAPA_PORTALES } from "@celda/ui/mapa/rotulos.ts";
+import { CAPA_EDIFICIOS } from "@celda/ui/mapa/suelo.ts";
+import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
+import * as Predicate from "effect/Predicate";
+import { createContext, createEffect, createSignal, untrack } from "solid-js";
+
+import {
+  dibujoDelEdificio,
+  type DibujoDelEdificio,
+  DISTANCIA_AL_EDIFICIO_M,
+  type EdificioEncontrado,
+  edificioDeRasgo,
+  elegirEdificio,
+  portalDeRasgo,
+  type RasgoDelMapa,
+  SIN_EDIFICIO,
+} from "./edificio.ts";
+import { ZOOM_EDIFICIO } from "./foto.ts";
+
+/** Hasta dónde, alrededor del emplazamiento, se miran los números de portal. */
+const ALCANCE_PORTALES_M = 90;
+
+/** Lo que hace el mapa con la foto aérea. En las pruebas, un lienzo que apunta lo que recibe. */
+export interface LienzoDeFoto {
+  /** Enciende o apaga la foto. */
+  readonly ponerFoto: (encendida: boolean) => void;
+  /**
+   * Vuela al emplazamiento, a `desplazamiento` píxeles del centro, y cuando el mapa se queda
+   * quieto con sus teselas, resalta su edificio y llama a `alAcabar` con lo encontrado, o sin nada
+   * si el emplazamiento ya no está a la vista (lo ha movido la persona). Devuelve con qué dejar de
+   * esperar.
+   */
+  readonly verEdificio: (
+    posicion: Coordenada,
+    desplazamiento: readonly [number, number],
+    alAcabar: (encontrado: EdificioEncontrado | undefined) => void,
+  ) => () => void;
+  /** Quita el edificio resaltado. */
+  readonly quitarEdificio: () => void;
+}
+
+type Pixel = [number, number];
+
+/** Lo que hace falta del mapa de MapLibre para la foto aérea y «Ver el edificio». */
+export interface MapaParaFoto extends MapaConFoto {
+  readonly flyTo: (opciones: {
+    readonly center: [number, number];
+    readonly zoom: number;
+    readonly offset: [number, number];
+  }) => void;
+  readonly on: (evento: "moveend" | "idle", escuchador: () => void) => void;
+  readonly off: (evento: "moveend" | "idle", escuchador: () => void) => void;
+  readonly project: (punto: [number, number]) => { readonly x: number; readonly y: number };
+  readonly getBounds: () => { readonly contains: (punto: [number, number]) => boolean };
+  readonly queryRenderedFeatures: (
+    caja: [Pixel, Pixel],
+    opciones: { readonly layers: Array<string> },
+  ) => ReadonlyArray<RasgoDelMapa>;
+  readonly getSource: (fuente: string) => FuenteDelMapa | undefined;
+}
+
+/** Una fuente del estilo, como la da MapLibre. */
+interface FuenteDelMapa {
+  readonly type: string;
+}
+
+/** Una fuente GeoJSON del mapa, que se rellena con `setData`. */
+interface FuenteRellenable extends FuenteDelMapa {
+  readonly setData: (datos: DibujoDelEdificio) => void;
+}
+
+const esRellenable = (fuente: FuenteDelMapa | undefined): fuente is FuenteRellenable =>
+  Predicate.hasProperty(fuente, "setData") && Predicate.isFunction(fuente.setData);
+
+const comoPunto = (posicion: Coordenada): [number, number] => [posicion.longitud, posicion.latitud];
+
+/**
+ * El lienzo de un mapa de MapLibre. La foto se enciende con el estado del estilo; el edificio se
+ * busca en lo que el mapa ha pintado (`queryRenderedFeatures`) y no en las teselas: las partidas
+ * por encima del zoom 15 dan las coordenadas desplazadas. Se busca en un radio de píxeles que a
+ * ese zoom cubre la distancia que hace falta.
+ */
+export const lienzoDeFoto = (mapa: MapaParaFoto): LienzoDeFoto => {
+  const pintar = (dibujo: DibujoDelEdificio) => {
+    const fuente = mapa.getSource(FUENTE_EDIFICIO);
+    if (esRellenable(fuente)) fuente.setData(dibujo);
+  };
+  /** La caja de píxeles alrededor de `posicion` que cubre `metros` hacia cada lado. */
+  const cajaDe = (posicion: Coordenada, metros: number): [Pixel, Pixel] => {
+    const centro = mapa.project(comoPunto(posicion));
+    const borde = mapa.project(comoPunto(desdePlano(posicion, { este: metros, norte: 0 })));
+    const radio = Math.max(20, Math.abs(borde.x - centro.x));
+    return [
+      [centro.x - radio, centro.y - radio],
+      [centro.x + radio, centro.y + radio],
+    ];
+  };
+  const buscar = (posicion: Coordenada): EdificioEncontrado | undefined => {
+    if (!mapa.getBounds().contains(comoPunto(posicion))) return undefined;
+    const edificios = mapa
+      .queryRenderedFeatures(cajaDe(posicion, DISTANCIA_AL_EDIFICIO_M + 5), {
+        layers: [CAPA_EDIFICIOS],
+      })
+      .flatMap((rasgo) => edificioDeRasgo(rasgo) ?? []);
+    const portales = mapa
+      .queryRenderedFeatures(cajaDe(posicion, ALCANCE_PORTALES_M), { layers: [CAPA_PORTALES] })
+      .flatMap((rasgo) => portalDeRasgo(rasgo) ?? []);
+    return elegirEdificio(posicion, edificios, portales);
+  };
+  return {
+    ponerFoto: (encendida) => ponerFotoAerea(mapa, encendida),
+    verEdificio: (posicion, desplazamiento, alAcabar) => {
+      const alQuedarQuieto = () => {
+        mapa.off("idle", alQuedarQuieto);
+        const encontrado = buscar(posicion);
+        pintar(encontrado === undefined ? SIN_EDIFICIO : dibujoDelEdificio(encontrado));
+        alAcabar(encontrado);
+      };
+      // Al parar el vuelo aún faltan teselas y rótulos por colocar: se espera a `idle`.
+      const alParar = () => {
+        mapa.off("moveend", alParar);
+        mapa.on("idle", alQuedarQuieto);
+      };
+      mapa.on("moveend", alParar);
+      // Con la preferencia de reducir movimiento, MapLibre salta en lugar de volar.
+      mapa.flyTo({
+        center: comoPunto(posicion),
+        zoom: ZOOM_EDIFICIO,
+        offset: [desplazamiento[0], desplazamiento[1]],
+      });
+      return () => {
+        mapa.off("moveend", alParar);
+        mapa.off("idle", alQuedarQuieto);
+      };
+    },
+    quitarEdificio: () => pintar(SIN_EDIFICIO),
+  };
+};
+
+/** Lo que ha pedido «Ver el edificio»: un objeto nuevo por pulsación. */
+interface PedidoDeEdificio {
+  readonly clave: string;
+  readonly posicion: Coordenada;
+}
+
+/** De dónde sale la foto aérea. Cada campo es una lectura reactiva. */
+export interface EntradaFoto {
+  /** El mapa, cuando está listo. */
+  readonly lienzo: () => LienzoDeFoto | undefined;
+  /** El emplazamiento con la ficha abierta. */
+  readonly seleccionada: () => string | null;
+  /** Dónde queda el centro de lo que deja libre el panel (`centroLibre`). */
+  readonly desplazamiento: () => readonly [number, number];
+}
+
+export interface FotoDelMapa {
+  /** Si la foto aérea está encendida. Apagada al abrir cada visita. */
+  readonly encendida: () => boolean;
+  readonly alternar: () => void;
+  readonly encender: () => void;
+  /** Qué ha hecho «Ver el edificio» con el emplazamiento `clave`. */
+  readonly edificio: (clave: string) => EstadoEdificio;
+  /** «Ver el edificio»: enciende la foto, vuela al emplazamiento y resalta su edificio. */
+  readonly verEdificio: (clave: string, posicion: Coordenada) => void;
+}
+
+export const FotoContexto = createContext<FotoDelMapa>();
+
+const PARADO: EstadoEdificio = { tipo: "parado" };
+const BUSCANDO: EstadoEdificio = { tipo: "buscando" };
+
+/**
+ * La foto aérea en el mapa y «Ver el edificio». Encender la foto y volar al edificio abren cosas
+ * en el mapa (teselas del PNOA, un vuelo y sus escuchadores), así que se abren con `recurso()`:
+ * cada uno con una clave que solo cambia cuando la persona pulsa, cambia de emplazamiento o el
+ * mapa se crea otra vez. Cambiar de emplazamiento o cerrar la ficha quita el resaltado.
+ */
+export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
+  const [encendida, setEncendida] = createSignal(false);
+  const [pedido, setPedido] = createSignal<PedidoDeEdificio>();
+  const [hallado, setHallado] = createSignal<{
+    readonly pedido: PedidoDeEdificio;
+    readonly encontrado: EdificioEncontrado | undefined;
+  }>();
+
+  recurso(
+    "mapa:foto",
+    () => {
+      const lienzo = entrada.lienzo();
+      return lienzo === undefined ? undefined : { lienzo, encendida: encendida() };
+    },
+    ({ lienzo, encendida: si }) => {
+      lienzo.ponerFoto(si);
+      return undefined;
+    },
+    { iguales: mismosCampos },
+  );
+
+  // Otro emplazamiento o la ficha cerrada: lo pedido para el anterior ya no vale.
+  createEffect(entrada.seleccionada, (clave) => {
+    if (untrack(pedido)?.clave !== clave) setPedido(undefined);
+  });
+
+  recurso(
+    "mapa:edificio",
+    () => {
+      const lienzo = entrada.lienzo();
+      const actual = pedido();
+      return lienzo === undefined || actual === undefined ? undefined : { lienzo, pedido: actual };
+    },
+    ({ lienzo, pedido: actual }) => {
+      const dejar = lienzo.verEdificio(
+        actual.posicion,
+        untrack(entrada.desplazamiento),
+        (encontrado) => setHallado({ pedido: actual, encontrado }),
+      );
+      return (siguiente) => {
+        dejar();
+        if (siguiente?.lienzo !== lienzo) lienzo.quitarEdificio();
+      };
+    },
+    { iguales: mismosCampos },
+  );
+
+  const edificio = (clave: string): EstadoEdificio => {
+    const actual = pedido();
+    if (actual === undefined || actual.clave !== clave) return PARADO;
+    const resultado = hallado();
+    if (resultado?.pedido !== actual) return BUSCANDO;
+    const { encontrado } = resultado;
+    if (encontrado === undefined) return PARADO;
+    return encontrado.tipo === "ninguno"
+      ? { tipo: "sin-contorno" }
+      : { tipo: "resaltado", numero: encontrado.portal?.numero };
+  };
+
+  return {
+    encendida,
+    alternar: () => setEncendida((si) => !si),
+    encender: () => setEncendida(true),
+    edificio,
+    verEdificio: (clave, posicion) => {
+      setEncendida(true);
+      setPedido({ clave, posicion });
+    },
+  };
+}

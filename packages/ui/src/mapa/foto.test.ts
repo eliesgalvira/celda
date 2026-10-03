@@ -5,7 +5,13 @@ import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { conLaFoto } from "../pruebas/foto.ts";
 import { estiloMapa } from "./estilo.ts";
 import { FOTO_AEREA } from "./expresiones.ts";
-import { CAPA_FOTO, FUENTE_EDIFICIO, FUENTE_FOTO, ponerFotoAerea } from "./foto.ts";
+import {
+  CAPA_FOTO,
+  type EstadoConFoto,
+  FUENTE_EDIFICIO,
+  FUENTE_FOTO,
+  ponerFotoAerea,
+} from "./foto.ts";
 import { CAPA_PORTALES } from "./rotulos.ts";
 
 const estilo = estiloMapa((token) => `token:${token}`, CONTORNO_DE_PRUEBA);
@@ -13,10 +19,11 @@ const ids = estilo.layers.map((capa) => capa.id);
 const capa = (id: string): LayerSpecification | undefined => estilo.layers.find((c) => c.id === id);
 const visibilidad = (id: string, encendida: boolean) =>
   conLaFoto(capa(id)?.layout?.visibility ?? "visible", encendida);
-const pintura = (id: string, propiedad: string, encendida: boolean) => {
-  const paint: Record<string, unknown> = { ...capa(id)?.paint };
-  return conLaFoto(paint[propiedad], encendida);
-};
+const pintura = (id: string, propiedad: string, encendida: boolean) =>
+  conLaFoto(
+    Object.entries(capa(id)?.paint ?? {}).find(([nombre]) => nombre === propiedad)?.[1],
+    encendida,
+  );
 
 /** Las capas de rótulos del mapa base que se ven con la foto apagada. */
 const ROTULOS = estilo.layers.filter(
@@ -107,13 +114,18 @@ describe("foto aérea en el estilo", () => {
     assert.isBelow(edificio, ids.indexOf("nombres-de-calles"));
   });
 
-  it("encender y apagar solo cambia el estado del estilo", () => {
+  it("encender y apagar solo cambia el estado del estilo, y solo si cambia", () => {
+    const estado: EstadoConFoto = {};
     const llamadas: Array<readonly [string, boolean]> = [];
     const mapa = {
+      getGlobalState: () => estado,
       setGlobalStateProperty: (nombre: string, valor: boolean) => {
+        if (nombre === FOTO_AEREA) estado[FOTO_AEREA] = valor;
         llamadas.push([nombre, valor]);
       },
     };
+    ponerFotoAerea(mapa, false);
+    ponerFotoAerea(mapa, true);
     ponerFotoAerea(mapa, true);
     ponerFotoAerea(mapa, false);
     assert.deepStrictEqual(llamadas, [
