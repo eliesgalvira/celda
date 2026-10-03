@@ -208,23 +208,34 @@ const municipioDePrueba = (
   latitud: number,
 ): MunicipioDeCapa => ({ ...municipio(codigo, nombre, longitud, latitud), habitantes: 10_000 });
 
+/** Los emplazamientos de `emplazamientos` que cumplen `donde`, con Movistar en lugar de Digi. */
+const sinDigi = (
+  emplazamientos: ReadonlyArray<EmplazamientoLeido>,
+  donde: (emplazamiento: EmplazamientoLeido) => boolean = () => true,
+): ReadonlyArray<EmplazamientoLeido> =>
+  emplazamientos.map((e) =>
+    donde(e) && e.companias.includes("digi") ? { ...e, companias: ["movistar"] } : e,
+  );
+
 /**
  * Una España en pequeño con los casos de las zonas, para recorrer todos los zooms: Zaragoza, una
  * ciudad que no cabe en la pantalla en los niveles de municipios; Utebo, 8 emplazamientos
  * juntos, zona en los dos; Cuarte, 6 en 5 km, zona solo en el 11; Pinseque, con uno; y dos sin
  * municipio. En Barcelona, la ciudad con dos barrios y Badalona, compacta. Lleida no tiene nada.
+ * Hay ausencias en cada tipo de zona: Digi no está en la provincia de Zaragoza, en Badalona ni
+ * en el Poblenou.
  */
 export const espanaDePrueba = () => {
   const capas: ReadonlyArray<CapaDeProvincia> = [
     {
       provincia: "50",
-      emplazamientos: [
+      emplazamientos: sinDigi([
         ...rejilla("z", "50", 200, { longitud: -0.89, latitud: 41.65 }, [0.12, 0.07], "50297"),
         ...rejilla("u", "50", 8, { longitud: -1, latitud: 41.71 }, [0.02, 0.012], "50272"),
         ...rejilla("c", "50", 6, { longitud: -0.93, latitud: 41.58 }, [0.06, 0.03], "50089"),
         ...rejilla("p", "50", 1, { longitud: -1.1, latitud: 41.735 }, [0, 0], "50208"),
         ...rejilla("n", "50", 2, { longitud: -1.2, latitud: 41.6 }, [0.01, 0], null),
-      ],
+      ]),
       barrios: [],
       fuenteDeBarrios: undefined,
       municipios: [
@@ -238,10 +249,15 @@ export const espanaDePrueba = () => {
     {
       provincia: "08",
       emplazamientos: [
-        ...rejilla("b", "08", 60, { longitud: 2.15, latitud: 41.4 }, [0.1, 0.06], "08019", (lon) =>
-          lon < 2.15 ? "10" : "68",
+        ...sinDigi(
+          rejilla("b", "08", 60, { longitud: 2.15, latitud: 41.4 }, [0.1, 0.06], "08019", (lon) =>
+            lon < 2.15 ? "10" : "68",
+          ),
+          (e) => e.barrio === "68",
         ),
-        ...rejilla("d", "08", 10, { longitud: 2.245, latitud: 41.45 }, [0.016, 0.01], "08015"),
+        ...sinDigi(
+          rejilla("d", "08", 10, { longitud: 2.245, latitud: 41.45 }, [0.016, 0.01], "08015"),
+        ),
       ],
       barrios: [
         { codigo: "10", nombre: "Sant Antoni", etiqueta: { longitud: 2.125, latitud: 41.4 } },

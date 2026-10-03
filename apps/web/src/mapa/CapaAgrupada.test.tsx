@@ -449,15 +449,42 @@ describe("capa agrupada a todos los zooms", () => {
     return Number(numero);
   };
 
+  /** Si la zona de `boton` dice que falta alguna compañía: «sin» en su nombre o en lo que se ve. */
+  const diceAusencias = (boton: HTMLElement): boolean =>
+    /\bsin\b/u.test(`${boton.getAttribute("aria-label") ?? ""} ${boton.textContent ?? ""}`) ||
+    boton.querySelector("svg[viewBox='0 0 40 40'], svg use") !== null;
+
   // Cada zoom en su prueba: montar la capa abre su latido, y el vigilante de recursos pide que
   // no se abra más de diez veces en un segundo.
   const zooms = Array.from({ length: 14 }, (_, i) => 5 + i);
 
+  it("la España de prueba tiene ausencias en provincias, municipios y barrios", () => {
+    const conAusencias = new Set(
+      zooms.flatMap((zoom) =>
+        [...agrupador.escena(nivelDeZoom(zoom), MUNDO, null).elementos.values()].flatMap((e) =>
+          (e.tipo === "provincia" && e.ausentes.length > 0) ||
+          ((e.tipo === "municipio" || e.tipo === "barrio") && e.resumen.ausentes.length > 0)
+            ? [e.tipo]
+            : [],
+        ),
+      ),
+    );
+    assert.sameMembers([...conAusencias], ["provincia", "municipio", "barrio"]);
+  });
+
   for (const zoom of zooms) {
-    it(`a zoom ${zoom}, cada emplazamiento está en un hexágono con su número o en un logo`, () => {
+    it(`a zoom ${zoom}, cada emplazamiento está en un hexágono con su número o en un logo, y ninguna zona dice qué compañías faltan`, () => {
       const { botones } = montarEspana(nivelDeZoom(zoom), true);
       const suma = botones().reduce((total, boton) => total + representados(boton), 0);
       assert.strictEqual(suma, todos.length, `zoom ${zoom}`);
+      // Ninguna zona dice qué compañías faltan, aunque sus datos lo sepan (ADR 0024).
+      const zonas = botones().filter((boton) => boton.hasAttribute("data-zona"));
+      for (const zona of zonas) {
+        assert.isFalse(
+          diceAusencias(zona),
+          `«${zona.getAttribute("aria-label") ?? ""}» dice qué compañías faltan`,
+        );
+      }
     });
   }
 
