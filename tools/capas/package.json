@@ -5,6 +5,7 @@
   "scripts": {
     "barrios": "vp build && node dist/capas.js barrios",
     "build": "vp build",
+    "espana": "vp build && node dist/capas.js espana",
     "municipios": "vp build && node dist/capas.js municipios",
     "poblacion": "vp build && node dist/capas.js poblacion",
     "servir": "vp build && node dist/capas.js servir",

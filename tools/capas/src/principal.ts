@@ -19,11 +19,12 @@ import * as NodeHttp from "node:http";
 
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
 import { descargarMunicipios } from "./descargaDeMunicipios.ts";
+import { escribirEspana } from "./espana.ts";
 import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
 import { escribirZonas } from "./zonas.ts";
 
 /**
- * Generador de capas. Seis órdenes:
+ * Generador de capas. Siete órdenes:
  *
  * - `servir`: sirve una carpeta publicada como origen estático local, con las cabeceras de la
  *   CDN. La publica la ingesta nocturna (`pnpm run ingesta publicar`) o `sintetica`.
@@ -34,6 +35,8 @@ import { escribirZonas } from "./zonas.ts";
  *   los guarda en el repositorio junto a los barrios (ADR 0017).
  * - `zonas`: escribe desde esos límites, sin descargar nada, el índice de municipios y el
  *   contorno de cada provincia que la web descarga al abrir el ejercicio de emplazamientos.
+ * - `espana`: escribe desde esos límites, sin descargar nada, el contorno de España con que el
+ *   mapa base esconde de lejos los rótulos de fuera (ADR 0024).
  * - `sintetica`: publica en la carpeta una España sintética de `CELDA_SINTETICOS` emplazamientos
  *   (100.000 por defecto), con la publicación de verdad, para medir el mapa (ADR 0016).
  */
@@ -79,6 +82,11 @@ const configMunicipios = Config.all({
 /** Dónde escribe `zonas` el índice y los contornos: la web los lee de su carpeta. */
 const configZonas = Config.String("CELDA_ZONAS").pipe(
   Config.withDefault("../../apps/web/src/ejercicio/zonas"),
+);
+
+/** Dónde escribe `espana` el contorno: el estilo del mapa base lo lee de su carpeta. */
+const configEspana = Config.String("CELDA_ESPANA").pipe(
+  Config.withDefault("../../packages/ui/src/mapa/espana.json"),
 );
 
 /** Pausa entre dos peticiones al mismo sitio de la orden `municipios`. */
@@ -181,11 +189,21 @@ const zonas = Effect.gen(function* () {
   yield* Effect.log(`${escritos.size} ficheros de zonas, ${bytes} bytes, escritos en ${destino}`);
 });
 
+const espana = Effect.gen(function* () {
+  const { municipios } = yield* configMunicipios;
+  const destino = yield* configEspana;
+  const { contorno, bytes } = yield* escribirEspana(municipios, destino);
+  const vertices = contorno.coordinates.reduce((suma, [anillo = []]) => suma + anillo.length, 0);
+  yield* Effect.log(
+    `${contorno.coordinates.length} polígonos y ${vertices} vértices, ${bytes} bytes, escritos en ${destino}`,
+  );
+});
+
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas» o «sintetica».`;
+    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas», «espana» o «sintetica».`;
   }
 }
 
@@ -196,6 +214,7 @@ const principal = Effect.gen(function* () {
   if (orden === "poblacion") return yield* poblacion;
   if (orden === "municipios") return yield* municipios;
   if (orden === "zonas") return yield* zonas;
+  if (orden === "espana") return yield* espana;
   if (orden === "sintetica") return yield* sintetica;
   return yield* new OrdenDesconocida({ orden });
 });
