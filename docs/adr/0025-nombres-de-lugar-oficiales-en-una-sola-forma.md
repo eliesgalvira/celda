@@ -29,7 +29,7 @@ Los datos, para quien implemente: el contorno de la Comunitat pesa 9.490 bytes, 
 
 ## Consecuencias
 
-- El nombre de una zona de Celda y el rótulo del mapa base del mismo sitio coinciden. Eso hace que funcione quitar el rótulo de un municipio que es zona (ADR 0017), que compara nombres, y esconder la capital que se llama como su provincia (ADR 0024).
+- El nombre de una zona de Celda y el rótulo del mapa base del mismo sitio coinciden. Eso hace que funcione quitar el rótulo de un municipio que es zona (ADR 0017), que compara nombres. La cinta de una provincia y el rótulo de su capital sí salen los dos, en versalitas la primera y en caja normal el segundo (ADR 0024).
 - El contorno de la Comunitat deja fuera los islotes de menos de 1 km², como Tabarca y las Columbretes. Un rótulo con «/» en ellos saldría en castellano.
 - El buscador y el mapa escriben igual el mismo sitio.
 - Una persona que busque «Alicante» encuentra Alacant: Nominatim busca en todos los nombres del lugar, no solo en el que Celda enseña.
