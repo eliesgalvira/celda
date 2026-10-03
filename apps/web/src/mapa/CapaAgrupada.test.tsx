@@ -159,16 +159,16 @@ describe("capa agrupada", () => {
     lamina.getByRole("button", { name: "3 emplazamientos, acercar" });
   });
 
-  it("en el nivel de barrios, cada barrio dice su nombre, su número y sus ausencias", () => {
+  it("en el nivel de barrios, cada barrio dice su nombre y su número, no qué compañías faltan", () => {
     const { setNivel, lamina, pulsables, abiertas } = montar(false, null, true);
     setNivel(NIVEL_DE_BARRIOS);
     flush();
 
     const santAntoni = lamina.getByRole("button", {
-      name: "Sant Antoni, 2 emplazamientos, sin Digi, acercar",
+      name: "Sant Antoni, 2 emplazamientos, acercar",
     });
     const poblenou = lamina.getByRole("button", {
-      name: "el Poblenou, 1 emplazamiento, sin Movistar, Vodafone ni Orange, acercar",
+      name: "el Poblenou, 1 emplazamiento, acercar",
     });
     assert.sameMembers(pulsables(), [santAntoni, poblenou]);
     // Los emplazamientos siguen en el DOM mientras se deslizan hacia su barrio.
@@ -244,7 +244,7 @@ describe("capa agrupada por provincias", () => {
     );
     // Mientras llega, se ve su hexágono con su número y dice que se está cargando.
     const hexagono = lamina.getByRole("button", {
-      name: "Barcelona, 40 emplazamientos, sin Vodafone, cargando, acercar",
+      name: "Barcelona, 40 emplazamientos, cargando, acercar",
     });
     assert.strictEqual(hexagono.getAttribute("aria-busy"), "true");
     assert.include(hexagono.textContent, "40");
@@ -280,10 +280,9 @@ describe("capa agrupada por provincias", () => {
     fireEvent.click(lleida);
     assert.strictEqual(abiertas[0]?.tipo, "provincia");
 
-    // Las cubiertas dicen su número y sus ausencias.
-    assert.isNotNull(
-      lamina.getByRole("button", { name: "Barcelona, 40 emplazamientos, sin Vodafone, acercar" }),
-    );
+    // Las cubiertas dicen su número, y no qué compañías faltan: a Barcelona le falta Vodafone.
+    const barcelona = lamina.getByRole("button", { name: "Barcelona, 40 emplazamientos, acercar" });
+    assert.notMatch(barcelona.textContent ?? "", /\bsin\b/u);
   });
 
   it("al acercar desde el resumen, cada provincia se abre desde su hexágono", () => {
@@ -310,7 +309,7 @@ describe("capa agrupada por provincias", () => {
       ["17", { tipo: "lista", provincia: GIRONA }],
     );
 
-    it("cada zona es un hexágono con su número y su nombre y, con 10 o más, sus ausencias", () => {
+    it("cada zona es un hexágono con su número y su nombre, sin decir qué compañías faltan", () => {
       const { setNivel, lamina, abiertas } = montarNacional(
         conMunicipios,
         NIVEL_DE_MUNICIPIOS - 1,
@@ -322,14 +321,14 @@ describe("capa agrupada por provincias", () => {
       flush();
 
       const oeste = lamina.getByRole("button", {
-        name: "Oeste, 20 emplazamientos, sin Vodafone, acercar",
+        name: "Oeste, 20 emplazamientos, acercar",
       });
       assert.strictEqual(oeste.getAttribute("data-zona"), "municipio");
-      // Se ve el hexágono con su número, el nombre debajo y la marca de quien falta.
+      // Se ve el hexágono con su número y el nombre debajo. Le falta Vodafone, y no lo dice.
       assert.isNotNull(oeste.querySelector("svg polygon"));
       assert.include(oeste.textContent, "20");
       assert.include(oeste.textContent, "Oeste");
-      assert.include(oeste.textContent, "sin");
+      assert.notMatch(oeste.textContent ?? "", /\bsin\b/u);
       // Pequeño, con 3, no llega al mínimo de una zona: sus emplazamientos van en hexágonos.
       assert.isNull(lamina.queryByRole("button", { name: /^Pequeño/u }));
 
@@ -450,15 +449,42 @@ describe("capa agrupada a todos los zooms", () => {
     return Number(numero);
   };
 
+  /** Si la zona de `boton` dice que falta alguna compañía: «sin» en su nombre o en lo que se ve. */
+  const diceAusencias = (boton: HTMLElement): boolean =>
+    /\bsin\b/u.test(`${boton.getAttribute("aria-label") ?? ""} ${boton.textContent ?? ""}`) ||
+    boton.querySelector("svg[viewBox='0 0 40 40'], svg use") !== null;
+
   // Cada zoom en su prueba: montar la capa abre su latido, y el vigilante de recursos pide que
   // no se abra más de diez veces en un segundo.
   const zooms = Array.from({ length: 14 }, (_, i) => 5 + i);
 
+  it("la España de prueba tiene ausencias en provincias, municipios y barrios", () => {
+    const conAusencias = new Set(
+      zooms.flatMap((zoom) =>
+        [...agrupador.escena(nivelDeZoom(zoom), MUNDO, null).elementos.values()].flatMap((e) =>
+          (e.tipo === "provincia" && e.ausentes.length > 0) ||
+          ((e.tipo === "municipio" || e.tipo === "barrio") && e.resumen.ausentes.length > 0)
+            ? [e.tipo]
+            : [],
+        ),
+      ),
+    );
+    assert.sameMembers([...conAusencias], ["provincia", "municipio", "barrio"]);
+  });
+
   for (const zoom of zooms) {
-    it(`a zoom ${zoom}, cada emplazamiento está en un hexágono con su número o en un logo`, () => {
+    it(`a zoom ${zoom}, cada emplazamiento está en un hexágono con su número o en un logo, y ninguna zona dice qué compañías faltan`, () => {
       const { botones } = montarEspana(nivelDeZoom(zoom), true);
       const suma = botones().reduce((total, boton) => total + representados(boton), 0);
       assert.strictEqual(suma, todos.length, `zoom ${zoom}`);
+      // Ninguna zona dice qué compañías faltan, aunque sus datos lo sepan (ADR 0024).
+      const zonas = botones().filter((boton) => boton.hasAttribute("data-zona"));
+      for (const zona of zonas) {
+        assert.isFalse(
+          diceAusencias(zona),
+          `«${zona.getAttribute("aria-label") ?? ""}» dice qué compañías faltan`,
+        );
+      }
     });
   }
 

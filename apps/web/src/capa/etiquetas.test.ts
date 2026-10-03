@@ -49,6 +49,16 @@ describe("forma de las zonas de barrio", () => {
     assert.strictEqual(formas.get("b:03"), "compacta");
   });
 
+  it("las compañías que faltan no ocupan sitio: no hacen compacta a la de al lado", () => {
+    // Con la cinta «sin» y tres logos, la primera llegaba 161 px a la derecha y pisaba la otra.
+    const formas = formasDeBarrios([
+      barrio("01", 0, 30, ["movistar", "vodafone", "digi"]),
+      barrio("02", 120, 5),
+    ]);
+    assert.strictEqual(formas.get("b:01"), "completa");
+    assert.strictEqual(formas.get("b:02"), "completa");
+  });
+
   it("ningún barrio se queda sin dibujar, aunque su forma compacta pise otra", () => {
     const encima = [barrio("01", 0, 5), barrio("02", 1, 5), barrio("03", 2, 5)];
     const formas = formasDeBarrios(encima);
@@ -80,10 +90,10 @@ describe("forma de las zonas de barrio", () => {
 });
 
 describe("nombre accesible de un barrio", () => {
-  it("dice lo que se ve en la etiqueta y qué hace al pulsarla", () => {
+  it("dice lo que se ve en la etiqueta y qué hace al pulsarla, no qué compañías faltan", () => {
     assert.strictEqual(
       nombreDeBarrio(barrio("07", 0, 94, ["digi"]).resumen),
-      "Barrio 07, 94 emplazamientos, sin Digi, acercar",
+      "Barrio 07, 94 emplazamientos, acercar",
     );
     assert.strictEqual(
       nombreDeBarrio(barrio("18", 0, 19).resumen),
@@ -91,7 +101,7 @@ describe("nombre accesible de un barrio", () => {
     );
     assert.strictEqual(
       nombreDeBarrio(barrio("56", 0, 0, ["movistar", "vodafone"]).resumen),
-      "Barrio 56, ningún emplazamiento, sin Movistar ni Vodafone, acercar",
+      "Barrio 56, ningún emplazamiento, acercar",
     );
   });
 });
@@ -135,10 +145,10 @@ describe("forma de las zonas de municipio", () => {
 });
 
 describe("nombre accesible de un municipio", () => {
-  it("dice lo que se ve en la etiqueta: con 10 emplazamientos o más, sus ausencias", () => {
+  it("dice lo que se ve en la etiqueta, no qué compañías faltan aunque tenga 10 o más", () => {
     assert.strictEqual(
       nombreDeMunicipio(municipio("08279", "Terrassa", 0, 118, ["digi"]).resumen),
-      "Terrassa, 118 emplazamientos, sin Digi, acercar",
+      "Terrassa, 118 emplazamientos, acercar",
     );
     assert.strictEqual(
       nombreDeMunicipio(municipio("08014", "Aiguafreda", 0, 3).resumen),

@@ -3,7 +3,6 @@ import type { ResumenDeBarrio } from "@celda/dominio/barrio";
 import type { ResumenDeMunicipio } from "@celda/dominio/zona";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
-import { textoDeAusencias } from "@celda/ui/marcadores/Ausencias.tsx";
 import {
   type CoberturaDeProvincia,
   textoDeEmplazamientos,
@@ -69,32 +68,15 @@ export const nombreDeAgrupacion = (cuantos: number): string => `${cuantos} empla
 
 /**
  * Nombre accesible de un barrio: lo que dice su etiqueta, en el mismo orden, y qué hace al
- * pulsarlo. «la Clota, 1 emplazamiento, sin Vodafone, Orange ni Digi, acercar».
+ * pulsarlo. «la Clota, 1 emplazamiento, acercar». Como el mapa, no dice qué compañías faltan
+ * (ADR 0024).
  */
 export const nombreDeBarrio = (resumen: ResumenDeBarrio): string =>
-  [
-    resumen.barrio.nombre,
-    textoDeEmplazamientos(resumen.emplazamientos),
-    textoDeAusencias(resumen.ausentes),
-    "acercar",
-  ]
-    .filter((parte) => parte !== "")
-    .join(", ");
+  `${resumen.barrio.nombre}, ${textoDeEmplazamientos(resumen.emplazamientos)}, acercar`;
 
-/**
- * Nombre accesible de un municipio, como el de un barrio: «Terrassa, 118 emplazamientos, sin Digi,
- * acercar». Uno con menos de 10 emplazamientos no tiene ausencias: «Aiguafreda, 3 emplazamientos,
- * acercar».
- */
+/** Nombre accesible de un municipio, como el de un barrio: «Terrassa, 118 emplazamientos, acercar». */
 export const nombreDeMunicipio = (resumen: ResumenDeMunicipio): string =>
-  [
-    resumen.municipio.nombre,
-    textoDeEmplazamientos(resumen.emplazamientos),
-    textoDeAusencias(resumen.ausentes),
-    "acercar",
-  ]
-    .filter((parte) => parte !== "")
-    .join(", ");
+  `${resumen.municipio.nombre}, ${textoDeEmplazamientos(resumen.emplazamientos)}, acercar`;
 
 /** Las combinaciones distintas de compañías de la capa, cada una una vez: un logo por cada una. */
 export const combinacionesDe = (
@@ -130,7 +112,5 @@ export const nombreDeProvincia = (elemento: ElementoProvincia): string => {
       : elemento.carga === "fallo"
         ? "no han llegado sus emplazamientos"
         : "";
-  return [nombre, cuantos, textoDeAusencias(elemento.ausentes), carga, "acercar"]
-    .filter((parte) => parte !== "")
-    .join(", ");
+  return [nombre, cuantos, carga, "acercar"].filter((parte) => parte !== "").join(", ");
 };
