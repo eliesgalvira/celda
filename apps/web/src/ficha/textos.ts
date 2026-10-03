@@ -108,11 +108,28 @@ export const textoTramo = (banda: Banda): string =>
 
 export const SIN_BANDAS = "Celda aún no ha leído sus bandas en el registro oficial.";
 
-/** Qué decir de una estación base sin bandas: si no está en el registro, no hay de dónde leerlas. */
-export const sinBandasDe = (estacion: EstacionDeFicha): string =>
-  estacion.origenes.some((o) => o.fuente === "registro-oficial")
+/**
+ * Lo que se dice de una estación base sin ficha en el registro: el listado del registro la
+ * incluye, pero su página de detalle dice «Código de emplazamiento no válido».
+ */
+export const SIN_FICHA_EN_REGISTRO = "El registro no tiene ficha para este emplazamiento";
+
+/** Cuándo se comprobó que el registro no tiene la ficha: «comprobado el 2 oct 2026». */
+export const comprobadoEl = (fecha: number): string => `comprobado el ${fechaCorta(fecha)}`;
+
+/**
+ * Qué decir de una estación base sin bandas: si el registro no tiene su ficha, que no la tiene y
+ * desde cuándo se sabe; si no está en el registro, que no hay de dónde leerlas; si no, que Celda
+ * aún no las ha leído.
+ */
+export const sinBandasDe = (estacion: EstacionDeFicha): string => {
+  if (estacion.sinFichaEnRegistro !== undefined) {
+    return `${SIN_FICHA_EN_REGISTRO} (${comprobadoEl(estacion.sinFichaEnRegistro)}), así que no se conocen sus bandas.`;
+  }
+  return estacion.origenes.some((o) => o.fuente === "registro-oficial")
     ? SIN_BANDAS
     : "No está en el registro oficial, así que no se conocen sus bandas.";
+};
 
 export const NOMBRE_FUENTE: Readonly<Record<Fuente, string>> = {
   "registro-oficial": "Registro oficial",

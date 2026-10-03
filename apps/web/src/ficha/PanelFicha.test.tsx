@@ -333,6 +333,78 @@ describe("panel del emplazamiento", () => {
     assert.isNotNull(getByText(/no publica la tecnología/u));
   });
 
+  it("en un emplazamiento compartido, dice que el registro no tiene ficha solo de la compañía afectada, con la fecha", async () => {
+    const sinFicha: Ficha = {
+      ...CAMPUS_NORD,
+      estaciones: CAMPUS_NORD.estaciones.map((e) =>
+        e.compania === "vodafone" ? { ...e, sinFichaEnRegistro: NOCHE + DIA } : e,
+      ),
+    };
+    const { findByRole, getByRole, getByText, getAllByRole, origen } = abrir(CAMPUS_NORD.clave);
+    await responder(origen, sinFicha);
+    const ficha = await findByRole("article", { name: TITULO_CAMPUS_NORD });
+
+    assert.isNotNull(
+      getByText(
+        textoEntero(
+          "Movistar y Vodafone comparten este emplazamiento. Por las bandas que se conocen, " +
+            "probablemente da 5G con Movistar. Llega lejos y entra bien en los edificios, y tiene " +
+            "bandas altas que dan más velocidad. El registro no tiene ficha de Vodafone para " +
+            "este emplazamiento (comprobado el 27 sept 2026).",
+        ),
+      ),
+    );
+    // No la da por pendiente en ninguna parte.
+    assert.notMatch(ficha.textContent ?? "", /aún no se conocen|aún no ha leído/iu);
+    assert.include(
+      getByRole("row", { name: /^Vodafone/u }).textContent,
+      "El registro no tiene ficha para este emplazamiento",
+    );
+    assert.notInclude(getByRole("row", { name: /^Movistar/u }).textContent, "no tiene ficha");
+
+    // Los datos del listado siguen ahí: la dirección, la compañía, el código y el enlace.
+    assert.isNotNull(getByRole("heading", { name: "Vodafone" }));
+    assert.deepStrictEqual(
+      getAllByRole("link", { name: /Ver en el registro oficial/u }).map((a) =>
+        a.getAttribute("href"),
+      ),
+      [`${REGISTRO}0802532`, `${REGISTRO}086040`],
+    );
+    fireEvent.click(getByRole("button", { name: "Datos técnicos" }));
+    flush();
+    assert.isNotNull(
+      getByText(
+        "El registro no tiene ficha para este emplazamiento (comprobado el 27 sept 2026), así " +
+          "que no se conocen sus bandas.",
+      ),
+    );
+    assert.isNotNull(getByRole("table", { name: "Expedientes de Movistar" }));
+  });
+
+  it("con una sola compañía, dice que el registro no tiene ficha para el emplazamiento", async () => {
+    const sinFicha: Ficha = {
+      ...PEDRALBES,
+      estaciones: PEDRALBES.estaciones.map((e) => ({ ...e, sinFichaEnRegistro: NOCHE })),
+    };
+    const { findByRole, getByRole, getByText, origen } = abrir(PEDRALBES.clave);
+    await responder(origen, sinFicha);
+    const ficha = await findByRole("article", { name: TITULO_PEDRALBES });
+    assert.isNotNull(
+      getByText(
+        textoEntero(
+          "Aquí emite Orange. El registro no tiene ficha para este emplazamiento (comprobado " +
+            "el 26 sept 2026). Sin sus bandas no se sabe si da 4G o 5G ni si llega lejos o da " +
+            "velocidad.",
+        ),
+      ),
+    );
+    assert.notMatch(ficha.textContent ?? "", /aún no se conocen|aún no ha leído/iu);
+    assert.include(
+      getByRole("row", { name: /^Orange/u }).textContent,
+      "El registro no tiene ficha para este emplazamiento",
+    );
+  });
+
   it("dibuja cómo emite: un diagrama de modelo, con su versión y la orientación supuesta", async () => {
     const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
     await responder(origen, CAMPUS_NORD);
