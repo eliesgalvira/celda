@@ -1,10 +1,10 @@
 import type { Area } from "@celda/dominio/area";
 import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
-import { coloresDelTema, estiloMapa, FUENTE_MAPA_BASE } from "@celda/ui/mapa/estilo.ts";
+import { coloresDelTema, estiloMapa } from "@celda/ui/mapa/estilo.ts";
 import { Map as MapaMapLibre, prewarm, setWorkerUrl } from "maplibre-gl";
 import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
-import type { MotivoFallo } from "./estado.ts";
+import { type Avisos, vigilarCallejero } from "./callejero.ts";
 import { zoomsSinPartir } from "./teselas.ts";
 import { type Relleno, ZOOM_MAXIMO_AL_ABRIR } from "./vistaInicial.ts";
 
@@ -18,11 +18,6 @@ prewarm();
 const TEXTOS_MAPLIBRE = {
   "Map.Title": "Mapa. Muévete con las flechas y acerca o aleja con + y −.",
 };
-
-export interface Avisos {
-  readonly listo: () => void;
-  readonly fallo: (motivo: MotivoFallo) => void;
-}
 
 /**
  * Crea el mapa base de `area` en `contenedor`, con el estilo del tema activo
@@ -62,17 +57,6 @@ export const crearMapaBase = (
   mapa.touchZoomRotate.disableRotation();
   mapa.keyboard.disableRotation();
 
-  // El evento `load` de MapLibre llega aunque el callejero no haya cargado, y
-  // eso dejaría un lienzo vacío pasando por mapa. El mapa está listo cuando
-  // llega la primera tesela del mapa base; hasta entonces, un error es un fallo.
-  let conCallejero = false;
-  mapa.on("sourcedata", (evento) => {
-    if (conCallejero || evento.sourceId !== FUENTE_MAPA_BASE || evento.tile === undefined) return;
-    conCallejero = true;
-    avisos.listo();
-  });
-  mapa.on("error", () => {
-    if (!conCallejero) avisos.fallo("sin-respuesta");
-  });
+  vigilarCallejero(mapa, avisos);
   return mapa;
 };
