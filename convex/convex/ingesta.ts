@@ -1,13 +1,9 @@
 import registeredFunctions from "../confect/_generated/registeredFunctions/ingesta";
 
-export const antenasMoviles = registeredFunctions.antenasMoviles;
-export const aplicarDetalle = registeredFunctions.aplicarDetalle;
 export const aplicarFicha = registeredFunctions.aplicarFicha;
 export const aplicarListado = registeredFunctions.aplicarListado;
-export const aplicarPuntos = registeredFunctions.aplicarPuntos;
 export const cambiarInterruptor = registeredFunctions.cambiarInterruptor;
 export const cerrarBarrido = registeredFunctions.cerrarBarrido;
-export const cerrarBarridoDePuntos = registeredFunctions.cerrarBarridoDePuntos;
 export const clavesDeEmplazamientos = registeredFunctions.clavesDeEmplazamientos;
 export const completar = registeredFunctions.completar;
 export const ejecucion = registeredFunctions.ejecucion;
@@ -16,7 +12,6 @@ export const estado = registeredFunctions.estado;
 export const fallar = registeredFunctions.fallar;
 export const iniciar = registeredFunctions.iniciar;
 export const observacionesVigentes = registeredFunctions.observacionesVigentes;
-export const pendientesDeDetalle = registeredFunctions.pendientesDeDetalle;
 export const pendientesDeFicha = registeredFunctions.pendientesDeFicha;
 export const recalcularFusion = registeredFunctions.recalcularFusion;
 export const registroOficial = registeredFunctions.registroOficial;

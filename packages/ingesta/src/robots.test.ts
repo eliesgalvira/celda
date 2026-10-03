@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 
 import { leerRobots, permitido, SIN_RESTRICCIONES } from "./robots.ts";
 
-const ANTENASMOVILES = `User-agent: *
+const SOLO_PARA_TODOS = `User-agent: *
 Disallow: /api
 Disallow: /archive
 Disallow: /assets
@@ -14,9 +14,9 @@ describe("robots.txt", () => {
   });
 
   it("aplica el grupo * si no hay uno propio", () => {
-    const robots = leerRobots(ANTENASMOVILES, "Celda");
-    assert.isTrue(permitido(robots, "/v1/markers?id=000455"));
-    assert.isFalse(permitido(robots, "/assets/propios/mapFunctions.js"));
+    const robots = leerRobots(SOLO_PARA_TODOS, "Celda");
+    assert.isTrue(permitido(robots, "/v1/listado?id=000455"));
+    assert.isFalse(permitido(robots, "/assets/propios/mapa.js"));
   });
 
   it("un grupo propio sustituye al de *", () => {

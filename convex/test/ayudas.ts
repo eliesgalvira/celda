@@ -1,6 +1,6 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
-import type { Extractor, ExtractorDePuntos } from "@celda/ingesta/extractor";
+import type { Extractor } from "@celda/ingesta/extractor";
 import { OPCIONES_PROCESO, type OpcionesProceso } from "@celda/ingesta/proceso";
 import { MutationRunner, QueryRunner } from "@confect/server";
 import * as Effect from "effect/Effect";
@@ -11,14 +11,8 @@ import { DatabaseReader } from "../confect/_generated/services";
 import emplazamientos from "../confect/_generated/tables/emplazamientos";
 import estacionesBase from "../confect/_generated/tables/estacionesBase";
 import observaciones from "../confect/_generated/tables/observaciones";
-import puntos from "../confect/_generated/tables/puntos";
 import { Publicacion } from "../src/publicacion";
-import {
-  ejecutarIngesta,
-  ejecutarIngestaDePuntos,
-  OPCIONES_PROCESO_DE_PUNTOS,
-  type OpcionesProcesoDePuntos,
-} from "../src/proceso";
+import { ejecutarIngesta } from "../src/proceso";
 import * as TestConfect from "./TestConfect";
 
 /** Una publicación que no publica, como la de un despliegue sin almacén de ficheros. */
@@ -51,23 +45,10 @@ export const ejecutar = (
     );
   });
 
-/** Lo mismo que `ejecutar`, con un extractor de una fuente que lista puntos. */
-export const ejecutarDePuntos = (
-  extractor: Layer.Layer<ExtractorDePuntos>,
-  opciones: OpcionesProcesoDePuntos = OPCIONES_PROCESO_DE_PUNTOS,
-  publicacion: Layer.Layer<Publicacion> = sinAlmacen,
-) =>
-  Effect.gen(function* () {
-    return yield* ejecutarIngestaDePuntos(opciones).pipe(
-      Effect.provide(Layer.mergeAll(extractor, yield* convexEnMemoria, publicacion)),
-    );
-  });
-
 interface Instantanea {
   readonly observaciones: ReadonlyArray<typeof observaciones.Doc.Type>;
   readonly emplazamientos: ReadonlyArray<typeof emplazamientos.Doc.Type>;
   readonly estaciones: ReadonlyArray<typeof estacionesBase.Doc.Type>;
-  readonly puntos: ReadonlyArray<typeof puntos.Doc.Type>;
 }
 
 /** Todos los datos de la base, para comparar antes y después de una ejecución. */
@@ -77,7 +58,6 @@ export const instantanea = Effect.gen(function* () {
     observaciones: [],
     emplazamientos: [],
     estaciones: [],
-    puntos: [],
   });
   yield* convex.run(
     Effect.gen(function* () {
@@ -86,7 +66,6 @@ export const instantanea = Effect.gen(function* () {
         observaciones: yield* reader.table("observaciones").index("por_clave").collect(),
         emplazamientos: yield* reader.table("emplazamientos").index("por_clave").collect(),
         estaciones: yield* reader.table("estacionesBase").index("por_emplazamiento").collect(),
-        puntos: yield* reader.table("puntos").index("por_clave").collect(),
       });
     }).pipe(Effect.orDie),
   );

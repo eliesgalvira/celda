@@ -8,16 +8,13 @@ export interface Interruptor {
 }
 
 /**
- * Interruptor de cada fuente mientras nadie lo cambie. antenasmoviles.es empieza apagado: antes
- * de publicar sus datos hay que escribir a su administrador (investigación de fuentes
- * comunitarias).
+ * Interruptor de cada fuente mientras nadie lo cambie. Las correcciones de la comunidad llegarán
+ * con el buzón y la moderación (ADR 0020), y OpenCelliD no está decidido (ADR 0019): ninguna de
+ * las dos tiene extractor.
  */
 export const INTERRUPTOR_POR_DEFECTO: Readonly<Record<Fuente, Interruptor>> = {
   "registro-oficial": { activo: true, motivo: "" },
-  antenasmoviles: {
-    activo: false,
-    motivo: "apagado por defecto hasta escribir a su administrador antes de publicar sus datos",
-  },
+  antenasmoviles: { activo: false, motivo: "retirada: Celda ya no la lee (ADR 0019)" },
   opencellid: { activo: false, motivo: "apagado por defecto: aún no tiene extractor" },
 };
 
@@ -46,15 +43,11 @@ export const Cuentas = Schema.Struct({
 });
 export type Cuentas = typeof Cuentas.Type;
 
-/**
- * Lo que ha escrito una ejecución. Todo a cero si no ha cambiado nada. En las fuentes que listan
- * puntos, `fichas` cuenta los detalles leídos y `puntos`, los puntos del listado.
- */
+/** Lo que ha escrito una ejecución. Todo a cero si no ha cambiado nada. */
 export const Cambios = Schema.Struct({
   observaciones: Cuentas,
   fichas: Schema.Struct({ leidas: Schema.Int, cambiadas: Schema.Int }),
   emplazamientos: Cuentas,
-  puntos: Schema.optionalKey(Cuentas),
 });
 export type Cambios = typeof Cambios.Type;
 

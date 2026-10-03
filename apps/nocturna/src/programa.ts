@@ -7,8 +7,7 @@ import {
   type ZonaEnLaEjecucion,
   zonasDeLaNoche,
 } from "@celda/ingesta/barrido";
-import { ejecutarBarridoDePuntos, type OpcionesPuntos } from "@celda/ingesta/barridoDePuntos";
-import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
+import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
 import {
   pendientesPorZona,
   Provincias,
@@ -49,7 +48,6 @@ export class Extractores extends Context.Service<
   Extractores,
   {
     readonly registroOficial: Layer.Layer<ExtractorPorCajas>;
-    readonly antenasMoviles: Layer.Layer<ExtractorDePuntos>;
   }
 >()("@celda/nocturna/programa/Extractores") {}
 
@@ -135,8 +133,6 @@ export interface OpcionesCopias {
 /** Lo que hace la noche, aparte de los extractores. */
 export interface OpcionesNoche {
   readonly proceso: OpcionesBarrido;
-  /** Lo que hace antenasmoviles.es: sus zonas y cuántos detalles lee. */
-  readonly puntos: OpcionesPuntos;
   /** Si publicar falla por algo pasajero, cuánto se espera para repetirlo una vez. */
   readonly reintento: Duration.Duration;
   readonly copias: OpcionesCopias;
@@ -340,10 +336,9 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
 /**
  * La noche entera:
  *
- * 1. Una ejecución de ingesta por fuente, con su interruptor. El registro oficial barre sus zonas
- *    de barrido, lee las fichas de la cola hasta cerrar su ventana, publicando a mitad, y fusiona
- *    (`ejecutarBarrido`). antenasmoviles.es lee su listado una vez, guarda los puntos de sus
- *    zonas, lee el detalle de las ER5 pendientes y fusiona (`ejecutarBarridoDePuntos`).
+ * 1. Una ejecución de ingesta por fuente con extractor, con su interruptor. El registro oficial
+ *    barre sus zonas de barrido, lee las fichas de la cola hasta cerrar su ventana, publicando a
+ *    mitad, y fusiona (`ejecutarBarrido`).
  * 2. Publica la capa y las fichas. Sin cambios no escribe nada, y si la noche anterior no pudo
  *    publicar, lo hace ahora. Si falla por algo pasajero, lo apunta, espera `reintento` y lo
  *    intenta otra vez; si vuelve a fallar, queda para la noche siguiente. Los datos ya están en
@@ -370,13 +365,8 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
     extractores.registroOficial,
     ejecutarBarrido(opciones.proceso).pipe(Effect.provideService(PublicacionAMitad, aMitad)),
   );
-  const puntos = yield* ejecutarCon(
-    extractores.antenasMoviles,
-    ejecutarBarridoDePuntos(opciones.puntos),
-  );
   const ejecuciones: ReadonlyArray<EjecucionDeLaNoche> = [
     { fuente: "registro-oficial", ...registro },
-    { fuente: "antenasmoviles", ...puntos },
   ];
   for (const { fuente, estado, zonas } of ejecuciones) {
     yield* Effect.logInfo(`Ejecución de ${fuente}: ${estado}`);

@@ -16,7 +16,6 @@ import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import type * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
@@ -327,19 +326,6 @@ const zonasDeLista = (variable: string, porDefecto: string) =>
   Config.schema(ListaDeZonas, variable).pipe(
     Config.withDefault(porDefecto),
     Config.map((lista) => nombres(lista).flatMap((nombre) => zonaDeBarrido(nombre) ?? [])),
-  );
-
-/**
- * Las zonas de barrido de una variable de entorno, por su nombre y separadas por comas, o
- * `ninguna`; `Option.none()` si no está puesta. Un nombre que no está en `ZONAS_DE_BARRIDO` es
- * un error de configuración.
- */
-export const zonasDesdeConfig = (
-  variable: string,
-): Config.Config<Option.Option<ReadonlyArray<ZonaDeBarrido>>> =>
-  Config.schema(ListaDeZonas, variable).pipe(
-    Config.map((lista) => nombres(lista).flatMap((nombre) => zonaDeBarrido(nombre) ?? [])),
-    Config.option,
   );
 
 /**

@@ -17,7 +17,7 @@ import {
   RespuestaInesperada,
 } from "@celda/ingesta/extractor";
 import { OPCIONES_FICHAS, type OpcionesFichas, SIN_FICHA_SEGUIDAS } from "@celda/ingesta/fichas";
-import { ObservacionGuardada, PuntoGuardado } from "@celda/ingesta/guardado";
+import { ObservacionGuardada } from "@celda/ingesta/guardado";
 import {
   capaGrabadaPorCajas,
   type FuenteGrabada,
@@ -57,7 +57,9 @@ const codificarObservacion = Schema.encodeEffect(Schema.fromJsonString(Observaci
 const decodificarObservacion = Schema.decodeUnknownEffect(
   Schema.fromJsonString(ObservacionGuardada),
 );
-const codificarPunto = Schema.encodeEffect(Schema.fromJsonString(PuntoGuardado));
+
+/** Una fuente que ya no está en `Fuente`, como la web de antenas que retiró el ADR 0019. */
+const RETIRADA = "fuente-retirada";
 
 /** Las opciones de la noche con otras de fichas. */
 const conFichas = (fichas: Partial<OpcionesFichas>) => ({
@@ -313,10 +315,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           assert.strictEqual((yield* Ref.get(pedidas)).length, 3);
           assert.deepStrictEqual(
             hecha.ejecuciones.map((e) => [e.fuente, e.estado]),
-            [
-              ["registro-oficial", "completada"],
-              ["antenasmoviles", "omitida"],
-            ],
+            [["registro-oficial", "completada"]],
           );
           assert.strictEqual(hecha.publicacion.tipo, "publicada");
           const ejecucion = yield* ultimaDe(entorno);
@@ -527,7 +526,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
   );
 
   it.effect(
-    "una base de la versión 3 se pone al día, conserva sus puntos y su cola sigue donde estaba",
+    "una base de la versión 3 se pone al día, pierde lo de las fuentes retiradas y su cola sigue donde estaba",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -537,7 +536,8 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           const registros = grabada.listado.registros;
           const leidas = new Set(registros.slice(0, 10).map((r) => r.clave));
           // Una base como la deja la versión 3 tras una noche: las 40 observaciones del Campus
-          // Nord, las 10 primeras con su ficha leída, y un punto de antenasmoviles.es.
+          // Nord, las 10 primeras con su ficha leída, y un punto, una observación y una ejecución
+          // omitida de una fuente que ya no está en `Fuente` (ADR 0019).
           yield* fs.makeDirectory(path.dirname(entorno.base), { recursive: true });
           yield* Effect.gen(function* () {
             const sql = yield* SqlClient.SqlClient;
@@ -565,24 +565,34 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
               })}`;
             }
             yield* sql`INSERT INTO puntos ${sql.insert({
-              fuente: "antenasmoviles",
+              fuente: RETIRADA,
               clave: "CATR0228A",
               cuadro: "2,41",
               prioridad: 0,
               detalle_leido_en: null,
               vista_en: NOCHE - DIA,
               retirado_en: null,
-              datos: yield* codificarPunto({
-                clave: "CATR0228A",
-                codigos: ["CATR0228A"],
-                posicion: { longitud: 2.113628, latitud: 41.388344 },
-                huella: "abc",
-                prioridad: 0,
-                detalleLeidoEn: null,
-                observaciones: [],
-                ausencias: 0,
-                retiradoEn: null,
-              }),
+              datos: "{}",
+            })}`;
+            yield* sql`INSERT INTO observaciones ${sql.insert({
+              fuente: RETIRADA,
+              clave: "orange - CATR0228A",
+              ficha_leida_en: NOCHE - DIA,
+              retirada_en: null,
+              cuadro: "2,41",
+              vista_en: NOCHE - DIA,
+              datos: "{}",
+            })}`;
+            yield* sql`INSERT INTO ejecuciones ${sql.insert({
+              fuente: RETIRADA,
+              inicio: NOCHE - DIA,
+              fin: NOCHE - DIA,
+              estado: "omitida",
+              registros: null,
+              cambios: "{}",
+              errores: "[]",
+              publicacion: null,
+              zonas: null,
             })}`;
           }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
 
@@ -592,13 +602,27 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             const [version] = yield* sql<{ readonly user_version: number }>`PRAGMA user_version`;
             const [fallos] = yield* sql<{ readonly n: number }>`SELECT sum(ficha_fallos) AS n
               FROM observaciones`;
-            const puntos = yield* sql<{ readonly clave: string }>`SELECT clave FROM puntos`;
-            return { version: version?.user_version, fallos: fallos?.n, puntos };
+            const tablas = yield* sql<{ readonly name: string }>`SELECT name FROM sqlite_master
+              WHERE type = 'table' AND name = 'puntos'`;
+            const [retiradas] = yield* sql<{ readonly n: number }>`SELECT
+              (SELECT count(*) FROM observaciones WHERE fuente = ${RETIRADA}) +
+              (SELECT count(*) FROM ejecuciones WHERE fuente = ${RETIRADA}) AS n`;
+            const [vigentes] = yield* sql<{ readonly n: number }>`SELECT count(*) AS n
+              FROM observaciones`;
+            return {
+              version: version?.user_version,
+              fallos: fallos?.n,
+              puntos: tablas.length,
+              retiradas: retiradas?.n,
+              vigentes: vigentes?.n,
+            };
           }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
           assert.deepStrictEqual(alDia, {
             version: ESQUEMA.length,
             fallos: 0,
-            puntos: [{ clave: "CATR0228A" }],
+            puntos: 0,
+            retiradas: 0,
+            vigentes: 40,
           });
 
           // La noche pide solo las 30 sin leer, y la que falla queda esperando.

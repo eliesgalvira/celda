@@ -22,7 +22,6 @@ import {
   PARTES_DEL_INDICE,
   type ResumenLeido,
 } from "@celda/dominio/provincias";
-import { capaDePuntosGrabada, muestraAntenasMoviles } from "@celda/ingesta/pruebas/antenasmoviles";
 import { capaGrabada, type FuenteGrabada, muestraCampusNord } from "@celda/ingesta/pruebas/grabado";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
@@ -45,7 +44,7 @@ import {
   publicacionDirecta,
   publicar as publicarInstantanea,
 } from "../src/publicacion";
-import { convexEnMemoria, ejecutar, ejecutarDePuntos } from "./ayudas";
+import { convexEnMemoria, ejecutar } from "./ayudas";
 import * as TestConfect from "./TestConfect";
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
@@ -554,48 +553,6 @@ describe("publicación de la capa y las fichas (Convex en memoria, almacén en c
           assert.strictEqual(Result.getOrUndefined(nueva)?.version, versionDeCapa(NOCHE + 2 * DIA));
         }),
       ),
-  );
-
-  it.effect("tras la ingesta de la comunidad publica sus estados en una versión nueva", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const convex = yield* TestConfect.TestConfect;
-        const llamadas = yield* Ref.make(0);
-        const publicacion = yield* publicacionContada(entorno, llamadas);
-        yield* TestClock.setTime(NOCHE);
-        yield* ejecutar(
-          capaGrabada("registro-oficial", yield* muestraCampusNord),
-          undefined,
-          publicacion,
-        );
-        yield* convex.mutation(refs.internal.ingesta.cambiarInterruptor, {
-          fuente: "antenasmoviles",
-          activo: true,
-          motivo: "prueba",
-        });
-        yield* TestClock.adjust(3_600_000);
-        yield* ejecutarDePuntos(
-          capaDePuntosGrabada(yield* muestraAntenasMoviles),
-          undefined,
-          publicacion,
-        );
-        assert.strictEqual(yield* Ref.get(llamadas), 2);
-
-        const leida = yield* leerVigente(entorno);
-        assert.strictEqual(leida.vigente.version, "sitios@2026-09-26T03:15:00Z");
-        const estadoDe = (clave: string) =>
-          leida.emplazamientos.find((e) => e.clave === clave)?.estado;
-        assert.strictEqual(estadoDe("movistar-0802532"), "corregido");
-        assert.strictEqual(estadoDe("movistar-MV-BCN-82383"), "nuevo");
-        assert.strictEqual(estadoDe("orange-CATR0508Z"), "verificado");
-
-        // La ficha del corregido sale en su lote con el mismo estado que el marcador.
-        const corregido = leida.emplazamientos.find((e) => e.clave === "movistar-0802532");
-        if (corregido === undefined) return assert.fail("falta el corregido");
-        const fichas = yield* fichasDelLote(entorno, leida, corregido);
-        assert.strictEqual(fichas.find((f) => f.clave === "movistar-0802532")?.estado, "corregido");
-      }),
-    ),
   );
 
   it.effect("no pisa un fichero con otro contenido, no cambia la vigente y la ingesta acaba", () =>
