@@ -38,6 +38,7 @@ import {
   trasFicha,
   trasListado,
   trasPunto,
+  trasSinFicha,
 } from "@celda/ingesta/guardado";
 import { PRIORIDAD } from "@celda/ingesta/antenasmoviles/normalizar";
 import { BaseDePuntos } from "@celda/ingesta/barridoDePuntos";
@@ -48,6 +49,7 @@ import {
   ResultadoPublicacion,
 } from "@celda/publicacion/publicar";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -259,6 +261,20 @@ const FilaZona = Schema.Struct({
   aMedias: Schema.Int,
 });
 
+/** Una ficha que espera tras un fallo, para la orden `estado`. */
+export const FichaEnEspera = Schema.Struct({
+  clave: Schema.String,
+  /** Fallos seguidos: el próximo intento es el siguiente. */
+  fallos: Schema.Int,
+  esperaHasta: Schema.Finite,
+  /** El último error, o nulo en una base de antes de apuntarlo. */
+  motivo: Schema.NullOr(Schema.String),
+});
+export type FichaEnEspera = typeof FichaEnEspera.Type;
+
+/** Cuántas fichas espera la orden `estado` enseñar, de las que esperan tras un fallo. */
+export const PRIMERAS_EN_ESPERA = 10;
+
 const FilaPublicacion = Schema.Struct({
   fecha: Schema.Finite,
   resultado: Schema.fromJsonString(ResultadoPublicacion),
@@ -312,6 +328,10 @@ export interface ResumenDeFuente {
   readonly sinLeer: number;
   /** Fichas leídas antes de la fecha de rotación, que se vuelven a leer. */
   readonly porReleer: number;
+  /** Fichas que esperan tras un fallo para volver a pedirse. */
+  readonly enEspera: number;
+  /** Las primeras que se volverán a pedir, como mucho `PRIMERAS_EN_ESPERA`. */
+  readonly primerasEnEspera: ReadonlyArray<FichaEnEspera>;
   /** Las zonas que ha barrido alguna vez, por nombre. */
   readonly zonas: ReadonlyArray<ResumenDeZona>;
   /** En las fuentes que listan puntos, los que no se han retirado. */
@@ -349,7 +369,10 @@ export class BaseNocturna extends Context.Service<
       intento: IntentoDePublicacion,
       ejecuciones: ReadonlyArray<string>,
     ) => Effect.Effect<void>;
-    /** El estado de cada fuente, de los emplazamientos y de lo publicado. */
+    /**
+     * El estado de cada fuente, de los emplazamientos y de lo publicado. Las fichas en espera son
+     * las que esperan a esta hora.
+     */
     readonly resumen: (leidasAntesDe: number) => Effect.Effect<Resumen>;
     /** Una copia coherente de la base en `destino`, que no puede existir (`VACUUM INTO`). */
     readonly copiar: (destino: string) => Effect.Effect<void>;
@@ -677,9 +700,23 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         }, Effect.orDie),
 
         fallarFicha: Effect.fn("BaseNocturna.fallarFicha")(function* (fuente, clave, fallo) {
-          yield* sql`UPDATE observaciones SET ficha_fallos = ${fallo.fallos},
-              ficha_espera_hasta = ${fallo.esperaHasta}, ficha_error = ${fallo.motivo}
-              WHERE fuente = ${fuente} AND clave = ${clave}`;
+          const { sinFichaEnRegistro } = fallo;
+          yield* sql.withTransaction(
+            Effect.gen(function* () {
+              if (sinFichaEnRegistro !== undefined) {
+                const previa = (yield* observacionesDe(fuente, [clave])).get(clave);
+                if (previa !== undefined) {
+                  yield* guardarObservacion(
+                    previa.id,
+                    trasSinFicha(previa.datos, sinFichaEnRegistro),
+                  );
+                }
+              }
+              yield* sql`UPDATE observaciones SET ficha_fallos = ${fallo.fallos},
+                  ficha_espera_hasta = ${fallo.esperaHasta}, ficha_error = ${fallo.motivo}
+                  WHERE fuente = ${fuente} AND clave = ${clave}`;
+            }),
+          );
         }, Effect.orDie),
 
         fusionar: Effect.fn("BaseNocturna.fusionar")(function* (fecha) {
@@ -1129,6 +1166,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         }, Effect.orDie),
 
         resumen: Effect.fn("BaseNocturna.resumen")(function* (leidasAntesDe) {
+          const ahora = yield* Clock.currentTimeMillis;
           const fuentes = yield* Effect.forEach(Fuente.literals, (fuente) =>
             Effect.gen(function* () {
               const [ultima] = yield* decodificar(EjecucionGuardada)(
@@ -1146,6 +1184,17 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 porReleer: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
                     WHERE fuente = ${fuente} AND retirada_en IS NULL
                       AND ficha_leida_en < ${leidasAntesDe}`),
+                enEspera: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
+                    WHERE fuente = ${fuente} AND retirada_en IS NULL
+                      AND ficha_espera_hasta > ${ahora}`),
+                primerasEnEspera: yield* decodificar(FichaEnEspera)(
+                  yield* sql`SELECT clave, ficha_fallos AS fallos,
+                      ficha_espera_hasta AS esperaHasta, ficha_error AS motivo
+                    FROM observaciones
+                    WHERE fuente = ${fuente} AND retirada_en IS NULL
+                      AND ficha_espera_hasta > ${ahora}
+                    ORDER BY ficha_espera_hasta, id LIMIT ${PRIMERAS_EN_ESPERA}`,
+                ),
                 zonas: [...(yield* base.estadoDeZonas(fuente))]
                   .map(([zona, estado]) => ({ zona, ...estado }))
                   .sort((a, b) => compararTexto(a.zona, b.zona)),
