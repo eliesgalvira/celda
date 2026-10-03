@@ -1,6 +1,5 @@
 import type {
   ExpressionSpecification,
-  FilterSpecification,
   LayerSpecification,
   SymbolLayerSpecification,
 } from "maplibre-gl";
@@ -52,37 +51,22 @@ const soloDeEspana = (espana: ContornoDeEspana): ExpressionSpecification => [
 ];
 
 /**
- * La parte del filtro de los lugares que quita los municipios de `nombres`: los que son zona de
- * Celda, con su nombre bajo el hexágono. Los dos nombres se pisarían. Se comparan en minúsculas,
- * porque el mapa base escribe «l'Hospitalet» y el IGN, «L'Hospitalet». Un nombre que no coincide
- * deja los dos rótulos, que es lo menos malo: quitar el del mapa base donde Celda no pone etiqueta
- * dejaría esa parte del mapa sin nombres.
+ * El estado del estilo con los municipios que son zona de Celda, en minúsculas. Los cambia
+ * `quitarRotulosDeMunicipios`; el filtro de las capas de lugares no cambia nunca.
  */
-export const sinLosDeCelda = (nombres: ReadonlyArray<string>): ExpressionSpecification =>
-  nombres.length === 0
-    ? ["literal", true]
-    : [
-        "!",
-        [
-          "in",
-          ["downcase", ["to-string", ["get", "name"]]],
-          ["literal", nombres.map((nombre) => nombre.toLowerCase())],
-        ],
-      ];
+export const MUNICIPIOS_DE_CELDA = "municipiosDeCelda";
 
 /**
- * El filtro de una capa de lugares: lo que rotula la capa y, en este orden, lo que Celda quita.
- * `quitarRotulosDeMunicipios` cambia solo lo segundo.
+ * Lo que quita Celda de las capas de lugares: los municipios que son zona, con su nombre bajo el
+ * hexágono. Los dos nombres se pisarían. Se comparan en minúsculas, porque el mapa base escribe
+ * «l'Hospitalet» y el IGN, «L'Hospitalet». Un nombre que no coincide deja los dos rótulos, que es
+ * lo menos malo: quitar el del mapa base donde Celda no pone etiqueta dejaría esa parte del mapa
+ * sin nombres.
  */
-type FiltroDeLugares = ["all", ExpressionSpecification, ExpressionSpecification];
-
-const filtroDeLugares = (
-  propio: ExpressionSpecification,
-  nombres: ReadonlyArray<string>,
-): FiltroDeLugares => ["all", propio, sinLosDeCelda(nombres)];
-
-const esFiltroDeLugares = (filtro: FilterSpecification | void): filtro is FiltroDeLugares =>
-  Array.isArray(filtro) && filtro[0] === "all" && filtro.length === 3;
+const SIN_LOS_DE_CELDA: ExpressionSpecification = [
+  "!",
+  ["in", ["downcase", ["to-string", ["get", "name"]]], ["global-state", MUNICIPIOS_DE_CELDA]],
+];
 
 /** El rango de capital de OpenMapTiles: 2 la del país, 4 las de comunidad, 6 las de provincia. */
 const CAPITAL: ExpressionSpecification = ["coalesce", ["get", "capital"], 99];
@@ -209,7 +193,7 @@ const capaDeLugares = (
   "source-layer": "place",
   minzoom: capa.desde,
   maxzoom: capa.hasta,
-  filter: filtroDeLugares(["all", soloDeEspana(espana), capa.propio], []),
+  filter: ["all", soloDeEspana(espana), capa.propio, SIN_LOS_DE_CELDA],
   layout: {
     "text-field": ["get", "name"],
     "text-font": [capa.letra],
@@ -423,27 +407,27 @@ export const capasRotulos = (
   ...LUGARES.toReversed().map((capa) => capaDeLugares(fuente, color, espana, capa)),
 ];
 
-/** Lo que hace falta del mapa de MapLibre para cambiar los rótulos de lugar. */
+/** Lo que hace falta del mapa de MapLibre para quitar rótulos de lugar. */
 export interface MapaConRotulos {
   readonly getLayer: (capa: string) => object | undefined;
-  readonly getFilter: (capa: string) => FilterSpecification | void;
-  readonly setFilter: (capa: string, filtro: FilterSpecification) => void;
+  readonly setGlobalStateProperty: (nombre: string, valor: ReadonlyArray<string>) => void;
 }
 
 /**
  * Quita del mapa base los rótulos de lugar de los municipios de `nombres`, en todas las capas de
- * lugares: un municipio puede ser ciudad, pueblo o aldea en OpenStreetMap. Antes de que el estilo
- * tenga sus capas no hace nada: MapLibre no deja cambiar un filtro todavía, y en la vista inicial
- * no hay etiquetas de municipio. No espera a las teselas (`isStyleLoaded` sí).
+ * lugares: un municipio puede ser ciudad, pueblo o aldea en OpenStreetMap. Cambia un estado del
+ * estilo y no los filtros: así no se vuelve a mandar a los workers el contorno de España de cada
+ * capa, que costaba un tercio más de JavaScript por fotograma al acercar (#61). MapLibre no hace
+ * nada si los nombres no cambian. Antes de que el estilo tenga sus capas no hace nada: MapLibre no
+ * deja cambiar el estado todavía, y en la vista inicial no hay etiquetas de municipio.
  */
 export const quitarRotulosDeMunicipios = (
   mapa: MapaConRotulos,
   nombres: ReadonlyArray<string>,
 ): void => {
-  for (const capa of CAPAS_DE_LUGARES) {
-    if (mapa.getLayer(capa) === undefined) continue;
-    const actual = mapa.getFilter(capa);
-    if (!esFiltroDeLugares(actual)) continue;
-    mapa.setFilter(capa, filtroDeLugares(actual[1], nombres));
-  }
+  if (mapa.getLayer(CAPAS_DE_LUGARES[0] ?? "") === undefined) return;
+  mapa.setGlobalStateProperty(
+    MUNICIPIOS_DE_CELDA,
+    nombres.map((nombre) => nombre.toLowerCase()),
+  );
 };

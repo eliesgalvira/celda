@@ -1,6 +1,6 @@
-import type { LayerSpecification, LineLayerSpecification } from "maplibre-gl";
+import type { ExpressionSpecification, LayerSpecification } from "maplibre-gl";
 
-import { alAcercar, deClase, porZoom } from "./expresiones.ts";
+import { deClase, porZoom } from "./expresiones.ts";
 import type { ColorDeToken, TokenMapa } from "./tokens.ts";
 
 /**
@@ -24,17 +24,13 @@ const GROSOR = {
 /** Lo que el borde sobresale del relleno, sumando los dos lados, en píxeles. */
 const BORDE = 1.6;
 
-/** El grosor del borde: el del relleno más `BORDE` en cada parada. */
-const conBorde = (pares: ReadonlyArray<number>): Array<number> =>
-  pares.map((valor, k) => (k % 2 === 0 ? valor : valor + BORDE));
-
 const REDONDO = { "line-cap": "round", "line-join": "round" } as const;
 
 /** Una clase de vía con su relleno y su borde. */
 interface ClaseDeVia {
-  readonly id: string;
-  readonly clases: ReadonlyArray<string>;
-  /** El zoom desde el que sale. */
+  /** La `class` de OpenMapTiles. */
+  readonly clase: string;
+  /** El zoom desde el que sale: un entero, porque se filtra con el zoom de la tesela. */
   readonly desde: number;
   readonly grosor: ReadonlyArray<number>;
   readonly relleno: TokenMapa;
@@ -43,11 +39,21 @@ interface ClaseDeVia {
   readonly bordeDesde: number;
 }
 
-/** De la menos importante a la más: así una autopista se pinta encima de la calle que cruza. */
-const CLASES: ReadonlyArray<ClaseDeVia> = [
+/**
+ * De la menos importante a la más: así una autopista se pinta encima de la calle que cruza. Las
+ * calles peatonales llegan como caminos (`path`) y van como una calle de servicio sin borde.
+ */
+export const CLASES_DE_VIAS: ReadonlyArray<ClaseDeVia> = [
   {
-    id: "servicio",
-    clases: ["service"],
+    clase: "path",
+    desde: 14,
+    grosor: GROSOR.servicio,
+    relleno: "mapa-calle",
+    borde: "mapa-calle-borde",
+    bordeDesde: Infinity,
+  },
+  {
+    clase: "service",
     desde: 14,
     grosor: GROSOR.servicio,
     relleno: "mapa-calle",
@@ -55,8 +61,7 @@ const CLASES: ReadonlyArray<ClaseDeVia> = [
     bordeDesde: 15,
   },
   {
-    id: "calles",
-    clases: ["minor"],
+    clase: "minor",
     desde: 12,
     grosor: GROSOR.calle,
     relleno: "mapa-calle",
@@ -64,8 +69,7 @@ const CLASES: ReadonlyArray<ClaseDeVia> = [
     bordeDesde: 14,
   },
   {
-    id: "terciarias",
-    clases: ["tertiary"],
+    clase: "tertiary",
     desde: 11,
     grosor: GROSOR.terciaria,
     relleno: "mapa-calle",
@@ -73,8 +77,7 @@ const CLASES: ReadonlyArray<ClaseDeVia> = [
     bordeDesde: 12,
   },
   {
-    id: "secundarias",
-    clases: ["secondary"],
+    clase: "secondary",
     desde: 9,
     grosor: GROSOR.secundaria,
     relleno: "mapa-calle",
@@ -82,8 +85,7 @@ const CLASES: ReadonlyArray<ClaseDeVia> = [
     bordeDesde: 11,
   },
   {
-    id: "principales",
-    clases: ["primary"],
+    clase: "primary",
     desde: 7,
     grosor: GROSOR.principal,
     relleno: "mapa-calle",
@@ -91,8 +93,7 @@ const CLASES: ReadonlyArray<ClaseDeVia> = [
     bordeDesde: 10,
   },
   {
-    id: "autovias",
-    clases: ["trunk"],
+    clase: "trunk",
     desde: 5,
     grosor: GROSOR.autovia,
     relleno: "mapa-autovia",
@@ -100,8 +101,7 @@ const CLASES: ReadonlyArray<ClaseDeVia> = [
     bordeDesde: 8.5,
   },
   {
-    id: "autopistas",
-    clases: ["motorway"],
+    clase: "motorway",
     desde: 4,
     grosor: GROSOR.autopista,
     relleno: "mapa-autopista",
@@ -110,35 +110,92 @@ const CLASES: ReadonlyArray<ClaseDeVia> = [
   },
 ];
 
-const borde = (fuente: string, color: ColorDeToken, via: ClaseDeVia): LineLayerSpecification => ({
-  id: `${via.id}-borde`,
-  type: "line",
-  source: fuente,
-  "source-layer": "transportation",
-  minzoom: via.desde,
-  filter: deClase(...via.clases),
-  layout: REDONDO,
-  paint: {
-    "line-color": color(via.borde),
-    "line-width": alAcercar(...conBorde(via.grosor)),
-    "line-opacity": porZoom(via.bordeDesde, 0, via.bordeDesde + 1, 1),
-  },
-});
+/**
+ * El valor en `zoom` de una interpolación exponencial de pares de zoom y valor, como la calcula
+ * MapLibre. Fuera de las paradas, el de la más cercana.
+ */
+export const valorEnZoom = (pares: ReadonlyArray<number>, zoom: number, base: number): number => {
+  const n = pares.length / 2;
+  if (zoom <= (pares[0] ?? 0)) return pares[1] ?? 0;
+  for (let k = 1; k < n; k++) {
+    const z1 = pares[2 * k] ?? 0;
+    if (zoom > z1) continue;
+    const z0 = pares[2 * k - 2] ?? 0;
+    const v0 = pares[2 * k - 1] ?? 0;
+    const v1 = pares[2 * k + 1] ?? 0;
+    const t =
+      base === 1 ? (zoom - z0) / (z1 - z0) : (base ** (zoom - z0) - 1) / (base ** (z1 - z0) - 1);
+    return v0 + t * (v1 - v0);
+  }
+  return pares.at(-1) ?? 0;
+};
 
-const relleno = (fuente: string, color: ColorDeToken, via: ClaseDeVia): LineLayerSpecification => ({
-  id: via.id,
-  type: "line",
-  source: fuente,
-  "source-layer": "transportation",
-  minzoom: via.desde,
-  filter: deClase(...via.clases),
-  layout: REDONDO,
-  paint: { "line-color": color(via.relleno), "line-width": alAcercar(...via.grosor) },
-});
+/** Las paradas de zoom de todas las clases juntas, ordenadas y sin repetir. */
+const paradas = (de: (via: ClaseDeVia) => ReadonlyArray<number>): Array<number> =>
+  [...new Set(CLASES_DE_VIAS.flatMap((via) => de(via).filter((_, k) => k % 2 === 0)))].toSorted(
+    (a, b) => a - b,
+  );
+
+/** Lo que puede dar un caso de un `match`. */
+type Salida = string | number | boolean | ExpressionSpecification;
+
+/** Un valor por clase de vía: el de su `class`, o el de por defecto. */
+const porClase = (valor: (via: ClaseDeVia) => Salida, defecto: Salida): ExpressionSpecification => {
+  const [primera, ...resto] = CLASES_DE_VIAS;
+  return [
+    "match",
+    ["get", "class"],
+    primera?.clase ?? "",
+    primera === undefined ? defecto : valor(primera),
+    ...resto.flatMap((via) => [via.clase, valor(via)]),
+    defecto,
+  ];
+};
 
 /**
- * Las capas de las vías: el tren y los caminos, todos los bordes debajo y los rellenos de la
- * menos importante a la más, para que los cruces no se corten con un borde.
+ * Una propiedad que cambia con el zoom y con la clase: en cada parada de cualquier clase, el valor
+ * de cada una. Así todas las vías van en una sola capa, que MapLibre dibuja de una vez por tesela.
+ */
+const porZoomYClase = (
+  base: number,
+  pares: (via: ClaseDeVia) => ReadonlyArray<number>,
+): ExpressionSpecification => [
+  "interpolate",
+  base === 1 ? ["linear"] : ["exponential", base],
+  ["zoom"],
+  ...paradas(pares).flatMap((zoom) => [
+    zoom,
+    porClase((via) => Math.round(valorEnZoom(pares(via), zoom, base) * 100) / 100, 0),
+  ]),
+];
+
+/** Cada vía, desde el zoom de su clase; los caminos, solo los peatonales. */
+const VIAS: ExpressionSpecification = [
+  "all",
+  ["any", ["!=", ["get", "class"], "path"], ["==", ["get", "subclass"], "pedestrian"]],
+  porClase((via) => [">=", ["zoom"], via.desde], false),
+];
+
+/** El grosor del borde: el del relleno más `BORDE` en cada parada. */
+const conBorde = (pares: ReadonlyArray<number>): Array<number> =>
+  pares.map((valor, k) => (k % 2 === 0 ? valor : valor + BORDE));
+
+/** La opacidad del borde: nada hasta `bordeDesde` y entero un zoom después. */
+const opacidadDelBorde = (via: ClaseDeVia): ReadonlyArray<number> =>
+  Number.isFinite(via.bordeDesde) ? [via.bordeDesde, 0, via.bordeDesde + 1, 1] : [0, 0];
+
+/** La opacidad del relleno: las peatonales entran en medio zoom, como los caminos. */
+const opacidadDelRelleno = (via: ClaseDeVia): ReadonlyArray<number> =>
+  via.clase === "path" ? [14, 0, 14.6, 1] : [0, 1];
+
+/** El orden dentro de la capa: la clase más importante, encima. */
+const ORDEN = porClase((via) => CLASES_DE_VIAS.indexOf(via), 0);
+
+/**
+ * Las capas de las vías: el tren y los caminos, todos los bordes debajo y los rellenos encima, de
+ * la clase menos importante a la más, para que los cruces no se corten con un borde. Bordes y
+ * rellenos van en una capa cada uno, con el color, el grosor y el orden por clase: con una capa
+ * por clase, el mapa gastaba un tercio más de JavaScript por fotograma al acercar (#61).
  */
 export const capasVias = (
   fuente: string,
@@ -167,21 +224,32 @@ export const capasVias = (
       "line-opacity": porZoom(14, 0, 14.6, 1),
     },
   },
-  ...CLASES.map((via) => borde(fuente, color, via)),
   {
-    // Las calles peatonales llegan como caminos (`path`): se pintan como calles, sin borde.
-    id: "peatonales",
+    id: "vias-borde",
     type: "line",
     source: fuente,
     "source-layer": "transportation",
-    minzoom: 14,
-    filter: ["all", deClase("path"), ["==", ["get", "subclass"], "pedestrian"]],
-    layout: REDONDO,
+    minzoom: 4,
+    filter: ["all", VIAS, ["!=", ["get", "class"], "path"]],
+    layout: { ...REDONDO, "line-sort-key": ORDEN },
     paint: {
-      "line-color": color("mapa-calle"),
-      "line-width": alAcercar(...GROSOR.servicio),
-      "line-opacity": porZoom(14, 0, 14.6, 1),
+      "line-color": porClase((via) => color(via.borde), color("mapa-calle-borde")),
+      "line-width": porZoomYClase(1.5, (via) => conBorde(via.grosor)),
+      "line-opacity": porZoomYClase(1, opacidadDelBorde),
     },
   },
-  ...CLASES.map((via) => relleno(fuente, color, via)),
+  {
+    id: "vias",
+    type: "line",
+    source: fuente,
+    "source-layer": "transportation",
+    minzoom: 4,
+    filter: VIAS,
+    layout: { ...REDONDO, "line-sort-key": ORDEN },
+    paint: {
+      "line-color": porClase((via) => color(via.relleno), color("mapa-calle")),
+      "line-width": porZoomYClase(1.5, (via) => via.grosor),
+      "line-opacity": porZoomYClase(1, opacidadDelRelleno),
+    },
+  },
 ];

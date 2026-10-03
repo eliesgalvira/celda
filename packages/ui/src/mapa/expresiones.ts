@@ -16,14 +16,3 @@ export const porZoom = (...pares: ReadonlyArray<number>): ExpressionSpecificatio
   ["zoom"],
   ...pares,
 ];
-
-/**
- * Un valor que crece cada vez más deprisa al acercar, como el ancho real de una calle en la
- * pantalla: pares de zoom y valor.
- */
-export const alAcercar = (...pares: ReadonlyArray<number>): ExpressionSpecification => [
-  "interpolate",
-  ["exponential", 1.5],
-  ["zoom"],
-  ...pares,
-];

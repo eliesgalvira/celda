@@ -3,7 +3,12 @@ import type { StyleSpecification } from "maplibre-gl";
 import { capasCeldas, FUENTE_CELDAS } from "./celdas.ts";
 import { comoRgb, leerOklch } from "./color.ts";
 import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
-import { capasRotulos, type ContornoDeEspana, LETRAS_DE_LEJOS } from "./rotulos.ts";
+import {
+  capasRotulos,
+  type ContornoDeEspana,
+  LETRAS_DE_LEJOS,
+  MUNICIPIOS_DE_CELDA,
+} from "./rotulos.ts";
 import {
   capasServicioDebajo,
   capasServicioEncima,
@@ -56,6 +61,7 @@ export const FUENTE_MAPA_BASE = "openmaptiles";
 export const estiloMapa = (color: ColorDeToken, espana: ContornoDeEspana): StyleSpecification => ({
   version: 8,
   glyphs: GLIFOS,
+  state: { [MUNICIPIOS_DE_CELDA]: { default: [] } },
   sources: {
     [FUENTE_MAPA_BASE]: { type: "vector", url: TILEJSON },
     [FUENTE_CELDAS]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
