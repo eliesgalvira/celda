@@ -12,6 +12,7 @@
   "dependencies": {
     "@confect/core": "catalog:",
     "@confect/server": "catalog:",
+    "@convex-dev/rate-limiter": "catalog:",
     "convex": "catalog:",
     "effect": "catalog:"
   },
