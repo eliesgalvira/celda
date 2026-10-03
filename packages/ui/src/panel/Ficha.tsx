@@ -26,6 +26,8 @@ export interface CabeceraFichaProps {
   readonly companias: ReadonlyArray<Compania>;
   /** Etiquetas junto a los logos, como el estado. */
   readonly etiquetas?: JSX.Element;
+  /** Un botón delante de las etiquetas, como «Ver el edificio» (`BotonEdificio`). */
+  readonly accion?: JSX.Element;
 }
 
 /** La cabecera de la ficha: lo que se ve con la hoja en el resumen. */
@@ -45,7 +47,10 @@ export function CabeceraFicha(props: CabeceraFichaProps) {
             )}
           </For>
         </div>
-        <div class="ml-auto flex flex-wrap items-center gap-2">{props.etiquetas}</div>
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {props.accion}
+          {props.etiquetas}
+        </div>
       </div>
     </header>
   );
