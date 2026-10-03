@@ -316,7 +316,7 @@ export function AreaDeTexto(props: AreaDeTextoProps) {
           {props.etiqueta}
         </label>
         <span class="font-mono text-xs text-tinta-suave">
-          {props.maximo - props.valor.length} de {props.maximo}
+          quedan {props.maximo - props.valor.length}
         </span>
       </div>
       <textarea
