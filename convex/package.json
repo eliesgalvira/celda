@@ -10,6 +10,7 @@
     "test:repetido": "./scripts/pruebas-repetidas.sh"
   },
   "dependencies": {
+    "@celda/dominio": "workspace:*",
     "@confect/core": "catalog:",
     "@confect/server": "catalog:",
     "@convex-dev/rate-limiter": "catalog:",

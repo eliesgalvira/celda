@@ -220,6 +220,9 @@ importers:
 
   convex:
     dependencies:
+      '@celda/dominio':
+        specifier: workspace:*
+        version: link:../packages/dominio
       '@confect/core':
         specifier: 'catalog:'
         version: 10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)

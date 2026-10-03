@@ -8,13 +8,23 @@
  * @module
  */
 
+import type * as buzon from "../buzon.js";
+import type * as crons from "../crons.js";
+import type * as limpieza from "../limpieza.js";
+import type * as moderacion from "../moderacion.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  buzon: typeof buzon;
+  crons: typeof crons;
+  limpieza: typeof limpieza;
+  moderacion: typeof moderacion;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
@@ -42,4 +52,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};
