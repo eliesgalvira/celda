@@ -1,6 +1,6 @@
 # Límites de comunidades y provincias en un fichero propio, servido por la web
 
-Estado: aceptada el 03/10/2026, con las decisiones del usuario del 02/10/2026. Sale del prototipo de la rama desechable `prototipo/mapa-base-ign` (2f5bb80, ajustada en 9d47710; veredicto en `PROTOTIPO.md`, e0b75de). Lo lleva a cabo el ticket de los límites.
+Estado: aceptada el 03/10/2026, con las decisiones del usuario del 02/10/2026. Sale del prototipo de la rama desechable `prototipo/mapa-base-ign` (2f5bb80, ajustada en 9d47710; veredicto en `PROTOTIPO.md`, e0b75de). Lo lleva a cabo el #65.
 
 ## Contexto
 

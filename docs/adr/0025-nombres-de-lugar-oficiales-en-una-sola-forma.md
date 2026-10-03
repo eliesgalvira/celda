@@ -1,6 +1,6 @@
 # Nombres de lugar: el oficial, en una sola forma
 
-Estado: aceptada el 03/10/2026, con las decisiones del usuario del 03/10/2026. Sale del prototipo de la rama desechable `prototipo/mapa-base-ign`, que probó tres reglas antes de esta (9d47710, 54f3339, 944bdf8); la última está en e0b75de y en su `PROTOTIPO.md`. Amplía el párrafo de los topónimos del [ADR 0013](0013-busqueda-de-direcciones-con-nominatim.md). Lo lleva a cabo el ticket de los nombres de lugar.
+Estado: aceptada el 03/10/2026, con las decisiones del usuario del 03/10/2026. Sale del prototipo de la rama desechable `prototipo/mapa-base-ign`, que probó tres reglas antes de esta (9d47710, 54f3339, 944bdf8); la última está en e0b75de y en su `PROTOTIPO.md`. Amplía el párrafo de los topónimos del [ADR 0013](0013-busqueda-de-direcciones-con-nominatim.md). Lo lleva a cabo el #63.
 
 ## Contexto
 

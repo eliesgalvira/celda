@@ -1,6 +1,6 @@
 # Mapa base al estilo de Google Maps, y la foto aérea como función aparte
 
-Estado: aceptada el 03/10/2026, con las decisiones del usuario del 02 y el 03/10/2026. Sale del prototipo de la rama desechable `prototipo/mapa-base-ign`, que no se fusiona; su veredicto está en `PROTOTIPO.md` (e0b75de) y cada punto de abajo cita el commit que lo probó. Sustituye la paleta de piedra cálida del mapa base, que venía del tema (los `--mapa-*` de `tema.css`). Lo llevan a cabo dos tickets: la paleta, los rótulos y los nombres de calle, y la foto aérea.
+Estado: aceptada el 03/10/2026, con las decisiones del usuario del 02 y el 03/10/2026. Sale del prototipo de la rama desechable `prototipo/mapa-base-ign`, que no se fusiona; su veredicto está en `PROTOTIPO.md` (e0b75de) y cada punto de abajo cita el commit que lo probó. Sustituye la paleta de piedra cálida del mapa base, que venía del tema (los `--mapa-*` de `tema.css`). Lo llevan a cabo el #61 (la paleta, los rótulos y los nombres de calle) y el #64 (la foto aérea).
 
 ## Contexto
 
