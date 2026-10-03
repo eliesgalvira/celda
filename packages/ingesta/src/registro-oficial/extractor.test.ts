@@ -14,6 +14,7 @@ import {
   FuenteBloqueada,
   type Registro,
   RespuestaInesperada,
+  SinFichaEnElRegistro,
 } from "../extractor.ts";
 import { leerMuestra } from "../pruebas/grabado.ts";
 import {
@@ -223,34 +224,36 @@ describe("extractor del registro oficial", () => {
     }),
   );
 
-  it.effect("una ficha con el aviso de código no válido es una respuesta inesperada", () =>
-    Effect.gen(function* () {
-      const html = new Uint8Array(yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"));
-      const { salida } = yield* conExtractor(
-        (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 200, cuerpo: html }),
-        (extractor) =>
-          extractor
-            .ficha({
-              clave: "ORANGE ESPAGNE, S.A.U. - CATR0228A",
-              compania: "orange",
-              codigo: "CATR0228A",
-              posicion: { longitud: 2.113628, latitud: 41.388344 },
-              direccion: "PZ EUSEBI GÜELL, 1. BARCELONA, BARCELONA",
-              municipio: "BARCELONA",
+  it.effect(
+    "una ficha con el aviso de código no válido es una estación base sin ficha en el registro",
+    () =>
+      Effect.gen(function* () {
+        const html = new Uint8Array(yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"));
+        const { salida } = yield* conExtractor(
+          (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 200, cuerpo: html }),
+          (extractor) =>
+            extractor
+              .ficha({
+                clave: "ORANGE ESPAGNE, S.A.U. - CATR0228A",
+                compania: "orange",
+                codigo: "CATR0228A",
+                posicion: { longitud: 2.113628, latitud: 41.388344 },
+                direccion: "PZ EUSEBI GÜELL, 1. BARCELONA, BARCELONA",
+                municipio: "BARCELONA",
+                url: "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR0228A",
+              })
+              .pipe(Effect.flip),
+        );
+        assert.deepStrictEqual(
+          salida,
+          Exit.succeed(
+            new SinFichaEnElRegistro({
               url: "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR0228A",
-            })
-            .pipe(Effect.flip),
-      );
-      assert.deepStrictEqual(
-        salida,
-        Exit.succeed(
-          new RespuestaInesperada({
-            url: "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=CATR0228A",
-            motivo: "La ficha dice «Código de emplazamiento no válido»",
-          }),
-        ),
-      );
-    }).pipe(Effect.provide(NodeServices.layer)),
+              motivo: "La ficha dice «Código de emplazamiento no válido»",
+            }),
+          ),
+        );
+      }).pipe(Effect.provide(NodeServices.layer)),
   );
 });
 

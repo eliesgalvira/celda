@@ -7,6 +7,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Ref from "effect/Ref";
 
 import type { OpcionesCliente } from "./cliente.ts";
@@ -236,6 +237,11 @@ const leerContraElGeoportal = (
   Effect.gen(function* () {
     const peticiones = yield* Ref.make<ReadonlyArray<Peticion>>([]);
     const apuntado = yield* Ref.make<Apuntado>({ leidas: [], fallos: [], aMitad: [] });
+    // Las líneas de aviso del diario.
+    const avisos: Array<string> = [];
+    const diario = Logger.make(({ logLevel, message }) => {
+      if (logLevel === "Warn") avisos.push([message].flat().join(" "));
+    });
     const cliente: OpcionesCliente = opcionesClienteDeFichas(OPCIONES, opciones);
     const fibra = yield* Effect.gen(function* () {
       const extractor = yield* ExtractorPorCajas;
@@ -262,6 +268,7 @@ const leerContraElGeoportal = (
           Layer.provide(clienteDePrueba(peticiones, responder, latencia)),
         ),
       ),
+      Effect.provide(Logger.layer([diario])),
       Effect.forkChild,
     );
     const hechas = yield* esperarConReloj(fibra, segundos);
@@ -269,6 +276,7 @@ const leerContraElGeoportal = (
       hechas,
       peticiones: (yield* Ref.get(peticiones)).filter((p) => p.ruta !== "/robots.txt"),
       apuntado: yield* Ref.get(apuntado),
+      avisos,
     };
   });
 
@@ -514,53 +522,106 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("tres fichas ilegibles seguidas paran la noche, y cada una espera un día", () =>
+  it.effect(
+    "tres fichas sin ficha en el registro seguidas paran la noche, y cada una espera un día",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* fichaGrabada;
+        const noValido = new Uint8Array(
+          yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"),
+        );
+        const malas = new Set(["800001", "800003", "800004", "800005"]);
+        const { hechas, apuntado, avisos } = yield* leerContraElGeoportal(
+          colaDe(10).map((f) =>
+            f.registro.codigo === "800003" ? { ...f, fallos: 2, leidaEn: null } : f,
+          ),
+          geoportal(html, (codigo) =>
+            malas.has(codigo) ? () => ({ estado: 200, cuerpo: noValido }) : undefined,
+          ),
+          A_UN_SEGUNDO,
+        );
+        // 800001 falla y 800002 se lee: el fallo no era seguido. 800003, 800004 y 800005, sí.
+        assert.strictEqual(hechas.leidas, 2);
+        assert.strictEqual(hechas.pendientes, 4);
+        assert.strictEqual(hechas.parada, "3 fallos seguidos");
+        const motivo = "SinFichaEnElRegistro: La ficha dice «Código de emplazamiento no válido»";
+        assert.deepStrictEqual(
+          hechas.fallidas.map((f) => [f.clave.slice(-6), f.motivo, f.intento]),
+          [
+            ["800001", motivo, 1],
+            ["800003", motivo, 3],
+            ["800004", motivo, 1],
+            ["800005", motivo, 1],
+          ],
+        );
+        // Los errores de la ejecución nombran cada ficha con su motivo.
+        assert.strictEqual(hechas.errores.length, 5);
+        assert.strictEqual(
+          hechas.errores[0],
+          `Ficha TELEFONICA MOVILES ESPAÑA, S.A.U. - 800001: ${motivo} ` +
+            "(https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=800001)",
+        );
+        assert.strictEqual(
+          hechas.errores.at(-1),
+          "Fichas paradas hasta la próxima noche: 3 fallos seguidos",
+        );
+        assert.deepStrictEqual(
+          apuntado.fallos.map(([clave, fallo]) => [
+            clave.slice(-6),
+            fallo.fallos,
+            fallo.sinFichaEnRegistro,
+          ]),
+          [
+            ["800001", 1, 0],
+            ["800003", 3, 0],
+            ["800004", 1, 0],
+            ["800005", 1, 0],
+          ],
+        );
+        for (const [, fallo] of apuntado.fallos) {
+          assert.include(fallo.motivo, "Código de emplazamiento no válido");
+        }
+        // Una línea de aviso en el diario por ficha, con su clave, su URL, el motivo, el intento
+        // y cuándo se vuelve a pedir: un día después la primera vez, cuatro a la tercera.
+        assert.strictEqual(avisos.length, 4);
+        assert.match(
+          avisos[0] ?? "",
+          /^Ficha fallida, intento 1: TELEFONICA MOVILES ESPAÑA, S\.A\.U\. - 800001 \(https:\/\/geoportal\.minetur\.gob\.es\/VCTEL\/detalleEstacion\.do\?emplazamiento=800001\): SinFichaEnElRegistro: La ficha dice «Código de emplazamiento no válido»; se vuelve a pedir desde 1970-01-02 00:00:0\d UTC$/u,
+        );
+        assert.match(avisos[1] ?? "", /intento 3: .* - 800003 .*desde 1970-01-05 00:00:\d\d UTC$/u);
+        // Cada una espera un día desde que falló.
+        const [primero] = apuntado.fallos;
+        assert.isDefined(primero);
+        assert.isAtLeast(primero[1].esperaHasta, DIA);
+        assert.isBelow(primero[1].esperaHasta, DIA + 60_000);
+      }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("una ficha ilegible espera, pero no se da por sin ficha en el registro", () =>
     Effect.gen(function* () {
       const html = yield* fichaGrabada;
-      const noValido = new Uint8Array(
-        yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"),
-      );
-      const malas = new Set(["800001", "800003", "800004", "800005"]);
-      const { hechas, apuntado } = yield* leerContraElGeoportal(
-        colaDe(10),
+      const { hechas, apuntado, avisos } = yield* leerContraElGeoportal(
+        colaDe(3),
         geoportal(html, (codigo) =>
-          malas.has(codigo) ? () => ({ estado: 200, cuerpo: noValido }) : undefined,
+          codigo === "800001"
+            ? () => ({ estado: 200, cuerpo: "<table id=tablaDetalleEstacion></table>" })
+            : undefined,
         ),
         A_UN_SEGUNDO,
       );
-      // 800001 falla y 800002 se lee: el fallo no era seguido. 800003, 800004 y 800005, sí.
       assert.strictEqual(hechas.leidas, 2);
-      assert.strictEqual(hechas.fallidas, 4);
-      assert.strictEqual(hechas.pendientes, 4);
-      assert.strictEqual(hechas.parada, "3 fallos seguidos");
-      assert.strictEqual(hechas.errores.length, 5);
-      assert.strictEqual(
-        hechas.errores.at(-1),
-        "Fichas paradas hasta la próxima noche: 3 fallos seguidos",
-      );
       assert.deepStrictEqual(
-        apuntado.fallos.map(([clave, fallo]) => [clave.slice(-6), fallo.fallos]),
-        [
-          ["800001", 1],
-          ["800003", 1],
-          ["800004", 1],
-          ["800005", 1],
-        ],
+        apuntado.fallos.map(([clave, fallo]) => [clave.slice(-6), fallo.sinFichaEnRegistro]),
+        [["800001", undefined]],
       );
-      for (const [, fallo] of apuntado.fallos) {
-        assert.include(fallo.motivo, "Código de emplazamiento no válido");
-      }
-      // Cada una espera un día desde que falló.
-      const [primero] = apuntado.fallos;
-      assert.isDefined(primero);
-      assert.isAtLeast(primero[1].esperaHasta, DIA);
-      assert.isBelow(primero[1].esperaHasta, DIA + 60_000);
+      assert.lengthOf(avisos, 1);
+      assert.include(avisos[0] ?? "", "RespuestaInesperada: La ficha no tiene la tabla");
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
   it.effect("una fuente que no responde cuenta como fallo, pero no hace esperar a la ficha", () =>
     Effect.gen(function* () {
-      const { hechas, peticiones, apuntado } = yield* leerContraElGeoportal(
+      const { hechas, peticiones, apuntado, avisos } = yield* leerContraElGeoportal(
         colaDe(5),
         (url) => (url.pathname === "/robots.txt" ? NO_HAY_ROBOTS : { estado: 503, cuerpo: "" }),
         A_UN_SEGUNDO,
@@ -569,6 +630,16 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
       assert.strictEqual(peticiones.length, 3 * (1 + OPCIONES.reintentos));
       assert.strictEqual(hechas.parada, "3 fallos seguidos");
       assert.deepStrictEqual(apuntado.fallos, []);
+      // Cada una deja su línea en el diario, aunque no apunte espera.
+      assert.lengthOf(avisos, 3);
+      assert.match(
+        avisos[0] ?? "",
+        /^Ficha fallida, intento 1: .* - 800000 \(https:.*\): FuenteNoDisponible: .*; no espera: vuelve a la cola la noche siguiente$/u,
+      );
+      assert.deepStrictEqual(
+        hechas.fallidas.map((f) => f.esperaHasta),
+        [undefined, undefined, undefined],
+      );
     }),
   );
 

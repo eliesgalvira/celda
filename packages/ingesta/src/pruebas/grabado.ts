@@ -9,14 +9,17 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 import {
+  type ErrorDeExtractor,
   Extractor,
   ExtractorPorCajas,
   type Listado,
   type ListadoDeCaja,
   type Registro,
   RespuestaInesperada,
+  SinFichaEnElRegistro,
 } from "../extractor.ts";
 import {
+  AVISO_SIN_FICHA,
   bandasDeFicha,
   bandasDeFilas,
   listadoDeElementos,
@@ -31,6 +34,11 @@ import { type Caja, enCaja } from "../zona.ts";
 export interface FuenteGrabada {
   readonly listado: Listado;
   readonly fichas: ReadonlyMap<string, ReadonlyArray<Banda>>;
+  /**
+   * Claves cuya ficha dice «Código de emplazamiento no válido», como la de `061723` de Vodafone
+   * y la de `CLMR6422A` de Orange el 02/10/2026: el registro no tiene su ficha, aunque las liste.
+   */
+  readonly sinFicha?: ReadonlySet<string>;
 }
 
 /**
@@ -48,12 +56,17 @@ export const capaGrabada = (fuente: Fuente, grabada: FuenteGrabada): Layer.Layer
     }),
   );
 
-const fichaGrabada = (grabada: FuenteGrabada) => (registro: Registro) => {
-  const bandas = grabada.fichas.get(registro.clave);
-  return bandas === undefined
-    ? Effect.fail(new RespuestaInesperada({ url: registro.url, motivo: "ficha no grabada" }))
-    : Effect.succeed(bandas);
-};
+const fichaGrabada =
+  (grabada: FuenteGrabada) =>
+  (registro: Registro): Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor> => {
+    if (grabada.sinFicha?.has(registro.clave) === true) {
+      return Effect.fail(new SinFichaEnElRegistro({ url: registro.url, motivo: AVISO_SIN_FICHA }));
+    }
+    const bandas = grabada.fichas.get(registro.clave);
+    return bandas === undefined
+      ? Effect.fail(new RespuestaInesperada({ url: registro.url, motivo: "ficha no grabada" }))
+      : Effect.succeed(bandas);
+  };
 
 /** Bytes por registro en el listado del registro oficial (investigación 08). */
 const BYTES_POR_REGISTRO = 617;

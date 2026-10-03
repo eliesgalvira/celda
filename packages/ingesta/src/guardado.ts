@@ -78,17 +78,25 @@ export const trasListado = (
   if (igual && previa.ausencias === 0 && previa.retiradaEn === null) {
     return { guardar: undefined, cuenta: undefined };
   }
+  const guardada: ObservacionGuardada = {
+    ...previa,
+    ...registroDe(registro),
+    fecha: igual ? previa.fecha : fecha,
+    fichaLeidaEn: igual ? previa.fichaLeidaEn : null,
+    ausencias: 0,
+    retiradaEn: null,
+  };
   return {
-    guardar: {
-      ...previa,
-      ...registroDe(registro),
-      fecha: igual ? previa.fecha : fecha,
-      fichaLeidaEn: igual ? previa.fichaLeidaEn : null,
-      ausencias: 0,
-      retiradaEn: null,
-    },
+    // Con otro listado la ficha vuelve a estar pendiente, aunque el registro no la tuviera.
+    guardar: igual ? guardada : conFicha(guardada),
     cuenta: !igual || previa.retiradaEn !== null ? "cambiada" : undefined,
   };
+};
+
+/** La observación sin la marca de sin ficha en el registro. */
+const conFicha = (o: ObservacionGuardada): ObservacionGuardada => {
+  const { sinFichaEnRegistro: _sinFicha, ...resto } = o;
+  return resto;
 };
 
 /** La observación tras leer su ficha, y si han cambiado sus bandas. */
@@ -105,7 +113,8 @@ export interface TrasAusencia {
 
 /**
  * La observación tras leer su ficha en una ejecución con fecha `fecha`. La fecha de la
- * observación solo cambia si cambian las bandas; la de lectura, siempre.
+ * observación solo cambia si cambian las bandas; la de lectura, siempre. Una lectura buena quita
+ * la marca de sin ficha en el registro, y eso también cuenta como cambio.
  */
 export const trasFicha = (
   previa: ObservacionGuardada,
@@ -114,10 +123,25 @@ export const trasFicha = (
 ): TrasFicha => {
   const iguales = mismasBandas(previa.bandas, bandas);
   return {
-    guardada: { ...previa, bandas, fecha: iguales ? previa.fecha : fecha, fichaLeidaEn: fecha },
-    cambiada: !iguales,
+    guardada: conFicha({
+      ...previa,
+      bandas,
+      fecha: iguales ? previa.fecha : fecha,
+      fichaLeidaEn: fecha,
+    }),
+    cambiada: !iguales || previa.sinFichaEnRegistro !== undefined,
   };
 };
+
+/**
+ * La observación cuando el registro dice que no tiene su ficha («Código de emplazamiento no
+ * válido»), comprobado en una ejecución con fecha `fecha`. Sus bandas y su fecha no cambian, y la
+ * ficha sigue en la cola: se vuelve a pedir con la espera de cualquier fallo (`ESPERA_TRAS_FALLO`).
+ */
+export const trasSinFicha = (previa: ObservacionGuardada, fecha: number): ObservacionGuardada => ({
+  ...previa,
+  sinFichaEnRegistro: fecha,
+});
 
 /**
  * La observación tras un barrido completo que no la ha visto, en una ejecución con fecha
@@ -131,19 +155,23 @@ export const trasAusencia = (previa: ObservacionGuardada, fecha: number): TrasAu
 };
 
 /** Lo que la fusión necesita de una observación guardada. */
-export const observacionDe = (o: ObservacionGuardada): Observacion => ({
-  fuente: o.fuente,
-  clave: o.clave,
-  compania: o.compania,
-  codigo: o.codigo,
-  posicion: o.posicion,
-  direccion: o.direccion,
-  municipio: o.municipio,
-  bandas: o.bandas,
-  url: o.url,
-  fecha: o.fecha,
-  afirma: o.afirma,
-});
+export const observacionDe = (o: ObservacionGuardada): Observacion => {
+  const observacion: Observacion = {
+    fuente: o.fuente,
+    clave: o.clave,
+    compania: o.compania,
+    codigo: o.codigo,
+    posicion: o.posicion,
+    direccion: o.direccion,
+    municipio: o.municipio,
+    bandas: o.bandas,
+    url: o.url,
+    fecha: o.fecha,
+    afirma: o.afirma,
+  };
+  const { sinFichaEnRegistro } = o;
+  return sinFichaEnRegistro === undefined ? observacion : { ...observacion, sinFichaEnRegistro };
+};
 
 /**
  * Un punto del listado de una fuente que agrupa estaciones base, tal como lo guarda la ingesta
