@@ -24,10 +24,11 @@ import {
  *
  * En los niveles de municipios, los emplazamientos de una provincia cubierta se recogen por
  * municipio, con su nombre, su número y, si tiene 10 o más, sus ausencias (ADR 0017), pero solo los
- * municipios que en ese nivel son zona (`zonasDeMunicipios`). En el nivel de barrios, los de
- * Barcelona se recogen por barrio. El resto siguen sueltos o agrupados en hexágonos. Las
- * transiciones que entran o salen de esos niveles se calculan por los emplazamientos que recoge
- * cada elemento: cada uno va al elemento que se queda con la mayoría de los suyos.
+ * municipios que en ese nivel son zona (`zonasDeMunicipios`). Las ausencias se calculan, pero el
+ * mapa no las dibuja (ADR 0024). En el nivel de barrios, los de Barcelona se recogen por barrio.
+ * El resto siguen sueltos o agrupados en hexágonos. Las transiciones que entran o salen de esos
+ * niveles se calculan por los emplazamientos que recoge cada elemento: cada uno va al elemento que
+ * se queda con la mayoría de los suyos.
  */
 
 /** Tope de pasos al bajar por la jerarquía en un salto de muchos niveles. */
