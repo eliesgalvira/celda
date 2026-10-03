@@ -467,8 +467,12 @@ describe("punto de referencia: punto elegido", () => {
       assert.lengthOf(almacen.guardadas(), 1);
     });
     const [guardado] = almacen.guardadas();
+    assert.strictEqual(guardado?.tipo, "punto-elegido");
     assert.strictEqual(guardado?.origen, "busqueda");
-    assert.deepStrictEqual(guardado?.posicion, SAGRADA_FAMILIA.posicion);
+    assert.deepStrictEqual(
+      guardado?.tipo === "punto-elegido" ? guardado.posicion : undefined,
+      SAGRADA_FAMILIA.posicion,
+    );
     assert.deepStrictEqual(buscador.consultas(), ["Sagrada Familia"]);
     // Elegir cierra la elección.
     assert.isNull(queryByRole("region", { name: "Elige un punto" }));
@@ -534,7 +538,11 @@ describe("punto de referencia: buscar una dirección en toda España", () => {
     await waitFor(() => {
       assert.lengthOf(almacen.guardadas(), 1);
     });
-    assert.deepStrictEqual(almacen.guardadas()[0]?.posicion, PLAZAS_MAYORES[1]?.posicion);
+    const [elegido] = almacen.guardadas();
+    assert.deepStrictEqual(
+      elegido?.tipo === "punto-elegido" ? elegido.posicion : undefined,
+      PLAZAS_MAYORES[1]?.posicion,
+    );
   });
 
   it("elegir un sitio lejos de los emplazamientos de la capa dice que ahí aún no hay datos", async () => {

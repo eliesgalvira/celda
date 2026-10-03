@@ -2,6 +2,10 @@
   "name": "@celda/convex",
   "private": true,
   "type": "module",
+  "exports": {
+    "./refs": "./confect/_generated/refs.ts",
+    "./buzon": "./confect/buzon.spec.ts"
+  },
   "scripts": {
     "codegen": "./scripts/codegen.sh",
     "backend": "./scripts/backend.sh",

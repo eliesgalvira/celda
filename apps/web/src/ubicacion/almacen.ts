@@ -32,37 +32,69 @@ export class AlmacenLocal extends Context.Service<
     ) => Effect.Effect<ReadonlyArray<Aportacion>, AlmacenNoDisponible>;
     /** Guarda una aportación en lugar de las que hubiera de su tipo, todo de una vez. */
     readonly sustituir: (aportacion: Aportacion) => Effect.Effect<void, AlmacenNoDisponible>;
+    /**
+     * Guarda una aportación junto a las demás de su tipo. Si ya hay una con su identificador, la
+     * sustituye.
+     */
+    readonly guardar: (aportacion: Aportacion) => Effect.Effect<void, AlmacenNoDisponible>;
     /** Borra todas las aportaciones de un tipo. */
     readonly borrar: (tipo: TipoAportacion) => Effect.Effect<void, AlmacenNoDisponible>;
     /** Los ajustes guardados, o los iniciales si nunca se ha guardado ninguno. */
     readonly leerAjustes: Effect.Effect<Ajustes, AlmacenNoDisponible>;
     readonly guardarAjustes: (ajustes: Ajustes) => Effect.Effect<void, AlmacenNoDisponible>;
+    /**
+     * Cuándo se compartió cada aportación, por su identificador (ADR 0007): lo apunta
+     * `Sincronizacion` cuando el buzón la recibe.
+     */
+    readonly leerCompartidas: Effect.Effect<ReadonlyMap<string, number>, AlmacenNoDisponible>;
+    readonly apuntarCompartida: (
+      id: string,
+      compartidaEl: number,
+    ) => Effect.Effect<void, AlmacenNoDisponible>;
+    /** El token de la identidad anónima que el buzón dio a este dispositivo, si ya tiene. */
+    readonly leerIdentidad: Effect.Effect<Option.Option<string>, AlmacenNoDisponible>;
+    /** Guarda el token de la identidad, o lo olvida con `None` (el buzón ya no lo reconoce). */
+    readonly guardarIdentidad: (
+      identidad: Option.Option<string>,
+    ) => Effect.Effect<void, AlmacenNoDisponible>;
   }
 >()("@celda/web/ubicacion/almacen/AlmacenLocal") {}
 
 const BASE = "celda";
-/** La 2 añade el almacén de ajustes; las aportaciones de la 1 siguen donde estaban. */
-const VERSION_BASE = 2;
+/**
+ * La 2 añade el almacén de ajustes y la 3 el del buzón; las aportaciones de la 1 siguen donde
+ * estaban.
+ */
+const VERSION_BASE = 3;
 const APORTACIONES = "aportaciones";
 const POR_TIPO = "tipo";
 const AJUSTES = "ajustes";
 /** Clave de la única fila de ajustes: son del dispositivo, no de una persona. */
 const DEL_DISPOSITIVO = "dispositivo";
+/**
+ * Lo que el dispositivo sabe del buzón: el token de su identidad (clave `identidad`) y cuándo se
+ * compartió cada aportación (clave `compartida:<id>`, con la fecha).
+ */
+const BUZON = "buzon";
+const IDENTIDAD = "identidad";
+const COMPARTIDA = "compartida:";
 
 const leerAportacion = Schema.decodeUnknownOption(Aportacion);
 const leerAjustesGuardados = Schema.decodeUnknownOption(Ajustes);
+const leerToken = Schema.decodeUnknownOption(Schema.String);
+const leerFecha = Schema.decodeUnknownOption(Schema.Finite);
 
 /**
  * Una aportación nueva con su identificador y su fecha de creación. Sin números aleatorios
  * seguros no se crea nada: es un defecto del navegador, no algo que se pueda arreglar aquí.
  */
-export const nuevaAportacion = Effect.fn("AlmacenLocal.nuevaAportacion")(function* (
-  contenido: ContenidoAportacion,
-) {
+export const nuevaAportacion = Effect.fn("AlmacenLocal.nuevaAportacion")(function* <
+  Contenido extends ContenidoAportacion,
+>(contenido: Contenido) {
   const crypto = yield* Crypto.Crypto;
   const id = yield* Effect.orDie(crypto.randomUUIDv4);
   const creada = yield* Clock.currentTimeMillis;
-  return { ...contenido, id, creada } satisfies Aportacion;
+  return { ...contenido, id, creada };
 });
 
 /** Las aportaciones leídas que este código entiende. Las demás (de otra versión) se dejan estar. */
@@ -89,6 +121,7 @@ const abrir = (fabrica: IDBFactory): Effect.Effect<IDBDatabase, AlmacenNoDisponi
         base.createObjectStore(APORTACIONES, { keyPath: "id" }).createIndex(POR_TIPO, "tipo");
       }
       if (!base.objectStoreNames.contains(AJUSTES)) base.createObjectStore(AJUSTES);
+      if (!base.objectStoreNames.contains(BUZON)) base.createObjectStore(BUZON);
     });
     peticion.addEventListener("success", () => reanudar(Effect.succeed(peticion.result)));
     peticion.addEventListener("error", () =>
@@ -109,7 +142,7 @@ const transaccion = <A>(
   base: IDBDatabase,
   modo: IDBTransactionMode,
   hacer: (almacen: IDBObjectStore) => () => A,
-  almacen: typeof APORTACIONES | typeof AJUSTES = APORTACIONES,
+  almacen: typeof APORTACIONES | typeof AJUSTES | typeof BUZON = APORTACIONES,
 ): Effect.Effect<A, AlmacenNoDisponible> =>
   Effect.callback<A, AlmacenNoDisponible>((reanudar) => {
     const tx = base.transaction(almacen, modo);
@@ -199,6 +232,96 @@ export const almacenEnIndexedDb = (fabrica: IDBFactory | undefined): Layer.Layer
         );
       });
 
-      return AlmacenLocal.of({ leer, sustituir, borrar, leerAjustes, guardarAjustes });
+      const guardar = Effect.fn("AlmacenLocal.guardar")(function* (nueva: Aportacion) {
+        const abierta = yield* base;
+        yield* transaccion(abierta, "readwrite", (almacen) => {
+          almacen.put(nueva);
+          return () => undefined;
+        });
+      });
+
+      const leerCompartidas = Effect.gen(function* () {
+        const abierta = yield* base;
+        return yield* transaccion(
+          abierta,
+          "readonly",
+          (almacen) => {
+            // El almacén es pequeño (una fila por aportación compartida y la identidad): se lee
+            // entero y se quedan las compartidas.
+            const claves = almacen.getAllKeys();
+            const valores = almacen.getAll();
+            return (): ReadonlyMap<string, number> =>
+              new Map(
+                claves.result.flatMap((clave, i) => {
+                  const texto = String(clave);
+                  if (!texto.startsWith(COMPARTIDA)) return [];
+                  return Option.match(leerFecha(valores.result[i]), {
+                    onNone: () => [],
+                    onSome: (fecha) => [[texto.slice(COMPARTIDA.length), fecha] as const],
+                  });
+                }),
+              );
+          },
+          BUZON,
+        );
+      }).pipe(Effect.withSpan("AlmacenLocal.leerCompartidas"));
+
+      const apuntarCompartida = Effect.fn("AlmacenLocal.apuntarCompartida")(function* (
+        id: string,
+        compartidaEl: number,
+      ) {
+        const abierta = yield* base;
+        yield* transaccion(
+          abierta,
+          "readwrite",
+          (almacen) => {
+            almacen.put(compartidaEl, `${COMPARTIDA}${id}`);
+            return () => undefined;
+          },
+          BUZON,
+        );
+      });
+
+      const leerIdentidad = Effect.gen(function* () {
+        const abierta = yield* base;
+        return yield* transaccion(
+          abierta,
+          "readonly",
+          (almacen) => {
+            const peticion = almacen.get(IDENTIDAD);
+            return () => leerToken(peticion.result);
+          },
+          BUZON,
+        );
+      }).pipe(Effect.withSpan("AlmacenLocal.leerIdentidad"));
+
+      const guardarIdentidad = Effect.fn("AlmacenLocal.guardarIdentidad")(function* (
+        identidad: Option.Option<string>,
+      ) {
+        const abierta = yield* base;
+        yield* transaccion(
+          abierta,
+          "readwrite",
+          (almacen) => {
+            if (Option.isSome(identidad)) almacen.put(identidad.value, IDENTIDAD);
+            else almacen.delete(IDENTIDAD);
+            return () => undefined;
+          },
+          BUZON,
+        );
+      });
+
+      return AlmacenLocal.of({
+        leer,
+        sustituir,
+        guardar,
+        borrar,
+        leerAjustes,
+        guardarAjustes,
+        leerCompartidas,
+        apuntarCompartida,
+        leerIdentidad,
+        guardarIdentidad,
+      });
     }),
   );

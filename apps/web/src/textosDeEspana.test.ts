@@ -38,6 +38,17 @@ interface Justificado {
 /** Donde «Barcelona» es un dato que solo tiene Barcelona, o no llega a la interfaz. */
 const JUSTIFICADOS: ReadonlyArray<Justificado> = [
   {
+    fichero: "packages/dominio/src/licencias.ts",
+    texto: "Barrios de Barcelona (Open Data BCN)",
+    motivo:
+      "los límites de barrio son del Ayuntamiento de Barcelona y su crédito lo pide (ADR 0021)",
+  },
+  {
+    fichero: "packages/dominio/src/licencias.ts",
+    texto: "Ajuntament de Barcelona",
+    motivo: "es el crédito literal de los límites de barrio (ADR 0021)",
+  },
+  {
     fichero: "apps/web/src/ejercicio/estado.ts",
     texto: "Barrio de Barcelona",
     motivo: "los barrios del ejercicio son solo los de Barcelona",

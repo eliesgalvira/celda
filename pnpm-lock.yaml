@@ -162,6 +162,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@celda/convex':
+        specifier: workspace:*
+        version: link:../../convex
       '@celda/dominio':
         specifier: workspace:*
         version: link:../../packages/dominio
@@ -171,9 +174,15 @@ importers:
       '@celda/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@confect/core':
+        specifier: 'catalog:'
+        version: 10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)
       '@solidjs/web':
         specifier: 'catalog:'
         version: 2.0.0-rc.9(solid-js@2.0.0-rc.9)
+      convex:
+        specifier: 'catalog:'
+        version: 1.46.0
       effect:
         specifier: 'catalog:'
         version: 4.0.0-rc.117
