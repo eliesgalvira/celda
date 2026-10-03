@@ -1,14 +1,20 @@
 import type {
   DataDrivenPropertyValueSpecification,
+  ExpressionSpecification,
   FilterSpecification,
   LayerSpecification,
 } from "maplibre-gl";
+
+import { conFoto } from "./expresiones.ts";
 
 /**
  * Cómo se dibujan las celdas en el mapa, como en el prototipo v8: un trazo fino del color primario
  * para todas y, al seleccionar un emplazamiento, su celda remarcada y las demás casi invisibles,
  * para que no se amontonen líneas alrededor de la que importa. El relleno de la seleccionada es el
  * degradado de `servicio.ts`.
+ *
+ * Sobre la foto aérea un trazo de 1 px del color primario se pierde: las líneas suben de opacidad
+ * y llevan debajo un casco claro, de 3 px las de todas y de 5 px el de la seleccionada.
  */
 
 /** La fuente GeoJSON de las celdas. Cada polígono lleva la `clave` de su emplazamiento. */
@@ -28,11 +34,22 @@ const CAPA_BORDES = "celdas";
 const CAPA_SELECCIONADA = "celda-seleccionada";
 /** El contorno discontinuo de la seleccionada, que la sustituye con la vista de interferencia. */
 const CAPA_SELECCIONADA_CONTORNO = "celda-seleccionada-contorno";
+/** Los cascos claros, que solo se ven sobre la foto aérea. */
+const CAPA_CASCO = "celdas-casco";
+const CAPA_SELECCIONADA_CASCO = "celda-seleccionada-casco";
 
-/** Opacidad de las líneas de todas las celdas, sin selección y con ella. */
-const OPACIDAD_BORDES = { normal: 0.45, apagada: 0.14 } as const;
+/**
+ * Opacidad de las líneas de todas las celdas, sin selección y con ella, y de su casco. Sin la foto
+ * el casco no se ve.
+ */
+const OPACIDAD_BORDES = {
+  normal: { bordes: conFoto(0.45, 0.85), casco: conFoto(0, 0.5) },
+  apagada: { bordes: conFoto(0.14, 0.22), casco: conFoto(0, 0.12) },
+} as const;
 
-const conFundido = (opacidad: number): DataDrivenPropertyValueSpecification<number> => [
+const conFundido = (
+  opacidad: number | ExpressionSpecification,
+): DataDrivenPropertyValueSpecification<number> => [
   "interpolate",
   ["linear"],
   ["zoom"],
@@ -49,10 +66,26 @@ const deLaCelda = (clave: string | null): FilterSpecification => [
 ];
 
 /**
- * Las capas de las celdas, con el color que les da el tema. Van por debajo de los nombres de las
- * calles, que se siguen leyendo encima de las líneas.
+ * Las capas de las celdas, con el color que les da el tema y el del casco claro que llevan sobre
+ * la foto aérea. Van por debajo de los nombres de las calles, que se siguen leyendo encima de las
+ * líneas.
  */
-export const capasCeldas = (color: string): ReadonlyArray<LayerSpecification> => [
+export const capasCeldas = (
+  color: string,
+  colorCasco: string,
+): ReadonlyArray<LayerSpecification> => [
+  {
+    id: CAPA_CASCO,
+    type: "line",
+    source: FUENTE_CELDAS,
+    minzoom: ZOOM_CELDAS,
+    layout: { "line-join": "round" },
+    paint: {
+      "line-color": colorCasco,
+      "line-width": 3,
+      "line-opacity": conFundido(OPACIDAD_BORDES.normal.casco),
+    },
+  },
   {
     id: CAPA_BORDES,
     type: "line",
@@ -62,7 +95,20 @@ export const capasCeldas = (color: string): ReadonlyArray<LayerSpecification> =>
     paint: {
       "line-color": color,
       "line-width": 1,
-      "line-opacity": conFundido(OPACIDAD_BORDES.normal),
+      "line-opacity": conFundido(OPACIDAD_BORDES.normal.bordes),
+    },
+  },
+  {
+    id: CAPA_SELECCIONADA_CASCO,
+    type: "line",
+    source: FUENTE_CELDAS,
+    minzoom: ZOOM_CELDAS,
+    filter: deLaCelda(null),
+    layout: { "line-join": "round" },
+    paint: {
+      "line-color": colorCasco,
+      "line-width": 5,
+      "line-opacity": conFundido(conFoto(0, 0.85)),
     },
   },
   {
@@ -102,16 +148,16 @@ export interface MapaConCeldas {
 
 /**
  * Remarca la celda del emplazamiento `clave` y apaga las demás, o las deja todas igual con
- * `null`. MapLibre funde el cambio de opacidad.
+ * `null`. MapLibre funde el cambio de opacidad. Las opacidades llevan dentro las de la foto
+ * aérea, así que encenderla o apagarla no pasa por aquí.
  */
 export const remarcarCelda = (mapa: MapaConCeldas, clave: string | null): void => {
-  mapa.setFilter(CAPA_SELECCIONADA, deLaCelda(clave));
-  mapa.setFilter(CAPA_SELECCIONADA_CONTORNO, deLaCelda(clave));
-  mapa.setPaintProperty(
-    CAPA_BORDES,
-    "line-opacity",
-    conFundido(clave === null ? OPACIDAD_BORDES.normal : OPACIDAD_BORDES.apagada),
-  );
+  for (const capa of [CAPA_SELECCIONADA, CAPA_SELECCIONADA_CONTORNO, CAPA_SELECCIONADA_CASCO]) {
+    mapa.setFilter(capa, deLaCelda(clave));
+  }
+  const opacidad = clave === null ? OPACIDAD_BORDES.normal : OPACIDAD_BORDES.apagada;
+  mapa.setPaintProperty(CAPA_BORDES, "line-opacity", conFundido(opacidad.bordes));
+  mapa.setPaintProperty(CAPA_CASCO, "line-opacity", conFundido(opacidad.casco));
 };
 
 /** Lo que hace falta del mapa de MapLibre para ocultar las celdas. */
@@ -132,7 +178,7 @@ export const ocultarCeldasSalvoContorno = (
   soloContorno: boolean,
 ): void => {
   const normal = soloContorno ? "none" : "visible";
-  for (const capa of [CAPA_BORDES, CAPA_SELECCIONADA]) {
+  for (const capa of [CAPA_CASCO, CAPA_BORDES, CAPA_SELECCIONADA_CASCO, CAPA_SELECCIONADA]) {
     mapa.setLayoutProperty(capa, "visibility", normal);
   }
   mapa.setLayoutProperty(

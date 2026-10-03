@@ -78,7 +78,9 @@ describe("capa de la vista de interferencia", () => {
     assert.deepStrictEqual(Object.fromEntries(visibles), {
       interferencia: "visible",
       celdas: "none",
+      "celdas-casco": "none",
       "celda-seleccionada": "none",
+      "celda-seleccionada-casco": "none",
       "celda-seleccionada-contorno": "visible",
       // El degradado del sector que da servicio, sus límites y la línea al punto se apartan.
       "servicio-sectores": "none",
@@ -91,7 +93,9 @@ describe("capa de la vista de interferencia", () => {
     assert.deepStrictEqual(Object.fromEntries(visibles), {
       interferencia: "none",
       celdas: "visible",
+      "celdas-casco": "visible",
       "celda-seleccionada": "visible",
+      "celda-seleccionada-casco": "visible",
       "celda-seleccionada-contorno": "none",
       "servicio-sectores": "visible",
       "servicio-degradado": "visible",

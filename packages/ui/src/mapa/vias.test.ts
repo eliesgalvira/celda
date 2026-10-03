@@ -49,10 +49,23 @@ describe("capas de las vías", () => {
     }
   });
 
-  it("dibuja los bordes debajo y la autopista encima de todo, en dos capas", () => {
+  it("dibuja los bordes debajo y la autopista encima de todo, en dos capas, y otra sobre la foto", () => {
     const ids = capas.map((c) => c.id);
-    assert.deepStrictEqual(ids, ["tren", "caminos", "vias-borde", "vias"]);
+    assert.deepStrictEqual(ids, ["tren", "caminos", "vias-borde", "vias", "vias-foto"]);
     assert.strictEqual(CLASES_DE_VIAS.at(-1)?.clase, "motorway");
     assert.strictEqual(CLASES_DE_VIAS.at(-2)?.clase, "trunk");
+  });
+
+  it("sobre la foto cada clase tiene en su capa el grosor fino que le toca en sus paradas", () => {
+    const foto = capa("vias-foto");
+    const anchos = foto?.type === "line" ? foto.paint?.["line-width"] : undefined;
+    for (const via of CLASES_DE_VIAS) {
+      const valores = valoresEnParadas(anchos, via.clase);
+      const { grosor } = via.sobreLaFoto;
+      for (let k = 0; k + 1 < grosor.length; k += 2) {
+        assert.closeTo(valores.get(grosor[k] ?? 0) ?? -1, grosor[k + 1] ?? 0, 0.01, via.clase);
+        assert.isBelow(grosor[k + 1] ?? 0, valorEnZoom(via.grosor, grosor[k] ?? 0, 1.5) + 0.5);
+      }
+    }
   });
 });

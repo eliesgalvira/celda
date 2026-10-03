@@ -166,7 +166,7 @@ describe("estiloMapa", () => {
       "!",
       ["in", ["downcase", ["to-string", ["get", "name"]]], ["global-state", MUNICIPIOS_DE_CELDA]],
     ];
-    assert.deepStrictEqual<unknown>(estilo.state, { [MUNICIPIOS_DE_CELDA]: { default: [] } });
+    assert.deepStrictEqual<unknown>(estilo.state?.[MUNICIPIOS_DE_CELDA], { default: [] });
     for (const capa of estilo.layers) {
       if (!CAPAS_DE_LUGARES.includes(capa.id)) continue;
       const filtro = "filter" in capa ? capa.filter : undefined;

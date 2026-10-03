@@ -2,6 +2,15 @@ import type { StyleSpecification } from "maplibre-gl";
 
 import { capasCeldas, FUENTE_CELDAS } from "./celdas.ts";
 import { comoRgb, leerOklch } from "./color.ts";
+import { FOTO_AEREA } from "./expresiones.ts";
+import {
+  capaFoto,
+  capasEdificio,
+  FUENTE_EDIFICIO,
+  FUENTE_FOTO,
+  fuenteEdificio,
+  fuenteFoto,
+} from "./foto.ts";
 import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
 import {
   capasRotulos,
@@ -54,6 +63,10 @@ export const FUENTE_MAPA_BASE = "openmaptiles";
  * que la web las llena (`FUENTE_CELDAS`, `FUENTE_SERVICIO`, `FUENTE_SERVICIO_LINEA`,
  * `FUENTE_INTERFERENCIA` y `FUENTE_ZONA`), entre las vías y los rótulos.
  *
+ * La foto aérea (ADR 0022) va en el mismo estilo, apagada: la ortofoto sobre la tierra, el
+ * edificio que resalta «Ver el edificio» bajo los rótulos, y en cada capa del mapa base cómo se ve
+ * sobre ella. Se enciende con el estado `FOTO_AEREA` (`ponerFotoAerea`).
+ *
  * `espana` es el contorno con que los rótulos de lugar de fuera de España no salen de lejos. Llega
  * de fuera, y no de un `import` de este módulo, para que sus 24 KB vayan con el código del mapa y
  * no con el de la primera pantalla, que también usa este módulo.
@@ -61,9 +74,11 @@ export const FUENTE_MAPA_BASE = "openmaptiles";
 export const estiloMapa = (color: ColorDeToken, espana: ContornoDeEspana): StyleSpecification => ({
   version: 8,
   glyphs: GLIFOS,
-  state: { [MUNICIPIOS_DE_CELDA]: { default: [] } },
+  state: { [MUNICIPIOS_DE_CELDA]: { default: [] }, [FOTO_AEREA]: { default: false } },
   sources: {
     [FUENTE_MAPA_BASE]: { type: "vector", url: TILEJSON },
+    [FUENTE_FOTO]: fuenteFoto(),
+    [FUENTE_EDIFICIO]: fuenteEdificio(),
     [FUENTE_CELDAS]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     [FUENTE_SERVICIO]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     [FUENTE_SERVICIO_LINEA]: {
@@ -77,7 +92,7 @@ export const estiloMapa = (color: ColorDeToken, espana: ContornoDeEspana): Style
     [FUENTE_ZONA]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   },
   layers: [
-    ...capasSuelo(FUENTE_MAPA_BASE, color),
+    ...capasSuelo(FUENTE_MAPA_BASE, color, [capaFoto()]),
     ...capasVias(FUENTE_MAPA_BASE, color),
     ...capasInterferencia([
       color("mapa-sinr-1"),
@@ -88,9 +103,10 @@ export const estiloMapa = (color: ColorDeToken, espana: ContornoDeEspana): Style
       color("mapa-sinr-6"),
     ]),
     ...capasServicioDebajo(color("mapa-celda")),
-    ...capasCeldas(color("mapa-celda")),
+    ...capasCeldas(color("mapa-celda"), color("mapa-foto-linea")),
     ...capasServicioEncima(color("mapa-celda"), color("mapa-referencia")),
     ...capasZona(color("mapa-referencia")),
+    ...capasEdificio(color),
     ...capasRotulos(FUENTE_MAPA_BASE, color, espana),
   ],
 });
