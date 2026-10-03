@@ -25,6 +25,29 @@ export type EstadoDeModeracion = typeof EstadoDeModeracion.Type;
 export const TipoDeVeto = Schema.Literals(["identidad", "ip"]);
 export type TipoDeVeto = typeof TipoDeVeto.Type;
 
+/** Ninguna aportación del buzón tiene ese identificador. */
+export class AportacionDesconocida extends Schema.TaggedError<AportacionDesconocida>()(
+  "AportacionDesconocida",
+  { id: Schema.String },
+) {
+  override get message() {
+    return `El buzón no tiene ninguna aportación ${this.id}.`;
+  }
+}
+
+/**
+ * La aportación ya tiene el otro veredicto. Un veredicto no se cambia: lo aceptado puede haber
+ * salido ya en la publicación nocturna, que solo lee lo aceptado.
+ */
+export class AportacionYaModerada extends Schema.TaggedError<AportacionYaModerada>()(
+  "AportacionYaModerada",
+  { id: Schema.String, estado: EstadoDeModeracion },
+) {
+  override get message() {
+    return `La aportación ${this.id} ya está ${this.estado}: un veredicto no se cambia.`;
+  }
+}
+
 /** Lo más largo que puede ser un motivo de la moderación, en caracteres. */
 export const LARGO_MAXIMO_MOTIVO = 500;
 
@@ -62,6 +85,12 @@ export const PaginaDeCola = Schema.Struct({
   ultima: Schema.NullOr(Schema.Finite),
 });
 export type PaginaDeCola = typeof PaginaDeCola.Type;
+
+/** Lo más largo que puede ser una página de la cola del buzón. */
+export const PAGINA_MAXIMA = 200;
+
+/** Cuántas aportaciones se piden de una vez al buzón con su contexto. */
+export const CONTEXTOS_POR_LLAMADA = 20;
 
 /** Cuántas aportaciones de una identidad ha aceptado y rechazado la moderación, y cuántas esperan. */
 export const HistorialDeIdentidad = Schema.Struct({

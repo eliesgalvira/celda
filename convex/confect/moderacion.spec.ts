@@ -1,34 +1,18 @@
 import {
+  AportacionDesconocida,
   AportacionEnCola,
+  AportacionYaModerada,
+  CONTEXTOS_POR_LLAMADA,
   ContextoEnElBuzon,
-  EstadoDeModeracion,
   Motivo,
+  PAGINA_MAXIMA,
   PaginaDeCola,
   TipoDeVeto,
 } from "@celda/dominio/moderacion";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-/** Ninguna aportación tiene ese identificador. */
-export class AportacionDesconocida extends Schema.TaggedError<AportacionDesconocida>()(
-  "AportacionDesconocida",
-  { id: Schema.String },
-) {}
-
-/**
- * La aportación ya tiene el otro veredicto. Un veredicto no se cambia: lo aceptado puede haber
- * salido ya en la publicación nocturna, que solo lee lo aceptado.
- */
-export class AportacionYaModerada extends Schema.TaggedError<AportacionYaModerada>()(
-  "AportacionYaModerada",
-  { id: Schema.String, estado: EstadoDeModeracion },
-) {}
-
-/** Cuántas aportaciones se piden de una vez con su contexto. */
-export const CONTEXTOS_POR_LLAMADA = 20;
-
-/** Lo más largo que puede ser una página de la cola. */
-export const PAGINA_MAXIMA = 200;
+export { AportacionDesconocida, AportacionYaModerada };
 
 const Limite = Schema.Int.pipe(
   Schema.check(Schema.isBetween({ minimum: 1, maximum: PAGINA_MAXIMA })),

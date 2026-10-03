@@ -22,6 +22,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@celda/moderacion": "workspace:*",
     "@confect/cli": "catalog:",
     "@confect/test": "catalog:",
     "@effect/vitest": "catalog:",

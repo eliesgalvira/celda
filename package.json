@@ -12,6 +12,7 @@
     "test": "vp run -r test",
     "resistencia": "vp run --filter @celda/rendimiento resistencia",
     "ingesta": "pnpm --filter @celda/nocturna run ingesta",
+    "moderar": "pnpm --silent --filter @celda/moderacion run moderar",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check"
   },
