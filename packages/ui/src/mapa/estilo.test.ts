@@ -2,22 +2,24 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Predicate from "effect/Predicate";
 import type { StyleSpecification } from "maplibre-gl";
 
+import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { tokensDelTema } from "../pruebas/tema.ts";
 import { leerOklch } from "./color.ts";
 import {
   estiloMapa,
-  filtroDeRotulosDeMunicipios,
   FUENTE_MAPA_BASE,
+  quitarRotulosDeMunicipios,
   RECURSOS_INICIALES_MAPA_BASE,
-  ROTULOS_DE_MUNICIPIOS,
   TOKENS_MAPA,
 } from "./estilo.ts";
+import { CAPAS_DE_LUGARES, type MapaConRotulos, ZOOM_DE_FUERA } from "./rotulos.ts";
 
 const MARCA = "token:";
 
 /**
  * Los valores de todas las propiedades de color (`*-color`) de las capas del estilo. De una
- * expresión `step`, el color de cada tramo: las posiciones pares desde la segunda.
+ * expresión `step`, el color de cada tramo: las posiciones pares desde la segunda. De un `match`,
+ * el de cada caso: las impares desde la tercera y la última, la de por defecto.
  */
 const coloresDelEstilo = (estilo: StyleSpecification) =>
   estilo.layers.flatMap((capa) =>
@@ -26,10 +28,31 @@ const coloresDelEstilo = (estilo: StyleSpecification) =>
       .flatMap(([propiedad, valor]) =>
         (Array.isArray(valor) && valor[0] === "step"
           ? valor.filter((_, i) => i >= 2 && i % 2 === 0)
-          : [valor]
+          : Array.isArray(valor) && valor[0] === "match"
+            ? valor.filter((_, i) => (i >= 3 && i % 2 === 1) || i === valor.length - 1)
+            : [valor]
         ).map((color) => ({ capa: capa.id, propiedad, valor: color })),
       ),
   );
+
+const estiloDePrueba = () => estiloMapa(() => "#000", CONTORNO_DE_PRUEBA);
+
+/** Un mapa de prueba con las capas del estilo: guarda los filtros como MapLibre. */
+const mapaDePrueba = (estilo: StyleSpecification | undefined) => {
+  const filtros = new Map(
+    (estilo?.layers ?? []).map((capa) => [capa.id, "filter" in capa ? capa.filter : undefined]),
+  );
+  const cambios: Array<string> = [];
+  const mapa: MapaConRotulos = {
+    getLayer: (capa) => (filtros.has(capa) ? {} : undefined),
+    getFilter: (capa) => structuredClone(filtros.get(capa)),
+    setFilter: (capa, filtro) => {
+      cambios.push(capa);
+      filtros.set(capa, filtro);
+    },
+  };
+  return { mapa, filtros, cambios };
+};
 
 describe("estiloMapa", () => {
   it("pinta el mapa solo con tokens del tema", () => {
@@ -37,7 +60,7 @@ describe("estiloMapa", () => {
     const estilo = estiloMapa((token) => {
       pedidos.add(token);
       return `${MARCA}${token}`;
-    });
+    }, CONTORNO_DE_PRUEBA);
 
     const colores = coloresDelEstilo(estilo);
     assert.isAbove(colores.length, 0);
@@ -62,7 +85,7 @@ describe("estiloMapa", () => {
   });
 
   it("pide por adelantado el TileJSON y los glifos que usa la vista inicial", () => {
-    const estilo = estiloMapa(() => "#000");
+    const estilo = estiloDePrueba();
     const fuente = estilo.sources[FUENTE_MAPA_BASE];
     assert.isTrue(
       fuente?.type === "vector" && RECURSOS_INICIALES_MAPA_BASE.includes(fuente.url ?? ""),
@@ -80,26 +103,92 @@ describe("estiloMapa", () => {
     }
   });
 
-  it("los rótulos de ciudades y pueblos dejan fuera, sin mirar mayúsculas, los que lleva Celda", () => {
-    const capa = estiloMapa(() => "red").layers.find((c) => c.id === ROTULOS_DE_MUNICIPIOS);
-    assert.isDefined(capa);
-    assert.deepStrictEqual(
-      capa !== undefined && "filter" in capa ? capa.filter : undefined,
-      filtroDeRotulosDeMunicipios([]),
-    );
-    const deMunicipio = ["in", ["get", "class"], ["literal", ["city", "town"]]];
-    assert.deepStrictEqual<unknown>(filtroDeRotulosDeMunicipios([]), deMunicipio);
-    assert.deepStrictEqual<unknown>(filtroDeRotulosDeMunicipios(["L'Hospitalet de Llobregat"]), [
-      "all",
-      deMunicipio,
-      [
-        "!",
-        [
-          "in",
-          ["downcase", ["to-string", ["get", "name"]]],
-          ["literal", ["l'hospitalet de llobregat"]],
-        ],
-      ],
+  it("rotula los lugares por importancia: la capa más importante, la última, se coloca antes", () => {
+    const ids = estiloDePrueba().layers.map((capa) => capa.id);
+    assert.deepStrictEqual(ids.slice(-CAPAS_DE_LUGARES.length), CAPAS_DE_LUGARES.toReversed());
+    assert.deepStrictEqual(CAPAS_DE_LUGARES, [
+      "lugares-capitales",
+      "lugares-grandes",
+      "lugares-ciudades",
+      "lugares-pueblos-grandes",
+      "lugares-pueblos",
+      "lugares-aldeas",
     ]);
+    const desde = new Map(
+      estiloDePrueba().layers.map((capa) => [capa.id, capa.minzoom ?? 0] as const),
+    );
+    assert.deepStrictEqual(
+      CAPAS_DE_LUGARES.map((id) => desde.get(id)),
+      [4, 4.5, 7, 8, 10, 12],
+    );
+  });
+
+  it("los rótulos de lugar no salen de fuera de España hasta el zoom 9 y Gibraltar, nunca", () => {
+    const soloDeEspana = [
+      "all",
+      ["!=", ["get", "name"], "Gibraltar"],
+      ["any", [">=", ["zoom"], ZOOM_DE_FUERA], ["within", CONTORNO_DE_PRUEBA]],
+    ];
+    assert.strictEqual(ZOOM_DE_FUERA, 9);
+    for (const capa of estiloDePrueba().layers) {
+      if (!CAPAS_DE_LUGARES.includes(capa.id)) continue;
+      const filtro = "filter" in capa ? capa.filter : undefined;
+      assert.deepStrictEqual<unknown>(
+        Array.isArray(filtro) ? [filtro[0], filtro[1]?.[0], filtro[1]?.[1]] : undefined,
+        ["all", "all", soloDeEspana],
+        capa.id,
+      );
+    }
+  });
+
+  it("las capas de lugares dejan fuera, sin mirar mayúsculas, los municipios que lleva Celda", () => {
+    const estilo = estiloDePrueba();
+    const { mapa, filtros, cambios } = mapaDePrueba(estilo);
+    const propios = new Map(
+      CAPAS_DE_LUGARES.map((capa) => {
+        const filtro = filtros.get(capa);
+        return [capa, Array.isArray(filtro) ? filtro[1] : undefined] as const;
+      }),
+    );
+    for (const capa of CAPAS_DE_LUGARES) {
+      assert.deepStrictEqual<unknown>(filtros.get(capa), [
+        "all",
+        propios.get(capa),
+        ["literal", true],
+      ]);
+    }
+
+    quitarRotulosDeMunicipios(mapa, ["L'Hospitalet de Llobregat", "Badalona"]);
+    assert.deepStrictEqual(cambios, CAPAS_DE_LUGARES);
+    for (const capa of CAPAS_DE_LUGARES) {
+      assert.deepStrictEqual<unknown>(filtros.get(capa), [
+        "all",
+        propios.get(capa),
+        [
+          "!",
+          [
+            "in",
+            ["downcase", ["to-string", ["get", "name"]]],
+            ["literal", ["l'hospitalet de llobregat", "badalona"]],
+          ],
+        ],
+      ]);
+    }
+
+    // Sin zonas de municipio a la vista, cada capa vuelve a su filtro de partida.
+    quitarRotulosDeMunicipios(mapa, []);
+    for (const capa of CAPAS_DE_LUGARES) {
+      assert.deepStrictEqual<unknown>(filtros.get(capa), [
+        "all",
+        propios.get(capa),
+        ["literal", true],
+      ]);
+    }
+  });
+
+  it("antes de que el estilo tenga sus capas, quitar rótulos no hace nada", () => {
+    const { mapa, cambios } = mapaDePrueba(undefined);
+    quitarRotulosDeMunicipios(mapa, ["Badalona"]);
+    assert.deepStrictEqual(cambios, []);
   });
 });

@@ -92,20 +92,50 @@
   --control-tinta: oklch(29.9% 0.005 121.8);
   --control-borde: oklch(29.9% 0.005 121.8);
 
-  /* MAPA BASE */
-  --mapa-fondo: oklch(86.7% 0.011 89.7);
-  --mapa-parque: oklch(83.9% 0.021 116);
-  --mapa-agua: oklch(81.1% 0.013 190.9);
-  --mapa-edificio: oklch(83.7% 0.013 86.8);
-  --mapa-edificio-borde: oklch(77.7% 0.016 86.4);
-  --mapa-tren: oklch(63.7% 0.012 89.8);
-  --mapa-camino: oklch(78.6% 0.013 86.8);
-  --mapa-calle-borde: oklch(74.5% 0.015 88.7);
-  --mapa-calle: oklch(92% 0.009 84.6);
-  --mapa-avenida: oklch(95.2% 0.007 88.6);
-  --mapa-rotulo: oklch(46.8% 0.012 87.5);
-  --mapa-halo: oklch(86.7% 0.011 89.7);
-  --mapa-lugar: oklch(38.6% 0.008 97.5);
+  /*
+   * MAPA BASE: la paleta A «Google literal» (ADR 0022). Tierra gris claro, vías blancas,
+   * autovías y autopistas en amarillo, agua azul y verdes; los rótulos, más oscuros cuanto más
+   * importante es el lugar. La identidad de Celda va en la interfaz, no aquí.
+   */
+  --mapa-fondo: oklch(96.9% 0.004 106.5);
+  --mapa-urbano: oklch(93.7% 0.005 95.1);
+  --mapa-hospital: oklch(92.3% 0.025 14.6);
+  --mapa-educacion: oklch(94.4% 0.017 88);
+  --mapa-cementerio: oklch(92.3% 0.033 135.5);
+  --mapa-bosque: oklch(90.1% 0.056 134.5);
+  --mapa-hierba: oklch(93% 0.043 134.7);
+  --mapa-parque: oklch(87.6% 0.082 135.3);
+  --mapa-arena: oklch(95.1% 0.032 93.5);
+  --mapa-agua: oklch(82.5% 0.076 247);
+  --mapa-edificio: oklch(91.9% 0.006 84.6);
+  --mapa-edificio-borde: oklch(87.4% 0.009 84.6);
+  --mapa-tren: oklch(78.6% 0 0);
+  --mapa-camino: oklch(85.5% 0 0);
+  /* Calles, secundarias y principales van en blanco; las distingue el borde y el grosor. */
+  --mapa-calle: oklch(100% 0 0);
+  --mapa-calle-borde: oklch(90.1% 0 0);
+  --mapa-secundaria-borde: oklch(87.6% 0 0);
+  --mapa-principal-borde: oklch(85.5% 0 0);
+  --mapa-autovia: oklch(93.2% 0.093 93.8);
+  --mapa-autovia-borde: oklch(82.8% 0.126 88.6);
+  --mapa-autopista: oklch(88.8% 0.135 91.5);
+  --mapa-autopista-borde: oklch(76.6% 0.138 78.6);
+  /* Los rótulos llevan un halo blanco; cada color cumple AA sobre él (mapa/color.test.ts). */
+  --mapa-halo: oklch(100% 0 0);
+  --mapa-rotulo-capital: oklch(24.8% 0.006 271.2);
+  --mapa-rotulo-ciudad: oklch(36.9% 0.007 240);
+  --mapa-rotulo-pueblo: oklch(43.3% 0.01 253.9);
+  --mapa-rotulo-aldea: oklch(56% 0.01 248);
+  --mapa-rotulo-barrio: oklch(56% 0.01 243);
+  --mapa-rotulo-calle: oklch(49.8% 0.009 253.9);
+  --mapa-rotulo-agua: oklch(55.5% 0.116 254);
+  /* El número de una autopista o una autovía, sobre su amarillo. */
+  --mapa-rotulo-carretera: oklch(35.6% 0.067 89.6);
+  /* Los pocos puntos de interés: transporte, salud, parques y el resto. */
+  --mapa-pdi-transporte: oklch(53.2% 0.181 258.3);
+  --mapa-pdi-salud: oklch(53.2% 0.198 27.9);
+  --mapa-pdi-parque: oklch(48.8% 0.13 149);
+  --mapa-pdi-otro: oklch(56% 0.01 248);
   /* Las líneas de las celdas: el verde azulado del primario */
   --mapa-celda: oklch(52% 0.077 203.3);
   /*
@@ -187,18 +217,40 @@
   --eje-lejos: oklch(70% 0.09 78);
 
   --mapa-fondo: oklch(23% 0.006 100);
-  --mapa-parque: oklch(27% 0.02 130);
-  --mapa-agua: oklch(29% 0.03 220);
+  --mapa-urbano: oklch(26% 0.006 100);
+  --mapa-hospital: oklch(28% 0.03 15);
+  --mapa-educacion: oklch(27% 0.015 85);
+  --mapa-cementerio: oklch(27% 0.025 135);
+  --mapa-bosque: oklch(28% 0.035 135);
+  --mapa-hierba: oklch(26% 0.025 135);
+  --mapa-parque: oklch(31% 0.05 135);
+  --mapa-arena: oklch(28% 0.025 90);
+  --mapa-agua: oklch(30% 0.05 245);
   --mapa-edificio: oklch(29% 0.008 90);
   --mapa-edificio-borde: oklch(33% 0.008 90);
   --mapa-tren: oklch(48% 0.01 90);
   --mapa-camino: oklch(38% 0.01 90);
+  --mapa-calle: oklch(37% 0.008 90);
   --mapa-calle-borde: oklch(20% 0.005 100);
-  --mapa-calle: oklch(35% 0.008 90);
-  --mapa-avenida: oklch(41% 0.008 90);
-  --mapa-rotulo: oklch(78% 0.01 90);
+  --mapa-secundaria-borde: oklch(19% 0.005 100);
+  --mapa-principal-borde: oklch(18% 0.005 100);
+  --mapa-autovia: oklch(50% 0.07 85);
+  --mapa-autovia-borde: oklch(32% 0.05 80);
+  --mapa-autopista: oklch(60% 0.1 85);
+  --mapa-autopista-borde: oklch(38% 0.07 75);
   --mapa-halo: oklch(23% 0.006 100);
-  --mapa-lugar: oklch(86% 0.008 90);
+  --mapa-rotulo-capital: oklch(96% 0.005 90);
+  --mapa-rotulo-ciudad: oklch(91% 0.006 90);
+  --mapa-rotulo-pueblo: oklch(86% 0.008 90);
+  --mapa-rotulo-aldea: oklch(78% 0.01 90);
+  --mapa-rotulo-barrio: oklch(76% 0.01 90);
+  --mapa-rotulo-calle: oklch(80% 0.01 90);
+  --mapa-rotulo-agua: oklch(76% 0.08 245);
+  --mapa-rotulo-carretera: oklch(15% 0.03 85);
+  --mapa-pdi-transporte: oklch(76% 0.11 255);
+  --mapa-pdi-salud: oklch(74% 0.13 25);
+  --mapa-pdi-parque: oklch(76% 0.12 145);
+  --mapa-pdi-otro: oklch(76% 0.01 248);
   --mapa-celda: oklch(72% 0.085 203.3);
   --mapa-sinr-1: oklch(52% 0.14 40);
   --mapa-sinr-2: oklch(66% 0.16 55);

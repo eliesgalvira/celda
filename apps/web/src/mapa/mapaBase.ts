@@ -1,4 +1,5 @@
 import type { Area } from "@celda/dominio/area";
+import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
 import { coloresDelTema, estiloMapa, FUENTE_MAPA_BASE } from "@celda/ui/mapa/estilo.ts";
 import { Map as MapaMapLibre, prewarm, setWorkerUrl } from "maplibre-gl";
 import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
@@ -38,7 +39,7 @@ export const crearMapaBase = (
   const { encuadre, limites } = area;
   const mapa = new MapaMapLibre({
     container: contenedor,
-    style: estiloMapa(coloresDelTema(document.documentElement)),
+    style: estiloMapa(coloresDelTema(document.documentElement), CONTORNO_DE_ESPANA),
     bounds: [
       [encuadre.suroeste.longitud, encuadre.suroeste.latitud],
       [encuadre.noreste.longitud, encuadre.noreste.latitud],

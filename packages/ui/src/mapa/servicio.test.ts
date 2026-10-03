@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import type { LayerSpecification } from "maplibre-gl";
 
 import { ZOOM_CELDAS } from "./celdas.ts";
+import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { estiloMapa } from "./estilo.ts";
 import {
   CAPAS_SERVICIO,
@@ -36,7 +37,7 @@ describe("degradado del sector que da servicio", () => {
   });
 
   it("sus capas van en el estilo desde el zoom de las celdas, los rellenos debajo de las líneas", () => {
-    const estilo = estiloMapa((token) => `token:${token}`);
+    const estilo = estiloMapa((token) => `token:${token}`, CONTORNO_DE_PRUEBA);
     const ids = estilo.layers.map((capa: LayerSpecification) => capa.id);
     for (const id of CAPAS_SERVICIO) {
       const capa = estilo.layers.find((c: LayerSpecification) => c.id === id);
