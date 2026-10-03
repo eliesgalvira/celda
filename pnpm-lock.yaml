@@ -217,24 +217,12 @@ importers:
 
   convex:
     dependencies:
-      '@celda/dominio':
-        specifier: workspace:*
-        version: link:../packages/dominio
-      '@celda/ingesta':
-        specifier: workspace:*
-        version: link:../packages/ingesta
-      '@celda/publicacion':
-        specifier: workspace:*
-        version: link:../packages/publicacion
       '@confect/core':
         specifier: 'catalog:'
         version: 10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)
       '@confect/server':
         specifier: 'catalog:'
         version: 10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(@effect/platform-node@4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1))(convex@1.46.0)(effect@4.0.0-rc.117)
-      '@effect/platform-node':
-        specifier: 'catalog:'
-        version: 4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1)
       convex:
         specifier: 'catalog:'
         version: 1.46.0
@@ -242,9 +230,6 @@ importers:
         specifier: 'catalog:'
         version: 4.0.0-rc.117
     devDependencies:
-      '@celda/nocturna':
-        specifier: workspace:*
-        version: link:../apps/nocturna
       '@confect/cli':
         specifier: 'catalog:'
         version: 10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(@confect/server@10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(@effect/platform-node@4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1))(convex@1.46.0)(effect@4.0.0-rc.117))(effect@4.0.0-rc.117)(redis@6.2.1)
@@ -394,9 +379,6 @@ importers:
 
   tools/capas:
     dependencies:
-      '@celda/convex':
-        specifier: workspace:*
-        version: link:../../convex
       '@celda/dominio':
         specifier: workspace:*
         version: link:../../packages/dominio
@@ -406,18 +388,9 @@ importers:
       '@celda/publicacion':
         specifier: workspace:*
         version: link:../../packages/publicacion
-      '@confect/core':
-        specifier: 'catalog:'
-        version: 10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117)
-      '@confect/server':
-        specifier: 'catalog:'
-        version: 10.0.0-next.24(@confect/core@10.0.0-next.24(convex@1.46.0)(effect@4.0.0-rc.117))(@effect/platform-node@4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1))(convex@1.46.0)(effect@4.0.0-rc.117)
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1)
-      convex:
-        specifier: 'catalog:'
-        version: 1.46.0
       effect:
         specifier: 'catalog:'
         version: 4.0.0-rc.117

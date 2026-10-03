@@ -2,9 +2,6 @@
   "name": "@celda/convex",
   "private": true,
   "type": "module",
-  "exports": {
-    "./publicacion": "./src/publicacion.ts"
-  },
   "scripts": {
     "codegen": "./scripts/codegen.sh",
     "backend": "./scripts/backend.sh",
@@ -13,17 +10,12 @@
     "test:repetido": "./scripts/pruebas-repetidas.sh"
   },
   "dependencies": {
-    "@celda/dominio": "workspace:*",
-    "@celda/ingesta": "workspace:*",
-    "@celda/publicacion": "workspace:*",
     "@confect/core": "catalog:",
     "@confect/server": "catalog:",
-    "@effect/platform-node": "catalog:",
     "convex": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@celda/nocturna": "workspace:*",
     "@confect/cli": "catalog:",
     "@confect/test": "catalog:",
     "@effect/vitest": "catalog:",

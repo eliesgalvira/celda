@@ -7,8 +7,6 @@
     "build": "vp build",
     "municipios": "vp build && node dist/capas.js municipios",
     "poblacion": "vp build && node dist/capas.js poblacion",
-    "publicar": "vp build && node dist/capas.js publicar",
-    "publicar:local": "vp build && ./scripts/local.sh publicar",
     "servir": "vp build && node dist/capas.js servir",
     "sintetica": "vp build && node dist/capas.js sintetica",
     "test": "vp test run",
@@ -16,14 +14,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@celda/convex": "workspace:*",
     "@celda/dominio": "workspace:*",
     "@celda/ingesta": "workspace:*",
     "@celda/publicacion": "workspace:*",
-    "@confect/core": "catalog:",
-    "@confect/server": "catalog:",
     "@effect/platform-node": "catalog:",
-    "convex": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
