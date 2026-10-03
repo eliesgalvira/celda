@@ -50,6 +50,12 @@ export const TOKENS_MAPA = [
   "mapa-sinr-5",
   "mapa-sinr-6",
   "mapa-referencia",
+  // Lo que va sobre la foto aérea: el mismo color en los dos temas, porque la foto no cambia.
+  "mapa-foto-linea",
+  "mapa-foto-autopista",
+  "mapa-foto-rotulo",
+  "mapa-foto-halo",
+  "mapa-foto-tinta",
 ] as const;
 
 export type TokenMapa = (typeof TOKENS_MAPA)[number];

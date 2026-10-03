@@ -6,6 +6,7 @@ import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
 import { Desplegable } from "@celda/ui/Desplegable.tsx";
 import { Etiqueta } from "@celda/ui/Etiqueta.tsx";
+import { BotonEdificio } from "@celda/ui/foto/FotoAerea.tsx";
 import { ConflictosFicha, ContrasteFicha, NotaFicha } from "@celda/ui/panel/Correccion.tsx";
 import {
   AvisoFicha,
@@ -39,6 +40,7 @@ import {
 import { DialogoCorroborar } from "../buzon/DialogoCorroborar.tsx";
 import { DialogoProponer } from "../buzon/DialogoProponer.tsx";
 import { leerEnSolid, usarDatos } from "../datos.tsx";
+import { FotoContexto } from "../foto/enMapa.ts";
 import { MejorarSenal } from "../mejorar/MejorarSenal.tsx";
 import { TITULO_MEJORAR } from "../mejorar/textos.ts";
 import { UbicacionContexto } from "../ubicacion/controlador.ts";
@@ -188,6 +190,7 @@ function ContenidoFicha(props: {
   );
   const origenes = createMemo(() => textosDeOrigenes(props.ficha.estaciones));
   const ubicacion = useContext(UbicacionContexto);
+  const foto = useContext(FotoContexto);
   /** El diálogo de la comunidad abierto desde la ficha: proponer o respaldar una corrección. */
   const [comunidad, setComunidad] = createSignal<
     | { readonly tipo: "proponer" }
@@ -200,6 +203,18 @@ function ContenidoFicha(props: {
         titulo={tituloDe(props.ficha)}
         lugar={lugarDe(props.ficha)}
         companias={props.ficha.estaciones.map((e) => e.compania)}
+        accion={
+          // El edificio que resalta es el de OpenStreetMap: su número no es la dirección del
+          // registro, que sigue en el título de la ficha.
+          <Show when={foto}>
+            {(delMapa) => (
+              <BotonEdificio
+                estado={delMapa().edificio(props.clave)}
+                alPulsar={() => delMapa().verEdificio(props.clave, props.ficha.posicion)}
+              />
+            )}
+          </Show>
+        }
         etiquetas={
           <Etiqueta tono={props.ficha.estado}>{NOMBRE_ESTADO[props.ficha.estado]}</Etiqueta>
         }

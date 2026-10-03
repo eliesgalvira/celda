@@ -187,6 +187,24 @@ Medido el 03/10/2026 en Chromium con GPU, contra `celda/v1` en las mismas condic
 
   El hilo principal gasta un 25-30 % más de JavaScript en los vuelos: casi todo es recibir y deserializar lo que mandan los workers de MapLibre (`receive`), porque cada tesela trae más cosas que dibujar. Se reparte entre los rótulos nuevos (pueblos y aldeas, puntos de interés, avenidas, números de carretera, ríos), el suelo nuevo (usos, verdes, ríos) y el corte de las teselas en el 15: quitando cualquiera de los tres se recupera una parte, ninguno solo lo explica. Lo que sí se arregló: las vías van en dos capas (bordes y rellenos, con el color, el grosor y el orden por clase) y no en catorce, el suelo en dos y no en seis, y los municipios que son zona se quitan con un estado del estilo (`setGlobalStateProperty`) y no con `setFilter`, que mandaba a los workers el contorno de España de cada capa de lugares. Queda abierto: al alejar desde la calle se pierden de 1 a 7 fps según el tramo, y donde más, al alejar desde la calle.
 
+## Foto aérea (#64)
+
+Medido el 03 y el 04/10/2026 en Chromium con SwiftShader contra la build local, con el PNOA de verdad, un contexto nuevo en cada medida y el registro de red de CDP. El móvil es de 390 × 844 a DPR 3.
+
+| Medida | #64 | Prototipo (ADR 0022) |
+|---|---|---|
+| Con la foto apagada, en toda la visita | 0 peticiones a `tms-pnoa-ma.idee.es` | 0 |
+| Eixample a z18 en el móvil, al encender la foto | 15 teselas, 267 KB | 15 teselas, 266 KB |
+| Barcelona a z12 en el móvil, al encender la foto | 15 teselas, 206 KB | 15 teselas, 206 KB |
+| De España al tejado de Passeig de Gràcia 68 y vuelta, con la foto encendida, con vuelos de 2,5 s | de 2,48 a 2,97 MB en 207 a 276 peticiones, según la ronda | 2,3 MB en 232 peticiones |
+| Lo mismo saltando de vista en vista | 0,91 MB en 71 peticiones | — |
+| «Ver el edificio» en el móvil, desde la ficha abierta a z16 | unas 31 teselas y 470 KB, 8 canceladas por el vuelo | — |
+| Tiempo de una tesela del PNOA | mediana de 21 a 30 ms en el servidor y de 30 a 85 ms hasta tenerla entera | 148 ms en frío y 91 en caliente |
+| Quieto 20 s: foto apagada, encendida, tras «Ver el edificio» y tras pulsar «Foto aérea» diez veces | 0 peticiones, 0 `render` de MapLibre y 0 llamadas a `fetch`, XHR, `requestAnimationFrame`, `setTimeout`, `setInterval` y `postMessage` | igual |
+| Capas y fuentes tras pulsar «Foto aérea» diez veces | las mismas 47 capas y 8 fuentes, sin repetir ninguna | — |
+
+Con vuelos, cuántas teselas se piden depende de los fotogramas de cada vuelo, como ya pasaba con el callejero: la diferencia con el prototipo es de recorrido y de ronda. Las teselas canceladas son las que MapLibre deja de esperar al seguir volando. En la primera ronda de Barcelona a z12 la mediana hasta tener la tesela entera fue de 1,3 s con la CloudFront fría; en las siguientes, de 80 ms.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.

@@ -274,6 +274,28 @@ describe("panel del emplazamiento", () => {
     );
   });
 
+  it("«Ver el edificio» enciende la foto aérea, y la ficha sigue con la dirección del registro", async () => {
+    const { findByRole, getByRole, queryByRole, origen } = abrir(CAMPUS_NORD.clave);
+    await responder(origen, CAMPUS_NORD);
+    await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+    assert.isNull(queryByRole("link", { name: /PNOA/u }));
+
+    const control = getByRole("button", { name: "Foto aérea" });
+    assert.strictEqual(control.getAttribute("aria-pressed"), "false");
+    const boton = getByRole("button", { name: "Ver el edificio" });
+    fireEvent.click(boton);
+    flush();
+    assert.strictEqual(control.getAttribute("aria-pressed"), "true");
+    // Sin mapa (happy-dom no tiene WebGL) el vuelo no acaba: se queda buscando.
+    assert.strictEqual(
+      getByRole("button", { name: "Ver el edificio" }).getAttribute("aria-busy"),
+      "true",
+    );
+    assert.isNotNull(getByRole("heading", { name: TITULO_CAMPUS_NORD }));
+    // El crédito del PNOA sale con la foto encendida.
+    assert.isNotNull(getByRole("link", { name: /PNOA · CC BY 4\.0 scne\.es/u }));
+  });
+
   it("dice el municipio y la provincia del IGN y lo cita como obra derivada", async () => {
     const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
     const lote = generarLoteDeProvincia(

@@ -28,3 +28,11 @@ export const desplazamientoParaVer = (
   const limite = Math.max(pantalla.alto / 2, pantalla.alto - ALTO_RESUMEN - MARGEN);
   return punto.y > limite ? [0, punto.y - limite] : undefined;
 };
+
+/**
+ * Dónde queda, respecto al centro de la pantalla, el centro de lo que deja libre el panel abierto
+ * (en píxeles, como el `offset` de `flyTo`): a la derecha de la columna en escritorio y encima del
+ * resumen de la hoja en el móvil.
+ */
+export const centroLibre = (escritorio: boolean): readonly [number, number] =>
+  escritorio ? [ANCHO_PANEL / 2, 0] : [0, -ALTO_RESUMEN / 2];

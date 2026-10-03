@@ -4,7 +4,7 @@ import type {
   SymbolLayerSpecification,
 } from "maplibre-gl";
 
-import { deClase, porZoom } from "./expresiones.ts";
+import { conFoto, deClase, porZoom, visibleConFoto } from "./expresiones.ts";
 import type { ColorDeToken, TokenMapa } from "./tokens.ts";
 
 /**
@@ -71,11 +71,21 @@ const SIN_LOS_DE_CELDA: ExpressionSpecification = [
 /** El rango de capital de OpenMapTiles: 2 la del país, 4 las de comunidad, 6 las de provincia. */
 const CAPITAL: ExpressionSpecification = ["coalesce", ["get", "capital"], 99];
 
+/**
+ * El halo de un rótulo. Sobre la foto aérea todos llevan el mismo, oscuro, con la letra en blanco
+ * (`tinta`), como el modo híbrido de Google.
+ */
 const halo = (color: ColorDeToken, ancho: number) => ({
-  "text-halo-color": color("mapa-halo"),
-  "text-halo-width": ancho,
-  "text-halo-blur": 0.3,
+  "text-halo-color": conFoto(color("mapa-halo"), color("mapa-foto-halo")),
+  "text-halo-width": conFoto(ancho, 1.6),
+  "text-halo-blur": conFoto(0.3, 0.4),
 });
+
+/** El color de un rótulo: el suyo o, sobre la foto aérea, blanco. */
+const tinta = (
+  color: ColorDeToken,
+  propio: string | ExpressionSpecification,
+): ExpressionSpecification => conFoto(propio, color("mapa-foto-rotulo"));
 
 /** Una capa de lugares: qué clase de lugar rotula, desde y hasta qué zoom y con qué letra. */
 interface CapaDeLugares {
@@ -201,7 +211,7 @@ const capaDeLugares = (
     "symbol-sort-key": ["get", "rank"],
     "text-padding": capa.aire ?? 2,
   },
-  paint: { "text-color": color(capa.color), ...halo(color, capa.halo) },
+  paint: { "text-color": tinta(color, color(capa.color)), ...halo(color, capa.halo) },
 });
 
 /** Los nombres del agua, de las vías, los puntos de interés y los barrios. */
@@ -223,7 +233,7 @@ const capasDeNombres = (
       "text-size": 11.5,
       "text-letter-spacing": 0.05,
     },
-    paint: { "text-color": color("mapa-rotulo-agua"), ...halo(color, 1.2) },
+    paint: { "text-color": tinta(color, color("mapa-rotulo-agua")), ...halo(color, 1.2) },
   },
   {
     id: "nombres-de-mares",
@@ -238,7 +248,7 @@ const capasDeNombres = (
       "text-letter-spacing": 0.12,
       "text-max-width": 7,
     },
-    paint: { "text-color": color("mapa-rotulo-agua"), ...halo(color, 1) },
+    paint: { "text-color": tinta(color, color("mapa-rotulo-agua")), ...halo(color, 1) },
   },
   {
     id: "nombres-de-lagos",
@@ -253,7 +263,7 @@ const capasDeNombres = (
       "text-size": 11.5,
       "text-max-width": 7,
     },
-    paint: { "text-color": color("mapa-rotulo-agua"), ...halo(color, 1) },
+    paint: { "text-color": tinta(color, color("mapa-rotulo-agua")), ...halo(color, 1) },
   },
   {
     id: "nombres-de-calles",
@@ -272,7 +282,7 @@ const capasDeNombres = (
       "text-font": [LETRA],
       "text-size": porZoom(15, 11, 18, 13.5),
     },
-    paint: { "text-color": color("mapa-rotulo-calle"), ...halo(color, 1.6) },
+    paint: { "text-color": tinta(color, color("mapa-rotulo-calle")), ...halo(color, 1.6) },
   },
   {
     id: "nombres-de-avenidas",
@@ -289,7 +299,7 @@ const capasDeNombres = (
       "symbol-sort-key": ["match", ["get", "class"], ["trunk", "primary"], 0, "secondary", 1, 2],
     },
     paint: {
-      "text-color": color("mapa-rotulo-ciudad"),
+      "text-color": tinta(color, color("mapa-rotulo-ciudad")),
       ...halo(color, 1.8),
       "text-opacity": porZoom(12.5, 0, 13, 1),
     },
@@ -314,7 +324,7 @@ const capasDeNombres = (
     },
     paint: {
       "text-color": color("mapa-rotulo-carretera"),
-      "text-halo-color": color("mapa-autopista"),
+      "text-halo-color": conFoto(color("mapa-autopista"), color("mapa-foto-autopista")),
       "text-halo-width": 2.6,
     },
   },
@@ -345,7 +355,7 @@ const capasDeNombres = (
       "text-padding": 6,
     },
     paint: {
-      "text-color": [
+      "text-color": tinta(color, [
         "match",
         ["get", "class"],
         "railway",
@@ -355,7 +365,7 @@ const capasDeNombres = (
         "park",
         color("mapa-pdi-parque"),
         color("mapa-pdi-otro"),
-      ],
+      ]),
       ...halo(color, 1.4),
       "text-opacity": porZoom(14.5, 0, 15, 1),
     },
@@ -373,7 +383,7 @@ const capasDeNombres = (
       "text-size": 11,
       "text-max-width": 8,
     },
-    paint: { "text-color": color("mapa-pdi-transporte"), ...halo(color, 1.4) },
+    paint: { "text-color": tinta(color, color("mapa-pdi-transporte")), ...halo(color, 1.4) },
   },
   {
     id: "barrios",
@@ -390,20 +400,54 @@ const capasDeNombres = (
       "text-size": porZoom(14, 11.5, 17, 13),
       "text-max-width": 7,
     },
-    paint: { "text-color": color("mapa-rotulo-barrio"), ...halo(color, 1.5) },
+    paint: { "text-color": tinta(color, color("mapa-rotulo-barrio")), ...halo(color, 1.5) },
   },
 ];
 
+/** Los números de portal, que solo salen sobre la foto aérea y que busca «Ver el edificio». */
+export const CAPA_PORTALES = "portales";
+
 /**
- * Las capas de rótulos, de abajo arriba: los nombres y después los lugares, de menos a más
+ * Los números de portal, como en Google, desde el zoom 18: a 17 llenan las manzanas. Solo con la
+ * foto aérea encendida, así que sin ella no cuestan nada. El zoom mínimo es 15 y no 17: por
+ * encima de 15 MapLibre no vuelve a maquetar las teselas (`zoomsSinPartir` en la web), y una capa
+ * que empieza más arriba no saldría nunca. No apartan a los demás rótulos.
+ */
+const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecification => ({
+  id: CAPA_PORTALES,
+  type: "symbol",
+  source: fuente,
+  "source-layer": "housenumber",
+  minzoom: 15,
+  layout: {
+    visibility: visibleConFoto,
+    "text-field": ["get", "housenumber"],
+    "text-font": [LETRA],
+    "text-size": 10.5,
+    "text-ignore-placement": true,
+  },
+  paint: {
+    "text-color": color("mapa-foto-rotulo"),
+    "text-halo-color": color("mapa-foto-halo"),
+    "text-halo-width": 1.6,
+    "text-opacity": porZoom(17.5, 0, 18, 1),
+  },
+});
+
+/**
+ * Las capas de rótulos, de abajo arriba: los nombres, los números de portal, lo que tenga que ir
+ * `sobreLosPortales` (el número del edificio resaltado) y después los lugares, de menos a más
  * importantes.
  */
 export const capasRotulos = (
   fuente: string,
   color: ColorDeToken,
   espana: ContornoDeEspana,
+  sobreLosPortales: ReadonlyArray<LayerSpecification> = [],
 ): ReadonlyArray<LayerSpecification> => [
   ...capasDeNombres(fuente, color),
+  capaDePortales(fuente, color),
+  ...sobreLosPortales,
   ...LUGARES.toReversed().map((capa) => capaDeLugares(fuente, color, espana, capa)),
 ];
 

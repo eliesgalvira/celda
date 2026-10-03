@@ -62,8 +62,11 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   ["mapa-pdi-salud", "mapa-halo"],
   ["mapa-pdi-parque", "mapa-halo"],
   ["mapa-pdi-otro", "mapa-halo"],
-  // El número de una autopista, con su amarillo de halo.
+  // El número de una autopista, con su amarillo de halo, también sobre la foto aérea.
   ["mapa-rotulo-carretera", "mapa-autopista"],
+  ["mapa-rotulo-carretera", "mapa-foto-autopista"],
+  // El número de portal del edificio resaltado, sobre su halo blanco.
+  ["mapa-foto-tinta", "mapa-foto-rotulo"],
   // Las etiquetas y los iconos de los controles claros.
   ["control-tinta", "control"],
   ["control-tinta", "control-hover"],

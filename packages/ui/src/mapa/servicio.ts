@@ -5,6 +5,7 @@ import type {
 } from "maplibre-gl";
 
 import { ZOOM_CELDAS } from "./celdas.ts";
+import { conFoto } from "./expresiones.ts";
 
 /**
  * Cómo se dibuja en el mapa la celda del emplazamiento seleccionado, la variante «A · Degradado»
@@ -111,10 +112,23 @@ export const capasServicioDebajo = (color: string): ReadonlyArray<LayerSpecifica
     source: FUENTE_SERVICIO,
     minzoom: ZOOM_CELDAS,
     filter: deTipo("banda"),
-    // Sin borde suavizado: el de cada banda se notaría como un anillo.
+    // Sin borde suavizado: el de cada banda se notaría como un anillo. Sobre la foto aérea, de
+    // z16,5 a z18 baja al 35 %: a pie de calle cubre toda la pantalla y teñía la foto.
     paint: {
       "fill-color": color,
-      "fill-opacity": conFundido(["get", "opacidad"]),
+      "fill-opacity": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        ZOOM_CELDAS,
+        0,
+        ZOOM_CELDAS + 0.5,
+        ["get", "opacidad"],
+        16.5,
+        ["get", "opacidad"],
+        18,
+        conFoto(["get", "opacidad"], ["*", 0.35, ["get", "opacidad"]]),
+      ],
       "fill-antialias": false,
     },
   },

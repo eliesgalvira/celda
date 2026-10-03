@@ -32,6 +32,8 @@ export const variantesBoton = cva(
       },
       tamano: {
         normal: "min-h-9 px-4 text-sm",
+        /** Para un botón que va en una fila apretada, como «Edificio» junto a los logos. */
+        compacto: "min-h-9 px-2.5 text-sm",
         grande: "min-h-11 px-5 text-base",
       },
       /** `completo` ocupa todo el ancho que le deja su contenedor. */

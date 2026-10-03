@@ -15,7 +15,11 @@ const CONTENEDOR_CABECERA =
 const ANTETITULO = "font-mono text-[11px] leading-4 tracking-[0.14em] uppercase";
 const TITULO = "font-titulo text-[1.375rem] leading-7 md:text-[1.625rem] md:leading-8";
 const LUGAR = "font-mono text-xs leading-4 text-tinta-suave";
-const FILA_LOGOS = "mt-2 flex min-h-10 items-center gap-3";
+/**
+ * La fila de los logos llega por debajo de «Cerrar», que queda a la altura del título: así caben
+ * los logos, «Ver el edificio» y el estado sin partirse en dos líneas.
+ */
+const FILA_LOGOS = "mt-2 -mr-23 flex min-h-10 items-center gap-3 md:-mr-22";
 
 export interface CabeceraFichaProps {
   /** Qué es, en pocas palabras: «Emplazamiento compartido». Puede llevar un `Termino`. */
@@ -26,6 +30,8 @@ export interface CabeceraFichaProps {
   readonly companias: ReadonlyArray<Compania>;
   /** Etiquetas junto a los logos, como el estado. */
   readonly etiquetas?: JSX.Element;
+  /** Un botón delante de las etiquetas, como «Ver el edificio» (`BotonEdificio`). */
+  readonly accion?: JSX.Element;
 }
 
 /** La cabecera de la ficha: lo que se ve con la hoja en el resumen. */
@@ -45,7 +51,10 @@ export function CabeceraFicha(props: CabeceraFichaProps) {
             )}
           </For>
         </div>
-        <div class="ml-auto flex flex-wrap items-center gap-2">{props.etiquetas}</div>
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {props.accion}
+          {props.etiquetas}
+        </div>
       </div>
     </header>
   );

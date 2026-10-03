@@ -1,6 +1,6 @@
 import type { ExpressionSpecification, LayerSpecification } from "maplibre-gl";
 
-import { deClase, porZoom } from "./expresiones.ts";
+import { conFoto, deClase, porZoom } from "./expresiones.ts";
 import type { ColorDeToken } from "./tokens.ts";
 
 /** Los usos del suelo que se tiñen de cerca, encima de las zonas urbanas. */
@@ -17,14 +17,21 @@ const opacidadDeVerde = (bosque: number, hierba: number): ExpressionSpecificatio
   ["match", ["get", "class"], "sand", 1, "wood", bosque, hierba],
 ];
 
+/** Los edificios de OpenStreetMap, que también busca «Ver el edificio». */
+export const CAPA_EDIFICIOS = "edificios";
+
 /**
  * El suelo del mapa base, de abajo arriba: la tierra, las zonas urbanas y los usos que se
  * reconocen de cerca, los verdes, el agua y los edificios. Todo de las capas `landuse`,
  * `landcover`, `park`, `water`, `waterway` y `building` de OpenMapTiles.
+ *
+ * `bajoElAgua` va entre la tierra y el agua: la foto aérea, que tapa la tierra. El agua va encima,
+ * porque el mar del PNOA es casi negro (ADR 0022), y los edificios se apagan sobre la foto.
  */
 export const capasSuelo = (
   fuente: string,
   color: ColorDeToken,
+  bajoElAgua: ReadonlyArray<LayerSpecification> = [],
 ): ReadonlyArray<LayerSpecification> => [
   { id: "fondo", type: "background", paint: { "background-color": color("mapa-fondo") } },
   {
@@ -133,13 +140,15 @@ export const capasSuelo = (
       "fill-opacity": porZoom(5, 0.35, 10, 0.3, 13, 0.15),
     },
   },
+  ...bajoElAgua,
   {
     id: "agua",
     type: "fill",
     source: fuente,
     "source-layer": "water",
     filter: ["!=", ["get", "brunnel"], "tunnel"],
-    paint: { "fill-color": color("mapa-agua") },
+    // Sobre la foto deja ver algo de la costa y los puertos.
+    paint: { "fill-color": color("mapa-agua"), "fill-opacity": conFoto(1, 0.88) },
   },
   {
     id: "rios",
@@ -164,7 +173,8 @@ export const capasSuelo = (
     },
   },
   {
-    id: "edificios",
+    // Sobre la foto no se pintan, pero siguen en el mapa: «Ver el edificio» los busca aquí.
+    id: CAPA_EDIFICIOS,
     type: "fill",
     source: fuente,
     "source-layer": "building",
@@ -172,7 +182,7 @@ export const capasSuelo = (
     paint: {
       "fill-color": color("mapa-edificio"),
       "fill-outline-color": color("mapa-edificio-borde"),
-      "fill-opacity": porZoom(14, 0, 15, 1),
+      "fill-opacity": porZoom(14, 0, 15, conFoto(1, 0)),
     },
   },
 ];
