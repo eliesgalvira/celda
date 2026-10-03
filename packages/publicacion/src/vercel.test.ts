@@ -2,19 +2,17 @@
 // @effect-diagnostics strictEffectProvide:off
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
-import { TestClock } from "effect/testing";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
-import { CopiaDeReserva, copiaEnVercel, leerPorHttp } from "./reserva.ts";
+import { SitioEnVercel, sitioEnVercel } from "./vercel.ts";
 
 const HOOK = "https://api.vercel.prueba/v1/integrations/deploy/prj_1/secreto-del-hook";
-const COPIA = "https://celda.prueba/capas";
+const CAPAS = "https://celda.prueba/capas";
 
 interface Peticion {
   readonly metodo: string;
@@ -41,27 +39,27 @@ const servidor = (respuestas: ReadonlyMap<string, ReadonlyArray<readonly [number
     return { capa: Layer.succeed(HttpClient.HttpClient, cliente), peticiones: Ref.get(peticiones) };
   });
 
-describe("copia de reserva en Vercel", () => {
-  it.effect("lee el vigente.json que sirve la copia sin caché, y un 404 es que no tiene", () =>
+describe("la web en Vercel, vista desde la ingesta", () => {
+  it.effect("lee el vigente.json que sirve en /capas sin caché, y un 404 es que no tiene", () =>
     Effect.gen(function* () {
-      const conCopia = yield* servidor(
-        new Map([[`${COPIA}/vigente.json`, [[200, '{"version":"a"}']]]]),
+      const conCapas = yield* servidor(
+        new Map([[`${CAPAS}/vigente.json`, [[200, '{"version":"a"}']]]]),
       );
-      const vigente = yield* Effect.flatMap(CopiaDeReserva, (c) => c.vigente).pipe(
+      const vigente = yield* Effect.flatMap(SitioEnVercel, (c) => c.vigente).pipe(
         Effect.provide(
-          copiaEnVercel({ hook: Redacted.make(HOOK), origen: Option.some(`${COPIA}/`) }).pipe(
-            Layer.provide(conCopia.capa),
+          sitioEnVercel({ hook: Redacted.make(HOOK), origen: Option.some(`${CAPAS}/`) }).pipe(
+            Layer.provide(conCapas.capa),
           ),
         ),
       );
       assert.deepStrictEqual(vigente, Option.some('{"version":"a"}'));
-      const [peticion] = yield* conCopia.peticiones;
+      const [peticion] = yield* conCapas.peticiones;
       assert.strictEqual(peticion?.cabeceras["cache-control"], "no-cache");
 
       const vacia = yield* servidor(new Map());
-      const nada = yield* Effect.flatMap(CopiaDeReserva, (c) => c.vigente).pipe(
+      const nada = yield* Effect.flatMap(SitioEnVercel, (c) => c.vigente).pipe(
         Effect.provide(
-          copiaEnVercel({ hook: Redacted.make(HOOK), origen: Option.some(COPIA) }).pipe(
+          sitioEnVercel({ hook: Redacted.make(HOOK), origen: Option.some(CAPAS) }).pipe(
             Layer.provide(vacia.capa),
           ),
         ),
@@ -70,12 +68,12 @@ describe("copia de reserva en Vercel", () => {
     }),
   );
 
-  it.effect("sin la URL de la copia no pregunta nada y se despliega siempre", () =>
+  it.effect("sin la URL de las capas no pregunta nada y se despliega siempre", () =>
     Effect.gen(function* () {
       const vacio = yield* servidor(new Map());
-      const vigente = yield* Effect.flatMap(CopiaDeReserva, (c) => c.vigente).pipe(
+      const vigente = yield* Effect.flatMap(SitioEnVercel, (c) => c.vigente).pipe(
         Effect.provide(
-          copiaEnVercel({ hook: Redacted.make(HOOK), origen: Option.none() }).pipe(
+          sitioEnVercel({ hook: Redacted.make(HOOK), origen: Option.none() }).pipe(
             Layer.provide(vacio.capa),
           ),
         ),
@@ -98,11 +96,11 @@ describe("copia de reserva en Vercel", () => {
           ],
         ]),
       );
-      const reserva = copiaEnVercel({ hook: Redacted.make(HOOK), origen: Option.none() }).pipe(
+      const sitio = sitioEnVercel({ hook: Redacted.make(HOOK), origen: Option.none() }).pipe(
         Layer.provide(vercel.capa),
       );
-      const desplegar = Effect.flatMap(CopiaDeReserva, (c) => c.desplegar).pipe(
-        Effect.provide(reserva),
+      const desplegar = Effect.flatMap(SitioEnVercel, (c) => c.desplegar).pipe(
+        Effect.provide(sitio),
       );
       yield* desplegar;
       const fallo = yield* Effect.flip(desplegar);
@@ -113,41 +111,6 @@ describe("copia de reserva en Vercel", () => {
           ["POST", HOOK],
           ["POST", HOOK],
         ],
-      );
-    }),
-  );
-});
-
-describe("lectura de lo publicado por HTTP", () => {
-  it.effect("un 404 es un fichero que no existe; un 5xx se reintenta antes de fallar", () =>
-    Effect.gen(function* () {
-      const origen = "https://capas.prueba";
-      const r2 = yield* servidor(
-        new Map([
-          [
-            `${origen}/vigente.json`,
-            [
-              [503, ""],
-              [200, "{}"],
-            ],
-          ],
-          [`${origen}/caido.json`, [[503, ""]]],
-        ]),
-      );
-      const leer = yield* leerPorHttp(`${origen}/`).pipe(Effect.provide(r2.capa));
-      assert.isTrue(Option.isNone(yield* leer("no-esta.json")));
-      const reintentado = yield* Effect.forkChild(leer("vigente.json"));
-      yield* TestClock.adjust("1 second");
-      assert.deepStrictEqual(yield* Fiber.join(reintentado), Option.some("{}"));
-
-      const caido = yield* Effect.forkChild(Effect.flip(leer("caido.json")));
-      yield* TestClock.adjust("1 minute");
-      const fallo = yield* Fiber.join(caido);
-      assert.strictEqual(fallo.motivo, "GET caido.json: 503");
-      // La primera y tres reintentos.
-      assert.lengthOf(
-        (yield* r2.peticiones).filter((p) => p.url.endsWith("/caido.json")),
-        4,
       );
     }),
   );

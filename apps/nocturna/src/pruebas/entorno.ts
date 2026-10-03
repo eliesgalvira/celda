@@ -9,9 +9,9 @@ import { OPCIONES_PUNTOS, type OpcionesPuntos } from "@celda/ingesta/barridoDePu
 import type { ExtractorDePuntos, ExtractorPorCajas } from "@celda/ingesta/extractor";
 import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
 import { capaDePuntosGrabada } from "@celda/ingesta/pruebas/antenasmoviles";
-import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
+import { type AlmacenDeCopias, AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
-import type { CopiaDeReserva } from "@celda/publicacion/reserva";
+import type { SitioEnVercel } from "@celda/publicacion/vercel";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
@@ -115,8 +115,10 @@ export interface Variante {
   readonly sinPublicar?: boolean;
   /** Emplazamientos por lote de fichas; por defecto, `POR_LOTE`. */
   readonly porLote?: number;
-  /** La copia de reserva de Vercel. Sin ella, la noche no la toca. */
-  readonly reserva?: Layer.Layer<CopiaDeReserva>;
+  /** La web en Vercel. Sin ella, la noche no lanza ningún build. */
+  readonly vercel?: Layer.Layer<SitioEnVercel>;
+  /** Las copias de la base en R2. Sin ellas, la copia se queda en el disco. */
+  readonly copiasEnR2?: Layer.Layer<AlmacenDeCopias>;
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
   readonly reintento?: Duration.Duration;
   readonly proceso?: OpcionesBarrido;
@@ -147,7 +149,7 @@ export const unaNoche = (
         ? sinAlmacen
         : publicadorEn(zonas, variante.porLote ?? POR_LOTE).pipe(
             Layer.provide(variante.almacen ?? entorno.almacenVigilado),
-            Layer.provide(variante.reserva ?? Layer.empty),
+            Layer.provide(variante.vercel ?? Layer.empty),
           ),
       Layer.succeed(
         Extractores,
@@ -157,6 +159,7 @@ export const unaNoche = (
         }),
       ),
       Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
+      variante.copiasEnR2 ?? Layer.empty,
     ).pipe(
       Layer.provideMerge(
         baseNocturna({

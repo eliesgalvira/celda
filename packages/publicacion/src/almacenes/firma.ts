@@ -18,12 +18,15 @@ const cripto = <A>(operacion: string, promesa: () => Promise<A>) =>
     catch: (causa) => new FirmaFallida({ motivo: `${operacion}: ${String(causa)}` }),
   });
 
-/** SHA-256 en hexadecimal, como lo piden las cabeceras de S3. */
-export const sha256 = (datos: string) =>
+/** SHA-256 de unos bytes en hexadecimal, como lo piden las cabeceras de S3. */
+export const sha256DeBytes = (datos: Uint8Array<ArrayBuffer>) =>
   Effect.map(
-    cripto("sha256", () => globalThis.crypto.subtle.digest("SHA-256", bytes(datos))),
+    cripto("sha256", () => globalThis.crypto.subtle.digest("SHA-256", datos)),
     hex,
   );
+
+/** SHA-256 de un texto en UTF-8, en hexadecimal. */
+export const sha256 = (datos: string) => sha256DeBytes(bytes(datos));
 
 const hmac = (clave: ArrayBuffer | Uint8Array<ArrayBuffer>, datos: string) =>
   cripto("hmac", async () => {

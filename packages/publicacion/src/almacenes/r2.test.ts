@@ -10,9 +10,9 @@ import { TestClock } from "effect/testing";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
-import { codificarConsulta, codificarRuta, firmarV4 } from "./firma.ts";
-import { almacenEnR2, leerListado } from "./r2.ts";
-import { AlmacenDeFicheros } from "../almacen.ts";
+import { codificarConsulta, codificarRuta, firmarV4, sha256DeBytes } from "./firma.ts";
+import { almacenEnR2, copiasEnR2, leerListado } from "./r2.ts";
+import { AlmacenDeCopias, AlmacenDeFicheros } from "../almacen.ts";
 
 const PUNTO = "http://r2.prueba";
 const FICHERO = "sitios@2026-09-26T02:15:03Z.json";
@@ -22,33 +22,47 @@ interface Peticion {
   readonly metodo: string;
   readonly url: string;
   readonly cabeceras: Readonly<Record<string, string>>;
+  readonly bytes: number;
 }
+
+const OPCIONES = {
+  cuenta: "cuenta",
+  cubo: CUBO,
+  idClave: "AKIDEXAMPLE",
+  secreto: Redacted.make("secreto"),
+  puntoDeEntrada: PUNTO,
+};
+
+const texto = (bytes: Uint8Array | undefined): string | undefined =>
+  bytes === undefined ? undefined : new TextDecoder().decode(bytes);
 
 /**
  * Un cubo de S3 de prueba en memoria: guarda lo que se sube, respeta `If-None-Match: *` con un
- * 412 y apunta cada petición con sus cabeceras.
+ * 412, lista por prefijo y apunta cada petición con sus cabeceras y el tamaño de su cuerpo.
  */
 const cuboDePrueba = Effect.gen(function* () {
-  const objetos = yield* Ref.make<ReadonlyMap<string, string>>(new Map());
+  const objetos = yield* Ref.make<ReadonlyMap<string, Uint8Array>>(new Map());
   const peticiones = yield* Ref.make<ReadonlyArray<Peticion>>([]);
   const cliente = HttpClient.make((request, url) =>
     Effect.gen(function* () {
+      const cuerpo = request.body._tag === "Uint8Array" ? request.body.body : new Uint8Array(0);
       yield* Ref.update(peticiones, (p) => [
         ...p,
-        { metodo: request.method, url: url.href, cabeceras: request.headers },
+        { metodo: request.method, url: url.href, cabeceras: request.headers, bytes: cuerpo.length },
       ]);
       const guardados = yield* Ref.get(objetos);
       const clave = url.pathname;
-      const responder = (estado: number, cuerpo = "") =>
+      const responder = (estado: number, cuerpo: BodyInit = "") =>
         HttpClientResponse.fromWeb(
           request,
           new Response(estado === 204 ? null : cuerpo, { status: estado }),
         );
       if (request.method === "GET" && clave === `/${CUBO}`) {
         // ListObjectsV2 de dos en dos, para que haga falta pedir varias páginas.
-        const todas = [...guardados.keys()].map((k) =>
-          decodeURIComponent(k.slice(`/${CUBO}/`.length)),
-        );
+        const prefijo = url.searchParams.get("prefix") ?? "";
+        const todas = [...guardados.keys()]
+          .map((k) => decodeURIComponent(k.slice(`/${CUBO}/`.length)))
+          .filter((k) => k.startsWith(prefijo));
         const desde = Number(url.searchParams.get("continuation-token") ?? "0");
         const pagina = todas.slice(desde, desde + 2);
         const mas = desde + 2 < todas.length;
@@ -69,26 +83,23 @@ const cuboDePrueba = Effect.gen(function* () {
       }
       if (request.method === "GET") {
         const guardado = guardados.get(clave);
-        return guardado === undefined ? responder(404, "NoSuchKey") : responder(200, guardado);
+        return guardado === undefined
+          ? responder(404, "NoSuchKey")
+          : responder(200, new Uint8Array(guardado));
       }
       if (request.headers["if-none-match"] === "*" && guardados.has(clave)) {
         return responder(412, "PreconditionFailed");
       }
-      const cuerpo =
-        request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : "";
       yield* Ref.update(objetos, (o) => new Map([...o, [clave, cuerpo]]));
       return responder(200);
     }),
   );
-  const almacen = almacenEnR2({
-    cuenta: "cuenta",
-    cubo: CUBO,
-    idClave: "AKIDEXAMPLE",
-    secreto: Redacted.make("secreto"),
-    origen: "https://capas.celda.prueba",
-    puntoDeEntrada: PUNTO,
-  }).pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, cliente)));
-  return { almacen, objetos, peticiones };
+  const http = Layer.succeed(HttpClient.HttpClient, cliente);
+  const almacen = almacenEnR2({ ...OPCIONES, origen: "https://celda.prueba/capas" }).pipe(
+    Layer.provide(http),
+  );
+  const copias = copiasEnR2(OPCIONES).pipe(Layer.provide(http));
+  return { almacen, copias, objetos, peticiones };
 });
 
 describe("almacén de ficheros en R2", () => {
@@ -173,7 +184,9 @@ describe("almacén de ficheros en R2", () => {
       const fallo = yield* Effect.flip(almacen.guardar(FICHERO, '{"version":"b"}'));
       assert.strictEqual(fallo._tag, "FicheroInmutable");
       assert.deepStrictEqual(
-        (yield* Ref.get(cubo.objetos)).get("/celda-capas/sitios%402026-09-26T02%3A15%3A03Z.json"),
+        texto(
+          (yield* Ref.get(cubo.objetos)).get("/celda-capas/sitios%402026-09-26T02%3A15%3A03Z.json"),
+        ),
         '{"version":"a"}',
       );
 
@@ -190,7 +203,7 @@ describe("almacén de ficheros en R2", () => {
         subida?.cabeceras.authorization ?? "",
         /^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/20260926\/auto\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/u,
       );
-      assert.strictEqual(almacen.url(FICHERO), `https://capas.celda.prueba/${FICHERO}`);
+      assert.strictEqual(almacen.url(FICHERO), `https://celda.prueba/capas/${FICHERO}`);
     }),
   );
 
@@ -239,6 +252,65 @@ describe("almacén de ficheros en R2", () => {
       const borrado = (yield* Ref.get(cubo.peticiones)).find((p) => p.metodo === "DELETE");
       assert.strictEqual(borrado?.url, `${PUNTO}/${CUBO}/fichas%402026-09-26T02%3A15%3A03Z/0.json`);
     }),
+  );
+
+  it.effect(
+    "las copias de la base van firmadas con su contenido bajo copias/, y se listan y se borran sin tocar lo publicado",
+    () =>
+      Effect.gen(function* () {
+        const cubo = yield* cuboDePrueba;
+        const almacen = yield* Effect.service(AlmacenDeFicheros).pipe(Effect.provide(cubo.almacen));
+        const copias = yield* Effect.service(AlmacenDeCopias).pipe(Effect.provide(cubo.copias));
+        yield* almacen.guardar(FICHERO, "{}");
+        const contenido = new Uint8Array([0x1f, 0x8b, 0, 255, 128, 7]);
+        yield* copias.guardar("ingesta-2026-09-26T02-15-03.000Z.sqlite.gz", contenido);
+        yield* copias.guardar("ingesta-2026-09-27T02-15-03.000Z.sqlite.gz", contenido);
+        yield* copias.guardar("ingesta-2026-09-28T02-15-03.000Z.sqlite.gz", contenido);
+
+        const subida = (yield* Ref.get(cubo.peticiones)).find(
+          (p) => p.metodo === "PUT" && p.url.includes("/copias/"),
+        );
+        assert.strictEqual(
+          subida?.url,
+          `${PUNTO}/${CUBO}/copias/ingesta-2026-09-26T02-15-03.000Z.sqlite.gz`,
+        );
+        assert.strictEqual(subida?.bytes, contenido.length);
+        assert.strictEqual(subida?.cabeceras["content-type"], "application/gzip");
+        assert.strictEqual(
+          subida?.cabeceras["x-amz-content-sha256"],
+          yield* sha256DeBytes(contenido),
+        );
+        // Una copia no es inmutable: con el mismo nombre se sube otra vez.
+        assert.isUndefined(subida?.cabeceras["if-none-match"]);
+        assert.deepStrictEqual(
+          [
+            ...((yield* Ref.get(cubo.objetos)).get(
+              `/${CUBO}/copias/ingesta-2026-09-26T02-15-03.000Z.sqlite.gz`,
+            ) ?? []),
+          ],
+          [...contenido],
+        );
+
+        assert.deepStrictEqual(
+          [...(yield* copias.listar)],
+          [
+            "ingesta-2026-09-26T02-15-03.000Z.sqlite.gz",
+            "ingesta-2026-09-27T02-15-03.000Z.sqlite.gz",
+            "ingesta-2026-09-28T02-15-03.000Z.sqlite.gz",
+          ],
+        );
+        const listados = (yield* Ref.get(cubo.peticiones)).filter((p) => p.url.includes("?"));
+        assert.deepStrictEqual(
+          listados.map((p) => p.url),
+          [
+            `${PUNTO}/${CUBO}?list-type=2&prefix=copias%2F`,
+            `${PUNTO}/${CUBO}?continuation-token=2&list-type=2&prefix=copias%2F`,
+          ],
+        );
+        yield* copias.borrar("ingesta-2026-09-26T02-15-03.000Z.sqlite.gz");
+        assert.lengthOf(yield* copias.listar, 2);
+        assert.isTrue(Option.isSome(yield* almacen.leer(FICHERO)));
+      }),
   );
 
   it("lee las claves y el testigo de ListObjectsV2", () => {

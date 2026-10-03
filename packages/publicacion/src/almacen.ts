@@ -15,8 +15,9 @@ export class AlmacenNoDisponible extends Schema.TaggedError<AlmacenNoDisponible>
 ) {}
 
 /**
- * El almacén de ficheros donde se publica: una carpeta servida por un origen estático, o R2
- * detrás de la CDN. Todo fichero es inmutable menos `vigente.json`.
+ * El almacén de ficheros donde se publica: una carpeta servida por un origen estático, o el cubo
+ * privado de R2 del que el build de Vercel monta las capas (ADR 0018). Todo fichero es inmutable
+ * menos `vigente.json`.
  */
 export class AlmacenDeFicheros extends Context.Service<
   AlmacenDeFicheros,
@@ -41,3 +42,22 @@ export class AlmacenDeFicheros extends Context.Service<
     readonly url: (fichero: string) => string;
   }
 >()("@celda/publicacion/almacen/AlmacenDeFicheros") {}
+
+/**
+ * Dónde van, fuera de la máquina de la ingesta, las copias de seguridad de su base: un prefijo
+ * propio del cubo de R2 (ADR 0018). Cada copia es un fichero nuevo con la fecha en el nombre.
+ */
+export class AlmacenDeCopias extends Context.Service<
+  AlmacenDeCopias,
+  {
+    /** Sube una copia. Si ya hay una con ese nombre, la sustituye. */
+    readonly guardar: (
+      nombre: string,
+      contenido: Uint8Array<ArrayBuffer>,
+    ) => Effect.Effect<void, AlmacenNoDisponible>;
+    /** Los nombres de las copias guardadas, sin el prefijo. */
+    readonly listar: Effect.Effect<ReadonlyArray<string>, AlmacenNoDisponible>;
+    /** Borra una copia. Si ya no está, no hace nada. */
+    readonly borrar: (nombre: string) => Effect.Effect<void, AlmacenNoDisponible>;
+  }
+>()("@celda/publicacion/almacen/AlmacenDeCopias") {}

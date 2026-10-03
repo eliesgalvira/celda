@@ -15,7 +15,11 @@ import {
   type FuenteGrabada,
   muestraCampusNord,
 } from "@celda/ingesta/pruebas/grabado";
-import { AlmacenDeFicheros, AlmacenNoDisponible } from "@celda/publicacion/almacen";
+import {
+  AlmacenDeCopias,
+  AlmacenDeFicheros,
+  AlmacenNoDisponible,
+} from "@celda/publicacion/almacen";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
@@ -157,6 +161,48 @@ const almacenCaido = (entorno: Entorno, caido: Ref.Ref<boolean>) =>
       });
     }),
   ).pipe(Layer.provide(entorno.almacenVigilado));
+
+/**
+ * Un cubo de R2 de prueba para las copias de la base: las guarda en memoria, contesta en otra
+ * tarea y puede dejar de contestar.
+ */
+const copiasDePrueba = Effect.gen(function* () {
+  const guardadas = yield* Ref.make<ReadonlyMap<string, Uint8Array>>(new Map());
+  const caido = yield* Ref.make(false);
+  const siContesta = <A>(efecto: Effect.Effect<A>) =>
+    Effect.andThen(
+      Effect.yieldNow,
+      Effect.flatMap(Ref.get(caido), (sinRed) =>
+        sinRed ? Effect.fail(new AlmacenNoDisponible({ motivo: "R2 no contesta" })) : efecto,
+      ),
+    );
+  const capa = Layer.succeed(
+    AlmacenDeCopias,
+    AlmacenDeCopias.of({
+      guardar: (nombre, contenido) =>
+        siContesta(Ref.update(guardadas, (g) => new Map([...g, [nombre, contenido]]))),
+      listar: siContesta(Effect.map(Ref.get(guardadas), (g) => [...g.keys()])),
+      borrar: (nombre) =>
+        siContesta(
+          Ref.update(guardadas, (g) => new Map([...g].filter(([guardada]) => guardada !== nombre))),
+        ),
+    }),
+  );
+  return { capa, guardadas: Ref.get(guardadas), caido };
+});
+
+/** Descomprime una copia subida a R2. */
+const descomprimir = (comprimida: Uint8Array) =>
+  Effect.promise(
+    async () =>
+      new Uint8Array(
+        await new Response(
+          new Blob([new Uint8Array(comprimida)])
+            .stream()
+            .pipeThrough(new DecompressionStream("gzip")),
+        ).arrayBuffer(),
+      ),
+  );
 
 describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial grabado)", () => {
   it.effect("una noche lee el listado y las fichas, fusiona y publica la capa y sus fichas", () =>
@@ -335,9 +381,18 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           const path = yield* Path.Path;
           const grabada = yield* muestraCampusNord;
           yield* TestClock.setTime(NOCHE);
+          const r2 = yield* copiasDePrueba;
           let ultima: string | undefined;
           for (let noche = 0; noche < COPIAS_CONSERVADAS + 2; noche++) {
-            ultima = (yield* unaNoche(entorno, registroOficial(grabada))).copia;
+            const hecha = yield* unaNoche(entorno, registroOficial(grabada), {
+              copiasEnR2: r2.capa,
+            });
+            ultima = hecha.copia;
+            assert.deepStrictEqual(hecha.copiaEnR2, {
+              tipo: "subida",
+              nombre: `${path.basename(ultima ?? "")}.gz`,
+              retiradas: noche < COPIAS_CONSERVADAS ? 0 : 1,
+            });
             yield* TestClock.adjust(DIA);
           }
           const copias = (yield* fs.readDirectory(entorno.copias)).toSorted();
@@ -346,6 +401,16 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           assert.strictEqual(path.join(entorno.copias, copias.at(-1) ?? ""), ultima);
           // Las dos primeras noches ya no tienen copia.
           assert.isFalse(copias.some((copia) => copia.includes("2026-09-26")));
+          // En R2 quedan las mismas, comprimidas, y la última es la copia del disco.
+          const enR2 = yield* r2.guardadas;
+          assert.deepStrictEqual(
+            [...enR2.keys()].toSorted(),
+            copias.map((copia) => `${copia}.gz`),
+          );
+          assert.deepStrictEqual(
+            [...(yield* descomprimir(enR2.get(`${copias.at(-1) ?? ""}.gz`) ?? new Uint8Array()))],
+            [...(yield* fs.readFile(ultima ?? ""))],
+          );
 
           const original = yield* resumenDe(entorno);
           const copiada = yield* conBase(
@@ -365,6 +430,36 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           assert.deepStrictEqual(fuente.ultima?.cambios.observaciones, SIN_CAMBIOS.observaciones);
         }),
       ),
+  );
+
+  it.effect("si la copia no llega a R2, la noche acaba bien y la sube la noche siguiente", () =>
+    conEntorno((entorno) =>
+      Effect.gen(function* () {
+        const grabada = yield* muestraCampusNord;
+        const r2 = yield* copiasDePrueba;
+        yield* TestClock.setTime(NOCHE);
+        yield* Ref.set(r2.caido, true);
+        const primera = yield* unaNoche(entorno, registroOficial(grabada), {
+          copiasEnR2: r2.capa,
+        });
+        assert.strictEqual(primera.publicacion.tipo, "publicada");
+        assert.isDefined(primera.copia);
+        assert.deepStrictEqual(primera.copiaEnR2, { tipo: "fallida", motivo: "R2 no contesta" });
+
+        yield* Ref.set(r2.caido, false);
+        yield* TestClock.adjust(DIA);
+        const segunda = yield* unaNoche(entorno, registroOficial(grabada), {
+          copiasEnR2: r2.capa,
+        });
+        assert.strictEqual(segunda.copiaEnR2.tipo, "subida");
+        assert.lengthOf(yield* r2.guardadas, 1);
+
+        // Sin cubo de R2, la copia se queda en el disco.
+        yield* TestClock.adjust(DIA);
+        const sinR2 = yield* unaNoche(entorno, registroOficial(grabada));
+        assert.deepStrictEqual(sinR2.copiaEnR2, { tipo: "sin-subir" });
+      }),
+    ),
   );
 
   it.effect(

@@ -9,7 +9,7 @@
     "build": "vp build",
     "ingesta": "vp build && node dist/nocturna.js",
     "medir-espana": "node src/medida/espana.ts",
-    "reserva": "vp build && node dist/nocturna.js reserva",
+    "capas": "vp build && node dist/nocturna.js capas",
     "test": "vp test run",
     "typecheck": "tsc --noEmit"
   },
