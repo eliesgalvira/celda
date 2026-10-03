@@ -532,11 +532,11 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           yield* sql`SELECT max(inicio) AS v FROM ejecuciones WHERE estado = 'completada'
             AND json_extract(cambios, '$.emplazamientos.retirados') > 0`,
         );
-        // Lo aceptado en la moderación cambia las fichas de su emplazamiento: cuenta la fecha de
-        // la ejecución que lo trajo.
+        // Lo aceptado en la moderación cambia la ficha de su emplazamiento, si está: cuenta la
+        // fecha de la ejecución que lo trajo.
         const [aceptado] = yield* decodificar(Maximo)(
           yield* sql`SELECT max(importada_en) AS v FROM aportaciones_aceptadas
-            WHERE tipo <> 'propia'`,
+            WHERE tipo <> 'propia' AND emplazamiento IN (SELECT clave FROM emplazamientos)`,
         );
         const fechas = [cambiado?.v ?? null, retirado?.v ?? null, aceptado?.v ?? null].filter(
           (v) => v !== null,
