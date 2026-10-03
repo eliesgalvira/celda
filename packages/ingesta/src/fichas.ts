@@ -418,6 +418,20 @@ const describirFichaFallida = (f: FichaFallida): string =>
     : `se vuelve a pedir desde ${fechaUtc(f.esperaHasta)}`);
 
 /**
+ * Hasta cuándo espera una ficha tras su fallo número `intento`, acabado en `fin`. Una ilegible, o
+ * una que el registro no tiene, espera; un fallo pasajero, no.
+ */
+const esperaHastaTras = (
+  fallo: ErrorDeExtractor,
+  intento: number,
+  fin: number,
+  relectura: Duration.Duration,
+): number | undefined =>
+  fallo._tag === "RespuestaInesperada" || fallo._tag === "SinFichaEnElRegistro"
+    ? fin + Duration.toMillis(esperaTrasFallos(intento, relectura))
+    : undefined;
+
+/**
  * Lee las fichas de la cola en orden, una cada `ritmo`, hasta que se acaba la cola o se cierra la
  * ventana: una ficha que ya no empezaría antes del cierre se deja para la noche siguiente. La
  * pausa la hace el cliente de la fuente; aquí solo se mira si la siguiente cabe.
@@ -431,7 +445,9 @@ const describirFichaFallida = (f: FichaFallida): string =>
  *   intento y cuándo se vuelve a pedir, y el resumen del final las nombra con su motivo.
  * - Una que el registro no tiene no cuenta para los fallos seguidos ni los corta: es lo que dice
  *   el registro, no un fallo de la fuente. Tras `SIN_FICHA_SEGUIDAS` así seguidas, se paran las
- *   fichas, porque lo probable es que haya cambiado la URL de la ficha.
+ *   fichas, porque lo probable es que haya cambiado la URL de la ficha, y ninguna de la racha
+ *   queda sin ficha en el registro: esperan como cualquier fallo. Por eso la marca de una racha
+ *   se apunta cuando acaba.
  * - Tras `fallosSeguidos` fallos seguidos, o si la fuente bloquea a Celda (un 401 o un 403, una
  *   página que no es una ficha), pide esperar (un 429, o un 503 con `Retry-After` que pide más de
  *   lo que el cliente aguanta), el tope de peticiones o `robots.txt`, se deja de pedir esta noche
@@ -451,7 +467,22 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
   let cambiadas = 0;
   const fallidas: Array<FichaFallida> = [];
   let seguidos = 0;
-  let sinFichaSeguidas = 0;
+  /**
+   * Las fichas sin ficha en el registro seguidas, aún sin apuntar: la marca solo se guarda cuando
+   * la racha acaba antes de `SIN_FICHA_SEGUIDAS`. Si llega, la racha entera es sospechosa.
+   */
+  let racha: Array<{ readonly clave: string; readonly fallo: FalloDeFicha }> = [];
+  const apuntarRacha = (conMarca: boolean) =>
+    Effect.suspend(() => {
+      const apuntar = racha;
+      racha = [];
+      return Effect.forEach(
+        apuntar,
+        ({ clave, fallo }) =>
+          lectura.fallar(clave, conMarca ? fallo : { ...fallo, sinFichaEnRegistro: undefined }),
+        { discard: true },
+      );
+    });
   let finAnterior: number | undefined;
   let parada: string | undefined;
   const parar = (motivo: string) => {
@@ -482,35 +513,34 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
       }
       const sinFicha = fallo._tag === "SinFichaEnElRegistro";
       // Una ficha que el registro no tiene no es un fallo de la fuente: ni suma ni corta los
-      // fallos seguidos. Las demás cortan las que no tiene seguidas.
-      if (sinFicha) sinFichaSeguidas++;
-      else {
+      // fallos seguidos. Las demás acaban la racha de las que no tiene.
+      if (!sinFicha) {
         seguidos++;
-        sinFichaSeguidas = 0;
+        yield* apuntarRacha(true);
       }
       const { clave, url } = enCola.registro;
       errores.push(`Ficha ${clave}: ${motivo}`);
       const intento = enCola.fallos + 1;
-      // Una ficha ilegible, o una que el registro no tiene, espera; un fallo pasajero, no.
-      const espera = sinFicha || fallo._tag === "RespuestaInesperada";
-      const esperaHasta = espera
-        ? finAnterior + Duration.toMillis(esperaTrasFallos(intento, opciones.relectura))
-        : undefined;
+      const esperaHasta = esperaHastaTras(fallo, intento, finAnterior, opciones.relectura);
       if (esperaHasta !== undefined) {
-        yield* lectura.fallar(clave, {
+        const apuntado: FalloDeFicha = {
           fallos: intento,
           esperaHasta,
           motivo,
           sinFichaEnRegistro: sinFicha ? lectura.inicio : undefined,
-        });
+        };
+        if (sinFicha) racha.push({ clave, fallo: apuntado });
+        else yield* lectura.fallar(clave, apuntado);
       }
       const fallida: FichaFallida = { clave, url, motivo: motivoDe(fallo), intento, esperaHasta };
       fallidas.push(fallida);
       yield* Effect.logWarning(describirFichaFallida(fallida));
-      if (sinFichaSeguidas >= SIN_FICHA_SEGUIDAS) {
+      if (racha.length >= SIN_FICHA_SEGUIDAS) {
         const motivoDeParar =
-          `${sinFichaSeguidas} fichas seguidas dicen «Código de emplazamiento no válido»: ` +
+          `${racha.length} fichas seguidas dicen «Código de emplazamiento no válido»: ` +
           "puede que haya cambiado la URL de la ficha del registro o el formato de sus códigos";
+        // Ninguna de la racha se da por sin ficha: esperan y se reintentan como cualquier fallo.
+        yield* apuntarRacha(false);
         yield* Effect.logError(`Fichas paradas: ${motivoDeParar}`);
         parar(motivoDeParar);
         break;
@@ -522,7 +552,7 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
       continue;
     }
     seguidos = 0;
-    sinFichaSeguidas = 0;
+    yield* apuntarRacha(true);
     const cambiada = yield* lectura.aplicar(enCola.registro.clave, bandas.success);
     leidas++;
     cambiadas += cambiada ? 1 : 0;
@@ -536,6 +566,8 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
     }
   }
 
+  // Una racha corta que acaba con la cola, la ventana o una parada es lo que dice el registro.
+  yield* apuntarRacha(true);
   const hechas: FichasDeLaNoche = {
     leidas,
     cambiadas,

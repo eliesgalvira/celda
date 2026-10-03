@@ -602,7 +602,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
         const noValido = new Uint8Array(
           yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"),
         );
-        const { hechas, peticiones } = yield* leerContraElGeoportal(
+        const { hechas, peticiones, apuntado } = yield* leerContraElGeoportal(
           colaDe(SIN_FICHA_SEGUIDAS + 5),
           geoportal(noValido),
           A_UN_SEGUNDO,
@@ -618,6 +618,14 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
           hechas.errores.at(-1),
           `Fichas paradas hasta la próxima noche: ${motivo}`,
         );
+        // La racha entera es sospechosa: ninguna queda sin ficha en el registro, pero todas
+        // esperan y se reintentan como cualquier fallo.
+        assert.strictEqual(apuntado.fallos.length, SIN_FICHA_SEGUIDAS);
+        for (const [, fallo] of apuntado.fallos) {
+          assert.isUndefined(fallo.sinFichaEnRegistro);
+          assert.strictEqual(fallo.fallos, 1);
+          assert.isAtLeast(fallo.esperaHasta, DIA);
+        }
       }).pipe(Effect.provide(NodeServices.layer)),
   );
 

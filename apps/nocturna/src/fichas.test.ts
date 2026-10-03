@@ -16,7 +16,7 @@ import {
   type Registro,
   RespuestaInesperada,
 } from "@celda/ingesta/extractor";
-import { OPCIONES_FICHAS, type OpcionesFichas } from "@celda/ingesta/fichas";
+import { OPCIONES_FICHAS, type OpcionesFichas, SIN_FICHA_SEGUIDAS } from "@celda/ingesta/fichas";
 import { ObservacionGuardada, PuntoGuardado } from "@celda/ingesta/guardado";
 import {
   capaGrabadaPorCajas,
@@ -490,6 +490,37 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             sinMarca?.estaciones.find((e) => e.compania === afectada.compania)?.bandas.length ?? 0,
             0,
           );
+        }),
+      ),
+    30_000,
+  );
+
+  it.effect(
+    "veinte fichas seguidas sin ficha en el registro paran la noche y ninguna queda marcada",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          const todas = new Set(grabada.listado.registros.map((r) => r.clave));
+          const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
+          yield* TestClock.setTime(NOCHE);
+          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, sinFicha: todas }, pedidas));
+          const pedidasEnLaNoche = yield* Ref.get(pedidas);
+          assert.lengthOf(pedidasEnLaNoche, SIN_FICHA_SEGUIDAS);
+          for (const clave of pedidasEnLaNoche) {
+            const guardada = yield* observacionEn(entorno, clave);
+            // Esperan como cualquier fallo, pero sin la marca pública.
+            assert.notProperty(guardada.datos, "sinFichaEnRegistro");
+            assert.strictEqual(guardada.fallos, 1);
+            assert.strictEqual(guardada.espera, NOCHE + DIA);
+          }
+          assert.isTrue(
+            (yield* fichasPublicadas(entorno)).every((f) =>
+              f.estaciones.every((e) => e.sinFichaEnRegistro === undefined),
+            ),
+          );
+          const ejecucion = yield* ultimaDe(entorno);
+          assert.include(ejecucion?.errores.at(-1) ?? "", "puede que haya cambiado la URL");
         }),
       ),
     30_000,
