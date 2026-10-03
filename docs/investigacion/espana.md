@@ -1,6 +1,6 @@
 # Investigación 08 · Ampliación a toda España
 
-> **Nota (03/10/2026).** Celda ya no lee antenasmoviles.es ([ADR 0019](../adr/0019-fuentes-registro-y-aportaciones-propias.md)). Las cifras de aquí que salen de su densidad, como los 87 cuadros, los registros previstos por zona y la simulación del teselado, quedan como historia. El #55 rehízo los cuadros y las densidades con el listado propio de toda España (apartado «Los cuadros con el registro», al final) y borró los guiones de `muestras/espana/` que leían `showf`.
+> **Nota (03/10/2026).** Celda ya no lee antenasmoviles.es ([ADR 0019](../adr/0019-fuentes-registro-y-aportaciones-propias.md)). Las cifras de aquí que salen de su densidad, como los 87 cuadros, los registros previstos por zona y la simulación del teselado, quedan como historia. El #55 rehízo los cuadros y las densidades con el listado propio de toda España (apartado 7) y borró los guiones de `muestras/espana/` que leían `showf`.
 
 Qué cambia al pasar de la caja de Barcelona a toda España, con cifras. Es un plan: no hay nada implementado. Las decisiones que salen de aquí están en los ADR 0014 a 0017, en estado «propuesta».
 
@@ -596,6 +596,58 @@ Medido con `pmtiles extract --dry-run`, sobre el polígono de España con un mar
 El extracto de OpenFreeMap vale con el estilo de hoy sin tocarlo, porque usa el mismo esquema. OpenFreeMap publica el planeta en PMTiles en `btrfs.openfreemap.com`, aunque su README no lo documente. El de Protomaps necesitaría otro estilo.
 
 El problema no es el tamaño sino dónde ponerlo. 1,5 GB cabe en R2, pero R2 está detrás de Cloudflare y cae con los bloqueos de LaLiga igual que OpenFreeMap. En Vercel no cabe: son 1,5 GB y 219.342 teselas contra 100 MB y 15.000 ficheros. Una reserva de verdad para toda España necesita un tercer sitio fuera de Cloudflare, o conformarse con una reserva de zooms bajos. Hasta z10 serían unos 30 MB (estimado: hasta z13 son 563 MB y cada nivel multiplica el total por unos 2,6), más Barcelona entera a z14. Es una decisión del usuario y queda fuera de la ampliación.
+
+## 7. Los cuadros con el registro (#55, 03/10/2026)
+
+Los 94 cuadros de `ZONAS_DE_BARRIDO` y los registros previstos de cada zona salían de los marcadores de antenasmoviles.es (apartado 1). El ADR 0019 los rehace con el listado propio del registro oficial.
+
+**De dónde sale.** De la base de la ingesta nocturna tras su primera noche, la del 29/09/2026, que barrió las siete zonas de 22:01 a 22:17 UTC en esta máquina (**medido**). Tiene 69.612 observaciones vigentes del registro oficial, todas de esa noche, en los 94 cuadros, con un barrido completo de cada zona. Es el listado de toda España: se comprueba antes de usarlo, porque la orden falla si a la base le falta un barrido completo de alguna zona.
+
+```sh
+cd apps/nocturna
+pnpm run cuadros <ingesta.sqlite> [pasada-de-borde.json]
+```
+
+La orden abre la base solo para leer, sitúa cada registro en su cuadro y su provincia con los límites del IGN y escribe `packages/dominio/datos/cuadros-del-registro.json`: por cuadro, sus registros, sus registros por provincia, las provincias que toca y su zona con la regla del ADR 0014 (`zonaDelCuadro`). Dice además qué cuadros son nuevos y cuáles cambian de zona; `ZONAS_DE_BARRIDO` se pone al día a mano, y una prueba de `@celda/dominio` comprueba que coincide con el fichero.
+
+**Lo que sale** (**medido**):
+
+- Los 94 cuadros tienen registros, de 10 (`-19,27`, el oeste de El Hierro) a 7.643 (`-4,40`, Madrid). Ninguno sobra.
+- Todos los registros caen en alguna provincia.
+- Dos cuadros cambian de zona, porque su comunidad con más registros no es la que preveía la densidad de antenasmoviles.es:
+  - `-5,38`, el norte de Córdoba y Jaén y el sur de Ciudad Real, pasa de `centro` a Andalucía: 213 registros de Andalucía, 188 de Castilla-La Mancha y 2 de Extremadura.
+  - `-5,40`, Ávila, Segovia, el oeste de Madrid y el norte de Toledo, pasa de `centro` al Ebro y el Duero: 503 de Castilla y León, 407 de Madrid y 208 de Castilla-La Mancha.
+
+| Zona | Previstos con antenasmoviles.es | La primera noche, con los cuadros de antes | Con los cuadros nuevos |
+|---|---|---|---|
+| Cataluña | 9.859 | 10.305 | 10.305 |
+| `centro` | 12.230 | 12.528 | 11.007 |
+| Andalucía | 11.351 | 11.175 | 11.578 |
+| levante | 10.709 | 10.947 | 10.947 |
+| norte | 9.488 | 9.287 | 9.287 |
+| Ebro y Duero | 10.045 | 9.875 | 10.993 |
+| oeste y Canarias | 5.229 | 5.495 | 5.495 |
+| **Total** | 68.911 | 69.612 | 69.612 |
+
+Un cuadro que cambia de zona no pierde nada: sus observaciones pasan a contar ausencias en los barridos de su zona nueva, y la noche que barre la vieja ya no lo pide. Las dos zonas que lo reciben lo barren entero la próxima vez que les toque.
+
+**Los cuadros de borde.** El listado de las zonas solo pide sus cuadros, así que un registro en otro cuadro nunca aparece en la base. Con los límites del IGN, los cuadros de 1° que tocan alguna provincia y no están en ninguna zona son cuatro (**medido**): `-17,27` (el sur de Tenerife), `-19,28` (el oeste de La Palma), `-4,35` (Alborán) y `-8,40` (el oeste de Cáceres). Hay que pedirlos una vez, con el ritmo y el `User-Agent` del extractor:
+
+```sh
+sudo --user=celda-nocturna celda-nocturna cuadros-de-borde /var/lib/celda-nocturna/cuadros-de-borde.json
+```
+
+Son `robots.txt` y una petición por cuadro, unos 15 s, y no toca la base. Se lanza por SSH en el portátil de la ingesta, fuera de la ventana de la noche para no doblar el ritmo. Con ese fichero y una copia de la base, `pnpm run cuadros <copia> cuadros-de-borde.json` suma los cuadros que traigan algo: cada uno va a su zona con la misma regla, el fichero guarda la pasada (peticiones y registros de cada cuadro) y la orden dice qué añadir a `ZONAS_DE_BARRIDO`.
+
+**La pasada aún no está hecha.** Desde esta máquina no se pide nada al registro. Cuando se haga, sus peticiones, los cuadros nuevos y los registros de cada uno van aquí, y el comentario de `ZONAS_DE_BARRIDO` deja de decir que falta.
+
+**La España sintética.** `apps/nocturna/src/pruebas/espana.ts` reparte ahora los registros por cuadro con las cifras de `cuadros-del-registro.json`, y no por zona con los previstos. Da 69.612 registros y 42.089 emplazamientos. Toda España en una noche pide 242 listados la primera vez y 205 después; la primera noche real hizo 247, y levante, con 46, es la zona que más pide en las dos. Con el montón de V8 a 512 MB caben las tres noches de la medida (`pnpm run medir-espana`, 03/10/2026, en esta máquina):
+
+| Noche | Sin las pausas | RSS máximo, con el montón a 512 MB |
+|---|---|---|
+| Toda España, primera pasada, sin fichas: 242 peticiones, 428 ficheros publicados | 19 s | 628 MB |
+| Las 69.612 fichas en una noche, y publicar todos los lotes con bandas | 114 s | 734 MB |
+| Por defecto: una zona y 5.500 fichas que cambian, 33 ficheros publicados | 26 s | 748 MB |
 
 ## Qué no he podido comprobar
 

@@ -30,8 +30,9 @@ Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias
 7. comprueba que la noche llamó una vez al deploy hook y que Vercel monta las dos versiones de la noche, la vigente y su anterior, igual byte a byte que R2, leyendo con la clave de solo lectura y sin escribir nada con ella;
 8. publica a mano con `systemd-run`, como el servicio, y comprueba que con Vercel al día no se llama al hook;
 9. deja servido un despliegue de otra versión y hace que R2 no conteste al build: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo el anterior. Con R2 de vuelta, la siguiente publicación lo pone al día;
-10. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
-11. busca las dos claves de R2, sus secretos y el hook en todo el almacén de Nix de la máquina y no los encuentra.
+10. lanza `celda-nocturna cuadros-de-borde` como el usuario del servicio y comprueba que pide una vez cada uno de los cuatro cuadros de borde, que en el Campus Nord no traen nada, y que no toca la base;
+11. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
+12. busca las dos claves de R2, sus secretos y el hook en todo el almacén de Nix de la máquina y no los encuentra.
 
 Con todo construido, la máquina virtual tarda unos 2 min 30 s en arrancar y pasar la prueba. Casi todo es la ventana de fichas.
 
@@ -261,6 +262,24 @@ sudo systemctl start celda-nocturna.service        # una noche ahora, con petici
 ```
 
 El módulo instala `celda-nocturna` con la configuración de la máquina pero sin credenciales. Sirve para `estado` y `copia`. Para una noche entera o para publicar, usa el servicio, que es el que tiene las credenciales.
+
+### Los cuadros de borde
+
+Los cuadros de las zonas salen del listado propio del registro (ADR 0019 y [convex.md](convex.md#los-cuadros-de-las-zonas)). Los que tocan alguna provincia y no están en ninguna zona se piden una vez, por SSH, en la máquina:
+
+```sh
+sudo --user=celda-nocturna celda-nocturna cuadros-de-borde /var/lib/celda-nocturna/cuadros-de-borde.json
+```
+
+Usa el extractor del registro con la configuración de la máquina: su ritmo, su `User-Agent`, `robots.txt` y su tope. No abre la base ni el almacén, así que no le hacen falta credenciales. Lánzala fuera de la ventana de la noche, para no pedir a la vez que el servicio. Con los límites del IGN de hoy son cuatro cuadros y unos 15 s. Después, en el repositorio, con el fichero y la última copia de la base:
+
+```sh
+scp maquina:/var/lib/celda-nocturna/cuadros-de-borde.json maquina:/ruta/de/copias/ingesta-<fecha>.sqlite .
+cd apps/nocturna
+pnpm run cuadros ../../ingesta-<fecha>.sqlite ../../cuadros-de-borde.json
+```
+
+La orden suma los cuadros que traigan algún registro, dice en qué zona va cada uno y deja la pasada en `cuadros-del-registro.json`. Los cuadros nuevos se añaden a `ZONAS_DE_BARRIDO`, y la pasada se anota en la investigación 08, apartado 7.
 
 ## Certificados del geoportal
 
