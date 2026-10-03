@@ -6,7 +6,9 @@ import { opcionesClienteDeFichas, opcionesFichasDesdeConfig } from "@celda/inges
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
+import * as Option from "effect/Option";
 
+import { type ConexionDePublicacion, conexionDePublicacionDesdeConfig } from "./buzon.ts";
 import type { OpcionesNoche } from "./programa.ts";
 
 /** Todo lo que la ingesta nocturna lee de fuera, con los valores de hoy por defecto. */
@@ -18,6 +20,8 @@ export interface Configuracion {
   /** Las del cliente de las fichas del registro oficial: su pausa es el ritmo de las fichas. */
   readonly fichasDelRegistro: OpcionesCliente;
   readonly interruptores: Readonly<Record<Fuente, Interruptor>>;
+  /** De dónde se lee lo aceptado en la moderación, si está configurado. */
+  readonly buzon: Option.Option<ConexionDePublicacion>;
 }
 
 /** Cada cuánto se reintenta una publicación fallida la misma noche. */
@@ -46,8 +50,13 @@ export const COPIAS_CONSERVADAS = 14;
  *   `CELDA_REGISTRO_MAX_PETICIONES`, `CELDA_REGISTRO_USER_AGENT`, `CELDA_REGISTRO_REINTENTOS` y
  *   `CELDA_REGISTRO_ESPERA_SEGUNDOS` (`RegistroOficial.opcionesClienteDesdeConfig`).
  *
- * El registro oficial es la única fuente con extractor (ADR 0019): las correcciones de la
- * comunidad y OpenCelliD quedan apagados. Dónde se publica lo dice `almacenDesdeConfig`
+ * - `CELDA_CONVEX_SITE_URL` y `CELDA_PUBLICACION_CLAVE`: las acciones HTTP del buzón de Convex y
+ *   la clave de publicación, con las que la noche lee lo aceptado en la moderación (ADR 0020). Con
+ *   las dos, la comunidad tiene su interruptor encendido; sin ellas, apagado. Nunca una clave de
+ *   despliegue.
+ *
+ * El registro oficial es la única fuente con extractor (ADR 0019), y la comunidad llega por el
+ * buzón. OpenCelliD queda apagado. Dónde se publica lo dice `almacenDesdeConfig`
  * (`@celda/publicacion`).
  */
 export const configuracion: Config.Config<Configuracion> = Config.all({
@@ -68,6 +77,7 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
   registroMotivo: Config.String("CELDA_REGISTRO_MOTIVO").pipe(
     Config.withDefault("apagado en la configuración de la ingesta"),
   ),
+  buzon: conexionDePublicacionDesdeConfig,
 }).pipe(
   Config.map((c): Configuracion => ({
     base: c.base,
@@ -83,6 +93,10 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
       "registro-oficial": c.registroActivo
         ? INTERRUPTOR_POR_DEFECTO["registro-oficial"]
         : { activo: false, motivo: c.registroMotivo },
+      comunidad: Option.isSome(c.buzon)
+        ? { activo: true, motivo: "" }
+        : INTERRUPTOR_POR_DEFECTO.comunidad,
     },
+    buzon: c.buzon,
   })),
 );

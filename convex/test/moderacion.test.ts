@@ -1,7 +1,10 @@
 // Cada prueba es su propio punto de entrada y monta sus capas.
 // @effect-diagnostics strictEffectProvide:off
 import { assert, describe, it } from "@effect/vitest";
+import type { PaginaDeCola } from "@celda/dominio/moderacion";
+import { makeFunctionReference } from "convex/server";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 
 import refs from "../confect/_generated/refs";
 import {
@@ -142,6 +145,210 @@ describe("moderación", () => {
         enviadas.map((e) => e.id),
       );
       assert.isNull(segunda.ultima);
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("el contexto da el historial de quien envía y lo demás del mismo emplazamiento", () =>
+    Effect.gen(function* () {
+      const convex = yield* TestConfect.TestConfect;
+      const ana = yield* identidadDesde(IP);
+      const otra = yield* identidadDesde(IP);
+      const aceptada = correccion();
+      const rechazada = correccion();
+      const pendiente = correccion();
+      for (const enviada of [aceptada, rechazada, pendiente]) {
+        yield* convex
+          .desde(IP)
+          .mutation(buzon.enviarCorreccion, { identidad: ana, correccion: enviada });
+        avanzar(1000);
+      }
+      yield* convex.mutation(moderacion.aceptar, {
+        id: aceptada.id,
+        motivo: "Se ve en la foto aérea",
+      });
+      yield* convex.mutation(moderacion.rechazar, { id: rechazada.id, motivo: "Repetida" });
+      // De otra identidad: una corroboración del mismo sitio, una medida (no cuenta) y otro sitio.
+      const respaldo = corroboracion();
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorroboracion, { identidad: otra, corroboracion: respaldo });
+      yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad: otra, medida: medida() });
+      yield* convex.desde(IP).mutation(buzon.enviarCorreccion, {
+        identidad: otra,
+        correccion: correccion({ emplazamiento: "orange-1" }),
+      });
+
+      const [contexto] = yield* convex.query(moderacion.contexto, { ids: [pendiente.id] });
+      assert.isDefined(contexto);
+      assert.strictEqual(contexto.aportacion.id, pendiente.id);
+      assert.deepStrictEqual(contexto.historial, { aceptadas: 1, rechazadas: 1, pendientes: 0 });
+      // De la más reciente a la más antigua, sin ella misma ni la medida.
+      assert.deepStrictEqual(
+        contexto.relacionadas.map((a) => [a.id, a.estado]),
+        [
+          [respaldo.id, "pendiente"],
+          [rechazada.id, "rechazada"],
+          [aceptada.id, "aceptada"],
+        ],
+      );
+
+      const desconocida = yield* Effect.flip(
+        convex.query(moderacion.contexto, { ids: ["no-existe"] }),
+      );
+      assert.deepInclude(desconocida, { _tag: "AportacionDesconocida", id: "no-existe" });
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("de un emplazamiento que falta, el contexto da los que dicen que falta uno cerca", () =>
+    Effect.gen(function* () {
+      const convex = yield* TestConfect.TestConfect;
+      const identidad = yield* identidadDesde(IP);
+      const falta = (longitud: number) =>
+        correccion({
+          emplazamiento: null,
+          cambio: {
+            tipo: "falta",
+            posicion: { longitud, latitud: 41.3889 },
+            companias: ["orange"],
+          },
+        });
+      // A unos 8 m y a unos 800 m.
+      const [esta, cerca, lejos] = [falta(2.1141), falta(2.1142), falta(2.1237)];
+      for (const enviada of [esta, cerca, lejos]) {
+        yield* convex
+          .desde(IP)
+          .mutation(buzon.enviarCorreccion, { identidad, correccion: enviada });
+      }
+      const [contexto] = yield* convex.query(moderacion.contexto, { ids: [esta.id] });
+      assert.deepStrictEqual(
+        contexto?.relacionadas.map((a) => a.id),
+        [cerca.id],
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("un veredicto no se cambia, y repetirlo no cambia nada", () =>
+    Effect.gen(function* () {
+      const convex = yield* TestConfect.TestConfect;
+      const identidad = yield* identidadDesde(IP);
+      const propuesta = correccion();
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorreccion, { identidad, correccion: propuesta });
+      const primera = yield* convex.mutation(moderacion.aceptar, {
+        id: propuesta.id,
+        motivo: "Bien",
+      });
+      avanzar(1000);
+      const otraVez = yield* convex.mutation(moderacion.aceptar, {
+        id: propuesta.id,
+        motivo: "Otra",
+      });
+      assert.deepStrictEqual(otraVez, primera);
+      const error = yield* Effect.flip(
+        convex.mutation(moderacion.rechazar, { id: propuesta.id, motivo: "Me lo pienso" }),
+      );
+      assert.deepInclude(error, {
+        _tag: "AportacionYaModerada",
+        id: propuesta.id,
+        estado: "aceptada",
+      });
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("aceptar o rechazar sin motivo da error y no cambia nada", () =>
+    Effect.gen(function* () {
+      const convex = yield* TestConfect.TestConfect;
+      const identidad = yield* identidadDesde(IP);
+      const propuesta = correccion();
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorreccion, { identidad, correccion: propuesta });
+      for (const motivo of ["", "   "]) {
+        assert.isTrue(
+          Exit.isFailure(
+            yield* Effect.exit(convex.mutation(moderacion.aceptar, { id: propuesta.id, motivo })),
+          ),
+        );
+        assert.isTrue(
+          Exit.isFailure(
+            yield* Effect.exit(convex.mutation(moderacion.rechazar, { id: propuesta.id, motivo })),
+          ),
+        );
+      }
+      // Ni saltándose el esquema del cliente: el servidor lo vuelve a comprobar.
+      const crudo = yield* Effect.exit(
+        Effect.promise(() =>
+          convex.crudo.mutation(makeFunctionReference<"mutation">("moderacion:aceptar"), {
+            id: propuesta.id,
+            motivo: " ",
+          }),
+        ),
+      );
+      assert.isTrue(Exit.isFailure(crudo));
+      assert.deepStrictEqual(
+        (yield* tablas).aportaciones.map((a) => a.estado),
+        ["pendiente"],
+      );
+    }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect(
+    "dos aceptadas en el mismo milisegundo tienen horas distintas y la noche no se salta ninguna",
+    () =>
+      Effect.gen(function* () {
+        const convex = yield* TestConfect.TestConfect;
+        const identidad = yield* identidadDesde(IP);
+        const enviadas = [correccion(), correccion(), correccion()];
+        for (const enviada of enviadas) {
+          yield* convex
+            .desde(IP)
+            .mutation(buzon.enviarCorreccion, { identidad, correccion: enviada });
+        }
+        // El reloj no se mueve entre una aceptación y otra.
+        for (const enviada of enviadas) {
+          yield* convex.mutation(moderacion.aceptar, { id: enviada.id, motivo: "Bien" });
+        }
+        const leidas: Array<string> = [];
+        let despuesDe: number | null = null;
+        for (let vuelta = 0; vuelta < 10; vuelta++) {
+          const pagina: typeof PaginaDeCola.Type = yield* convex.query(moderacion.aceptadas, {
+            despuesDe,
+            limite: 1,
+          });
+          leidas.push(...pagina.aportaciones.map((a) => a.id));
+          if (pagina.ultima === null) break;
+          despuesDe = pagina.ultima;
+        }
+        assert.deepStrictEqual(
+          leidas,
+          enviadas.map((e) => e.id),
+        );
+      }).pipe(Effect.provide(TestConfect.layer)),
+  );
+
+  it.effect("una identidad vetada ya no puede enviar, y sus pendientes quedan marcadas", () =>
+    Effect.gen(function* () {
+      const convex = yield* TestConfect.TestConfect;
+      const identidad = yield* identidadDesde(IP);
+      const otra = yield* identidadDesde(IP);
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() });
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorreccion, { identidad: otra, correccion: correccion() });
+      const [id = ""] = identidad.split(".");
+      yield* convex.mutation(moderacion.vetar, { tipo: "identidad", valor: id, motivo: "spam" });
+      const error = yield* Effect.flip(
+        convex.desde(IP).mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() }),
+      );
+      assert.deepInclude(error, { _tag: "Vetada", que: "identidad" });
+      const cola = yield* convex.query(moderacion.pendientes, { despuesDe: null, limite: 10 });
+      assert.deepStrictEqual(
+        cola.aportaciones.map((a) => a.vetada),
+        [true, false],
+      );
     }).pipe(Effect.provide(TestConfect.layer)),
   );
 });

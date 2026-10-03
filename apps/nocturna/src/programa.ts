@@ -1,5 +1,7 @@
 import { type IndiceDeMunicipios, municipioDelPunto } from "@celda/dominio/municipio";
 import type { Fuente } from "@celda/dominio/observacion";
+import type { PaginaParaPublicar } from "@celda/dominio/moderacion";
+import { SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
 import {
   BaseDeBarrido,
   ejecutarBarrido,
@@ -38,6 +40,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import { BaseNocturna } from "./base.ts";
+import { AceptadasDelBuzon } from "./buzon.ts";
 import { describirResumen, type Turno } from "./estado.ts";
 
 /**
@@ -48,6 +51,11 @@ export class Extractores extends Context.Service<
   Extractores,
   {
     readonly registroOficial: Layer.Layer<ExtractorPorCajas>;
+    /**
+     * Lo aceptado en la moderación, por la acción HTTP del buzón con la clave de publicación (la
+     * comunidad, ADR 0020). `None` sin la conexión configurada.
+     */
+    readonly comunidad: Option.Option<Layer.Layer<AceptadasDelBuzon>>;
   }
 >()("@celda/nocturna/programa/Extractores") {}
 
@@ -320,6 +328,81 @@ const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<
     ),
   );
 
+/**
+ * Lee del buzón lo aceptado en la moderación desde la última vez y lo guarda en la base, página a
+ * página, como una ejecución de la comunidad (ADR 0020). Sigue desde la última aceptada que tiene
+ * la base, y una que ya tenía no se guarda dos veces, así que leer dos veces lo mismo no duplica
+ * nada. Si el buzón no contesta, la ejecución queda fallida con lo que haya guardado, lo dice el
+ * diario y la noche sigue: lo que falte llega la noche siguiente.
+ */
+export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function* (
+  buzon: Layer.Layer<AceptadasDelBuzon>,
+) {
+  const base = yield* BaseDeBarrido;
+  const nocturna = yield* BaseNocturna;
+  const inicio = yield* Clock.currentTimeMillis;
+  const arranque = yield* base.iniciar("comunidad", inicio);
+  const sinZonas: ReadonlyArray<ZonaEnLaEjecucion> = [];
+  if (arranque.tipo === "omitida") {
+    const omitida: EjecucionDeLaNoche = {
+      fuente: "comunidad",
+      ejecucion: arranque.ejecucion,
+      estado: "omitida",
+      zonas: sinZonas,
+    };
+    return omitida;
+  }
+  const cuentas = { leidas: 0, nuevas: 0 };
+  const recogida = Effect.gen(function* () {
+    const cliente = yield* AceptadasDelBuzon;
+    let despuesDe = yield* nocturna.ultimaAceptada;
+    for (;;) {
+      const pagina: PaginaParaPublicar = yield* cliente.leer(despuesDe);
+      cuentas.leidas += pagina.aportaciones.length;
+      cuentas.nuevas += yield* nocturna.guardarAceptadas(pagina.aportaciones, inicio);
+      if (pagina.ultima === null) return;
+      despuesDe = pagina.ultima;
+    }
+  }).pipe(Effect.provide(buzon));
+  const fallo = yield* recogida.pipe(
+    Effect.match({
+      onSuccess: () => Option.none<string>(),
+      onFailure: (error) => Option.some(error.message),
+    }),
+  );
+  const cierre = {
+    fin: yield* Clock.currentTimeMillis,
+    cambios: {
+      ...SIN_CAMBIOS,
+      observaciones: { creados: cuentas.nuevas, cambiados: 0, retirados: 0 },
+    },
+    zonas: sinZonas,
+  };
+  if (Option.isSome(fallo)) {
+    yield* base.fallar(arranque.ejecucion, { ...cierre, errores: [fallo.value] });
+    yield* Effect.logWarning(
+      `${fallo.value}. La noche publica lo demás; lo aceptado que falta llega la próxima noche` +
+        ` (${cuentas.nuevas} aceptadas nuevas guardadas antes del fallo)`,
+    );
+  } else {
+    yield* base.completar(arranque.ejecucion, {
+      ...cierre,
+      registros: cuentas.leidas,
+      errores: [],
+    });
+    yield* Effect.logInfo(
+      `Buzón de Convex: ${cuentas.leidas} aceptadas leídas, ${cuentas.nuevas} nuevas`,
+    );
+  }
+  const hecha: EjecucionDeLaNoche = {
+    fuente: "comunidad",
+    ejecucion: arranque.ejecucion,
+    estado: Option.isSome(fallo) ? "fallida" : "completada",
+    zonas: sinZonas,
+  };
+  return hecha;
+});
+
 /** Las provincias de los límites del IGN, para ordenar la cola de fichas y nombrarlas. */
 export const provinciasDe = (municipios: IndiceDeMunicipios) =>
   Provincias.of({
@@ -336,6 +419,9 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
 /**
  * La noche entera:
  *
+ * 0. Con la conexión con el buzón de Convex, lee lo aceptado en la moderación desde la última vez
+ *    (`recogerAceptadas`), para que la publicación lo lleve a las fichas. Si Convex no contesta,
+ *    lo dice el diario y la noche sigue.
  * 1. Una ejecución de ingesta por fuente con extractor, con su interruptor. El registro oficial
  *    barre sus zonas de barrido, lee las fichas de la cola hasta cerrar su ventana, publicando a
  *    mitad, y fusiona (`ejecutarBarrido`).
@@ -355,6 +441,9 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
  */
 export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNoche) {
   const extractores = yield* Extractores;
+  const comunidad = Option.isSome(extractores.comunidad)
+    ? [yield* recogerAceptadas(extractores.comunidad.value)]
+    : [];
   // A mitad de la ventana de fichas se publica lo que haya, sin esperar ni repetir si falla: al
   // final de la noche se vuelve a publicar.
   const contexto = yield* Effect.context<Publicador | BaseNocturna>();
@@ -366,6 +455,7 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
     ejecutarBarrido(opciones.proceso).pipe(Effect.provideService(PublicacionAMitad, aMitad)),
   );
   const ejecuciones: ReadonlyArray<EjecucionDeLaNoche> = [
+    ...comunidad,
     { fuente: "registro-oficial", ...registro },
   ];
   for (const { fuente, estado, zonas } of ejecuciones) {

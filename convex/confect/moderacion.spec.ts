@@ -1,81 +1,95 @@
-import { AportacionCompartible } from "@celda/dominio/aportacion";
+import {
+  AportacionDesconocida,
+  AportacionEnCola,
+  AportacionYaModerada,
+  CONTEXTOS_POR_LLAMADA,
+  ContextoEnElBuzon,
+  Motivo,
+  PAGINA_MAXIMA,
+  PaginaDeCola,
+  PaginaParaPublicar,
+  TipoDeVeto,
+} from "@celda/dominio/moderacion";
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-import { EstadoDeModeracion } from "./tables/aportaciones";
-import { TipoDeVeto } from "./tables/vetos";
+export { AportacionDesconocida, AportacionYaModerada };
 
-/** Ninguna aportación tiene ese identificador. */
-export class AportacionDesconocida extends Schema.TaggedError<AportacionDesconocida>()(
-  "AportacionDesconocida",
-  { id: Schema.String },
-) {}
-
-/** Un motivo de moderación: siempre hace falta uno, al aceptar, al rechazar y al vetar. */
-const Motivo = Schema.String.pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(500)));
-
-/** Una aportación compartida tal como la ve la moderación. */
-export const AportacionEnCola = Schema.Struct({
-  id: Schema.String,
-  /** El `_id` de la identidad que la envió: el historial de quien envía sale de aquí. */
-  identidad: Schema.String,
-  /** La huella de la IP, si aún no han pasado 24 horas. */
-  huellaIp: Schema.NullOr(Schema.String),
-  recibidaEl: Schema.Finite,
-  contenido: AportacionCompartible,
-  estado: EstadoDeModeracion,
-  moderadaEl: Schema.NullOr(Schema.Finite),
-  motivo: Schema.NullOr(Schema.String),
-  /** Si la identidad o la huella que la enviaron están vetadas. */
-  vetada: Schema.Boolean,
-});
-export type AportacionEnCola = typeof AportacionEnCola.Type;
-
-/** Una página de la cola: sigue después de `ultima` mientras no sea nula. */
-export const PaginaDeCola = Schema.Struct({
-  aportaciones: Schema.Array(AportacionEnCola),
-  ultima: Schema.NullOr(Schema.Finite),
-});
+const Limite = Schema.Int.pipe(
+  Schema.check(Schema.isBetween({ minimum: 1, maximum: PAGINA_MAXIMA })),
+);
 
 /**
  * Lo que necesita la herramienta de moderación (#57), que habla con Convex por estas funciones
- * internas con la clave de administración. Son la costura con ella: listar, aceptar, rechazar,
- * vetar y leer lo aceptado para la publicación nocturna. Ninguna es pública.
+ * internas con la clave de administración: listar con su contexto, aceptar, rechazar, vetar y leer
+ * lo aceptado para la publicación nocturna. Ninguna es pública.
  */
 export default GroupSpec.make()
   .addFunction(
     /** Las pendientes, de la más antigua a la más reciente, después de `despuesDe` (`recibidaEl`). */
     FunctionSpec.internalQuery({
       name: "pendientes",
-      args: () => ({ despuesDe: Schema.NullOr(Schema.Finite), limite: Schema.Int }),
+      args: () => ({ despuesDe: Schema.NullOr(Schema.Finite), limite: Limite }),
       returns: () => PaginaDeCola,
     }),
   )
   .addFunction(
     /**
+     * Lo que sabe el buzón de cada aportación, en el mismo orden: el historial de quien la envió y
+     * las demás del mismo emplazamiento. Como mucho `CONTEXTOS_POR_LLAMADA` de una vez.
+     */
+    FunctionSpec.internalQuery({
+      name: "contexto",
+      args: () => ({
+        ids: Schema.Array(Schema.String).pipe(
+          Schema.check(Schema.isMaxLength(CONTEXTOS_POR_LLAMADA)),
+        ),
+      }),
+      returns: () => Schema.Array(ContextoEnElBuzon),
+      error: () => AportacionDesconocida,
+    }),
+  )
+  .addFunction(
+    /**
      * Las aceptadas después de `despuesDe` (`moderadaEl`), en el orden en que se aceptaron: lo que
-     * la ingesta nocturna lleva a la publicación. Leer dos veces lo mismo da lo mismo.
+     * la ingesta nocturna lleva a la publicación. Dos aceptadas nunca tienen la misma hora, así que
+     * seguir desde la última no se salta ninguna, y leer dos veces lo mismo da lo mismo.
      */
     FunctionSpec.internalQuery({
       name: "aceptadas",
-      args: () => ({ despuesDe: Schema.NullOr(Schema.Finite), limite: Schema.Int }),
+      args: () => ({ despuesDe: Schema.NullOr(Schema.Finite), limite: Limite }),
       returns: () => PaginaDeCola,
     }),
   )
   .addFunction(
+    /**
+     * Lo aceptado para la publicación nocturna, como `aceptadas` pero con lo mínimo: solo
+     * correcciones propuestas y corroboraciones, sin la nota, sin la huella de la IP y con un
+     * seudónimo en lugar de la identidad (`AceptadaParaPublicar`). La llama la acción HTTP de
+     * `confect/http.ts`, que es lo único que ve la noche.
+     */
+    FunctionSpec.internalQuery({
+      name: "publicables",
+      args: () => ({ despuesDe: Schema.NullOr(Schema.Finite), limite: Limite }),
+      returns: () => PaginaParaPublicar,
+    }),
+  )
+  .addFunction(
+    /** Acepta una pendiente. Aceptar otra vez una aceptada no cambia nada. */
     FunctionSpec.internalMutation({
       name: "aceptar",
       args: () => ({ id: Schema.String, motivo: Motivo }),
       returns: () => AportacionEnCola,
-      error: () => AportacionDesconocida,
+      error: () => Schema.Union([AportacionDesconocida, AportacionYaModerada]),
     }),
   )
   .addFunction(
+    /** Rechaza una pendiente. Rechazar otra vez una rechazada no cambia nada. */
     FunctionSpec.internalMutation({
       name: "rechazar",
       args: () => ({ id: Schema.String, motivo: Motivo }),
       returns: () => AportacionEnCola,
-      error: () => AportacionDesconocida,
+      error: () => Schema.Union([AportacionDesconocida, AportacionYaModerada]),
     }),
   )
   .addFunction(

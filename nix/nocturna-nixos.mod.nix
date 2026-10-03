@@ -142,6 +142,23 @@
           '';
         };
 
+        credenciales.convex = mkOption {
+          type = nullOr externalPath;
+          default = null;
+          example = "/etc/secretos/celda-convex.env";
+          description = ''
+            Fichero con la conexión con el buzón de Convex (ADR 0020), fuera del almacén de Nix y
+            legible solo por root. Va en formato `.env`, con `CELDA_CONVEX_SITE_URL` (las acciones
+            HTTP del despliegue, `https://<nombre>.convex.site`) y `CELDA_PUBLICACION_CLAVE` (la
+            misma que la variable de entorno del despliegue). Esa clave solo abre la acción que da lo
+            aceptado, sin identidades ni huellas de IP. Nunca pongas aquí una clave de despliegue de
+            Convex: lo puede todo. Se pasa como la credencial de R2. Cada noche lee de ahí lo
+            aceptado en la moderación desde la última vez y lo publica en las fichas. Si Convex no
+            contesta, la noche publica lo demás y lo dice en el diario. Sin él, la comunidad queda
+            apagada y no se publica ninguna corrección.
+          '';
+        };
+
         origenPublico = mkOption {
           type = nullOr str;
           default = null;
@@ -423,7 +440,10 @@
               ) "r2:${config.services.celda-nocturna.credenciales.r2}"
               ++ optional (
                 config.services.celda-nocturna.credenciales.vercel != null
-              ) "vercel:${config.services.celda-nocturna.credenciales.vercel}";
+              ) "vercel:${config.services.celda-nocturna.credenciales.vercel}"
+              ++ optional (
+                config.services.celda-nocturna.credenciales.convex != null
+              ) "convex:${config.services.celda-nocturna.credenciales.convex}";
 
             # ENDURECIMIENTO
             # Sin MemoryDenyWriteExecute: el compilador de V8 escribe y ejecuta su código.

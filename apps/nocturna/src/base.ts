@@ -1,9 +1,14 @@
 import { Caja as CajaEsquema, Cuadro, cuadroDe, ZONAS_DE_BARRIDO } from "@celda/dominio/barrido";
 import { compararTexto } from "@celda/dominio/banda";
 import { type EmplazamientoDeCapa, emplazamientoDeCapa } from "@celda/dominio/capa";
-import { Emplazamiento } from "@celda/dominio/emplazamiento";
+import { Emplazamiento, type Estado } from "@celda/dominio/emplazamiento";
 import { fichaDe } from "@celda/dominio/ficha";
 import { fusionar } from "@celda/dominio/fusion";
+import {
+  AceptadaParaPublicar,
+  correccionesDeFicha,
+  emplazamientoDe,
+} from "@celda/dominio/moderacion";
 import { Fuente, type Observacion } from "@celda/dominio/observacion";
 import {
   type BarridoAbierto,
@@ -81,6 +86,12 @@ export interface OpcionesBase {
  * La versión 5 retira esa web (ADR 0019, #55): borra la tabla `puntos` y las observaciones, los
  * barridos y las ejecuciones de las fuentes que ya no están en `Fuente`. Con su interruptor siempre
  * apagado, solo eran ejecuciones omitidas.
+ *
+ * La versión 6 trae lo aceptado en la moderación (ADR 0020, #57): `aportaciones_aceptadas`, con
+ * cada corrección propuesta o corroboración aceptada que la noche ha leído del buzón, su
+ * emplazamiento, el seudónimo de quien la envió (para contar a cada persona una vez), cuándo se
+ * aceptó y la fecha de la ejecución que la trajo. Ni la identidad ni la huella de la IP salen del
+ * buzón.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -203,6 +214,20 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
     `DELETE FROM ejecuciones WHERE fuente NOT IN ${FUENTES}`,
     `DROP TABLE puntos`,
   ],
+  [
+    `CREATE TABLE aportaciones_aceptadas (
+      id TEXT PRIMARY KEY,
+      tipo TEXT NOT NULL,
+      emplazamiento TEXT,
+      persona TEXT NOT NULL,
+      aceptada_en INTEGER NOT NULL,
+      importada_en INTEGER NOT NULL,
+      datos TEXT NOT NULL
+    )`,
+    `CREATE INDEX aportaciones_aceptadas_por_emplazamiento
+      ON aportaciones_aceptadas (emplazamiento, tipo)`,
+    `CREATE INDEX aportaciones_aceptadas_por_aceptacion ON aportaciones_aceptadas (aceptada_en)`,
+  ],
 ];
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
@@ -220,6 +245,32 @@ const FilaDeCola = Schema.Struct({
   ficha_espera_hasta: Schema.NullOr(Schema.Finite),
   datos: Schema.fromJsonString(Registro),
 });
+const ContenidoEnJson = Schema.fromJsonString(AceptadaParaPublicar.fields.contenido);
+const codificarAportacion = Schema.encodeEffect(ContenidoEnJson);
+
+/** Una aportación aceptada tal como la guarda la base. */
+const FilaAceptada = Schema.Struct({
+  id: Schema.String,
+  persona: Schema.String,
+  aceptada_en: Schema.Finite,
+  importada_en: Schema.Finite,
+  datos: ContenidoEnJson,
+});
+
+/** Las correcciones de la ficha que salen de las filas aceptadas de su emplazamiento. */
+const correccionesDeFilas = (filas: ReadonlyArray<typeof FilaAceptada.Type>) =>
+  correccionesDeFicha(
+    filas.map((f) => ({
+      id: f.id,
+      persona: f.persona,
+      aceptadaEl: f.aceptada_en,
+      contenido: f.datos,
+    })),
+  );
+
+/** Un emplazamiento que la comunidad corrige deja de estar verificado (CONTEXT.md, «Estado»). */
+const corregido = (estado: Estado): Estado => (estado === "verificado" ? "corregido" : estado);
+
 const FilaEmplazamiento = Schema.Struct({
   clave: Schema.String,
   version: Schema.Finite,
@@ -369,6 +420,19 @@ export class BaseNocturna extends Context.Service<
     readonly resumen: (leidasAntesDe: number) => Effect.Effect<Resumen>;
     /** Una copia coherente de la base en `destino`, que no puede existir (`VACUUM INTO`). */
     readonly copiar: (destino: string) => Effect.Effect<void>;
+    /**
+     * La hora de aceptación de la última aportación aceptada que tiene la base, o `null` si no
+     * tiene ninguna: la noche sigue leyendo el buzón desde ahí.
+     */
+    readonly ultimaAceptada: Effect.Effect<number | null>;
+    /**
+     * Guarda, en una transacción, las aportaciones aceptadas que aún no tenía, con la fecha de la
+     * ejecución que las trae. Las que ya tenía no cambian. Devuelve cuántas eran nuevas.
+     */
+    readonly guardarAceptadas: (
+      aceptadas: ReadonlyArray<AceptadaParaPublicar>,
+      fecha: number,
+    ) => Effect.Effect<number>;
   }
 >()("@celda/nocturna/base/BaseNocturna") {}
 
@@ -468,7 +532,15 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           yield* sql`SELECT max(inicio) AS v FROM ejecuciones WHERE estado = 'completada'
             AND json_extract(cambios, '$.emplazamientos.retirados') > 0`,
         );
-        const fechas = [cambiado?.v ?? null, retirado?.v ?? null].filter((v) => v !== null);
+        // Lo aceptado en la moderación cambia la ficha de su emplazamiento, si está: cuenta la
+        // fecha de la ejecución que lo trajo.
+        const [aceptado] = yield* decodificar(Maximo)(
+          yield* sql`SELECT max(importada_en) AS v FROM aportaciones_aceptadas
+            WHERE tipo <> 'propia' AND emplazamiento IN (SELECT clave FROM emplazamientos)`,
+        );
+        const fechas = [cambiado?.v ?? null, retirado?.v ?? null, aceptado?.v ?? null].filter(
+          (v) => v !== null,
+        );
         return fechas.length === 0 ? null : Math.max(...fechas);
       });
 
@@ -814,7 +886,23 @@ export const baseNocturna = (opciones: OpcionesBase) =>
             }),
           ),
         );
-        return [fichaDe(fila.datos, fila.version, estaciones)];
+        const ficha = fichaDe(fila.datos, fila.version, estaciones);
+        const aceptadas = yield* decodificar(FilaAceptada)(
+          yield* sql`SELECT id, persona, aceptada_en, importada_en, datos
+            FROM aportaciones_aceptadas WHERE emplazamiento = ${clave} AND tipo <> 'propia'`,
+        );
+        const correcciones = correccionesDeFilas(aceptadas).get(clave) ?? [];
+        if (correcciones.length === 0) return [ficha];
+        // Lo aceptado va al lado del registro, que sigue igual (ADR 0020), y la ficha cambia con la
+        // noche que lo trajo.
+        return [
+          {
+            ...ficha,
+            estado: corregido(ficha.estado),
+            correcciones,
+            version: Math.max(ficha.version, ...aceptadas.map((a) => a.importada_en)),
+          },
+        ];
       });
 
       const datos = DatosPublicables.of({
@@ -828,6 +916,15 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         ),
         // Por páginas, y cada una pasa a lo que guarda la capa antes de leer la siguiente.
         emplazamientos: Effect.gen(function* () {
+          const corregidos = new Set(
+            correccionesDeFilas(
+              yield* decodificar(FilaAceptada)(
+                yield* sql`SELECT id, persona, aceptada_en, importada_en, datos
+                  FROM aportaciones_aceptadas
+                  WHERE emplazamiento IS NOT NULL AND tipo <> 'propia'`,
+              ),
+            ).keys(),
+          );
           const deCapa: Array<EmplazamientoDeCapa> = [];
           for (let desde = ""; ;) {
             const pagina = yield* decodificar(FilaEmplazamiento)(
@@ -835,7 +932,10 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                   WHERE clave > ${desde} ORDER BY clave LIMIT ${PAGINA}`,
             );
             for (const fila of pagina) {
-              deCapa.push(emplazamientoDeCapa(fila.datos, fila.datos.estaciones));
+              const datos = corregidos.has(fila.clave)
+                ? { ...fila.datos, estado: corregido(fila.datos.estado) }
+                : fila.datos;
+              deCapa.push(emplazamientoDeCapa(datos, datos.estaciones));
             }
             const ultima = pagina.at(-1);
             if (ultima === undefined) break;
@@ -949,6 +1049,36 @@ export const baseNocturna = (opciones: OpcionesBase) =>
 
         copiar: Effect.fn("BaseNocturna.copiar")(function* (destino) {
           yield* sql`VACUUM INTO ${destino}`;
+        }, Effect.orDie),
+
+        ultimaAceptada: Effect.map(
+          Effect.flatMap(
+            sql`SELECT max(aceptada_en) AS v FROM aportaciones_aceptadas`,
+            decodificar(Maximo),
+          ),
+          ([fila]) => fila?.v ?? null,
+        ).pipe(Effect.orDie, Effect.withSpan("BaseNocturna.ultimaAceptada")),
+
+        guardarAceptadas: Effect.fn("BaseNocturna.guardarAceptadas")(function* (aceptadas, fecha) {
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              let nuevas = 0;
+              for (const aceptada of aceptadas) {
+                const filas = yield* sql<{ readonly id: string }>`INSERT INTO aportaciones_aceptadas
+                  ${sql.insert({
+                    id: aceptada.id,
+                    tipo: aceptada.contenido.tipo,
+                    emplazamiento: emplazamientoDe(aceptada.contenido),
+                    persona: aceptada.persona,
+                    aceptada_en: aceptada.aceptadaEl,
+                    importada_en: fecha,
+                    datos: yield* codificarAportacion(aceptada.contenido),
+                  })} ON CONFLICT (id) DO NOTHING RETURNING id`;
+                nuevas += filas.length;
+              }
+              return nuevas;
+            }),
+          );
         }, Effect.orDie),
       });
 

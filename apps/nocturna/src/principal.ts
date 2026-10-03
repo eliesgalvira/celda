@@ -18,8 +18,10 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
 import { baseNocturna } from "./base.ts";
+import { aceptadasPorHttp } from "./buzon.ts";
 import { montarCapasEn } from "./capas.ts";
 import { clienteHttpDelRegistro } from "./conexionDelRegistro.ts";
 import { configuracion } from "./configuracion.ts";
@@ -152,7 +154,12 @@ const principal = Effect.gen(function* () {
   });
   const extractores = Layer.succeed(
     Extractores,
-    Extractores.of({ registroOficial: extractorDelRegistro }),
+    Extractores.of({
+      registroOficial: extractorDelRegistro,
+      comunidad: Option.map(c.buzon, (conexion) =>
+        aceptadasPorHttp(conexion).pipe(Layer.provide(FetchHttpClient.layer)),
+      ),
+    }),
   );
   const entorno = Layer.mergeAll(
     publicador,

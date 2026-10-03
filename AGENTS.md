@@ -38,7 +38,7 @@ Solid 2 es una RC con API nueva. Lee `apps/web/node_modules/solid-js/CHEATSHEET.
 
 Vitest en orden aleatorio, con `@effect/vitest` (`it.effect` para lo que devuelve un `Effect`). Los componentes se prueban con `@solidjs/testing-library` sobre happy-dom. Las dependencias reales se sustituyen por capas o funciones de prueba; la regla `no-module-mocking` rechaza los mocks de módulos. Los dobles imitan la API real: entregan al abrirse lo que el navegador entregaría y contestan en otra tarea.
 
-La ingesta, la publicación y Convex tienen su propia guía: [docs/patterns/convex.md](docs/patterns/convex.md). Explica cómo lanzar la ingesta nocturna (`pnpm run ingesta`), cómo se publica, cómo arrancar Convex en local, cómo se prueba cada cosa y qué no hacer contra las fuentes reales.
+La ingesta, la publicación y Convex tienen su propia guía: [docs/patterns/convex.md](docs/patterns/convex.md). Explica cómo lanzar la ingesta nocturna (`pnpm run ingesta`), cómo se publica, cómo arrancar Convex en local, cómo se modera el buzón (`pnpm -s moderar`, con `--json` para un agente), cómo se prueba cada cosa y qué no hacer contra las fuentes reales. Proponer un veredicto no cambia nada; aceptar, rechazar o vetar solo con la confirmación del usuario.
 
 La ingesta nocturna se empaqueta con Nix y corre con un módulo de NixOS: [docs/patterns/nixos.md](docs/patterns/nixos.md). Si tocas `nix/` o las dependencias de `apps/nocturna`, pasa también `nix flake check`.
 

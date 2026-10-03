@@ -23,6 +23,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@celda/moderacion": "workspace:*",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "vite": "catalog:",

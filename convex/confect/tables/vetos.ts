@@ -1,9 +1,6 @@
+import { TipoDeVeto } from "@celda/dominio/moderacion";
 import { Table } from "@confect/core";
 import * as Schema from "effect/Schema";
-
-/** Qué se veta: la identidad de un dispositivo o la huella de una IP. */
-export const TipoDeVeto = Schema.Literals(["identidad", "ip"]);
-export type TipoDeVeto = typeof TipoDeVeto.Type;
 
 /**
  * Lo que la moderación ha vetado (ADR 0020). Las funciones de envío lo miran antes que nada. El
