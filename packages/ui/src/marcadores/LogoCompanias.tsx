@@ -232,8 +232,10 @@ export interface LogoDeMarcador {
 }
 
 /** Si un logo apaga alguna de sus compañías. */
-const apagaAlguna = (logo: LogoDeMarcador): boolean =>
-  logo.resaltadas !== undefined && logo.companias.some((c) => !logo.resaltadas?.includes(c));
+const apagaAlguna = (logo: LogoDeMarcador): boolean => {
+  const resaltadas = logo.resaltadas;
+  return resaltadas !== undefined && logo.companias.some((c) => !resaltadas.includes(c));
+};
 
 /**
  * Identificador del símbolo de un logo en `SimbolosDeLogos`: el de sus compañías y, si apaga

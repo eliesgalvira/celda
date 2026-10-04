@@ -3,6 +3,7 @@
 import type { LimitesDeBarrios } from "@celda/dominio/barrio";
 import {
   carpetaDeFichas,
+  codificarVigente,
   decodificarVigente,
   type EmplazamientoLeido,
   FICHERO_VIGENTE,
@@ -547,7 +548,7 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
           yield* fs.writeFileString(path.join(entorno.almacen, viejo ?? ""), sinEllas);
           yield* fs.writeFileString(
             path.join(entorno.almacen, FICHERO_VIGENTE),
-            JSON.stringify({ ...leida.vigente, resumen: viejo }),
+            codificarVigente({ ...leida.vigente, resumen: viejo ?? "" }),
           );
           const antes = (yield* entorno.escritos).length;
 
