@@ -42,6 +42,7 @@ pnpm run medir -- --capas <carpeta> --web <antes>,<después> --escenario vuelos 
 - `--escenario espana` cambia los gestos por el recorrido de varias provincias (ADR 0016): alejar con el botón hasta ver toda España con el resumen, tocar el hexágono de Barcelona, acercar con el botón hasta el nivel de municipios y arrastrar y pellizcar allí, acercar hasta la calle tocando cada vez la agrupación o la zona mayor, alejar hasta el nivel de provincias y cruzar de una a otra con seis arrastres largos. Al final mide la memoria de la página y sus Workers (`measureUserAgentSpecificMemory`, con el sitio aislado por COOP y COEP) y el montón del hilo principal, y cuenta lo pedido de las capas en toda la visita.
 - `--escenario vuelos` (#67) mueve la cámara de MapLibre en lugar de tocar la interfaz, así que no depende de qué marcadores hay ni de dónde caen: es la medida de referencia de la fluidez del mapa con toda España, en el móvil y en el escritorio. Hace cinco grupos de gestos, cada uno en una página nueva de la misma visita, con un mapa sin teselas en memoria: saltos de vista en vista (València z8, Barcelona z12, el Eixample z17 y z18, y España z5,5, cada uno con 2,5 s para que lleguen sus teselas), los cinco vuelos de 2,5 s del #61 (España → Cataluña z8 → Barcelona z12 → Eixample z17 → Barcelona z11 → España), alejarse del Eixample z17 a España en 4 s y acercar y alejar del 9,5 al 14,5, un nivel cada 1,5 s, sobre Zaragoza y sobre Barcelona (#66). Antes, una primera página hace todo el recorrido sin medir, para que las teselas ya estén en la caché HTTP y la red no meta ruido. `--grupos saltos,vuelos,alejar,niveles-zaragoza,niveles-barcelona` elige cuáles.
 - La web no expone el mapa. La medida lo encuentra por CDP: busca en el montón de V8 la clase cuyo prototipo tiene `flyTo` y `getCanvasContainer` y deja el ejemplar de la página en `window.__celdaMapa`. Las órdenes a la cámara no devuelven nada: `jumpTo` devuelve el mapa, y Playwright lo serializaba entero, hasta 2 s de JavaScript en el hilo principal que no eran de Celda.
+- `--foto` enciende la foto aérea con su control al abrir cada página, como una persona, y cuenta lo pedido al PNOA en la primera página, la de la caché vacía: bytes, peticiones y cuántas empezaron en pleno vuelo o acercamiento de la medida. Con `--escenario vuelos --grupos vuelos` es la sesión con vuelos del #67.
 - `--pantalla escritorio` mide en una pantalla de 1400 × 900 con ratón, en lugar del móvil.
 - En las tablas, «fps por ronda» da el menor y el mayor de las rondas y su desviación típica. Dos webs que se separan menos que eso no se distinguen.
 - Con toda España la web abre de lejos y, a 390 px, el hexágono de Barcelona queda fuera de la pantalla: los escenarios `barcelona` y `espana` centran el mapa en Barcelona antes de tocarlo. El de `barcelona` centra también la ciudad tras abrir la provincia, porque su hexágono va en el centro visual de la provincia (ADR 0024).
@@ -309,7 +310,34 @@ Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 
 - **Igual que antes.** Capturas de `celda/v1` y de esta rama en el móvil y a 1400 px: España z5,5, València z8, Barcelona z12, el Eixample z17 y z18, y la foto en Barcelona z12 y el Eixample z18. Comparadas píxel a píxel con un 2 % de tolerancia salen iguales salvo 16 píxeles de 2,2 millones en Barcelona z12, menos que lo que cambian dos capturas seguidas de la misma web (322).
 - **Quieto.** Al abrir, tras volar al Eixample z18, con la foto encendida y tras volar con ella a España, 20 s quieto en el móvil y a 1400 px: 0 peticiones, 0 `render` de MapLibre y 0 llamadas a `fetch`, `requestAnimationFrame`, `setTimeout`, `setInterval` y `postMessage`.
-- **Foto aérea con vuelos.** De España z5,5 a Cataluña z8, Barcelona z12, el Eixample z17, el tejado a z18,5, Barcelona z12 y España, con vuelos de 2,5 s y la foto encendida, a DPR 3: 3,8 MB en 366 peticiones, 24 o 25 canceladas, en dos rondas. Saltando de vista en vista, 0,86 MB en 63. Los vuelos piden todos los zooms intermedios: los del 14 al 17, que solo se ven de paso, son 1,8 MB. MapLibre ya cancela lo pendiente al cambiar de zoom (`cancelPendingTileRequestsWhileZooming`); lo que llega antes se pinta durante el vuelo. No pedirlas dejaría la foto en blanco o borrosa mientras se vuela, y no se ha tocado. La ruta no es la del #64 (2,5 a 3 MB), así que no se comparan.
+- **Foto aérea con vuelos.** De España z5,5 a Cataluña z8, Barcelona z12, el Eixample z17, el tejado a z18,5, Barcelona z12 y España, con vuelos de 2,5 s y la foto encendida, a DPR 3: 3,8 MB en 366 peticiones, 24 o 25 canceladas, en dos rondas. Saltando de vista en vista, 0,86 MB en 63. Los vuelos piden todos los zooms intermedios: los del 14 al 17, que solo se ven de paso, son 1,8 MB. MapLibre ya cancela lo pendiente al cambiar de zoom (`cancelPendingTileRequestsWhileZooming`); lo que llega antes se pinta durante el vuelo. No pedirlas dejaría la foto en blanco o borrosa mientras se vuela. La ruta no es la del #64 (2,5 a 3 MB), así que no se comparan. Después el usuario decidió quitar la foto durante los vuelos: ver «Foto aérea fuera de los vuelos».
+
+## Foto aérea fuera de los vuelos (#67)
+
+Con la foto encendida, mientras la web mueve la cámara con una animación el mapa va sin ella, y la foto vuelve al pararse (`apps/web/src/foto/enMapa.ts`, [ui.md](ui.md#foto-aérea)). Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --foto` en el móvil (390 × 844, DPR 2,6, CPU ×4, «Fast 4G», GPU), la capa de `celda-noche`, OpenFreeMap y el PNOA de verdad, rondas alternadas de `celda/v1` (81cc535) y esta rama. Los bytes son los de la primera página, con la caché vacía; los fps, los de las páginas medidas, con las teselas ya en la caché HTTP.
+
+| Medida | `celda/v1` | Esta rama |
+|---|---|---|
+| Sesión con vuelos (`--grupos vuelos`: España → Cataluña z8 → Barcelona z12 → Eixample z17 → Barcelona z11 → España, 2,5 s cada uno), foto | 1422 KB en 138 peticiones (de 1376 a 1432 KB) | 948 KB en 81 (las cinco rondas iguales) |
+| De ellas, pedidas en pleno vuelo | 111 | 0 |
+| Alejar del Eixample y los niveles de Barcelona (`easeTo` de la medida), foto | 2411 KB en 184, 59 en pleno movimiento | 2153 KB en 149, 0 |
+
+Fps, medianas de cinco rondas (los niveles y alejar, de tres); entre paréntesis, el menor y el mayor.
+
+| Gesto | `celda/v1` | Esta rama |
+|---|---|---|
+| Vuelo a Cataluña z8 | 57,9 (57,4–58,5) | 57,4 (55,0–58,0) |
+| Vuelo a Barcelona z12 | 52,0 (49,4–52,9) | 51,5 (50,3–51,8) |
+| Vuelo al Eixample z17 | 40,3 (35,9–41,8) | 49,1 (48,8–54,1) |
+| Vuelo a Barcelona z11 | 42,4 (31,8–43,8) | 48,2 (45,9–51,3) |
+| Vuelo a España z5,5 | 49,7 (48,5–50,3) | 51,2 (49,7–53,2) |
+| Alejar del Eixample a España en 4 s | 54,3 (53,9–54,9) | 56,9 (56,3–57,0) |
+| Barcelona, del 9,5 al 14,5 y vuelta | 53,9 (52,0–54,7) | 51,5 (50,2–53,5) |
+
+- **Lo que se gana.** Los vuelos que bajan a la ciudad o salen de ella dejan de descodificar y subir a la GPU la foto de cada zoom del camino: de 8 a 10 fotogramas de más de 50 ms pasan a 2 a 4, y el Eixample z17 gana 9 fps. Los demás quedan dentro de lo que cambian entre rondas.
+- **Lo que cuesta.** Cada vuelo cambia el estado de la foto dos veces, y cada cambio vuelve a maquetar las teselas del callejero en los workers (ver ui.md). En un vuelo de 2,5 s no se nota. En los niveles, que la medida hace con diez `easeTo` de 0,5 s, son veinte recargas: 1,6 s más de hilo principal y 2,4 fps menos. La web no hace eso: Acercar y Alejar llevan el evento de la pulsación y no cuentan como vuelo.
+- **La caché de la foto.** La primera versión escondía la capa de la foto con el estado del estilo. MapLibre recarga entonces la fuente y vacía su caché de teselas con cada cambio, y los niveles pedían 254 teselas, 108 distintas, y 3081 KB en lugar de 2411. Ahora la capa se esconde con `setLayoutProperty`, que en una capa de imagen no recarga la fuente: 123 peticiones de 108 teselas (102 en `celda/v1`).
+- **En un MapLibre de verdad** (Chromium sin interfaz, la build servida en local): un vuelo al Eixample z17 pide 0 teselas de la foto en el aire y 12 al llegar; un vuelo que interrumpe otro la deja fuera hasta que llega el segundo; un vuelo que coge el dedo la devuelve y el arrastre no la quita; pellizcar y Acercar no la quitan (0 cambios del estado); cuatro pulsaciones de «Foto aérea» a mitad de un vuelo de 9 s no cambian nada hasta llegar, y al llegar, uno. Después, 20 s quieto: 0 peticiones y 0 llamadas a `fetch`, `setTimeout`, `setInterval`, `requestAnimationFrame`, `postMessage` y `addEventListener`.
 
 ## Qué entró
 
