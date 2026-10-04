@@ -1,5 +1,5 @@
 {
-  description = "Celda: antenas de telefonía móvil de Barcelona en un mapa";
+  description = "Celda: antenas de telefonía móvil de España en un mapa";
 
   nixConfig = {
     extra-experimental-features = [ "pipe-operators" ];

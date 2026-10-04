@@ -131,6 +131,7 @@ import { type CargasDeZonas, crearLugares } from "./lugar.ts";
 import { Marcadores } from "./Marcadores.tsx";
 import {
   crearVistaInicial,
+  type Pantalla,
   provinciaDelPunto,
   rellenoDeLaVista,
   zoomParaEncuadrar,
@@ -156,6 +157,9 @@ const ESCRITORIO = "(min-width: 48rem)";
  * más lejos, la provincia que la puede recortar se pide igual (`provinciasQueFaltan`).
  */
 const MARGEN_VECINAS_CELDAS_M = 2000;
+
+/** El tamaño de la ventana, que el mapa ocupa entera. */
+const pantalla = (): Pantalla => ({ ancho: window.innerWidth, alto: window.innerHeight });
 
 /**
  * El mapa de España a pantalla completa con los emplazamientos de la capa vigente, provincia a
@@ -244,19 +248,16 @@ export function PantallaMapa() {
     activa: emplazamientoDe(ubicacion()) === null,
     alAbrir: () => {
       const punto = puntoAlAbrir();
-      const actual = capa();
       return {
         punto,
         provinciaDelPunto:
           punto === null || punto === undefined
             ? null
             : provinciaDelPunto(lugares.dondeCae(punto), lugares.provincias()),
-        resumen:
-          actual.tipo === "cargando" ? undefined : actual.tipo === "lista" ? actual.resumen : null,
       };
     },
     mapa: mapaCreado,
-    relleno: () => rellenoDeLaVista(escritorio()),
+    relleno: (caja) => rellenoDeLaVista(caja, pantalla(), escritorio()),
   });
   createEffect(
     () => vistaInicial.encuadre() !== undefined,
@@ -268,10 +269,10 @@ export function PantallaMapa() {
   const crear = (modulo: ModuloMapaBase) => {
     if (contenedor === undefined) return;
     try {
-      const inicial = vistaInicial.alCrear();
+      const inicial = vistaInicial.alCrear() ?? ESPANA.encuadre;
       const nuevo = modulo.crearMapaBase(
         contenedor,
-        inicial === undefined ? ESPANA : { ...ESPANA, encuadre: inicial },
+        { ...ESPANA, encuadre: inicial },
         {
           listo: () => {
             setEstado({ tipo: "listo" });
@@ -283,7 +284,7 @@ export function PantallaMapa() {
             setCallejero("reserva");
           },
         },
-        rellenoDeLaVista(escritorio()),
+        rellenoDeLaVista(inicial, pantalla(), escritorio()),
         callejeroActual,
       );
       const mirarZoom = () => {
@@ -385,8 +386,8 @@ export function PantallaMapa() {
             caja,
             zoom: zoomParaEncuadrar(
               caja,
-              { ancho: window.innerWidth, alto: window.innerHeight },
-              rellenoDeLaVista(escritorio()),
+              pantalla(),
+              rellenoDeLaVista(caja, pantalla(), escritorio()),
             ),
           };
     const vista = ultimaVista ?? inicial;

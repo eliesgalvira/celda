@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import {
+  alRectangulo,
   cajaDe,
   ESPANA,
   Coordenada,
@@ -32,16 +33,35 @@ describe("Coordenada", () => {
 });
 
 describe("ESPANA", () => {
-  it("abre en la península con Baleares, dentro de los límites que llegan a Canarias", () => {
+  it("abre en la península entera, dentro de los límites que llegan a Canarias", () => {
     assert.isTrue(contiene(ESPANA.limites, ESPANA.encuadre.suroeste));
     assert.isTrue(contiene(ESPANA.limites, ESPANA.encuadre.noreste));
-    const madrid = { longitud: -3.7038, latitud: 40.4168 };
-    const palma = { longitud: 2.65, latitud: 39.57 };
+    const extremos = [
+      { longitud: -9.2997, latitud: 43.0544 }, // cabo Touriñán, el oeste
+      { longitud: 3.3222, latitud: 42.3192 }, // cabo de Creus, el este
+      { longitud: -7.6853, latitud: 43.7906 }, // Estaca de Bares, el norte
+      { longitud: -5.6094, latitud: 36.0003 }, // Tarifa, el sur
+      { longitud: -2.1933, latitud: 36.7194 }, // cabo de Gata
+    ];
+    for (const extremo of extremos) assert.isTrue(contiene(ESPANA.encuadre, extremo));
     const tenerife = { longitud: -16.25, latitud: 28.47 };
-    assert.isTrue(contiene(ESPANA.encuadre, madrid));
-    assert.isTrue(contiene(ESPANA.encuadre, palma));
     assert.isTrue(contiene(ESPANA.limites, tenerife));
     assert.isBelow(ESPANA.zoomMinimo, ESPANA.zoomMaximo);
+  });
+});
+
+describe("alRectangulo", () => {
+  it("deja un punto de dentro donde está y lleva uno de fuera al borde más cercano", () => {
+    const madrid = { longitud: -3.7038, latitud: 40.4168 };
+    assert.deepStrictEqual(alRectangulo(ESPANA.limites, madrid), madrid);
+    assert.deepStrictEqual(alRectangulo(ESPANA.limites, { longitud: 2.35, latitud: 48.86 }), {
+      longitud: 2.35,
+      latitud: ESPANA.limites.noreste.latitud,
+    });
+    assert.deepStrictEqual(alRectangulo(ESPANA.limites, { longitud: -40, latitud: 10 }), {
+      longitud: ESPANA.limites.suroeste.longitud,
+      latitud: ESPANA.limites.suroeste.latitud,
+    });
   });
 });
 

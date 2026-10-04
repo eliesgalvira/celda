@@ -1,4 +1,4 @@
-import type { Area } from "@celda/dominio/area";
+import { alRectangulo, type Area } from "@celda/dominio/area";
 import { CONTORNO_DE_LA_COMUNITAT_VALENCIANA } from "@celda/dominio/comunitatValenciana";
 import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
 import { coloresDelTema, estiloMapa } from "@celda/ui/mapa/estilo.ts";
@@ -7,7 +7,13 @@ import { FUENTE_LIMITES } from "@celda/ui/mapa/limites.ts";
 import { conLoDeCelda, estiloDeReserva } from "@celda/ui/mapa/reserva/estilo.ts";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import { type GeoJSONSource, Map as MapaMapLibre, prewarm, setWorkerUrl } from "maplibre-gl";
+import {
+  type GeoJSONSource,
+  LngLat,
+  Map as MapaMapLibre,
+  prewarm,
+  setWorkerUrl,
+} from "maplibre-gl";
 import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
 import { type Avisos, type Callejero, esperarDeVerdad, vigilarCallejero } from "./callejero.ts";
@@ -51,7 +57,9 @@ const TEXTOS_MAPLIBRE = {
  * Crea el mapa base de `area` en `contenedor`, con el estilo del tema activo
  * y sin giros: se mueve con un dedo o el ratón y se acerca pellizcando, con
  * la rueda o con el teclado. Nace encuadrando `area.encuadre` sin lo que tapa
- * `relleno`.
+ * `relleno`. Su centro no sale de `area.limites`, pero lo que se ve alrededor sí: con `maxBounds`,
+ * MapLibre acerca el mapa hasta que los límites llenan la pantalla, y en un móvil alto eso dejaba
+ * media península fuera al abrir.
  *
  * Nace con el callejero `desde`. Con el principal, si OpenFreeMap no responde, pasa al de reserva
  * del IGN con `setStyle`, sin recargar ni perder la vista, las capas de Celda ni la ficha
@@ -77,10 +85,13 @@ export const crearMapaBase = (
       [encuadre.noreste.longitud, encuadre.noreste.latitud],
     ],
     fitBoundsOptions: { padding: relleno, maxZoom: ZOOM_MAXIMO_AL_ABRIR },
-    maxBounds: [
-      [limites.suroeste.longitud, limites.suroeste.latitud],
-      [limites.noreste.longitud, limites.noreste.latitud],
-    ],
+    transformConstrain: (centro, zoom) => {
+      const dentro = alRectangulo(limites, { longitud: centro.lng, latitud: centro.lat });
+      return {
+        center: new LngLat(dentro.longitud, dentro.latitud),
+        zoom: Math.min(area.zoomMaximo, Math.max(area.zoomMinimo, zoom)),
+      };
+    },
     minZoom: area.zoomMinimo,
     maxZoom: area.zoomMaximo,
     // Sin esto, por encima del zoom 17 no sale ningún nombre de calle (`teselas.ts`).
