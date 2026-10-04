@@ -75,7 +75,7 @@ const dobleAreaConSigno = (anillo: ReadonlyArray<readonly [number, number]>): nu
 };
 
 /** Un anillo de la unión, en las unidades de los límites, y si lo forman bordes de agujeros. */
-interface AnilloDeLaUnion {
+export interface AnilloDeLaUnion {
   readonly vertices: ReadonlyArray<readonly [number, number]>;
   readonly deAgujero: boolean;
 }
@@ -111,9 +111,10 @@ const bordesDeLaUnion = (limites: LimitesDeMunicipios): Array<AnilloDeLaUnion> =
 
 /**
  * Los anillos de la unión: sus bordes encadenados por sus extremos hasta cerrar cada anillo. Un
- * anillo hecho con el agujero de algún recinto es un agujero de la unión: nadie lo llena.
+ * anillo hecho con el agujero de algún recinto es un agujero de la unión: nadie lo llena. Los
+ * centros visuales de las provincias (`centros.ts`) los usan sin simplificar.
  */
-const anillosDeLaUnion = (
+export const anillosDeLaUnion = (
   limites: LimitesDeMunicipios,
 ): Result.Result<Array<AnilloDeLaUnion>, ContornoImposible> => {
   const bordes = bordesDeLaUnion(limites);
