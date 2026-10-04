@@ -25,7 +25,7 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  *   pnpm run medir -- --capas <carpeta publicada> [--web ../../apps/web/dist] [--cpu 4,6]
  *                     [--repeticiones 3] [--trazas <carpeta>] [--json <fichero>]
  *                     [--escenario barcelona|espana|borde|vuelos] [--ruta /?emplazamiento=<clave>]
- *                     [--pantalla movil|escritorio] [--grupos saltos,vuelos,alejar,…]
+ *                     [--pantalla movil|escritorio] [--grupos saltos,vuelos,alejar,…] [--foto]
  *
  * El escenario `barcelona` va a Barcelona entera y hace allí los gestos de siempre. El de `espana`, el
  * de varias provincias (ADR 0016): aleja hasta ver toda España con el resumen, toca el hexágono
@@ -42,6 +42,10 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  * vista en vista, cinco vuelos de España a la calle y vuelta, alejarse del Eixample hasta España y
  * acercar y alejar nivel a nivel sobre Zaragoza y Barcelona. No depende de qué marcadores se ven
  * ni de dónde caen en la pantalla, así que da lo mismo con cualquier capa publicada y pantalla.
+ *
+ * Con `--foto`, cada página enciende la foto aérea con su control al abrir, y la medida cuenta lo
+ * pedido al PNOA en la primera visita y cuántas de esas teselas se pidieron con la cámara de la
+ * medida en movimiento (#67).
  */
 
 /**
@@ -70,6 +74,8 @@ const { values: opciones } = NodeUtil.parseArgs({
     pantalla: { type: "string", default: "movil" },
     // Con `--escenario vuelos`, solo estos grupos de gestos, separados por comas.
     grupos: { type: "string" },
+    // Enciende la foto aérea al abrir cada página.
+    foto: { type: "boolean", default: false },
   },
 });
 
@@ -702,6 +708,24 @@ const ESPANA = lugar("espana-5,5", [-3.7, 40.2], 5.5);
  * son de Celda.
  */
 
+/** Las teselas de la foto aérea, del TMS del PNOA (ADR 0022). */
+const HOST_DE_LA_FOTO = "tms-pnoa-ma.idee.es";
+
+/** Un movimiento de la cámara hecho por la medida, en ms desde el origen de la página. */
+interface Movimiento {
+  readonly inicio: number;
+  readonly fin: number;
+}
+
+/** Los movimientos animados de la cámara de cada página: vuelos y acercamientos. */
+const movimientos = new WeakMap<Page, Array<Movimiento>>();
+
+const apuntarMovimiento = (pagina: Page, inicio: number, ms: number) => {
+  const suyos = movimientos.get(pagina) ?? [];
+  suyos.push({ inicio, fin: inicio + ms });
+  movimientos.set(pagina, suyos);
+};
+
 /** Salta sin animación a `destino`, como al abrir un enlace o elegir un resultado del buscador. */
 const saltar = (pagina: Page, destino: Lugar) =>
   pagina.evaluate((l) => {
@@ -709,22 +733,30 @@ const saltar = (pagina: Page, destino: Lugar) =>
   }, destino);
 
 /** Vuela a `destino` en `ms`, como `flyTo` de MapLibre: se aleja, cruza y se acerca. */
-const volar = (pagina: Page, destino: Lugar, ms: number) =>
-  pagina.evaluate(
+const volar = async (pagina: Page, destino: Lugar, ms: number): Promise<void> => {
+  const inicio = await pagina.evaluate(
     ({ l, duracion }) => {
+      const ahora = performance.now();
       window.__celdaMapa?.flyTo({ center: l.centro, zoom: l.zoom, duration: duracion });
+      return ahora;
     },
     { l: destino, duracion: ms },
   );
+  apuntarMovimiento(pagina, inicio, ms);
+};
 
 /** Acerca o aleja hasta `zoom` en `ms`, sin mover el centro. */
-const acercarA = (pagina: Page, zoom: number, ms: number) =>
-  pagina.evaluate(
+const acercarA = async (pagina: Page, zoom: number, ms: number): Promise<void> => {
+  const inicio = await pagina.evaluate(
     ({ z, duracion }) => {
+      const ahora = performance.now();
       window.__celdaMapa?.easeTo({ zoom: z, duration: duracion });
+      return ahora;
     },
     { z: zoom, duracion: ms },
   );
+  apuntarMovimiento(pagina, inicio, ms);
+};
 
 /** Centra el mapa en `centro` sin cambiar el zoom, como quien arrastra hasta verlo, y espera. */
 const centrarEn = async (pagina: Page, centro: Centro): Promise<void> => {
@@ -756,7 +788,8 @@ type Medir = (nombre: string, accion: () => Promise<void>) => Promise<void>;
 
 /**
  * Abre la web y espera a que se vean el mapa base y los marcadores, y tres segundos más para que
- * terminen de llegar las teselas de la primera vista.
+ * terminen de llegar las teselas de la primera vista. Con `--foto`, enciende después la foto aérea
+ * con su control y le da otros tres segundos.
  */
 const abrirYEsperar = async (pagina: Page, origen: string): Promise<void> => {
   await pagina.goto(new URL(opciones.ruta, origen).href, { waitUntil: "load" });
@@ -769,6 +802,10 @@ const abrirYEsperar = async (pagina: Page, origen: string): Promise<void> => {
     { timeout: 60_000, polling: 200 },
   );
   await esperar(3000);
+  if (opciones.foto === true) {
+    await pulsar(pagina, "Foto aérea", 1);
+    await esperar(3000);
+  }
 };
 
 /** Un grupo de gestos del escenario `vuelos`, que empieza en la vista inicial de la web. */
@@ -893,6 +930,15 @@ interface Ronda {
   readonly memoria: { readonly total: number | undefined; readonly hilo: number | undefined };
   /** Tras el escenario de España: lo pedido de las capas, en total. */
   readonly capasTrasElRecorrido: { readonly bytes: number; readonly peticiones: number };
+  /**
+   * Lo pedido al PNOA en la primera página, en toda la visita: bytes, peticiones y cuántas se
+   * pidieron en pleno vuelo o acercamiento de la medida.
+   */
+  readonly foto: {
+    readonly bytes: number;
+    readonly peticiones: number;
+    readonly enMovimiento: number;
+  };
 }
 
 const ronda = async (
@@ -1122,9 +1168,12 @@ const ronda = async (
           ? recorridoEnVuelo()
           : gestosYFicha());
   }
-  const trasElRecorrido = (
-    await red.peticiones(await pagina.evaluate(() => performance.timeOrigin))
-  ).filter((p) => new URL(p.url).pathname.startsWith("/capas/"));
+  const todas = await red.peticiones(await pagina.evaluate(() => performance.timeOrigin));
+  const trasElRecorrido = todas.filter((p) => new URL(p.url).pathname.startsWith("/capas/"));
+  const deLaFoto = todas.filter((p) => new URL(p.url).host === HOST_DE_LA_FOTO);
+  const enMovimiento = deLaFoto.filter((p) =>
+    (movimientos.get(pagina) ?? []).some((m) => p.inicio >= m.inicio && p.inicio < m.fin),
+  );
   const interacciones = await pagina.evaluate(() => window.__celda.interacciones());
   // Otra visita con la caché HTTP de la primera: lo que ve quien vuelve.
   const otra = await contexto.newPage();
@@ -1167,6 +1216,11 @@ const ronda = async (
     capasTrasElRecorrido: {
       bytes: trasElRecorrido.reduce((a, p) => a + p.bytes, 0),
       peticiones: trasElRecorrido.length,
+    },
+    foto: {
+      bytes: deLaFoto.reduce((a, p) => a + p.bytes, 0),
+      peticiones: deLaFoto.length,
+      enMovimiento: enMovimiento.length,
     },
     inp: Math.max(0, ...interacciones.map((i) => i.duracion)),
     interacciones: [...interacciones].sort((a, b) => b.duracion - a.duracion).slice(0, 5),
@@ -1257,6 +1311,11 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
     lineas.push(
       `\nCapas tras el recorrido: ${f(m((r) => r.capasTrasElRecorrido.bytes / 1024))} KB / ${f(m((r) => r.capasTrasElRecorrido.peticiones))} peticiones`,
     );
+    if (suyas.some((r) => r.foto.peticiones > 0)) {
+      lineas.push(
+        `Foto aérea en la primera página: ${f(m((r) => r.foto.bytes / 1024))} KB / ${f(m((r) => r.foto.peticiones))} peticiones, ${f(m((r) => r.foto.enMovimiento))} pedidas con la cámara de la medida en movimiento (por ronda: ${suyas.map((r) => `${Math.round(r.foto.bytes / 1024)} KB`).join(", ")})`,
+      );
+    }
     lineas.push(
       `Memoria: ${f(m((r) => (r.memoria.total === undefined ? undefined : r.memoria.total / 1048576)))} MB página y Workers, ${f(m((r) => (r.memoria.hilo === undefined ? undefined : r.memoria.hilo / 1048576)))} MB de montón del hilo principal`,
     );
