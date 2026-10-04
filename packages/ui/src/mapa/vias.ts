@@ -42,7 +42,7 @@ const SOBRE_LA_FOTO = {
 >;
 
 /** Lo que el borde sobresale del relleno, sumando los dos lados, en píxeles. */
-const BORDE = 1.6;
+export const BORDE = 1.6;
 
 const REDONDO = { "line-cap": "round", "line-join": "round" } as const;
 

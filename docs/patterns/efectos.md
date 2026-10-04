@@ -173,7 +173,7 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 Se abre una vez por lo que lo crea, no por una reejecución:
 
 - Al cargar el módulo: `lib/rutas.ts` (`popstate`) y `mapa/precarga.ts` (MapLibre, `prefetch` y `preload`).
-- Una vez por mapa: `mapa/mapaBase.ts` (`sourcedata`, `error`) y `PantallaMapa.crear` (`zoom`, `moveend`, `load`).
+- Una vez por mapa: `mapa/mapaBase.ts` (`sourcedata`, `error`, el plazo de 4 s del callejero principal y, si vence o falla, un `setStyle` al de reserva, una sola vez; el plazo se cancela al llegar la primera tesela o con `remove`) y `PantallaMapa.crear` (`zoom`, `moveend`, `load`).
 - Una vez por Worker: `capa/navegador.ts`, el Worker que lee e indexa las capas de provincia; se crea con la primera provincia y dura la visita, y una lectura interrumpida no lo termina: su respuesta se descarta.
 - Una vez por Worker: `simulacion/navegador.ts` (`new Worker` y sus escuchadores). El simulador arranca uno con la primera simulación y lo termina si se interrumpe un cálculo a medias. Por eso los cálculos que se cancelan de más cuestan tanto.
 - Los servicios de Effect (`geolocalizacion.ts`, `brujula.ts`, `almacen.ts`, las lecturas de red de `capa/`, `ficha/` y `buscador.ts`) abren con `acquireRelease` y cierran al interrumpirse. Los abre el sitio de Solid de la primera tabla.

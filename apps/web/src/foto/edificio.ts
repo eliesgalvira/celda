@@ -223,8 +223,14 @@ export const dibujoDelEdificio = (encontrado: EdificioEncontrado): DibujoDelEdif
 /** Un elemento de `queryRenderedFeatures`, con lo poco que se lee de él. */
 export interface RasgoDelMapa {
   readonly id?: string | number | undefined;
-  /** De un número de portal, `housenumber`; de un edificio no se lee nada. */
-  readonly properties: { readonly housenumber?: string | number } | null;
+  /**
+   * De un número de portal, `housenumber` en OpenFreeMap y `ref` en el mapa base de reserva del
+   * IGN; de un edificio no se lee nada.
+   */
+  readonly properties: {
+    readonly housenumber?: string | number;
+    readonly ref?: string | number;
+  } | null;
   readonly geometry: { readonly type: string; readonly coordinates?: unknown };
 }
 
@@ -245,7 +251,7 @@ export const edificioDeRasgo = (rasgo: RasgoDelMapa): Edificio | undefined => {
 /** El portal de un rasgo de la capa de portales, ya abreviado, o nada si no es un punto. */
 export const portalDeRasgo = (rasgo: RasgoDelMapa): Portal | undefined => {
   const { type, coordinates } = rasgo.geometry;
-  const numero = rasgo.properties?.["housenumber"];
+  const numero = rasgo.properties?.["housenumber"] ?? rasgo.properties?.["ref"];
   if (type !== "Point" || !Array.isArray(coordinates) || numero === undefined) return undefined;
   const [longitud, latitud] = coordinates;
   if (!Predicate.isNumber(longitud) || !Predicate.isNumber(latitud)) return undefined;

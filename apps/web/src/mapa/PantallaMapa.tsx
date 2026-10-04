@@ -118,7 +118,14 @@ import {
   MenuDeUbicacion,
   PasoPrevio,
 } from "../ubicacion/Ubicacion.tsx";
-import { CREDITOS_MAPA_BASE, type EstadoMapa, hayWebgl, type MotivoFallo } from "./estado.ts";
+import type { Callejero } from "./callejero.ts";
+import {
+  CREDITOS_MAPA_BASE,
+  CREDITOS_RESERVA,
+  type EstadoMapa,
+  hayWebgl,
+  type MotivoFallo,
+} from "./estado.ts";
 import { type CargasDeZonas, crearLugares } from "./lugar.ts";
 import { Marcadores } from "./Marcadores.tsx";
 import {
@@ -160,6 +167,13 @@ export function PantallaMapa() {
   const eligiendo = createMemo(() => puntoDeReferencia.ubicacion().estado.tipo === "eligiendo");
   const [escritorio, setEscritorio] = createSignal(window.matchMedia(ESCRITORIO).matches);
   const [estado, setEstado] = createSignal<EstadoMapa>({ tipo: "cargando" });
+  /**
+   * De dónde sale el callejero. Pasa a la reserva si el principal no llega, y ya no vuelve en esta
+   * visita: un reintento crea el mapa con la reserva.
+   */
+  const [callejero, setCallejero] = createSignal<Callejero>("principal");
+  /** Lo mismo, para crear el mapa sin esperar al siguiente `flush`. */
+  let callejeroActual: Callejero = "principal";
   const [capa, setCapa] = createSignal<EstadoCapa>({ tipo: "cargando" });
   /** Cómo va cada provincia pedida. Una vez pedida, se queda para la visita. */
   const [provincias, setProvincias] = createSignal<ReadonlyMap<string, EstadoProvincia>>(new Map());
@@ -261,8 +275,13 @@ export function PantallaMapa() {
             setMapaListo(nuevo);
           },
           fallo: fallar,
+          aReserva: () => {
+            callejeroActual = "reserva";
+            setCallejero("reserva");
+          },
         },
         rellenoDeLaVista(escritorio()),
+        callejeroActual,
       );
       const mirarZoom = () => {
         setCerca(nuevo.getZoom() >= ZOOM_CELDAS);
@@ -510,10 +529,11 @@ export function PantallaMapa() {
   const conBarrios = createMemo(() => cargadas().some((p) => p.capa.barrios.length > 0));
   const creditos = createMemo(() => {
     const fuentes = resumen()?.fuentes;
+    const delCallejero = callejero() === "reserva" ? CREDITOS_RESERVA : CREDITOS_MAPA_BASE;
     return fuentes === undefined
-      ? CREDITOS_MAPA_BASE
+      ? delCallejero
       : [
-          ...CREDITOS_MAPA_BASE,
+          ...delCallejero,
           creditoDeMunicipios(fuentes.municipios),
           ...(conBarrios() ? [creditoDeBarrios(fuentes.barrios)] : []),
         ];
@@ -1021,7 +1041,7 @@ export function PantallaMapa() {
   const aviso = createMemo(() => {
     const actual = estado();
     return actual.tipo === "listo" ? undefined : (
-      <AvisoMapa estado={actual} reintentar={arrancar} />
+      <AvisoMapa estado={actual} callejero={callejero()} reintentar={arrancar} />
     );
   });
 
@@ -1398,13 +1418,19 @@ const EXPLICACION_FALLO_CAPA = {
   interno: "Es un error de Celda, no de tu conexión.",
 } as const;
 
-function AvisoMapa(props: { readonly estado: EstadoMapa; readonly reintentar: () => void }) {
+function AvisoMapa(props: {
+  readonly estado: EstadoMapa;
+  readonly callejero: Callejero;
+  readonly reintentar: () => void;
+}) {
   const reintentar = <Boton onClick={() => props.reintentar()}>Reintentar</Boton>;
   return (
     <Switch>
       <Match when={props.estado.tipo === "cargando"}>
         <Aviso tono="espera" titulo="Cargando el mapa base">
-          El callejero llega desde OpenFreeMap.
+          {props.callejero === "reserva"
+            ? "OpenFreeMap no responde: el callejero llega desde el IGN."
+            : "El callejero llega desde OpenFreeMap."}
         </Aviso>
       </Match>
       <Match when={props.estado.tipo === "fallo" && props.estado.motivo === "sin-webgl"}>
@@ -1415,8 +1441,9 @@ function AvisoMapa(props: { readonly estado: EstadoMapa; readonly reintentar: ()
       </Match>
       <Match when={props.estado.tipo === "fallo" && props.estado.motivo === "sin-respuesta"}>
         <Aviso tono="fallo" titulo="No se ha podido cargar el mapa base" acciones={reintentar}>
-          El callejero viene de los servidores de OpenFreeMap y no ha llegado. Puede fallar la
-          conexión o estar bloqueado el servidor.
+          {props.callejero === "reserva"
+            ? "No ha llegado el callejero de OpenFreeMap ni el de reserva del IGN. Puede fallar la conexión o estar bloqueados los servidores."
+            : "El callejero viene de los servidores de OpenFreeMap y no ha llegado. Puede fallar la conexión o estar bloqueado el servidor."}
         </Aviso>
       </Match>
       <Match when={props.estado.tipo === "fallo"}>

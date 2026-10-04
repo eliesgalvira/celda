@@ -2,7 +2,11 @@
 // @effect-diagnostics strictEffectProvide:off
 import { dentroDelPoligono } from "@celda/dominio/barrio";
 import { LimitesDeMunicipios } from "@celda/dominio/municipio";
-import { deLaComunitatValenciana } from "@celda/dominio/nombreDeLugar";
+import {
+  deLaComunitatValenciana,
+  FORMAS_QUE_NO_SE_VEN,
+  formasDe,
+} from "@celda/dominio/nombreDeLugar";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -155,5 +159,24 @@ describe("nombres de lugar guardados en el repositorio", () => {
         assert.strictEqual(dentro(simplificado, longitud, latitud), enLaComunitat, lugar);
       }
     }),
+  );
+
+  it.effect(
+    "ninguna forma que el mapa base de reserva no rotula es el oficial de otro municipio",
+    () =>
+      Effect.gen(function* () {
+        const { limites } = yield* leer;
+        // El mapa del IGN rotula los bilingües una vez con cada forma, y se quita la que no se ve.
+        // Si fuera también el nombre de otro sitio, ese otro se quedaría sin rótulo.
+        const deUnaForma = new Set(
+          limites.territorios.flatMap((territorio) =>
+            formasDe(territorio.nombre) === undefined ? [territorio.nombre] : [],
+          ),
+        );
+        assert.deepStrictEqual(
+          FORMAS_QUE_NO_SE_VEN.filter((forma) => deUnaForma.has(forma)),
+          [],
+        );
+      }),
   );
 });

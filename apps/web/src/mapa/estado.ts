@@ -15,6 +15,21 @@ export const CREDITOS_MAPA_BASE: ReadonlyArray<Credito> = [
   { texto: "OpenStreetMap", enlace: "https://www.openstreetmap.org/copyright" },
 ];
 
+/**
+ * El crédito del mapa base de reserva del IGN, mientras está puesto (ADR 0021). Es la fórmula de
+ * la etiqueta `AccessConstraints` del servicio, y su licencia pide verla a pie de mapa: en el móvil
+ * se queda a la vista, corto y en una línea, con los demás créditos plegados.
+ */
+export const CREDITOS_RESERVA: ReadonlyArray<Credito> = [
+  {
+    texto: "Sistema Cartográfico Nacional · CC BY 4.0 scne.es",
+    corto: "CC BY 4.0 scne.es",
+    enlace: "https://www.scne.es/",
+    detalle: "Mapa base de reserva: el del IGN, que Celda pone cuando el de OpenFreeMap no llega",
+    fijo: true,
+  },
+];
+
 /** Si el navegador puede dibujar con WebGL, que MapLibre necesita. */
 export const hayWebgl = (): boolean => {
   const lienzo = document.createElement("canvas");

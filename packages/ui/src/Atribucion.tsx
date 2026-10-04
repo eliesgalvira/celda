@@ -8,6 +8,13 @@ export interface Credito {
   readonly enlace: string;
   /** Qué datos son, para quien pasa el puntero o usa un lector de pantalla. */
   readonly detalle?: string;
+  /** Lo que se escribe en el móvil, donde los créditos tienen poco sitio, si es más corto. */
+  readonly corto?: string;
+  /**
+   * Si se ve también con los créditos plegados en el móvil, junto al botón «i». Lo pide la licencia
+   * del mapa base de reserva del IGN: su crédito, a pie de mapa.
+   */
+  readonly fijo?: boolean;
 }
 
 /**
@@ -27,12 +34,35 @@ export interface AtribucionProps {
   readonly creditos: ReadonlyArray<Credito>;
 }
 
-/** Los créditos de los datos del mapa, siempre a la vista o a un toque del botón «i». */
+/** El texto de un crédito: entero y, en el móvil, el corto si lo tiene. */
+function TextoDelCredito(props: { readonly credito: Credito }) {
+  return (
+    <Show when={props.credito.corto} fallback={<>© {props.credito.texto}</>}>
+      {(corto) => (
+        <>
+          <span class="max-md:hidden">© {props.credito.texto}</span>
+          <span class="md:hidden">© {corto()}</span>
+        </>
+      )}
+    </Show>
+  );
+}
+
+const ENLACE =
+  "inline-flex min-h-6 items-center underline-offset-2 hover:text-primario-texto hover:underline";
+const CINTA =
+  "cinta flex flex-wrap items-center gap-x-2 bg-superficie/90 px-3 py-0.5 font-mono text-[10.5px] text-tinta [--pico:6px]";
+
+/**
+ * Los créditos de los datos del mapa, siempre a la vista o a un toque del botón «i». Los que son
+ * `fijo` se ven también plegados, en una línea junto al botón.
+ */
 export function Atribucion(props: AtribucionProps) {
   const id = createUniqueId();
   const pliegue = useContext(PliegueDeCreditos);
   const plegable = () => pliegue !== undefined;
   const plegada = () => plegable() && pliegue?.plegada() === true;
+  const fijos = () => props.creditos.filter((credito) => credito.fijo === true);
   return (
     <div class="flex items-end gap-1">
       <Show when={plegable()}>
@@ -58,7 +88,7 @@ export function Atribucion(props: AtribucionProps) {
       <p
         id={id}
         class={cn(
-          "cinta flex flex-wrap items-center gap-x-2 bg-superficie/90 px-3 py-0.5 font-mono text-[10.5px] text-tinta [--pico:6px]",
+          CINTA,
           // En el móvil, abiertos, pueden quedar sobre la pista o la vista: fondo opaco.
           plegable() && "max-md:bg-superficie",
           plegada() && "max-md:hidden",
@@ -71,13 +101,30 @@ export function Atribucion(props: AtribucionProps) {
               title={credito.detalle}
               target="_blank"
               rel="noreferrer"
-              class="inline-flex min-h-6 items-center underline-offset-2 hover:text-primario-texto hover:underline"
+              class={ENLACE}
             >
-              © {credito.texto}
+              <TextoDelCredito credito={credito} />
             </a>
           )}
         </For>
       </p>
+      <Show when={plegada() && fijos().length > 0}>
+        <p class={cn(CINTA, "flex-nowrap whitespace-nowrap md:hidden")}>
+          <For each={fijos()}>
+            {(credito) => (
+              <a
+                href={credito.enlace}
+                title={credito.detalle}
+                target="_blank"
+                rel="noreferrer"
+                class={ENLACE}
+              >
+                © {credito.corto ?? credito.texto}
+              </a>
+            )}
+          </For>
+        </p>
+      </Show>
     </div>
   );
 }

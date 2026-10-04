@@ -2,12 +2,15 @@ import { assert, describe, it } from "@effect/vitest";
 
 import {
   deLaComunitatValenciana,
+  FORMAS_QUE_NO_SE_VEN,
   formasDe,
   nombreDeLugarDeMunicipio,
   nombreDeLugarDeProvincia,
+  nombreDelIgn,
   nombreDelMapaBase,
   nombreDeResultado,
   partesDeLaBarra,
+  TABLA_DE_NOMBRES,
 } from "./nombreDeLugar.ts";
 
 /** Municipios con su código INE, su oficial del IGN y su nombre de lugar. */
@@ -216,5 +219,52 @@ describe("resultado del buscador, por su posición", () => {
   it("sin barra, el mismo nombre", () => {
     assert.strictEqual(nombreDeResultado("Girona", undefined, false), "Girona");
     assert.strictEqual(nombreDeResultado("Vitoria-Gasteiz", "Vitoria", false), "Vitoria-Gasteiz");
+  });
+});
+
+describe("rótulo del mapa base de reserva del IGN", () => {
+  it("de un bilingüe que el IGN rotula dos veces, solo sale el nombre de lugar", () => {
+    const pares: ReadonlyArray<readonly [ves: string, quitas: string]> = [
+      ["San Sebastián", "Donostia"],
+      ["Pamplona", "Iruña"],
+      ["Mondragón", "Arrasate"],
+      ["Alacant", "Alicante"],
+      ["Elx", "Elche"],
+      ["Sagunt", "Sagunto"],
+      ["Castelló de la Plana", "Castellón de la Plana"],
+    ];
+    for (const [ves, quitas] of pares) {
+      assert.strictEqual(nombreDelIgn(ves), ves);
+      assert.isUndefined(nombreDelIgn(quitas), quitas);
+    }
+  });
+
+  it("un oficial con barra da su nombre de lugar, con o sin espacios", () => {
+    assert.strictEqual(nombreDelIgn("Donostia/San Sebastián"), "San Sebastián");
+    assert.strictEqual(nombreDelIgn("Alacant/Alicante"), "Alacant");
+    assert.strictEqual(nombreDelIgn("Elx/Elche"), "Elx");
+    assert.strictEqual(nombreDelIgn("Pamplona / Iruña"), "Pamplona");
+    // Uno que no está en la tabla, como las comunidades, en su primera forma.
+    assert.strictEqual(nombreDelIgn("Cataluña/Catalunya"), "Cataluña");
+  });
+
+  it("sin lo que el IGN pone entre paréntesis: el exónimo de fuera o el país", () => {
+    assert.strictEqual(nombreDelIgn("Porto (Oporto)"), "Porto");
+    assert.strictEqual(nombreDelIgn("Ceuta (ESP)"), "Ceuta");
+  });
+
+  it("los oficiales de una sola forma y los de guion no cambian", () => {
+    for (const nombre of ["Girona", "A Coruña", "Bilbao", "Vitoria-Gasteiz", "València"]) {
+      assert.strictEqual(nombreDelIgn(nombre), nombre);
+    }
+  });
+
+  it("ninguna forma que no se ve es el nombre de lugar de una provincia o un municipio", () => {
+    const filas = [
+      ...Object.values(TABLA_DE_NOMBRES.provincias),
+      ...Object.values(TABLA_DE_NOMBRES.municipios),
+    ];
+    assert.isAtLeast(FORMAS_QUE_NO_SE_VEN.length, filas.length - 1);
+    for (const { nombre } of filas) assert.notInclude(FORMAS_QUE_NO_SE_VEN, nombre);
   });
 });
