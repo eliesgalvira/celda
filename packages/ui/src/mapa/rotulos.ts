@@ -6,7 +6,7 @@ import type {
 
 import type { Contorno } from "@celda/dominio/comunitatValenciana";
 
-import { conFoto, deClase, porZoom, visibleConFoto } from "./expresiones.ts";
+import { conFoto, deClase, porZoom, textoDeRotulo, visibleConFoto } from "./expresiones.ts";
 import { capaHuecos } from "./huecos.ts";
 import { nombreDelRotulo } from "./nombres.ts";
 import type { ColorDeToken, TokenMapa } from "./tokens.ts";
@@ -267,7 +267,7 @@ const capaDeLugares = (
     maxzoom: capa.hasta,
     filter: ["all", soloDeEspana(espana), capa.propio, sinLosDeCelda(nombre)],
     layout: {
-      "text-field": nombre,
+      "text-field": textoDeRotulo(nombre),
       "text-font": [capa.letra],
       "text-size": tamanoDe(capa.tamano),
       "symbol-sort-key": ["get", "rank"],
@@ -469,7 +469,7 @@ const capasDeNombres = (
     minzoom: 14,
     filter: deClase("suburb", "quarter", "neighbourhood"),
     layout: {
-      "text-field": nombre,
+      "text-field": textoDeRotulo(nombre),
       "text-font": [LETRA],
       "text-size": porZoom(14, 11.5, 17, 13),
       "text-max-width": 7,

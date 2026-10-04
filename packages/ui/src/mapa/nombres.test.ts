@@ -12,6 +12,7 @@ import {
 
 import { CONTORNO_DE_ESPANA } from "./espana.ts";
 import { estiloMapa, FUENTE_MAPA_BASE } from "./estilo.ts";
+import { textoDeRotulo } from "./expresiones.ts";
 import { nombreDelRotulo } from "./nombres.ts";
 import { CAPA_PORTALES, CAPAS_DE_LUGARES, MUNICIPIOS_DE_CELDA } from "./rotulos.ts";
 
@@ -171,10 +172,29 @@ describe("nombre de los rótulos del mapa base", () => {
       deLugar.map(([id]) => id).toSorted(),
       [...CAPAS_DE_LUGARES, "barrios"].toSorted(),
     );
-    for (const [id, , texto] of deLugar) assert.deepStrictEqual(texto, TEXTO, id);
+    for (const [id, , texto] of deLugar) assert.deepStrictEqual(texto, textoDeRotulo(TEXTO), id);
     for (const [id, capa, texto] of conTexto) {
       if (capa === "place" || id === "numeros-de-carreteras" || id === CAPA_PORTALES) continue;
       assert.deepStrictEqual(texto, ["get", "name"], id);
+    }
+  });
+
+  it("cada capa de lugares escribe, dentro de su `format`, lo mismo que el nombre de lugar", () => {
+    for (const id of [...CAPAS_DE_LUGARES, "barrios"]) {
+      const capa = ESTILO.layers.find((otra) => otra.id === id);
+      const texto = capa?.type === "symbol" ? capa.layout?.["text-field"] : undefined;
+      // Sin tipo esperado: el `format` da un texto con formato, que se escribe con `String`.
+      const expresion = createExpression(texto, "text-field", null);
+      if (expresion.result === "error")
+        return assert.fail(expresion.value.map((e) => e.message).join());
+      for (const [lugar, longitud, latitud, esperado] of CASOS) {
+        const { canonical, rasgo: enTesela } = rasgo(lugar, longitud, latitud);
+        assert.strictEqual(
+          String(expresion.value.evaluate({ zoom: 10 }, enTesela, {}, canonical)),
+          esperado,
+          `${id}: ${lugar.name}`,
+        );
+      }
     }
   });
 

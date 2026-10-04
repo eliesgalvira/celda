@@ -4,6 +4,7 @@ import {
   leerRotulosDeCiudad,
   type MapaConRotulosColocados,
   type RasgoColocado,
+  type ZoomsDeCapa,
 } from "./rotulosDeCiudad.ts";
 
 /** Un rasgo de una capa de ciudades como lo devuelve `queryRenderedFeatures`. */
@@ -18,10 +19,22 @@ const rasgo = (
   layer: { id: capa },
 });
 
+/**
+ * Los zooms de las capas de ciudades, como en `rotulos.ts`, con las de lejos del mapa base de
+ * reserva, que en una prueba están a la vez que las del principal.
+ */
+const ZOOMS = new Map<string, ZoomsDeCapa>([
+  ["lugares-capitales", { minzoom: 4, maxzoom: 14 }],
+  ["lugares-grandes", { minzoom: 4.5, maxzoom: 14 }],
+  ["lugares-ciudades", { minzoom: 7, maxzoom: 14 }],
+  ["lugares-capitales-lejos", { minzoom: 4, maxzoom: 7 }],
+  ["lugares-grandes-lejos", { minzoom: 4.5, maxzoom: 7 }],
+]);
+
 const mapaCon = (rasgos: ReadonlyArray<RasgoColocado>, zoom = 8) => {
   const pedidas: Array<ReadonlyArray<string>> = [];
   const mapa: MapaConRotulosColocados = {
-    getLayer: () => ({}),
+    getLayer: (id) => ZOOMS.get(id) ?? {},
     getZoom: () => zoom,
     queryRenderedFeatures: (opciones) => {
       pedidas.push(opciones.layers);
@@ -40,15 +53,7 @@ describe("lectura de los rótulos de ciudad colocados", () => {
     ]);
     const { zoom, rotulos } = leerRotulosDeCiudad(mapa);
     assert.strictEqual(zoom, 8);
-    assert.deepStrictEqual(pedidas, [
-      [
-        "lugares-capitales",
-        "lugares-grandes",
-        "lugares-ciudades",
-        "lugares-capitales-lejos",
-        "lugares-grandes-lejos",
-      ],
-    ]);
+    assert.deepStrictEqual(pedidas, [["lugares-capitales", "lugares-grandes", "lugares-ciudades"]]);
     assert.deepStrictEqual(
       rotulos.map((r) => [r.clave, r.importancia, r.tamano]),
       [
@@ -56,6 +61,17 @@ describe("lectura de los rótulos de ciudad colocados", () => {
         ["lugares-grandes:Zaragoza", "ciudad", 13.5],
       ],
     );
+  });
+
+  it("solo pregunta por las capas que se ven a su zoom, y de cerca no pregunta", () => {
+    const lejos = mapaCon([], 5);
+    leerRotulosDeCiudad(lejos.mapa);
+    assert.deepStrictEqual(lejos.pedidas, [
+      ["lugares-capitales", "lugares-grandes", "lugares-capitales-lejos", "lugares-grandes-lejos"],
+    ]);
+    const cerca = mapaCon([rasgo("lugares-grandes", { name: "Zaragoza" }, -0.88, 41.65)], 14);
+    assert.deepStrictEqual(leerRotulosDeCiudad(cerca.mapa), { zoom: 14, rotulos: [] });
+    assert.deepStrictEqual(cerca.pedidas, []);
   });
 
   it("su texto es el nombre de lugar, en una sola forma según el lado de la Comunitat", () => {

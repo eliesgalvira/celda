@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 import type { DataDrivenPropertyValueSpecification, LayerSpecification } from "maplibre-gl";
 
-import { CLASES_DE_VIAS, capasVias, valorEnZoom } from "./vias.ts";
+import { BORDE, CLASES_DE_VIAS, capasVias, valorEnZoom } from "./vias.ts";
 
 const capas = capasVias("fuente", (token) => token);
 const capa = (id: string): LayerSpecification | undefined => capas.find((c) => c.id === id);
@@ -33,27 +33,63 @@ describe("capas de las vías", () => {
     assert.strictEqual(valorEnZoom(pares, 11.5, 1), 3.25);
   });
 
-  it("cada clase tiene en la capa común el grosor que le toca en cada una de sus paradas", () => {
-    const relleno = capa("vias");
-    const anchos = relleno?.type === "line" ? relleno.paint?.["line-width"] : undefined;
+  it("cada clase tiene su grosor en sus paradas y su borde sobresale `BORDE` de su relleno", () => {
     for (const via of CLASES_DE_VIAS) {
-      const valores = valoresEnParadas(anchos, via.clase);
-      for (let k = 0; k + 1 < via.grosor.length; k += 2) {
-        assert.closeTo(
-          valores.get(via.grosor[k] ?? 0) ?? -1,
-          via.grosor[k + 1] ?? 0,
-          0.01,
-          via.clase,
-        );
+      const relleno = capa(`vias-${via.clase}`);
+      const anchos = relleno?.type === "line" ? relleno.paint?.["line-width"] : undefined;
+      assert.deepStrictEqual(anchos, [
+        "interpolate",
+        ["exponential", 1.5],
+        ["zoom"],
+        ...via.grosor,
+      ]);
+      const borde = capa(`vias-borde-${via.clase}`);
+      if (!Number.isFinite(via.bordeDesde)) {
+        assert.isUndefined(borde, via.clase);
+        continue;
       }
+      const conBorde = borde?.type === "line" ? borde.paint?.["line-width"] : undefined;
+      assert.deepStrictEqual(conBorde, [
+        "interpolate",
+        ["exponential", 1.5],
+        ["zoom"],
+        ...via.grosor.map((valor, k) => (k % 2 === 0 ? valor : valor + BORDE)),
+      ]);
     }
   });
 
-  it("dibuja los bordes debajo y la autopista encima de todo, en dos capas, y otra sobre la foto", () => {
+  it("dibuja los bordes debajo y los rellenos encima, de la clase menor a la autopista, y otra sobre la foto", () => {
     const ids = capas.map((c) => c.id);
-    assert.deepStrictEqual(ids, ["tren", "caminos", "vias-borde", "vias", "vias-foto"]);
+    const conBorde = CLASES_DE_VIAS.filter((via) => Number.isFinite(via.bordeDesde));
+    assert.deepStrictEqual(ids, [
+      "tren",
+      "caminos",
+      ...conBorde.map((via) => `vias-borde-${via.clase}`),
+      ...CLASES_DE_VIAS.map((via) => `vias-${via.clase}`),
+      "vias-foto",
+    ]);
     assert.strictEqual(CLASES_DE_VIAS.at(-1)?.clase, "motorway");
     assert.strictEqual(CLASES_DE_VIAS.at(-2)?.clase, "trunk");
+  });
+
+  it("el borde y el relleno de una clase salen del mismo cubo: el mismo filtro, la misma disposición y los mismos zooms", () => {
+    for (const via of CLASES_DE_VIAS) {
+      const borde = capa(`vias-borde-${via.clase}`);
+      const relleno = capa(`vias-${via.clase}`);
+      if (borde === undefined) continue;
+      assert.deepStrictEqual(
+        borde.type === "line" ? [borde.filter, borde.layout, borde.minzoom] : undefined,
+        relleno?.type === "line" ? [relleno.filter, relleno.layout, relleno.minzoom] : undefined,
+        via.clase,
+      );
+    }
+  });
+
+  it("ningún color, grosor ni opacidad de las vías depende de cada vía: MapLibre no los guarda por vértice", () => {
+    for (const una of capas) {
+      if (una.type !== "line" || una.id === "vias-foto") continue;
+      assert.notInclude(JSON.stringify(una.paint), '"get"', una.id);
+    }
   });
 
   it("sobre la foto cada clase tiene en su capa el grosor fino que le toca en sus paradas", () => {

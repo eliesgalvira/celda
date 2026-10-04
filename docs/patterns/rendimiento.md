@@ -32,13 +32,19 @@ cd tools/rendimiento
 pnpm run medir -- --capas <carpeta publicada>
 pnpm run medir -- --capas <carpeta> --web <dist de antes>,../../apps/web/dist --repeticiones 3
 pnpm run medir -- --capas <carpeta> --trazas /tmp/trazas --perfil /tmp/perfiles
+pnpm run medir -- --capas <carpeta> --web <antes>,<después> --escenario vuelos --cpu 4 --repeticiones 5
 ```
 
 - `--web` admite varias carpetas separadas por comas. Las rondas se alternan entre ellas, así el ruido de la máquina reparte igual.
 - Antes de cada ronda espera a que la CPU esté por debajo del 8 % (`--calma`). Otro navegador o una compilación en marcha frenan el móvil simulado y dan fotogramas largos que no son de Celda. Durante este trabajo otro agente abría Chromium con SwiftShader a la vez, y una ronda sin esa espera salió el doble de mala.
-- `--trazas` graba una traza de CDP de cada gesto en una ronda aparte, que no cuenta en las medianas, y resume el tiempo propio por hilo y por tipo de trabajo. `--perfil` guarda el perfil de CPU de V8 de cada gesto; para leerlo, construye la web sin minificar (`npx vp build --minify false`).
+- `--trazas` graba una traza de CDP de cada gesto en una ronda aparte, que no cuenta en las medianas, y resume el tiempo propio por hilo y por tipo de trabajo. `--perfil` guarda el perfil de CPU de V8 de cada gesto, con el nombre del gesto, así que va con una sola `--web`; para leerlo, construye la web sin minificar (`npx vp build --minify false`).
 - `--solo-carga` se salta los gestos, `--cascada` imprime las peticiones de la carga con su inicio y su fin, y `--json` guarda las rondas enteras.
 - `--escenario espana` cambia los gestos por el recorrido de varias provincias (ADR 0016): alejar con el botón hasta ver toda España con el resumen, tocar el hexágono de Barcelona, acercar con el botón hasta el nivel de municipios y arrastrar y pellizcar allí, acercar hasta la calle tocando cada vez la agrupación o la zona mayor, alejar hasta el nivel de provincias y cruzar de una a otra con seis arrastres largos. Al final mide la memoria de la página y sus Workers (`measureUserAgentSpecificMemory`, con el sitio aislado por COOP y COEP) y el montón del hilo principal, y cuenta lo pedido de las capas en toda la visita.
+- `--escenario vuelos` (#67) mueve la cámara de MapLibre en lugar de tocar la interfaz, así que no depende de qué marcadores hay ni de dónde caen: es la medida de referencia de la fluidez del mapa con toda España, en el móvil y en el escritorio. Hace cinco grupos de gestos, cada uno en una página nueva de la misma visita, con un mapa sin teselas en memoria: saltos de vista en vista (València z8, Barcelona z12, el Eixample z17 y z18, y España z5,5, cada uno con 2,5 s para que lleguen sus teselas), los cinco vuelos de 2,5 s del #61 (España → Cataluña z8 → Barcelona z12 → Eixample z17 → Barcelona z11 → España), alejarse del Eixample z17 a España en 4 s y acercar y alejar del 9,5 al 14,5, un nivel cada 1,5 s, sobre Zaragoza y sobre Barcelona (#66). Antes, una primera página hace todo el recorrido sin medir, para que las teselas ya estén en la caché HTTP y la red no meta ruido. `--grupos saltos,vuelos,alejar,niveles-zaragoza,niveles-barcelona` elige cuáles.
+- La web no expone el mapa. La medida lo encuentra por CDP: busca en el montón de V8 la clase cuyo prototipo tiene `flyTo` y `getCanvasContainer` y deja el ejemplar de la página en `window.__celdaMapa`. Las órdenes a la cámara no devuelven nada: `jumpTo` devuelve el mapa, y Playwright lo serializaba entero, hasta 2 s de JavaScript en el hilo principal que no eran de Celda.
+- `--pantalla escritorio` mide en una pantalla de 1400 × 900 con ratón, en lugar del móvil.
+- En las tablas, «fps por ronda» da el menor y el mayor de las rondas y su desviación típica. Dos webs que se separan menos que eso no se distinguen.
+- Con toda España la web abre de lejos y, a 390 px, el hexágono de Barcelona queda fuera de la pantalla: los escenarios `barcelona` y `espana` centran el mapa en Barcelona antes de tocarlo. El de `barcelona` centra también la ciudad tras abrir la provincia, porque su hexágono va en el centro visual de la provincia (ADR 0024).
 - `--escenario borde --ruta "/?emplazamiento=<clave>"` abre la web con el enlace a la ficha de un emplazamiento junto al borde de dos provincias, sin su provincia (#45). Cierra la ficha, cruza el borde con cuatro arrastres de 500 px con las celdas, abre la vista de interferencia, lo cruza otra vez y aleja y acerca dos niveles.
 - Para medir con muchos datos sin ingerir nada, `pnpm run sintetica` en `tools/capas` publica en `CELDA_CAPAS_CARPETA` una España sintética de `CELDA_SINTETICOS` emplazamientos (100.000 por defecto, la de la investigación 08) con la publicación de verdad.
 - El Chromium es el del sistema (`/usr/bin/chromium`, o `--chromium`, o `CELDA_CHROMIUM`): `playwright-core` no descarga navegadores.
@@ -241,6 +247,69 @@ Medido el 04/10/2026 contra `celda/v1` (cf5457a) construida igual, con la public
 | Barcelona, del 9,5 al 14,5 y vuelta | 55,0 · 47 · 9 | 55,0 · 50,5 · 8,5 |
 
   En la primera tanda los huecos se ponían también a mitad de un gesto, al cambiar de nivel, y Barcelona daba 54,4 frente a 55,3 con 52 fotogramas de más de 20 ms frente a 42: cada `setData` de la fuente de los huecos manda los datos a los workers de MapLibre y vuelve a colocar los rótulos. Ahora se ponen con el mapa quieto. Los rótulos copiados solo cambian su `transform` en cada fotograma, como los marcadores, y su letra es la del zoom en que se leyeron, así que moverlos no maqueta texto. La máquina tenía otros agentes trabajando: entre rondas hay ±2 fps.
+
+## Fluidez tras la paleta A (#67)
+
+Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repeticiones 5`, en el móvil (390 × 844, DPR 2,6, Chromium con GPU), con la publicación de toda España del 30/09/2026 (35.667 emplazamientos) y las tres webs alternadas ronda a ronda: `165faf1` (`celda/v1` antes del #61), `celda/v1` (9b2a85f, con el #61 al #66) y esta rama. La máquina tenía otros agentes compilando: cada ronda esperó a bajar del 12 % de CPU, y aun así hay rondas sueltas peores (ver «fps por ronda»).
+
+**Dónde se iba el tiempo.** Perfiles de CPU de V8 de los vuelos, el alejamiento y los niveles sobre Barcelona, con la web sin minificar y MapLibre de desarrollo, sumando el tiempo del hilo principal con la CPU a ×4 por lo que lo llama:
+
+| Hilo principal, ms | `165faf1` | `celda/v1` | Esta rama |
+|---|---|---|---|
+| Pintar (WebGL, subir cubos a la GPU) | 2746 | 4139 | 4462 |
+| Recalcular las capas del estilo en cada fotograma | 489 | 2016 | 1467 |
+| Recibir las teselas de los workers | 477 | 1552 | 1020 |
+| Colocar rótulos y colisiones | 541 | 964 | 1010 |
+| Fuentes y teselas por fotograma | 675 | 1114 | 1164 |
+| MapLibre, resto (cámara, glifos e imágenes para los workers) y otros | 2523 | 3594 | 3807 |
+| Celda: marcadores, hexágonos, rótulos copiados, Solid | 2242 | 2292 | 2347 |
+| Celda: leer los rótulos de ciudad en cada `idle` | — | 331 | 241 |
+| Recolección de basura | 377 | 620 | 638 |
+| **Total** | **10.074** | **16.627** | **16.162** |
+
+  El total de esta rama salió con la máquina más cargada; en las rondas alternadas de abajo su hilo principal gasta de un 8 a un 25 % menos que `celda/v1`. Lo que pesaba:
+
+  - **Los valores por vértice.** El #61 juntó las vías en dos capas con el color, el grosor y la opacidad por clase, y el suelo en dos con el color y la opacidad por clase. Con eso MapLibre guarda esos valores en cada vértice: en Barcelona a z12, 25 MB de pintura por 5 MB de líneas, y en Cataluña a z8, 12 MB por 3,8 MB de geometría. `165faf1` no tenía ninguno. Cada tesela que llega los manda del worker al hilo principal y los sube a la GPU.
+  - **`_setPaintOverrides`.** En cada fotograma en que cambia el zoom, MapLibre recorre entera la expresión del `text-field` de cada capa de símbolos. La del nombre de lugar (ADR 0025) tiene 112 nodos y va en siete capas: 809 ms de los 2016 de recalcular.
+  - **Leer los rótulos de ciudad** (#66) con `queryRenderedFeatures` lee entera cada tesela a la vista, también desde el zoom 14, donde las capas de ciudades ya no salen.
+  - **Más capas y más rótulos**, que es lo decidido en el ADR 0022: unas 67 capas frente a 20 (cada una se recalcula y se pinta por tesela en cada fotograma), las vías, los números de carretera y los nombres de avenidas, ríos, pueblos y puntos de interés, y tres fuentes GeoJSON más (límites, huecos y edificio).
+  - **No es de Celda**: los marcadores, los hexágonos, los rótulos copiados en el DOM y su estilo y maquetación cuestan lo mismo que en `165faf1`, y su estilo y maquetación en el DOM no crecen: de 120 a 400 ms por vuelo en las tres webs.
+  - **Un artefacto de medida**: `jumpTo` devuelve el mapa, y la primera versión del escenario lo devolvía a Playwright, que lo serializaba: hasta 2 s de JavaScript por salto que no eran de Celda.
+
+**Qué se cambió**, un commit cada uno, medido contra el anterior en rondas alternadas (hilo principal de los niveles sobre Barcelona, que es el gesto más estable, y fps):
+
+| Cambio | Hilo principal | fps |
+|---|---|---|
+| Bordes y rellenos de las vías con el mismo filtro: salen del mismo cubo | 7649 → 7338 ms | igual, dentro del ruido |
+| El nombre de lugar dentro de un `format` de un tramo: MapLibre no recorre la expresión | 7338 → 7019 ms | 55,1 → 55,8 |
+| Los rótulos de ciudad solo se leen de las capas que se ven a ese zoom | 7019 → 6831 ms; a z18, 283 → 265 ms por salto | igual |
+| Cada clase de vía en su capa de borde y de relleno, sin valores por vértice | 10.387 → 9090 ms (máquina cargada) | niveles 50,5 → 53,5; vuelo a Barcelona z12, 44,9 → 52,7 |
+| Los verdes en una capa por clase | 8661 → 8390 ms | 53,5 → 54,4 |
+| Las zonas urbanas y los usos de cerca en dos capas | 8390 → 8188 ms | 54,4 → 55,0 |
+
+**Resultado**, medianas de cinco rondas con la CPU a ×4 en el móvil. Fps y fotogramas de más de 20 ms; la dispersión entre rondas está en la salida de la medida.
+
+| Gesto | `165faf1` | `celda/v1` | Esta rama |
+|---|---|---|---|
+| Salto a València z8 | 51,6 | 58,0 | 58,0 |
+| Salto a Barcelona z12 | 55,3 | 50,4 | 50,7 |
+| Salto al Eixample z17 | 57,7 | 56,6 | 56,0 |
+| Salto al Eixample z18 | 60,0 | 60,0 | 60,0 |
+| Salto a España z5,5 | 59,4 | 58,8 | 58,5 |
+| Vuelo a Cataluña z8 | 51,5 | 57,1 | 57,4 |
+| Vuelo a Barcelona z12 | 56,5 | 50,2 | 52,9 |
+| Vuelo al Eixample z17 | 57,4 | 51,5 | 54,1 |
+| Vuelo del Eixample a Barcelona z11 | 55,3 | 47,1 | 50,6 |
+| Vuelo a España z5,5 | 53,2 | 47,1 | 50,3 |
+| Alejar del Eixample a España en 4 s | 58,4 | 57,6 | 58,6 |
+| Zaragoza, del 9,5 al 14,5 y vuelta | 58,2 | 56,1 | 57,3 |
+| Barcelona, del 9,5 al 14,5 y vuelta | 57,5 | 52,7 | 56,4 |
+
+  Ocho de trece gestos quedan a 2 fps o menos de `165faf1`; el alejamiento del Eixample, los niveles y los saltos lejanos, en su sitio. Quedan por encima los vuelos que acaban o empiezan en la ciudad (de 2,9 a 4,7 fps menos) y el salto a Barcelona z12 (4,6). Ahí el hilo principal gasta de 300 a 600 ms más de JavaScript por vuelo que en `165faf1`: pintar más capas por tesela (los nombres de avenidas, que se colocan a lo largo de la calle en cada fotograma, y los números de carretera son las dos capas que más cuestan), recalcular 67 capas en cada fotograma, colocar más rótulos y servir glifos de tres letras a los workers. Es lo que añadió el ADR 0022, no un desperdicio: bajar más pide quitar capas o rótulos, y eso lo decide el usuario. El peor fotograma del salto a Barcelona z12 es otro: la capa de la provincia de Barcelona al llegar del Worker de Celda, 235 ms frente a 188 en `165faf1` (#66).
+
+- **Igual que antes.** Capturas de `celda/v1` y de esta rama en el móvil y a 1400 px: España z5,5, València z8, Barcelona z12, el Eixample z17 y z18, y la foto en Barcelona z12 y el Eixample z18. Comparadas píxel a píxel con un 2 % de tolerancia salen iguales salvo 16 píxeles de 2,2 millones en Barcelona z12, menos que lo que cambian dos capturas seguidas de la misma web (322).
+- **Quieto.** Al abrir, tras volar al Eixample z18, con la foto encendida y tras volar con ella a España, 20 s quieto en el móvil y a 1400 px: 0 peticiones, 0 `render` de MapLibre y 0 llamadas a `fetch`, `requestAnimationFrame`, `setTimeout`, `setInterval` y `postMessage`.
+- **Foto aérea con vuelos.** De España z5,5 a Cataluña z8, Barcelona z12, el Eixample z17, el tejado a z18,5, Barcelona z12 y España, con vuelos de 2,5 s y la foto encendida, a DPR 3: 3,8 MB en 366 peticiones, 24 o 25 canceladas, en dos rondas. Saltando de vista en vista, 0,86 MB en 63. Los vuelos piden todos los zooms intermedios: los del 14 al 17, que solo se ven de paso, son 1,8 MB. MapLibre ya cancela lo pendiente al cambiar de zoom (`cancelPendingTileRequestsWhileZooming`); lo que llega antes se pinta durante el vuelo. No pedirlas dejaría la foto en blanco o borrosa mientras se vuela, y no se ha tocado. La ruta no es la del #64 (2,5 a 3 MB), así que no se comparan.
 
 ## Qué entró
 

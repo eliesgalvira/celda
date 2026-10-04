@@ -37,6 +37,23 @@ export interface Interaccion {
   readonly tipo: string;
 }
 
+/** Un sitio del mapa: longitud y latitud, como las pide MapLibre. */
+export type Centro = readonly [number, number];
+
+/**
+ * Lo que la medida usa del mapa de MapLibre de la página para mover la cámara. La web no lo
+ * expone: la medida lo encuentra por CDP (`atraparMapa` en `medir.ts`).
+ */
+export interface CamaraEnPagina {
+  readonly jumpTo: (opciones: { center?: Centro; zoom?: number }) => void;
+  readonly flyTo: (opciones: { center: Centro; zoom: number; duration: number }) => void;
+  readonly easeTo: (opciones: { center?: Centro; zoom: number; duration: number }) => void;
+  readonly project: (lugar: Centro) => { readonly x: number; readonly y: number };
+  readonly getZoom: () => number;
+  readonly once: (evento: "idle", oyente: () => void) => void;
+  readonly triggerRepaint: () => void;
+}
+
 declare global {
   interface Window {
     __celda: {
@@ -45,6 +62,8 @@ declare global {
       readonly parar: () => FotogramasEnPagina;
       readonly interacciones: () => ReadonlyArray<Interaccion>;
     };
+    /** El mapa de la página, cuando la medida lo ha encontrado. */
+    __celdaMapa?: CamaraEnPagina;
   }
 }
 

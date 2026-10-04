@@ -9,6 +9,20 @@ export const deClase = (...clases: ReadonlyArray<string>): ExpressionSpecificati
   ["literal", clases],
 ];
 
+/**
+ * El `text-field` de unos rótulos cuyo texto sale de una expresión grande, como el nombre de lugar
+ * (`nombreDelRotulo`). En cada fotograma en que cambia el zoom, MapLibre recorre entera la
+ * expresión del `text-field` de cada capa de símbolos, buscando tramos de `format` con su propio
+ * color (`_setPaintOverrides`): con las seis capas de lugares y los barrios eran unos 0,7 ms por
+ * fotograma con la CPU a ×4 (#67). Dentro de un `format` de un solo tramo sin color, MapLibre se
+ * para en el `format`. El texto, la letra y la colocación son los mismos.
+ */
+export const textoDeRotulo = (texto: ExpressionSpecification): ExpressionSpecification => [
+  "format",
+  texto,
+  {},
+];
+
 /** Un valor que pasa en línea recta de una parada a otra: pares de zoom y valor. */
 export const porZoom = (
   ...pares: ReadonlyArray<number | ExpressionSpecification>

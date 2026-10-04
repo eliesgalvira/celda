@@ -4,7 +4,7 @@ import type {
   SymbolLayerSpecification,
 } from "maplibre-gl";
 
-import { conFoto, porZoom, visibleConFoto } from "../expresiones.ts";
+import { conFoto, porZoom, textoDeRotulo, visibleConFoto } from "../expresiones.ts";
 import { capaHuecos } from "../huecos.ts";
 import { CAPA_PORTALES, MUNICIPIOS_DE_CELDA, ZOOM_DE_FUERA } from "../rotulos.ts";
 import type { ColorDeToken, TokenMapa } from "../tokens.ts";
@@ -242,7 +242,7 @@ const capaDeLugares = (
     maxzoom: capa.hasta,
     filter: ["all", capa.propio, CON_NOMBRE, SE_ROTULA, NO_GIBRALTAR, sinLosDeCelda(nombre)],
     layout: {
-      "text-field": nombre,
+      "text-field": textoDeRotulo(nombre),
       "text-font": [capa.letra],
       "text-size": capa.tamano,
       "text-padding": capa.aire ?? 2,
@@ -436,7 +436,7 @@ const capasDeNombres = (
     minzoom: 14,
     filter: ["all", ["==", CLASE, "barrio"], CON_NOMBRE, SE_ROTULA],
     layout: {
-      "text-field": NOMBRE_DEL_IGN,
+      "text-field": textoDeRotulo(NOMBRE_DEL_IGN),
       "text-font": [LETRA],
       "text-size": porZoom(14, 11.5, 17, 13),
       "text-max-width": 7,
