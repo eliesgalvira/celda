@@ -27,6 +27,11 @@ export const TOKENS_MAPA = [
   "mapa-autovia-borde",
   "mapa-autopista",
   "mapa-autopista-borde",
+  // Los límites.
+  "mapa-limite-pais",
+  "mapa-limite-comunidad",
+  "mapa-limite-provincia",
+  "mapa-limite-municipio",
   // Los rótulos.
   "mapa-halo",
   "mapa-rotulo-capital",
