@@ -1,14 +1,23 @@
 import { contiene } from "@celda/dominio/area";
+import {
+  claveDeFiltro,
+  combinacionesDe,
+  type FiltroDeCompanias,
+  separarPorPapel,
+  SIN_FILTRO,
+} from "@celda/dominio/filtro";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { assert, describe, it } from "@effect/vitest";
 
 import {
+  type Agrupador,
   type Elemento,
   type ElementoMunicipio,
   type ElementoProvincia,
   type Escena,
 } from "./agrupacion.ts";
 import {
+  agrupacionEnHilo,
   claveDeProvincia,
   crearAgrupadorNacional,
   NIVEL_DE_PROVINCIAS,
@@ -334,7 +343,9 @@ describe("el hexágono de cada provincia, en su centro visual", () => {
     assert.closeTo(barcelona?.posicion.latitud ?? 0, 41.6375, 0.01);
     assert.notDeepEqual(barcelona?.posicion, RESUMEN.provincias[0]?.etiqueta);
 
-    const sinTabla = crearAgrupadorNacional(RESUMEN, estados(), (p) => p.etiqueta).escena(6, MUNDO);
+    const sinTabla = crearAgrupadorNacional(RESUMEN, estados(), {
+      centroDe: (p) => p.etiqueta,
+    }).escena(6, MUNDO);
     assert.deepStrictEqual(
       sinTabla.elementos.get(claveDeProvincia("08"))?.posicion,
       RESUMEN.provincias[0]?.etiqueta,
@@ -403,5 +414,183 @@ describe("niveles de municipios grandes", () => {
     assert.isTrue(deZaragoza.every((e) => e.tipo === "agrupacion" || e.tipo === "emplazamiento"));
     const suma = deZaragoza.reduce((n, e) => n + (e.tipo === "agrupacion" ? e.cuantos : 0), 0);
     assert.isAbove(suma, 200);
+  });
+});
+
+describe("filtro de compañías (ADR 0026)", () => {
+  const { resumen: sinCombinaciones, provincias } = espanaDePrueba();
+  /** El resumen de prueba con las combinaciones de cada provincia, como lo publica la noche. */
+  const resumen: ResumenLeido = {
+    ...sinCombinaciones,
+    provincias: sinCombinaciones.provincias.map((p) => {
+      const estado = provincias.get(p.codigo);
+      const suyos = estado?.tipo === "lista" ? estado.provincia.capa.emplazamientos : [];
+      return { ...p, combinaciones: combinacionesDe(suyos) };
+    }),
+  };
+  const cargadas = [...provincias.values()].flatMap((e) =>
+    e.tipo === "lista" ? [e.provincia] : [],
+  );
+  const todos = cargadas.flatMap((p) => p.capa.emplazamientos);
+  const agrupadorCon = (filtro: FiltroDeCompanias, conResumen: ResumenLeido = resumen) =>
+    crearAgrupadorNacional(conResumen, provincias, {
+      filtro,
+      agrupaciones: new Map(
+        cargadas.map((p) => [p.codigo, agrupacionEnHilo(p, conResumen, filtro)] as const),
+      ),
+    });
+
+  /** Lo que cuentan los elementos de una escena: los suyos y los de la red usada, aparte. */
+  const cuentas = (escena: Escena) => {
+    let suyos = 0;
+    let deLaRed = 0;
+    for (const e of escena.elementos.values()) {
+      const cuantos =
+        e.tipo === "emplazamiento"
+          ? 1
+          : e.tipo === "agrupacion"
+            ? e.cuantos
+            : e.tipo === "provincia"
+              ? e.cuantos
+              : e.resumen.emplazamientos;
+      const red = (e.tipo === "emplazamiento" || e.tipo === "agrupacion") && e.redUsada === true;
+      if (red) deLaRed += cuantos;
+      else suyos += cuantos;
+    }
+    return { suyos, deLaRed };
+  };
+
+  /** Las claves de los emplazamientos que recoge cada elemento de una escena, por su papel. */
+  const recogidos = (agrupador: Agrupador, escena: Escena) => {
+    const suyos: Array<string> = [];
+    const deLaRed: Array<string> = [];
+    for (const e of escena.elementos.values()) {
+      const claves = agrupador.emplazamientosDe(e).map((x) => x.clave);
+      const red = (e.tipo === "emplazamiento" || e.tipo === "agrupacion") && e.redUsada === true;
+      (red ? deLaRed : suyos).push(...claves);
+    }
+    return { suyos: suyos.toSorted(), deLaRed: deLaRed.toSorted() };
+  };
+
+  const FILTROS: ReadonlyArray<FiltroDeCompanias> = [
+    ["movistar"],
+    ["digi"],
+    ["orange"],
+    ["movistar", "digi"],
+    ["vodafone", "digi"],
+  ];
+
+  it("a todos los zooms se cuentan solo los suyos, y los de la red usada aparte", () => {
+    for (const filtro of FILTROS) {
+      const { propios, redUsada } = separarPorPapel(todos, filtro);
+      const agrupador = agrupadorCon(filtro);
+      for (let nivel = 5; nivel <= 18; nivel++) {
+        const escena = agrupador.escena(nivel, MUNDO);
+        const { suyos, deLaRed } = cuentas(escena);
+        const que = `${claveDeFiltro(filtro)} nivel ${nivel}`;
+        assert.strictEqual(suyos, propios.length, que);
+        // De lejos solo se ven los hexágonos de las provincias: la red usada sale de cerca.
+        assert.strictEqual(deLaRed, nivel < NIVEL_DE_PROVINCIAS ? 0 : redUsada.length, que);
+        if (nivel >= NIVEL_DE_PROVINCIAS) {
+          const claves = recogidos(agrupador, escena);
+          assert.deepStrictEqual(claves.suyos, propios.map((e) => e.clave).toSorted(), que);
+          assert.deepStrictEqual(claves.deLaRed, redUsada.map((e) => e.clave).toSorted(), que);
+        }
+      }
+    }
+  });
+
+  it("de lejos, cada provincia cuenta lo del filtro por sus combinaciones", () => {
+    const hexagonos = (filtro: FiltroDeCompanias, conResumen = resumen) =>
+      provinciasDe(agrupadorCon(filtro, conResumen).escena(6, MUNDO)).map((p) => [
+        p.provincia.codigo,
+        p.cuantos,
+        p.deLaRed,
+        p.sinFiltrar,
+      ]);
+    const deLaProvincia = (codigo: string, filtro: FiltroDeCompanias) => {
+      const suyos = todos.filter((e) => e.provincia === codigo);
+      const { propios, redUsada } = separarPorPapel(suyos, filtro);
+      return [codigo, propios.length, redUsada.length, false];
+    };
+    assert.deepStrictEqual(hexagonos(["digi"]), [
+      deLaProvincia("08", ["digi"]),
+      ["25", 0, 0, false],
+      deLaProvincia("50", ["digi"]),
+    ]);
+    // Zaragoza no tiene Digi: su hexágono dice 0, y los de Movistar salen aparte.
+    assert.deepStrictEqual(deLaProvincia("50", ["digi"]).slice(1, 3), [0, 144]);
+    assert.deepStrictEqual(
+      hexagonos(SIN_FILTRO).map(([codigo, cuantos]) => [codigo, cuantos]),
+      [
+        ["08", 70],
+        ["25", 0],
+        ["50", 217],
+      ],
+    );
+    // Con un resumen de antes de las combinaciones no se puede contar: cuenta todas y lo dice.
+    assert.deepStrictEqual(hexagonos(["digi"], sinCombinaciones), [
+      ["08", 70, 0, true],
+      ["25", 0, 0, true],
+      ["50", 217, 0, true],
+    ]);
+  });
+
+  it("las zonas cuentan solo lo del filtro, y un municipio sin bastantes deja de ser zona", () => {
+    const zonas = (filtro: FiltroDeCompanias, nivel: number) =>
+      [...agrupadorCon(filtro).escena(nivel, MUNDO).elementos.values()]
+        .filter((e): e is ElementoMunicipio => e.tipo === "municipio")
+        .map((e) => [e.resumen.municipio.nombre, e.resumen.emplazamientos] as const)
+        .toSorted(([a], [b]) => (a < b ? -1 : 1));
+    const enUtebo = (filtro: FiltroDeCompanias) =>
+      separarPorPapel(
+        todos.filter((e) => e.municipio === "50272"),
+        filtro,
+      ).propios.length;
+    assert.deepStrictEqual(
+      zonas(SIN_FILTRO, 11).find(([n]) => n === "Utebo"),
+      ["Utebo", 8],
+    );
+    // Utebo tiene 3 de Orange: menos de los 4 que hacen falta para ser zona.
+    assert.strictEqual(enUtebo(["orange"]), 3);
+    assert.isUndefined(zonas(["orange"], 11).find(([n]) => n === "Utebo"));
+    assert.deepStrictEqual(
+      zonas(["movistar"], 11).find(([n]) => n === "Utebo"),
+      ["Utebo", enUtebo(["movistar"])],
+    );
+  });
+
+  it("una provincia lista sin la agrupación del filtro se ve con su hexágono, cargando", () => {
+    const agrupador = crearAgrupadorNacional(resumen, provincias, {
+      filtro: ["digi"],
+      agrupaciones: new Map(),
+    });
+    const escena = agrupador.escena(10, MUNDO);
+    const hexagonos = provinciasDe(escena);
+    assert.deepStrictEqual(
+      hexagonos.map((p) => [p.provincia.codigo, p.carga]),
+      [
+        ["08", "cargando"],
+        // Lleida no tiene ninguno: va con su hexágono del resumen, como sin filtro.
+        ["25", "resumen"],
+        ["50", "cargando"],
+      ],
+    );
+    assert.isFalse([...escena.elementos.values()].some((e) => e.tipo === "emplazamiento"));
+  });
+
+  it("la red usada sale y entra de sus propias agrupaciones, no de las de la provincia", () => {
+    const agrupador = agrupadorCon(["digi"]);
+    const lejos = agrupador.escena(12, MUNDO);
+    const cerca = agrupador.escena(14, MUNDO);
+    const { origen } = agrupador.transicion(lejos, cerca);
+    for (const [clave, desde] of origen) {
+      const nueva = cerca.elementos.get(clave);
+      const vieja = lejos.elementos.get(desde);
+      const red = (e: Elemento | undefined) =>
+        (e?.tipo === "emplazamiento" || e?.tipo === "agrupacion") && e.redUsada === true;
+      assert.strictEqual(red(nueva), red(vieja), `${clave} sale de ${desde}`);
+    }
+    assert.isAbove(origen.size, 0);
   });
 });

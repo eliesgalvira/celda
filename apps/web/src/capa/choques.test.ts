@@ -85,6 +85,9 @@ const provincia = (codigo: string, nombre: string, posicion: Coordenada): Elemen
   },
   carga: "resumen",
   ausentes: [],
+  cuantos: 100,
+  deLaRed: 0,
+  sinFiltrar: false,
 });
 
 const rotulo = (texto: string, posicion: Coordenada, habitantes: number): RotuloEnElMapa => ({
@@ -403,5 +406,54 @@ describe("la caja de un rótulo", () => {
     assert.strictEqual(corto.derecha - 100, 100 - corto.izquierda);
     assert.isAbove(largo.derecha - largo.izquierda, 8 * (corto.derecha - corto.izquierda) - 40);
     assert.closeTo(corto.abajo - corto.arriba, 13 * 1.15, 1e-9);
+  });
+});
+
+describe("la red que usa una compañía del filtro (ADR 0026)", () => {
+  const deLaRed = (clave: string, x: number): ElementoAgrupacion => ({
+    ...agrupacion(clave, en(x)),
+    redUsada: true,
+  });
+
+  it("cede ante todo lo demás: lo suyo, las zonas y los rótulos", () => {
+    const { ocultos } = resolverChoques({
+      elementos: [deLaRed("a:08r:1", 100), agrupacion("a:08:1", en(110)), deLaRed("a:08r:2", 400)],
+      rotulos: [rotulo("Badalona", en(700), 220_000)],
+      proyectar: plana,
+      tamano: "normal",
+    });
+    assert.deepStrictEqual([...ocultos], ["a:08r:1"]);
+    const conRotulo = resolverChoques({
+      elementos: [deLaRed("a:08r:3", 700)],
+      rotulos: [rotulo("Badalona", en(700), 220_000)],
+      proyectar: plana,
+      tamano: "normal",
+    });
+    assert.deepStrictEqual([...conRotulo.ocultos], ["a:08r:3"]);
+    assert.deepStrictEqual([...conRotulo.rotulosOcultos], []);
+  });
+
+  it("el emplazamiento seleccionado no cede, aunque sea de la red usada", () => {
+    const seleccionado: Elemento = {
+      tipo: "emplazamiento",
+      clave: "e:movistar-1",
+      posicion: en(100),
+      emplazamiento: {
+        clave: "movistar-1",
+        posicion: en(100),
+        estado: "verificado",
+        companias: ["movistar"],
+        barrio: null,
+      },
+      redUsada: true,
+    };
+    const { ocultos } = resolverChoques({
+      elementos: [seleccionado, agrupacion("a:08:1", en(110))],
+      rotulos: [],
+      proyectar: plana,
+      tamano: "normal",
+      seleccionada: "movistar-1",
+    });
+    assert.deepStrictEqual([...ocultos], []);
   });
 });

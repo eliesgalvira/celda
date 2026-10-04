@@ -2,10 +2,8 @@ import { indexadorEnWorker, type PuertoIndexador, type RespuestaDeIndice } from 
 
 /** Un Worker del navegador como lo necesita el indexador. */
 const puertoDe = (worker: Worker): PuertoIndexador => ({
-  // El texto de la capa se copia: es una cadena. El `postMessage` de un Worker no lleva origen de
-  // destino; la regla lo confunde con el de una ventana.
-  // oxlint-disable-next-line unicorn/require-post-message-target-origin
-  enviar: (solicitud) => worker.postMessage(solicitud),
+  // El texto de la capa se copia: es una cadena. Las columnas de un filtro se transfieren.
+  enviar: (solicitud, transferibles = []) => worker.postMessage(solicitud, [...transferibles]),
   escuchar: (alResponder, alFallar) => {
     worker.addEventListener("message", (evento: MessageEvent<RespuestaDeIndice>) => {
       alResponder(evento.data);

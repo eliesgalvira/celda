@@ -1,6 +1,8 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import { codificarVigente, versionDeCapa } from "@celda/dominio/capa";
+import type { Compania } from "@celda/dominio/compania";
+import { SIN_FILTRO } from "@celda/dominio/filtro";
 import { parteDeClave } from "@celda/dominio/provincias";
 import type { Ficha } from "@celda/dominio/ficha";
 import { assert, describe, it } from "@effect/vitest";
@@ -8,15 +10,18 @@ import * as Cause from "effect/Cause";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
+import type { Agrupador } from "./agrupacion.ts";
 import {
   atenderIndice,
   IndexadorDeProvincias,
+  IndiceFallido,
   indexadorEnHilo,
   indexadorEnWorker,
   type PuertoIndexador,
@@ -350,6 +355,170 @@ describe("índice de una provincia en un Worker", () => {
       );
       assert.deepStrictEqual(resultado.map(errorDe), ["IndiceFallido", "IndiceFallido"]);
       assert.strictEqual(worker.creados(), 2);
+    }),
+  );
+});
+
+describe("agrupación de una provincia con un filtro de compañías (ADR 0026)", () => {
+  const conCompanias = (
+    clave: string,
+    longitud: number,
+    companias: ReadonlyArray<Compania>,
+  ): Ficha => ({
+    ...ficha(clave, longitud),
+    estaciones: companias.map((compania) => ({
+      compania,
+      codigos: [clave],
+      bandas: [],
+      origenes: [],
+    })),
+  });
+  const COMPANIAS = publicacionDePrueba(versionDeCapa(NOCHE), NOCHE, [
+    conCompanias("m", 2.1134, ["movistar"]),
+    conCompanias("mv", 2.15, ["movistar", "vodafone"]),
+    conCompanias("o", 2.19, ["orange"]),
+    conCompanias("d", 2.2, ["digi"]),
+    conCompanias("y", 2.21, ["yoigo"]),
+  ]);
+  const MUNDO = {
+    suroeste: { longitud: -180, latitud: -85 },
+    noreste: { longitud: 180, latitud: 85 },
+  };
+  /** Las claves de los emplazamientos sueltos de una escena, con su papel. */
+  const sueltos = (agrupador: Agrupador | undefined) =>
+    [...(agrupador?.escena(17, MUNDO).elementos.values() ?? [])].flatMap((e) =>
+      e.tipo === "emplazamiento"
+        ? [`${e.emplazamiento.clave}${e.redUsada === true ? "·red" : ""}`]
+        : [],
+    );
+
+  it.effect(
+    "el Worker indexa una vez por provincia y filtro, sin descargar nada; volver a uno no le pide nada",
+    () =>
+      Effect.gen(function* () {
+        const worker = workerDePrueba();
+        const { resultado, peticiones } = yield* conCapa(
+          origenCon(COMPANIAS),
+          (capa) =>
+            Effect.gen(function* () {
+              yield* capa.provincia("08");
+              const digi = yield* capa.agrupacion("08", ["digi"]);
+              const otraVez = yield* capa.agrupacion("08", ["digi"]);
+              const todas = yield* capa.agrupacion("08", SIN_FILTRO);
+              const movistar = yield* capa.agrupacion("08", ["movistar"]);
+              const digiDeNuevo = yield* capa.agrupacion("08", ["digi"]);
+              return { digi, otraVez, todas, movistar, digiDeNuevo };
+            }),
+          indexadorEnWorker(worker.crear),
+        );
+        // La capa, Digi y Movistar: sin filtro es el agrupador de la provincia.
+        assert.strictEqual(worker.recibidas(), 3);
+        assert.strictEqual(resultado.otraVez, resultado.digi);
+        assert.strictEqual(resultado.digiDeNuevo, resultado.digi);
+        assert.strictEqual(resultado.todas.filtro, "todas");
+        // El resumen, vigente.json y la capa: el filtro no descarga nada.
+        assert.lengthOf(
+          peticiones.filter((p) => p.startsWith("provincias/")),
+          1,
+        );
+        assert.deepStrictEqual(sueltos(resultado.digi.propios), ["d"]);
+        assert.deepStrictEqual(sueltos(resultado.digi.redUsada), ["m·red", "mv·red"]);
+        assert.deepStrictEqual(sueltos(resultado.movistar.propios), ["m", "mv"]);
+        assert.isUndefined(resultado.movistar.redUsada);
+        assert.deepStrictEqual(sueltos(resultado.todas.propios), ["d", "m", "mv", "o", "y"]);
+      }),
+  );
+
+  it.effect(
+    "las del Worker dan las mismas escenas que las hechas en el hilo, a todos los zooms",
+    () =>
+      Effect.gen(function* () {
+        const worker = workerDePrueba();
+        const filtros: ReadonlyArray<ReadonlyArray<Compania>> = [
+          ["digi"],
+          ["yoigo"],
+          ["movistar", "orange"],
+        ];
+        const enWorker = yield* conCapa(
+          origenCon(COMPANIAS),
+          (capa) => Effect.forEach(filtros, (f) => capa.agrupacion("08", f)),
+          indexadorEnWorker(worker.crear),
+        );
+        const enHilo = yield* conCapa(origenCon(COMPANIAS), (capa) =>
+          Effect.forEach(filtros, (f) => capa.agrupacion("08", f)),
+        );
+        for (const [i, deWorker] of enWorker.resultado.entries()) {
+          const deHilo = enHilo.resultado[i];
+          for (let nivel = 0; nivel <= 17; nivel++) {
+            for (const parte of ["propios", "redUsada"] as const) {
+              assert.deepStrictEqual(
+                deWorker[parte]?.escena(nivel, MUNDO).elementos,
+                deHilo?.[parte]?.escena(nivel, MUNDO).elementos,
+                `${deWorker.filtro} ${parte} nivel ${nivel}`,
+              );
+            }
+          }
+        }
+      }),
+  );
+
+  it.effect("dos peticiones a la vez del mismo filtro mandan una sola al Worker", () =>
+    Effect.gen(function* () {
+      const worker = workerDePrueba();
+      const { resultado } = yield* conCapa(
+        origenCon(COMPANIAS),
+        (capa) =>
+          Effect.all([capa.agrupacion("08", ["orange"]), capa.agrupacion("08", ["orange"])], {
+            concurrency: 2,
+          }),
+        indexadorEnWorker(worker.crear),
+      );
+      assert.strictEqual(resultado[0], resultado[1]);
+      assert.strictEqual(worker.recibidas(), 2);
+    }),
+  );
+
+  it.effect("una petición cortada cuando el Worker ya la tiene se termina y se guarda", () =>
+    Effect.gen(function* () {
+      const worker = workerDePrueba();
+      yield* conCapa(
+        origenCon(COMPANIAS),
+        (capa) =>
+          Effect.gen(function* () {
+            yield* capa.provincia("08");
+            // Se corta antes de que conteste el Worker, que contesta en otra tarea.
+            const fibra = yield* Effect.forkChild(capa.agrupacion("08", ["vodafone"]));
+            yield* Effect.yieldNow;
+            yield* Fiber.interrupt(fibra);
+            yield* capa.agrupacion("08", ["vodafone"]);
+          }),
+        indexadorEnWorker(worker.crear),
+      );
+      assert.strictEqual(worker.recibidas(), 2);
+    }),
+  );
+
+  it.effect("si el Worker falla, la agrupación se hace en el hilo", () =>
+    Effect.gen(function* () {
+      // La capa se lee en el hilo y el filtro va a un Worker que se cae.
+      const seCae = Layer.effect(
+        IndexadorDeProvincias,
+        Effect.gen(function* () {
+          const enHilo = yield* IndexadorDeProvincias;
+          return IndexadorDeProvincias.of({
+            indexar: enHilo.indexar,
+            indexarFiltro: (provincia) =>
+              Effect.fail(new IndiceFallido({ provincia, motivo: "se ha caído" })),
+          });
+        }),
+      ).pipe(Layer.provide(indexadorEnHilo));
+      const { resultado } = yield* conCapa(
+        origenCon(COMPANIAS),
+        (capa) => capa.agrupacion("08", ["digi"]),
+        seCae,
+      );
+      assert.deepStrictEqual(sueltos(resultado.propios), ["d"]);
+      assert.deepStrictEqual(sueltos(resultado.redUsada), ["m·red", "mv·red"]);
     }),
   );
 });

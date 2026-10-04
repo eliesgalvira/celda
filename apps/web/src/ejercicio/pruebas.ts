@@ -13,7 +13,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { crearAgrupador } from "../capa/agrupacion.ts";
-import { type ProvinciaCargada, prefijoDeProvincia } from "../capa/nacional.ts";
+import { agrupacionEnHilo, type ProvinciaCargada, prefijoDeProvincia } from "../capa/nacional.ts";
 import { cajaDeBarcelona, FUENTES_DE_PRUEBA } from "../capa/pruebas.ts";
 import { CapaEmplazamientos, CapaNoDescargada } from "../capa/servicio.ts";
 
@@ -165,6 +165,18 @@ export const capaDeProvincias = (provincias: ReadonlyArray<ProvinciaDePrueba>) =
             provincias.find((p) => p.emplazamientos.some((e) => e.clave === clave))?.codigo,
           ),
         ),
+      agrupacion: (codigo, filtro) => {
+        const provincia = provincias.find((p) => p.codigo === codigo);
+        return provincia === undefined
+          ? Effect.fail(new CapaNoDescargada({ url: codigo, motivo: "prueba" }))
+          : Effect.succeed(
+              agrupacionEnHilo(
+                provinciaCargada(provincia),
+                resumenDeProvincias(provincias),
+                filtro,
+              ),
+            );
+      },
     }),
   );
   return {

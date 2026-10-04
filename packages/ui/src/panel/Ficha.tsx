@@ -146,6 +146,19 @@ export function ResumenFicha(props: { readonly children: JSX.Element }) {
   );
 }
 
+/**
+ * Por qué sale este emplazamiento con el filtro de compañías puesto, si es de la red que usa una
+ * compañía del filtro (ADR 0026): una nota bajo el resumen, con el borde discontinuo y claro de
+ * sus agrupaciones en el mapa.
+ */
+export function RedUsadaFicha(props: { readonly children: JSX.Element }) {
+  return (
+    <p class="mx-5 mt-3 border-l-2 border-dashed border-tinta-suave pl-3 text-sm leading-relaxed text-tinta md:mx-6">
+      {props.children}
+    </p>
+  );
+}
+
 export const variantesOrigen = cva("flex flex-wrap items-center gap-x-2 text-sm", {
   variants: {
     tono: {

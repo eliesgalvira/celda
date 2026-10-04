@@ -5,6 +5,7 @@ import {
   mismaCoordenada,
   type Rectangulo,
 } from "@celda/dominio/area";
+import { hayFiltro, papelDe, redesUsadas } from "@celda/dominio/filtro";
 import { origenCerca } from "@celda/dominio/plano";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
@@ -44,7 +45,11 @@ import {
   textoDatosDelMapa,
 } from "../capa/estado.ts";
 import type { Vista } from "../capa/marcadores.ts";
-import { type EstadoProvincia, provinciasDeLaVista } from "../capa/nacional.ts";
+import {
+  type EstadoProvincia,
+  NIVEL_DE_PROVINCIAS,
+  provinciasDeLaVista,
+} from "../capa/nacional.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
 import {
   cargadasDe,
@@ -69,6 +74,8 @@ import {
   type ZonaEnMapa,
 } from "../ejercicio/zona.ts";
 import { centroLibre, desplazamientoParaVer } from "../ficha/enfoque.ts";
+import { crearFiltro, propiosDelFiltro } from "../filtro/enMapa.ts";
+import { AvisoDelFiltro, ControlDeCompanias } from "../filtro/Filtro.tsx";
 import { crearFoto, FotoContexto, lienzoDeFoto } from "../foto/enMapa.ts";
 import { aPieDeCalle, CREDITO_FOTO_AEREA, pideVerFoto } from "../foto/foto.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
@@ -529,6 +536,12 @@ export function PantallaMapa() {
   );
   /** Los emplazamientos de las provincias que han llegado: los que el mapa conoce ahora. */
   const emplazamientos = createMemo(() => cargadas().flatMap((p) => p.capa.emplazamientos));
+  /** Las compañías que enseña el mapa, guardadas en el dispositivo (ADR 0026). */
+  const filtro = crearFiltro(datos, {
+    guardado: ajustes.filtro,
+    guardar: ajustes.cambiarFiltro,
+    cargadas,
+  });
   /**
    * Los créditos del mapa base y, con el resumen, el de los límites de municipios. El de los
    * límites de barrio, solo con una provincia con barrios cargada: la de Barcelona.
@@ -730,8 +743,10 @@ export function PantallaMapa() {
   const cargadasDeCeldas = createMemo(() => cargadasDe(provincias(), provinciasDeCeldas()), {
     equals: mismasListas,
   });
-  const emplazamientosDeCeldas = createMemo(() =>
-    cargadasDeCeldas().flatMap((p) => p.capa.emplazamientos),
+  /** Con un filtro, las celdas son solo de los emplazamientos de sus compañías (ADR 0026). */
+  const emplazamientosDeCeldas = propiosDelFiltro(
+    () => cargadasDeCeldas().flatMap((p) => p.capa.emplazamientos),
+    filtro.aplicado,
   );
   /** Las provincias con emplazamientos que no entran en el cálculo, con su caja. */
   const fueraDeCeldas = createMemo((): ReadonlyArray<ProvinciaFuera> => {
@@ -1056,6 +1071,28 @@ export function PantallaMapa() {
   });
   const midiendo = createMemo(() => medirAbierto(ubicacion()));
 
+  /**
+   * Con un filtro, de lejos, y un resumen publicado antes de las combinaciones de compañías: los
+   * hexágonos de las provincias aún cuentan todas, y el aviso del filtro lo dice.
+   */
+  const deLejosSinFiltrar = createMemo(
+    () =>
+      hayFiltro(filtro.aplicado()) &&
+      Math.floor(vistaDelMapa()?.zoom ?? 0) < NIVEL_DE_PROVINCIAS &&
+      (resumen()?.provincias.some((p) => p.combinaciones === undefined) ?? false),
+  );
+  /**
+   * Si el emplazamiento seleccionado sale por la red que usa una compañía del filtro, cuál: la
+   * ficha lo explica (ADR 0026).
+   */
+  const redUsadaDeLaSeleccionada = createMemo(() => {
+    const clave = seleccionada();
+    const actual = filtro.aplicado();
+    const suyo = clave === null ? undefined : emplazamientos().find((e) => e.clave === clave);
+    if (suyo === undefined || papelDe(suyo.companias, actual) !== "red-usada") return [];
+    return redesUsadas(actual).filter((r) => suyo.companias.includes(r.red));
+  });
+
   const aviso = createMemo(() => {
     const actual = estado();
     return actual.tipo === "listo" ? undefined : (
@@ -1085,6 +1122,13 @@ export function PantallaMapa() {
                   reintentarProvincias={reintentarProvincias}
                 />
               }
+              filtro={
+                <AvisoDelFiltro
+                  filtro={filtro.aplicado()}
+                  deLejosSinFiltrar={deLejosSinFiltrar()}
+                  alQuitar={() => filtro.elegir([])}
+                />
+              }
               ubicacion={
                 <>
                   <AvisosDeUbicacion panelAbierto={panelAbierto()} cobertura={resumen()} />
@@ -1110,6 +1154,8 @@ export function PantallaMapa() {
                             mapa={actual()}
                             resumen={leido()}
                             provincias={provincias()}
+                            filtro={filtro.aplicado()}
+                            agrupaciones={filtro.agrupaciones()}
                             seleccionada={seleccionada()}
                             alSeleccionar={seleccionar}
                             alVer={precargarFichas}
@@ -1168,6 +1214,11 @@ export function PantallaMapa() {
               }
               botonUbicacion={
                 <>
+                  <ControlDeCompanias
+                    filtro={filtro.elegido()}
+                    disabled={resumen() === undefined}
+                    alElegir={filtro.elegir}
+                  />
                   <ControlDelMapa
                     etiqueta="Foto aérea"
                     detalle="Fotos aéreas del Instituto Geográfico Nacional bajo las calles."
@@ -1231,6 +1282,7 @@ export function PantallaMapa() {
                         clave={clave()}
                         provincia={provinciaSeleccionada()}
                         fechaCapa={fechaDeLaSeleccionada()}
+                        redUsada={redUsadaDeLaSeleccionada()}
                         alCerrar={() => navegar(ruta.mapa)}
                       />
                     )}

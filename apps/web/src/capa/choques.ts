@@ -46,7 +46,10 @@ export interface RotuloEnElMapa {
 export interface Choques {
   /** Completa, con su nombre, o compacta. Todas las zonas de la escena están aquí. */
   readonly formas: ReadonlyMap<string, FormaDeZona>;
-  /** Las claves de las zonas que ceden su sitio: no se dibujan. */
+  /**
+   * Las claves de lo que cede su sitio y no se dibuja: zonas y, con un filtro, logos y
+   * agrupaciones de la red que usan sus compañías (ADR 0026).
+   */
   readonly ocultos: ReadonlySet<string>;
   /** Las claves de los rótulos que ceden su sitio. */
   readonly rotulosOcultos: ReadonlySet<string>;
@@ -180,6 +183,8 @@ export interface EntradaDeChoques {
    * mal («Las Palmas de Gran Canar»). Sin ella, no se mira.
    */
   readonly pantalla?: { readonly ancho: number; readonly alto: number };
+  /** La clave del emplazamiento seleccionado: no cede nunca, aunque sea de la red usada. */
+  readonly seleccionada?: string | null;
 }
 
 /**
@@ -195,6 +200,9 @@ export interface EntradaDeChoques {
  *    esconden, y cede ante todo lo demás: nunca esconde un hexágono. Si cede, la zona va compacta.
  *    Su caja es la que se dibuja, a 0,85, y puede rozar lo demás `HOLGURA_DE_CINTA` píxeles.
  *
+ * 4. Con un filtro de compañías, los logos y las agrupaciones de la red que usan (ADR 0026), que
+ *    van aparte y ceden ante todo lo demás: lo que pisa algo ya colocado no se dibuja.
+ *
  * El rótulo de una capital no se esconde por llamarse como su provincia: compite como cualquier
  * otro, y la cinta en versalitas y el rótulo en caja normal se distinguen (ADR 0024).
  */
@@ -209,7 +217,9 @@ export const resolverChoques = (entrada: EntradaDeChoques): Choques => {
   // 1. Lo que no cede nunca.
   const candidatos: Array<Candidato> = [];
   const barrios: Array<readonly [ElementoBarrio, Puesto]> = [];
+  const deLaRed = entrada.elementos.filter((e) => vaAparte(e, entrada.seleccionada));
   for (const elemento of entrada.elementos) {
+    if (vaAparte(elemento, entrada.seleccionada)) continue;
     if (elemento.tipo === "municipio" || elemento.tipo === "provincia") {
       candidatos.push({ tipo: "zona", zona: elemento, habitantes: habitantesDe(elemento) });
       continue;
@@ -221,13 +231,8 @@ export const resolverChoques = (entrada: EntradaDeChoques): Choques => {
   }
   for (const rotulo of entrada.rotulos) {
     const caja = cajaDeRotulo(rotulo, proyectar(rotulo.posicion));
-    const cabe =
-      pantalla === undefined ||
-      (caja.izquierda >= 0 &&
-        caja.arriba >= 0 &&
-        caja.derecha <= pantalla.ancho &&
-        caja.abajo <= pantalla.alto);
-    if (cabe) candidatos.push({ tipo: "rotulo", rotulo, habitantes: rotulo.habitantes });
+    if (cabeEn(caja, pantalla))
+      candidatos.push({ tipo: "rotulo", rotulo, habitantes: rotulo.habitantes });
     else rotulosOcultos.add(rotulo.clave);
   }
 
@@ -270,8 +275,35 @@ export const resolverChoques = (entrada: EntradaDeChoques): Choques => {
     puestos = [...puestos.filter((p) => p !== suyo && !otros.includes(p)), { caja: completa }];
     formas.set(zona.clave, "completa");
   }
+
+  // 4. La red usada, aparte: cede ante todo lo demás.
+  for (const elemento of deLaRed) {
+    const caja = cajaEn(proyectar(elemento.posicion), cajaDeMarcador(elemento, "compacta", tamano));
+    if (pisa(caja).length > 0) ocultos.add(elemento.clave);
+    else puestos.push({ caja });
+  }
   return { formas, ocultos, rotulosOcultos };
 };
+
+/**
+ * Un logo o una agrupación de la red que usa una compañía del filtro (ADR 0026), que se coloca
+ * aparte y cede. El emplazamiento seleccionado no cede nunca.
+ */
+const vaAparte = (elemento: Elemento, seleccionada: string | null | undefined): boolean =>
+  elemento.tipo === "emplazamiento"
+    ? elemento.redUsada === true && elemento.emplazamiento.clave !== seleccionada
+    : elemento.tipo === "agrupacion" && elemento.redUsada === true;
+
+/** Si una caja cabe entera en la pantalla. Sin pantalla, no se mira. */
+const cabeEn = (
+  caja: Caja,
+  pantalla: { readonly ancho: number; readonly alto: number } | undefined,
+): boolean =>
+  pantalla === undefined ||
+  (caja.izquierda >= 0 &&
+    caja.arriba >= 0 &&
+    caja.derecha <= pantalla.ancho &&
+    caja.abajo <= pantalla.alto);
 
 /** Lo que mide medio hexágono de alto a su tamaño: los huecos empiezan en lo alto del hexágono. */
 const MEDIO_HEXAGONO = 28;

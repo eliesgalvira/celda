@@ -70,6 +70,8 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   // Las etiquetas y los iconos de los controles claros.
   ["control-tinta", "control"],
   ["control-tinta", "control-hover"],
+  // La línea de debajo del aviso del filtro de compañías (ADR 0026).
+  ["tinta-suave", "control"],
 ];
 
 /** Los fondos del mapa base sobre los que puede quedar un control. */

@@ -8,7 +8,7 @@ import { createSignal, flush } from "solid-js";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 
 import { crearAgrupador, type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
-import { combinacionesDe } from "../capa/marcadores.ts";
+import { logosDe } from "../capa/marcadores.ts";
 import { tamanoDeNivel } from "../capa/choques.ts";
 import { crearAgrupadorNacional, type EstadoProvincia } from "../capa/nacional.ts";
 import {
@@ -74,7 +74,7 @@ const montar = (reducido: boolean, seleccionada: string | null = null, barrios =
   render(() => (
     <CapaAgrupada
       contenedor={contenedor}
-      combinaciones={combinacionesDe(EMPLAZAMIENTOS)}
+      logos={logosDe(EMPLAZAMIENTOS)}
       escena={agrupador.escena(nivel(), MUNDO, seleccionada)}
       transicion={agrupador.transicion}
       proyectar={proyectar}
@@ -215,7 +215,7 @@ describe("capa agrupada por provincias", () => {
     render(() => (
       <CapaAgrupada
         contenedor={contenedor}
-        combinaciones={combinacionesDe(todas)}
+        logos={logosDe(todas)}
         escena={agrupador().escena(nivelActual(), nivelActual() < 8 ? MUNDO : BORDE, null)}
         transicion={agrupador().transicion}
         proyectar={(posicion) => ({
@@ -410,7 +410,7 @@ describe("capa agrupada con la regla de choques (ADR 0024)", () => {
     render(() => (
       <CapaAgrupada
         contenedor={contenedor}
-        combinaciones={[]}
+        logos={[]}
         escena={escena}
         transicion={agrupador.transicion}
         proyectar={(p) => ({ x: p.longitud * 100, y: p.latitud * 100 })}
@@ -459,7 +459,7 @@ describe("capa agrupada a todos los zooms", () => {
     render(() => (
       <CapaAgrupada
         contenedor={contenedor}
-        combinaciones={combinacionesDe(todos)}
+        logos={logosDe(todos)}
         escena={agrupador.escena(actual(), MUNDO, null)}
         transicion={agrupador.transicion}
         proyectar={proyectarEspana}

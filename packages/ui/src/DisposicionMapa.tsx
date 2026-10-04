@@ -16,6 +16,8 @@ export interface DisposicionMapaProps {
   readonly cabecera: JSX.Element;
   /** Bajo la cabecera: la fecha de los datos del mapa. */
   readonly datos?: JSX.Element;
+  /** Bajo la fecha: el aviso de que hay un filtro de compañías puesto (`AvisoDeFiltro`). */
+  readonly filtro?: JSX.Element;
   /**
    * Bajo la fecha: los avisos de la ubicación y, mientras se elige un punto, `EleccionDePunto`,
    * que en el móvil se coloca sola abajo.
@@ -138,6 +140,9 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
       <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-1.5 px-3 md:top-[18px]">
         {props.cabecera}
         {props.datos}
+        <Show when={props.filtro}>
+          <div class="pointer-events-auto">{props.filtro}</div>
+        </Show>
         <Show when={props.ubicacion}>
           <div class="pointer-events-auto flex flex-col items-center gap-1.5">
             {props.ubicacion}

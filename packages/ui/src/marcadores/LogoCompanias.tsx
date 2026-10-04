@@ -1,4 +1,5 @@
 import type { Compania } from "@celda/dominio/compania";
+import { cva } from "class-variance-authority";
 import { For, Match, Show, Switch } from "solid-js";
 
 import { DIBUJOS_DE_COMPANIAS, type LogoOficial, type Pintura } from "./logosDeCompanias.ts";
@@ -124,8 +125,26 @@ export interface LogoCompaniasProps {
   readonly tamano: number;
 }
 
+/**
+ * Con un filtro de compañías, la porción de una compañía que no está en él va apagada: el
+ * emplazamiento sale por otra, que es la que se resalta (ADR 0026).
+ */
+const variantesPorcion = cva("", {
+  variants: { apagada: { si: "opacity-30", no: "" } },
+});
+
+/** La clase de una porción: su color y, si va apagada, la opacidad. */
+const claseDePorcion = (compania: Compania, apagada: "si" | "no"): string =>
+  [claseDeFondo(compania), variantesPorcion({ apagada })].filter((c) => c !== "").join(" ");
+
 /** El dibujo del logo en un lienzo de 40 × 40, sin el `<svg>` que lo contiene. */
-function DibujoLogo(props: { readonly companias: ReadonlyArray<Compania> }) {
+function DibujoLogo(props: {
+  readonly companias: ReadonlyArray<Compania>;
+  /** Las que se resaltan; sin ellas, todas. */
+  readonly resaltadas?: ReadonlyArray<Compania> | undefined;
+}) {
+  const apagada = (compania: Compania) =>
+    props.resaltadas !== undefined && !props.resaltadas.includes(compania) ? "si" : "no";
   return (
     <>
       <Switch>
@@ -144,8 +163,14 @@ function DibujoLogo(props: { readonly companias: ReadonlyArray<Compania> }) {
           <For each={porciones(props.companias)}>
             {(porcion) => (
               <>
-                <path d={porcion.d} class={claseDeFondo(porcion.compania)} />
-                <g transform={porcion.glifo}>
+                <path
+                  d={porcion.d}
+                  class={claseDePorcion(porcion.compania, apagada(porcion.compania))}
+                />
+                <g
+                  transform={porcion.glifo}
+                  class={variantesPorcion({ apagada: apagada(porcion.compania) }) || undefined}
+                >
                   <Glifo compania={porcion.compania} />
                 </g>
               </>
@@ -197,24 +222,45 @@ export function LogoCompanias(props: LogoCompaniasProps) {
   );
 }
 
-/** Identificador del símbolo de una combinación de compañías en `SimbolosDeLogos`. */
-export const idDeLogo = (companias: ReadonlyArray<Compania>): string =>
-  companias.length === 0 ? "celda-logo-ninguna" : `celda-logo-${companias.join("-")}`;
+/**
+ * Un logo de los marcadores: sus compañías y, con un filtro, las que se resaltan. Sin
+ * `resaltadas`, o con todas, se resaltan todas.
+ */
+export interface LogoDeMarcador {
+  readonly companias: ReadonlyArray<Compania>;
+  readonly resaltadas?: ReadonlyArray<Compania> | undefined;
+}
+
+/** Si un logo apaga alguna de sus compañías. */
+const apagaAlguna = (logo: LogoDeMarcador): boolean =>
+  logo.resaltadas !== undefined && logo.companias.some((c) => !logo.resaltadas?.includes(c));
 
 /**
- * Un símbolo SVG por combinación de compañías, dibujado una sola vez. Cada marcador lo usa con
- * `<use>`: con cientos de marcadores en pantalla, eso son cuatro nodos por marcador en lugar de
- * una veintena.
+ * Identificador del símbolo de un logo en `SimbolosDeLogos`: el de sus compañías y, si apaga
+ * alguna, las que resalta detrás.
  */
-export function SimbolosDeLogos(props: {
-  readonly combinaciones: ReadonlyArray<ReadonlyArray<Compania>>;
-}) {
+export const idDeLogo = (
+  companias: ReadonlyArray<Compania>,
+  resaltadas?: ReadonlyArray<Compania>,
+): string => {
+  const base = companias.length === 0 ? "celda-logo-ninguna" : `celda-logo-${companias.join("-")}`;
+  return apagaAlguna({ companias, resaltadas }) ? `${base}--${resaltadas?.join("-") ?? ""}` : base;
+};
+
+/**
+ * Un símbolo SVG por logo, dibujado una sola vez. Cada marcador lo usa con `<use>`: con cientos
+ * de marcadores en pantalla, eso son cuatro nodos por marcador en lugar de una veintena.
+ */
+export function SimbolosDeLogos(props: { readonly logos: ReadonlyArray<LogoDeMarcador> }) {
   return (
     <svg aria-hidden="true" class="absolute size-0 overflow-hidden">
-      <For each={props.combinaciones}>
-        {(companias) => (
-          <symbol id={idDeLogo(companias)} viewBox="0 0 40 40">
-            <DibujoLogo companias={companias} />
+      <For each={props.logos}>
+        {(logo) => (
+          <symbol id={idDeLogo(logo.companias, logo.resaltadas)} viewBox="0 0 40 40">
+            <DibujoLogo
+              companias={logo.companias}
+              resaltadas={apagaAlguna(logo) ? logo.resaltadas : undefined}
+            />
           </symbol>
         )}
       </For>

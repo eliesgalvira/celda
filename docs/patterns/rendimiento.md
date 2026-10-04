@@ -339,6 +339,24 @@ Fps, medianas de cinco rondas (los niveles y alejar, de tres); entre paréntesis
 - **La caché de la foto.** La primera versión escondía la capa de la foto con el estado del estilo. MapLibre recarga entonces la fuente y vacía su caché de teselas con cada cambio, y los niveles pedían 254 teselas, 108 distintas, y 3081 KB en lugar de 2411. Ahora la capa se esconde con `setLayoutProperty`, que en una capa de imagen no recarga la fuente: 123 peticiones de 108 teselas (102 en `celda/v1`).
 - **En un MapLibre de verdad** (Chromium sin interfaz, la build servida en local): un vuelo al Eixample z17 pide 0 teselas de la foto en el aire y 12 al llegar; un vuelo que interrumpe otro la deja fuera hasta que llega el segundo; un vuelo que coge el dedo la devuelve y el arrastre no la quita; pellizcar y Acercar no la quitan (0 cambios del estado); cuatro pulsaciones de «Foto aérea» a mitad de un vuelo de 9 s no cambian nada hasta llegar, y al llegar, uno. Después, 20 s quieto: 0 peticiones y 0 llamadas a `fetch`, `setTimeout`, `setInterval`, `requestAnimationFrame`, `postMessage` y `addEventListener`.
 
+## Filtro de compañías (#69)
+
+Medido el 04/10/2026 en Chromium sin interfaz con SwiftShader, con la build local servida como en Vercel (`tools/rendimiento/src/sitio.ts`), la publicación de toda España del 30/09/2026 rehecha con las combinaciones de compañías (35.667 emplazamientos) y OpenFreeMap de verdad, en el móvil (390 × 844, DPR 2) y en el escritorio (1400 × 900). Un guion cuenta las llamadas a `fetch`, XHR, `setTimeout`, `setInterval`, `requestAnimationFrame` y `postMessage` de cada Worker por su nombre, y el tiempo del toque a los marcadores con un `MutationObserver` sobre su lámina. Cómo se hace, en el [ADR 0026](../adr/0026-filtro-de-companias-con-la-red-que-usan.md).
+
+- **Peso.** El resumen nacional pasa de 10.745 a 13.798 bytes, de 4.532 a 5.752 con `gzip -9`. La primera pantalla crece 5,0 KB con `gzip -9` (223.869 → 228.911 bytes): el filtro, sus chips y su aviso, y el agrupador con la red usada. El Worker de capas, 0,2 KB (37.038 → 37.242). El trozo del mapa, igual.
+- **Del toque al mapa redibujado**, con Barcelona a z12 y sus provincias cargadas, contando los 150 ms de espera tras el último toque:
+
+| | Móvil | Escritorio | Móvil, CPU ×4 | Escritorio, CPU ×4 |
+|---|---|---|---|---|
+| Primer marcador que cambia | 157-171 ms | 164-174 ms | 184-241 ms | 236-318 ms |
+| Último, con el filtro ya agrupado | 159-181 ms | 168-205 ms | 184-212 ms | 236-260 ms |
+| Último, con un filtro nuevo que agrupa el Worker | 175-193 ms | 192-215 ms | 360 ms | 552 ms |
+
+- **Red.** 0 peticiones al tocar los chips: ni capas ni fichas. Antes de cambiar la precarga de fichas, el primer toque que dejaba sueltos otros emplazamientos pedía un lote.
+- **Workers.** El de capas recibe 1 mensaje por provincia y filtro nuevo, y 0 al volver a uno de los cuatro últimos o a todas. Cuatro chips en menos de 150 ms entre uno y otro: 1 mensaje, el del último filtro, y 0 si ya estaba guardado. El de simulaciones, 0 a z12; a z15 o más, un cálculo de celdas por filtro aplicado.
+- **Quieto 20 s** tras los toques, en el móvil y en el escritorio: 0 peticiones y 0 llamadas a todo lo contado.
+- **Celdas.** En el Eixample a z16 en el móvil, 163 con solo Movistar y 14 con solo DIGI.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.

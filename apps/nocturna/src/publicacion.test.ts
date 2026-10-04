@@ -518,6 +518,53 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
     ),
   );
 
+  it.effect(
+    "una vigente sin combinaciones de compañías se vuelve a publicar con ellas, sin tocar las capas",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          yield* TestClock.setTime(NOCHE);
+          yield* ingerir(entorno, yield* muestraCampusNord);
+          yield* publicar(entorno);
+          const leida = yield* leerVigente(entorno);
+          for (const p of leida.resumen.provincias) {
+            const suyos = leida.capas.get(p.codigo)?.emplazamientos.length ?? 0;
+            const suma = [...(p.combinaciones ?? [])].reduce((n, [, cuantos]) => n + cuantos, 0);
+            assert.strictEqual(suma, suyos, p.codigo);
+          }
+
+          // Lo que dejó una publicación de antes de las combinaciones (ADR 0026): el mismo
+          // resumen sin su columna, con otro nombre, y la vigente apuntando a él.
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const conEllas = (yield* leer(entorno, leida.vigente.resumen ?? "")) ?? "";
+          const sinEllas = conEllas.replace(/,"combinaciones":\[(?:\[[0-9,]*\],?)*\]/u, "");
+          assert.notStrictEqual(sinEllas, conEllas);
+          const viejo = leida.vigente.resumen?.replace(
+            /\.[0-9a-f]+\.json$/u,
+            ".0000000000000000.json",
+          );
+          yield* fs.writeFileString(path.join(entorno.almacen, viejo ?? ""), sinEllas);
+          yield* fs.writeFileString(
+            path.join(entorno.almacen, FICHERO_VIGENTE),
+            JSON.stringify({ ...leida.vigente, resumen: viejo }),
+          );
+          const antes = (yield* entorno.escritos).length;
+
+          const otra = yield* publicar(entorno);
+          assert.strictEqual(otra.tipo, "publicada");
+          const nuevos = (yield* entorno.escritos).slice(antes);
+          assert.isFalse(
+            nuevos.some((f) => f.startsWith("provincias/") || f.startsWith("fichas/")),
+            nuevos.join(", "),
+          );
+          const despues = yield* leerVigente(entorno);
+          assert.strictEqual(despues.vigente.resumen, leida.vigente.resumen);
+          assert.isTrue(despues.resumen.provincias.every((p) => p.combinaciones !== undefined));
+        }),
+      ),
+  );
+
   it.effect("sin emplazamientos no hay nada que publicar", () =>
     conEntorno((entorno) =>
       Effect.gen(function* () {

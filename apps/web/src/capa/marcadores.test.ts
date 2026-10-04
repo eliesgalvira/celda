@@ -83,3 +83,47 @@ describe("nombre accesible de una provincia", () => {
     );
   });
 });
+
+describe("nombres accesibles con un filtro de compañías (ADR 0026)", () => {
+  it("dicen de quién son los emplazamientos que se cuentan, y los de la red usada, de qué red", () => {
+    assert.strictEqual(
+      nombreDeAgrupacion(12, ["movistar", "vodafone"]),
+      "12 emplazamientos de Movistar y Vodafone, acercar",
+    );
+    assert.strictEqual(
+      nombreDeAgrupacion(30, ["digi"], true),
+      "30 emplazamientos de Movistar, la red que usa Digi, acercar",
+    );
+    assert.strictEqual(
+      nombreDeAgrupacion(30, ["digi", "yoigo"], true),
+      "30 emplazamientos de Movistar y Orange, las redes que usan Digi y Yoigo, acercar",
+    );
+    assert.strictEqual(
+      nombreDeMarcador({ ...en("m", 0, 0), companias: ["movistar", "vodafone"] }, ["digi"], true),
+      "Emplazamiento compartido por Movistar y Vodafone, red que usa Digi",
+    );
+    assert.strictEqual(
+      nombreDeMarcador({ ...en("m", 0, 0), companias: ["movistar", "digi"] }, ["digi"]),
+      "Emplazamiento compartido por Movistar y Digi",
+    );
+  });
+
+  it("el de una provincia cuenta lo del filtro, aparte la red usada, y dice si aún cuenta todas", () => {
+    const [barcelona] = provinciasDeRESUMEN();
+    if (barcelona === undefined) return assert.fail("sin Barcelona");
+    assert.strictEqual(
+      nombreDeProvincia({ ...barcelona, cuantos: 3, deLaRed: 20 }, ["digi"]),
+      "Barcelona, 3 emplazamientos de Digi y 20 de Movistar, la red que usa Digi, acercar",
+    );
+    assert.strictEqual(
+      nombreDeProvincia({ ...barcelona, sinFiltrar: true }, ["digi"]),
+      `Barcelona, ${barcelona.cuantos} emplazamientos de todas las compañías, acercar`,
+    );
+  });
+});
+
+/** Los hexágonos de las provincias del resumen de prueba, de lejos. */
+const provinciasDeRESUMEN = (): ReadonlyArray<ElementoProvincia> =>
+  [...crearAgrupadorNacional(RESUMEN, estados()).escena(6, MUNDO).elementos.values()].filter(
+    (e): e is ElementoProvincia => e.tipo === "provincia",
+  );

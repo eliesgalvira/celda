@@ -2,6 +2,14 @@ import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area"
 import { COMPANIAS_DE_CAPA, type EmplazamientoLeido } from "@celda/dominio/capa";
 import { centroVisual } from "@celda/dominio/centroVisual";
 import { seCortan } from "@celda/dominio/cobertura";
+import {
+  claveDeFiltro,
+  contarConFiltro,
+  type FiltroDeCompanias,
+  hayFiltro,
+  separarPorPapel,
+  SIN_FILTRO,
+} from "@celda/dominio/filtro";
 import type { CapaDeProvincia, ProvinciaDelResumen, ResumenLeido } from "@celda/dominio/provincias";
 import { ausentesDeProvincia, companiasDelResumen, resumirMunicipios } from "@celda/dominio/zona";
 
@@ -20,6 +28,7 @@ import {
   SIN_TRANSICION,
   type Transicion,
 } from "./agrupacion.ts";
+import type { IndicesDeFiltro, ParteDeCapa } from "./indexador.ts";
 import type { Indice, IndicesDeCapa } from "./indice.ts";
 import { cajaConMargen, cajaVisible, type Vista } from "./marcadores.ts";
 
@@ -80,12 +89,101 @@ export const claveDeProvincia = (codigo: string): string => `${PREFIJO_PROVINCIA
 /** El prefijo de las claves de las agrupaciones y los barrios de una provincia. */
 export const prefijoDeProvincia = (codigo: string): string => `${codigo}:`;
 
+/** Lo que marca, tras el código de la provincia, las agrupaciones de la red que usa un filtro. */
+const DE_LA_RED = "r";
+
+/**
+ * El prefijo de las agrupaciones de la red que usa una compañía del filtro en una provincia
+ * (`a:08r:12`), que no chocan con las suyas (ADR 0026).
+ */
+export const prefijoDeRedUsada = (codigo: string): string => `${codigo}${DE_LA_RED}:`;
+
 /**
  * La provincia de una clave de agrupación, de barrio o de municipio (`a:08:123`, `s11:08:4`), o
- * `undefined`.
+ * `undefined`. Las de la red usada llevan la marca detrás (`08r`).
  */
 const provinciaDeClave = (clave: string): string | undefined =>
   /^(?:[afbm]|s\d+):([^:]+):/u.exec(clave)?.[1];
+
+/**
+ * Cómo se agrupa una provincia con un filtro de compañías (ADR 0026): sus emplazamientos de las
+ * compañías del filtro, con sus zonas, y aparte, si hay, los de la red que usan, en hexágonos y
+ * logos sin zonas.
+ */
+export interface AgrupacionConFiltro {
+  /** El filtro con que se hizo (`claveDeFiltro`). */
+  readonly filtro: string;
+  readonly propios: Agrupador;
+  readonly redUsada: Agrupador | undefined;
+}
+
+/**
+ * Lo que hay que indexar de una capa con un filtro: los emplazamientos de las compañías del
+ * filtro, con los municipios si la provincia está cubierta y sus barrios, y los de la red que
+ * usan, sin zonas. Sin ninguno de la red, `redUsada` no está.
+ */
+export interface PartesDelFiltro {
+  readonly propios: ParteDeCapa;
+  readonly redUsada: ParteDeCapa | undefined;
+}
+
+/** Las partes de una capa con un filtro (`PartesDelFiltro`). */
+export const partesDelFiltro = (
+  capa: CapaDeProvincia,
+  resumen: ResumenLeido,
+  filtro: FiltroDeCompanias,
+): PartesDelFiltro => {
+  const cubierta = resumen.provincias.find((p) => p.codigo === capa.provincia)?.cubierta === true;
+  const { propios, redUsada } = separarPorPapel(capa.emplazamientos, filtro);
+  return {
+    propios: {
+      emplazamientos: propios,
+      municipios: cubierta ? capa.municipios : [],
+      conBarrios: capa.barrios.length > 0,
+    },
+    redUsada:
+      redUsada.length === 0
+        ? undefined
+        : { emplazamientos: redUsada, municipios: [], conBarrios: false },
+  };
+};
+
+/**
+ * La agrupación de una provincia con un filtro, con los índices que hizo el Worker para las
+ * partes de `partesDelFiltro` o, sin ellos, hechos aquí.
+ */
+export const agrupacionConFiltro = (
+  capa: CapaDeProvincia,
+  resumen: ResumenLeido,
+  filtro: { readonly companias: FiltroDeCompanias; readonly clave: string },
+  indices?: IndicesDeFiltro,
+): AgrupacionConFiltro => {
+  const partes = partesDelFiltro(capa, resumen, filtro.companias);
+  const red = partes.redUsada;
+  const indicesDeLaRed = indices?.redUsada;
+  return {
+    filtro: filtro.clave,
+    propios: agrupadorDeProvincia(
+      { ...capa, emplazamientos: partes.propios.emplazamientos },
+      resumen,
+      indices?.propios,
+    ),
+    redUsada:
+      red === undefined
+        ? undefined
+        : crearAgrupador(
+            red.emplazamientos,
+            [],
+            indicesDeLaRed === undefined
+              ? { prefijo: prefijoDeRedUsada(capa.provincia), redUsada: true }
+              : {
+                  prefijo: prefijoDeRedUsada(capa.provincia),
+                  redUsada: true,
+                  indices: indicesDeLaRed,
+                },
+          ),
+  };
+};
 
 /**
  * El agrupador de una provincia leída, con sus barrios y, si está cubierta en `resumen`, sus
@@ -138,17 +236,79 @@ type Partes = ReadonlyMap<
 /** Las partes de cada escena nacional, las haga el agrupador que las haga. */
 const partesDe = new WeakMap<Escena, Partes>();
 
+/** La agrupación sin filtro de una provincia lista: su agrupador, con todos. */
+export const agrupacionSinFiltro = (cargada: ProvinciaCargada): AgrupacionConFiltro => ({
+  filtro: claveDeFiltro(SIN_FILTRO),
+  propios: cargada.agrupador,
+  redUsada: undefined,
+});
+
+/**
+ * La agrupación de una provincia lista con un filtro, hecha en el hilo, sin el Worker: la de las
+ * pruebas de pantalla.
+ */
+export const agrupacionEnHilo = (
+  cargada: ProvinciaCargada,
+  resumen: ResumenLeido,
+  filtro: FiltroDeCompanias,
+): AgrupacionConFiltro =>
+  hayFiltro(filtro)
+    ? agrupacionConFiltro(cargada.capa, resumen, {
+        companias: filtro,
+        clave: claveDeFiltro(filtro),
+      })
+    : agrupacionSinFiltro(cargada);
+
+/** Lo que cambia el agrupador de toda España, además del resumen y las provincias. */
+export interface OpcionesNacional {
+  /** Dónde va el hexágono de cada provincia. Sin él, en su centro visual. */
+  readonly centroDe?: CentroDeProvincia;
+  /** Las compañías que se ven (ADR 0026). Sin él, todas. */
+  readonly filtro?: FiltroDeCompanias;
+  /**
+   * Con un filtro, la agrupación de cada provincia lista que se dibuja: la del filtro o, mientras
+   * el Worker la prepara, la que ya se veía. Una provincia lista sin ninguna se ve con su hexágono,
+   * cargando.
+   */
+  readonly agrupaciones?: ReadonlyMap<string, AgrupacionConFiltro> | undefined;
+}
+
+/**
+ * Lo que dice el hexágono de una provincia del resumen con un filtro: los emplazamientos de las
+ * compañías del filtro y, aparte, los de la red que usan. Con un resumen de antes de las
+ * combinaciones no se puede contar: dice los de todas y lo marca `sinFiltrar`.
+ */
+export const cuentaDeProvincia = (
+  provincia: ProvinciaDelResumen,
+  filtro: FiltroDeCompanias,
+): Pick<ElementoProvincia, "cuantos" | "deLaRed" | "sinFiltrar"> => {
+  if (!hayFiltro(filtro)) {
+    return { cuantos: provincia.emplazamientos, deLaRed: 0, sinFiltrar: false };
+  }
+  if (provincia.combinaciones === undefined) {
+    return { cuantos: provincia.emplazamientos, deLaRed: 0, sinFiltrar: true };
+  }
+  const { propios, redUsada } = contarConFiltro(provincia.combinaciones, filtro);
+  return { cuantos: propios, deLaRed: redUsada, sinFiltrar: false };
+};
+
 /**
  * El agrupador de toda España con las provincias de `provincias`: las listas con su detalle, y el
  * resto con su hexágono del resumen, que dice si se están pidiendo o si han fallado. Se vuelve a
  * crear cada vez que cambia una provincia, pero las transiciones funcionan entre escenas de
- * agrupadores distintos, porque cada provincia conserva el suyo.
+ * agrupadores distintos, porque cada provincia conserva el suyo. Con un filtro de compañías, los
+ * hexágonos cuentan solo lo del filtro y cada provincia lista se dibuja con su agrupación de
+ * `agrupaciones` (ADR 0026).
  */
 export const crearAgrupadorNacional = (
   resumen: ResumenLeido,
   provincias: ReadonlyMap<string, EstadoProvincia>,
-  centroDe: CentroDeProvincia = enSuCentroVisual,
+  opciones: OpcionesNacional = {},
 ): Agrupador => {
+  const centroDe = opciones.centroDe ?? enSuCentroVisual;
+  const filtro = opciones.filtro ?? SIN_FILTRO;
+  const conFiltro = hayFiltro(filtro);
+  const agrupaciones = opciones.agrupaciones ?? new Map<string, AgrupacionConFiltro>();
   const enElResumen = companiasDelResumen(resumen.provincias);
   const cargadas = new Map(
     [...provincias].flatMap(([codigo, estado]) =>
@@ -166,6 +326,10 @@ export const crearAgrupadorNacional = (
     return deClave.get(clave);
   };
 
+  /** Cómo se agrupa una provincia lista: sin filtro, con su agrupador; con él, con el suyo. */
+  const agrupacionDe = (cargada: ProvinciaCargada): AgrupacionConFiltro | undefined =>
+    conFiltro ? agrupaciones.get(cargada.codigo) : agrupacionSinFiltro(cargada);
+
   const cargaDe = (codigo: string): CargaDeProvincia => {
     const estado = provincias.get(codigo);
     return estado?.tipo === "cargando"
@@ -174,13 +338,18 @@ export const crearAgrupadorNacional = (
         ? "fallo"
         : "resumen";
   };
-  const hexagono = (p: ProvinciaDelResumen, posicion: Coordenada): ElementoProvincia => ({
+  const hexagono = (
+    p: ProvinciaDelResumen,
+    posicion: Coordenada,
+    carga: CargaDeProvincia,
+  ): ElementoProvincia => ({
     tipo: "provincia",
     clave: claveDeProvincia(p.codigo),
     posicion,
     provincia: p,
-    carga: cargaDe(p.codigo),
+    carga,
     ausentes: ausentesDeProvincia(p, enElResumen, COMPANIAS_DE_CAPA),
+    ...cuentaDeProvincia(p, filtro),
   });
 
   /**
@@ -192,20 +361,28 @@ export const crearAgrupadorNacional = (
     nivel: number,
     caja: Rectangulo,
     visible: Rectangulo,
-  ): { readonly detalle: ProvinciaCargada } | { readonly posicion: Coordenada } | undefined => {
+  ):
+    | { readonly detalle: AgrupacionConFiltro }
+    | { readonly posicion: Coordenada; readonly carga: CargaDeProvincia }
+    | undefined => {
     const corta = p.caja !== undefined && seCortan(p.caja, caja);
     if (nivel >= NIVEL_DE_PROVINCIAS && corta && p.caja !== undefined) {
       const cargada = cargadas.get(p.codigo);
-      if (cargada !== undefined) return { detalle: cargada };
+      const agrupacion = cargada === undefined ? undefined : agrupacionDe(cargada);
+      if (agrupacion !== undefined) return { detalle: agrupacion };
       // Mientras llega su capa, su hexágono dentro de lo que se ve de ella: nunca un hueco.
       const suya = seCortan(p.caja, visible)
         ? interseccion(p.caja, visible)
         : interseccion(p.caja, caja);
-      return { posicion: alBorde(centroDe(p), suya) };
+      // Lista, pero sin la agrupación del filtro: el Worker la está preparando.
+      const carga = cargada === undefined ? cargaDe(p.codigo) : "cargando";
+      return { posicion: alBorde(centroDe(p), suya), carga };
     }
     const soloResumen = nivel < NIVEL_DE_PROVINCIAS || p.caja === undefined;
     const centro = centroDe(p);
-    return soloResumen && contiene(caja, centro) ? { posicion: centro } : undefined;
+    return soloResumen && contiene(caja, centro)
+      ? { posicion: centro, carga: cargaDe(p.codigo) }
+      : undefined;
   };
 
   /** El seleccionado, suelto, si alguna provincia cargada lo tiene y cae en la caja. */
@@ -229,11 +406,20 @@ export const crearAgrupadorNacional = (
       const parte = parteDe(p, nivel, caja, visible);
       if (parte === undefined) continue;
       if ("detalle" in parte) {
-        const detalle = parte.detalle.agrupador.escena(nivel, caja, aparte);
+        const { propios, redUsada } = parte.detalle;
+        const detalle = propios.escena(nivel, caja, aparte);
         for (const [clave, elemento] of detalle.elementos) elementos.set(clave, elemento);
-        partes.set(p.codigo, { escena: detalle, agrupador: parte.detalle.agrupador });
+        partes.set(p.codigo, { escena: detalle, agrupador: propios });
+        if (redUsada !== undefined) {
+          // La red usada va aparte, con sus propias transiciones, y no cuenta en las zonas.
+          const deLaRed = redUsada.escena(nivel, caja, aparte);
+          for (const [clave, elemento] of deLaRed.elementos) {
+            if (!elementos.has(clave)) elementos.set(clave, elemento);
+          }
+          partes.set(`${p.codigo}${DE_LA_RED}`, { escena: deLaRed, agrupador: redUsada });
+        }
       } else {
-        elementos.set(claveDeProvincia(p.codigo), hexagono(p, parte.posicion));
+        elementos.set(claveDeProvincia(p.codigo), hexagono(p, parte.posicion, parte.carga));
         partes.set(p.codigo, null);
       }
     }
@@ -245,10 +431,16 @@ export const crearAgrupadorNacional = (
     return hecha;
   };
 
-  const agrupadorDe = (elemento: Elemento): Agrupador | undefined =>
-    elemento.tipo === "emplazamiento"
-      ? cargadaDe(elemento.emplazamiento.clave)?.agrupador
-      : cargadas.get(provinciaDeClave(elemento.clave) ?? "")?.agrupador;
+  const agrupadorDe = (elemento: Elemento): Agrupador | undefined => {
+    if (elemento.tipo === "emplazamiento") {
+      return cargadaDe(elemento.emplazamiento.clave)?.agrupador;
+    }
+    const codigo = provinciaDeClave(elemento.clave) ?? "";
+    const deLaRed = codigo.endsWith(DE_LA_RED);
+    const cargada = cargadas.get(deLaRed ? codigo.slice(0, -DE_LA_RED.length) : codigo);
+    const agrupacion = cargada === undefined ? undefined : agrupacionDe(cargada);
+    return deLaRed ? agrupacion?.redUsada : agrupacion?.propios;
+  };
 
   const zoomDeApertura = (elemento: ElementoAbrible): number =>
     elemento.tipo === "provincia"

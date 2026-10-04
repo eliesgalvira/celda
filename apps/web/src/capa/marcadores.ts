@@ -1,8 +1,21 @@
 import type { Rectangulo } from "@celda/dominio/area";
 import type { ResumenDeBarrio } from "@celda/dominio/barrio";
 import type { ResumenDeMunicipio } from "@celda/dominio/zona";
-import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
-import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import {
+  mascaraDeCompanias,
+  type EmplazamientoDeCapa,
+  companiasDeMascara,
+} from "@celda/dominio/capa";
+import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import {
+  type FiltroDeCompanias,
+  hayFiltro,
+  nombresDelFiltro,
+  redesUsadas,
+  resaltadasDe,
+  SIN_FILTRO,
+} from "@celda/dominio/filtro";
+import { idDeLogo, type LogoDeMarcador } from "@celda/ui/marcadores/LogoCompanias.tsx";
 import {
   type CoberturaDeProvincia,
   textoDeEmplazamientos,
@@ -48,8 +61,37 @@ const enumerar = (nombres: ReadonlyArray<string>): string =>
     ? (nombres[0] ?? "")
     : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1) ?? ""}`;
 
-/** Nombre accesible del marcador: las compañías que emiten allí y el estado si no es verificado. */
-export const nombreDeMarcador = (emplazamiento: EmplazamientoDeCapa): string => {
+/**
+ * De quién son los emplazamientos que se cuentan con un filtro: « de Movistar y Vodafone». Sin
+ * filtro, nada.
+ */
+const deQuien = (filtro: FiltroDeCompanias): string =>
+  hayFiltro(filtro) ? ` de ${nombresDelFiltro(filtro)}` : "";
+
+/**
+ * Las redes que usan las compañías del filtro, dicho de unos emplazamientos que son de ellas: «la
+ * red que usa Digi», «las redes que usan Digi y Yoigo».
+ */
+const redQueUsan = (filtro: FiltroDeCompanias): string => {
+  const usadas = redesUsadas(filtro);
+  const quienes = enumerar(usadas.map((r) => NOMBRE_COMPANIA[r.compania]));
+  return usadas.length > 1 ? `las redes que usan ${quienes}` : `la red que usa ${quienes}`;
+};
+
+/** De qué redes son los emplazamientos de la red usada: « de Movistar, la red que usa Digi». */
+const deLaRed = (filtro: FiltroDeCompanias): string =>
+  ` de ${enumerar(redesUsadas(filtro).map((r) => NOMBRE_COMPANIA[r.red]))}, ${redQueUsan(filtro)}`;
+
+/**
+ * Nombre accesible del marcador: las compañías que emiten allí y el estado si no es verificado.
+ * Con un filtro, si es de la red que usa una compañía del filtro, lo dice: «Emplazamiento de
+ * Movistar, red que usa Digi».
+ */
+export const nombreDeMarcador = (
+  emplazamiento: EmplazamientoDeCapa,
+  filtro: FiltroDeCompanias = SIN_FILTRO,
+  redUsada = false,
+): string => {
   const companias = emplazamiento.companias.map((c) => NOMBRE_COMPANIA[c]);
   const quien =
     companias.length === 0
@@ -57,33 +99,62 @@ export const nombreDeMarcador = (emplazamiento: EmplazamientoDeCapa): string => 
       : companias.length === 1
         ? `Emplazamiento de ${companias[0] ?? ""}`
         : `Emplazamiento compartido por ${enumerar(companias)}`;
-  return emplazamiento.estado === "verificado" ? quien : `${quien}, ${emplazamiento.estado}`;
+  const deRed = redesUsadas(filtro).filter((r) => emplazamiento.companias.includes(r.red));
+  const conRed =
+    redUsada && deRed.length > 0
+      ? `${quien}, red que usa ${enumerar(deRed.map((r) => NOMBRE_COMPANIA[r.compania]))}`
+      : quien;
+  return emplazamiento.estado === "verificado" ? conRed : `${conRed}, ${emplazamiento.estado}`;
 };
 
 /**
  * Nombre accesible de una agrupación: cuántos emplazamientos recoge y qué hace al pulsarla. Empieza
- * por el número, que es lo que se ve.
+ * por el número, que es lo que se ve. Con un filtro, de quién son: «12 emplazamientos de
+ * Movistar, acercar» o, los de la red usada, «30 emplazamientos de Movistar, la red que usa Digi,
+ * acercar».
  */
-export const nombreDeAgrupacion = (cuantos: number): string => `${cuantos} emplazamientos, acercar`;
+export const nombreDeAgrupacion = (
+  cuantos: number,
+  filtro: FiltroDeCompanias = SIN_FILTRO,
+  redUsada = false,
+): string =>
+  `${cuantos} emplazamientos${redUsada && hayFiltro(filtro) ? deLaRed(filtro) : deQuien(filtro)}, acercar`;
 
 /**
  * Nombre accesible de un barrio: lo que dice su etiqueta, en el mismo orden, y qué hace al
  * pulsarlo. «la Clota, 1 emplazamiento, acercar». Como el mapa, no dice qué compañías faltan
- * (ADR 0024).
+ * (ADR 0024). Con un filtro, de quién son los que cuenta.
  */
-export const nombreDeBarrio = (resumen: ResumenDeBarrio): string =>
-  `${resumen.barrio.nombre}, ${textoDeEmplazamientos(resumen.emplazamientos)}, acercar`;
+export const nombreDeBarrio = (
+  resumen: ResumenDeBarrio,
+  filtro: FiltroDeCompanias = SIN_FILTRO,
+): string =>
+  `${resumen.barrio.nombre}, ${textoDeEmplazamientos(resumen.emplazamientos)}${deQuien(filtro)}, acercar`;
 
 /** Nombre accesible de un municipio, como el de un barrio: «Terrassa, 118 emplazamientos, acercar». */
-export const nombreDeMunicipio = (resumen: ResumenDeMunicipio): string =>
-  `${resumen.municipio.nombre}, ${textoDeEmplazamientos(resumen.emplazamientos)}, acercar`;
+export const nombreDeMunicipio = (
+  resumen: ResumenDeMunicipio,
+  filtro: FiltroDeCompanias = SIN_FILTRO,
+): string =>
+  `${resumen.municipio.nombre}, ${textoDeEmplazamientos(resumen.emplazamientos)}${deQuien(filtro)}, acercar`;
 
-/** Las combinaciones distintas de compañías de la capa, cada una una vez: un logo por cada una. */
-export const combinacionesDe = (
+/**
+ * Los logos distintos de unos emplazamientos con un filtro, cada uno una vez: cada combinación de
+ * compañías con las que resalta (`resaltadasDe`). Se mira cada combinación, no cada emplazamiento.
+ */
+export const logosDe = (
   emplazamientos: ReadonlyArray<EmplazamientoDeCapa>,
-): ReadonlyArray<ReadonlyArray<Compania>> => [
-  ...new Map(emplazamientos.map((e) => [e.companias.join("-"), e.companias])).values(),
-];
+  filtro: FiltroDeCompanias = SIN_FILTRO,
+): ReadonlyArray<LogoDeMarcador> => {
+  const mascaras = new Set(emplazamientos.map((e) => mascaraDeCompanias(e.companias)));
+  const logos = new Map<string, LogoDeMarcador>();
+  for (const mascara of [...mascaras].sort((a, b) => a - b)) {
+    const companias = companiasDeMascara(mascara);
+    const resaltadas = resaltadasDe(companias, filtro);
+    logos.set(idDeLogo(companias, resaltadas), { companias, resaltadas });
+  }
+  return [...logos.values()];
+};
 
 /** Cuánto sabe Celda de una provincia del resumen. */
 export const coberturaDe = (elemento: ElementoProvincia): CoberturaDeProvincia =>
@@ -95,17 +166,25 @@ export const coberturaDe = (elemento: ElementoProvincia): CoberturaDeProvincia =
 
 /**
  * Nombre accesible de una provincia: lo que dice su hexágono, en el mismo orden, y qué hace al
- * pulsarla. «Barcelona, 1318 emplazamientos en la parte que Celda ya tiene, acercar».
+ * pulsarla. «Barcelona, 1318 emplazamientos en la parte que Celda ya tiene, acercar». Con un
+ * filtro, de quién son y, aparte, cuántos hay de la red que usan.
  */
-export const nombreDeProvincia = (elemento: ElementoProvincia): string => {
-  const { nombre, emplazamientos } = elemento.provincia;
+export const nombreDeProvincia = (
+  elemento: ElementoProvincia,
+  filtro: FiltroDeCompanias = SIN_FILTRO,
+): string => {
+  const { nombre } = elemento.provincia;
   const cobertura = coberturaDe(elemento);
+  const deLosSuyos = elemento.sinFiltrar
+    ? " de todas las compañías"
+    : `${deQuien(filtro)}${elemento.deLaRed > 0 ? ` y ${elemento.deLaRed}${deLaRed(filtro)}` : ""}`;
+  const emplazamientos = `${textoDeEmplazamientos(elemento.cuantos)}${deLosSuyos}`;
   const cuantos =
     cobertura === "ninguna"
       ? "Celda aún no tiene sus emplazamientos"
       : cobertura === "parcial"
-        ? `${textoDeEmplazamientos(emplazamientos)} en la parte que Celda ya tiene`
-        : textoDeEmplazamientos(emplazamientos);
+        ? `${emplazamientos} en la parte que Celda ya tiene`
+        : emplazamientos;
   const carga =
     elemento.carga === "cargando"
       ? "cargando"

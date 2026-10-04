@@ -1,5 +1,6 @@
 import type { Ficha } from "@celda/dominio/ficha";
 import { AVISO_DE_MARCAS, CITA_DEL_LOGO_DE_DIGI, NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { type RedUsada, textoDeRedUsada } from "@celda/dominio/filtro";
 import { primeraVezEn } from "@celda/dominio/glosario";
 import { BANDAS_NOMINALES } from "@celda/dominio/tecnologia";
 import { Aviso } from "@celda/ui/Aviso.tsx";
@@ -15,6 +16,7 @@ import {
   EstacionFicha,
   MarcaDeAguaFicha,
   OrigenFicha,
+  RedUsadaFicha,
   ResumenFicha,
   SeccionFicha,
 } from "@celda/ui/panel/Ficha.tsx";
@@ -79,6 +81,11 @@ export interface PanelFichaProps {
   readonly provincia: string | null;
   /** Fecha de la capa de su provincia en el mapa, si ya ha llegado: su marca de agua. */
   readonly fechaCapa: number | undefined;
+  /**
+   * Con un filtro de compañías, si el emplazamiento sale por ser de la red que usa una compañía
+   * del filtro, cuál: la ficha lo explica (ADR 0026). Sin él, nada.
+   */
+  readonly redUsada?: ReadonlyArray<RedUsada>;
   readonly alCerrar: () => void;
 }
 
@@ -139,7 +146,12 @@ export function PanelFicha(props: PanelFichaProps) {
             fallback={<FichaInexistente clave={props.clave} alCerrar={() => props.alCerrar()} />}
           >
             {(leida) => (
-              <ContenidoFicha ficha={leida()} clave={props.clave} fechaCapa={props.fechaCapa} />
+              <ContenidoFicha
+                ficha={leida()}
+                clave={props.clave}
+                fechaCapa={props.fechaCapa}
+                redUsada={props.redUsada ?? []}
+              />
             )}
           </Show>
         </Loading>
@@ -181,6 +193,7 @@ function ContenidoFicha(props: {
    */
   readonly clave: string;
   readonly fechaCapa: number | undefined;
+  readonly redUsada: ReadonlyArray<RedUsada>;
 }) {
   const marca = createMemo(() =>
     textosMarca(props.ficha, compararConCapa(props.fechaCapa, props.ficha.version)),
@@ -222,6 +235,15 @@ function ContenidoFicha(props: {
       <ResumenFicha>
         <TextoConTerminos texto={fraseDeResumen(props.ficha.estaciones)} />
       </ResumenFicha>
+      <For each={props.redUsada}>
+        {(red) => (
+          <RedUsadaFicha>
+            {textoDeRedUsada(red)}: donde {NOMBRE_COMPANIA[red.compania]} no tiene emplazamientos
+            propios, sus clientes se conectan a los de {NOMBRE_COMPANIA[red.red]}. Por eso sale con
+            su filtro, más claro.
+          </RedUsadaFicha>
+        )}
+      </For>
       <MarcaDeAguaFicha
         tono={posterior() ? "posterior" : "al-dia"}
         titulo={<TextoConTerminos texto={marca().titulo} />}

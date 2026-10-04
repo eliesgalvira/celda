@@ -10,6 +10,7 @@ import { repartirEnLotes } from "@celda/dominio/lotes";
 import type { FuenteDeMunicipios } from "@celda/dominio/municipio";
 import {
   type CapaDeProvincia,
+  combinacionesDeSituados,
   companiasDeSituados,
   cajaDeSituados,
   type EmplazamientoSituado,
@@ -28,13 +29,14 @@ import {
   type ResumenLeido,
 } from "@celda/dominio/provincias";
 import { cajaDe } from "@celda/dominio/area";
+import { combinacionesDe } from "@celda/dominio/filtro";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 
 import { crearAgrupador } from "./agrupacion.ts";
-import { type ProvinciaCargada, prefijoDeProvincia } from "./nacional.ts";
+import { agrupacionEnHilo, type ProvinciaCargada, prefijoDeProvincia } from "./nacional.ts";
 import { CapaEmplazamientos, type FalloCapa } from "./servicio.ts";
 
 /** La fuente de los límites de barrio, como la publica Open Data BCN. */
@@ -150,24 +152,32 @@ export const provinciaDePrueba = (capa: CapaDePrueba): ProvinciaCargada => {
   };
 };
 
-/** El resumen con la capa de prueba: Barcelona, cubierta, con todos sus emplazamientos. */
-export const resumenDePrueba = (capa: CapaDePrueba): ResumenLeido => ({
-  version: capa.version,
-  fecha: capa.fecha,
-  fuentes: FUENTES_DE_PRUEBA,
-  cobertura: [cajaDeBarcelona(capa.fecha)],
-  provincias: [
-    {
-      ...BARCELONA,
-      caja: cajaDe(capa.emplazamientos.map((e) => e.posicion)),
-      emplazamientos: capa.emplazamientos.length,
-      companias: [...new Set(capa.emplazamientos.flatMap((e) => e.companias))],
-      cubierta: true,
-      barrido: capa.fecha,
-      fichero: ficheroDeCapaDeProvincia(BARCELONA.codigo, "prueba"),
-    },
-  ],
-});
+/**
+ * El resumen con la capa de prueba: Barcelona, cubierta, con todos sus emplazamientos y sus
+ * combinaciones de compañías. Con `sinCombinaciones`, como uno publicado antes de ellas.
+ */
+export const resumenDePrueba = (capa: CapaDePrueba, sinCombinaciones = false): ResumenLeido => {
+  const barcelona: ProvinciaDelResumen = {
+    ...BARCELONA,
+    caja: cajaDe(capa.emplazamientos.map((e) => e.posicion)),
+    emplazamientos: capa.emplazamientos.length,
+    companias: [...new Set(capa.emplazamientos.flatMap((e) => e.companias))],
+    cubierta: true,
+    barrido: capa.fecha,
+    fichero: ficheroDeCapaDeProvincia(BARCELONA.codigo, "prueba"),
+  };
+  return {
+    version: capa.version,
+    fecha: capa.fecha,
+    fuentes: FUENTES_DE_PRUEBA,
+    cobertura: [cajaDeBarcelona(capa.fecha)],
+    provincias: [
+      sinCombinaciones
+        ? barcelona
+        : { ...barcelona, combinaciones: combinacionesDe(capa.emplazamientos) },
+    ],
+  };
+};
 
 /**
  * Servicio de capa de prueba: la carga número `n` del resumen devuelve el de `cargas[n]`, y a
@@ -176,6 +186,7 @@ export const resumenDePrueba = (capa: CapaDePrueba): ResumenLeido => ({
  */
 export const capaDePrueba = (
   cargas: ReadonlyArray<Effect.Effect<CapaDePrueba, FalloCapa>>,
+  opciones: { readonly sinCombinaciones?: boolean } = {},
 ): Layer.Layer<CapaEmplazamientos> =>
   Layer.sync(CapaEmplazamientos, () => {
     let hechas = 0;
@@ -191,7 +202,7 @@ export const capaDePrueba = (
               llegada = Option.some(capa);
             }),
           ),
-          resumenDePrueba,
+          (capa) => resumenDePrueba(capa, opciones.sinCombinaciones === true),
         );
       }),
       provincia: () =>
@@ -202,6 +213,21 @@ export const capaDePrueba = (
               onNone: () => carga(cargas.length - 1),
             }),
             provinciaDePrueba,
+          ),
+        ),
+      agrupacion: (_codigo, filtro) =>
+        Effect.suspend(() =>
+          Effect.map(
+            Option.match(llegada, {
+              onSome: Effect.succeed,
+              onNone: () => carga(cargas.length - 1),
+            }),
+            (capa) =>
+              agrupacionEnHilo(
+                provinciaDePrueba(capa),
+                resumenDePrueba(capa, opciones.sinCombinaciones === true),
+                filtro,
+              ),
           ),
         ),
       // Todos los emplazamientos de prueba van en Barcelona.
@@ -263,7 +289,8 @@ export const publicacionDePrueba = (
         clave: f.clave,
         posicion: f.posicion,
         estado: f.estado,
-        companias: ["movistar"],
+        // Las de sus estaciones base o, sin ninguna, Movistar.
+        companias: f.estaciones.length > 0 ? f.estaciones.map((e) => e.compania) : ["movistar"],
       };
       return {
         emplazamiento,
@@ -316,6 +343,7 @@ export const publicacionDePrueba = (
         emplazamientos: situados.length,
         companias: companiasDeSituados(situados),
         fichero: ficheroCapa,
+        combinaciones: combinacionesDeSituados(situados),
       },
     ],
     cuadros: new Map(),

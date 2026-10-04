@@ -144,12 +144,39 @@ describe("logos de las compañías", () => {
       ["movistar", "digi"],
       ["vodafone", "orange", "yoigo"],
     ];
-    const { container } = render(() => <SimbolosDeLogos combinaciones={combinaciones} />);
+    const { container } = render(() => (
+      <SimbolosDeLogos logos={combinaciones.map((companias) => ({ companias }))} />
+    ));
     flush();
     assert.deepStrictEqual(
       Array.from(container.querySelectorAll("symbol"), (simbolo) => simbolo.id),
       ["celda-logo-movistar", "celda-logo-movistar-digi", "celda-logo-vodafone-orange-yoigo"],
     );
     assert.strictEqual(idDeLogo([]), "celda-logo-ninguna");
+  });
+
+  it("con un filtro, el compartido apaga las porciones de las compañías que no están en él", () => {
+    const { container } = render(() => (
+      <SimbolosDeLogos
+        logos={[
+          { companias: ["movistar", "vodafone"], resaltadas: ["vodafone"] },
+          { companias: ["movistar", "vodafone"], resaltadas: ["movistar", "vodafone"] },
+          { companias: ["digi"], resaltadas: ["digi"] },
+        ]}
+      />
+    ));
+    flush();
+    const simbolos = Array.from(container.querySelectorAll("symbol"));
+    assert.deepStrictEqual(
+      simbolos.map((simbolo) => simbolo.id),
+      ["celda-logo-movistar-vodafone--vodafone", "celda-logo-movistar-vodafone", "celda-logo-digi"],
+    );
+    const apagadas = (simbolo: Element | undefined) =>
+      Array.from(simbolo?.querySelectorAll(".opacity-30") ?? []).length;
+    // La porción de Movistar y su logo.
+    assert.strictEqual(apagadas(simbolos[0]), 2);
+    assert.strictEqual(apagadas(simbolos[1]), 0);
+    assert.strictEqual(idDeLogo(["movistar", "vodafone"], ["vodafone"]), simbolos[0]?.id);
+    assert.strictEqual(idDeLogo(["digi"], ["digi"]), "celda-logo-digi");
   });
 });
