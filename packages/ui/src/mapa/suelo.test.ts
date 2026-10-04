@@ -13,9 +13,14 @@ describe("capas del suelo", () => {
     );
   });
 
-  it("ningún color ni opacidad de los verdes depende de cada polígono: MapLibre no los guarda por vértice", () => {
+  it("las zonas urbanas van debajo de los usos que se tiñen de cerca, desde el zoom 12", () => {
+    assert.isBelow(ids.indexOf("usos"), ids.indexOf("usos-de-cerca"));
+    assert.strictEqual(capas.find((capa) => capa.id === "usos-de-cerca")?.minzoom, 12);
+  });
+
+  it("ningún color ni opacidad de los verdes ni de las zonas urbanas depende de cada polígono: MapLibre no los guarda por vértice", () => {
     for (const capa of capas) {
-      if (!capa.id.startsWith("verdes-") || capa.type !== "fill") continue;
+      if (!(capa.id.startsWith("verdes-") || capa.id === "usos") || capa.type !== "fill") continue;
       assert.notInclude(JSON.stringify(capa.paint), '"get"', capa.id);
     }
   });

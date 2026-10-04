@@ -3,6 +3,17 @@ import type { ExpressionSpecification, LayerSpecification } from "maplibre-gl";
 import { conFoto, deClase, porZoom } from "./expresiones.ts";
 import type { ColorDeToken } from "./tokens.ts";
 
+/** Las zonas urbanas de `landuse`. */
+const URBANOS = [
+  "residential",
+  "suburb",
+  "quarter",
+  "neighbourhood",
+  "commercial",
+  "retail",
+  "industrial",
+];
+
 /** Los usos del suelo que se tiñen de cerca, encima de las zonas urbanas. */
 const USOS = ["hospital", "school", "university", "college", "cemetery"];
 
@@ -53,22 +64,27 @@ export const capasSuelo = (
 ): ReadonlyArray<LayerSpecification> => [
   { id: "fondo", type: "background", paint: { "background-color": color("mapa-fondo") } },
   {
-    // Las zonas urbanas y, desde el zoom 12, los hospitales, los centros de enseñanza y los
-    // cementerios, encima. Una sola capa: cada capa de más cuesta JavaScript en cada fotograma.
+    // Las zonas urbanas, con su color y su opacidad por zoom.
     id: "usos",
     type: "fill",
     source: fuente,
     "source-layer": "landuse",
-    filter: [
-      "match",
-      ["get", "class"],
-      ["residential", "suburb", "quarter", "neighbourhood", "commercial", "retail", "industrial"],
-      true,
-      ["hospital", "school", "university", "college", "cemetery"],
-      [">=", ["zoom"], 12],
-      false,
-    ],
-    layout: { "fill-sort-key": ["match", ["get", "class"], USOS, 1, 0] },
+    filter: deClase(...URBANOS),
+    paint: {
+      "fill-color": color("mapa-urbano"),
+      "fill-opacity": porZoom(5, 0.7, 10, 1, 12, 0.88, 13, 0.82, 15, 0.7),
+    },
+  },
+  {
+    // Desde el zoom 12, encima, los hospitales, los centros de enseñanza y los cementerios. En
+    // una sola capa con las zonas urbanas, la opacidad por clase iba en cada vértice (#67); aquí
+    // solo el color, que cambia de un uso a otro y son pocos polígonos.
+    id: "usos-de-cerca",
+    type: "fill",
+    source: fuente,
+    "source-layer": "landuse",
+    minzoom: 12,
+    filter: deClase(...USOS),
     paint: {
       "fill-color": [
         "match",
@@ -77,25 +93,9 @@ export const capasSuelo = (
         color("mapa-hospital"),
         "cemetery",
         color("mapa-cementerio"),
-        ["school", "university", "college"],
         color("mapa-educacion"),
-        color("mapa-urbano"),
       ],
-      "fill-opacity": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        5,
-        ["match", ["get", "class"], USOS, 0, 0.7],
-        10,
-        ["match", ["get", "class"], USOS, 0, 1],
-        12,
-        ["match", ["get", "class"], USOS, 0, 0.88],
-        13,
-        ["match", ["get", "class"], USOS, 1, 0.82],
-        15,
-        ["match", ["get", "class"], USOS, 1, 0.7],
-      ],
+      "fill-opacity": porZoom(12, 0, 13, 1),
     },
   },
   // La arena, el bosque, la hierba y, encima, los parques y jardines. Cada uno en su capa, con su
