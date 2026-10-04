@@ -1,9 +1,11 @@
 import { INTERMEDIO_FNMT } from "@celda/ingesta/registro-oficial/intermedio";
-import * as Undici from "@effect/platform-node/Undici";
+import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import type * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientError from "effect/unstable/http/HttpClientError";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import type * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 import * as NodeTls from "node:tls";
 
 /** En qué certificados confía una conexión HTTPS. */
@@ -27,43 +29,64 @@ export const confianzaDelRegistro = (): Confianza => ({
   intermedios: [INTERMEDIO_FNMT],
 });
 
-/**
- * `fetch` con su propio agente, que verifica los certificados con `confianza`. Es el `fetch` del
- * paquete `undici` y no el global de Node: el global lleva dentro otra versión de Undici y rechaza
- * los agentes de esta («invalid onRequestStart method»). Es la misma implementación que el global,
- * en otra versión (cabeceras, redirecciones y compresión como siempre), así que para el geoportal
- * solo cambia en qué certificados se confía.
- */
-const fetchCon = (confianza: Confianza) =>
-  Effect.map(
-    Effect.acquireRelease(
-      Effect.sync(
-        () =>
-          new Undici.Agent({ connect: { ca: [...confianza.raices, ...confianza.intermedios] } }),
-      ),
-      (agente) => Effect.promise(() => agente.destroy()),
-    ),
-    (agente): typeof globalThis.fetch =>
-      (entrada, opciones) =>
-        // SAFETY: los tipos del `fetch` de Undici son los de su versión de la API web y los del
-        // global, los de la versión que trae Node: difieren en detalles (iteradores de cabeceras,
-        // tipos de cuerpo), no en lo que usa `FetchHttpClient`, que pasa una URL y sus opciones y
-        // lee estado, cabeceras y cuerpo de la respuesta.
-        // oxlint-disable-next-line anti-slop/no-chained-type-assertions
-        Undici.fetch(entrada instanceof Request ? entrada.url : entrada, {
-          ...opciones,
-          dispatcher: agente,
-        } as Undici.RequestInit) as unknown as Promise<Response>,
-  );
+/** Las que seguía `fetch`. */
+const REDIRECCIONES_MAXIMAS = 20;
 
 /**
- * El cliente HTTP del registro oficial, listado y fichas: el de `fetch` de siempre, con un agente
- * propio que confía en `confianza`. El agente se cierra al cerrar la capa. El resto de fuentes y la
- * publicación siguen con el `fetch` global.
+ * Una respuesta comprimida no se descomprime: falla y dice con qué viene. El cliente pide el cuerpo
+ * sin comprimir (`accept-encoding: identity`), y el geoportal no comprime aunque se le pida. Si
+ * algún día lo hace, mejor un fallo claro que un listado o una ficha ilegibles.
+ */
+const sinComprimir = (
+  respuesta: HttpClientResponse.HttpClientResponse,
+): Effect.Effect<HttpClientResponse.HttpClientResponse, HttpClientError.HttpClientError> => {
+  const codificacion = respuesta.headers["content-encoding"]?.trim().toLowerCase() ?? "identity";
+  if (codificacion === "identity") return Effect.succeed(respuesta);
+  return Effect.fail(
+    new HttpClientError.HttpClientError({
+      reason: new HttpClientError.DecodeError({
+        request: respuesta.request,
+        response: respuesta,
+        cause: new Error(`respuesta comprimida con ${codificacion}, sin pedirlo`),
+      }),
+    }),
+  );
+};
+
+/**
+ * El cliente HTTP del registro oficial, listado y fichas: el de `node:https` de
+ * `@effect/platform-node`, con un agente propio que verifica los certificados con `confianza`. El
+ * resto de fuentes y la publicación siguen con el `fetch` global.
+ *
+ * Hace a mano lo que `fetch` hacía solo:
+ *
+ * - Sigue hasta `REDIRECCIONES_MAXIMAS` redirecciones.
+ * - Pide el cuerpo sin comprimir (`sinComprimir`). `fetch` pedía `br, gzip, deflate, zstd` y
+ *   descomprimía, pero el geoportal no comprime.
+ * - Mantiene viva la conexión entre peticiones, como el agente de `fetch`, para no repetir el
+ *   saludo TLS en cada ficha.
+ *
+ * El tiempo máximo de cada respuesta lo pone quien pide (`OpcionesCliente.espera`): al agotarse,
+ * la petición se interrumpe y se cierra su conexión. El agente se cierra al cerrar la capa.
  */
 export const clienteHttpDelRegistro = (
   confianza: Confianza = confianzaDelRegistro(),
 ): Layer.Layer<HttpClient.HttpClient> =>
-  FetchHttpClient.layer.pipe(
-    Layer.provide(Layer.effect(FetchHttpClient.Fetch, fetchCon(confianza))),
+  Layer.effect(
+    HttpClient.HttpClient,
+    Effect.map(Effect.service(HttpClient.HttpClient), (cliente) =>
+      cliente.pipe(
+        HttpClient.mapRequest(HttpClientRequest.setHeader("accept-encoding", "identity")),
+        HttpClient.transformResponse(Effect.flatMap(sinComprimir)),
+        HttpClient.followRedirects(REDIRECCIONES_MAXIMAS),
+      ),
+    ),
+  ).pipe(
+    Layer.provide(NodeHttpClient.layerNodeHttpNoAgent),
+    Layer.provide(
+      NodeHttpClient.layerAgentOptions({
+        ca: [...confianza.raices, ...confianza.intermedios],
+        keepAlive: true,
+      }),
+    ),
   );
