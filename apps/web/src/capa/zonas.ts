@@ -1,9 +1,9 @@
 import type { Coordenada } from "@celda/dominio/area";
 
 /**
- * Qué municipios se ven como zona en cada nivel de municipios (ADR 0017, #44 y su corrección). Lo
- * usan el Worker, que indexa aparte los emplazamientos que no van en zona, y el agrupador, que
- * dibuja las zonas: los dos tienen que decir lo mismo.
+ * Qué municipios se ven como zona en cada nivel de municipios (ADR 0017, #44 y su corrección, y
+ * ADR 0024 en los niveles 9 y 10). Lo usan el Worker, que indexa aparte los emplazamientos que no
+ * van en zona, y el agrupador, que dibuja las zonas: los dos tienen que decir lo mismo.
  */
 
 /**
@@ -15,21 +15,49 @@ import type { Coordenada } from "@celda/dominio/area";
 export const NIVEL_DE_BARRIOS = 13;
 
 /**
- * Primer nivel en que los emplazamientos se pueden recoger por municipio: los del zoom 11 al 13,
+ * Primer nivel en que un municipio es zona por lo que mide en la pantalla, del zoom 11 al 13,
  * justo antes del de barrios. En el 10, con los datos de Cataluña, se verían unas 180 zonas en la
  * pantalla de un móvil alrededor de Barcelona; en el 11, unas 60, como los barrios en el suyo.
  */
 export const NIVEL_DE_MUNICIPIOS = 11;
 
-/** Los niveles de municipios, del más lejano al más cercano. */
+/**
+ * Primer nivel con zonas de municipio: el 9, el primero con el detalle de las provincias (ADR
+ * 0024). En el 9 y el 10 solo son zona los municipios grandes (`HABITANTES_DE_ZONA`).
+ */
+export const NIVEL_DE_MUNICIPIOS_GRANDES = 9;
+
+/**
+ * Los habitantes del padrón que necesita un municipio para ser zona en los niveles 9 y 10: los
+ * datos van discretos de lejos, y solo las ciudades grandes recogen sus emplazamientos en un
+ * hexágono con su nombre (ADR 0024, prototipo 9d47710).
+ */
+export const HABITANTES_DE_ZONA: ReadonlyMap<number, number> = new Map([
+  [9, 50_000],
+  [10, 20_000],
+]);
+
+/**
+ * El radio de las agrupaciones de los niveles de municipios grandes, el doble del de siempre
+ * (`RADIO`): de lejos hay menos hexágonos y caben más nombres de ciudad.
+ */
+export const RADIO_DE_MUNICIPIOS_GRANDES = 120;
+
+/** Los niveles con zonas de municipio, del más lejano al más cercano: del 9 al 12. */
 export const NIVELES_DE_MUNICIPIOS: ReadonlyArray<number> = Array.from(
-  { length: NIVEL_DE_BARRIOS - NIVEL_DE_MUNICIPIOS },
-  (_, i) => NIVEL_DE_MUNICIPIOS + i,
+  { length: NIVEL_DE_BARRIOS - NIVEL_DE_MUNICIPIOS_GRANDES },
+  (_, i) => NIVEL_DE_MUNICIPIOS_GRANDES + i,
 );
 
-/** Si un nivel es de municipios: del `NIVEL_DE_MUNICIPIOS` al de barrios, sin él. */
+/** Si un nivel es de municipios: del `NIVEL_DE_MUNICIPIOS_GRANDES` al de barrios, sin él. */
 export const esNivelDeMunicipios = (nivel: number): boolean =>
-  nivel >= NIVEL_DE_MUNICIPIOS && nivel < NIVEL_DE_BARRIOS;
+  nivel >= NIVEL_DE_MUNICIPIOS_GRANDES && nivel < NIVEL_DE_BARRIOS;
+
+/**
+ * Si en un nivel solo los municipios grandes son zona, y el resto va en agrupaciones de
+ * `RADIO_DE_MUNICIPIOS_GRANDES`, haya zonas o no.
+ */
+export const esNivelDeMunicipiosGrandes = (nivel: number): boolean => HABITANTES_DE_ZONA.has(nivel);
 
 /**
  * Emplazamientos que necesita un municipio para verse como zona. Con 1 a 3, que son tres de cada
@@ -65,10 +93,12 @@ export interface ConMunicipio {
   readonly municipio?: string | null;
 }
 
-/** Lo que el criterio necesita de cada municipio: dónde va su etiqueta. */
+/** Lo que el criterio necesita de cada municipio: dónde va su etiqueta y sus habitantes. */
 export interface EtiquetaDeMunicipio {
   readonly codigo: string;
   readonly etiqueta: Coordenada;
+  /** Del padrón; `null` o sin ellos, no es zona en los niveles de municipios grandes. */
+  readonly habitantes?: number | null;
 }
 
 interface Extension {
@@ -82,15 +112,18 @@ interface Extension {
 
 /**
  * Los municipios que se ven como zona en cada nivel de municipios, en el orden de
- * `NIVELES_DE_MUNICIPIOS`: los que tienen `MINIMO_DE_ZONA` emplazamientos o más y, con su etiqueta,
- * no miden más de `LADO_MAXIMO_DE_ZONA` en ese nivel. Al acercar un nivel todo mide el doble, así
- * que la lista del 12 está dentro de la del 11. Es una función pura.
+ * `NIVELES_DE_MUNICIPIOS`. Todos tienen `MINIMO_DE_ZONA` emplazamientos o más. En los niveles de
+ * municipios grandes, además, los habitantes de `HABITANTES_DE_ZONA`, midan lo que midan: la lista
+ * del 9 está dentro de la del 10. En los demás, con su etiqueta, no miden más de
+ * `LADO_MAXIMO_DE_ZONA` en ese nivel; al acercar un nivel todo mide el doble, así que la lista del
+ * 12 está dentro de la del 11. Es una función pura.
  */
 export const zonasDeMunicipios = (
   emplazamientos: ReadonlyArray<ConMunicipio>,
   municipios: ReadonlyArray<EtiquetaDeMunicipio>,
 ): ReadonlyArray<ReadonlySet<string>> => {
   const etiquetas = new Map(municipios.map((m) => [m.codigo, m.etiqueta]));
+  const habitantes = new Map(municipios.map((m) => [m.codigo, m.habitantes ?? 0]));
   const extensiones = new Map<string, Extension>();
   const anadir = (codigo: string, { longitud, latitud }: Coordenada, cuenta: boolean) => {
     const y = yMercator(latitud);
@@ -122,10 +155,15 @@ export const zonasDeMunicipios = (
     }
   }
   return NIVELES_DE_MUNICIPIOS.map((nivel) => {
+    const minimo = HABITANTES_DE_ZONA.get(nivel);
     const escala = MUNDO * 2 ** nivel;
     const zonas = new Set<string>();
     for (const [codigo, e] of extensiones) {
       if (e.cuantos < MINIMO_DE_ZONA) continue;
+      if (minimo !== undefined) {
+        if ((habitantes.get(codigo) ?? 0) >= minimo) zonas.add(codigo);
+        continue;
+      }
       const ancho = ((e.este - e.oeste) / 360) * escala;
       const alto = (e.abajo - e.arriba) * escala;
       if (Math.max(ancho, alto) <= LADO_MAXIMO_DE_ZONA) zonas.add(codigo);

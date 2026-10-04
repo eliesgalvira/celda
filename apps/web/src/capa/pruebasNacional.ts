@@ -206,7 +206,8 @@ const municipioDePrueba = (
   nombre: string,
   longitud: number,
   latitud: number,
-): MunicipioDeCapa => ({ ...municipio(codigo, nombre, longitud, latitud), habitantes: 10_000 });
+  habitantes = 10_000,
+): MunicipioDeCapa => ({ ...municipio(codigo, nombre, longitud, latitud), habitantes });
 
 /** Los emplazamientos de `emplazamientos` que cumplen `donde`, con Movistar en lugar de Digi. */
 const sinDigi = (
@@ -219,13 +220,14 @@ const sinDigi = (
 
 /**
  * Una España en pequeño con los casos de las zonas, para recorrer todos los zooms: Zaragoza, una
- * ciudad que no cabe en la pantalla en los niveles de municipios; Utebo, 8 emplazamientos
- * juntos, zona en los dos; Cuarte, 6 en 5 km, zona solo en el 11; Pinseque, con uno; y dos sin
- * municipio. En Barcelona, la ciudad con dos barrios y Badalona, compacta. Lleida no tiene nada.
+ * ciudad grande, zona en el 9 y el 10 y que no cabe en la pantalla en el 11 y el 12; Utebo, 8
+ * emplazamientos juntos y menos de 20.000 habitantes, zona solo en el 11 y el 12; Cuarte, 6 en
+ * 5 km, zona solo en el 11; Pinseque, con uno; y dos sin municipio. En Barcelona, la ciudad con dos
+ * barrios, zona en el 9 y el 10, y Badalona, compacta, zona del 10 al 12. Lleida no tiene nada.
  * Hay ausencias en cada tipo de zona: Digi no está en la provincia de Zaragoza, en Badalona ni
  * en el Poblenou.
  */
-export const espanaDePrueba = () => {
+export const espanaDePrueba = (conResumen?: ResumenLeido) => {
   const capas: ReadonlyArray<CapaDeProvincia> = [
     {
       provincia: "50",
@@ -239,8 +241,8 @@ export const espanaDePrueba = () => {
       barrios: [],
       fuenteDeBarrios: undefined,
       municipios: [
-        municipioDePrueba("50297", "Zaragoza", -0.88, 41.65),
-        municipioDePrueba("50272", "Utebo", -1, 41.71),
+        municipioDePrueba("50297", "Zaragoza", -0.88, 41.65, 680_000),
+        municipioDePrueba("50272", "Utebo", -1, 41.71, 19_000),
         municipioDePrueba("50089", "Cuarte de Huerva", -0.93, 41.58),
         municipioDePrueba("50208", "Pinseque", -1.1, 41.735),
       ],
@@ -265,8 +267,8 @@ export const espanaDePrueba = () => {
       ],
       fuenteDeBarrios: undefined,
       municipios: [
-        municipioDePrueba("08019", "Barcelona", 2.15, 41.4),
-        municipioDePrueba("08015", "Badalona", 2.245, 41.45),
+        municipioDePrueba("08019", "Barcelona", 2.15, 41.4, 1_660_000),
+        municipioDePrueba("08015", "Badalona", 2.245, 41.45, 49_000),
       ],
       lotes: ["fichas/08/prueba.json"],
     },
@@ -289,7 +291,7 @@ export const espanaDePrueba = () => {
       fichero: suyos.length > 0 ? `provincias/${codigo}/prueba.json` : undefined,
     };
   };
-  const resumen: ResumenLeido = {
+  const resumen: ResumenLeido = conResumen ?? {
     ...RESUMEN,
     provincias: [
       filaDe("08", "Barcelona", { longitud: 2.1, latitud: 41.6 }),
