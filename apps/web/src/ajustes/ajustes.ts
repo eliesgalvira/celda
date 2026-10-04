@@ -1,9 +1,10 @@
-import { AJUSTES_INICIALES, type Ajustes } from "@celda/dominio/ajustes";
+import { AJUSTES_INICIALES, type Ajustes, filtroDeAjustes } from "@celda/dominio/ajustes";
+import { type FiltroDeCompanias, mismoFiltro } from "@celda/dominio/filtro";
 import { recursoFijo } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
-import { createContext, createSignal } from "solid-js";
+import { createContext, createMemo, createSignal } from "solid-js";
 
 import type { ServiciosDeDatos } from "../datos.tsx";
 import { AlmacenLocal } from "../ubicacion/almacen.ts";
@@ -13,6 +14,10 @@ export interface ControlAjustes {
   readonly ajustes: () => Ajustes;
   /** Enciende o apaga el modo estudiante y lo guarda en el dispositivo. */
   readonly cambiarModoEstudiante: (encendido: boolean) => void;
+  /** Las compañías que enseña el mapa: vacío, todas (ADR 0026). */
+  readonly filtro: () => FiltroDeCompanias;
+  /** Cambia las compañías que enseña el mapa y lo guarda en el dispositivo. */
+  readonly cambiarFiltro: (filtro: FiltroDeCompanias) => void;
   /** El último cambio no se ha podido guardar: vale hasta cerrar la página. */
   readonly sinGuardar: () => boolean;
 }
@@ -45,15 +50,23 @@ export const crearAjustes = (
     return () => parar.abort();
   });
 
+  /** Pone unos ajustes nuevos y los guarda. Si no se guardan, valen hasta cerrar la página. */
+  const cambiar = (nuevos: Ajustes) => {
+    cambiados = true;
+    setAjustes(nuevos);
+    void runtime
+      .runPromiseExit(Effect.flatMap(AlmacenLocal, (a) => a.guardarAjustes(nuevos)))
+      .then((salida) => setSinGuardar(Exit.isFailure(salida)));
+  };
+  const filtro = createMemo(() => filtroDeAjustes(ajustes()), { equals: mismoFiltro });
+
   return {
     ajustes,
-    cambiarModoEstudiante: (encendido) => {
-      cambiados = true;
-      const nuevos = { ...ajustes(), modoEstudiante: encendido };
-      setAjustes(nuevos);
-      void runtime
-        .runPromiseExit(Effect.flatMap(AlmacenLocal, (a) => a.guardarAjustes(nuevos)))
-        .then((salida) => setSinGuardar(Exit.isFailure(salida)));
+    cambiarModoEstudiante: (encendido) => cambiar({ ...ajustes(), modoEstudiante: encendido }),
+    filtro,
+    cambiarFiltro: (nuevo) => {
+      if (mismoFiltro(nuevo, filtro())) return;
+      cambiar({ ...ajustes(), companias: [...nuevo] });
     },
     sinGuardar,
   };

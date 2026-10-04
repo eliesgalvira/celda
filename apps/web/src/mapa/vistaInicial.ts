@@ -71,8 +71,8 @@ interface LoQueTapa {
   /** El margen con los bordes que no tapa nada. */
   readonly lado: number;
   /**
-   * Abajo a la derecha, las pastillas «Foto aérea», «Ubicación» y «Funciones» y, en escritorio,
-   * Acercar y Alejar encima.
+   * Abajo a la derecha, las pastillas «Compañías», «Foto aérea», «Ubicación» y «Funciones», 48
+   * px cada una, y, en escritorio, Acercar y Alejar encima.
    */
   readonly controles: { readonly ancho: number; readonly alto: number };
   /** Abajo a la izquierda, los créditos: en el móvil, el botón «i»; en escritorio, una o dos líneas. */
@@ -82,14 +82,14 @@ interface LoQueTapa {
 const LO_QUE_TAPA_EN_EL_MOVIL: LoQueTapa = {
   arriba: 100,
   lado: 12,
-  controles: { ancho: 174, alto: 168 },
+  controles: { ancho: 174, alto: 216 },
   creditos: 60,
 };
 
 const LO_QUE_TAPA_EN_ESCRITORIO: LoQueTapa = {
   arriba: 110,
   lado: 40,
-  controles: { ancho: 190, alto: 324 },
+  controles: { ancho: 190, alto: 372 },
   creditos: 64,
 };
 
