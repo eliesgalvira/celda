@@ -298,6 +298,8 @@ La primera noche en el portátil de producción (01/10/2026) falló en todas las
 
 No hay que tocar nada en la máquina. El intermedio va en el código de Celda (`packages/ingesta/src/registro-oficial/intermedio.ts`) y solo lo usa el cliente HTTP del registro oficial, que confía en las raíces de Node más ese intermedio. No hace falta `NODE_EXTRA_CA_CERTS` ni `security.pki.certificateFiles`, y no conviene usarlos para esto: cambiarían la confianza de todo el proceso o de toda la máquina para arreglar una sola fuente, y el arreglo no viajaría con el paquete. Si una máquina pone `NODE_EXTRA_CA_CERTS`, como la máquina virtual de la prueba con su autoridad de mentira, el cliente del registro también confía en esos certificados.
 
+Ese cliente (`apps/nocturna/src/conexionDelRegistro.ts`) es el de `node:https` de `@effect/platform-node` (`NodeHttpClient.layerNodeHttpNoAgent`), con un agente propio (`NodeHttpClient.layerAgentOptions`) que lleva esas raíces y ese intermedio, mantiene viva la conexión entre peticiones y se cierra al cerrar la capa. No es `fetch`, así que hace a mano lo que `fetch` hacía solo: sigue hasta 20 redirecciones y pide el cuerpo sin comprimir (`Accept-Encoding: identity`). El geoportal no comprime aunque se le pida; si un día contesta comprimido, la petición falla con `DecodeError: respuesta comprimida con …` en vez de leer un listado o una ficha ilegibles.
+
 Si la noche falla por un certificado, el diario lo dice: `el certificado del servidor no se pudo verificar, falta el certificado de su emisor (UNABLE_TO_GET_ISSUER_CERT_LOCALLY: …)`. Para ver qué cadena envía el geoportal:
 
 ```sh

@@ -14,6 +14,7 @@ import * as NodeFS from "node:fs";
 import * as NodeHttps from "node:https";
 import type * as NodeNet from "node:net";
 import * as NodeTls from "node:tls";
+import * as NodeZlib from "node:zlib";
 
 import {
   clienteHttpDelRegistro,
@@ -35,7 +36,24 @@ const servidorSinCadena = (hoja: string) =>
       const servidor = NodeHttps.createServer(
         { cert: certificado(`${hoja}.pem`), key: certificado(`${hoja}.key`) },
         (peticion, respuesta) => {
-          respuesta.end(peticion.url === "/robots.txt" ? "User-agent: *\nAllow: /\n" : "hola");
+          switch (peticion.url) {
+            case "/robots.txt":
+              return respuesta.end("User-agent: *\nAllow: /\n");
+            case "/de-paso":
+              return respuesta.writeHead(302, { location: "/se-fue" }).end("de paso");
+            case "/se-fue":
+              return respuesta.writeHead(301, { location: "/hola" }).end();
+            case "/cabeceras":
+              return respuesta.end(
+                `${peticion.headers["user-agent"]} | ${peticion.headers["accept-encoding"]}`,
+              );
+            case "/comprimida":
+              return respuesta
+                .writeHead(200, { "content-encoding": "gzip" })
+                .end(NodeZlib.gzipSync("hola"));
+            default:
+              return respuesta.end("hola");
+          }
         },
       );
       servidor.listen(0, "127.0.0.1", () => reanudar(Effect.succeed(servidor)));
@@ -61,14 +79,16 @@ const OPCIONES: OpcionesCliente = {
   reintentos: 0,
 };
 
-/** Pide `/hola` al servidor con la hoja `hoja` desde un cliente que confía en `confianza`. */
-const pedir = (hoja: string, confianza: Confianza) =>
+/** Pide `ruta` al servidor con la hoja `hoja` desde un cliente que confía en `confianza`. */
+const pedir = (hoja: string, confianza: Confianza, ruta = "/hola") =>
   Effect.gen(function* () {
     const origen = yield* servidorSinCadena(hoja);
     const cliente = yield* clienteDeFuente(origen, OPCIONES);
-    const respuesta = yield* cliente.pedir(`${origen}/hola`);
-    return new TextDecoder().decode(respuesta.cuerpo);
+    const respuesta = yield* cliente.pedir(`${origen}${ruta}`);
+    return `${respuesta.estado} ${new TextDecoder().decode(respuesta.cuerpo)}`;
   }).pipe(Effect.scoped, Effect.provide(clienteHttpDelRegistro(confianza)), Effect.result);
+
+const CON_EL_INTERMEDIO: Confianza = { raices: [RAIZ], intermedios: [INTERMEDIO] };
 
 /** El motivo de un fallo del cliente, o `""` si no ha fallado. */
 const motivo = (salida: Effect.Success<ReturnType<typeof pedir>>): string =>
@@ -89,7 +109,7 @@ describe("la conexión con el registro oficial", () => {
     Effect.gen(function* () {
       const salida = yield* pedir("hoja", { raices: [RAIZ], intermedios: [INTERMEDIO] });
       if (Result.isFailure(salida)) return assert.fail(describirError(salida.failure));
-      assert.strictEqual(salida.success, "hola");
+      assert.strictEqual(salida.success, "200 hola");
     }),
   );
 
@@ -106,6 +126,30 @@ describe("la conexión con el registro oficial", () => {
       const salida = yield* pedir("hoja", { raices: [], intermedios: [INTERMEDIO] });
       assert.strictEqual(salida._tag, "Failure");
       assert.include(motivo(salida), "el certificado del servidor no se pudo verificar");
+    }),
+  );
+
+  it.live("sigue las redirecciones hasta la respuesta", () =>
+    Effect.gen(function* () {
+      const salida = yield* pedir("hoja", CON_EL_INTERMEDIO, "/de-paso");
+      if (Result.isFailure(salida)) return assert.fail(describirError(salida.failure));
+      assert.strictEqual(salida.success, "200 hola");
+    }),
+  );
+
+  it.live("envía el User-Agent y pide el cuerpo sin comprimir", () =>
+    Effect.gen(function* () {
+      const salida = yield* pedir("hoja", CON_EL_INTERMEDIO, "/cabeceras");
+      if (Result.isFailure(salida)) return assert.fail(describirError(salida.failure));
+      assert.strictEqual(salida.success, `200 ${OPCIONES.userAgent} | identity`);
+    }),
+  );
+
+  it.live("rechaza una respuesta comprimida y dice con qué", () =>
+    Effect.gen(function* () {
+      const salida = yield* pedir("hoja", CON_EL_INTERMEDIO, "/comprimida");
+      assert.strictEqual(salida._tag, "Failure");
+      assert.include(motivo(salida), "DecodeError: respuesta comprimida con gzip");
     }),
   );
 
