@@ -2,11 +2,16 @@ import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 
-import { Atribucion } from "./Atribucion.tsx";
+import { Atribucion, type Credito } from "./Atribucion.tsx";
 import { ControlDelMapa } from "./ControlDelMapa.tsx";
 import { DisposicionMapa } from "./DisposicionMapa.tsx";
 
-const montar = () => {
+const OPENSTREETMAP: Credito = {
+  texto: "OpenStreetMap",
+  enlace: "https://www.openstreetmap.org/copyright",
+};
+
+const montar = (creditos: ReadonlyArray<Credito> = [OPENSTREETMAP]) => {
   const pantalla = render(() => (
     <DisposicionMapa
       nombre="Mapa de España"
@@ -17,11 +22,7 @@ const montar = () => {
       controles={<ControlDelMapa etiqueta="Interferencia" icono="≈" />}
       botonUbicacion={<ControlDelMapa etiqueta="Ubicación" icono="⌖" />}
       controlesSecundarios={<ControlDelMapa etiqueta="Ajustes" icono="≡" />}
-      atribucion={
-        <Atribucion
-          creditos={[{ texto: "OpenStreetMap", enlace: "https://www.openstreetmap.org/copyright" }]}
-        />
-      }
+      atribucion={<Atribucion creditos={creditos} />}
     />
   ));
   flush();
@@ -55,6 +56,38 @@ describe("DisposicionMapa", () => {
     fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
     flush();
     assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
+  });
+
+  it("plegados en el móvil, el crédito fijo sigue a la vista en una línea, en su forma corta", () => {
+    const reserva: Credito = {
+      texto: "Sistema Cartográfico Nacional · CC BY 4.0 scne.es",
+      corto: "CC BY 4.0 scne.es",
+      enlace: "https://www.scne.es/",
+      fijo: true,
+    };
+    const { getByRole, getAllByRole } = montar([reserva, OPENSTREETMAP]);
+    /** Los enlaces que no esconde el pliegue en el móvil. */
+    const aLaVista = () =>
+      getAllByRole("link").filter(
+        (enlace) => enlace.closest("p")?.classList.contains("max-md:hidden") !== true,
+      );
+    assert.lengthOf(aLaVista(), 2);
+
+    fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
+    flush();
+    const [fijo, ...otros] = aLaVista();
+    assert.lengthOf(otros, 0);
+    assert.strictEqual(fijo?.textContent, "© CC BY 4.0 scne.es");
+    assert.strictEqual(fijo?.getAttribute("href"), "https://www.scne.es/");
+    assert.isTrue(fijo?.closest("p")?.classList.contains("whitespace-nowrap"));
+    // Desplegados, el fijo va con los demás y en el móvil también se escribe corto.
+    fireEvent.click(getByRole("button", { name: "Créditos del mapa" }));
+    flush();
+    assert.lengthOf(aLaVista(), 2);
+    assert.include(
+      aLaVista()[0]?.querySelector(".md\\:hidden")?.textContent,
+      "© CC BY 4.0 scne.es",
+    );
   });
 
   it("a la vista, Ubicación y Funciones; el resto, dentro de Funciones", () => {
