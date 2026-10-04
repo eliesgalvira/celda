@@ -348,12 +348,12 @@ Medido el 04/10/2026 en Chromium sin interfaz con SwiftShader, con la build loca
 
 | | Móvil | Escritorio | Móvil, CPU ×4 | Escritorio, CPU ×4 |
 |---|---|---|---|---|
-| Primer marcador que cambia | 158-162 ms | 163-170 ms | 201-224 ms | 222-274 ms |
-| Último, con el filtro ya agrupado | 159-171 ms | 169-196 ms | 201-224 ms | 222-237 ms |
-| Último, con un filtro nuevo que agrupa el Worker | 184-199 ms | 196-220 ms | 362 ms | 501 ms |
+| Primer marcador que cambia | 157-171 ms | 164-174 ms | 184-241 ms | 236-318 ms |
+| Último, con el filtro ya agrupado | 159-181 ms | 168-205 ms | 184-212 ms | 236-260 ms |
+| Último, con un filtro nuevo que agrupa el Worker | 175-193 ms | 192-215 ms | 360 ms | 552 ms |
 
 - **Red.** 0 peticiones al tocar los chips: ni capas ni fichas. Antes de cambiar la precarga de fichas, el primer toque que dejaba sueltos otros emplazamientos pedía un lote.
-- **Workers.** El de capas recibe 1 mensaje por provincia y filtro nuevo, y 0 al volver a uno de los cuatro últimos o a todas. Cuatro chips en menos de 150 ms entre uno y otro: 1 mensaje, el del último filtro, o 0 si ya estaba. El de simulaciones, 0 a z12; a z15 o más, un cálculo de celdas por filtro aplicado.
+- **Workers.** El de capas recibe 1 mensaje por provincia y filtro nuevo, y 0 al volver a uno de los cuatro últimos o a todas. Cuatro chips en menos de 150 ms entre uno y otro: 1 mensaje, el del último filtro, y 0 si ya estaba guardado. El de simulaciones, 0 a z12; a z15 o más, un cálculo de celdas por filtro aplicado.
 - **Quieto 20 s** tras los toques, en el móvil y en el escritorio: 0 peticiones y 0 llamadas a todo lo contado.
 - **Celdas.** En el Eixample a z16 en el móvil, 163 con solo Movistar y 14 con solo DIGI.
 
