@@ -46,8 +46,12 @@ export interface MapaConCallejero {
 /** Espera `ms` y llama a `alVencer`; devuelve con qué cancelarlo. */
 export type Esperar = (ms: number, alVencer: () => void) => () => void;
 
-/** `setTimeout`, el de verdad. */
+/**
+ * `setTimeout`, el de verdad. Vive en el borde con los eventos de MapLibre, fuera de Effect, y se
+ * cancela al quitar el mapa.
+ */
 export const esperarDeVerdad: Esperar = (ms, alVencer) => {
+  // @effect-diagnostics-next-line globalTimers:off
   const temporizador = setTimeout(alVencer, ms);
   return () => clearTimeout(temporizador);
 };
