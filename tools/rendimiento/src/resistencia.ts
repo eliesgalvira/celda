@@ -101,11 +101,11 @@ const MAXIMO_HASTA_QUIETA_MS = 30_000;
  * quieta a tiempo: eso ya es un bucle.
  */
 const esperarQuieta = async (pagina: Page): Promise<ReadonlyArray<Contada> | undefined> => {
-  const desde = Date.now();
+  const desde = performance.now();
   let anterior = await cuentas(pagina);
-  let quietaDesde = Date.now();
+  let quietaDesde = performance.now();
   let crecen: ReadonlyArray<Contada> = [];
-  while (Date.now() - desde < MAXIMO_HASTA_QUIETA_MS) {
+  while (performance.now() - desde < MAXIMO_HASTA_QUIETA_MS) {
     await pausa(250);
     const ahora = await cuentas(pagina);
     const pendientes = await pagina.evaluate(() => window.__resistencia.fotogramasPendientes());
@@ -113,8 +113,8 @@ const esperarQuieta = async (pagina: Page): Promise<ReadonlyArray<Contada> | und
       (api) => api !== "setTimeout" && (ahora[api] ?? 0) !== (anterior[api] ?? 0),
     );
     anterior = ahora;
-    if (crecen.length > 0 || pendientes > 0) quietaDesde = Date.now();
-    else if (Date.now() - quietaDesde >= QUIETA_MS) return undefined;
+    if (crecen.length > 0 || pendientes > 0) quietaDesde = performance.now();
+    else if (performance.now() - quietaDesde >= QUIETA_MS) return undefined;
   }
   return crecen.length > 0 ? crecen : ["requestAnimationFrame"];
 };
