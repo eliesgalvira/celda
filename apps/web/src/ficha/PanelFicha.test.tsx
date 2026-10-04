@@ -296,7 +296,7 @@ describe("panel del emplazamiento", () => {
     assert.isNotNull(getByRole("link", { name: /PNOA · CC BY 4\.0 scne\.es/u }));
   });
 
-  it("dice el municipio y la provincia del IGN y lo cita como obra derivada", async () => {
+  it("dice el municipio y la provincia del IGN y lo cita como obra derivada, y de quién son los logos", async () => {
     const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
     const lote = generarLoteDeProvincia(
       "08",
@@ -314,6 +314,11 @@ describe("panel del emplazamiento", () => {
       getByText(
         "Municipio y provincia: obra derivada de Base de Datos de Límites Jurisdiccionales de " +
           "España 10 ago 2026, CC BY 4.0, Instituto Geográfico Nacional (ign.es).",
+      ),
+    );
+    assert.isNotNull(
+      getByText(
+        "Las marcas y logotipos de las compañías son de sus titulares; Celda no está afiliada a ninguna.",
       ),
     );
   });

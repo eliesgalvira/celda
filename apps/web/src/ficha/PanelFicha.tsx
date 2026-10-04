@@ -1,5 +1,5 @@
 import type { Ficha } from "@celda/dominio/ficha";
-import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { AVISO_DE_MARCAS, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import { primeraVezEn } from "@celda/dominio/glosario";
 import { BANDAS_NOMINALES } from "@celda/dominio/tecnologia";
 import { Aviso } from "@celda/ui/Aviso.tsx";
@@ -306,6 +306,7 @@ function ContenidoFicha(props: {
         <Show when={creditoDelLugar(props.ficha)}>
           {(credito) => <NotaFicha tono="credito">{credito()}</NotaFicha>}
         </Show>
+        <NotaFicha tono="credito">{AVISO_DE_MARCAS}</NotaFicha>
         <NotaFicha>
           ¿Algo no cuadra con lo que ves? Propón una corrección: la revisa la moderación y, si la
           acepta, sale aquí al lado de lo que dice el registro.
