@@ -40,7 +40,15 @@ describe("lectura de los rótulos de ciudad colocados", () => {
     ]);
     const { zoom, rotulos } = leerRotulosDeCiudad(mapa);
     assert.strictEqual(zoom, 8);
-    assert.deepStrictEqual(pedidas, [["lugares-capitales", "lugares-grandes", "lugares-ciudades"]]);
+    assert.deepStrictEqual(pedidas, [
+      [
+        "lugares-capitales",
+        "lugares-grandes",
+        "lugares-ciudades",
+        "lugares-capitales-lejos",
+        "lugares-grandes-lejos",
+      ],
+    ]);
     assert.deepStrictEqual(
       rotulos.map((r) => [r.clave, r.importancia, r.tamano]),
       [
@@ -68,6 +76,25 @@ describe("lectura de los rótulos de ciudad colocados", () => {
     assert.deepStrictEqual(
       leerRotulosDeCiudad(mapa).rotulos.map((r) => r.texto),
       ["Alacant", "San Sebastián"],
+    );
+  });
+
+  it("con el mapa base de reserva del IGN, lee su nombre oficial y su clase", () => {
+    const { mapa } = mapaCon([
+      rasgo("lugares-capitales-lejos", { nombre: "Madrid", clase: "capital_estado" }, -3.7, 40.42),
+      rasgo(
+        "lugares-grandes",
+        { nombre: "Alacant/Alicante", clase: "capital_provincia" },
+        -0.48,
+        38.35,
+      ),
+    ]);
+    assert.deepStrictEqual(
+      leerRotulosDeCiudad(mapa).rotulos.map((r) => [r.texto, r.importancia, r.tamano]),
+      [
+        ["Madrid", "capital", 17],
+        ["Alacant", "ciudad", 13.5],
+      ],
     );
   });
 });

@@ -1,8 +1,9 @@
 import type { Coordenada } from "@celda/dominio/area";
 import { enLaComunitatValenciana } from "@celda/dominio/comunitatValenciana";
 import { CIUDADES } from "@celda/dominio/habitantesDeCiudades";
-import { nombreDelMapaBase } from "@celda/dominio/nombreDeLugar";
+import { nombreDelIgn, nombreDelMapaBase } from "@celda/dominio/nombreDeLugar";
 import type { IndiceDeCiudades } from "@celda/dominio/poblacionDeRotulos";
+import { CAPAS_DE_CIUDADES_DE_RESERVA } from "@celda/ui/mapa/reserva/rotulos.ts";
 import { CAPAS_DE_CIUDADES, tamanoDeRotulo } from "@celda/ui/mapa/rotulos.ts";
 import type { ImportanciaDeRotulo } from "@celda/ui/marcadores/RotuloDeCiudad.tsx";
 
@@ -67,22 +68,20 @@ export interface LectorDeRotulos {
 const texto = (valor: string | number | undefined): string | undefined =>
   valor === undefined ? undefined : String(valor);
 
+/** Las capas de ciudades del mapa base o del de reserva del IGN, sin repetir. */
+const CAPAS = [...new Set([...CAPAS_DE_CIUDADES, ...CAPAS_DE_CIUDADES_DE_RESERVA])];
+
+/** La clase de la capital del Estado en las teselas del IGN. */
+const CAPITAL_DEL_ESTADO_EN_EL_IGN = "capital_estado";
+
 /**
- * Los rótulos de ciudad colocados ahora, cada uno una vez aunque salga en dos teselas, por orden
- * de clave. Su texto es el que pinta el mapa base, el nombre de lugar (ADR 0025).
+ * El nombre de lugar que pinta un rasgo: el de OpenStreetMap en una sola forma según el lado de la
+ * Comunitat Valenciana, o el del IGN si es del mapa base de reserva (ADR 0025).
  */
-export const leerRotulosDeCiudad = (mapa: MapaConRotulosColocados): LecturaDeRotulos => {
-  const zoom = mapa.getZoom();
-  const capas = CAPAS_DE_CIUDADES.filter((id) => mapa.getLayer(id) !== undefined);
-  if (capas.length === 0) return { zoom, rotulos: [] };
-  const vistos = new Map<string, RotuloLeido>();
-  for (const rasgo of mapa.queryRenderedFeatures({ layers: capas })) {
-    if (rasgo.geometry.type !== "Point") continue;
-    const [longitud = 0, latitud = 0] = rasgo.geometry.coordinates;
-    const posicion = { longitud, latitud };
-    const name = texto(rasgo.properties.name);
-    if (name === undefined) continue;
-    const nombre = nombreDelMapaBase(
+const nombreDe = (rasgo: RasgoColocado, posicion: Coordenada): string | undefined => {
+  const name = texto(rasgo.properties.name);
+  if (name !== undefined) {
+    return nombreDelMapaBase(
       {
         name,
         es: texto(rasgo.properties["name:es"]),
@@ -90,15 +89,43 @@ export const leerRotulosDeCiudad = (mapa: MapaConRotulosColocados): LecturaDeRot
       },
       name.includes("/") && enLaComunitatValenciana(posicion),
     );
+  }
+  const delIgn = texto(rasgo.properties.nombre);
+  return delIgn === undefined ? undefined : nombreDelIgn(delIgn);
+};
+
+/** El rango de capital de OpenMapTiles, 2 la del país, o el que le corresponde en el IGN. */
+const capitalDe = (rasgo: RasgoColocado): number =>
+  rasgo.properties.clase === CAPITAL_DEL_ESTADO_EN_EL_IGN
+    ? 2
+    : Number(rasgo.properties.capital ?? 99);
+
+/**
+ * Los rótulos de ciudad colocados ahora, cada uno una vez aunque salga en dos teselas, por orden
+ * de clave. Su texto es el que pinta el mapa base, el nombre de lugar (ADR 0025). Valen las capas
+ * de los dos mapas base: las de lejos del de reserva tienen la letra de las suyas de cerca.
+ */
+export const leerRotulosDeCiudad = (mapa: MapaConRotulosColocados): LecturaDeRotulos => {
+  const zoom = mapa.getZoom();
+  const capas = CAPAS.filter((id) => mapa.getLayer(id) !== undefined);
+  if (capas.length === 0) return { zoom, rotulos: [] };
+  const vistos = new Map<string, RotuloLeido>();
+  for (const rasgo of mapa.queryRenderedFeatures({ layers: capas })) {
+    if (rasgo.geometry.type !== "Point") continue;
+    const [longitud = 0, latitud = 0] = rasgo.geometry.coordinates;
+    const posicion = { longitud, latitud };
+    const nombre = nombreDe(rasgo, posicion);
+    if (nombre === undefined || nombre === "") continue;
     const capa = rasgo.layer.id;
     const clave = `${capa}:${nombre}`;
     if (vistos.has(clave)) continue;
+    const comoEnElPrincipal = capa.replace(/-lejos$/u, "");
     vistos.set(clave, {
       clave,
       texto: nombre,
       posicion,
-      importancia: capa === CAPAS_DE_CIUDADES[0] ? "capital" : "ciudad",
-      tamano: tamanoDeRotulo(capa, Number(rasgo.properties.capital ?? 99), zoom),
+      importancia: comoEnElPrincipal === CAPAS_DE_CIUDADES[0] ? "capital" : "ciudad",
+      tamano: tamanoDeRotulo(comoEnElPrincipal, capitalDe(rasgo), zoom),
     });
   }
   return {

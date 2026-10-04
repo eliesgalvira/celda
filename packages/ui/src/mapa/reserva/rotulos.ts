@@ -5,6 +5,7 @@ import type {
 } from "maplibre-gl";
 
 import { conFoto, porZoom, visibleConFoto } from "../expresiones.ts";
+import { capaHuecos } from "../huecos.ts";
 import { CAPA_PORTALES, MUNICIPIOS_DE_CELDA, ZOOM_DE_FUERA } from "../rotulos.ts";
 import type { ColorDeToken, TokenMapa } from "../tokens.ts";
 import { NOMBRE_DEL_IGN, SE_ROTULA } from "./nombres.ts";
@@ -207,12 +208,31 @@ const LUGARES: ReadonlyArray<CapaDeLugares> = [
   },
 ];
 
+/**
+ * Las capas de ciudades que Celda copia encima de sus datos, como las del principal
+ * (`CAPAS_DE_CIUDADES`), con las de lejos del IGN. Se colocan antes que los huecos de los
+ * marcadores; las de debajo, pueblos y lugares de fuera, los esquivan.
+ */
+export const CAPAS_DE_CIUDADES_DE_RESERVA: ReadonlyArray<string> = [
+  "lugares-capitales",
+  "lugares-capitales-lejos",
+  "lugares-grandes",
+  "lugares-grandes-lejos",
+  "lugares-ciudades",
+];
+
 const capaDeLugares = (
   fuente: string,
   color: ColorDeToken,
   capa: CapaDeLugares,
 ): SymbolLayerSpecification => {
   const nombre = NOMBRE_DEL_IGN;
+  const pintura: NonNullable<SymbolLayerSpecification["paint"]> = {
+    "text-color": tinta(color, color(capa.color)),
+    ...halo(color, capa.halo),
+  };
+  // Las ciudades se colocan pero no se pintan: Celda las copia encima de sus datos (ADR 0024).
+  if (CAPAS_DE_CIUDADES_DE_RESERVA.includes(capa.id)) pintura["text-opacity"] = 0;
   return {
     id: capa.id,
     type: "symbol",
@@ -227,7 +247,7 @@ const capaDeLugares = (
       "text-size": capa.tamano,
       "text-padding": capa.aire ?? 2,
     },
-    paint: { "text-color": tinta(color, color(capa.color)), ...halo(color, capa.halo) },
+    paint: pintura,
   };
 };
 
@@ -453,7 +473,7 @@ const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecifi
 /**
  * Las capas de rótulos de reserva, de abajo arriba, como las del principal: los nombres, los
  * números de portal, lo que tenga que ir `sobreLosPortales` y los lugares, de menos a más
- * importantes.
+ * importantes, con los huecos de los marcadores antes de las ciudades (ADR 0024).
  */
 export const capasRotulosDeReserva = (
   fuente: string,
@@ -463,5 +483,8 @@ export const capasRotulosDeReserva = (
   ...capasDeNombres(fuente, color),
   capaDePortales(fuente, color),
   ...sobreLosPortales,
-  ...LUGARES.map((capa) => capaDeLugares(fuente, color, capa)),
+  ...LUGARES.flatMap((capa) => [
+    ...(capa.id === CAPAS_DE_CIUDADES_DE_RESERVA.at(-1) ? [capaHuecos()] : []),
+    capaDeLugares(fuente, color, capa),
+  ]),
 ];

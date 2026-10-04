@@ -17,7 +17,9 @@ import {
   ZOOM_DE_FUERA,
 } from "../rotulos.ts";
 import { CAPA_EDIFICIOS } from "../suelo.ts";
+import { CAPA_HUECOS } from "../huecos.ts";
 import { conLoDeCelda, estiloDeReserva, FUENTE_RESERVA, GLIFOS_RESERVA } from "./estilo.ts";
+import { CAPAS_DE_CIUDADES_DE_RESERVA } from "./rotulos.ts";
 
 const MARCA = "token:";
 const RESERVA = estiloDeReserva((token) => `${MARCA}${token}`);
@@ -177,6 +179,22 @@ const principalEnMarcha = (): StyleSpecification => {
 };
 
 describe("pasar al mapa base de reserva", () => {
+  it("como el principal, las ciudades se colocan sin pintarse sobre los huecos de los marcadores (ADR 0024)", () => {
+    const ids = RESERVA.layers.map((capa) => capa.id);
+    const huecos = ids.indexOf(CAPA_HUECOS);
+    assert.isAbove(huecos, ids.indexOf("lugares-pueblos"));
+    assert.isAbove(huecos, ids.indexOf("lugares-de-fuera"));
+    for (const id of CAPAS_DE_CIUDADES_DE_RESERVA) {
+      assert.isAbove(ids.indexOf(id), huecos, id);
+      const capa = RESERVA.layers.find((c) => c.id === id);
+      assert.isTrue(capa?.type === "symbol" && capa.paint?.["text-opacity"] === 0, id);
+    }
+    // Al pasar a la reserva, los huecos siguen entre los pueblos y las ciudades.
+    const siguiente = conLoDeCelda(principalEnMarcha(), RESERVA).layers.map((capa) => capa.id);
+    assert.isBelow(siguiente.indexOf(CAPA_HUECOS), siguiente.indexOf("lugares-ciudades"));
+    assert.isAbove(siguiente.indexOf(CAPA_HUECOS), siguiente.indexOf("lugares-pueblos"));
+  });
+
   it("solo cambia el callejero: lo de Celda se queda como está", () => {
     const anterior = principalEnMarcha();
     const siguiente = conLoDeCelda(anterior, RESERVA);
