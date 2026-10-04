@@ -225,6 +225,23 @@ Medido el 04/10/2026 contra `celda/v1` (con la foto aérea del #64 y los nombres
 - **Capas.** Cuatro capas de línea más, entre el suelo y las vías: país, comunidades, provincias y municipios.
 - **Quieto.** Al abrir y tras acercar, alejar y encender y apagar la foto, 20 s quieto en el móvil y en el escritorio: 0 peticiones, 0 `render` de MapLibre y 0 llamadas a `fetch`, XHR, `requestAnimationFrame`, `setTimeout`, `setInterval` y `postMessage`.
 
+## Datos discretos y rótulos por población (#66)
+
+Medido el 04/10/2026 contra `celda/v1` (cf5457a) construida igual, con la publicación de toda España del 30/09/2026 (35.667 emplazamientos) servida en local.
+
+- **Peso.** La primera pantalla crece 4,9 KB con `gzip -9` (217.362 → 222.214 bytes): la regla de choques, los centros visuales con los habitantes de cada provincia (1,3 KB por sí solos), los niveles de municipios grandes y el rótulo copiado. El trozo del mapa crece 8,0 KB (301.378 → 309.392): la tabla de habitantes de las ciudades (6,9 KB) y la lectura de los rótulos. Por eso la tabla y la lectura van con el mapa: la pantalla las recibe al crearlo.
+- **Capas al abrir y a z8.** Con el resumen hasta z9, una vista a z8 ya no pide ninguna capa de provincia. En el móvil, al saltar de España a Valencia a z8, `celda/v1` pedía siete capas de provincia y dos lotes de fichas, 127 KB con gzip, y Cataluña a z8 cuatro capas más, 228 KB en total; ahora, en las dos, solo `vigente.json` y el resumen, 4,6 KB. Al abrir, lo mismo en las dos: el resumen.
+- **Quieto.** Al abrir y tras acercar y alejar sobre Navarra (z9,5, 11,5, 8,2, 12,5 y 6,5), 20 s quieto en el móvil: 0 peticiones, 0 `render` de MapLibre y 0 llamadas a `fetch`, XHR, `requestAnimationFrame`, `setTimeout`, `setInterval` y `postMessage`, igual que `celda/v1`. Los rótulos se leen en cada `idle`, que no llega con el mapa quieto, y una lectura igual a la anterior no decide nada.
+- **Fluidez.** Chromium con GPU (Vulkan), 390 × 844 a DPR 2,6 y la CPU a ×4, seis rondas alternadas; medianas de fps y de fotogramas de más de 20 y de 50 ms. El alejamiento va del Eixample a z17 hasta z5,5 en 4 s; los niveles, del 9,5 al 14,5 y vuelta, uno cada 1,5 s.
+
+| Gesto | `celda/v1` | #66 |
+|---|---|---|
+| Alejar del Eixample a España | 57,6 · 11 · 1 | 57,6 · 10,5 · 0 |
+| Zaragoza, del 9,5 al 14,5 y vuelta | 56,7 · 34 · 4 | 56,9 · 28 · 5 |
+| Barcelona, del 9,5 al 14,5 y vuelta | 55,0 · 47 · 9 | 55,0 · 50,5 · 8,5 |
+
+  En la primera tanda los huecos se ponían también a mitad de un gesto, al cambiar de nivel, y Barcelona daba 54,4 frente a 55,3 con 52 fotogramas de más de 20 ms frente a 42: cada `setData` de la fuente de los huecos manda los datos a los workers de MapLibre y vuelve a colocar los rótulos. Ahora se ponen con el mapa quieto. Los rótulos copiados solo cambian su `transform` en cada fotograma, como los marcadores, y su letra es la del zoom en que se leyeron, así que moverlos no maqueta texto. La máquina tenía otros agentes trabajando: entre rondas hay ±2 fps.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.
