@@ -24,6 +24,7 @@ Celda será abierta del todo, y el usuario pidió «la más abierta» para lo qu
 
 - **Lo publicado lleva esos créditos** y dice qué parte es CC0 y cuál de quién.
 - **La dedicación CC0 se enseña al enviar una aportación**, en el mismo paso y antes de enviarla, no en una página aparte.
+- **Los logos de las compañías se usan solo para decir de quién es cada estación base** (04/10/2026). Es un uso nominativo de la marca (art. 37 de la Ley 17/2001 de Marcas, art. 14 del Reglamento (UE) 2017/1001), con el vector oficial de cada una y sin redibujarlo. La ficha y los créditos del mapa dicen «Las marcas y logotipos de las compañías son de sus titulares; Celda no está afiliada a ninguna». Si las condiciones de una compañía piden citar la fuente, se cita donde sale su logo: hoy, DIGI («Logotipo de DIGI: digimobil.es», con enlace). Una compañía cuyas condiciones prohíben enseñar su logo va con su nombre escrito: hoy, Yoigo. De dónde sale cada logo y qué dicen sus condiciones está en `packages/ui/src/marcadores/logos/FUENTES.md`. Los logos no son CC0 ni 0BSD: el código que los dibuja sí, sus trazos no.
 
 ## Consecuencias
 

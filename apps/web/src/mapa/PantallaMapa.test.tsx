@@ -109,6 +109,54 @@ describe("capa de emplazamientos en el mapa", () => {
     assert.match(credito.getAttribute("title") ?? "", /^Límites de barrio/u);
     assert.include(credito.textContent ?? "", "CC BY 4.0");
   });
+
+  it("con los logos llega a los créditos el aviso de las marcas, sin «©» ni enlace, y sin DIGI no se cita su web", async () => {
+    navegar("/?emplazamiento=movistar-0802532&provincia=08", { reemplazar: true });
+    const { findByText, queryByRole } = render(() => (
+      <App
+        servicios={Layer.mergeAll(
+          capaDePrueba([Effect.succeed(CAPA)]),
+          fichasDePrueba().capa,
+          simuladorDePrueba,
+          ubicacionDePrueba().capa,
+        )}
+      />
+    ));
+    flush();
+
+    const aviso = await findByText(
+      "Las marcas y logotipos de las compañías son de sus titulares; Celda no está afiliada a ninguna.",
+    );
+    assert.isNull(aviso.closest("a"));
+    assert.isNull(queryByRole("link", { name: /digimobil\.es/u }));
+  });
+
+  it("con emplazamientos de DIGI, los créditos citan su web como fuente de su logotipo", async () => {
+    navegar("/?emplazamiento=movistar-0802532&provincia=08", { reemplazar: true });
+    const conDigi: CapaDePrueba = {
+      ...CAPA,
+      emplazamientos: CAPA.emplazamientos.map((e) => ({
+        ...e,
+        companias: [...e.companias, "digi" as const],
+      })),
+    };
+    const { findAllByRole } = render(() => (
+      <App
+        servicios={Layer.mergeAll(
+          capaDePrueba([Effect.succeed(conDigi)]),
+          fichasDePrueba().capa,
+          simuladorDePrueba,
+          ubicacionDePrueba().capa,
+        )}
+      />
+    ));
+    flush();
+
+    const [cita] = await findAllByRole("link", { name: "Logotipo de DIGI: digimobil.es" });
+    assert.strictEqual(cita?.getAttribute("href"), "https://www.digimobil.es/");
+    assert.strictEqual(cita?.getAttribute("rel"), "noopener noreferrer");
+    assert.notInclude(cita?.textContent ?? "", "©");
+  });
 });
 
 describe("enlace a una ficha sin provincia", () => {

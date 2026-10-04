@@ -1,12 +1,14 @@
 import type { Compania } from "@celda/dominio/compania";
 import { For, Match, Show, Switch } from "solid-js";
 
+import { DIBUJOS_DE_COMPANIAS, type LogoOficial, type Pintura } from "./logosDeCompanias.ts";
+
 /**
- * Logos de las compañías. Son aproximaciones dibujadas a mano a partir de los prototipos, no los
- * logos oficiales; qué permite usar cada marca está pendiente (ver `docs/patterns/ui.md`).
+ * Logos de las compañías: el oficial de cada una, como su icono, salvo Yoigo, que va con su
+ * nombre. De dónde sale cada uno y por qué, en `logos/FUENTES.md` y en `docs/patterns/ui.md`.
  */
 
-const RELLENO: Readonly<Record<Compania, string>> = {
+const COLOR: Readonly<Record<Compania, string>> = {
   movistar: "fill-movistar",
   vodafone: "fill-vodafone",
   orange: "fill-orange",
@@ -14,67 +16,66 @@ const RELLENO: Readonly<Record<Compania, string>> = {
   yoigo: "fill-yoigo",
 };
 
-/** El dibujo blanco de cada compañía sobre su color, en un lienzo de 40 × 40. */
+/** El logo oficial de una compañía, si se puede enseñar. */
+const logoDe = (compania: Compania): LogoOficial | undefined => {
+  const dibujo = DIBUJOS_DE_COMPANIAS[compania];
+  return dibujo.tipo === "logo" ? dibujo : undefined;
+};
+
+/** El nombre que se escribe en lugar del logo, si no se puede enseñar. */
+const nombreDe = (compania: Compania): string | undefined => {
+  const dibujo = DIBUJOS_DE_COMPANIAS[compania];
+  return dibujo.tipo === "nombre" ? dibujo.texto : undefined;
+};
+
+/** La clase que pinta de `pintura` algo de `compania`. */
+const claseDePintura = (compania: Compania, pintura: Pintura): string =>
+  pintura === "compania" ? COLOR[compania] : "fill-compania-tinta";
+
+/** La clase del círculo o de la porción de una compañía. */
+const claseDeFondo = (compania: Compania): string =>
+  claseDePintura(compania, logoDe(compania)?.fondo ?? "compania");
+
+/** El logo oficial, centrado en el lienzo de 40 × 40. */
+function LogoOficialCentrado(props: { readonly compania: Compania; readonly logo: LogoOficial }) {
+  const alto = () => (props.logo.ancho * props.logo.caja[3]) / props.logo.caja[2];
+  return (
+    <svg
+      x={20 - props.logo.ancho / 2}
+      y={20 - alto() / 2}
+      width={props.logo.ancho}
+      height={alto()}
+      viewBox={props.logo.caja.join(" ")}
+      overflow="hidden"
+    >
+      <For each={props.logo.trazos}>
+        {(trazo) => <path d={trazo.d} class={claseDePintura(props.compania, trazo.pintura)} />}
+      </For>
+    </svg>
+  );
+}
+
+/** El dibujo de cada compañía, centrado en un lienzo de 40 × 40. */
 function Glifo(props: { readonly compania: Compania }) {
   return (
     <Switch>
-      <Match when={props.compania === "movistar"}>
-        <path
-          d="M11,27 C11,17 13.5,13.5 15.8,13.5 C18.4,13.5 19.3,18 20,22 C20.7,18 21.6,13.5 24.2,13.5 C26.5,13.5 29,17 29,27"
-          fill="none"
-          class="stroke-compania-tinta"
-          stroke-width="3.6"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
+      <Match when={logoDe(props.compania)}>
+        {(logo) => <LogoOficialCentrado compania={props.compania} logo={logo()} />}
       </Match>
-      <Match when={props.compania === "vodafone"}>
-        <circle cx="20" cy="20" r="10.5" class="fill-compania-tinta" />
-        <path
-          d="M22.4,12.6 C17.6,13.4 14.9,17 15.1,20.9 C15.3,24.6 18.1,27.2 21.1,27.2 C24.2,27.2 26.3,25 26.3,22.1 C26.3,19 24.1,17.4 21.8,17.1 C21.4,15.7 21.6,14 22.4,12.6Z"
-          class="fill-vodafone"
-        />
-      </Match>
-      <Match when={props.compania === "orange"}>
-        <rect x="12" y="13" width="7" height="1.6" class="fill-compania-tinta" />
-        <text
-          x="20"
-          y="25"
-          text-anchor="middle"
-          font-family="Helvetica,Arial,sans-serif"
-          font-weight="700"
-          font-size="7.4"
-          class="fill-compania-tinta"
-        >
-          orange
-        </text>
-      </Match>
-      <Match when={props.compania === "digi"}>
-        <text
-          x="20"
-          y="23.6"
-          text-anchor="middle"
-          font-family="Arial Black,Arial,sans-serif"
-          font-weight="900"
-          font-size="10"
-          letter-spacing=".4"
-          class="fill-compania-tinta"
-        >
-          DIGI
-        </text>
-      </Match>
-      <Match when={props.compania === "yoigo"}>
-        <text
-          x="20"
-          y="24"
-          text-anchor="middle"
-          font-family="Helvetica,Arial,sans-serif"
-          font-weight="700"
-          font-size="9"
-          class="fill-compania-tinta"
-        >
-          yoigo
-        </text>
+      <Match when={nombreDe(props.compania)}>
+        {(nombre) => (
+          <text
+            x="20"
+            y="24"
+            text-anchor="middle"
+            font-family="Helvetica,Arial,sans-serif"
+            font-weight="700"
+            font-size="9"
+            class="fill-compania-tinta"
+          >
+            {nombre()}
+          </text>
+        )}
       </Match>
     </Switch>
   );
@@ -134,7 +135,7 @@ function DibujoLogo(props: { readonly companias: ReadonlyArray<Compania> }) {
         <Match when={props.companias.length === 1 ? props.companias[0] : undefined}>
           {(compania) => (
             <>
-              <circle cx="20" cy="20" r="19" class={RELLENO[compania()]} />
+              <circle cx="20" cy="20" r="19" class={claseDeFondo(compania())} />
               <Glifo compania={compania()} />
             </>
           )}
@@ -143,7 +144,7 @@ function DibujoLogo(props: { readonly companias: ReadonlyArray<Compania> }) {
           <For each={porciones(props.companias)}>
             {(porcion) => (
               <>
-                <path d={porcion.d} class={RELLENO[porcion.compania]} />
+                <path d={porcion.d} class={claseDeFondo(porcion.compania)} />
                 <g transform={porcion.glifo}>
                   <Glifo compania={porcion.compania} />
                 </g>

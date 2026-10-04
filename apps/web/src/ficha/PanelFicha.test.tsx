@@ -296,8 +296,8 @@ describe("panel del emplazamiento", () => {
     assert.isNotNull(getByRole("link", { name: /PNOA · CC BY 4\.0 scne\.es/u }));
   });
 
-  it("dice el municipio y la provincia del IGN y lo cita como obra derivada", async () => {
-    const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
+  it("dice el municipio y la provincia del IGN y lo cita como obra derivada, y de quién son los logos", async () => {
+    const { findByRole, getByText, getAllByText, origen } = abrir(CAMPUS_NORD.clave);
     const lote = generarLoteDeProvincia(
       "08",
       [CAMPUS_NORD],
@@ -315,6 +315,12 @@ describe("panel del emplazamiento", () => {
         "Municipio y provincia: obra derivada de Base de Datos de Límites Jurisdiccionales de " +
           "España 10 ago 2026, CC BY 4.0, Instituto Geográfico Nacional (ign.es).",
       ),
+    );
+    // También lo dicen los créditos del mapa; aquí cuenta el de la ficha.
+    assert.isTrue(
+      getAllByText(
+        "Las marcas y logotipos de las compañías son de sus titulares; Celda no está afiliada a ninguna.",
+      ).some((aviso) => aviso.closest("article") !== null),
     );
   });
 
@@ -401,6 +407,27 @@ describe("panel del emplazamiento", () => {
       ),
     );
     assert.isNotNull(getByRole("table", { name: "Expedientes de Movistar" }));
+  });
+
+  it("con DIGI, cita su web como fuente de su logotipo, con un enlace", async () => {
+    const conDigi: Ficha = {
+      ...PEDRALBES,
+      estaciones: PEDRALBES.estaciones.map((e) => ({ ...e, compania: "digi" as const })),
+    };
+    const { findByRole, getByRole, origen } = abrir(PEDRALBES.clave);
+    await responder(origen, conDigi);
+    await findByRole("article", { name: TITULO_PEDRALBES });
+    const cita = getByRole("link", { name: "digimobil.es" });
+    assert.strictEqual(cita.getAttribute("href"), "https://www.digimobil.es/");
+    assert.strictEqual(cita.getAttribute("rel"), "noopener noreferrer");
+    assert.strictEqual(cita.closest("p")?.textContent, "Logotipo de DIGI: digimobil.es");
+  });
+
+  it("sin DIGI, no cita su web", async () => {
+    const { findByRole, queryByRole, origen } = abrir(PEDRALBES.clave);
+    await responder(origen, PEDRALBES);
+    await findByRole("article", { name: TITULO_PEDRALBES });
+    assert.isNull(queryByRole("link", { name: "digimobil.es" }));
   });
 
   it("con una sola compañía, dice que el registro no tiene ficha para el emplazamiento", async () => {

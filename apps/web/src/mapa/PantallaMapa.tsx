@@ -120,6 +120,8 @@ import {
 } from "../ubicacion/Ubicacion.tsx";
 import type { Callejero } from "./callejero.ts";
 import {
+  CREDITO_DE_MARCAS,
+  CREDITO_DEL_LOGO_DE_DIGI,
   CREDITOS_MAPA_BASE,
   CREDITOS_RESERVA,
   type EstadoMapa,
@@ -532,15 +534,27 @@ export function PantallaMapa() {
    * límites de barrio, solo con una provincia con barrios cargada: la de Barcelona.
    */
   const conBarrios = createMemo(() => cargadas().some((p) => p.capa.barrios.length > 0));
+  /**
+   * Los logos de las compañías salen con la primera provincia que llega. Con ellos va el aviso de
+   * que las marcas son de sus titulares y, si alguna provincia tiene emplazamientos de DIGI, la
+   * cita de su logotipo que piden sus condiciones.
+   */
+  const conLogos = createMemo(() => emplazamientos().length > 0);
+  const conDigi = createMemo(() => emplazamientos().some((e) => e.companias.includes("digi")));
   const creditos = createMemo(() => {
     const fuentes = resumen()?.fuentes;
     const delCallejero = callejero() === "reserva" ? CREDITOS_RESERVA : CREDITOS_MAPA_BASE;
+    const deLosLogos = [
+      ...(conLogos() ? [CREDITO_DE_MARCAS] : []),
+      ...(conDigi() ? [CREDITO_DEL_LOGO_DE_DIGI] : []),
+    ];
     return fuentes === undefined
-      ? delCallejero
+      ? [...delCallejero, ...deLosLogos]
       : [
           ...delCallejero,
           creditoDeMunicipios(fuentes.municipios),
           ...(conBarrios() ? [creditoDeBarrios(fuentes.barrios)] : []),
+          ...deLosLogos,
         ];
   });
   /** Lo que dice la marca de agua del mapa de lo que se ve. */

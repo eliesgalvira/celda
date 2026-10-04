@@ -1,5 +1,5 @@
 import type { Ficha } from "@celda/dominio/ficha";
-import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { AVISO_DE_MARCAS, CITA_DEL_LOGO_DE_DIGI, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import { primeraVezEn } from "@celda/dominio/glosario";
 import { BANDAS_NOMINALES } from "@celda/dominio/tecnologia";
 import { Aviso } from "@celda/ui/Aviso.tsx";
@@ -305,6 +305,15 @@ function ContenidoFicha(props: {
         </For>
         <Show when={creditoDelLugar(props.ficha)}>
           {(credito) => <NotaFicha tono="credito">{credito()}</NotaFicha>}
+        </Show>
+        <NotaFicha tono="credito">{AVISO_DE_MARCAS}</NotaFicha>
+        <Show when={props.ficha.estaciones.some((estacion) => estacion.compania === "digi")}>
+          <NotaFicha
+            tono="credito"
+            enlace={{ texto: CITA_DEL_LOGO_DE_DIGI.sitio, href: CITA_DEL_LOGO_DE_DIGI.enlace }}
+          >
+            {CITA_DEL_LOGO_DE_DIGI.texto}
+          </NotaFicha>
         </Show>
         <NotaFicha>
           ¿Algo no cuadra con lo que ves? Propón una corrección: la revisa la moderación y, si la
