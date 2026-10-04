@@ -1492,7 +1492,7 @@ const EXPLICACION_FALLO_CAPA = {
     "No han llegado los datos de los emplazamientos. Puede que falle la conexión o que el servidor esté bloqueado.",
   danada:
     "Los datos de los emplazamientos no tienen el formato que se esperaba, por un fallo de Celda.",
-  interno: "Es un fallo de Celda, así que cambiar de conexión no lo arregla.",
+  interno: "El fallo viene de Celda y no depende de tu conexión.",
 } as const;
 
 function AvisoMapa(props: {
@@ -1525,8 +1525,8 @@ function AvisoMapa(props: {
       </Match>
       <Match when={props.estado.tipo === "fallo"}>
         <Aviso tono="fallo" titulo="Algo ha fallado al preparar el mapa" acciones={reintentar}>
-          Es un fallo de Celda, así que cambiar de conexión no lo arregla. Si se repite al
-          reintentar, recarga la página.
+          El fallo viene de Celda y no depende de tu conexión. Si se repite al reintentar, recarga
+          la página.
         </Aviso>
       </Match>
     </Switch>

@@ -238,11 +238,11 @@ export const GLOSARIO: Glosario = {
     relacionados: ["sector", "modo-de-informacion", "celda"],
   },
   modelo: {
-    nombre: "Modelo",
+    nombre: "Simulación",
     explicacion:
-      "Un cálculo que imita cómo se suele comportar la señal. Celda lo marca siempre como " +
-      "modelo para que no se confunda con una medida.",
-    tecnico: "simulación",
+      "Un cálculo que imita cómo se suele comportar la señal. Celda lo marca como simulación " +
+      "para distinguirlo de una medida.",
+    tecnico: "modelo",
     relacionados: ["sector", "azimut"],
   },
   "punto-de-referencia": {
