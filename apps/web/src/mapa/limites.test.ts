@@ -1,9 +1,12 @@
+// Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
+// @effect-diagnostics strictEffectProvide:off
 import type { LineasDeLimites } from "@celda/ui/mapa/limites.ts";
 import { assert, describe, it } from "@effect/vitest";
 import { waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
 
 import { origenDePrueba } from "../ficha/pruebas.ts";
+import { otraTarea } from "../lib/pruebas.ts";
 import { leerLimites, limitesDeLaVisita, type MapaParaLimites } from "./limites.ts";
 
 const URL_LIMITES = "http://celda.prueba/assets/limites-0a1b2c.json";
@@ -114,7 +117,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     await waitFor(() => assert.lengthOf(origen.abiertas(), 1));
     prueba.quitar();
     origen.responder(URL_LIMITES, { estado: 200, cuerpo: FICHERO });
-    await new Promise((listo) => setTimeout(listo, 0));
+    await otraTarea();
     assert.deepStrictEqual(prueba.dibujos, []);
   });
 
@@ -125,7 +128,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     primero.pintar();
     await waitFor(() => assert.lengthOf(origen.abiertas(), 1));
     origen.responder(URL_LIMITES, { estado: 404, cuerpo: "" });
-    await new Promise((listo) => setTimeout(listo, 0));
+    await otraTarea();
     assert.deepStrictEqual(primero.dibujos, []);
 
     const segundo = mapaDePrueba();
@@ -133,7 +136,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     segundo.pintar();
     await waitFor(() => assert.lengthOf(origen.abiertas(), 1));
     origen.responder(URL_LIMITES, { estado: 200, cuerpo: '{"comunidades":[]}' });
-    await new Promise((listo) => setTimeout(listo, 0));
+    await otraTarea();
     assert.deepStrictEqual(segundo.dibujos, []);
     assert.deepStrictEqual(origen.pedidas(), [URL_LIMITES, URL_LIMITES]);
   });

@@ -27,7 +27,9 @@ prewarm();
  */
 const ponerLimites = limitesDeLaVisita(
   leerLimites(new URL(urlDeLimites, globalThis.location.href).href).pipe(
-    // Los límites no pasan por el runtime de la pantalla: este módulo monta su cliente HTTP.
+    // Los límites no pasan por el runtime de la pantalla: este módulo es su punto de entrada y
+    // monta su cliente HTTP.
+    // @effect-diagnostics-next-line strictEffectProvide:off
     Effect.provide(FetchHttpClient.layer),
   ),
 );
