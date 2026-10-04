@@ -115,9 +115,10 @@ const MEDIO_ALTO = 28;
 const ANCHO_NOMBRE = 152;
 /**
  * Lo que ocupa como mucho una letra del nombre con `text-[13px]`, en versalitas y con
- * `tracking-[0.12em]`, medido en Chromium con la letra del sistema.
+ * `tracking-[0.12em]`. Medido en Chromium con la letra del sistema, a su tamaño: de 9,3 a 9,6 px
+ * en «Lugo», «Córdoba», «Málaga» o «Zamora».
  */
-const LETRA = 9.4;
+const LETRA = 9.8;
 /** Relleno de la cinta del nombre a los dos lados: `pl-2.5` y `pr-2.5`. */
 const RELLENO_NOMBRE = 20;
 /** Alto de una línea del nombre, `leading-4`, y el relleno de arriba y abajo de la cinta. */
