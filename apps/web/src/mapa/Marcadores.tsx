@@ -173,13 +173,18 @@ export function Marcadores(props: MarcadoresProps) {
   const [lectura, setLectura] = createSignal<LecturaDeRotulos>(SIN_ROTULOS, {
     equals: mismaLectura,
   });
+  /** Cuántas veces ha quedado quieto el mapa: los huecos se ponen entonces, no al moverse. */
+  const [quieto, setQuieto] = createSignal(0);
   recurso(
     "marcadores:rotulos",
     () => (props.lectorDeRotulos === undefined ? undefined : props.mapa),
     (mapa) => {
       const lector = props.lectorDeRotulos;
       if (lector === undefined) return undefined;
-      const leer = () => setLectura(lector.leer(mapa));
+      const leer = () => {
+        setLectura(lector.leer(mapa));
+        setQuieto((n) => n + 1);
+      };
       mapa.on("idle", leer);
       return () => mapa.off("idle", leer);
     },
@@ -235,8 +240,9 @@ export function Marcadores(props: MarcadoresProps) {
   const formas = createMemo(() => choques().formas);
   const ocultos = createMemo(() => choques().ocultos);
 
-  // Los huecos de los marcadores en el mapa base, para que sus rótulos los esquiven. Solo cambian
-  // al decidir; si son los mismos, no se toca el mapa.
+  // Los huecos de los marcadores en el mapa base, para que sus rótulos los esquiven. Se ponen con
+  // el mapa quieto: cada `setData` manda la fuente a los workers y vuelve a colocar los rótulos, y
+  // a mitad de un gesto costaba fotogramas. Si son los mismos, no se toca el mapa.
   const ponerHuecos = createMemo(() => {
     const mapa = props.mapa;
     return puestaDeHuecos((datos) => {
@@ -244,9 +250,12 @@ export function Marcadores(props: MarcadoresProps) {
     });
   });
   createEffect(
-    () => huecosDe([...(escena()?.elementos.values() ?? [])], choques(), tamano()),
-    (huecos) => {
-      ponerHuecos()(huecos);
+    () => ({
+      huecos: huecosDe([...(escena()?.elementos.values() ?? [])], choques(), tamano()),
+      quieto: quieto(),
+    }),
+    ({ huecos }) => {
+      if (!props.mapa.isMoving()) ponerHuecos()(huecos);
     },
   );
 
