@@ -6,7 +6,7 @@ import type {
   LineLayerSpecification,
 } from "maplibre-gl";
 
-import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
+import { COMUNITAT_DE_PRUEBA, CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { conLaFoto } from "../pruebas/foto.ts";
 import { estiloMapa, FUENTE_MAPA_BASE } from "./estilo.ts";
 import { capasLimites, FUENTE_LIMITES, lineasDeLimites } from "./limites.ts";
@@ -177,7 +177,7 @@ describe("límites en el mapa", () => {
   });
 
   it("el estilo los pone entre el suelo y las vías, con la fuente propia vacía", () => {
-    const estilo = estiloMapa(() => "#000", CONTORNO_DE_PRUEBA);
+    const estilo = estiloMapa(() => "#000", CONTORNO_DE_PRUEBA, COMUNITAT_DE_PRUEBA);
     assert.deepStrictEqual<unknown>(estilo.sources[FUENTE_LIMITES], {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
