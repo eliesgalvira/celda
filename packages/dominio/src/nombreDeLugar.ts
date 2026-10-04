@@ -191,3 +191,59 @@ export const nombreDeResultado = (
   if (conocido !== undefined) return conocido;
   return parteQueSeVe(formas, es, enLaComunitat);
 };
+
+/**
+ * Las formas de los oficiales bilingües que no se ven: la castellana en la Comunitat Valenciana
+ * (Alicante, Elche, Castellón de la Plana) y la otra en el resto (Donostia, Iruña, Araba). El mapa
+ * base de reserva del IGN rotula cada municipio bilingüe dos veces en el mismo punto, una con cada
+ * forma, y no trae `name:es`: el rótulo de estas formas se quita y queda el del nombre de lugar.
+ * Ninguna es el oficial de otro municipio (`nombresReales.test.ts` de `tools/capas`).
+ */
+export const FORMAS_QUE_NO_SE_VEN: ReadonlyArray<string> = [
+  ...new Set(
+    [...PROVINCIAS.values(), ...MUNICIPIOS.values()].flatMap(({ oficial, nombre }) =>
+      (formasDe(oficial) ?? []).filter((forma) => forma !== nombre),
+    ),
+  ),
+];
+
+const NO_SE_VEN: ReadonlySet<string> = new Set(FORMAS_QUE_NO_SE_VEN);
+
+/**
+ * Los oficiales bilingües escritos con la barra, como los trae el IGN de lejos
+ * («Donostia/San Sebastián») o con espacios («Donostia / San Sebastián»), con su nombre de lugar.
+ */
+export const BILINGUES_DEL_IGN: ReadonlyMap<string, string> = new Map(
+  [...PROVINCIAS.values(), ...MUNICIPIOS.values()].flatMap(({ oficial, nombre }) => {
+    const formas = formasDe(oficial);
+    return formas === undefined
+      ? []
+      : [
+          [`${formas[0]}/${formas[1]}`, nombre] as const,
+          [`${formas[0]} / ${formas[1]}`, nombre] as const,
+        ];
+  }),
+);
+
+/**
+ * El rótulo de un lugar en el mapa base de reserva del IGN (ADR 0025), que escribe los
+ * oficiales del IGN y no trae `name:es`. `undefined` si no se rotula: es la forma que no se ve de un
+ * bilingüe, que el IGN rotula también con la otra.
+ *
+ * 1. Las formas que no se ven, fuera (`FORMAS_QUE_NO_SE_VEN`).
+ * 2. Un oficial con barra, el nombre de lugar de la tabla (`BILINGUES_DEL_IGN`) o, si no está, su
+ *    primera forma.
+ * 3. Con otro nombre entre paréntesis, el de antes: el IGN añade así el exónimo de lo de fuera
+ *    («Porto (Oporto)») y el país de lo de España en la capa de contexto («Ceuta (ESP)»).
+ * 4. Si no, el mismo.
+ *
+ * El estilo de reserva lo escribe como expresión (`@celda/ui/mapa/reserva/nombres.ts`), y una prueba
+ * comprueba que dan lo mismo.
+ */
+export const nombreDelIgn = (nombre: string): string | undefined => {
+  if (NO_SE_VEN.has(nombre)) return undefined;
+  const formas = formasDe(nombre);
+  if (formas !== undefined) return BILINGUES_DEL_IGN.get(`${formas[0]}/${formas[1]}`) ?? formas[0];
+  const parentesis = nombre.indexOf(" (");
+  return parentesis === -1 ? nombre : nombre.slice(0, parentesis);
+};
