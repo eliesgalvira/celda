@@ -4,20 +4,28 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 
-import { type BrowserContext, type CDPSession, chromium, type Page } from "playwright-core";
+import {
+  type BrowserContext,
+  type CDPSession,
+  chromium,
+  type Locator,
+  type Page,
+} from "playwright-core";
 
-import { type FotogramasEnPagina, instalar } from "./pagina.ts";
+import { type Centro, type FotogramasEnPagina, instalar } from "./pagina.ts";
 import { servirSitio } from "./sitio.ts";
 import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
 
 /**
  * Mide la carga y la fluidez de Celda en un móvil simulado: Chromium sin interfaz con GPU, a
- * 390 × 844 con DPR 2,6, la CPU frenada por CDP y la red de «Fast 4G» de DevTools. El mapa base
- * viene de OpenFreeMap de verdad, así que hace falta conexión. Ver docs/patterns/rendimiento.md.
+ * 390 × 844 con DPR 2,6, la CPU frenada por CDP y la red de «Fast 4G» de DevTools. Con
+ * `--pantalla escritorio`, en una pantalla de 1400 × 900 con ratón. El mapa base viene de
+ * OpenFreeMap de verdad, así que hace falta conexión. Ver docs/patterns/rendimiento.md.
  *
  *   pnpm run medir -- --capas <carpeta publicada> [--web ../../apps/web/dist] [--cpu 4,6]
  *                     [--repeticiones 3] [--trazas <carpeta>] [--json <fichero>]
- *                     [--escenario barcelona|espana|borde] [--ruta /?emplazamiento=<clave>]
+ *                     [--escenario barcelona|espana|borde|vuelos] [--ruta /?emplazamiento=<clave>]
+ *                     [--pantalla movil|escritorio] [--grupos saltos,vuelos,alejar,…]
  *
  * El escenario `barcelona` va a Barcelona entera y hace allí los gestos de siempre. El de `espana`, el
  * de varias provincias (ADR 0016): aleja hasta ver toda España con el resumen, toca el hexágono
@@ -29,9 +37,20 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  * borde de dos provincias, sin su provincia: la web la busca en el índice de claves y abre el
  * mapa a zoom 16 sobre él. Cierra la ficha y cruza el borde arrastrando con las celdas, abre la
  * vista de interferencia y lo cruza otra vez, y aleja y acerca.
+ *
+ * El de `vuelos` (#67) mueve la cámara de MapLibre como los recorridos del #61 y el #66: saltos de
+ * vista en vista, cinco vuelos de España a la calle y vuelta, alejarse del Eixample hasta España y
+ * acercar y alejar nivel a nivel sobre Zaragoza y Barcelona. No depende de qué marcadores se ven
+ * ni de dónde caen en la pantalla, así que da lo mismo con cualquier capa publicada y pantalla.
  */
 
+/**
+ * Los argumentos de la orden. `pnpm run medir -- --capas …` deja pasar el `--`, que `parseArgs`
+ * toma como el fin de las opciones: se quita.
+ */
+const argumentos = process.argv.slice(2);
 const { values: opciones } = NodeUtil.parseArgs({
+  args: argumentos[0] === "--" ? argumentos.slice(1) : argumentos,
   options: {
     capas: { type: "string" },
     web: { type: "string", default: "../../apps/web/dist" },
@@ -48,6 +67,9 @@ const { values: opciones } = NodeUtil.parseArgs({
     calma: { type: "string", default: "0.08" },
     escenario: { type: "string", default: "barcelona" },
     ruta: { type: "string", default: "/" },
+    pantalla: { type: "string", default: "movil" },
+    // Con `--escenario vuelos`, solo estos grupos de gestos, separados por comas.
+    grupos: { type: "string" },
   },
 });
 
@@ -98,8 +120,18 @@ const esperarCalma = async (): Promise<void> => {
   process.stderr.write("  la máquina no se calma: la ronda puede salir más lenta\n");
 };
 
-const ANCHO = 390;
-const ALTO = 844;
+/**
+ * Las pantallas: el móvil de siempre, con el dedo, y una de escritorio, con el ratón. `centro` es
+ * donde empiezan los gestos, en medio del mapa.
+ */
+const PANTALLAS = {
+  movil: { ancho: 390, alto: 844, dpr: 2.6, tactil: true, centro: { x: 195, y: 420 } },
+  escritorio: { ancho: 1400, alto: 900, dpr: 1, tactil: false, centro: { x: 700, y: 450 } },
+} as const;
+
+const PANTALLA = opciones.pantalla === "escritorio" ? PANTALLAS.escritorio : PANTALLAS.movil;
+const ANCHO = PANTALLA.ancho;
+const ALTO = PANTALLA.alto;
 
 const esperar = (ms: number) =>
   new Promise<void>((resolver) => {
@@ -117,15 +149,23 @@ interface Peticion {
 const abrirContexto = async (
   navegador: Awaited<ReturnType<typeof chromium.launch>>,
 ): Promise<BrowserContext> => {
-  const contexto = await navegador.newContext({
-    viewport: { width: ANCHO, height: ALTO },
-    deviceScaleFactor: 2.6,
-    isMobile: true,
-    hasTouch: true,
-    locale: "es-ES",
-    userAgent:
-      "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
-  });
+  const contexto = await navegador.newContext(
+    PANTALLA.tactil
+      ? {
+          viewport: { width: ANCHO, height: ALTO },
+          deviceScaleFactor: PANTALLA.dpr,
+          isMobile: true,
+          hasTouch: true,
+          locale: "es-ES",
+          userAgent:
+            "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+        }
+      : {
+          viewport: { width: ANCHO, height: ALTO },
+          deviceScaleFactor: PANTALLA.dpr,
+          locale: "es-ES",
+        },
+  );
   await contexto.addInitScript(instalar);
   return contexto;
 };
@@ -270,43 +310,82 @@ const grabar = async (
     : { fotogramas: resumirFotogramas(datos), traza: resumen };
 };
 
-const CENTRO = { x: ANCHO / 2, y: 420 };
+const CENTRO = PANTALLA.centro;
+
+/** Toca un elemento con el dedo o, en el escritorio, lo pulsa con el ratón. */
+const tocar = (elemento: Locator): Promise<void> =>
+  PANTALLA.tactil ? elemento.tap() : elemento.click();
+
+/** Toca un punto de la pantalla con el dedo o lo pulsa con el ratón. */
+const tocarEn = (pagina: Page, x: number, y: number): Promise<void> =>
+  PANTALLA.tactil ? pagina.touchscreen.tap(x, y) : pagina.mouse.click(x, y);
 
 /**
- * Arrastra el mapa con un dedo, ida y vuelta, a unos 60 eventos por segundo. `synthesizeScrollGesture`
- * no sirve: el navegador se queda el gesto como desplazamiento y MapLibre no recibe `touchmove`.
+ * Lo que hace un dedo, o el ratón con el botón pulsado en el escritorio, para arrastrar el mapa.
+ * Va por CDP: `synthesizeScrollGesture` no sirve, porque el navegador se queda el gesto como
+ * desplazamiento y MapLibre no recibe `touchmove`.
  */
+const dedo = (cdp: CDPSession) => ({
+  apoyar: (punto: { x: number; y: number }) =>
+    PANTALLA.tactil
+      ? cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [punto] })
+      : cdp.send("Input.dispatchMouseEvent", {
+          type: "mousePressed",
+          ...punto,
+          button: "left",
+          buttons: 1,
+          clickCount: 1,
+        }),
+  mover: (punto: { x: number; y: number }) =>
+    PANTALLA.tactil
+      ? cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [punto] })
+      : cdp.send("Input.dispatchMouseEvent", {
+          type: "mouseMoved",
+          ...punto,
+          button: "left",
+          buttons: 1,
+        }),
+  levantar: (punto: { x: number; y: number }) =>
+    PANTALLA.tactil
+      ? cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] })
+      : cdp.send("Input.dispatchMouseEvent", {
+          type: "mouseReleased",
+          ...punto,
+          button: "left",
+          buttons: 0,
+          clickCount: 1,
+        }),
+});
+
+/** Un arrastre de `dx`, `dy` píxeles desde el centro en `pasos` eventos, uno cada 16 ms. */
+const arrastrarDesdeElCentro = async (cdp: CDPSession, dx: number, dy: number, pasos: number) => {
+  const mano = dedo(cdp);
+  const puntos = Array.from({ length: pasos }, (_, k) => ({
+    x: CENTRO.x + (dx * (k + 1)) / pasos,
+    y: CENTRO.y + (dy * (k + 1)) / pasos,
+  }));
+  await mano.apoyar(CENTRO);
+  for (const punto of puntos) {
+    await mano.mover(punto);
+    await esperar(16);
+  }
+  await mano.levantar(puntos.at(-1) ?? CENTRO);
+};
+
+/** Arrastra el mapa, ida y vuelta, a unos 60 eventos por segundo. */
 const arrastrar = async (cdp: CDPSession) => {
-  const pasos = 40;
   for (const [dx, dy] of [
     [-220, -160],
     [220, 160],
   ] as const) {
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [CENTRO] });
-    for (let i = 1; i <= pasos; i += 1) {
-      await cdp.send("Input.dispatchTouchEvent", {
-        type: "touchMove",
-        touchPoints: [{ x: CENTRO.x + (dx * i) / pasos, y: CENTRO.y + (dy * i) / pasos }],
-      });
-      await esperar(16);
-    }
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await arrastrarDesdeElCentro(cdp, dx, dy, 40);
     await esperar(200);
   }
 };
 
-/** Un arrastre de un dedo de `dx`, `dy` píxeles en unos 0,6 s, y un momento para asentarse. */
+/** Un arrastre de `dx`, `dy` píxeles en unos 0,6 s, y un momento para asentarse. */
 const arrastrarUnaVez = async (cdp: CDPSession, dx: number, dy: number) => {
-  const pasos = 36;
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [CENTRO] });
-  for (let i = 1; i <= pasos; i += 1) {
-    await cdp.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ x: CENTRO.x + (dx * i) / pasos, y: CENTRO.y + (dy * i) / pasos }],
-    });
-    await esperar(16);
-  }
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await arrastrarDesdeElCentro(cdp, dx, dy, 36);
   await esperar(700);
 };
 
@@ -339,7 +418,7 @@ const pellizcar = async (cdp: CDPSession) => {
       y: CENTRO.y,
       scaleFactor: escala,
       relativeSpeed: 500,
-      gestureSourceType: "touch",
+      gestureSourceType: PANTALLA.tactil ? "touch" : "mouse",
     });
     await esperar(300);
   }
@@ -370,10 +449,10 @@ const pulsar = async (pagina: Page, etiqueta: string, veces: number) => {
   const menu = pagina.getByRole("button", { name: "Funciones", exact: true });
   for (let i = 0; i < veces; i += 1) {
     if (!(await boton.isVisible()) && (await menu.count()) > 0) {
-      await menu.tap();
+      await tocar(menu);
       await esperar(150);
     }
-    await boton.tap();
+    await tocar(boton);
     await esperar(700);
   }
 };
@@ -384,23 +463,33 @@ const pulsar = async (pagina: Page, etiqueta: string, veces: number) => {
  */
 const abrirAgrupaciones = async (pagina: Page, veces: number) => {
   for (let i = 0; i < veces; i += 1) {
-    const objetivo = await pagina.evaluate(() => {
+    const objetivo = await pagina.evaluate((pantalla) => {
       const lamina = document.querySelector('section[aria-label="Emplazamientos"]');
       const botones = [...(lamina?.querySelectorAll(":scope > button:not([inert])") ?? [])];
-      return botones
-        .map((b) => {
-          const caja = b.getBoundingClientRect();
-          // «12 emplazamientos, acercar» o «Terrassa, 118 emplazamientos, sin Digi, acercar».
-          const numero = Number(
-            /(\d+) emplazamientos?,/u.exec(b.getAttribute("aria-label") ?? "")?.[1] ?? Number.NaN,
-          );
-          return { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2, numero };
-        })
-        .filter((c) => Number.isFinite(c.numero) && c.x > 30 && c.x < 330 && c.y > 160 && c.y < 700)
-        .sort((a, b) => b.numero - a.numero)[0];
-    });
+      return (
+        botones
+          .map((b) => {
+            const caja = b.getBoundingClientRect();
+            // «12 emplazamientos, acercar» o «Terrassa, 118 emplazamientos, sin Digi, acercar».
+            const numero = Number(
+              /(\d+) emplazamientos?,/u.exec(b.getAttribute("aria-label") ?? "")?.[1] ?? Number.NaN,
+            );
+            return { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2, numero };
+          })
+          // Lejos de la cabecera, de los controles de la derecha y de la hoja de abajo.
+          .filter(
+            (c) =>
+              Number.isFinite(c.numero) &&
+              c.x > 30 &&
+              c.x < pantalla.ancho - 60 &&
+              c.y > 160 &&
+              c.y < pantalla.alto - 144,
+          )
+          .sort((a, b) => b.numero - a.numero)[0]
+      );
+    }, PANTALLA);
     if (objetivo === undefined) return;
-    await pagina.touchscreen.tap(objetivo.x, objetivo.y);
+    await tocarEn(pagina, objetivo.x, objetivo.y);
     await esperar(1200);
   }
 };
@@ -424,21 +513,26 @@ const contarMarcadores = (pagina: Page) =>
  * `pointerdown` hasta el fotograma que ya tiene el artículo de la ficha.
  */
 const tocarFicha = async (pagina: Page, cerca: { x: number; y: number }) => {
-  const objetivo = await pagina.evaluate((punto) => {
-    const lamina = document.querySelector('section[aria-label="Emplazamientos"]');
-    const candidatos = [...(lamina?.querySelectorAll(":scope > button[data-estado]") ?? [])]
-      .map((b) => {
-        const caja = b.getBoundingClientRect();
-        return { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2 };
-      })
-      // Lejos de la cabecera, de los controles de la derecha y de la hoja de abajo.
-      .filter((c) => c.x > 30 && c.x < 300 && c.y > 160 && c.y < 520)
-      .sort(
-        (a, b) =>
-          Math.hypot(a.x - punto.x, a.y - punto.y) - Math.hypot(b.x - punto.x, b.y - punto.y),
-      );
-    return candidatos[0];
-  }, cerca);
+  const objetivo = await pagina.evaluate(
+    ({ punto, pantalla }) => {
+      const lamina = document.querySelector('section[aria-label="Emplazamientos"]');
+      const candidatos = [...(lamina?.querySelectorAll(":scope > button[data-estado]") ?? [])]
+        .map((b) => {
+          const caja = b.getBoundingClientRect();
+          return { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2 };
+        })
+        // Lejos de la cabecera, de los controles de la derecha y de la hoja de abajo.
+        .filter(
+          (c) => c.x > 30 && c.x < pantalla.ancho - 90 && c.y > 160 && c.y < pantalla.alto - 324,
+        )
+        .sort(
+          (a, b) =>
+            Math.hypot(a.x - punto.x, a.y - punto.y) - Math.hypot(b.x - punto.x, b.y - punto.y),
+        );
+      return candidatos[0];
+    },
+    { punto: cerca, pantalla: PANTALLA },
+  );
   if (objetivo === undefined) return undefined;
   const medida = pagina.evaluate(
     () =>
@@ -470,7 +564,7 @@ const tocarFicha = async (pagina: Page, cerca: { x: number; y: number }) => {
     if (peticion.url().includes("/fichas/")) lotes += 1;
   };
   pagina.on("request", contar);
-  await pagina.touchscreen.tap(objetivo.x, objetivo.y);
+  await tocarEn(pagina, objetivo.x, objetivo.y);
   const ms = await medida;
   pagina.off("request", contar);
   if (lotes > 0)
@@ -483,6 +577,254 @@ const cerrarFicha = async (pagina: Page) => {
   await pagina.waitForSelector("article[aria-label]", { state: "detached" });
   await esperar(800);
 };
+
+/**
+ * Encuentra el mapa de MapLibre de la página y lo deja en `window.__celdaMapa`, para mover la
+ * cámara (`CamaraEnPagina`). La web no lo expone, así que se busca en el montón de V8 por CDP: la
+ * clase cuyo prototipo tiene `flyTo` y `getCanvasContainer`, y el ejemplar de esa clase que está
+ * en la página. Va antes de medir: recorrer el montón cuesta.
+ */
+const atraparMapa = async (cdp: CDPSession): Promise<boolean> => {
+  const grupo = "celda-mapa";
+  const funciones = await cdp.send("Runtime.evaluate", {
+    expression: "Function.prototype",
+    objectGroup: grupo,
+  });
+  const todas = await cdp.send("Runtime.queryObjects", {
+    prototypeObjectId: funciones.result.objectId ?? "",
+    objectGroup: grupo,
+  });
+  const prototipo = await cdp.send("Runtime.callFunctionOn", {
+    objectId: todas.objects.objectId ?? "",
+    functionDeclaration: `function () {
+      const clase = this.find((f) => {
+        try {
+          return typeof f.prototype?.flyTo === "function" &&
+            typeof f.prototype?.getCanvasContainer === "function";
+        } catch {
+          return false;
+        }
+      });
+      return clase?.prototype;
+    }`,
+    objectGroup: grupo,
+  });
+  let encontrado = false;
+  if (prototipo.result.objectId !== undefined) {
+    const mapas = await cdp.send("Runtime.queryObjects", {
+      prototypeObjectId: prototipo.result.objectId,
+      objectGroup: grupo,
+    });
+    const puesto = await cdp.send("Runtime.callFunctionOn", {
+      objectId: mapas.objects.objectId ?? "",
+      functionDeclaration: `function () {
+        window.__celdaMapa = this.find((mapa) => mapa.getContainer().isConnected);
+        return window.__celdaMapa !== undefined;
+      }`,
+      returnByValue: true,
+    });
+    encontrado = puesto.result.value === true;
+  }
+  await cdp.send("Runtime.releaseObjectGroup", { objectGroup: grupo });
+  return encontrado;
+};
+
+/**
+ * Espera a que el mapa quede quieto y pintado, con todas sus teselas (`idle` de MapLibre), o a
+ * que pasen `maximo` ms. Pide un repintado: si ya estaba quieto, `idle` no volvería a llegar.
+ */
+const esperarQuieto = (pagina: Page, maximo = 10_000): Promise<boolean> =>
+  pagina.evaluate(
+    (ms) =>
+      new Promise<boolean>((resolver) => {
+        const mapa = window.__celdaMapa;
+        if (mapa === undefined) {
+          resolver(false);
+          return;
+        }
+        const plazo = setTimeout(() => resolver(false), ms);
+        mapa.once("idle", () => {
+          clearTimeout(plazo);
+          resolver(true);
+        });
+        mapa.triggerRepaint();
+      }),
+    maximo,
+  );
+
+/** Un sitio de los recorridos, con su zoom. */
+interface Lugar {
+  readonly nombre: string;
+  readonly centro: Centro;
+  readonly zoom: number;
+}
+
+const lugar = (nombre: string, centro: Centro, zoom: number): Lugar => ({ nombre, centro, zoom });
+
+const BARCELONA: Centro = [2.17, 41.39];
+/** Passeig de Gràcia 68, en el Eixample: el tejado de los recorridos del #61 y el #64. */
+const EIXAMPLE: Centro = [2.1625, 41.3934];
+const ESPANA = lugar("espana-5,5", [-3.7, 40.2], 5.5);
+
+/*
+ * Las órdenes a la cámara van entre llaves y no devuelven nada: `jumpTo` y los demás devuelven el
+ * mapa, y Playwright lo serializaría entero, segundos de JavaScript en el hilo principal que no
+ * son de Celda.
+ */
+
+/** Salta sin animación a `destino`, como al abrir un enlace o elegir un resultado del buscador. */
+const saltar = (pagina: Page, destino: Lugar) =>
+  pagina.evaluate((l) => {
+    window.__celdaMapa?.jumpTo({ center: l.centro, zoom: l.zoom });
+  }, destino);
+
+/** Vuela a `destino` en `ms`, como `flyTo` de MapLibre: se aleja, cruza y se acerca. */
+const volar = (pagina: Page, destino: Lugar, ms: number) =>
+  pagina.evaluate(
+    ({ l, duracion }) => {
+      window.__celdaMapa?.flyTo({ center: l.centro, zoom: l.zoom, duration: duracion });
+    },
+    { l: destino, duracion: ms },
+  );
+
+/** Acerca o aleja hasta `zoom` en `ms`, sin mover el centro. */
+const acercarA = (pagina: Page, zoom: number, ms: number) =>
+  pagina.evaluate(
+    ({ z, duracion }) => {
+      window.__celdaMapa?.easeTo({ zoom: z, duration: duracion });
+    },
+    { z: zoom, duracion: ms },
+  );
+
+/** Centra el mapa en `centro` sin cambiar el zoom, como quien arrastra hasta verlo, y espera. */
+const centrarEn = async (pagina: Page, centro: Centro): Promise<void> => {
+  await pagina.evaluate((c) => {
+    window.__celdaMapa?.jumpTo({ center: c });
+  }, centro);
+  await esperarQuieto(pagina);
+};
+
+/**
+ * Deja el hexágono de Barcelona donde se puede tocar. Con la vista de toda España en el móvil de
+ * 390 px queda fuera de la pantalla: entonces centra el mapa en Barcelona.
+ */
+const asomarBarcelona = async (pagina: Page): Promise<Locator> => {
+  const hexagono = pagina.getByRole("button", { name: /^Barcelona, / }).first();
+  const caja = (await hexagono.count()) > 0 ? await hexagono.boundingBox() : null;
+  const seToca =
+    caja !== null &&
+    caja.x + caja.width / 2 > 30 &&
+    caja.x + caja.width / 2 < ANCHO - 60 &&
+    caja.y + caja.height / 2 > 160 &&
+    caja.y + caja.height / 2 < ALTO - 144;
+  if (!seToca) await centrarEn(pagina, BARCELONA);
+  return hexagono;
+};
+
+/** Graba un gesto con su nombre. */
+type Medir = (nombre: string, accion: () => Promise<void>) => Promise<void>;
+
+/**
+ * Abre la web y espera a que se vean el mapa base y los marcadores, y tres segundos más para que
+ * terminen de llegar las teselas de la primera vista.
+ */
+const abrirYEsperar = async (pagina: Page, origen: string): Promise<void> => {
+  await pagina.goto(new URL(opciones.ruta, origen).href, { waitUntil: "load" });
+  await pagina.waitForFunction(
+    () => {
+      const carga = window.__celda.carga();
+      return carga.mapaBase !== undefined && carga.marcadores !== undefined;
+    },
+    undefined,
+    { timeout: 60_000, polling: 200 },
+  );
+  await esperar(3000);
+};
+
+/** Un grupo de gestos del escenario `vuelos`, que empieza en la vista inicial de la web. */
+interface GrupoEnVuelo {
+  readonly nombre: string;
+  readonly hacer: (pagina: Page, medir: Medir) => Promise<void>;
+}
+
+/** Los niveles del #66: del 9,5 al 14,5 y vuelta, uno cada 1,5 s. */
+const NIVELES = [10.5, 11.5, 12.5, 13.5, 14.5, 13.5, 12.5, 11.5, 10.5, 9.5];
+
+/** Del 9,5 al 14,5 y vuelta sobre `centro`. */
+const niveles = (centro: Lugar): GrupoEnVuelo => ({
+  nombre: `niveles-${centro.nombre}`,
+  hacer: async (pagina, medir) => {
+    await saltar(pagina, centro);
+    await esperarQuieto(pagina);
+    await medir(`niveles-${centro.nombre}-9,5-14,5`, async () => {
+      for (const zoom of NIVELES) {
+        await acercarA(pagina, zoom, 500);
+        await esperar(1500);
+      }
+    });
+  },
+});
+
+/**
+ * Los grupos del escenario `vuelos`: saltos de vista en vista (España, València, Barcelona y el
+ * Eixample), los cinco vuelos de 2,5 s del #61, alejarse del Eixample a España en 4 s y los
+ * niveles del #66 sobre Zaragoza y Barcelona. Cada gesto empieza con el mapa quieto y pintado.
+ */
+const GRUPOS_EN_VUELO: ReadonlyArray<GrupoEnVuelo> = [
+  {
+    nombre: "saltos",
+    hacer: async (pagina, medir) => {
+      await saltar(pagina, ESPANA);
+      await esperarQuieto(pagina);
+      for (const destino of [
+        lugar("valencia-8", [-0.376, 39.47], 8),
+        lugar("barcelona-12", BARCELONA, 12),
+        lugar("eixample-17", EIXAMPLE, 17),
+        lugar("eixample-18", EIXAMPLE, 18),
+        ESPANA,
+      ]) {
+        await medir(`salto-${destino.nombre}`, async () => {
+          await saltar(pagina, destino);
+          await esperar(2500);
+        });
+        await esperarQuieto(pagina);
+      }
+    },
+  },
+  {
+    nombre: "vuelos",
+    hacer: async (pagina, medir) => {
+      await saltar(pagina, ESPANA);
+      await esperarQuieto(pagina);
+      for (const destino of [
+        lugar("cataluna-8", [1.7, 41.75], 8),
+        lugar("barcelona-12", BARCELONA, 12),
+        lugar("eixample-17", EIXAMPLE, 17),
+        lugar("barcelona-11", BARCELONA, 11),
+        ESPANA,
+      ]) {
+        await medir(`vuelo-${destino.nombre}`, async () => {
+          await volar(pagina, destino, 2500);
+          await esperar(2500);
+        });
+        await esperarQuieto(pagina);
+      }
+    },
+  },
+  {
+    nombre: "alejar",
+    hacer: async (pagina, medir) => {
+      await saltar(pagina, lugar("eixample-17", EIXAMPLE, 17));
+      await esperarQuieto(pagina);
+      await medir("alejar-del-eixample-a-espana", async () => {
+        await acercarA(pagina, ESPANA.zoom, 4000);
+        await esperar(4000);
+      });
+    },
+  },
+  niveles(lugar("zaragoza", [-0.8891, 41.6488], 9.5)),
+  niveles(lugar("barcelona", BARCELONA, 9.5)),
+];
 
 interface Ronda {
   readonly cpu: number;
@@ -535,18 +877,13 @@ const ronda = async (
   await frenar(cdp, cpu);
   const red = seguirRed(pagina);
 
-  await pagina.goto(new URL(opciones.ruta, origen).href, { waitUntil: "load" });
-  await pagina.waitForFunction(
-    () => {
-      const carga = window.__celda.carga();
-      return carga.mapaBase !== undefined && carga.marcadores !== undefined;
-    },
-    undefined,
-    { timeout: 60_000, polling: 200 },
-  );
-  // Que terminen de llegar las teselas de la primera vista.
-  await esperar(3000);
+  await abrirYEsperar(pagina, origen);
   const carga = await pagina.evaluate(() => window.__celda.carga());
+  if (!(await atraparMapa(cdp))) {
+    process.stderr.write(
+      "  no se encuentra el mapa de MapLibre: los gestos de cámara no harán nada\n",
+    );
+  }
   const peticiones = await red.peticiones(await pagina.evaluate(() => performance.timeOrigin));
   if (opciones.cascada === true) {
     for (const p of [...peticiones].sort((a, b) => a.inicio - b.inicio)) {
@@ -577,17 +914,20 @@ const ronda = async (
   const gestos: Record<string, Fotogramas> = {};
   const marcadores: Record<string, Awaited<ReturnType<typeof contarMarcadores>>> = {};
   const resumenes: Record<string, ResumenDeTraza> = {};
-  const medir = async (nombre: string, accion: () => Promise<void>) => {
-    const hecho = await grabar(
-      pagina,
-      cdp,
-      nombre,
-      accion,
-      trazas === undefined ? undefined : NodePath.join(trazas, `cpu${cpu}`),
-    );
-    gestos[nombre] = hecho.fotogramas;
-    if (hecho.traza !== undefined) resumenes[nombre] = hecho.traza;
-  };
+  const medirEn =
+    (enPagina: Page, enCdp: CDPSession): Medir =>
+    async (nombre, accion) => {
+      const hecho = await grabar(
+        enPagina,
+        enCdp,
+        nombre,
+        accion,
+        trazas === undefined ? undefined : NodePath.join(trazas, `cpu${cpu}`),
+      );
+      gestos[nombre] = hecho.fotogramas;
+      if (hecho.traza !== undefined) resumenes[nombre] = hecho.traza;
+    };
+  const medir = medirEn(pagina, cdp);
 
   let ficha: Ronda["ficha"] = { fria: undefined, vecina: undefined, enCache: undefined };
   let memoria: Ronda["memoria"] = { total: undefined, hilo: undefined };
@@ -602,11 +942,9 @@ const ronda = async (
     marcadores.espana = await contarMarcadores(pagina);
     // Con toda España a la vista, los límites del mapa lo han centrado: se vuelve a Barcelona
     // tocando su hexágono, como haría una persona.
+    const hexagono = await asomarBarcelona(pagina);
     await medir("abrir-provincia", async () => {
-      await pagina
-        .getByRole("button", { name: /^Barcelona, / })
-        .first()
-        .tap();
+      await tocar(hexagono);
       await esperar(1200);
     });
     marcadores.provincia = await contarMarcadores(pagina);
@@ -643,7 +981,7 @@ const ronda = async (
   const recorridoPorElBorde = async () => {
     await esperar(1500);
     await medir("cerrar-ficha", async () => {
-      await pagina.getByRole("button", { name: "Cerrar", exact: true }).first().tap();
+      await tocar(pagina.getByRole("button", { name: "Cerrar", exact: true }).first());
       await pagina.waitForSelector("article[aria-label]", { state: "detached" });
       await esperar(1200);
     });
@@ -673,15 +1011,42 @@ const ronda = async (
     await esperar(1500);
     memoria = await medirMemoria(pagina, cdp);
   };
+  /**
+   * Los recorridos del #61 y el #66 con la cámara de MapLibre (#67). La primera página los hace
+   * todos sin medir, para que la caché HTTP tenga las teselas y la red no meta ruido. Después cada
+   * grupo de gestos va en una página nueva, con un mapa sin teselas en memoria: así un grupo no se
+   * aprovecha de lo que dejó el anterior, y alejarse del Eixample parte o no de lo mismo en todas
+   * las rondas.
+   */
+  const recorridoEnVuelo = async () => {
+    const elegidos = opciones.grupos?.split(",");
+    const grupos = GRUPOS_EN_VUELO.filter(
+      (grupo) => elegidos === undefined || elegidos.includes(grupo.nombre),
+    );
+    for (const grupo of grupos) {
+      await grupo.hacer(pagina, async (_nombre, accion) => {
+        await accion();
+      });
+    }
+    for (const grupo of grupos) {
+      const otra = await contexto.newPage();
+      const cdpOtra = await contexto.newCDPSession(otra);
+      await frenar(cdpOtra, cpu);
+      await abrirYEsperar(otra, origen);
+      await atraparMapa(cdpOtra);
+      await grupo.hacer(otra, medirEn(otra, cdpOtra));
+      if (grupo.nombre === "saltos") marcadores.espana = await contarMarcadores(otra);
+      await otra.close();
+    }
+  };
   const gestosYFicha = async () => {
     // La vista inicial es lo que Celda tiene, de lejos (#52). Se va a Barcelona entera como haría
-    // una persona: su hexágono y tres veces Acercar, hasta el zoom 10,7 o así.
+    // una persona: su hexágono, la ciudad en el centro y tres veces Acercar, hasta el zoom 10,7 o
+    // así. El hexágono va en el centro de la provincia (ADR 0024), lejos de la ciudad.
     await esperar(500);
-    await pagina
-      .getByRole("button", { name: /^Barcelona, / })
-      .first()
-      .tap();
+    await tocar(await asomarBarcelona(pagina));
     await esperar(1200);
+    await centrarEn(pagina, BARCELONA);
     await pulsar(pagina, "Acercar", 3);
     await esperar(1500);
     // Lejos: Barcelona entera.
@@ -723,7 +1088,9 @@ const ronda = async (
       ? recorridoPorEspana()
       : opciones.escenario === "borde"
         ? recorridoPorElBorde()
-        : gestosYFicha());
+        : opciones.escenario === "vuelos"
+          ? recorridoEnVuelo()
+          : gestosYFicha());
   }
   const trasElRecorrido = (
     await red.peticiones(await pagina.evaluate(() => performance.timeOrigin))
@@ -788,6 +1155,18 @@ const mediana = (valores: ReadonlyArray<number | undefined>): number | undefined
 
 const f = (v: number | undefined, decimales = 0) => (v === undefined ? "—" : v.toFixed(decimales));
 
+/**
+ * Cuánto cambia un valor de una ronda a otra: el menor, el mayor y la desviación típica. Una
+ * diferencia entre dos webs menor que esto es ruido de la máquina.
+ */
+const dispersion = (valores: ReadonlyArray<number | undefined>): string => {
+  const definidos = valores.filter((v): v is number => v !== undefined);
+  if (definidos.length < 2) return "—";
+  const media = definidos.reduce((a, b) => a + b, 0) / definidos.length;
+  const varianza = definidos.reduce((a, b) => a + (b - media) ** 2, 0) / (definidos.length - 1);
+  return `${Math.min(...definidos).toFixed(1)}–${Math.max(...definidos).toFixed(1)} · σ ${Math.sqrt(varianza).toFixed(1)}`;
+};
+
 const informe = (rondas: ReadonlyArray<Ronda>): string => {
   const lineas: Array<string> = [];
   for (const cpu of new Set(rondas.map((r) => r.cpu))) {
@@ -818,8 +1197,8 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
       );
     }
     lineas.push(
-      "\n| Gesto | fps | p95 ms | máx ms | >20 ms | >50 ms | LoAF | peor LoAF |",
-      "|---|---|---|---|---|---|---|---|",
+      "\n| Gesto | fps | fps por ronda | p95 ms | máx ms | >20 ms | >50 ms | LoAF | peor LoAF |",
+      "|---|---|---|---|---|---|---|---|---|",
     );
     for (const gesto of Object.keys(suyas[0]?.gestos ?? {})) {
       const g = (leer: (x: Fotogramas) => number) =>
@@ -834,7 +1213,7 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
         `| ${gesto} | ${f(
           g((x) => x.fps),
           1,
-        )} | ${f(
+        )} | ${dispersion(suyas.map((r) => r.gestos[gesto]?.fps))} | ${f(
           g((x) => x.p95),
           1,
         )} | ${f(g((x) => x.maximo))} | ${f(g((x) => x.perdidos))} | ${f(g((x) => x.mas50))} | ${f(g((x) => x.loaf))} | ${peor === undefined || peor.duracion === 0 ? "—" : `${Math.round(peor.duracion)} ms (estilo ${Math.round(peor.estilo)}) ${peor.guion}`} |`,
@@ -883,7 +1262,11 @@ const principal = async () => {
   const webs = opciones.web.split(",").map((web) => NodePath.resolve(web));
   const sitios = await Promise.all(
     webs.map((web) =>
-      servirSitio(web, NodePath.resolve(capas), opciones.escenario !== "barcelona"),
+      servirSitio(
+        web,
+        NodePath.resolve(capas),
+        opciones.escenario === "espana" || opciones.escenario === "borde",
+      ),
     ),
   );
   const navegador = await chromium.launch({
