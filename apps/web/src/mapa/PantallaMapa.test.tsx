@@ -59,7 +59,7 @@ describe("capa de emplazamientos en el mapa", () => {
 
   it("si no carga, lo dice con un reintento; al reintentar enseña la fecha de los datos", async () => {
     navegar(ruta.mapa, { reemplazar: true });
-    const { getByRole, findByRole, findByText, queryByText } = render(() => (
+    const { getByRole, findByText, queryByRole, queryByText } = render(() => (
       <App
         servicios={Layer.mergeAll(
           capaDePrueba([NO_LLEGA, Effect.succeed(CAPA)]),
@@ -82,15 +82,32 @@ describe("capa de emplazamientos en el mapa", () => {
 
     const fecha = await findByText(textoEntero("Datos del mapa: 26 sept 2026"));
     assert.strictEqual(fecha.closest("output")?.getAttribute("data-tono"), "fecha");
-    // Lo que Celda tiene es Barcelona, así que se ve al abrir: con su provincia llegan sus barrios,
-    // y con ellos el crédito de sus límites.
+    await waitFor(() => {
+      assert.isNull(queryByText(/No se han podido cargar los emplazamientos/u));
+    });
+    // Al abrir se ve la península, de lejos: no se descarga ninguna provincia, así que tampoco
+    // llegan los barrios de Barcelona ni el crédito de sus límites.
+    assert.isNull(queryByRole("link", { name: /Ajuntament de Barcelona/u }));
+  });
+
+  it("con la provincia de Barcelona llegan sus barrios y el crédito de sus límites", async () => {
+    navegar("/?emplazamiento=movistar-0802532&provincia=08", { reemplazar: true });
+    const { findByRole } = render(() => (
+      <App
+        servicios={Layer.mergeAll(
+          capaDePrueba([Effect.succeed(CAPA)]),
+          fichasDePrueba().capa,
+          simuladorDePrueba,
+          ubicacionDePrueba().capa,
+        )}
+      />
+    ));
+    flush();
+
     const credito = await findByRole("link", { name: /Ajuntament de Barcelona \(nov 2024/u });
     assert.strictEqual(credito.getAttribute("href"), FUENTE_DE_BARRIOS.enlace);
     assert.match(credito.getAttribute("title") ?? "", /^Límites de barrio/u);
     assert.include(credito.textContent ?? "", "CC BY 4.0");
-    await waitFor(() => {
-      assert.isNull(queryByText(/No se han podido cargar los emplazamientos/u));
-    });
   });
 });
 

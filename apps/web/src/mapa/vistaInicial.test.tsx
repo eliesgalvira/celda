@@ -1,4 +1,4 @@
-import { ESPANA, type Rectangulo } from "@celda/dominio/area";
+import { contiene, type Coordenada, ESPANA, type Rectangulo } from "@celda/dominio/area";
 import type { ProvinciaDelResumen, ResumenLeido } from "@celda/dominio/provincias";
 import { assert, describe, it } from "@effect/vitest";
 import { render } from "@solidjs/testing-library";
@@ -9,10 +9,10 @@ import { FUENTES_DE_PRUEBA } from "../capa/pruebas.ts";
 import {
   type AlAbrir,
   crearVistaInicial,
-  encuadreDeLoQueHay,
   encuadreInicial,
   type MapaQueSeEncuadra,
   type Movimiento,
+  type Pantalla,
   provinciaDelPunto,
   rellenoDeLaVista,
   zoomParaEncuadrar,
@@ -47,69 +47,41 @@ const resumenCon = (provincias: ReadonlyArray<ProvinciaDelResumen>): ResumenLeid
   provincias,
 });
 
-// Cataluña cubierta, Huesca a medias y Soria sin nada.
-const BARCELONA = provincia("08", "Barcelona", {
-  caja: caja(1.36, 41.19, 2.78, 42.32),
-  cubierta: true,
-});
-const GIRONA = provincia("17", "Girona", { caja: caja(1.72, 41.65, 3.33, 42.5), cubierta: true });
-const LLEIDA = provincia("25", "Lleida", { caja: caja(0.32, 41.27, 1.86, 42.86), cubierta: true });
-const TARRAGONA = provincia("43", "Tarragona", {
-  caja: caja(0.16, 40.52, 1.66, 41.58),
-  cubierta: true,
-});
-const HUESCA = provincia("22", "Huesca", { caja: caja(0.1, 41.4, 0.77, 42.6) });
-const SORIA = provincia("42", "Soria", {});
-const CATALUNA = resumenCon([BARCELONA, GIRONA, HUESCA, LLEIDA, SORIA, TARRAGONA]);
+// Cataluña cubierta y Huesca a medias.
+const CATALUNA = resumenCon([
+  provincia("08", "Barcelona", { caja: caja(1.36, 41.19, 2.78, 42.32), cubierta: true }),
+  provincia("17", "Girona", { caja: caja(1.72, 41.65, 3.33, 42.5), cubierta: true }),
+  provincia("22", "Huesca", { caja: caja(0.1, 41.4, 0.77, 42.6) }),
+  provincia("25", "Lleida", { caja: caja(0.32, 41.27, 1.86, 42.86), cubierta: true }),
+  provincia("43", "Tarragona", { caja: caja(0.16, 40.52, 1.66, 41.58), cubierta: true }),
+]);
 const MADRID_ENTERA = caja(-4.58, 39.88, -3.05, 41.17);
 const EN_MADRID = { longitud: -3.7, latitud: 40.42 };
+const SIN_PUNTO: AlAbrir = { punto: null, provinciaDelPunto: null };
 
 describe("encuadreInicial", () => {
-  it("sin punto, encuadra las provincias cubiertas, no las que están a medias", () => {
-    assert.deepStrictEqual(
-      encuadreInicial({ punto: null, provinciaDelPunto: null, resumen: CATALUNA }),
-      caja(0.16, 40.52, 3.33, 42.86),
-    );
-  });
-
-  it("sin ninguna cubierta, las que tienen algún emplazamiento; sin ninguna, España", () => {
-    assert.deepStrictEqual(encuadreDeLoQueHay(resumenCon([HUESCA, SORIA])), HUESCA.caja);
-    assert.deepStrictEqual(
-      encuadreInicial({ punto: null, provinciaDelPunto: null, resumen: resumenCon([SORIA]) }),
-      ESPANA.encuadre,
-    );
-  });
-
-  it("si el resumen no llega, España", () => {
-    assert.deepStrictEqual(
-      encuadreInicial({ punto: null, provinciaDelPunto: null, resumen: null }),
-      ESPANA.encuadre,
-    );
+  it("sin punto, la península entera", () => {
+    assert.deepStrictEqual(encuadreInicial(SIN_PUNTO), ESPANA.encuadre);
   });
 
   it("con un punto guardado, su provincia entera, aunque Celda no tenga datos de ella", () => {
     assert.deepStrictEqual(
-      encuadreInicial({ punto: EN_MADRID, provinciaDelPunto: MADRID_ENTERA, resumen: undefined }),
+      encuadreInicial({ punto: EN_MADRID, provinciaDelPunto: MADRID_ENTERA }),
       MADRID_ENTERA,
     );
   });
 
-  it("con el punto fuera de todas las provincias, lo que Celda tiene", () => {
+  it("con el punto fuera de todas las provincias, la península", () => {
     assert.deepStrictEqual(
-      encuadreInicial({
-        punto: { longitud: 2.35, latitud: 43.21 },
-        provinciaDelPunto: null,
-        resumen: CATALUNA,
-      }),
-      encuadreDeLoQueHay(CATALUNA),
+      encuadreInicial({ punto: { longitud: 2.35, latitud: 43.21 }, provinciaDelPunto: null }),
+      ESPANA.encuadre,
     );
   });
 
-  it("espera a saber si hay punto, dónde cae y, sin él, a que llegue el resumen", () => {
+  it("espera a saber si hay punto y dónde cae", () => {
     const esperando: ReadonlyArray<AlAbrir> = [
-      { punto: undefined, provinciaDelPunto: undefined, resumen: CATALUNA },
-      { punto: EN_MADRID, provinciaDelPunto: undefined, resumen: CATALUNA },
-      { punto: null, provinciaDelPunto: null, resumen: undefined },
+      { punto: undefined, provinciaDelPunto: undefined },
+      { punto: EN_MADRID, provinciaDelPunto: undefined },
     ];
     for (const alAbrir of esperando) assert.isUndefined(encuadreInicial(alAbrir));
   });
@@ -126,24 +98,146 @@ describe("encuadreInicial", () => {
     assert.isNull(provinciaDelPunto({ municipio: undefined, provincia: undefined }, provincias));
     assert.isUndefined(provinciaDelPunto(undefined, provincias));
   });
+});
 
-  it("de lo que Celda tiene al abrir no se pide ninguna provincia: se ve el resumen", () => {
-    const cubierto = encuadreDeLoQueHay(CATALUNA);
-    assert.isDefined(cubierto);
-    if (cubierto === undefined) return;
-    for (const [pantalla, escritorio] of [
-      [{ ancho: 390, alto: 844 }, false],
-      [{ ancho: 1400, alto: 900 }, true],
-    ] as const) {
-      const zoom = zoomParaEncuadrar(cubierto, pantalla, rellenoDeLaVista(escritorio));
-      assert.deepStrictEqual(provinciasDeLaVista(CATALUNA, { caja: cubierto, zoom }), []);
+/** Un rectángulo de la pantalla en píxeles CSS, desde la esquina de arriba a la izquierda. */
+interface Recuadro {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+const seTocan = (a: Recuadro, b: Recuadro): boolean =>
+  a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+/**
+ * Lo que tapa la interfaz en cada pantalla, medido en Chromium sobre `DisposicionMapa` al abrir:
+ * la cabecera con «Datos del mapa» debajo, las pastillas de abajo a la derecha (con Acercar y
+ * Alejar encima en escritorio) y los créditos de abajo a la izquierda.
+ */
+const interfaz = (pantalla: Pantalla, escritorio: boolean): ReadonlyArray<Recuadro> => {
+  const { ancho, alto } = pantalla;
+  return escritorio
+    ? [
+        { x0: 0, y0: 0, x1: ancho, y1: 96 },
+        { x0: ancho - 174, y0: alto - 308, x1: ancho, y1: alto },
+        { x0: 0, y0: alto - 56, x1: ancho - 96, y1: alto },
+      ]
+    : [
+        { x0: 0, y0: 0, x1: ancho, y1: 84 },
+        { x0: ancho - 162, y0: alto - 156, x1: ancho, y1: alto },
+        { x0: 0, y0: alto - 48, x1: 48, y1: alto },
+      ];
+};
+
+const MUNDO = 512;
+const xMercator = (longitud: number) => (longitud + 180) / 360;
+const yMercator = (latitud: number) => {
+  const seno = Math.sin((latitud * Math.PI) / 180);
+  return 0.5 - Math.log((1 + seno) / (1 - seno)) / (4 * Math.PI);
+};
+const latitudDeY = (y: number) => (Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180) / Math.PI;
+
+/** Dónde queda una caja en la pantalla y dónde queda el centro del mapa. */
+interface Encuadrado {
+  readonly recuadro: Recuadro;
+  readonly centro: Coordenada;
+}
+
+/**
+ * Dónde queda `caja` en la pantalla y en qué punto se centra el mapa, como hace `fitBounds` de
+ * MapLibre: el zoom que da `zoomParaEncuadrar` y el centro de la caja en el centro de lo que deja
+ * libre el relleno.
+ */
+const encuadrar = (encuadre: Rectangulo, pantalla: Pantalla, escritorio: boolean): Encuadrado => {
+  const relleno = rellenoDeLaVista(encuadre, pantalla, escritorio);
+  const escala = MUNDO * 2 ** zoomParaEncuadrar(encuadre, pantalla, relleno);
+  const oeste = xMercator(encuadre.suroeste.longitud);
+  const este = xMercator(encuadre.noreste.longitud);
+  const norte = yMercator(encuadre.noreste.latitud);
+  const sur = yMercator(encuadre.suroeste.latitud);
+  const libreX = (relleno.left + pantalla.ancho - relleno.right) / 2;
+  const libreY = (relleno.top + pantalla.alto - relleno.bottom) / 2;
+  const ancho = (este - oeste) * escala;
+  const alto = (sur - norte) * escala;
+  const centroX = (oeste + este) / 2 + (pantalla.ancho / 2 - libreX) / escala;
+  const centroY = (norte + sur) / 2 + (pantalla.alto / 2 - libreY) / escala;
+  return {
+    recuadro: {
+      x0: libreX - ancho / 2,
+      y0: libreY - alto / 2,
+      x1: libreX + ancho / 2,
+      y1: libreY + alto / 2,
+    },
+    centro: { longitud: centroX * 360 - 180, latitud: latitudDeY(centroY) },
+  };
+};
+
+const PANTALLAS: ReadonlyArray<readonly [Pantalla, boolean]> = [
+  [{ ancho: 360, alto: 640 }, false],
+  [{ ancho: 390, alto: 844 }, false],
+  [{ ancho: 412, alto: 915 }, false],
+  [{ ancho: 768, alto: 1024 }, true],
+  [{ ancho: 1440, alto: 900 }, true],
+];
+
+/** Que `encuadre` se vea entero, sin salirse de la pantalla ni quedar bajo la interfaz. */
+const seVeEntero = (encuadre: Rectangulo, pantalla: Pantalla, escritorio: boolean) => {
+  const { recuadro, centro } = encuadrar(encuadre, pantalla, escritorio);
+  const donde = `${pantalla.ancho}×${pantalla.alto}`;
+  assert.isAtLeast(recuadro.x0, 0, donde);
+  assert.isAtLeast(recuadro.y0, 0, donde);
+  assert.isAtMost(recuadro.x1, pantalla.ancho, donde);
+  assert.isAtMost(recuadro.y1, pantalla.alto, donde);
+  for (const tapado of interfaz(pantalla, escritorio)) {
+    assert.isFalse(seTocan(recuadro, tapado), `${donde}: bajo ${JSON.stringify(tapado)}`);
+  }
+  // El mapa solo aparta el centro que sale de los límites: este se queda donde lo pone el encuadre.
+  assert.isTrue(contiene(ESPANA.limites, centro), donde);
+};
+
+describe("el encuadre al abrir", () => {
+  it("la península se ve entera, sin nada encima, en los móviles, una tableta y un portátil", () => {
+    for (const [pantalla, escritorio] of PANTALLAS) {
+      seVeEntero(ESPANA.encuadre, pantalla, escritorio);
     }
-    const madrid = zoomParaEncuadrar(
-      MADRID_ENTERA,
-      { ancho: 390, alto: 844 },
-      rellenoDeLaVista(false),
+  });
+
+  it("con un punto, su provincia se ve entera y más de cerca que la península", () => {
+    const madrid = encuadreInicial({ punto: EN_MADRID, provinciaDelPunto: MADRID_ENTERA });
+    assert.deepStrictEqual(madrid, MADRID_ENTERA);
+    for (const [pantalla, escritorio] of PANTALLAS) {
+      seVeEntero(MADRID_ENTERA, pantalla, escritorio);
+      const zoom = (encuadre: Rectangulo) =>
+        zoomParaEncuadrar(encuadre, pantalla, rellenoDeLaVista(encuadre, pantalla, escritorio));
+      assert.isAbove(zoom(MADRID_ENTERA), zoom(ESPANA.encuadre) + 2);
+    }
+    const enElMovil = { ancho: 390, alto: 844 };
+    assert.closeTo(
+      zoomParaEncuadrar(
+        MADRID_ENTERA,
+        enElMovil,
+        rellenoDeLaVista(MADRID_ENTERA, enElMovil, false),
+      ),
+      7.4,
+      0.2,
     );
-    assert.closeTo(madrid, 7.3, 0.3);
+  });
+
+  it("en el móvil la península va encima de los controles; en un portátil, a su izquierda", () => {
+    const movil = rellenoDeLaVista(ESPANA.encuadre, { ancho: 390, alto: 844 }, false);
+    assert.isAbove(movil.bottom, movil.right);
+    const portatil = rellenoDeLaVista(ESPANA.encuadre, { ancho: 1440, alto: 900 }, true);
+    assert.isAbove(portatil.right, portatil.bottom);
+  });
+
+  it("al abrir con la península no se pide ninguna provincia: se ve el resumen", () => {
+    for (const [pantalla, escritorio] of PANTALLAS) {
+      const relleno = rellenoDeLaVista(ESPANA.encuadre, pantalla, escritorio);
+      const zoom = zoomParaEncuadrar(ESPANA.encuadre, pantalla, relleno);
+      assert.deepStrictEqual(provinciasDeLaVista(CATALUNA, { caja: ESPANA.encuadre, zoom }), []);
+    }
   });
 });
 
@@ -176,7 +270,6 @@ const montar = (activa = true) => {
   const [alAbrir, setAlAbrir] = createSignal<AlAbrir>({
     punto: undefined,
     provinciaDelPunto: undefined,
-    resumen: undefined,
   });
   const [mapa, setMapa] = createSignal<MapaQueSeEncuadra>();
   let vista: ReturnType<typeof crearVistaInicial> | undefined;
@@ -185,7 +278,7 @@ const montar = (activa = true) => {
       activa,
       alAbrir,
       mapa,
-      relleno: () => rellenoDeLaVista(false),
+      relleno: (encuadre) => rellenoDeLaVista(encuadre, { ancho: 390, alto: 844 }, false),
     });
     return <></>;
   });
@@ -203,9 +296,14 @@ const montar = (activa = true) => {
   };
 };
 
-const SIN_PUNTO_CON_CATALUNA: AlAbrir = { punto: null, provinciaDelPunto: null, resumen: CATALUNA };
-const SUROESTE: [number, number] = [0.16, 40.52];
-const NORESTE: [number, number] = [3.33, 42.86];
+const SUROESTE: [number, number] = [
+  ESPANA.encuadre.suroeste.longitud,
+  ESPANA.encuadre.suroeste.latitud,
+];
+const NORESTE: [number, number] = [
+  ESPANA.encuadre.noreste.longitud,
+  ESPANA.encuadre.noreste.latitud,
+];
 
 describe("crearVistaInicial", () => {
   it("con el mapa ya creado, lo encuadra una vez al saber qué se ve, sin animación", () => {
@@ -213,18 +311,18 @@ describe("crearVistaInicial", () => {
     const { abrir, ponerMapa } = montar();
     ponerMapa(mapa);
     assert.lengthOf(encuadres, 0);
-    abrir(SIN_PUNTO_CON_CATALUNA);
+    abrir(SIN_PUNTO);
     assert.deepStrictEqual(encuadres, [[SUROESTE, NORESTE]]);
-    // Que llegue otro resumen no lo vuelve a mover.
-    abrir({ ...SIN_PUNTO_CON_CATALUNA, resumen: resumenCon([HUESCA]) });
+    // Que luego cambie lo que se sabe al abrir no lo vuelve a mover.
+    abrir({ punto: EN_MADRID, provinciaDelPunto: MADRID_ENTERA });
     assert.lengthOf(encuadres, 1);
   });
 
   it("si ya se sabe al crear el mapa, el mapa nace ahí y no se vuelve a encuadrar", () => {
     const { mapa, encuadres } = mapaDePrueba();
     const { abrir, ponerMapa, vista } = montar();
-    abrir(SIN_PUNTO_CON_CATALUNA);
-    assert.deepStrictEqual(vista()?.alCrear(), caja(0.16, 40.52, 3.33, 42.86));
+    abrir(SIN_PUNTO);
+    assert.deepStrictEqual(vista()?.alCrear(), ESPANA.encuadre);
     ponerMapa(mapa);
     assert.lengthOf(encuadres, 0);
     assert.isUndefined(vista()?.alCrear());
@@ -235,7 +333,7 @@ describe("crearVistaInicial", () => {
     const { abrir, ponerMapa } = montar();
     ponerMapa(mapa);
     gesto();
-    abrir(SIN_PUNTO_CON_CATALUNA);
+    abrir(SIN_PUNTO);
     assert.lengthOf(encuadres, 0);
   });
 
@@ -244,7 +342,7 @@ describe("crearVistaInicial", () => {
     const { abrir, ponerMapa, vista } = montar();
     ponerMapa(mapa);
     vista()?.yaColocado();
-    abrir(SIN_PUNTO_CON_CATALUNA);
+    abrir(SIN_PUNTO);
     assert.lengthOf(encuadres, 0);
   });
 
@@ -252,7 +350,7 @@ describe("crearVistaInicial", () => {
     const { mapa, encuadres } = mapaDePrueba();
     const { abrir, ponerMapa, vista } = montar(false);
     ponerMapa(mapa);
-    abrir(SIN_PUNTO_CON_CATALUNA);
+    abrir(SIN_PUNTO);
     assert.lengthOf(encuadres, 0);
     assert.isUndefined(vista()?.encuadre());
   });

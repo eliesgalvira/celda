@@ -18,7 +18,7 @@ export interface Area {
   readonly nombre: string;
   /** Lo que se ve al abrir el mapa, en cualquier tamaño de pantalla. */
   readonly encuadre: Rectangulo;
-  /** Hasta dónde se puede mover el mapa. */
+  /** Hasta dónde llega el centro del mapa al moverlo. */
   readonly limites: Rectangulo;
   readonly zoomMinimo: number;
   readonly zoomMaximo: number;
@@ -26,14 +26,16 @@ export interface Area {
 
 /**
  * El mapa de Celda desde la capa por provincias (ADR 0016): se mueve por toda España, con
- * Canarias. Su encuadre es la península con Baleares, lo que se ve si no se sabe nada mejor: la
- * vista inicial de la web encuadra lo que Celda ya tiene o la provincia del punto de referencia.
+ * Canarias. Su encuadre es la península entera, del cabo Touriñán al de Creus y de Estaca de Bares
+ * a Tarifa: lo que se ve al abrir sin punto de referencia. Baleares, Canarias, Ceuta y Melilla no
+ * cuentan: con ellas la península se vería más pequeña, y en un móvil de 320 px no cabría al zoom
+ * mínimo.
  */
 export const ESPANA: Area = {
   nombre: "España",
   encuadre: {
-    suroeste: { longitud: -9.4, latitud: 35.9 },
-    noreste: { longitud: 4.4, latitud: 43.8 },
+    suroeste: { longitud: -9.35, latitud: 35.95 },
+    noreste: { longitud: 3.4, latitud: 43.85 },
   },
   limites: {
     suroeste: { longitud: -19.5, latitud: 26.5 },
@@ -109,21 +111,24 @@ export const cajaDe = (puntos: ReadonlyArray<Coordenada>): Rectangulo | undefine
   };
 };
 
+/** El punto del rectángulo más cercano a `punto`: él mismo si cae dentro. */
+export const alRectangulo = (rectangulo: Rectangulo, punto: Coordenada): Coordenada => ({
+  longitud: Math.min(
+    Math.max(punto.longitud, rectangulo.suroeste.longitud),
+    rectangulo.noreste.longitud,
+  ),
+  latitud: Math.min(
+    Math.max(punto.latitud, rectangulo.suroeste.latitud),
+    rectangulo.noreste.latitud,
+  ),
+});
+
 /**
  * Distancia en metros de un punto al borde más cercano de un rectángulo, 0 si cae dentro. Mide
  * sobre la esfera (haversine) porque puede ser de cientos de kilómetros: de Tenerife a Barcelona.
  */
 export const distanciaAlRectangulo = (punto: Coordenada, rectangulo: Rectangulo): number => {
-  const cercano = {
-    longitud: Math.min(
-      Math.max(punto.longitud, rectangulo.suroeste.longitud),
-      rectangulo.noreste.longitud,
-    ),
-    latitud: Math.min(
-      Math.max(punto.latitud, rectangulo.suroeste.latitud),
-      rectangulo.noreste.latitud,
-    ),
-  };
+  const cercano = alRectangulo(rectangulo, punto);
   if (mismaCoordenada(punto, cercano)) return 0;
   const radianes = Math.PI / 180;
   const dLatitud = (cercano.latitud - punto.latitud) * radianes;

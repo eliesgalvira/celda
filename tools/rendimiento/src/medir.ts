@@ -1116,7 +1116,7 @@ const ronda = async (
     }
   };
   const gestosYFicha = async () => {
-    // La vista inicial es lo que Celda tiene, de lejos (#52). Se va a Barcelona entera como haría
+    // La vista inicial es la península entera, de lejos (#52). Se va a Barcelona entera como haría
     // una persona: su hexágono, la ciudad en el centro y tres veces Acercar, hasta el zoom 10,7 o
     // así. El hexágono va en el centro de la provincia (ADR 0024), lejos de la ciudad.
     await esperar(500);
