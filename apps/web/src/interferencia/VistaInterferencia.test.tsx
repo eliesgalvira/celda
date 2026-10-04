@@ -54,13 +54,13 @@ const montar = (inicial: { calculo: CalculoVista; referencia?: "gps" | "elegido"
 };
 
 describe("panel de la vista de interferencia", () => {
-  it("explica que solo se estorban las de la misma compañía y frecuencia, y que es un modelo", () => {
-    const { getByText, getByRole } = montar({
+  it("explica que solo se estorban las de la misma compañía y frecuencia, y que es una simulación", () => {
+    const { getByText, getByRole, queryByText } = montar({
       calculo: { estado: "lista", valor: undefined, conTrama: true },
     });
     getByRole("heading", { name: "Interferencia entre antenas" });
     getByText("Simulación orientativa");
-    getByText("Modelo sinr@1");
+    assert.isNull(queryByText(/sinr@/u));
     getByText(
       textoEntero("Solo se estorban las antenas de la misma compañía en la misma frecuencia."),
     );

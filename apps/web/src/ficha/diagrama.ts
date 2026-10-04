@@ -1,5 +1,4 @@
 import {
-  diagramaSector,
   type ParamsDiagramaSector,
   type ResultadoDiagramaSector,
   SECTOR_TIPICO,
@@ -69,13 +68,12 @@ const ORIENTACION = termino("azimut", "Orientación");
 export interface TextosDiagrama {
   readonly titulo: string;
   readonly descripcion: string;
-  readonly modelo: string;
   readonly leyenda: ReadonlyArray<string>;
   /** Con la orientación, los sectores y el modelo subrayados una vez entre todas. */
   readonly notas: ReadonlyArray<TextoMarcado>;
 }
 
-/** Lo que dice el diagrama: qué modelo es, hacia dónde apunta cada sector y de dónde sale. */
+/** Lo que dice el diagrama: que es un modelo, hacia dónde apunta cada sector y de dónde sale. */
 export const textosDiagrama = (orientacion: Orientacion): TextosDiagrama => {
   const n = orientacion.azimuts.length;
   const sectores = n === 1 ? "Un sector" : `${n} sectores`;
@@ -87,7 +85,6 @@ export const textosDiagrama = (orientacion: Orientacion): TextosDiagrama => {
   return {
     titulo: "Diagrama de radiación de los sectores",
     descripcion: `Modelo, no medida. ${sectores} ${hacia}. Cada uno concentra la señal en un haz de ${SECTOR_TIPICO.anchoHazGrados}° y pierde hasta ${SECTOR_TIPICO.atenuacionMaximaDb} dB hacia atrás.`,
-    modelo: `${diagramaSector.id} v${diagramaSector.version}`,
     leyenda: orientacion.azimuts.map(
       (azimut, k) => `Sector ${k + 1} · ${azimutDe(orientacion, azimut)}`,
     ),

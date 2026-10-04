@@ -7,7 +7,7 @@ import { Etiqueta } from "../Etiqueta.tsx";
 /**
  * El diagrama de radiación de los sectores de un emplazamiento (historias 15 y 16), como el
  * diagrama polar del prototipo v6: el borde es 0 dB y el centro, la atenuación máxima. Siempre
- * lleva la etiqueta de modelo con su versión y dice si la orientación es estimada o supuesta.
+ * lleva la etiqueta de modelo y dice si la orientación es estimada o supuesta.
  */
 
 const TAMANO = 300;
@@ -197,8 +197,6 @@ export interface DiagramaRadiacionProps {
   readonly titulo: string;
   /** Lo que enseña el diagrama, en una o dos frases, para quien no lo ve. */
   readonly descripcion: string;
-  /** Qué modelo es y su versión, como «diagrama-sector v1». */
-  readonly modelo: string;
   /** Una línea por sector bajo el diagrama, como «Sector 1 · 0°». */
   readonly leyenda: ReadonlyArray<string>;
   /** De dónde sale la forma y la orientación. Pueden llevar términos. */
@@ -223,7 +221,6 @@ export function DiagramaRadiacion(props: DiagramaRadiacionProps) {
     <figure class="flex flex-col items-center gap-3">
       <div class="flex w-full flex-wrap items-center gap-x-3 gap-y-1">
         <Etiqueta tono="modelo">Modelo</Etiqueta>
-        <span class="font-mono text-[11px] text-tinta-suave">{props.modelo}</span>
       </div>
       <svg
         viewBox={`0 0 ${TAMANO} ${TAMANO}`}

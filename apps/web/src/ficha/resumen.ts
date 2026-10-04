@@ -12,6 +12,7 @@ import type { EstacionTecnica } from "@celda/ui/panel/DatosTecnicos.tsx";
 import type { FilaEje } from "@celda/ui/panel/EjeFrecuencias.tsx";
 
 import {
+  claveDeOrigen,
   comprobadoEl,
   enumerar,
   fechaCorta,
@@ -177,7 +178,7 @@ export const datosTecnicosDe = (
     sinExpedientes: sinBandasDe(estacion),
     origenes: estacion.origenes.map((origen) => ({
       fuente: NOMBRE_FUENTE[origen.fuente],
-      clave: origen.clave,
+      clave: claveDeOrigen(origen),
       fecha:
         origen.afirma === "desmontada"
           ? `la da por desmontada desde el ${fechaCorta(origen.fecha)}`

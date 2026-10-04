@@ -93,7 +93,6 @@ export function ComoEmite(props: { readonly clave: string }) {
       <DiagramaRadiacion
         titulo={textos.titulo}
         descripcion={textos.descripcion}
-        modelo={textos.modelo}
         leyenda={textos.leyenda}
         notas={textos.notas.map((nota) => (
           <TextoConTerminos texto={nota} />

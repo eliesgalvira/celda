@@ -38,9 +38,13 @@ describe("diagrama de radiación del panel", () => {
     assert.include(textos.descripcion, "orientación estimada a 40°, 160° y 280°, ±15°");
   });
 
-  it("dice qué modelo es y su versión", () => {
+  it("dice que es un modelo sin dar su identificador interno", () => {
     const textos = textosDiagrama(orientacionDe([]));
-    assert.strictEqual(textos.modelo, `diagrama-sector v${diagramaSector.version}`);
+    assert.notProperty(textos, "modelo");
+    assert.notMatch(
+      [textos.titulo, textos.descripcion, ...textos.notas.map(textoPlano)].join(" "),
+      /diagrama-sector|\bv\d/u,
+    );
     assert.include(textoPlano(textos.notas.at(-1) ?? []), "haz de 65°");
     // La orientación, los sectores y el modelo se subrayan una vez entre todas las notas.
     assert.deepStrictEqual(terminosDe(textos.notas), ["azimut", "sector", "modelo"]);

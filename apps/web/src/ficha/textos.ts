@@ -150,12 +150,30 @@ export const ENLACE_FUENTE: Readonly<Record<Fuente, string>> = {
 };
 
 /**
- * El código de la observación, delante de su fecha: «086040, ». El registro oficial pone en su
- * clave la razón social y el código («VODAFONE ESPAÑA, S.A.U. - 086040»).
+ * El código de una observación, sin lo demás de su clave: «086040». El registro oficial pone en su
+ * clave la razón social y el código («VODAFONE ESPAÑA, S.A.U. - 086040»); la comunidad, la
+ * compañía y el código («vodafone - 086040»). Una clave sin código no da nada.
  */
+export const codigoDeLaClave = (clave: string): string => {
+  const codigo = clave.split(" - ").at(-1)?.trim() ?? "";
+  return codigo === clave ? "" : codigo;
+};
+
+/** El código de la observación, delante de su fecha: «086040, ». */
 const codigoDeOrigen = (origen: OrigenDeFicha): string => {
-  const codigo = origen.clave.split(" - ").at(-1)?.trim() ?? "";
-  return codigo === "" || codigo === origen.clave ? "" : `${codigo}, `;
+  const codigo = codigoDeLaClave(origen.clave);
+  return codigo === "" ? "" : `${codigo}, `;
+};
+
+/**
+ * De dónde sale una observación en los datos técnicos: la del registro oficial, tal como él
+ * escribe al titular y el código; la de otra fuente, solo su código, porque el resto de su clave
+ * es interno de Celda.
+ */
+export const claveDeOrigen = (origen: OrigenDeFicha): string => {
+  if (origen.fuente === "registro-oficial") return origen.clave;
+  const codigo = codigoDeLaClave(origen.clave);
+  return codigo === "" ? "" : `código ${codigo}`;
 };
 
 /** El nombre de una fuente en la ficha; el registro oficial lleva su explicación. */

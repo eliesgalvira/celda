@@ -981,7 +981,6 @@ export function PantallaMapa() {
     return (
       <Pista
         texto={actual.texto}
-        modelo={actual.modelo}
         accion={
           reintentar === false ? undefined : (
             <Boton
@@ -1171,7 +1170,7 @@ export function PantallaMapa() {
                 <>
                   <ControlDelMapa
                     etiqueta="Foto aérea"
-                    detalle="La ortofoto del IGN bajo las calles y los datos."
+                    detalle="Fotos aéreas del Instituto Geográfico Nacional bajo las calles."
                     icono={<IconoFotoAerea />}
                     activo={foto.encendida()}
                     disabled={!listo()}
@@ -1383,7 +1382,6 @@ type MarcaDeLaCapa =
   | { readonly tipo: "sin-datos"; readonly barridas: ReadonlyArray<string> }
   | {
       readonly tipo: "datos";
-      readonly version: string;
       readonly fecha: number;
       readonly hasta: number;
       readonly barrido: number | null;
@@ -1398,10 +1396,9 @@ const marcaDeLaCapa = (estado: EstadoCapa, vista: EstadoDeLaVista | undefined): 
   }
   if (vista?.tipo === "sin-datos") return vista;
   return vista?.tipo === "datos"
-    ? { ...vista, version: resumen.version }
+    ? vista
     : {
         tipo: "datos",
-        version: resumen.version,
         fecha: resumen.fecha,
         hasta: resumen.fecha,
         barrido: null,
@@ -1427,12 +1424,12 @@ const detalleDeMarca = (
       : `Por ahora tiene los emplazamientos de ${enumerar(marca.barridas)}.`;
   }
   return marca.tipo === "datos"
-    ? `${emplazamientos ?? 0} emplazamientos${donde.length === 0 ? "" : ` en ${enumerar(donde)}`} · capa ${marca.version}`
+    ? `${emplazamientos ?? 0} emplazamientos${donde.length === 0 ? "" : ` en ${enumerar(donde)}`}`
     : "";
 };
 
 const EXPLICACION_FALLO_CAPA = {
-  "sin-publicar": "Todavía no hay ninguna capa de emplazamientos publicada.",
+  "sin-publicar": "Celda todavía no ha publicado ningún emplazamiento.",
   "sin-origen":
     "El servidor de Celda no ha dicho qué datos cargar. Puede fallar la conexión o estar bloqueado el servidor.",
   "sin-descarga":

@@ -38,11 +38,11 @@ describe("queSale", () => {
         "Tipo de red",
         "Potencia de la señal",
         "Dónde la tomaste",
-        "Emplazamiento que daba servicio",
+        "Código del emplazamiento que daba servicio",
         "Posición del emplazamiento",
         "Orientación del sector",
         "Creada",
-        "Identificador",
+        "Código al azar de esta aportación",
       ],
     );
     assert.deepInclude(datos, { nombre: "Orientación del sector", valor: "no se sabe" });
@@ -77,10 +77,13 @@ describe("textosDelFallo", () => {
       textosDelFallo(new EnvioNoValido({ motivo: "la medida está fuera de España" }), AHORA).texto,
       /fuera de España/u,
     );
-    assert.match(
-      textosDelFallo(new AlmacenNoDisponible({ motivo: "Sin IndexedDB" }), AHORA).texto,
-      /Sin guardarla no se envía/u,
-    );
+    const sinAlmacen = textosDelFallo(
+      new AlmacenNoDisponible({ motivo: "IndexedDB ha rechazado la operación" }),
+      AHORA,
+    ).texto;
+    assert.match(sinAlmacen, /Sin guardarla no se envía/u);
+    // El error del navegador es técnico: no se enseña.
+    assert.notInclude(sinAlmacen, "IndexedDB");
   });
 });
 

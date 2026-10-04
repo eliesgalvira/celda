@@ -24,7 +24,7 @@ export const variantesDatosDelMapa = cva(
 export type DatosDelMapaProps = VariantProps<typeof variantesDatosDelMapa> & {
   /** Qué se ve. Puede llevar un `Termino`. */
   readonly texto: JSX.Element;
-  /** Detalle para quien pasa el puntero, como la versión exacta de la capa. */
+  /** Detalle para quien pasa el puntero, como cuántos emplazamientos hay y dónde. */
   readonly detalle?: string;
 };
 

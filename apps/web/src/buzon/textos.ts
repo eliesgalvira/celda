@@ -59,23 +59,21 @@ export const tituloDeAportacion = (aportacion: AportacionCompartible): string =>
   }
 };
 
-/** La línea de detalle de una aportación en la lista del dispositivo. */
+/**
+ * La línea de detalle de una aportación en la lista del dispositivo: cuándo se creó y, de una
+ * medida, su potencia. La clave del emplazamiento no sale: es interna y no dice nada a quien lee.
+ */
 export const detalleDeAportacion = (aportacion: AportacionCompartible): string => {
   const cuando = `Del ${fechaYHora(aportacion.creada)}`;
-  switch (aportacion.tipo) {
-    case "propia":
-      return `${cuando} · ${String(aportacion.senal.rsrpDbm).replace("-", "−")} dBm junto a ${aportacion.unidaA.emplazamiento}`;
-    case "correccion-propuesta":
-      return aportacion.emplazamiento === null ? cuando : `${cuando} · ${aportacion.emplazamiento}`;
-    case "corroboracion":
-      return `${cuando} · ${aportacion.emplazamiento}`;
-  }
+  return aportacion.tipo === "propia"
+    ? `${cuando} · ${String(aportacion.senal.rsrpDbm).replace("-", "−")} dBm`
+    : cuando;
 };
 
 const datosDeMedida = (medida: MedidaPropia): ReadonlyArray<DatoQueSale> => [
   ...valoresDeLaLectura(medida.senal).map(({ nombre, valor }) => ({ nombre, valor })),
   { nombre: "Dónde la tomaste", valor: textoCoordenada(medida.punto) },
-  { nombre: "Emplazamiento que daba servicio", valor: medida.unidaA.emplazamiento },
+  { nombre: "Código del emplazamiento que daba servicio", valor: medida.unidaA.emplazamiento },
   { nombre: "Posición del emplazamiento", valor: textoCoordenada(medida.unidaA.posicion) },
   {
     nombre: "Orientación del sector",
@@ -111,12 +109,13 @@ const datosDeCambio = (correccion: CorreccionPropuesta): ReadonlyArray<DatoQueSa
 
 /**
  * Todo lo que sale del dispositivo al compartir la aportación, dato a dato y con el valor tal como
- * se envía. Con lo que va en el sobre de toda aportación: su identificador y su fecha.
+ * se envía. Con lo que va en el sobre de toda aportación: su identificador y su fecha. Los códigos
+ * se enseñan tal cual porque es lo que sale, pero su nombre dice qué son.
  */
 export const queSale = (aportacion: AportacionCompartible): ReadonlyArray<DatoQueSale> => {
   const sobre: ReadonlyArray<DatoQueSale> = [
     { nombre: "Creada", valor: fechaYHora(aportacion.creada) },
-    { nombre: "Identificador", valor: aportacion.id },
+    { nombre: "Código al azar de esta aportación", valor: aportacion.id },
   ];
   switch (aportacion.tipo) {
     case "propia":
@@ -125,15 +124,15 @@ export const queSale = (aportacion: AportacionCompartible): ReadonlyArray<DatoQu
       return [
         ...(aportacion.emplazamiento === null
           ? []
-          : [{ nombre: "Emplazamiento", valor: aportacion.emplazamiento }]),
+          : [{ nombre: "Código del emplazamiento", valor: aportacion.emplazamiento }]),
         ...datosDeCambio(aportacion),
         { nombre: "Nota", valor: aportacion.nota ?? "sin nota" },
         ...sobre,
       ];
     case "corroboracion":
       return [
-        { nombre: "Emplazamiento", valor: aportacion.emplazamiento },
-        { nombre: "Corrección que respaldas", valor: aportacion.correccion },
+        { nombre: "Código del emplazamiento", valor: aportacion.emplazamiento },
+        { nombre: "Código de la corrección que respaldas", valor: aportacion.correccion },
         ...sobre,
       ];
   }
@@ -202,10 +201,12 @@ export const textosDelFallo = (fallo: FalloAlCompartir, ahora: number): TextosDe
         titulo: "El buzón no acepta esta aportación",
         texto: `No es posible: ${fallo.motivo}.`,
       };
+    // El motivo es el error del navegador, en inglés y técnico: no se enseña.
     case "AlmacenNoDisponible":
       return {
         titulo: "No se ha podido guardar en este dispositivo",
-        texto: `Sin guardarla no se envía. ${fallo.motivo}.`,
+        texto:
+          "Sin guardarla no se envía. Este navegador no deja a Celda guardar datos en el dispositivo, como pasa en algunas ventanas privadas.",
       };
   }
 };

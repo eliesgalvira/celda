@@ -21,6 +21,7 @@ export interface ExpedienteTecnico {
 /** De dónde sale una estación base: la fuente, su clave y su fecha, ya escritas. */
 export interface OrigenTecnico {
   readonly fuente: string;
+  /** Cómo la identifica la fuente, ya escrito para leerlo; vacío si no hay nada que decir. */
   readonly clave: string;
   readonly fecha: string;
 }
@@ -119,7 +120,9 @@ export function DatosTecnicos(props: DatosTecnicosProps) {
                 {(origen) => (
                   <li>
                     <span class="font-semibold text-tinta">{origen.fuente}</span>
-                    {` · ${origen.clave} · ${origen.fecha}`}
+                    {origen.clave === ""
+                      ? ` · ${origen.fecha}`
+                      : ` · ${origen.clave} · ${origen.fecha}`}
                   </li>
                 )}
               </For>

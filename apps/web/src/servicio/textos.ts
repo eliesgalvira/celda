@@ -1,5 +1,4 @@
 import { marcado, primeraVezEn, termino, type TextoMarcado } from "@celda/dominio/glosario";
-import { sectorServicio } from "@celda/sim/sectorServicio";
 import type { DatoServicio } from "@celda/ui/ubicacion/LecturaServicio.tsx";
 
 import { azimutDe, enumerar, type Orientacion } from "../ficha/diagrama.ts";
@@ -26,8 +25,6 @@ export interface TextosServicio {
   readonly datos: ReadonlyArray<DatoServicio>;
   /** La frase que lo explica. */
   readonly veredicto: TextoMarcado;
-  /** Qué modelo es, como «sector-servicio v1». */
-  readonly modelo: string;
   /** De dónde sale la orientación y qué quiere decir para el sector que da servicio. */
   readonly nota: TextoMarcado;
   /** Lo que dice la etiqueta junto al punto en el mapa: «340 m · sector 2». */
@@ -49,11 +46,10 @@ export const textosServicio = (
   const distancia = textoDistancia(lectura.distancia);
   // El emplazamiento visto desde el punto: el rumbo contrario al del emplazamiento al punto.
   const hacia = `hacia el ${nombreRumbo(lectura.rumbo + 180)}`;
-  const modelo = MODELO_SERVICIO;
   // El veredicto y la nota se leen seguidos: cada término se subraya una vez entre los dos.
   const conNota = (veredicto: TextoMarcado) => {
     const [primero = [], nota = []] = primeraVezEn([veredicto, notaServicio(orientacion)]);
-    return { veredicto: primero, nota, modelo };
+    return { veredicto: primero, nota };
   };
 
   if (lectura.sector === undefined) {
@@ -104,6 +100,3 @@ export const notaServicio = (orientacion: Orientacion): TextoMarcado => {
     ? marcado`${termino("azimut", "Orientación")} estimada, con ±${String(orientacion.margen)}° de margen en cada eje. Cerca del límite entre dos sectores, el ${servicio} puede ser el de al lado.`
     : marcado`${termino("azimut", "Orientación")} supuesta a ${enumerar(orientacion.azimuts)}: ninguna fuente publica hacia dónde apuntan los sectores, así que el ${servicio} sale de esa suposición y puede ser otro.`;
 };
-
-/** Qué modelo calcula el sector que da servicio, como «sector-servicio v1». */
-export const MODELO_SERVICIO = `${sectorServicio.id} v${sectorServicio.version}`;

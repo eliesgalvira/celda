@@ -19,7 +19,6 @@ const lobulo = (azimut: number) =>
 const marco = {
   titulo: "Diagrama de radiación",
   descripcion: "Tres sectores con orientación supuesta a 0°, 120° y 240°.",
-  modelo: "diagrama-sector v1",
   leyenda: ["Sector 1 · 0°", "Sector 2 · 120°", "Sector 3 · 240°"],
   notas: ["Orientación supuesta."],
   atenuacionMaxima: 30,
@@ -27,7 +26,7 @@ const marco = {
 };
 
 describe("DiagramaRadiacion", () => {
-  it("es una imagen con nombre y descripción, marcada como modelo con su versión", () => {
+  it("es una imagen con nombre y descripción, marcada como modelo y sin su identificador interno", () => {
     const { getByRole, getByText } = render(() => (
       <DiagramaRadiacion {...marco}>
         <LobulosSector
@@ -52,7 +51,7 @@ describe("DiagramaRadiacion", () => {
     assert.lengthOf(imagen.querySelectorAll("path"), 3);
     assert.strictEqual(imagen.querySelector("path")?.namespaceURI, "http://www.w3.org/2000/svg");
     getByText("Modelo");
-    getByText("diagrama-sector v1");
+    assert.notMatch(document.body.textContent ?? "", /diagrama-sector|\bv\d/u);
     getByText("Sector 2 · 120°");
     getByText("Orientación supuesta.");
   });

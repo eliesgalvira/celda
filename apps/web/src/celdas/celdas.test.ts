@@ -178,14 +178,16 @@ describe("pista de las celdas", () => {
     }
   });
 
-  it("dice que se calculan, que son un modelo con su versión o que han fallado", () => {
+  it("dice que se calculan, qué son y que son una simulación, o que han fallado", () => {
     assert.strictEqual(pistaDeCeldas(true, "calculando")?.texto, "Calculando las celdas…");
     assert.strictEqual(pistaDeCeldas(true, "sin-pedir")?.texto, "Calculando las celdas…");
     const listas = pistaDeCeldas(true, "listas");
-    assert.strictEqual(listas?.modelo, "celdas@1");
+    assert.strictEqual(
+      listas?.texto,
+      "Zona más cercana a cada emplazamiento. Simulación, no cobertura real.",
+    );
     assert.isFalse(listas?.reintentar);
     const fallo = pistaDeCeldas(true, "fallo");
-    assert.isUndefined(fallo?.modelo);
     assert.strictEqual(fallo?.reintentar, "calculo");
   });
 
@@ -193,7 +195,6 @@ describe("pista de las celdas", () => {
     const girona = { codigo: "17", nombre: "Girona" };
     const cargando = pistaDeCeldas(true, "listas", { tipo: "cargando", provincias: [girona] });
     assert.strictEqual(cargando?.texto, "Cargando Girona para las celdas de junto al borde…");
-    assert.isUndefined(cargando?.modelo);
     const fallo = pistaDeCeldas(true, "listas", { tipo: "fallo", provincias: [girona] });
     assert.match(fallo?.texto ?? "", /^No han llegado los emplazamientos de Girona/u);
     assert.deepStrictEqual(fallo?.reintentar, ["17"]);

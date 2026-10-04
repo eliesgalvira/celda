@@ -20,8 +20,6 @@ export interface LecturaServicioProps {
   readonly datos: ReadonlyArray<DatoServicio> | undefined;
   /** La frase que dice qué quiere decir. Puede llevar términos. */
   readonly veredicto: JSX.Element | undefined;
-  /** Qué modelo es y su versión, como «sector-servicio v1». */
-  readonly modelo: string;
   /** De dónde sale la orientación. Puede llevar términos. */
   readonly nota: JSX.Element;
 }
@@ -70,7 +68,6 @@ export function LecturaServicio(props: LecturaServicioProps) {
       <div class="flex flex-col gap-1">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
           <Etiqueta tono="modelo">Modelo</Etiqueta>
-          <span class="font-mono text-[11px] text-tinta-suave">{props.modelo}</span>
         </div>
         <p class="text-xs leading-snug text-tinta-suave">{props.nota}</p>
       </div>

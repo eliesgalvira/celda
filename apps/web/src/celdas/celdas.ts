@@ -1,7 +1,7 @@
 import { cajaDe, type Coordenada, type Rectangulo } from "@celda/dominio/area";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { aPlano, desdePlano } from "@celda/dominio/plano";
-import { celdas, type ParamsCeldas, type ResultadoCeldas } from "@celda/sim/celdas";
+import type { ParamsCeldas, ResultadoCeldas } from "@celda/sim/celdas";
 
 import { enumerar, type EstadoDeLasVecinas, VECINAS_LISTAS } from "../capa/vecinas.ts";
 
@@ -240,8 +240,6 @@ export type CalculoCeldas =
 /** Lo que dice la pista del mapa sobre las celdas. */
 export interface PistaCeldas {
   readonly texto: string;
-  /** La simulación, `id@version`, cuando lo que se ve es su resultado. */
-  readonly modelo?: string;
   /**
    * Qué se ofrece reintentar: el cálculo, o pedir otra vez las provincias vecinas que no han
    * llegado, por código.
@@ -251,7 +249,7 @@ export interface PistaCeldas {
 
 /**
  * La pista que acompaña a las celdas mientras se ven, es decir, con el mapa a su zoom o más
- * cerca. Cuando se dibujan, dice que son un modelo y su versión. Si falta alguna provincia vecina,
+ * cerca. Cuando se dibujan, dice qué son y que son una simulación. Si falta alguna provincia vecina,
  * lo dice antes que nada: las celdas junto a su borde no se dibujan hasta que llega.
  */
 export const pistaDeCeldas = (
@@ -277,8 +275,7 @@ export const pistaDeCeldas = (
       return { texto: "Calculando las celdas…", reintentar: false };
     case "listas":
       return {
-        texto: "Zona más cercana a cada emplazamiento",
-        modelo: `${celdas.id}@${celdas.version}`,
+        texto: "Zona más cercana a cada emplazamiento. Simulación, no cobertura real.",
         reintentar: false,
       };
     case "fallo":

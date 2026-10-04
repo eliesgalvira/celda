@@ -154,7 +154,7 @@ export function TablaDelEjercicio(props: TablaDelEjercicioProps) {
                       {(valor) => (
                         <td
                           colspan={fila.valores.length === 1 ? props.columnas.length : undefined}
-                          title={`${fila.fuente} (${fila.fecha})`}
+                          title={fila.fecha === "" ? fila.fuente : `${fila.fuente} (${fila.fecha})`}
                           data-marca={valor().marca}
                           class={
                             (fila.valores.length === 1 ? "px-2 py-2 " : "px-1 py-2 text-center ") +
