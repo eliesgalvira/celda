@@ -377,7 +377,7 @@ _Evitar_: clientes, carga
 - Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.
 - El hexágono de una **provincia** va en su **centro visual**. Los **rótulos** de ciudad van por encima de los hexágonos de **zona**; si se pisan, se dibuja el del sitio con más habitantes y el otro sale al acercar.
 - El **ejercicio de emplazamientos** se hace sobre una **zona**: un barrio de Barcelona o un municipio. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
-- Al abrir, el mapa encuadra la **provincia** del **punto elegido** que guarda el dispositivo o, sin él, las **provincias cubiertas** del **resumen nacional**. La **ubicación GPS** no cuenta: nunca se pide al abrir.
+- Al abrir, el mapa encuadra la **provincia** del **punto elegido** que guarda el dispositivo o, sin él, la península entera. La **ubicación GPS** no cuenta: nunca se pide al abrir.
 - Con un **punto de referencia**, cada **emplazamiento** tiene un **rumbo** y los **consejos** dicen a qué rumbo apuntar una **antena exterior**. La **brújula** ayuda a alinearla.
 
 ## Ambigüedades señaladas
