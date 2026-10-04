@@ -13,8 +13,11 @@ import {
   TOKENS_MAPA,
 } from "./estilo.ts";
 import { nombreDelRotulo } from "./nombres.ts";
+import { CAPA_HUECOS, crearImagenesDeHuecos, imagenDeHueco, ponerHuecos } from "./huecos.ts";
 import {
+  CAPAS_DE_CIUDADES,
   CAPAS_DE_LUGARES,
+  tamanoDeRotulo,
   type MapaConRotulos,
   MUNICIPIOS_DE_CELDA,
   ZOOM_DE_FUERA,
@@ -129,7 +132,16 @@ describe("estiloMapa", () => {
 
   it("rotula los lugares por importancia: la capa más importante, la última, se coloca antes", () => {
     const ids = estiloDePrueba().layers.map((capa) => capa.id);
-    assert.deepStrictEqual(ids.slice(-CAPAS_DE_LUGARES.length), CAPAS_DE_LUGARES.toReversed());
+    // Entre los pueblos y las ciudades, los huecos de los marcadores de Celda (ADR 0024).
+    assert.deepStrictEqual(ids.slice(-CAPAS_DE_LUGARES.length - 1), [
+      "lugares-aldeas",
+      "lugares-pueblos",
+      "lugares-pueblos-grandes",
+      CAPA_HUECOS,
+      "lugares-ciudades",
+      "lugares-grandes",
+      "lugares-capitales",
+    ]);
     assert.deepStrictEqual(CAPAS_DE_LUGARES, [
       "lugares-capitales",
       "lugares-grandes",
@@ -200,5 +212,93 @@ describe("estiloMapa", () => {
     const { mapa, estado } = mapaDePrueba(undefined);
     quitarRotulosDeMunicipios(mapa, ["Badalona"]);
     assert.strictEqual(estado.size, 0);
+  });
+});
+
+describe("rótulos de ciudad por encima de los datos (ADR 0024)", () => {
+  const capas = new Map(estiloDePrueba().layers.map((capa) => [capa.id, capa] as const));
+  const simbolo = (id: string) => {
+    const capa = capas.get(id);
+    return capa?.type === "symbol" ? capa : undefined;
+  };
+
+  it("las ciudades se colocan sin pintarse, y los pueblos se pintan como siempre", () => {
+    assert.deepStrictEqual(CAPAS_DE_CIUDADES, [
+      "lugares-capitales",
+      "lugares-grandes",
+      "lugares-ciudades",
+    ]);
+    for (const id of CAPAS_DE_CIUDADES)
+      assert.strictEqual(simbolo(id)?.paint?.["text-opacity"], 0, id);
+    for (const id of ["lugares-pueblos-grandes", "lugares-pueblos", "lugares-aldeas"]) {
+      assert.isUndefined(simbolo(id)?.paint?.["text-opacity"], id);
+    }
+  });
+
+  it("el tamaño de la letra de una copia es el que pinta MapLibre a ese zoom", () => {
+    assert.strictEqual(tamanoDeRotulo("lugares-capitales", 2, 5), 14);
+    assert.strictEqual(tamanoDeRotulo("lugares-capitales", 4, 8), 15);
+    assert.strictEqual(tamanoDeRotulo("lugares-grandes", 6, 6.5), 12.5);
+    assert.strictEqual(tamanoDeRotulo("lugares-ciudades", 99, 3), 12);
+    assert.strictEqual(tamanoDeRotulo("lugares-ciudades", 99, 13), 15.5);
+    // La expresión del estilo dice lo mismo en sus paradas.
+    assert.deepStrictEqual<unknown>(simbolo("lugares-grandes")?.layout?.["text-size"], [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      5,
+      11.5,
+      8,
+      13.5,
+      11,
+      16,
+    ]);
+  });
+
+  it("los huecos son iconos transparentes que ocupan su sitio, sin apartarse", () => {
+    const huecos = simbolo(CAPA_HUECOS);
+    assert.strictEqual(huecos?.layout?.["icon-allow-overlap"], true);
+    assert.strictEqual(huecos?.layout?.["icon-ignore-placement"], false);
+    assert.deepStrictEqual<unknown>(huecos?.paint, { "icon-opacity": 0 });
+  });
+
+  it("cada hueco pide una imagen de su tamaño en las unidades de su escala, redondeada a 4 px", () => {
+    assert.strictEqual(
+      imagenDeHueco({ longitud: 0, latitud: 0, ancho: 31, alto: 34.7, escala: 0.62 }),
+      "hueco:52x56",
+    );
+    const pedidas: Array<string> = [];
+    const imagenes = new Map<string, { width: number; height: number; data: Uint8Array }>();
+    let oyente: ((e: { id: string }) => void) | undefined;
+    crearImagenesDeHuecos({
+      on: (_evento, nuevo) => {
+        oyente = nuevo;
+      },
+      hasImage: (id) => imagenes.has(id),
+      addImage: (id, imagen) => {
+        pedidas.push(id);
+        imagenes.set(id, imagen);
+      },
+    });
+    oyente?.({ id: "hueco:52x56" });
+    oyente?.({ id: "hueco:52x56" });
+    oyente?.({ id: "otro-icono" });
+    assert.deepStrictEqual(pedidas, ["hueco:52x56"]);
+    assert.deepStrictEqual(imagenes.get("hueco:52x56"), {
+      width: 52,
+      height: 56,
+      data: new Uint8Array(52 * 56 * 4),
+    });
+  });
+
+  it("poner los mismos huecos otra vez no toca el mapa", () => {
+    let puestas = 0;
+    const mapa = { getSource: () => ({ setData: () => (puestas += 1) }) };
+    const huecos = [{ longitud: 2.1, latitud: 41.4, ancho: 44, alto: 50, escala: 1 }];
+    ponerHuecos(mapa, huecos);
+    ponerHuecos(mapa, [...huecos]);
+    assert.strictEqual(puestas, 1);
+    ponerHuecos(mapa, []);
+    assert.strictEqual(puestas, 2);
   });
 });

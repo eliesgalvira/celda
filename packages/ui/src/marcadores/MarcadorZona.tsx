@@ -5,6 +5,14 @@ import { Show } from "solid-js";
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
 import { Deslizable, type Movimiento } from "./Deslizable.tsx";
+import {
+  ESCALA_DE_CINTA,
+  ESCALA_DE_TAMANO,
+  type TamanoDeMarcador,
+  variantesCinta,
+  variantesDibujo,
+  variantesTamano,
+} from "./tamano.ts";
 
 /** Qué zona es: se ven igual, pero las pruebas y el DOM las distinguen (`data-zona`). */
 export type TipoDeZona = "provincia" | "municipio" | "barrio";
@@ -100,12 +108,16 @@ export interface CajaDeZona {
   readonly abajo: number;
 }
 
-/** El hexágono: 50 × 56 px, centrado en el punto de la zona. */
-const HEXAGONO: CajaDeZona = { izquierda: -25, arriba: -28, derecha: 25, abajo: 28 };
+/** Medio hexágono: 25 × 28 px a su tamaño, centrado en el punto de la zona. */
+const MEDIO_ANCHO = 25;
+const MEDIO_ALTO = 28;
 /** Ancho máximo del nombre: `max-w-38`. */
 const ANCHO_NOMBRE = 152;
-/** Lo que ocupa de media una letra del nombre con `text-xs` y `tracking-wider` en monoespaciada. */
-const LETRA = 7.8;
+/**
+ * Lo que ocupa como mucho una letra del nombre con `text-[13px]`, en versalitas y con
+ * `tracking-[0.12em]`, medido en Chromium con la letra del sistema.
+ */
+const LETRA = 9.4;
 /** Relleno de la cinta del nombre a los dos lados: `pl-2.5` y `pr-2.5`. */
 const RELLENO_NOMBRE = 20;
 /** Alto de una línea del nombre, `leading-4`, y el relleno de arriba y abajo de la cinta. */
@@ -115,21 +127,34 @@ const RELLENO_VERTICAL = 4;
 const HUECO = 2;
 
 /**
- * Lo que ocupa una zona en la pantalla respecto al centro de su hexágono, para decidir si cabe
- * entera sin pisar otra. Es una estimación por arriba con las clases de este fichero: el hexágono,
- * el nombre en una o dos líneas debajo y lo que se sabe de una provincia.
+ * Lo que ocupa una zona en la pantalla respecto al centro de su hexágono, como se dibuja con
+ * `tamano`: el hexágono a su escala y, en la forma completa, el nombre en una o dos líneas debajo
+ * y lo que se sabe de una provincia, a `ESCALA_DE_CINTA`. Es una estimación por arriba con las
+ * clases de este fichero, para decidir qué cabe sin pisar otra cosa.
  */
-export const cajaDeZona = (forma: FormaDeZona, nombre: string, conEstado = false): CajaDeZona => {
-  if (forma === "compacta") return HEXAGONO;
+export const cajaDeZona = (
+  forma: FormaDeZona,
+  nombre: string,
+  conEstado = false,
+  tamano: TamanoDeMarcador = "normal",
+): CajaDeZona => {
+  const escala = ESCALA_DE_TAMANO[tamano];
+  const hexagono = {
+    izquierda: -MEDIO_ANCHO * escala,
+    arriba: -MEDIO_ALTO * escala,
+    derecha: MEDIO_ANCHO * escala,
+    abajo: MEDIO_ALTO * escala,
+  };
+  if (forma === "compacta") return hexagono;
   const largo = nombre.length * LETRA + RELLENO_NOMBRE;
   const lineas = largo > ANCHO_NOMBRE ? 2 : 1;
-  const ancho = Math.min(ANCHO_NOMBRE, largo);
-  const alto = lineas * LINEA + RELLENO_VERTICAL + (conEstado ? LINEA : 0);
+  const ancho = Math.min(ANCHO_NOMBRE, largo) * ESCALA_DE_CINTA;
+  const alto = (lineas * LINEA + RELLENO_VERTICAL + (conEstado ? LINEA : 0)) * ESCALA_DE_CINTA;
   return {
-    izquierda: Math.min(HEXAGONO.izquierda, -ancho / 2),
-    arriba: HEXAGONO.arriba,
-    derecha: Math.max(HEXAGONO.derecha, ancho / 2),
-    abajo: HEXAGONO.abajo + HUECO + alto,
+    izquierda: Math.min(hexagono.izquierda, -ancho / 2),
+    arriba: hexagono.arriba,
+    derecha: Math.max(hexagono.derecha, ancho / 2),
+    abajo: hexagono.abajo + HUECO + alto,
   };
 };
 
@@ -139,8 +164,10 @@ export interface MarcadorZonaProps {
   readonly y: number;
   readonly zona: TipoDeZona;
   readonly forma: FormaDeZona;
-  /** El nombre de la zona, que se ve debajo del hexágono. */
+  /** El nombre de la zona, que se ve debajo del hexágono, en versalitas: es un área. */
   readonly nombreDeZona: string;
+  /** Lo grande que va el hexágono según lo lejos que está el mapa. Sin él, `normal`. */
+  readonly tamano?: TamanoDeMarcador;
   /** Cuántos emplazamientos tiene. Una provincia sin cubrir no lo enseña. */
   readonly emplazamientos: number;
   /** Solo en una provincia; el resto va siempre `entera`. */
@@ -159,8 +186,10 @@ const QUIETO: Movimiento = { tipo: "quieto" };
 /**
  * Una zona en el mapa (una provincia, un municipio o un barrio): el mismo hexágono oscuro con su
  * número que las agrupaciones, para que al cambiar de nivel un hexágono se deslice a otro y nunca
- * queden solo letras. En la forma completa lleva debajo el nombre en una cinta, con la letra de
- * las etiquetas (monoespaciada), que no se confunde con los rótulos del mapa base. No dice qué
+ * queden solo letras. En la forma completa lleva debajo el nombre en una cinta, en versalitas
+ * espaciadas: es el nombre de un área, y así no se confunde con el rótulo de una población del
+ * mapa base, en caja normal y con halo. «VALÈNCIA» bajo el hexágono es la provincia y «València»
+ * sobre la ciudad, su capital (ADR 0024). De lejos el hexágono encoge (`tamano`). No dice qué
  * compañías faltan: que una no tenga emplazamientos en la zona no quiere decir que no dé servicio
  * en ella (ADR 0024). Una provincia a medias lleva el borde discontinuo y lo dice; una sin cubrir y un
  * barrio vacío van en claro. Es un botón del tamaño del hexágono que acerca el mapa a la zona.
@@ -181,6 +210,7 @@ export function MarcadorZona(props: MarcadorZonaProps) {
           : "continuo";
   const estado = () => textoDeProvincia(cobertura(), carga());
   const completa = () => props.forma === "completa";
+  const tamano = () => props.tamano ?? "normal";
   return (
     <button
       type="button"
@@ -189,6 +219,7 @@ export function MarcadorZona(props: MarcadorZonaProps) {
       inert={saliendo()}
       data-zona={props.zona}
       data-forma={props.forma}
+      data-tamano={tamano()}
       data-cobertura={props.zona === "provincia" ? cobertura() : undefined}
       data-carga={props.zona === "provincia" ? carga() : undefined}
       class={cn(
@@ -201,43 +232,46 @@ export function MarcadorZona(props: MarcadorZonaProps) {
     >
       <Deslizable forma="agrupacion" movimiento={props.movimiento ?? QUIETO}>
         <span class="relative block">
-          <span
-            class={cn(
-              "relative grid h-14 w-[50px] place-items-center drop-shadow-marcador transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-95 motion-reduce:transition-none",
-              carga() === "cargando" && "animate-pulse motion-reduce:animate-none",
-            )}
-          >
-            <svg viewBox="0 0 50 56" aria-hidden="true" class="absolute inset-0 size-full">
-              <polygon
-                data-hexagono=""
-                points="25,2 48,15 48,41 25,54 2,41 2,15"
-                class={variantesHexagono({ relleno: relleno() })}
-              />
-              <polygon
-                points="25,7 43.5,17.5 43.5,38.5 25,49 6.5,38.5 6.5,17.5"
-                stroke-width="1.4"
-                class={variantesBorde({ borde: borde() })}
-              />
-            </svg>
-            <Show when={conNumero()}>
-              <span
+          <span class={variantesTamano({ tamano: tamano() })}>
+            <span
+              class={cn(
+                "relative grid h-14 w-[50px] place-items-center drop-shadow-marcador transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-95 motion-reduce:transition-none",
+                carga() === "cargando" && "animate-pulse motion-reduce:animate-none",
+              )}
+            >
+              <svg
+                viewBox="0 0 50 56"
                 aria-hidden="true"
-                class={variantesNumero({
-                  cifras: cifras(props.emplazamientos),
-                  relleno: relleno(),
-                })}
+                class={variantesDibujo({ tamano: tamano() })}
               >
-                {/* Como texto: Solid no pinta un 0 suelto. */}
-                {String(props.emplazamientos)}
-              </span>
-            </Show>
+                <polygon
+                  data-hexagono=""
+                  points="25,2 48,15 48,41 25,54 2,41 2,15"
+                  class={variantesHexagono({ relleno: relleno() })}
+                />
+                <polygon
+                  points="25,7 43.5,17.5 43.5,38.5 25,49 6.5,38.5 6.5,17.5"
+                  stroke-width="1.4"
+                  class={variantesBorde({ borde: borde() })}
+                />
+              </svg>
+              <Show when={conNumero()}>
+                <span
+                  aria-hidden="true"
+                  class={variantesNumero({
+                    cifras: cifras(props.emplazamientos),
+                    relleno: relleno(),
+                  })}
+                >
+                  {/* Como texto: Solid no pinta un 0 suelto. */}
+                  {String(props.emplazamientos)}
+                </span>
+              </Show>
+            </span>
           </span>
           <Show when={completa()}>
-            <span
-              aria-hidden="true"
-              class="absolute top-full left-1/2 mt-0.5 flex w-max max-w-38 -translate-x-1/2 flex-col items-center drop-shadow-marcador"
-            >
-              <span class="cinta line-clamp-2 bg-superficie-alta px-2.5 py-0.5 text-center font-mono text-xs leading-4 font-semibold tracking-wider text-tinta [--pico:6px] group-hover:text-primario-texto">
+            <span aria-hidden="true" class={variantesCinta({ tamano: tamano() })}>
+              <span class="cinta line-clamp-2 bg-superficie-alta px-2.5 py-0.5 text-center font-texto text-[13px] leading-4 font-semibold tracking-[0.12em] text-tinta [font-variant-caps:all-small-caps] [--pico:6px] group-hover:text-primario-texto">
                 {props.nombreDeZona}
               </span>
               <Show when={estado() !== ""}>

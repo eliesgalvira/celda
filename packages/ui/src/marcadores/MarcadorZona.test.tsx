@@ -30,7 +30,7 @@ const montar = (cambios: Partial<MarcadorZonaProps> = {}) => {
   /** El número que se ve dentro del hexágono, o `undefined` si no lleva. */
   const numero = () => boton.querySelector("svg + span")?.textContent ?? undefined;
   /** El nombre que se ve debajo del hexágono, o `undefined` si no lleva. */
-  const nombreVisible = () => boton.querySelector(".cinta.font-mono")?.textContent ?? undefined;
+  const nombreVisible = () => boton.querySelector(".cinta")?.textContent ?? undefined;
   return { ...pantalla, boton, numero, nombreVisible, pulsados: () => pulsado };
 };
 
@@ -63,13 +63,40 @@ describe("MarcadorZona", () => {
     }
   });
 
-  it("el nombre va en la letra de las etiquetas, en una cinta, no como un rótulo del mapa", () => {
-    const { boton } = montar();
-    const nombre = boton.querySelector(".cinta.font-mono");
-    assert.isNotNull(nombre);
+  it("el nombre es el de un área: en versalitas espaciadas, en una cinta, no como un rótulo", () => {
+    // «VALÈNCIA» bajo el hexágono de la provincia y «València» sobre la ciudad se leen como dos
+    // cosas: la provincia y su capital (ADR 0024).
+    const { boton } = montar({ zona: "provincia", nombreDeZona: "València" });
+    const nombre = boton.querySelector(".cinta");
+    assert.strictEqual(nombre?.textContent, "València");
+    const clases = nombre?.getAttribute("class") ?? "";
+    assert.include(clases, "[font-variant-caps:all-small-caps]");
+    assert.include(clases, "tracking-[0.12em]");
+    // Ya no es la letra de las etiquetas, monoespaciada.
+    assert.notInclude(clases, "font-mono");
     // Los rótulos del mapa base van sin fondo y con halo; el nombre de Celda, sobre su cinta.
-    assert.notInclude(nombre?.getAttribute("class"), "halo");
-    assert.include(nombre?.getAttribute("class"), "bg-superficie-alta");
+    assert.notInclude(clases, "halo");
+    assert.include(clases, "bg-superficie-alta");
+  });
+
+  it("de lejos el hexágono encoge y se aclara, y la cinta va siempre a 0,85 justo debajo", () => {
+    const lejos = montar({ tamano: "lejos" });
+    assert.strictEqual(lejos.boton.getAttribute("data-tamano"), "lejos");
+    const hexagono = lejos.boton.querySelector("svg")?.parentElement?.parentElement;
+    assert.include(hexagono?.getAttribute("class"), "scale-[0.62]");
+    assert.include(lejos.boton.querySelector("svg")?.getAttribute("class"), "opacity-82");
+    const cinta = lejos.boton.querySelector(".cinta")?.parentElement;
+    assert.include(cinta?.getAttribute("class"), "scale-85");
+    assert.include(cinta?.getAttribute("class"), "top-[calc(50%+17.36px)]");
+    // El número sigue opaco y en su sitio, y el botón no encoge.
+    assert.strictEqual(lejos.numero(), "118");
+    assert.include(lejos.boton.getAttribute("class"), "w-[50px]");
+    const cerca = montar({ tamano: "normal" });
+    assert.notInclude(cerca.boton.querySelector("svg")?.getAttribute("class"), "opacity");
+    assert.include(
+      cerca.boton.querySelector(".cinta")?.parentElement?.getAttribute("class"),
+      "scale-85",
+    );
   });
 
   it("un barrio vacío va en claro con un 0", () => {
@@ -122,7 +149,7 @@ describe("lo que ocupa una zona", () => {
     });
   });
 
-  it("completa, el nombre debajo y nada al lado; un nombre largo, dos líneas", () => {
+  it("completa, el nombre debajo y nada al lado; un nombre largo, dos líneas, a 0,85", () => {
     const corta = cajaDeZona("completa", "Sants");
     const larga = cajaDeZona("completa", "Vallvidrera, el Tibidabo i les Planes");
     const provincia = cajaDeZona("completa", "Sants", true);
@@ -130,9 +157,23 @@ describe("lo que ocupa una zona", () => {
     // Arriba, lo que el hexágono; a los lados, centrada en él: no hay nada a su derecha.
     assert.strictEqual(corta.arriba, -28);
     assert.strictEqual(corta.derecha, -corta.izquierda);
-    assert.strictEqual(larga.derecha, 76);
+    // La cinta mide como mucho 152 px, y se dibuja a 0,85.
+    assert.closeTo(larga.derecha, 76 * 0.85, 1e-9);
     assert.isAbove(larga.abajo, corta.abajo);
-    assert.isAtMost(larga.derecha - larga.izquierda, 152);
     assert.isAbove(provincia.abajo, corta.abajo);
+  });
+
+  it("con el hexágono encogido, la caja es la del hexágono a su escala y la cinta, a 0,85", () => {
+    assert.deepStrictEqual(cajaDeZona("compacta", "Sants", false, "lejos"), {
+      izquierda: -25 * 0.62,
+      arriba: -28 * 0.62,
+      derecha: 25 * 0.62,
+      abajo: 28 * 0.62,
+    });
+    const normal = cajaDeZona("completa", "Valladolid");
+    const lejos = cajaDeZona("completa", "Valladolid", false, "lejos");
+    // La cinta mide lo mismo: solo sube lo que encoge el hexágono.
+    assert.closeTo(lejos.derecha, normal.derecha, 1e-9);
+    assert.closeTo(normal.abajo - lejos.abajo, 28 * (1 - 0.62), 1e-9);
   });
 });

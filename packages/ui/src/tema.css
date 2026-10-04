@@ -173,6 +173,11 @@
   --fuente-texto: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --fuente-titulo: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --fuente-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /*
+   * La letra de los rótulos de ciudad que Celda copia encima de sus datos (ADR 0024): la del
+   * callejero de OpenFreeMap si el sistema la tiene, y si no una de palo seco parecida.
+   */
+  --fuente-rotulo: "Noto Sans", Roboto, "Segoe UI", system-ui, sans-serif;
 
   /* FORMAS */
   --hexagono: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
@@ -339,6 +344,9 @@
   --color-velo: var(--velo);
   --color-eje-lejos: var(--eje-lejos);
   --color-mapa-fondo: var(--mapa-fondo);
+  --color-rotulo-capital: var(--mapa-rotulo-capital);
+  --color-rotulo-ciudad: var(--mapa-rotulo-ciudad);
+  --color-rotulo-foto: var(--mapa-foto-rotulo);
   --color-sinr-1: var(--mapa-sinr-1);
   --color-sinr-2: var(--mapa-sinr-2);
   --color-sinr-3: var(--mapa-sinr-3);
@@ -361,6 +369,7 @@
   --font-texto: var(--fuente-texto);
   --font-titulo: var(--fuente-titulo);
   --font-mono: var(--fuente-mono);
+  --font-rotulo: var(--fuente-rotulo);
 
   --drop-shadow-panel: 0 10px 30px var(--sombra);
   --drop-shadow-marcador: 0 1px 3px var(--sombra);
