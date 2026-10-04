@@ -37,6 +37,7 @@ import {
   type MunicipioConHabitantes,
   municipioDelPunto,
 } from "./municipio.ts";
+import { type Combinaciones, combinacionesDe } from "./filtro.ts";
 import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "./nombreDeLugar.ts";
 import { FuenteDePoblacion } from "./poblacion.ts";
 
@@ -636,6 +637,13 @@ const ColumnasDelResumen = Schema.Struct({
     barrido: Schema.Array(Schema.NullOr(Schema.Finite)),
     /** Su capa, o `null` si no tiene emplazamientos. */
     fichero: Schema.Array(Schema.NullOr(Schema.String)),
+    /**
+     * Cuántos emplazamientos tiene con cada combinación de compañías, en pares de la máscara de la
+     * columna `companias` de la capa y su número: `[1, 523, 3, 120]` son 523 solo de Movistar y
+     * 120 de Movistar y Vodafone. Con ellas el mapa cuenta de lejos con cualquier filtro de
+     * compañías sin descargar ninguna capa (ADR 0026). Los resúmenes de antes no las llevan.
+     */
+    combinaciones: Schema.optionalKey(Schema.Array(Schema.Array(Schema.Int))),
   }),
   /**
    * Las partes del índice de claves, en el orden de `parteDeClave`. Los resúmenes publicados antes
@@ -660,6 +668,11 @@ export interface DatosDeProvincia {
   readonly companias: ReadonlyArray<Compania>;
   /** Su capa, o `undefined` si no tiene emplazamientos. */
   readonly fichero: string | undefined;
+  /**
+   * Cuántos emplazamientos tiene con cada combinación de compañías (ADR 0026), o `undefined` en
+   * un resumen de antes de que se publicaran.
+   */
+  readonly combinaciones?: Combinaciones | undefined;
 }
 
 /** Una fila del resumen nacional. */
@@ -688,6 +701,36 @@ export const cajaDeSituados = (
     suroeste: { longitud: oeste, latitud: sur },
     noreste: { longitud: este, latitud: norte },
   };
+};
+
+/** Cuántos emplazamientos hay con cada combinación de compañías entre unos cuantos. */
+export const combinacionesDeSituados = (
+  situados: ReadonlyArray<EmplazamientoSituado>,
+): Combinaciones => combinacionesDe(situados.map((s) => s.emplazamiento));
+
+/** Las combinaciones en pares, como van en el resumen. */
+const enPares = (combinaciones: Combinaciones): ReadonlyArray<number> =>
+  [...combinaciones].sort(([a], [b]) => a - b).flat();
+
+/**
+ * Las combinaciones de una fila del resumen, o `undefined` si están mal formadas o no cuadran con
+ * su número: entonces el mapa cuenta como con un resumen de antes, sin ellas.
+ */
+const dePares = (
+  pares: ReadonlyArray<number>,
+  emplazamientos: number,
+): Combinaciones | undefined => {
+  if (pares.length % 2 !== 0) return undefined;
+  const combinaciones = new Map<number, number>();
+  let suma = 0;
+  for (let i = 0; i < pares.length; i += 2) {
+    const mascara = pares[i] ?? -1;
+    const cuantos = pares[i + 1] ?? -1;
+    if (mascara < 0 || cuantos < 0 || combinaciones.has(mascara)) return undefined;
+    combinaciones.set(mascara, cuantos);
+    suma += cuantos;
+  }
+  return suma === emplazamientos ? combinaciones : undefined;
 };
 
 /** Las compañías con algún emplazamiento entre unos cuantos, en el orden de la capa. */
@@ -734,9 +777,19 @@ export const generarResumen = (resumen: {
       fichero: provincias.map((p) => p.fichero ?? null),
     },
   };
+  // Un resumen de antes de las combinaciones, rehecho con otra cobertura, sigue sin ellas.
+  const combinaciones = provincias.map((p) => p.combinaciones);
+  const conCombinaciones: ColumnasDelResumen = combinaciones.every((c) => c !== undefined)
+    ? {
+        ...sinIndice,
+        provincias: { ...sinIndice.provincias, combinaciones: combinaciones.map(enPares) },
+      }
+    : sinIndice;
   // Un resumen de antes del índice, rehecho con otra cobertura, sigue sin él.
   return codificarResumen(
-    resumen.claves === undefined ? sinIndice : { ...sinIndice, claves: resumen.claves },
+    resumen.claves === undefined
+      ? conCombinaciones
+      : { ...conCombinaciones, claves: resumen.claves },
   );
 };
 
@@ -791,9 +844,16 @@ export const leerResumen = (
       if (columnas.some((columna) => columna.length !== n)) {
         return descuadrada("el resumen está descuadrado");
       }
+      // Unas combinaciones que no cuadran no tumban el resumen: se cuenta como sin ellas.
+      const pares = p.combinaciones?.length === n ? p.combinaciones : undefined;
+      const combinaciones = p.codigo.map((_, i) =>
+        pares === undefined ? undefined : dePares(pares[i] ?? [], p.emplazamientos[i] ?? 0),
+      );
+      const conTodas = combinaciones.every((c) => c !== undefined);
       const provincias = p.codigo.map((codigo, i): ProvinciaDelResumen => {
         const caja = p.caja[i];
-        return {
+        const suyas = conTodas ? combinaciones[i] : undefined;
+        const fila: ProvinciaDelResumen = {
           codigo,
           nombre: p.nombre[i] ?? "",
           etiqueta: { longitud: p.lon[i] ?? 0, latitud: p.lat[i] ?? 0 },
@@ -804,6 +864,7 @@ export const leerResumen = (
           barrido: p.barrido[i] ?? null,
           fichero: p.fichero[i] ?? undefined,
         };
+        return suyas === undefined ? fila : { ...fila, combinaciones: suyas };
       });
       return Result.succeed({
         version: c.version,
