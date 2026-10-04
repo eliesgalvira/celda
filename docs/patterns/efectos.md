@@ -78,7 +78,7 @@ Con el GPS y la brújula nuevos, las pruebas «con una posición ya guardada en 
 
 ## Prueba de resistencia
 
-`tools/rendimiento/src/resistencia.ts`. Abre la web construida en Chromium sin interfaz, con WebGL por SwiftShader, como un Android de pantalla ancha con el permiso de ubicación y los sensores concedidos. Sirve una capa sintética de 25 emplazamientos (`capaSintetica.ts`) y contesta en local las peticiones a OpenFreeMap con teselas vacías: no necesita GPU ni conexión. Abre un emplazamiento, enciende el GPS y la brújula, abre la vista de interferencia (las celdas ya están calculadas a zoom 16) y la deja quieta 30 s. Mientras, el GPS da una lectura por segundo en el mismo sitio con otra precisión y la brújula diez por segundo. Un guion inyectado (`contador.ts`) cuenta las llamadas; la prueba falla si en esos 30 s crecen más de:
+`tools/rendimiento/src/resistencia.ts`. Abre la web construida en Chromium sin interfaz, con WebGL por SwiftShader, como un Android de pantalla ancha con el permiso de ubicación y los sensores concedidos. Sirve una capa sintética de 25 emplazamientos (`capaSintetica.ts`) y contesta en local las peticiones a OpenFreeMap con teselas vacías: no necesita GPU ni conexión. Abre un emplazamiento, enciende el GPS y la brújula, filtra por Digi (las celdas cuentan también las de Movistar, la red que usa, ADR 0026), abre la vista de interferencia (las celdas ya están calculadas a zoom 16), espera a que la página quede quieta y la deja así 30 s. Quieta es 2 s sin que crezca nada salvo `setTimeout` y sin fotogramas pendientes; si en 30 s no lo consigue, falla. Mientras, el GPS da una lectura por segundo en el mismo sitio con otra precisión y la brújula diez por segundo. Un guion inyectado (`contador.ts`) cuenta las llamadas; la prueba falla si en esos 30 s crecen más de:
 
 | API | Tope | Por qué |
 |---|---|---|
@@ -88,7 +88,7 @@ Con el GPS y la brújula nuevos, las pruebas «con una posición ya guardada en 
 | `requestAnimationFrame` | 0 | No hay nada animándose. |
 | `setTimeout` | 2 por lectura (660) | Effect agenda con `setTimeout` el trabajo de cada lectura que llega por una cola. |
 
-También falla si al preparar `watchPosition` se llamó más de una vez. El 28/09/2026 creció 0 en todo salvo `setTimeout`, que subió 332 con 330 lecturas. Con el GPS de antes de 480e670 salieron 3825 `watchPosition` en 7 s; con la vista de interferencia de antes de este arreglo, 140 `postMessage` y 52 fotogramas en 10 s.
+También falla si al preparar `watchPosition` se llamó más de una vez. Hasta el 04/10/2026 esperaba 3 s fijos antes de empezar a contar, y en una CI lenta el último fotograma de MapLibre llegaba ya dentro de la ventana: un `removeEventListener` sin `addEventListener`, el de la cancelación del fotograma, sin nada abierto. Con la espera recortada a 0,9 s fallaba igual 6f00c28, de antes de las celdas con la red usada. El 28/09/2026 creció 0 en todo salvo `setTimeout`, que subió 332 con 330 lecturas. Con el GPS de antes de 480e670 salieron 3825 `watchPosition` en 7 s; con la vista de interferencia de antes de este arreglo, 140 `postMessage` y 52 fotogramas en 10 s.
 
 Para correrla, desde la raíz de Celda:
 

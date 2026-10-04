@@ -109,7 +109,7 @@ export const puestaDeHuecos = (
 
 /** Lo que hace falta del mapa de MapLibre para crear las imágenes de los huecos. */
 export interface MapaConImagenes {
-  readonly on: (evento: "styleimagemissing", oyente: (e: { id: string }) => void) => void;
+  readonly setMissingStyleImageResolver: (resolver: (id: string) => void) => void;
   readonly hasImage: (id: string) => boolean;
   readonly addImage: (
     id: string,
@@ -119,10 +119,16 @@ export interface MapaConImagenes {
 
 /**
  * Crea la imagen de cada hueco cuando un icono la pide: un rectángulo transparente del tamaño de
- * su nombre. Se llama una vez por mapa, al crearlo. Los demás iconos que falten no son de Celda.
+ * su nombre. Se llama una vez por mapa, al crearlo, y vale también para el estilo de reserva. Los
+ * demás iconos que falten no son de Celda.
+ *
+ * Va en el resolvedor de MapLibre, que la tesela espera, y no en `styleimagemissing`: desde
+ * MapLibre 6 ese evento llega tarde para la tesela que la pide. La tesela salía sin el hueco, con
+ * un aviso en la consola, y la imagen añadida después hacía que MapLibre la volviera a maquetar en
+ * sus workers: otra vuelta de mensajes y fotogramas con el mapa ya quieto.
  */
 export const crearImagenesDeHuecos = (mapa: MapaConImagenes): void => {
-  mapa.on("styleimagemissing", ({ id }) => {
+  mapa.setMissingStyleImageResolver((id) => {
     const medidas = /^hueco:(\d+)x(\d+)$/u.exec(id);
     if (medidas === null || mapa.hasImage(id)) return;
     const width = Number(medidas[1]);

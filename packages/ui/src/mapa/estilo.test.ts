@@ -275,10 +275,10 @@ describe("rótulos de ciudad por encima de los datos (ADR 0024)", () => {
     );
     const pedidas: Array<string> = [];
     const imagenes = new Map<string, { width: number; height: number; data: Uint8Array }>();
-    let oyente: ((e: { id: string }) => void) | undefined;
+    let resolver: ((id: string) => void) | undefined;
     crearImagenesDeHuecos({
-      on: (_evento, nuevo) => {
-        oyente = nuevo;
+      setMissingStyleImageResolver: (nuevo) => {
+        resolver = nuevo;
       },
       hasImage: (id) => imagenes.has(id),
       addImage: (id, imagen) => {
@@ -286,9 +286,9 @@ describe("rótulos de ciudad por encima de los datos (ADR 0024)", () => {
         imagenes.set(id, imagen);
       },
     });
-    oyente?.({ id: "hueco:52x56" });
-    oyente?.({ id: "hueco:52x56" });
-    oyente?.({ id: "otro-icono" });
+    resolver?.("hueco:52x56");
+    resolver?.("hueco:52x56");
+    resolver?.("otro-icono");
     assert.deepStrictEqual(pedidas, ["hueco:52x56"]);
     assert.deepStrictEqual(imagenes.get("hueco:52x56"), {
       width: 52,
