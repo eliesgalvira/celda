@@ -7,7 +7,7 @@ import { estiloMapa } from "@celda/ui/mapa/estilo.ts";
 import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
 import { FOTO_AEREA } from "@celda/ui/mapa/expresiones.ts";
 import { FUENTE_CELDAS } from "@celda/ui/mapa/celdas.ts";
-import { type EstadoConFoto, FUENTE_EDIFICIO } from "@celda/ui/mapa/foto.ts";
+import { CAPA_FOTO, type EstadoConFoto, FUENTE_EDIFICIO } from "@celda/ui/mapa/foto.ts";
 import { CAPA_PORTALES } from "@celda/ui/mapa/rotulos.ts";
 import { CAPA_EDIFICIOS } from "@celda/ui/mapa/suelo.ts";
 import type { StyleSpecification } from "maplibre-gl";
@@ -22,6 +22,7 @@ import {
   lienzoDeFoto,
   type MapaParaFoto,
 } from "./enMapa.ts";
+import type { Movimiento } from "../mapa/vistaInicial.ts";
 import { ZOOM_EDIFICIO } from "./foto.ts";
 
 /** Passeig de Gràcia, 68. */
@@ -45,11 +46,27 @@ interface Vuelo {
   dejado: boolean;
 }
 
-/** Un lienzo que apunta lo que recibe; cada vuelo acaba cuando la prueba lo dice. */
+/**
+ * Un lienzo que apunta lo que recibe; cada vuelo acaba cuando la prueba lo dice. La cámara avisa
+ * como la de MapLibre: «Ver el edificio» empieza a volar en el acto, al llamar a `flyTo`, y el
+ * mapa se queda quieto con sus teselas en otra tarea.
+ */
 const lienzoDePrueba = () => {
   const fotos: Array<boolean> = [];
   const vuelos: Array<Vuelo> = [];
+  const avisos = new Set<(volando: boolean) => void>();
   let quitados = 0;
+  let seguimientos = 0;
+  const camara = {
+    /** Empieza a moverse: un vuelo de la web o, con `gesto`, la persona. */
+    empezar: (gesto = false) => {
+      for (const avisar of avisos) avisar(!gesto);
+    },
+    /** Se para: llega, la interrumpe otro vuelo o la coge la persona. */
+    parar: () => {
+      for (const avisar of avisos) avisar(false);
+    },
+  };
   const lienzo: LienzoDeFoto = {
     ponerFoto: (encendida) => fotos.push(encendida),
     verEdificio: (posicion, desplazamiento, alAcabar) => {
@@ -57,14 +74,15 @@ const lienzoDePrueba = () => {
         posicion,
         desplazamiento,
         dejado: false,
-        // Como MapLibre, el mapa se queda quieto en otra tarea.
         acabar: (encontrado) => {
+          camara.parar();
           void otraTarea().then(() => {
             if (!vuelo.dejado) alAcabar(encontrado);
           });
         },
       };
       vuelos.push(vuelo);
+      camara.empezar();
       return () => {
         vuelo.dejado = true;
       };
@@ -72,13 +90,30 @@ const lienzoDePrueba = () => {
     quitarEdificio: () => {
       quitados += 1;
     },
+    seguirVuelos: (alCambiar) => {
+      seguimientos += 1;
+      avisos.add(alCambiar);
+      return () => {
+        avisos.delete(alCambiar);
+      };
+    },
   };
-  return { lienzo, fotos, vuelos, quitados: () => quitados };
+  return {
+    lienzo,
+    fotos,
+    vuelos,
+    camara,
+    quitados: () => quitados,
+    seguimientos: () => seguimientos,
+    avisos: () => avisos.size,
+  };
 };
 
 interface Mandos {
   readonly foto: FotoDelMapa;
   readonly setSeleccionada: Setter<string | null>;
+  /** Cambia el mapa, como cuando se crea otra vez. */
+  readonly setLienzo: Setter<LienzoDeFoto | undefined>;
 }
 
 const montar = () => {
@@ -86,12 +121,9 @@ const montar = () => {
   let mandos: Mandos | undefined;
   const { unmount } = render(() => {
     const [seleccionada, setSeleccionada] = createSignal<string | null>("movistar-1");
-    const foto = crearFoto({
-      lienzo: () => prueba.lienzo,
-      seleccionada,
-      desplazamiento: () => [0, -94],
-    });
-    mandos = { foto, setSeleccionada };
+    const [lienzo, setLienzo] = createSignal<LienzoDeFoto | undefined>(prueba.lienzo);
+    const foto = crearFoto({ lienzo, seleccionada, desplazamiento: () => [0, -94] });
+    mandos = { foto, setSeleccionada, setLienzo };
     return null;
   });
   flush();
@@ -132,7 +164,6 @@ describe("foto aérea en el mapa", () => {
     m.foto.verEdificio("movistar-1", SITIO);
     flush();
     assert.isTrue(m.foto.encendida());
-    assert.strictEqual(m.fotos.at(-1), true);
     assert.lengthOf(m.vuelos, 1);
     assert.deepStrictEqual(m.vuelos[0]?.posicion, SITIO);
     assert.deepStrictEqual(m.vuelos[0]?.desplazamiento, [0, -94]);
@@ -202,6 +233,172 @@ describe("foto aérea en el mapa", () => {
   });
 });
 
+describe("foto aérea durante los vuelos de la cámara", () => {
+  it("un vuelo la quita del mapa y al llegar vuelve, una vez por vuelo", () => {
+    const m = montar();
+    m.foto.alternar();
+    flush();
+    assert.deepStrictEqual(m.fotos, [false, true]);
+
+    m.camara.empezar();
+    flush();
+    // Mientras vuela, el mapa va sin la foto; el control sigue encendido.
+    assert.deepStrictEqual(m.fotos, [false, true, false]);
+    assert.isTrue(m.foto.encendida());
+    assert.isFalse(m.foto.seVe());
+
+    m.camara.parar();
+    flush();
+    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
+    assert.isTrue(m.foto.seVe());
+    // Un solo seguimiento de la cámara para toda la visita.
+    assert.strictEqual(m.seguimientos(), 1);
+    m.desmontar();
+    assert.strictEqual(m.avisos(), 0);
+  });
+
+  it("los gestos de la persona y los saltos no la quitan", () => {
+    const m = montar();
+    m.foto.encender();
+    flush();
+    const antes = m.fotos.length;
+    // Pellizcar o arrastrar: MapLibre da el evento del dedo.
+    m.camara.empezar(true);
+    flush();
+    assert.isTrue(m.foto.seVe());
+    m.camara.parar();
+    flush();
+    // Un salto (`jumpTo`) empieza y acaba en la misma tarea.
+    m.camara.empezar();
+    m.camara.parar();
+    flush();
+    assert.isTrue(m.foto.seVe());
+    assert.strictEqual(m.fotos.length, antes);
+    m.desmontar();
+  });
+
+  it("un vuelo que interrumpe otro la deja quitada hasta que llega el segundo", () => {
+    const m = montar();
+    m.foto.encender();
+    m.camara.empezar();
+    flush();
+    // Encendida en pleno vuelo: el mapa no la pone hasta que llegue.
+    assert.deepStrictEqual(m.fotos, [false]);
+    assert.isFalse(m.foto.seVe());
+    // MapLibre para el primero (`moveend`) y empieza el segundo (`movestart`) en la misma tarea.
+    m.camara.parar();
+    m.camara.empezar();
+    flush();
+    assert.deepStrictEqual(m.fotos, [false]);
+    m.camara.parar();
+    flush();
+    assert.deepStrictEqual(m.fotos, [false, true]);
+    m.desmontar();
+  });
+
+  it("si la persona coge el mapa a mitad de vuelo, la foto vuelve y el gesto no la quita", () => {
+    const m = montar();
+    m.foto.encender();
+    flush();
+    m.camara.empezar();
+    flush();
+    assert.isFalse(m.foto.seVe());
+    // MapLibre para el vuelo y empieza el gesto, con el evento del dedo.
+    m.camara.parar();
+    m.camara.empezar(true);
+    flush();
+    assert.isTrue(m.foto.seVe());
+    m.camara.parar();
+    flush();
+    assert.isTrue(m.foto.seVe());
+    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
+    m.desmontar();
+  });
+
+  it("encender y apagar la foto a mitad de vuelo no toca el mapa hasta que llega", () => {
+    const m = montar();
+    m.camara.empezar();
+    flush();
+    for (let vez = 0; vez < 5; vez++) {
+      m.foto.alternar();
+      flush();
+    }
+    assert.isTrue(m.foto.encendida());
+    assert.deepStrictEqual(m.fotos, [false]);
+    m.camara.parar();
+    flush();
+    assert.deepStrictEqual(m.fotos, [false, true]);
+    // Con la foto apagada, los vuelos no tocan el mapa.
+    m.foto.alternar();
+    flush();
+    m.camara.empezar();
+    flush();
+    m.camara.parar();
+    flush();
+    assert.deepStrictEqual(m.fotos, [false, true, false]);
+    m.desmontar();
+  });
+
+  it("«Ver el edificio» enciende la foto al llegar y resalta el edificio", async () => {
+    const m = montar();
+    m.foto.verEdificio("movistar-1", SITIO);
+    flush();
+    assert.isTrue(m.foto.encendida());
+    assert.isFalse(m.foto.seVe());
+    assert.deepStrictEqual(m.fotos, [false]);
+    m.vuelos[0]?.acabar(EDIFICIO);
+    flush();
+    assert.isTrue(m.foto.seVe());
+    assert.strictEqual(m.fotos.at(-1), true);
+    await esperar(() =>
+      assert.deepStrictEqual(m.foto.edificio("movistar-1"), {
+        tipo: "resaltado",
+        numero: "251-259",
+      }),
+    );
+    // Con la foto ya puesta: se quita una vez al despegar y vuelve al llegar.
+    m.foto.verEdificio("movistar-1", OTRO);
+    flush();
+    assert.deepStrictEqual(m.fotos, [false, true, false]);
+    m.vuelos[1]?.acabar(EDIFICIO);
+    flush();
+    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
+    m.desmontar();
+  });
+
+  it("«Ver el edificio» anulado en la misma tarea no deja la foto quitada", () => {
+    const m = montar();
+    m.foto.encender();
+    flush();
+    m.foto.verEdificio("movistar-1", SITIO);
+    m.setSeleccionada(null);
+    flush();
+    // El vuelo ya ha salido y nadie lo espera; al pararse, la foto vuelve.
+    assert.isTrue(m.vuelos[0]?.dejado);
+    m.camara.parar();
+    flush();
+    assert.isTrue(m.foto.seVe());
+    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
+    m.desmontar();
+  });
+
+  it("un mapa nuevo a mitad de vuelo empieza con la foto puesta", () => {
+    const m = montar();
+    m.foto.encender();
+    m.camara.empezar();
+    flush();
+    assert.isFalse(m.foto.seVe());
+    const otro = lienzoDePrueba();
+    m.setLienzo(otro.lienzo);
+    flush();
+    assert.isTrue(m.foto.seVe());
+    assert.deepStrictEqual(otro.fotos, [true]);
+    // El mapa viejo ya no avisa.
+    assert.strictEqual(m.avisos(), 0);
+    m.desmontar();
+  });
+});
+
 // --- el lienzo, sobre un mapa que imita a MapLibre ----------------------------------------------
 
 /** Píxeles por grado alrededor del sitio, más o menos los del zoom 18,5. */
@@ -244,13 +441,14 @@ const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa
   const capasAntes = JSON.stringify(estilo.layers);
   const fuentesAntes = Object.keys(estilo.sources);
   const estado: EstadoConFoto = {};
-  const escuchadores = new Map<string, Set<() => void>>();
+  const visibles = new Map<string, string>();
+  const escuchadores = new Map<string, Set<(movimiento: Movimiento) => void>>();
   const datos = new Map<string, DibujoDelEdificio>();
   const prohibidas: Array<string> = [];
   const vuelos: Array<{ center: [number, number]; zoom: number; offset: [number, number] }> = [];
   const centro = { x: 195, y: 422 };
-  const emitir = (evento: string) => {
-    for (const escuchador of escuchadores.get(evento) ?? []) escuchador();
+  const emitir = (evento: string, movimiento: Movimiento = {}) => {
+    for (const escuchador of escuchadores.get(evento) ?? []) escuchador(movimiento);
   };
   const prohibida = (nombre: string) => () => {
     prohibidas.push(nombre);
@@ -259,6 +457,9 @@ const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa
     getGlobalState: () => estado,
     setGlobalStateProperty: (nombre, valor) => {
       if (nombre === FOTO_AEREA) estado[FOTO_AEREA] = valor;
+    },
+    setLayoutProperty: (capa, _propiedad, valor) => {
+      visibles.set(capa, valor);
     },
     setStyle: prohibida("setStyle"),
     addLayer: prohibida("addLayer"),
@@ -296,10 +497,12 @@ const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa
   return {
     mapa,
     estado,
+    visibles,
     datos,
     vuelos,
     prohibidas,
     escuchadores: () => [...escuchadores.values()].reduce((n, s) => n + s.size, 0),
+    emitir,
     emitirEnOtraTarea: async (evento: string) => {
       await otraTarea();
       emitir(evento);
@@ -316,6 +519,7 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
     const lienzo = lienzoDeFoto(m.mapa);
     for (let vez = 0; vez < 10; vez++) lienzo.ponerFoto(vez % 2 === 0);
     assert.isFalse(m.estado[FOTO_AEREA]);
+    assert.strictEqual(m.visibles.get(CAPA_FOTO), "none");
     assert.deepStrictEqual(m.prohibidas, []);
     assert.isTrue(m.sinCambiosEnElEstilo());
     // Las celdas y el edificio siguen con su fuente: nada se ha quitado ni añadido.
@@ -385,5 +589,21 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
     assert.strictEqual(m.escuchadores(), 0);
     await m.emitirEnOtraTarea("idle");
     assert.lengthOf(encontrados, 1);
+  });
+
+  it("un movimiento de la web es un vuelo hasta que se para; uno de la persona, no", () => {
+    const m = mapaDePrueba({});
+    const lienzo = lienzoDeFoto(m.mapa);
+    const avisos: Array<boolean> = [];
+    const dejar = lienzo.seguirVuelos((volando) => avisos.push(volando));
+    m.emitir("movestart");
+    m.emitir("moveend");
+    m.emitir("movestart", { originalEvent: new Event("touchstart") });
+    m.emitir("moveend", { originalEvent: new Event("touchend") });
+    assert.deepStrictEqual(avisos, [true, false, false, false]);
+    dejar();
+    assert.strictEqual(m.escuchadores(), 0);
+    m.emitir("movestart");
+    assert.lengthOf(avisos, 4);
   });
 });

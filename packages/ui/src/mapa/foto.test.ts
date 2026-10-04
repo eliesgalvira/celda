@@ -45,8 +45,8 @@ describe("foto aérea en el estilo", () => {
 
   it("va apagada al abrir: el estado empieza en falso y su capa, escondida, no pide nada", () => {
     assert.deepStrictEqual<unknown>(estilo.state?.[FOTO_AEREA], { default: false });
-    assert.strictEqual(visibilidad(CAPA_FOTO, false), "none");
-    assert.strictEqual(visibilidad(CAPA_FOTO, true), "visible");
+    // La pone `ponerFotoAerea`, no el estado: así MapLibre no vacía su caché de teselas (#67).
+    assert.strictEqual(capa(CAPA_FOTO)?.layout?.visibility, "none");
     // Tapa la tierra; el agua va encima, porque el mar del PNOA es casi negro.
     assert.isAbove(ids.indexOf(CAPA_FOTO), ids.indexOf("espacios-naturales"));
     assert.isBelow(ids.indexOf(CAPA_FOTO), ids.indexOf("agua"));
@@ -118,14 +118,17 @@ describe("foto aérea en el estilo", () => {
     assert.strictEqual(ids.indexOf("edificio-numero"), ids.indexOf(CAPA_PORTALES) + 1);
   });
 
-  it("encender y apagar solo cambia el estado del estilo, y solo si cambia", () => {
+  it("encender y apagar cambia el estado del estilo y la capa de la foto, y solo si cambia", () => {
     const estado: EstadoConFoto = {};
-    const llamadas: Array<readonly [string, boolean]> = [];
+    const llamadas: Array<readonly [string, string | boolean]> = [];
     const mapa = {
       getGlobalState: () => estado,
       setGlobalStateProperty: (nombre: string, valor: boolean) => {
         if (nombre === FOTO_AEREA) estado[FOTO_AEREA] = valor;
         llamadas.push([nombre, valor]);
+      },
+      setLayoutProperty: (capa: string, propiedad: string, valor: string) => {
+        llamadas.push([`${capa}.${propiedad}`, valor]);
       },
     };
     ponerFotoAerea(mapa, false);
@@ -134,7 +137,9 @@ describe("foto aérea en el estilo", () => {
     ponerFotoAerea(mapa, false);
     assert.deepStrictEqual(llamadas, [
       [FOTO_AEREA, true],
+      [`${CAPA_FOTO}.visibility`, "visible"],
       [FOTO_AEREA, false],
+      [`${CAPA_FOTO}.visibility`, "none"],
     ]);
   });
 });
