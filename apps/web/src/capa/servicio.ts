@@ -220,7 +220,8 @@ export const capaDelOrigen = Layer.effect(
           Effect.gen(function* () {
             // Su marca de agua y su cobertura son las del resumen que la listó.
             const { resumen: suyo, texto } = yield* textoDe(codigo);
-            const { capa, indices } = yield* indexador.indexar(codigo, texto);
+            const cubierta = suyo.provincias.find((p) => p.codigo === codigo)?.cubierta === true;
+            const { capa, indices } = yield* indexador.indexar(codigo, texto, cubierta);
             const cargada: ProvinciaCargada = {
               codigo,
               version: suyo.version,

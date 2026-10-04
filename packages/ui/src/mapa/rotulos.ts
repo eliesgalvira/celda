@@ -7,6 +7,7 @@ import type {
 import type { Contorno } from "@celda/dominio/comunitatValenciana";
 
 import { conFoto, deClase, porZoom, visibleConFoto } from "./expresiones.ts";
+import { capaHuecos } from "./huecos.ts";
 import { nombreDelRotulo } from "./nombres.ts";
 import type { ColorDeToken, TokenMapa } from "./tokens.ts";
 
@@ -93,6 +94,15 @@ const tinta = (
   propio: string | ExpressionSpecification,
 ): ExpressionSpecification => conFoto(propio, color("mapa-foto-rotulo"));
 
+/**
+ * El tamaño de la letra de una capa de lugares: pares de zoom y píxeles, en línea recta entre
+ * ellos. Con `delPais`, la capital del país va con esos otros.
+ */
+interface TamanoDeLugar {
+  readonly pares: ReadonlyArray<number>;
+  readonly delPais?: ReadonlyArray<number>;
+}
+
 /** Una capa de lugares: qué clase de lugar rotula, desde y hasta qué zoom y con qué letra. */
 interface CapaDeLugares {
   readonly id: string;
@@ -100,11 +110,16 @@ interface CapaDeLugares {
   readonly desde: number;
   readonly hasta: number;
   readonly letra: string;
-  readonly tamano: ExpressionSpecification;
+  readonly tamano: TamanoDeLugar;
   readonly color: TokenMapa;
   readonly halo: number;
   /** Píxeles de aire alrededor del rótulo; por defecto, 2. */
   readonly aire?: number;
+  /**
+   * Una capa de ciudades: MapLibre coloca sus rótulos sin pintarlos y Celda los copia encima de sus
+   * datos (ADR 0024). Se colocan antes que los huecos de los marcadores, así que no los esquivan.
+   */
+  readonly encima?: boolean;
 }
 
 /**
@@ -120,19 +135,10 @@ const LUGARES: ReadonlyArray<CapaDeLugares> = [
     desde: 4,
     hasta: 14,
     letra: LETRA_NEGRITA,
-    tamano: [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      5,
-      ["match", CAPITAL, 2, 14, 12.5],
-      8,
-      ["match", CAPITAL, 2, 17, 15],
-      11,
-      ["match", CAPITAL, 2, 19.5, 17.5],
-    ],
+    tamano: { pares: [5, 12.5, 8, 15, 11, 17.5], delPais: [5, 14, 8, 17, 11, 19.5] },
     color: "mapa-rotulo-capital",
     halo: 1.8,
+    encima: true,
   },
   {
     id: "lugares-grandes",
@@ -146,9 +152,10 @@ const LUGARES: ReadonlyArray<CapaDeLugares> = [
     desde: 4.5,
     hasta: 14,
     letra: LETRA,
-    tamano: porZoom(5, 11.5, 8, 13.5, 11, 16),
+    tamano: { pares: [5, 11.5, 8, 13.5, 11, 16] },
     color: "mapa-rotulo-ciudad",
     halo: 1.6,
+    encima: true,
   },
   {
     id: "lugares-ciudades",
@@ -156,9 +163,10 @@ const LUGARES: ReadonlyArray<CapaDeLugares> = [
     desde: 7,
     hasta: 14,
     letra: LETRA,
-    tamano: porZoom(7, 12, 10, 14, 12, 15.5),
+    tamano: { pares: [7, 12, 10, 14, 12, 15.5] },
     color: "mapa-rotulo-ciudad",
     halo: 1.6,
+    encima: true,
   },
   {
     id: "lugares-pueblos-grandes",
@@ -166,7 +174,7 @@ const LUGARES: ReadonlyArray<CapaDeLugares> = [
     desde: 8,
     hasta: 14,
     letra: LETRA,
-    tamano: porZoom(8, 11.5, 10, 13, 12, 14.5),
+    tamano: { pares: [8, 11.5, 10, 13, 12, 14.5] },
     color: "mapa-rotulo-ciudad",
     halo: 1.5,
     aire: 4,
@@ -177,7 +185,7 @@ const LUGARES: ReadonlyArray<CapaDeLugares> = [
     desde: 10,
     hasta: 16,
     letra: LETRA,
-    tamano: porZoom(10, 11, 13, 12.5, 15, 14),
+    tamano: { pares: [10, 11, 13, 12.5, 15, 14] },
     color: "mapa-rotulo-pueblo",
     halo: 1.5,
     aire: 3,
@@ -188,7 +196,7 @@ const LUGARES: ReadonlyArray<CapaDeLugares> = [
     desde: 12,
     hasta: 17,
     letra: LETRA,
-    tamano: porZoom(12, 10.5, 16, 12.5),
+    tamano: { pares: [12, 10.5, 16, 12.5] },
     color: "mapa-rotulo-aldea",
     halo: 1.5,
   },
@@ -197,29 +205,77 @@ const LUGARES: ReadonlyArray<CapaDeLugares> = [
 /** Los nombres de las capas de lugares, cuyo filtro cambia `quitarRotulosDeMunicipios`. */
 export const CAPAS_DE_LUGARES: ReadonlyArray<string> = LUGARES.map((capa) => capa.id);
 
+/** Las capas de ciudades que Celda copia encima de sus datos, de la más importante a la menos. */
+export const CAPAS_DE_CIUDADES: ReadonlyArray<string> = LUGARES.flatMap((capa) =>
+  capa.encima === true ? [capa.id] : [],
+);
+
+/** El `text-size` de una capa de lugares como expresión de MapLibre. */
+const tamanoDe = ({ pares, delPais }: TamanoDeLugar): ExpressionSpecification =>
+  porZoom(
+    ...pares.flatMap((valor, k): ReadonlyArray<number | ExpressionSpecification> =>
+      k % 2 === 0 || delPais === undefined
+        ? [valor]
+        : [["match", CAPITAL, 2, delPais[k] ?? valor, valor]],
+    ),
+  );
+
+/** El valor en línea recta entre pares de zoom y valor, como `interpolate` de MapLibre. */
+const interpolar = (pares: ReadonlyArray<number>, zoom: number): number => {
+  if (zoom <= (pares[0] ?? 0)) return pares[1] ?? 0;
+  for (let k = 2; k + 1 < pares.length; k += 2) {
+    const z0 = pares[k - 2] ?? 0;
+    const z1 = pares[k] ?? 0;
+    if (zoom <= z1) {
+      const v0 = pares[k - 1] ?? 0;
+      return v0 + ((zoom - z0) / (z1 - z0)) * ((pares[k + 1] ?? 0) - v0);
+    }
+  }
+  return pares.at(-1) ?? 0;
+};
+
+/**
+ * Lo que mide la letra de un rótulo de la capa `capa` a `zoom`, en píxeles, como la pinta
+ * MapLibre. `capital` es el rango de capital de OpenMapTiles (2 la del país).
+ */
+export const tamanoDeRotulo = (capa: string, capital: number, zoom: number): number => {
+  const suya = LUGARES.find((c) => c.id === capa);
+  if (suya === undefined) return 0;
+  const { pares, delPais } = suya.tamano;
+  return interpolar(capital === 2 && delPais !== undefined ? delPais : pares, zoom);
+};
+
 const capaDeLugares = (
   fuente: string,
   color: ColorDeToken,
   espana: ContornoDeEspana,
   nombre: ExpressionSpecification,
   capa: CapaDeLugares,
-): SymbolLayerSpecification => ({
-  id: capa.id,
-  type: "symbol",
-  source: fuente,
-  "source-layer": "place",
-  minzoom: capa.desde,
-  maxzoom: capa.hasta,
-  filter: ["all", soloDeEspana(espana), capa.propio, sinLosDeCelda(nombre)],
-  layout: {
-    "text-field": nombre,
-    "text-font": [capa.letra],
-    "text-size": capa.tamano,
-    "symbol-sort-key": ["get", "rank"],
-    "text-padding": capa.aire ?? 2,
-  },
-  paint: { "text-color": tinta(color, color(capa.color)), ...halo(color, capa.halo) },
-});
+): SymbolLayerSpecification => {
+  const pintura: NonNullable<SymbolLayerSpecification["paint"]> = {
+    "text-color": tinta(color, color(capa.color)),
+    ...halo(color, capa.halo),
+  };
+  // Las ciudades se colocan pero no se pintan: Celda las copia encima de sus datos con su color.
+  if (capa.encima === true) pintura["text-opacity"] = 0;
+  return {
+    id: capa.id,
+    type: "symbol",
+    source: fuente,
+    "source-layer": "place",
+    minzoom: capa.desde,
+    maxzoom: capa.hasta,
+    filter: ["all", soloDeEspana(espana), capa.propio, sinLosDeCelda(nombre)],
+    layout: {
+      "text-field": nombre,
+      "text-font": [capa.letra],
+      "text-size": tamanoDe(capa.tamano),
+      "symbol-sort-key": ["get", "rank"],
+      "text-padding": capa.aire ?? 2,
+    },
+    paint: pintura,
+  };
+};
 
 /**
  * El `name` de OpenStreetMap tal cual, para los rótulos que no son nombres de lugar: el agua, las
@@ -455,7 +511,9 @@ const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecifi
 /**
  * Las capas de rótulos, de abajo arriba: los nombres, los números de portal, lo que tenga que ir
  * `sobreLosPortales` (el número del edificio resaltado) y después los lugares, de menos a más
- * importantes. Con `comunitatValenciana`, los de lugar deciden la forma de los nombres con «/».
+ * importantes. Entre los pueblos y las ciudades, los huecos de los marcadores de Celda: MapLibre
+ * coloca primero lo de arriba, así que las ciudades no los esquivan y todo lo demás sí (ADR 0024).
+ * Con `comunitatValenciana`, los de lugar deciden la forma de los nombres con «/».
  */
 export const capasRotulos = (
   fuente: string,
@@ -469,7 +527,10 @@ export const capasRotulos = (
     ...capasDeNombres(fuente, color, nombre),
     capaDePortales(fuente, color),
     ...sobreLosPortales,
-    ...LUGARES.toReversed().map((capa) => capaDeLugares(fuente, color, espana, nombre, capa)),
+    ...LUGARES.toReversed().flatMap((capa) => [
+      ...(capa.encima === true && capa.id === CAPAS_DE_CIUDADES.at(-1) ? [capaHuecos()] : []),
+      capaDeLugares(fuente, color, espana, nombre, capa),
+    ]),
   ];
 };
 

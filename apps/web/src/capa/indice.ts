@@ -2,7 +2,14 @@ import type { Coordenada } from "@celda/dominio/area";
 import KDBush from "kdbush";
 import Supercluster from "supercluster";
 
-import { type ConMunicipio, type EtiquetaDeMunicipio, zonasDeMunicipios } from "./zonas.ts";
+import {
+  type ConMunicipio,
+  esNivelDeMunicipiosGrandes,
+  type EtiquetaDeMunicipio,
+  NIVELES_DE_MUNICIPIOS,
+  RADIO_DE_MUNICIPIOS_GRANDES,
+  zonasDeMunicipios,
+} from "./zonas.ts";
 
 /**
  * El índice de supercluster de una capa de provincia, que se construye en un Worker y se
@@ -52,14 +59,30 @@ export class Indice extends Supercluster<PropiedadesDePunto, PropiedadesDeAgrupa
   declare clusterProps: Array<unknown>;
 }
 
-const nuevoIndice = (): Indice => new Indice({ radius: RADIO, maxZoom: NIVEL_MAXIMO });
+/**
+ * Cómo agrupa un índice. Sin nada, el de siempre: `RADIO` en todos los niveles hasta
+ * `NIVEL_MAXIMO`. Con `nivel`, solo agrupa en ese nivel: es el de un nivel de municipios grandes,
+ * que no se mira en ningún otro, y así el Worker no agrupa los demás.
+ */
+export interface OpcionesDeIndice {
+  readonly radio?: number;
+  readonly nivel?: number;
+}
+
+const nuevoIndice = ({ radio = RADIO, nivel }: OpcionesDeIndice = {}): Indice =>
+  new Indice(
+    nivel === undefined
+      ? { radius: radio, maxZoom: NIVEL_MAXIMO }
+      : { radius: radio, minZoom: nivel, maxZoom: nivel },
+  );
 
 /** Un índice con las posiciones de `indices` dentro de `posiciones`. */
 export const indexar = (
   posiciones: ReadonlyArray<Coordenada>,
   indices: ReadonlyArray<number>,
+  opciones: OpcionesDeIndice = {},
 ): Indice => {
-  const indice = nuevoIndice();
+  const indice = nuevoIndice(opciones);
   indice.load(
     indices.map((i) => {
       const { longitud, latitud } = posiciones[i] ?? { longitud: 0, latitud: 0 };
@@ -89,6 +112,10 @@ interface ArbolRepetido {
  * búferes van en la lista de transferibles, así que no se copian.
  */
 export interface IndiceSerializado {
+  /** Cómo agrupa, como en `OpcionesDeIndice`: hay que rehidratarlo igual. */
+  readonly radio: number;
+  readonly nivelMinimo: number;
+  readonly nivelMaximo: number;
   readonly numPoints: number;
   readonly stride: number;
   readonly coords: Float64Array<ArrayBuffer>;
@@ -121,6 +148,9 @@ export const serializarIndice = (indice: Indice): IndiceParaEnviar => {
   );
   return {
     serializado: {
+      radio: indice.options.radius,
+      nivelMinimo: indice.options.minZoom,
+      nivelMaximo: indice.options.maxZoom,
       numPoints: indice.numPoints,
       stride: indice.stride,
       coords: indice.coords,
@@ -138,7 +168,11 @@ export const rehidratarIndice = (
   serializado: IndiceSerializado,
   indices: ReadonlyArray<number>,
 ): Indice => {
-  const indice = nuevoIndice();
+  const indice = new Indice({
+    radius: serializado.radio,
+    minZoom: serializado.nivelMinimo,
+    maxZoom: serializado.nivelMaximo,
+  });
   const arboles: Array<Arbol | undefined> = [];
   for (const [z, arbol] of serializado.arboles.entries()) {
     if (arbol !== null && "kd" in arbol) {
@@ -161,8 +195,10 @@ export const rehidratarIndice = (
 /**
  * Los índices de una capa: el de todos; si tiene barrios, el de los que no tienen ninguno; y, por
  * cada nivel de municipios (`NIVELES_DE_MUNICIPIOS`), el de los que en ese nivel no van en la zona
- * de su municipio (`zonasDeMunicipios`), que se agrupan en hexágonos. Es `undefined` si en ese
- * nivel no hay ninguna zona, y entonces vale el de todos, o si todos van en zona.
+ * de su municipio (`zonasDeMunicipios`), que se agrupan en hexágonos. En un nivel de municipios
+ * grandes está siempre, aunque no haya zonas, con agrupaciones de `RADIO_DE_MUNICIPIOS_GRANDES`. En
+ * los demás es `undefined` si en ese nivel no hay ninguna zona, y entonces vale el de todos. Y en
+ * todos, si todos van en zona.
  */
 export interface IndicesDeCapa<I> {
   readonly todos: I;
@@ -175,10 +211,15 @@ interface ConZonas extends ConMunicipio {
   readonly barrio: string | null;
 }
 
+/** Cómo agrupa el índice de los que no van en zona en un nivel de municipios. */
+const opcionesFueraDeZonas = (nivel: number): OpcionesDeIndice =>
+  esNivelDeMunicipiosGrandes(nivel) ? { radio: RADIO_DE_MUNICIPIOS_GRANDES, nivel } : {};
+
 /**
  * Las posiciones en la capa de sus emplazamientos, de los que quedan fuera de los barrios y, en
  * cada nivel de municipios, de los que no van en zona: los de un municipio pequeño o muy grande en
- * la pantalla, y los que no tienen municipio (un territorio compartido, el mar).
+ * la pantalla, y los que no tienen municipio (un territorio compartido, el mar). Sin `municipios`,
+ * como en una provincia a medias, ninguno va en zona.
  */
 export const indicesDeCapa = (
   emplazamientos: ReadonlyArray<ConZonas>,
@@ -190,8 +231,9 @@ export const indicesDeCapa = (
   return {
     todos,
     fuera: conBarrios ? todos.filter((i) => emplazamientos[i]?.barrio === null) : undefined,
-    fueraDeZonas: zonas.map((enZona) => {
-      if (enZona.size === 0) return undefined;
+    fueraDeZonas: zonas.map((enZona, k) => {
+      const nivel = NIVELES_DE_MUNICIPIOS[k] ?? 0;
+      if (enZona.size === 0 && !esNivelDeMunicipiosGrandes(nivel)) return undefined;
       const fuera = todos.filter((i) => !enZona.has(emplazamientos[i]?.municipio ?? ""));
       return fuera.length > 0 ? fuera : undefined;
     }),
@@ -212,8 +254,10 @@ export const indexarCapa = (
   return {
     todos: indexar(posiciones, indices.todos),
     fuera: indices.fuera === undefined ? undefined : indexar(posiciones, indices.fuera),
-    fueraDeZonas: indices.fueraDeZonas.map((lista) =>
-      lista === undefined ? undefined : indexar(posiciones, lista),
+    fueraDeZonas: indices.fueraDeZonas.map((lista, k) =>
+      lista === undefined
+        ? undefined
+        : indexar(posiciones, lista, opcionesFueraDeZonas(NIVELES_DE_MUNICIPIOS[k] ?? 0)),
     ),
   };
 };

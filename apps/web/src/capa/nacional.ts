@@ -1,5 +1,6 @@
 import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area";
 import { COMPANIAS_DE_CAPA, type EmplazamientoLeido } from "@celda/dominio/capa";
+import { centroVisual } from "@celda/dominio/centroVisual";
 import { seCortan } from "@celda/dominio/cobertura";
 import type { CapaDeProvincia, ProvinciaDelResumen, ResumenLeido } from "@celda/dominio/provincias";
 import { ausentesDeProvincia, companiasDelResumen, resumirMunicipios } from "@celda/dominio/zona";
@@ -24,8 +25,9 @@ import { cajaConMargen, cajaVisible, type Vista } from "./marcadores.ts";
 
 /**
  * El mapa de toda España (ADR 0016). Por debajo del nivel de provincias solo se dibuja el resumen
- * nacional: un hexágono por provincia con su número. Desde ese nivel se piden las provincias que
- * corta la vista; cada una se agrupa con su propio índice, y mientras no llega se ve su hexágono.
+ * nacional: un hexágono por provincia con su número, en su centro visual (ADR 0024). Desde ese
+ * nivel se piden las provincias que corta la vista; cada una se agrupa con su propio índice, y
+ * mientras no llega se ve su hexágono.
  *
  * Las transiciones son las de cada provincia donde hay detalle a los dos lados. Entre el resumen y
  * una provincia, cada elemento de la provincia sale de su hexágono o va a él. En el borde entre
@@ -33,8 +35,20 @@ import { cajaConMargen, cajaVisible, type Vista } from "./marcadores.ts";
  * suyos, y ningún emplazamiento está en dos.
  */
 
-/** Primer nivel en que se piden y se dibujan las provincias con detalle. */
-export const NIVEL_DE_PROVINCIAS = 8;
+/**
+ * Primer nivel en que se piden y se dibujan las provincias con detalle. Hasta el 9, el resumen:
+ * de lejos los datos van discretos y una vista a z8 no pide ninguna capa de provincia (ADR 0024).
+ */
+export const NIVEL_DE_PROVINCIAS = 9;
+
+/**
+ * Dónde va el hexágono de una provincia: su centro visual (`centroVisual`) o, si la tabla no la
+ * tiene, la etiqueta del resumen. La etiqueta se queda en el resumen: la publicación la usa para
+ * dar provincia a los emplazamientos que no tienen ninguna.
+ */
+export type CentroDeProvincia = (provincia: ProvinciaDelResumen) => Coordenada;
+
+const enSuCentroVisual: CentroDeProvincia = (p) => centroVisual(p.codigo) ?? p.etiqueta;
 
 /** Una provincia leída, indexada y lista para agrupar. */
 export interface ProvinciaCargada {
@@ -133,6 +147,7 @@ const partesDe = new WeakMap<Escena, Partes>();
 export const crearAgrupadorNacional = (
   resumen: ResumenLeido,
   provincias: ReadonlyMap<string, EstadoProvincia>,
+  centroDe: CentroDeProvincia = enSuCentroVisual,
 ): Agrupador => {
   const enElResumen = companiasDelResumen(resumen.provincias);
   const cargadas = new Map(
@@ -186,10 +201,11 @@ export const crearAgrupadorNacional = (
       const suya = seCortan(p.caja, visible)
         ? interseccion(p.caja, visible)
         : interseccion(p.caja, caja);
-      return { posicion: alBorde(p.etiqueta, suya) };
+      return { posicion: alBorde(centroDe(p), suya) };
     }
     const soloResumen = nivel < NIVEL_DE_PROVINCIAS || p.caja === undefined;
-    return soloResumen && contiene(caja, p.etiqueta) ? { posicion: p.etiqueta } : undefined;
+    const centro = centroDe(p);
+    return soloResumen && contiene(caja, centro) ? { posicion: centro } : undefined;
   };
 
   /** El seleccionado, suelto, si alguna provincia cargada lo tiene y cae en la caja. */

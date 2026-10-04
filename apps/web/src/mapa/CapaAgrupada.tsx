@@ -2,6 +2,7 @@ import type { Compania } from "@celda/dominio/compania";
 import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { MarcadorAgrupacion } from "@celda/ui/marcadores/MarcadorAgrupacion.tsx";
 import { type FormaDeZona, MarcadorZona } from "@celda/ui/marcadores/MarcadorZona.tsx";
+import type { TamanoDeMarcador } from "@celda/ui/marcadores/tamano.ts";
 import {
   CapaDeMarcadores,
   MarcadorEmplazamiento,
@@ -47,6 +48,13 @@ export interface CapaAgrupadaProps {
   readonly movimientoReducido: boolean;
   /** Qué forma toma la etiqueta de cada zona; la que no esté aquí va completa. */
   readonly formas: ReadonlyMap<string, FormaDeZona>;
+  /**
+   * Las zonas que ceden su sitio a un rótulo de ciudad o a otra zona con más habitantes (ADR 0024):
+   * no se dibujan hasta que, al acercar, dejan de chocar. Sin ella, se dibujan todas.
+   */
+  readonly ocultos?: ReadonlySet<string>;
+  /** Lo grande que van los hexágonos al zoom de la escena. Sin él, `normal`. */
+  readonly tamano?: TamanoDeMarcador;
   /** Clave del emplazamiento con la ficha abierta: su marcador se resalta. */
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento: se abre su ficha. */
@@ -119,19 +127,28 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
     return () => cancelAnimationFrame(latido);
   });
 
+  /** Lo que se dibuja: lo pintado menos lo que cede su sitio. Cambia al decidir, no al moverse. */
+  const visibles = createMemo(() => {
+    const ocultos = props.ocultos;
+    return ocultos === undefined || ocultos.size === 0
+      ? pintados()
+      : pintados().filter((pintado) => !ocultos.has(pintado.elemento.clave));
+  });
+
   return (
     <CapaDeMarcadores
       nombre="Emplazamientos"
       contenedor={props.contenedor}
       combinaciones={props.combinaciones}
     >
-      <For each={pintados()} keyed={(pintado) => pintado.elemento.clave}>
+      <For each={visibles()} keyed={(pintado) => pintado.elemento.clave}>
         {(pintado) => (
           <MarcadorPintado
             pintado={pintado()}
             fotograma={props.fotograma}
             proyectar={props.proyectar}
             formas={props.formas}
+            tamano={props.tamano ?? "normal"}
             seleccionada={props.seleccionada}
             alSeleccionar={(clave) => props.alSeleccionar(clave)}
             alAbrir={(elemento) => props.alAbrir(elemento)}
@@ -147,6 +164,7 @@ function MarcadorPintado(props: {
   readonly fotograma: number;
   readonly proyectar: Proyectar;
   readonly formas: ReadonlyMap<string, FormaDeZona>;
+  readonly tamano: TamanoDeMarcador;
   readonly seleccionada: string | null;
   readonly alSeleccionar: (clave: string) => void;
   readonly alAbrir: (elemento: ElementoAbrible) => void;
@@ -198,6 +216,7 @@ function MarcadorPintado(props: {
             x={punto().x}
             y={punto().y}
             cuantos={agrupada().cuantos}
+            tamano={props.tamano}
             nombre={nombreDeAgrupacion(agrupada().cuantos)}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(agrupada())}
@@ -211,6 +230,7 @@ function MarcadorPintado(props: {
             y={punto().y}
             zona="barrio"
             forma={props.formas.get(elegido().clave) ?? "completa"}
+            tamano={props.tamano}
             nombreDeZona={elegido().resumen.barrio.nombre}
             emplazamientos={elegido().resumen.emplazamientos}
             nombre={nombreDeBarrio(elegido().resumen)}
@@ -226,6 +246,7 @@ function MarcadorPintado(props: {
             y={punto().y}
             zona="municipio"
             forma={props.formas.get(elegido().clave) ?? "completa"}
+            tamano={props.tamano}
             nombreDeZona={elegido().resumen.municipio.nombre}
             emplazamientos={elegido().resumen.emplazamientos}
             nombre={nombreDeMunicipio(elegido().resumen)}
@@ -241,6 +262,7 @@ function MarcadorPintado(props: {
             y={punto().y}
             zona="provincia"
             forma={props.formas.get(hexagono().clave) ?? "completa"}
+            tamano={props.tamano}
             nombreDeZona={hexagono().provincia.nombre}
             emplazamientos={hexagono().provincia.emplazamientos}
             cobertura={coberturaDe(hexagono())}

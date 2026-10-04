@@ -129,6 +129,7 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 | `interferencia/enMapa.ts`, vista | cálculo en el Worker tras 120 ms | lienzo, capa, elección, encuadre, referencia, provincias vecinas (por `mismasVecinas`), reintento | **Fallo.** Cada lectura del GPS traía una posición nueva: cancelaba el cálculo, lo que termina el Worker, y pedía otro. Con una lectura por segundo y un cálculo más largo, no acababa nunca | arreglado (esta rama) | `recurso`, referencia por `mismaCoordenada` |
 | `servicio/enMapa.ts`, sector que da servicio | cálculo en el Worker | el pedido (emplazamiento, punto, celda) | **Fallo.** Cada lectura del GPS encolaba otro cálculo igual | arreglado (esta rama) | `recurso`, punto por `mismaCoordenada`, el cierre no interrumpe si sigue el mismo emplazamiento |
 | `mapa/Marcadores.tsx`, vista del mapa | `map.on("move"/"moveend")` y un fotograma por movimiento | el mapa | `onSettled` con `untrack` | seguro | `recurso("marcadores:vista")` |
+| `mapa/Marcadores.tsx`, rótulos de ciudad | `map.on("idle")`, que lee los rótulos colocados con `queryRenderedFeatures` | el mapa, con el lector del código del mapa | nuevo (#66) | seguro | `recurso("marcadores:rotulos")`; la lectura se compara por claves y zoom, así que un `idle` sin cambios no decide nada |
 | `mapa/Marcadores.tsx`, movimiento reducido | `matchMedia` | fija | `onSettled` | seguro | `recursoFijo` |
 | `mapa/Marcadores.tsx`, precarga de fichas | `fetch` de lotes por `alVer` | las claves sueltas que se ven | Volvía a pedir con cada escena, también al seleccionar un marcador; la caché del servicio evitaba la red salvo tras un fallo | riesgo → seguro | `recurso`, `mismasListas` |
 | `mapa/CapaAgrupada.tsx`, latido | `requestAnimationFrame` hasta que acaba la transición | si queda algo yéndose | Se pedía desde la segunda función del efecto; el bucle se paraba solo | seguro | `recurso("marcadores:latido")` |
@@ -165,6 +166,7 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 | `interferencia/enMapa.ts` | enseña u oculta la trama | lienzo y si está activa | seguro |
 | `servicio/enMapa.ts` | `setData` del degradado y de la línea; borra sin pedido | lo calculado; el punto, ya por coordenadas | seguro |
 | `mapa/CapaAgrupada.tsx` | calcula lo pintado y enciende el latido | la escena | seguro |
+| `mapa/Marcadores.tsx` | `setData` de los huecos de los marcadores (#66) | los huecos de la escena y cada `idle`; con el mapa moviéndose no hace nada, y si son los mismos no toca el mapa | seguro |
 | `mapa/Marcadores.tsx` | `setFilter` de los rótulos de municipio del mapa base | los nombres de los municipios de la escena, con `mismasListas` | seguro |
 | `ui/Eleccion.tsx`, `ui/Termino.tsx`, `ui/Dialogo.tsx` | escriben el campo, colocan, enfocan | un valor o un título | seguro |
 
@@ -180,4 +182,4 @@ Se abre una vez por lo que lo crea, no por una reejecución:
 - Escuchadores en el propio nodo desde un `ref` (`Dialogo`, `MenuDeControles`, `MenuUbicacion`, `PanelEmplazamiento`, `MarcadorReferencia`): uno por nodo, y mueren con él.
 - Manejadores de eventos (usar la ubicación, elegir, quitar, pedir permiso a la brújula): los abre la persona. Buscar una dirección solo escribe la búsqueda pedida, y la abre `recurso("buscador:busqueda")`.
 
-Resumen: 33 sitios abren algo desde Solid (29 en la auditoría, los dos del #45 y los dos de la foto aérea del #64); el resto de efectos y memos, en la segunda tabla, no abren nada. Cuatro tenían el fallo: el GPS y la brújula (ya arreglados en 480e670 y 119001f) y la vista de interferencia y el sector que da servicio, que recalculaban con cada lectura del GPS en el mismo sitio. La precarga de fichas era un riesgo sin fallo visible. Todos abren ahora con `recurso()` o `recursoFijo()`.
+Resumen: 34 sitios abren algo desde Solid (29 en la auditoría, los dos del #45, los dos de la foto aérea del #64 y la lectura de los rótulos de ciudad del #66); el resto de efectos y memos, en la segunda tabla, no abren nada. Cuatro tenían el fallo: el GPS y la brújula (ya arreglados en 480e670 y 119001f) y la vista de interferencia y el sector que da servicio, que recalculaban con cada lectura del GPS en el mismo sitio. La precarga de fichas era un riesgo sin fallo visible. Todos abren ahora con `recurso()` o `recursoFijo()`.

@@ -39,9 +39,14 @@ export interface ProvinciaIndexada {
 export class IndexadorDeProvincias extends Context.Service<
   IndexadorDeProvincias,
   {
+    /**
+     * Lee e indexa la capa de una provincia. Sus municipios son zona solo si está `cubierta`: en
+     * una a medias, un municipio del borde de lo barrido contaría solo una parte (ADR 0017).
+     */
     readonly indexar: (
       provincia: string,
       texto: string,
+      cubierta: boolean,
     ) => Effect.Effect<ProvinciaIndexada, IndiceFallido>;
   }
 >()("@celda/web/capa/indexador/IndexadorDeProvincias") {}
@@ -51,6 +56,7 @@ export interface SolicitudDeIndice {
   readonly numero: number;
   readonly provincia: string;
   readonly texto: string;
+  readonly cubierta: boolean;
 }
 
 /** Lo que contesta el Worker: la capa leída y sus índices serializados, o por qué no. */
@@ -76,6 +82,10 @@ export interface RespuestaParaEnviar {
 const leerCapa = (texto: string, provincia: string) =>
   Result.map(leerCapaDeProvincia(texto, provincia), capaConNombresDeLugar);
 
+/** Los municipios que pueden ser zona: los de una provincia cubierta. */
+const municipiosDeZona = (capa: CapaDeProvincia, cubierta: boolean) =>
+  cubierta ? capa.municipios : [];
+
 /**
  * Lo que hace el Worker con una solicitud: leer la capa, indexarla y serializar los índices. Los
  * búferes de `transferibles` se transfieren con la respuesta.
@@ -89,7 +99,11 @@ export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar
     };
   }
   const capa = leida.success;
-  const indices = indexarCapa(capa.emplazamientos, capa.barrios.length > 0, capa.municipios);
+  const indices = indexarCapa(
+    capa.emplazamientos,
+    capa.barrios.length > 0,
+    municipiosDeZona(capa, solicitud.cubierta),
+  );
   const todos = serializarIndice(indices.todos);
   const fuera = indices.fuera === undefined ? undefined : serializarIndice(indices.fuera);
   const fueraDeZonas = indices.fueraDeZonas.map((indice) =>
@@ -115,12 +129,13 @@ export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar
 /** Rehidrata los índices de una respuesta del Worker. */
 const indexadaDe = (
   respuesta: Extract<RespuestaDeIndice, { readonly tipo: "lista" }>,
+  cubierta: boolean,
 ): ProvinciaIndexada => {
   const { capa } = respuesta;
   const posiciones = indicesDeCapa(
     capa.emplazamientos,
     respuesta.fuera !== undefined,
-    capa.municipios,
+    municipiosDeZona(capa, cubierta),
   );
   return {
     capa,
@@ -146,7 +161,7 @@ const indexadaDe = (
 export const indexadorEnHilo = Layer.succeed(
   IndexadorDeProvincias,
   IndexadorDeProvincias.of({
-    indexar: (provincia, texto) =>
+    indexar: (provincia, texto, cubierta) =>
       Effect.suspend(() => {
         const leida = leerCapa(texto, provincia);
         if (Result.isFailure(leida)) {
@@ -155,7 +170,11 @@ export const indexadorEnHilo = Layer.succeed(
         const capa = leida.success;
         return Effect.succeed({
           capa,
-          indices: indexarCapa(capa.emplazamientos, capa.barrios.length > 0, capa.municipios),
+          indices: indexarCapa(
+            capa.emplazamientos,
+            capa.barrios.length > 0,
+            municipiosDeZona(capa, cubierta),
+          ),
         });
       }),
   }),
@@ -224,7 +243,7 @@ export const indexadorEnWorker = (
         return actual;
       };
 
-      const indexar = (provincia: string, texto: string) =>
+      const indexar = (provincia: string, texto: string, cubierta: boolean) =>
         Effect.callback<ProvinciaIndexada, IndiceFallido>((reanudar) => {
           numero += 1;
           const este = numero;
@@ -241,18 +260,20 @@ export const indexadorEnWorker = (
             } else if (respuesta.tipo === "fallo") {
               reanudar(Effect.fail(new IndiceFallido({ provincia, motivo: respuesta.motivo })));
             } else {
-              reanudar(Effect.sync(() => indexadaDe(respuesta)));
+              reanudar(Effect.sync(() => indexadaDe(respuesta, cubierta)));
             }
           });
-          puerto().enviar({ numero: este, provincia, texto });
+          puerto().enviar({ numero: este, provincia, texto, cubierta });
           return Effect.sync(() => {
             esperando.delete(este);
           });
         });
 
       return IndexadorDeProvincias.of({
-        indexar: (provincia, texto) =>
-          indexar(provincia, texto).pipe(Effect.withSpan("IndexadorDeProvincias.indexar")),
+        indexar: (provincia, texto, cubierta) =>
+          indexar(provincia, texto, cubierta).pipe(
+            Effect.withSpan("IndexadorDeProvincias.indexar"),
+          ),
       });
     }),
   );

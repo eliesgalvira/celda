@@ -13,6 +13,7 @@ import {
   fuenteEdificio,
   fuenteFoto,
 } from "./foto.ts";
+import { FUENTE_HUECOS, fuenteHuecos } from "./huecos.ts";
 import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
 import { capasLimites, FUENTE_LIMITES } from "./limites.ts";
 import {
@@ -69,8 +70,9 @@ export const estadoDelEstilo = (): NonNullable<StyleSpecification["state"]> => (
 
 /**
  * Las fuentes de lo que pinta Celda sobre el mapa base: la foto aérea, el edificio resaltado, las
- * celdas, el sector que da servicio, la vista de interferencia, la zona del ejercicio y los límites
- * de comunidades y provincias, vacías hasta que la web las llena.
+ * celdas, el sector que da servicio, la vista de interferencia, la zona del ejercicio, los límites
+ * de comunidades y provincias y los huecos de los marcadores (ADR 0024), vacías hasta que la web
+ * las llena.
  */
 export const fuentesDeCelda = (): StyleSpecification["sources"] => ({
   [FUENTE_FOTO]: fuenteFoto(),
@@ -87,6 +89,7 @@ export const fuentesDeCelda = (): StyleSpecification["sources"] => ({
   },
   [FUENTE_ZONA]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   [FUENTE_LIMITES]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+  [FUENTE_HUECOS]: fuenteHuecos(),
 });
 
 /**

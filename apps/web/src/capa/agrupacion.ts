@@ -10,8 +10,9 @@ import { type Indice, type IndicesDeCapa, indexarCapa, NIVEL_MAXIMO } from "./in
 import { cajaVisible } from "./marcadores.ts";
 import {
   esNivelDeMunicipios,
+  esNivelDeMunicipiosGrandes,
   NIVEL_DE_BARRIOS,
-  NIVEL_DE_MUNICIPIOS,
+  NIVEL_DE_MUNICIPIOS_GRANDES,
   NIVELES_DE_MUNICIPIOS,
   zonasDeMunicipios,
 } from "./zonas.ts";
@@ -24,8 +25,9 @@ import {
  *
  * En los niveles de municipios, los emplazamientos de una provincia cubierta se recogen por
  * municipio, con su nombre, su número y, si tiene 10 o más, sus ausencias (ADR 0017), pero solo los
- * municipios que en ese nivel son zona (`zonasDeMunicipios`). Las ausencias se calculan, pero el
- * mapa no las dibuja (ADR 0024). En el nivel de barrios, los de Barcelona se recogen por barrio.
+ * municipios que en ese nivel son zona (`zonasDeMunicipios`): en el 9 y el 10, los grandes, y el
+ * resto en agrupaciones más anchas (ADR 0024). Las ausencias se calculan, pero el mapa no las
+ * dibuja (ADR 0024). En el nivel de barrios, los de Barcelona se recogen por barrio.
  * El resto siguen sueltos o agrupados en hexágonos. Las transiciones que entran o salen de esos
  * niveles se calculan por los emplazamientos que recoge cada elemento: cada uno va al elemento que
  * se queda con la mayoría de los suyos.
@@ -267,12 +269,13 @@ export const crearAgrupador = (
     resumen,
   }));
   const hayMunicipios = municipios.length > 0;
-  // Las zonas de cada nivel de municipios, las mismas con que el Worker hizo `fueraDeZonas`.
-  const zonasPorNivel = hayMunicipios ? zonasDeMunicipios(emplazamientos, etiquetas) : [];
+  // Las zonas de cada nivel de municipios, las mismas con que el Worker hizo `fueraDeZonas`. Sin
+  // municipios no hay ninguna, pero los niveles de municipios grandes siguen con su índice.
+  const zonasPorNivel = zonasDeMunicipios(emplazamientos, etiquetas);
   const zonasEn = (nivel: number): ReadonlySet<string> | undefined =>
-    esNivelDeMunicipios(nivel) ? zonasPorNivel[nivel - NIVEL_DE_MUNICIPIOS] : undefined;
+    esNivelDeMunicipios(nivel) ? zonasPorNivel[nivel - NIVEL_DE_MUNICIPIOS_GRANDES] : undefined;
   const fueraDeZonasEn = (nivel: number): Indice | undefined =>
-    indices.fueraDeZonas[nivel - NIVEL_DE_MUNICIPIOS];
+    indices.fueraDeZonas[nivel - NIVEL_DE_MUNICIPIOS_GRANDES];
   const deMunicipio = new Map<string, Array<number>>();
   if (hayMunicipios) {
     for (const [i, emplazamiento] of emplazamientos.entries()) {
@@ -283,8 +286,12 @@ export const crearAgrupador = (
       deMunicipio.set(codigo, suyos);
     }
   }
-  /** Un nivel de municipios con alguna zona; sin ninguna, es uno más de hexágonos. */
-  const esDeMunicipios = (nivel: number): boolean => (zonasEn(nivel)?.size ?? 0) > 0;
+  /**
+   * Un nivel de municipios grandes, o uno de municipios con alguna zona; sin ninguna, es uno más de
+   * hexágonos.
+   */
+  const esDeMunicipios = (nivel: number): boolean =>
+    esNivelDeMunicipiosGrandes(nivel) || (zonasEn(nivel)?.size ?? 0) > 0;
   /** Los niveles en que las zonas recogen los emplazamientos, sin jerarquía de supercluster. */
   const esDeZonas = (nivel: number): boolean => esDeBarrios(nivel) || esDeMunicipios(nivel);
 
@@ -372,7 +379,7 @@ export const crearAgrupador = (
       caja.noreste.latitud,
     ];
     const zonas = zonasEn(nivel);
-    if (zonas !== undefined && zonas.size > 0) {
+    if (zonas !== undefined && esDeMunicipios(nivel)) {
       municipiosEn(caja, zonas, elementos);
       for (const punto of fueraDeZonasEn(nivel)?.getClusters(bbox, nivel) ?? []) {
         const elemento = elementoDe(punto, prefijoFueraDeZonas(nivel));
@@ -515,12 +522,15 @@ export const crearAgrupador = (
 
   const zoomDeApertura = (elemento: ElementoAbrible): number => {
     if (elemento.tipo === "barrio") return NIVEL_DE_BARRIOS + 1;
-    // Un municipio se abre en el primer nivel en que deja de ser zona: el 12 si en él ya mide
-    // demasiado, y si no el de barrios (barrios en Barcelona, hexágonos pequeños en el resto).
+    // Un municipio es zona en niveles seguidos: desde el 9 o el 10 si es grande, y hasta el 12 o
+    // antes si deja de caber. Se abre en el primero tras ellos (el de barrios si llega al 12:
+    // barrios en Barcelona, hexágonos pequeños en el resto).
     if (elemento.tipo === "municipio") {
       const codigo = elemento.resumen.municipio.codigo;
+      const esZona = (nivel: number) => zonasEn(nivel)?.has(codigo) === true;
+      const desde = NIVELES_DE_MUNICIPIOS.findIndex(esZona);
       return (
-        NIVELES_DE_MUNICIPIOS.find((nivel) => zonasEn(nivel)?.has(codigo) !== true) ??
+        NIVELES_DE_MUNICIPIOS.slice(Math.max(desde, 0)).find((nivel) => !esZona(nivel)) ??
         NIVEL_DE_BARRIOS
       );
     }

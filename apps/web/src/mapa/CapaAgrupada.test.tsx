@@ -9,6 +9,7 @@ import type { ResumenLeido } from "@celda/dominio/provincias";
 
 import { crearAgrupador, type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
 import { combinacionesDe } from "../capa/marcadores.ts";
+import { tamanoDeNivel } from "../capa/choques.ts";
 import { crearAgrupadorNacional, type EstadoProvincia } from "../capa/nacional.ts";
 import {
   BARCELONA,
@@ -395,6 +396,47 @@ describe("capa agrupada por provincias", () => {
         0,
       );
     });
+  });
+});
+
+describe("capa agrupada con la regla de choques (ADR 0024)", () => {
+  it("lo que cede su sitio no se dibuja, y de lejos los hexágonos encogen; los logos no", () => {
+    const { resumen, provincias } = espanaDePrueba();
+    const agrupador = crearAgrupadorNacional(resumen, provincias);
+    const [ocultos, setOcultos] = createSignal<ReadonlySet<string>>(new Set());
+    const contenedor = document.createElement("div");
+    document.body.append(contenedor);
+    const escena = agrupador.escena(9, MUNDO, null);
+    render(() => (
+      <CapaAgrupada
+        contenedor={contenedor}
+        combinaciones={[]}
+        escena={escena}
+        transicion={agrupador.transicion}
+        proyectar={(p) => ({ x: p.longitud * 100, y: p.latitud * 100 })}
+        seVe={() => true}
+        fotograma={0}
+        movimientoReducido={true}
+        formas={new Map()}
+        ocultos={ocultos()}
+        tamano={tamanoDeNivel(9)}
+        seleccionada={null}
+        alSeleccionar={() => undefined}
+        alAbrir={() => undefined}
+      />
+    ));
+    flush();
+    const zaragoza = () =>
+      within(contenedor).queryByRole("button", { name: /^Zaragoza, \d+ emplazamientos/u });
+    assert.isNotNull(zaragoza());
+    const hexagonos = within(contenedor)
+      .getAllByRole("button")
+      .filter((b) => b.querySelector("svg polygon") !== null);
+    assert.isAbove(hexagonos.length, 1);
+    assert.isTrue(hexagonos.every((b) => b.getAttribute("data-tamano") === "medio"));
+    setOcultos(new Set(["m:50:50297"]));
+    flush();
+    assert.isNull(zaragoza());
   });
 });
 

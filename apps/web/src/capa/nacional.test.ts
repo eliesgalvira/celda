@@ -18,6 +18,7 @@ import {
   BARCELONA,
   barcelonaConMunicipios,
   EMPLAZAMIENTOS_POR_PROVINCIA,
+  espanaDePrueba,
   estados,
   GIRONA,
   MUNDO,
@@ -43,6 +44,9 @@ const provinciasDe = (escena: Escena): ReadonlyArray<ElementoProvincia> =>
 describe("provincias que pide la vista", () => {
   it("por debajo del nivel de provincias no pide ninguna: basta el resumen", () => {
     assert.deepStrictEqual(provinciasDeLaVista(RESUMEN, { caja: MUNDO, zoom: 7.9 }), []);
+    // El resumen llega hasta el 9 (ADR 0024): una vista a z8 no pide ninguna capa de provincia.
+    assert.strictEqual(NIVEL_DE_PROVINCIAS, 9);
+    assert.deepStrictEqual(provinciasDeLaVista(RESUMEN, { caja: BORDE, zoom: 8.9 }), []);
   });
 
   it("desde ese nivel pide las que tienen emplazamientos en la vista, con su margen", () => {
@@ -136,8 +140,9 @@ describe("escena con provincias", () => {
   it("las claves de cada provincia llevan su código", () => {
     const escena = crearAgrupadorNacional(RESUMEN, LISTAS).escena(10, BORDE);
     const claves = [...escena.elementos.keys()];
-    assert.isTrue(claves.some((c) => c.startsWith("a:08:")));
-    assert.isTrue(claves.some((c) => c.startsWith("a:17:")));
+    // En el 10 van en las agrupaciones anchas de los municipios grandes, con su nivel delante.
+    assert.isTrue(claves.some((c) => c.startsWith("s10:08:")));
+    assert.isTrue(claves.some((c) => c.startsWith("s10:17:")));
   });
 
   it("el seleccionado se ve suelto también sobre el resumen", () => {
@@ -161,7 +166,9 @@ describe("transiciones entre el resumen y las provincias", () => {
     assert.strictEqual(acercar.origen.size, cerca.elementos.size);
     for (const elemento of cerca.elementos.values()) {
       const provincia =
-        elemento.clave.startsWith("a:08:") || elemento.clave.startsWith("e:b") ? "p:08" : "p:17";
+        /^(?:a|s\d+):08:/u.test(elemento.clave) || elemento.clave.startsWith("e:b")
+          ? "p:08"
+          : "p:17";
       assert.strictEqual(acercar.origen.get(elemento.clave), provincia, elemento.clave);
     }
     const alejar = agrupador.transicion(cerca, lejos);
@@ -315,5 +322,86 @@ describe("zonas de cada provincia", () => {
         `${m.clave} va a un hexágono sin ninguno de los suyos`,
       );
     }
+  });
+});
+
+describe("el hexágono de cada provincia, en su centro visual", () => {
+  it("de lejos va en el centro visual, y en su etiqueta solo si la tabla no la tiene", () => {
+    const real = crearAgrupadorNacional(RESUMEN, estados()).escena(6, MUNDO);
+    const barcelona = real.elementos.get(claveDeProvincia("08"));
+    // El polo de inaccesibilidad de la provincia de Barcelona, no la etiqueta del resumen.
+    assert.closeTo(barcelona?.posicion.longitud ?? 0, 1.945, 0.01);
+    assert.closeTo(barcelona?.posicion.latitud ?? 0, 41.6375, 0.01);
+    assert.notDeepEqual(barcelona?.posicion, RESUMEN.provincias[0]?.etiqueta);
+
+    const sinTabla = crearAgrupadorNacional(RESUMEN, estados(), (p) => p.etiqueta).escena(6, MUNDO);
+    assert.deepStrictEqual(
+      sinTabla.elementos.get(claveDeProvincia("08"))?.posicion,
+      RESUMEN.provincias[0]?.etiqueta,
+    );
+  });
+});
+
+describe("niveles de municipios grandes", () => {
+  const { resumen, provincias } = espanaDePrueba();
+  const agrupador = crearAgrupadorNacional(resumen, provincias);
+  const municipios = (nivel: number) =>
+    [...agrupador.escena(nivel, MUNDO).elementos.values()]
+      .filter((e): e is ElementoMunicipio => e.tipo === "municipio")
+      .map((e) => e.resumen.municipio.nombre)
+      .toSorted();
+
+  it("en el 9 solo son zona los de 50.000 habitantes o más, y en el 10 los de 20.000", () => {
+    assert.deepStrictEqual(municipios(8), []);
+    assert.deepStrictEqual(municipios(9), ["Barcelona", "Zaragoza"]);
+    assert.deepStrictEqual(municipios(10), ["Badalona", "Barcelona", "Zaragoza"]);
+    // Desde el 11, por lo que miden: Zaragoza y Barcelona no caben, Utebo sí.
+    assert.include(municipios(11), "Utebo");
+    assert.notInclude(municipios(11), "Zaragoza");
+  });
+
+  it("el resto va en agrupaciones anchas de su nivel, que se abren en el siguiente", () => {
+    for (const nivel of [9, 10]) {
+      const escena = agrupador.escena(nivel, MUNDO);
+      const anchas = [...escena.elementos.values()].filter(
+        (e) => e.tipo === "agrupacion" && e.clave.startsWith(`s${nivel}:`),
+      );
+      assert.isAbove(anchas.length, 0, `nivel ${nivel}`);
+      for (const e of anchas) {
+        if (e.tipo === "agrupacion") assert.strictEqual(agrupador.zoomDeApertura(e), nivel + 1);
+      }
+      // Ninguna agrupación de las de siempre, de 60 px.
+      assert.isFalse([...escena.elementos.keys()].some((clave) => clave.startsWith("a:")));
+    }
+  });
+
+  it("un municipio se abre en el primer nivel tras los que es zona", () => {
+    const abre = (nombre: string, nivel: number) => {
+      const elemento = [...agrupador.escena(nivel, MUNDO).elementos.values()].find(
+        (e): e is ElementoMunicipio =>
+          e.tipo === "municipio" && e.resumen.municipio.nombre === nombre,
+      );
+      assert.isDefined(elemento, nombre);
+      return elemento === undefined ? 0 : agrupador.zoomDeApertura(elemento);
+    };
+    assert.strictEqual(abre("Zaragoza", 9), 11);
+    assert.strictEqual(abre("Zaragoza", 10), 11);
+    assert.strictEqual(abre("Utebo", 11), 13);
+  });
+
+  it("una provincia a medias va toda en las agrupaciones anchas, sin zonas", () => {
+    const aMedias: ResumenLeido = {
+      ...resumen,
+      provincias: resumen.provincias.map((p) =>
+        p.codigo === "50" ? { ...p, cubierta: false } : p,
+      ),
+    };
+    const { provincias: suyas } = espanaDePrueba(aMedias);
+    const escena = crearAgrupadorNacional(aMedias, suyas).escena(9, MUNDO);
+    const deZaragoza = [...escena.elementos.values()].filter((e) => e.clave.includes(":50:"));
+    assert.isAbove(deZaragoza.length, 0);
+    assert.isTrue(deZaragoza.every((e) => e.tipo === "agrupacion" || e.tipo === "emplazamiento"));
+    const suma = deZaragoza.reduce((n, e) => n + (e.tipo === "agrupacion" ? e.cuantos : 0), 0);
+    assert.isAbove(suma, 200);
   });
 });

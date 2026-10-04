@@ -18,6 +18,7 @@ import * as HttpStaticServer from "effect/unstable/http/HttpStaticServer";
 import * as NodeHttp from "node:http";
 
 import { descargarBarrios, descargarPoblacion, leerLimites } from "./descarga.ts";
+import { escribirCentros } from "./centros.ts";
 import { descargarMunicipios } from "./descargaDeMunicipios.ts";
 import { escribirEspana } from "./espana.ts";
 import { FORMAS_CASTELLANAS } from "./formasCastellanas.ts";
@@ -27,7 +28,7 @@ import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
 import { escribirZonas } from "./zonas.ts";
 
 /**
- * Generador de capas. Nueve órdenes:
+ * Generador de capas. Diez órdenes:
  *
  * - `servir`: sirve una carpeta publicada como origen estático local, con las cabeceras de la
  *   CDN. La publica la ingesta nocturna (`pnpm run ingesta publicar`) o `sintetica`.
@@ -44,6 +45,10 @@ import { escribirZonas } from "./zonas.ts";
  *   oficiales bilingües y el contorno de la Comunitat Valenciana (ADR 0025).
  * - `limites`: escribe desde esos límites, sin descargar nada, los de comunidades autónomas y
  *   provincias que la web pinta en el mapa (ADR 0023).
+ * - `centros`: escribe desde esos límites y el padrón, sin descargar nada, el centro visual y los
+ *   habitantes de cada provincia y los habitantes de las ciudades, con los que el mapa decide
+ *   dónde va el hexágono de cada provincia y qué se dibuja cuando un rótulo y un hexágono se
+ *   pisan (ADR 0024).
  * - `sintetica`: publica en la carpeta una España sintética de `CELDA_SINTETICOS` emplazamientos
  *   (100.000 por defecto), con la publicación de verdad, para medir el mapa (ADR 0016).
  */
@@ -116,6 +121,19 @@ const configNombres = Config.all({
 const configLimites = Config.String("CELDA_LIMITES").pipe(
   Config.withDefault("../../apps/web/src/mapa/limites.json"),
 );
+
+/**
+ * Dónde escribe `centros` el centro visual y los habitantes de cada provincia y los habitantes de
+ * las ciudades: el dominio los lee de su carpeta de datos, y de allí el mapa.
+ */
+const configCentros = Config.all({
+  centros: Config.String("CELDA_CENTROS").pipe(
+    Config.withDefault("../../packages/dominio/datos/centros-de-provincia.json"),
+  ),
+  ciudades: Config.String("CELDA_CIUDADES").pipe(
+    Config.withDefault("../../packages/dominio/datos/habitantes-de-ciudades.json"),
+  ),
+});
 
 /** Pausa entre dos peticiones al mismo sitio de la orden `municipios`. */
 const PAUSA_MUNICIPIOS = Duration.seconds(5);
@@ -259,11 +277,23 @@ const comunidadesYProvincias = Effect.gen(function* () {
   );
 });
 
+const centros = Effect.gen(function* () {
+  const { municipios, padron } = yield* configMunicipios;
+  const destino = yield* configCentros;
+  const escritos = yield* escribirCentros(municipios, padron, destino.centros, destino.ciudades);
+  yield* Effect.log(
+    `${escritos.provincias.length} centros de provincia, ${escritos.bytesCentros} bytes, escritos en ${destino.centros}`,
+  );
+  yield* Effect.log(
+    `${escritos.ciudades} ciudades con sus habitantes, ${escritos.bytesCiudades} bytes, escritas en ${destino.ciudades}`,
+  );
+});
+
 class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesconocida", {
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas», «espana», «nombres», «limites» o «sintetica».`;
+    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas», «espana», «nombres», «limites», «centros» o «sintetica».`;
   }
 }
 
@@ -277,6 +307,7 @@ const principal = Effect.gen(function* () {
   if (orden === "espana") return yield* espana;
   if (orden === "nombres") return yield* nombres;
   if (orden === "limites") return yield* comunidadesYProvincias;
+  if (orden === "centros") return yield* centros;
   if (orden === "sintetica") return yield* sintetica;
   return yield* new OrdenDesconocida({ orden });
 });

@@ -126,6 +126,7 @@ import {
   hayWebgl,
   type MotivoFallo,
 } from "./estado.ts";
+import type { LectorDeRotulos } from "./rotulosDeCiudad.ts";
 import { type CargasDeZonas, crearLugares } from "./lugar.ts";
 import { Marcadores } from "./Marcadores.tsx";
 import {
@@ -186,6 +187,8 @@ export function PantallaMapa() {
    * fondo, sin esperar a las teselas del callejero.
    */
   const [mapaCreado, setMapaCreado] = createSignal<MapaMapLibre>();
+  /** El lector de los rótulos de ciudad, que llega con el código del mapa (ADR 0024). */
+  const [lectorDeRotulos, setLectorDeRotulos] = createSignal<LectorDeRotulos>();
   const listo = createMemo(() => estado().tipo === "listo");
   /** Si el mapa está al zoom de las celdas o más cerca. */
   const [cerca, setCerca] = createSignal(false);
@@ -300,6 +303,7 @@ export function PantallaMapa() {
       nuevo.on("moveend", mirarEncuadre);
       nuevo.once("load", mirarEncuadre);
       mapa = nuevo;
+      setLectorDeRotulos(() => modulo.LECTOR_DE_ROTULOS);
       setMapaCreado(nuevo);
     } catch (causa) {
       // MapLibre lanza un Error que nombra WebGL si no consigue el contexto.
@@ -1096,6 +1100,8 @@ export function PantallaMapa() {
                             alSeleccionar={seleccionar}
                             alVer={precargarFichas}
                             alCambiarVista={alCambiarVista}
+                            lectorDeRotulos={lectorDeRotulos()}
+                            conFoto={foto.encendida()}
                           />
                         )}
                       </Show>

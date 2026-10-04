@@ -2,6 +2,7 @@ import type { Area } from "@celda/dominio/area";
 import { CONTORNO_DE_LA_COMUNITAT_VALENCIANA } from "@celda/dominio/comunitatValenciana";
 import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
 import { coloresDelTema, estiloMapa } from "@celda/ui/mapa/estilo.ts";
+import { crearImagenesDeHuecos } from "@celda/ui/mapa/huecos.ts";
 import { FUENTE_LIMITES } from "@celda/ui/mapa/limites.ts";
 import { conLoDeCelda, estiloDeReserva } from "@celda/ui/mapa/reserva/estilo.ts";
 import * as Effect from "effect/Effect";
@@ -12,8 +13,15 @@ import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url
 import { type Avisos, type Callejero, esperarDeVerdad, vigilarCallejero } from "./callejero.ts";
 import { leerLimites, limitesDeLaVisita } from "./limites.ts";
 import urlDeLimites from "./limites.json?url";
+import { LECTOR_DE_ROTULOS } from "./rotulosDeCiudad.ts";
 import { zoomsSinPartir } from "./teselas.ts";
 import { type Relleno, ZOOM_MAXIMO_AL_ABRIR } from "./vistaInicial.ts";
+
+/**
+ * El lector de los rótulos de ciudad colocados, con la tabla de habitantes de las ciudades: va en
+ * este trozo, con el mapa, y no en el de la primera pantalla.
+ */
+export { LECTOR_DE_ROTULOS };
 
 // MapLibre 6 busca su worker junto a su propio fichero, que el empaquetador
 // mueve; Vite empaqueta el worker aparte y le da su URL.
@@ -98,6 +106,8 @@ export const crearMapaBase = (
       }),
     esperar: esperarDeVerdad,
   });
+  // Los huecos de los marcadores piden su imagen transparente la primera vez (ADR 0024).
+  crearImagenesDeHuecos(mapa);
   // Después del primer pintado completo: no compiten con el mapa base ni con los marcadores.
   ponerLimites({
     trasElPrimerPintado: (escuchar) => {

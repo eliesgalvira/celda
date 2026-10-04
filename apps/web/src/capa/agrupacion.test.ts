@@ -23,7 +23,12 @@ import {
   rehidratarIndice,
   serializarIndice,
 } from "./indice.ts";
-import { NIVEL_DE_BARRIOS, NIVEL_DE_MUNICIPIOS, NIVELES_DE_MUNICIPIOS } from "./zonas.ts";
+import {
+  esNivelDeMunicipiosGrandes,
+  NIVEL_DE_BARRIOS,
+  NIVEL_DE_MUNICIPIOS,
+  NIVELES_DE_MUNICIPIOS,
+} from "./zonas.ts";
 
 const MUNDO: Rectangulo = {
   suroeste: { longitud: -180, latitud: -85 },
@@ -75,6 +80,12 @@ const claves = (agrupador: Agrupador, elemento: Elemento): ReadonlyArray<string>
 const contiene = (agrupador: Agrupador, todo: Elemento, parte: Elemento): boolean => {
   const deTodo = new Set(claves(agrupador, todo));
   return claves(agrupador, parte).every((clave) => deTodo.has(clave));
+};
+
+/** Cuántos emplazamientos de `parte` están en `todo`. */
+const comunes = (agrupador: Agrupador, todo: Elemento, parte: Elemento): number => {
+  const deTodo = new Set(claves(agrupador, todo));
+  return claves(agrupador, parte).filter((clave) => deTodo.has(clave)).length;
 };
 
 const elemento = (escena: Escena, clave: string): Elemento => {
@@ -147,7 +158,21 @@ describe("agrupación por zoom", () => {
       assert.isDefined(destino, `${e.clave} desaparece de ${fino} a ${grueso} sin destino`);
       const grupo = elemento(escenaGruesa, destino ?? "");
       assert.strictEqual(grupo.tipo, "agrupacion");
-      assert.isTrue(contiene(agrupador, grupo, e), `${e.clave} no está en ${grupo.clave}`);
+      if (esNivelDeMunicipiosGrandes(fino) || esNivelDeMunicipiosGrandes(grueso)) {
+        // Las agrupaciones anchas del 9 y el 10 salen de su propio índice, sin jerarquía con
+        // las de al lado: cada elemento va a la que se queda con más emplazamientos suyos.
+        const suyos = comunes(agrupador, grupo, e);
+        assert.isAbove(suyos, 0, `${e.clave} no tiene nada en ${grupo.clave}`);
+        for (const otro of escenaGruesa.elementos.values()) {
+          assert.isAtMost(
+            comunes(agrupador, otro, e),
+            suyos,
+            `${otro.clave} recoge más de ${e.clave}`,
+          );
+        }
+      } else {
+        assert.isTrue(contiene(agrupador, grupo, e), `${e.clave} no está en ${grupo.clave}`);
+      }
     }
 
     // Al acercar, lo que aparece sale de la agrupación en que estaba.
@@ -716,9 +741,11 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
   });
 
   it("las claves llevan la provincia, para no chocar con las de otra en la misma escena", () => {
-    const claves = [...rehidratado.escena(10, MUNDO).elementos.keys()];
+    const claves = [...rehidratado.escena(8, MUNDO).elementos.keys()];
     assert.isTrue(claves.some((clave) => clave.startsWith("a:08:")));
     assert.isTrue(claves.every((clave) => clave.startsWith("a:08:") || clave.startsWith("e:")));
+    const anchas = [...rehidratado.escena(10, MUNDO).elementos.keys()];
+    assert.isTrue(anchas.some((clave) => clave.startsWith("s10:08:")));
     assert.isTrue(rehidratado.escena(NIVEL_DE_BARRIOS, MUNDO).elementos.has("b:08:01"));
     const municipios = [...rehidratado.escena(NIVEL_DE_MUNICIPIOS, MUNDO).elementos.keys()];
     assert.isTrue(municipios.some((clave) => clave.startsWith("m:08:")));
