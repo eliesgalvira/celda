@@ -9,13 +9,31 @@ const USOS = ["hospital", "school", "university", "college", "cemetery"];
 /** Las subclases de `landcover` que se pintan como parque. */
 const PARQUES = ["park", "garden", "golf_course", "playground"];
 
-/** La opacidad de un verde en una parada: los parques y la arena, enteros. */
-const opacidadDeVerde = (bosque: number, hierba: number): ExpressionSpecification => [
-  "case",
-  ["in", ["get", "subclass"], ["literal", PARQUES]],
-  1,
-  ["match", ["get", "class"], "sand", 1, "wood", bosque, hierba],
+/** Si un verde es un parque o un jardín: va como parque sea cual sea su clase. */
+const ES_PARQUE: ExpressionSpecification = ["in", ["get", "subclass"], ["literal", PARQUES]];
+
+/** Un verde de `landcover` de estas clases que no es un parque. */
+const verdeDeClase = (...clases: ReadonlyArray<string>): ExpressionSpecification => [
+  "all",
+  ["!", ES_PARQUE],
+  deClase(...clases),
 ];
+
+/** Una capa de verdes de `landcover`: los de `filtro`, de un color y una opacidad. */
+const verde = (
+  id: string,
+  fuente: string,
+  filtro: ExpressionSpecification,
+  relleno: string,
+  opacidad: number | ExpressionSpecification,
+): LayerSpecification => ({
+  id,
+  type: "fill",
+  source: fuente,
+  "source-layer": "landcover",
+  filter: filtro,
+  paint: { "fill-color": relleno, "fill-opacity": opacidad },
+});
 
 /** Los edificios de OpenStreetMap, que también busca «Ver el edificio». */
 export const CAPA_EDIFICIOS = "edificios";
@@ -80,55 +98,25 @@ export const capasSuelo = (
       ],
     },
   },
-  {
-    // La arena, el bosque, la hierba y, encima, los parques y jardines.
-    id: "verdes",
-    type: "fill",
-    source: fuente,
-    "source-layer": "landcover",
-    filter: [
-      "any",
-      ["in", ["get", "subclass"], ["literal", PARQUES]],
-      deClase("sand", "wood", "grass", "wetland", "scrub"),
-    ],
-    layout: {
-      "fill-sort-key": [
-        "case",
-        ["in", ["get", "subclass"], ["literal", PARQUES]],
-        3,
-        ["match", ["get", "class"], "sand", 0, "wood", 1, 2],
-      ],
-    },
-    paint: {
-      "fill-color": [
-        "case",
-        ["in", ["get", "subclass"], ["literal", PARQUES]],
-        color("mapa-parque"),
-        [
-          "match",
-          ["get", "class"],
-          "sand",
-          color("mapa-arena"),
-          "wood",
-          color("mapa-bosque"),
-          color("mapa-hierba"),
-        ],
-      ],
-      "fill-opacity": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        5,
-        opacidadDeVerde(0.6, 0.4),
-        10,
-        opacidadDeVerde(0.8, 0.6),
-        14,
-        opacidadDeVerde(0.88, 0.8),
-        15,
-        opacidadDeVerde(0.9, 0.8),
-      ],
-    },
-  },
+  // La arena, el bosque, la hierba y, encima, los parques y jardines. Cada uno en su capa, con su
+  // color y su opacidad fijos o por zoom: en una sola capa con el color y la opacidad por clase,
+  // MapLibre los guardaba en cada vértice, el doble que los propios polígonos (#67).
+  verde("verdes-arena", fuente, verdeDeClase("sand"), color("mapa-arena"), 1),
+  verde(
+    "verdes-bosque",
+    fuente,
+    verdeDeClase("wood"),
+    color("mapa-bosque"),
+    porZoom(5, 0.6, 10, 0.8, 14, 0.88, 15, 0.9),
+  ),
+  verde(
+    "verdes-hierba",
+    fuente,
+    verdeDeClase("grass", "wetland", "scrub"),
+    color("mapa-hierba"),
+    porZoom(5, 0.4, 10, 0.6, 14, 0.8),
+  ),
+  verde("verdes-parques", fuente, ES_PARQUE, color("mapa-parque"), 1),
   {
     // Parques naturales y nacionales: grandes, así que apenas se tiñen y se apagan al acercar.
     id: "espacios-naturales",
