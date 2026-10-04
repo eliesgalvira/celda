@@ -190,7 +190,7 @@ describe("modo estudiante", () => {
     await waitFor(() => assert.sameMembers([...fichas.abiertas()], ["movistar-1", "movistar-2"]));
     fichas.responder("movistar-1", ficha("movistar-1", 800));
     fichas.responder("movistar-2", ficha("movistar-2", 3500));
-    await findByText("Leídas 2 de 2 fichas.");
+    await findByText("Se han leído 2 de 2 fichas.");
     // Leídas, no hay botón para volver a leerlas: son de la misma versión que la capa.
     assert.isNull(queryByRole("button", { name: /Leer las fichas|Volver a leer/u, hidden: true }));
     await waitFor(() => assert.strictEqual(celdas("5G")[0], "probable"));
@@ -228,9 +228,9 @@ describe("modo estudiante", () => {
       estaciones: sinFicha.estaciones.map((e) => ({ ...e, bandas: [], sinFichaEnRegistro: NOCHE })),
     });
     await findByText(
-      "Leídas 2 de 2 fichas. 2 estaciones base no tienen ficha en el registro, aunque su " +
-        "listado las incluye (Movistar y Orange): cuentan aparte, y de sus bandas la tabla " +
-        "también dice «no consta».",
+      "Se han leído 2 de 2 fichas. 2 estaciones base de Movistar y Orange aparecen en el " +
+        "listado del registro pero no tienen ficha. Se cuentan aparte, y en sus bandas la tabla " +
+        "también pone «no consta».",
     );
     // No son fichas sin bandas conocidas ni fichas por leer.
     assert.isNull(queryByText(/no traen ninguna banda conocida|no han llegado/u));

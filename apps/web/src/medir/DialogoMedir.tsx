@@ -61,10 +61,10 @@ export function DialogoMedir(props: DialogoMedirProps) {
   const instrucciones = createMemo(() => instruccionesPara(detectado(), eleccion()));
 
   const ayudaDelTipo = () => {
-    if (eleccion().tipo !== undefined) return "Lo has elegido tú.";
+    if (eleccion().tipo !== undefined) return "Has elegido el dispositivo a mano.";
     return detectado().tipo === "desconocido"
-      ? "Tu navegador no deja claro qué dispositivo es. Elígelo tú."
-      : "Lo hemos deducido de tu navegador. Si no acierta, cámbialo.";
+      ? "El navegador no indica qué dispositivo es, así que elígelo aquí."
+      : "Lo hemos deducido de tu navegador. Si no es correcto, cámbialo.";
   };
 
   const verEjemplo = (
@@ -94,9 +94,9 @@ export function DialogoMedir(props: DialogoMedirProps) {
           <Match when={instrucciones().tipo === "ordenador"}>
             <Nota tono="aviso" titulo="Desde un ordenador no se puede medir">
               <p>
-                Quien habla con las <Termino termino="estacion-base">estaciones base</Termino> es el
-                móvil, a través de su tarjeta SIM. Un ordenador no tiene esa radio, así que desde
-                aquí no hay ninguna señal que medir.
+                El móvil se conecta a las <Termino termino="estacion-base">estaciones base</Termino>{" "}
+                con su radio y su tarjeta SIM. Un ordenador no tiene esa radio, así que no puede
+                medir la señal móvil.
               </p>
             </Nota>
             <p>Tienes tres opciones:</p>
@@ -116,14 +116,14 @@ export function DialogoMedir(props: DialogoMedirProps) {
               <p>
                 Si ya tienes una captura del{" "}
                 <Termino termino="modo-de-informacion">modo de información</Termino> de tu móvil,
-                podrás subirla desde aquí. Todavía no funciona. Falta decidir cómo leerá Celda los
-                números de la captura.
+                podrás subirla desde aquí. Todavía no se puede, porque falta decidir cómo leerá
+                Celda los números de la captura.
               </p>
             </Opcion>
             <Opcion titulo="Ver una medida de ejemplo" acciones={verEjemplo}>
               <p>
-                Una medida inventada, con lo que quiere decir cada número. Va marcada como ejemplo y
-                no cuenta como tuya.
+                Es una medida inventada en la que se explica qué quiere decir cada número. Está
+                marcada como ejemplo y no cuenta como medida tuya.
               </p>
             </Opcion>
           </Match>
@@ -139,8 +139,8 @@ export function DialogoMedir(props: DialogoMedirProps) {
           </Match>
           <Match when={instrucciones().tipo === "iphone" || instrucciones().tipo === "android"}>
             <p>
-              Tu móvil sabe cómo le llega la señal, pero por privacidad el navegador no deja que una
-              web lea esos datos. Por eso se hace a mano, en tres pasos.
+              El móvil registra cómo le llega la señal, pero por privacidad el navegador no deja que
+              una web lea esos datos. Por eso la medida se hace a mano, en tres pasos.
             </p>
             <Pasos>
               <Paso numero={1} titulo="Abre la app Teléfono y marca este código">
@@ -167,26 +167,27 @@ export function DialogoMedir(props: DialogoMedirProps) {
                 </Show>
               </Paso>
               <Paso numero={2} titulo="Haz una captura de pantalla">
-                <p>Con los números de la señal a la vista. Luego vuelve aquí.</p>
+                <p>Hazla cuando se vean los números de la señal y luego vuelve aquí.</p>
               </Paso>
               <Paso numero={3} titulo="Súbela a Celda">
                 <p>
-                  <Etiqueta tono="pronto">PRONTO</Etiqueta> Todavía no se puede. Falta decidir cómo
-                  leerá Celda los números de la captura. Guárdala y podrás subirla más adelante.
+                  <Etiqueta tono="pronto">PRONTO</Etiqueta> Todavía no se puede, porque falta
+                  decidir cómo leerá Celda los números de la captura. Si guardas la captura, podrás
+                  subirla más adelante.
                 </p>
               </Paso>
             </Pasos>
-            <Desplegable titulo="¿Qué le pasa a mi móvil?" abierto variante="recuadro">
+            <Desplegable titulo="Qué hace el código en el móvil" abierto variante="recuadro">
               <Puntos>
                 <li>
-                  No se instala nada ni cambia ningún ajuste. El código abre una pantalla que el
-                  móvil trae de fábrica.
+                  El código abre una pantalla que el móvil trae de fábrica. No instala nada y no
+                  cambia ningún ajuste.
                 </li>
-                <li>No es una llamada y no cuesta nada.</li>
+                <li>Marcarlo no hace ninguna llamada y no tiene coste.</li>
                 <Show when={instrucciones().tipo === "android"}>
                   <li>
-                    Algunas marcas enseñan botones de pruebas en esa pantalla. No hace falta tocar
-                    ninguno: sal con el botón de volver.
+                    En algunas marcas esa pantalla tiene botones de pruebas. No hace falta tocarlos.
+                    Para salir, usa el botón de volver.
                   </li>
                 </Show>
                 <li>
@@ -240,9 +241,9 @@ function ComoSeAbre(props: { readonly codigo: CodigoModoInformacion; readonly de
       <Show when={props.codigo.comprobacion === "sin-verificar"}>
         <Nota tono="aviso" titulo="Código sin comprobar">
           <p>
-            No lo hemos encontrado en ninguna fuente oficial, solo en guías publicadas por otros. Si
-            no se abre nada, no pasa nada. Prueba con «Otra marca», que da el código general de
-            Android, o mira la medida de ejemplo.
+            Este código no aparece en ninguna fuente oficial, solo en guías de terceros. Si no abre
+            nada, prueba con «Otra marca», que da el código general de Android, o consulta la medida
+            de ejemplo.
           </p>
         </Nota>
       </Show>

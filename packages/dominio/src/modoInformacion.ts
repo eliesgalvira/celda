@@ -148,7 +148,7 @@ export const CODIGOS_POR_MARCA: Readonly<Record<MarcaAndroid, CodigoModoInformac
     ...CUATRO_SEIS_TRES_SEIS,
     comprobacion: "fuente-secundaria",
     fuentes: [BEEBOM("Xiaomi", "xiaomi-secret-security-codes-list"), ...AOSP],
-    nota: "Márcalo en la app Teléfono de Xiaomi, no en la de Google. Las versiones recientes de HyperOS han quitado algunos códigos.",
+    nota: "Hay que marcarlo en la app Teléfono de Xiaomi, porque la de Google no lo abre. Las versiones recientes de HyperOS han quitado algunos códigos.",
   },
   google: {
     ...CUATRO_SEIS_TRES_SEIS,
@@ -182,7 +182,7 @@ export const CODIGOS_POR_MARCA: Readonly<Record<MarcaAndroid, CodigoModoInformac
     ...CUATRO_SEIS_TRES_SEIS,
     comprobacion: "sin-verificar",
     fuentes: [BEEBOM("OPPO", "oppo-secret-check-codes"), ...AOSP],
-    nota: "OPPO ha quitado muchos códigos desde ColorOS 13, y no sabemos si este sigue.",
+    nota: "OPPO ha quitado muchos códigos desde ColorOS 13, y no sabemos si este sigue funcionando.",
   },
   realme: {
     ...CUATRO_SEIS_TRES_SEIS,

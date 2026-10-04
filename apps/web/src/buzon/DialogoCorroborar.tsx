@@ -46,7 +46,7 @@ export function DialogoCorroborar(props: DialogoCorroborarProps) {
   });
   return (
     <Dialogo titulo="Yo también lo veo" antetitulo="COMUNIDAD" alCerrar={props.alCerrar}>
-      <p>Respaldas esta corrección de la comunidad: «{props.dice}».</p>
+      <p>Vas a respaldar esta corrección de la comunidad: «{props.dice}».</p>
       <Show when={borrador()} fallback={<EsqueletoAportaciones />}>
         {(corroboracion) => (
           <PasoCompartir

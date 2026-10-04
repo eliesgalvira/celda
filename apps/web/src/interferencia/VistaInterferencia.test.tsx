@@ -62,7 +62,9 @@ describe("panel de la vista de interferencia", () => {
     getByText("Simulación orientativa");
     assert.isNull(queryByText(/sinr@/u));
     getByText(
-      textoEntero("Solo se estorban las antenas de la misma compañía en la misma frecuencia."),
+      textoEntero(
+        "Solo interfieren entre sí las antenas de la misma compañía que usan la misma frecuencia.",
+      ),
     );
     // Dice qué se supone, con el recuento.
     getByText(

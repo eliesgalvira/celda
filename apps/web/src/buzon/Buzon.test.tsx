@@ -192,7 +192,7 @@ describe("Tus aportaciones", () => {
     for (const valor of ["−90 dBm", "−10 dB", "1800 MHz", "41.38780, 2.11550", MEDIDA.id]) {
       assert.isNotNull(within(sale).getByText(valor));
     }
-    assert.isNotNull(within(sale).getByText(/La captura no sale de tu dispositivo/u));
+    assert.isNotNull(within(sale).getByText(/La captura se queda en tu dispositivo/u));
     assert.isNotNull(within(abierto).getByText(/dominio público con la CC0 1.0 Universal/u));
     fireEvent.click(within(abierto).getByRole("button", { name: "Enviar al dominio público" }));
     flush();

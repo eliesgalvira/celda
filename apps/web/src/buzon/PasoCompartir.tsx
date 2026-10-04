@@ -81,25 +81,25 @@ export function PasoCompartir(props: PasoCompartirProps) {
     <>
       <QueSale titulo="Lo que sale de tu dispositivo" datos={queSale(props.aportacion)}>
         <Show when={esMedida()}>
-          <p>La captura no sale de tu dispositivo: solo estos números.</p>
+          <p>Solo se envían estos números. La captura se queda en tu dispositivo.</p>
         </Show>
         <p>
-          Va con la identidad anónima que el buzón da a este dispositivo, sin nombre ni cuenta.
-          Celda no guarda tu IP: guarda una huella cifrada que cambia cada día y se borra a las 24
-          horas, solo para los límites.
+          Se envía con un identificador anónimo que el buzón asigna a este dispositivo. No lleva tu
+          nombre y no hace falta cuenta. Celda no guarda tu dirección IP. Para aplicar los límites
+          de envío guarda una huella cifrada de ella, que cambia cada día y se borra a las 24 horas.
         </p>
         <p>
           {esMedida()
-            ? "No se publica sola: de las medidas solo se publican resúmenes que juntan muchas."
-            : "No cambia nada del mapa por sí sola: la revisa la moderación y, si la acepta, sale al lado de lo que dice el registro oficial."}
+            ? "La medida no se publica por separado. Celda solo publica resúmenes que reúnen muchas medidas."
+            : "Enviarla no cambia el mapa. Primero la revisa la moderación y, si la acepta, aparece junto a lo que dice el registro oficial."}
         </p>
       </QueSale>
       <DedicacionCc0 enlace={DEDICACION_CC0.enlace}>
         <p>
-          Al enviarla la dedicas al dominio público con la {DEDICACION_CC0.nombre}: cualquiera podrá
-          copiarla, cambiarla y publicarla sin pedirte permiso ni citarte.
+          Al enviarla, la dedicas al dominio público con la {DEDICACION_CC0.nombre}. Eso permite que
+          cualquiera la use y la modifique sin pedirte permiso y sin citarte.
         </p>
-        <p>No tiene vuelta atrás: una vez enviada, no se puede sacar del dominio público.</p>
+        <p>Una vez enviada, no se puede retirar del dominio público.</p>
       </DedicacionCc0>
       <AccionesDelPaso>
         <Show
@@ -136,8 +136,8 @@ export function PasoCompartir(props: PasoCompartirProps) {
           >
             {(enviada) => (
               <Aviso tono="hecho" encaje="panel" titulo="Recibida">
-                El buzón la ha recibido el {fechaYHora(enviada().compartidaEl)}. Espera a la
-                moderación y, mientras, no cambia nada de lo publicado.
+                El buzón la recibió el {fechaYHora(enviada().compartidaEl)}. Hasta que la revise la
+                moderación, el mapa no cambia.
               </Aviso>
             )}
           </Match>

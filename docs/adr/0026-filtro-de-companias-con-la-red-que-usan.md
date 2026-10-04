@@ -24,7 +24,7 @@ Hay otra dificultad en los números. De lejos el mapa dibuja solo el resumen nac
 
 - **Chips con «Todas».** Sin filtro, el chip «Todas» está pulsado y los de las compañías no. Desde ahí, tocar una deja solo esa: «solo Movistar» es un toque, no cuatro. Después, cada toque añade o quita una. Quitar la última o elegir las cinco vuelve a «Todas». Así se lee «por defecto están todas» sin obligar a apagar cuatro chips para ver una.
 - **Dónde.** Una pastilla «Compañías», con un embudo, encima de «Foto aérea». Abre encima un panel con los chips y no se cierra al tocarlos; Escape o un toque fuera lo cierran. Los chips son controles: rectángulos claros con borde de tinta, el logo pequeño y el nombre escrito. Los marcadores, que son los datos, son redondos o hexagonales.
-- **El aviso.** Bajo la fecha de los datos: «Solo Movistar» con «Ver todas». Si sale una red aparte, una línea más: «Más claros: la red de Movistar, que usa Digi.»
+- **El aviso.** Bajo la fecha de los datos: «Solo Movistar» con «Ver todas». Si sale una red aparte, una línea más: «La red de Movistar que usa Digi sale más clara.»
 - **Se guarda en los ajustes del dispositivo** (`Ajustes.companias`, clave opcional). Los ajustes de antes se leen igual, sin subir de esquema. Lo guardado vale al abrir.
 
 ### Qué sale con un filtro

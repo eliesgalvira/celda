@@ -60,7 +60,7 @@ const JUSTIFICADOS: ReadonlyArray<Justificado> = [
   },
   {
     fichero: "apps/web/src/ejercicio/PanelEjercicio.tsx",
-    texto: "En Barcelona, en el barrio",
+    texto: "En Barcelona se hará en el",
     motivo: "elegir en el mapa da un barrio solo en Barcelona",
   },
   {

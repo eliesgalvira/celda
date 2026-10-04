@@ -26,7 +26,7 @@ export const CREDITOS_RESERVA: ReadonlyArray<Credito> = [
     texto: "Sistema Cartográfico Nacional · CC BY 4.0 scne.es",
     corto: "CC BY 4.0 scne.es",
     enlace: "https://www.scne.es/",
-    detalle: "Mapa base de reserva: el del IGN, que Celda pone cuando el de OpenFreeMap no llega",
+    detalle: "Mapa base del IGN, que Celda usa cuando no carga el de OpenFreeMap",
     fijo: true,
   },
 ];
@@ -34,7 +34,7 @@ export const CREDITOS_RESERVA: ReadonlyArray<Credito> = [
 /** Que las marcas de los logos son de sus compañías, mientras el mapa enseña alguno. */
 export const CREDITO_DE_MARCAS: Credito = {
   texto: AVISO_DE_MARCAS,
-  corto: "Marcas y logotipos de sus titulares; Celda no está afiliada",
+  corto: "Las marcas son de sus titulares y Celda no está afiliada",
   aviso: true,
 };
 

@@ -5,10 +5,10 @@ import { marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 import type { Recuento } from "./interferencia.ts";
 
 /** La frase clave de la vista (historia 39). */
-export const FRASE_CLAVE: TextoMarcado = marcado`Solo se estorban las antenas de la misma ${termino("compania", "compañía")} en la misma ${termino("banda", "frecuencia")}.`;
+export const FRASE_CLAVE: TextoMarcado = marcado`Solo interfieren entre sí las antenas de la misma ${termino("compania", "compañía")} que usan la misma ${termino("banda", "frecuencia")}.`;
 
 /** Qué se ve en la trama. */
-export const QUE_SE_VE: TextoMarcado = marcado`Cada hexágono da la ${termino("sinr", "señal frente a interferencia")}: cuánto destaca la señal que le da servicio sobre la ${termino("interferencia", "interferencia")} de las demás. Al subir la ${termino("ocupacion", "ocupación")}, empeoran los bordes entre celdas.`;
+export const QUE_SE_VE: TextoMarcado = marcado`Cada hexágono muestra la ${termino("sinr", "señal frente a interferencia")}, es decir, cuánto destaca la señal que le da servicio sobre la ${termino("interferencia", "interferencia")} de las demás antenas. Al subir la ${termino("ocupacion", "ocupación")}, empeoran los bordes entre celdas.`;
 
 /** Sin punto de referencia, cómo tener el valor (historia 42). */
 export const SIN_PUNTO: TextoMarcado = marcado`Elige un ${termino("punto-de-referencia", "punto")} o usa tu ubicación para ver su valor.`;
@@ -30,11 +30,14 @@ export const textoDeEstaciones = (recuento: Recuento, compania: Compania, mhz: M
     otras === 0
       ? ""
       : otras === 1
-        ? " No cuenta la que solo emite en otras bandas."
-        : ` No cuentan las ${otras} que solo emiten en otras bandas.`;
+        ? " No se cuenta la que solo emite en otras bandas."
+        : ` No se cuentan las ${otras} que solo emiten en otras bandas.`;
   if (supuesta === 0) {
-    const cuales = confirmada === 1 ? "la estación base" : `las ${confirmada} estaciones base`;
-    return `Entran ${cuales} de ${nombre} que el registro da en ${mhz} MHz.${fuera}`;
+    const cuales =
+      confirmada === 1
+        ? "Se cuenta la estación base"
+        : `Se cuentan las ${confirmada} estaciones base`;
+    return `${cuales} de ${nombre} que el registro da en ${mhz} MHz.${fuera}`;
   }
   const supuestas =
     supuesta === 1
@@ -48,7 +51,7 @@ export const textoDeEstaciones = (recuento: Recuento, compania: Compania, mhz: M
 };
 
 /** Lo que ninguna fuente publica y la vista supone. */
-export const SUPUESTOS: TextoMarcado = marcado`${termino("sector", "Sectores")} supuestos a 0°, 120° y 240° y potencia típica: ninguna fuente publica la orientación ni la potencia.`;
+export const SUPUESTOS: TextoMarcado = marcado`Como ninguna fuente publica la orientación ni la potencia, se suponen ${termino("sector", "sectores")} a 0°, 120° y 240° con una potencia típica.`;
 
 /** Desde dónde se da el valor: «En el punto» o «En tu ubicación» (historia 31). */
 export const desdeDe = (tipo: "gps" | "elegido"): TextoMarcado =>

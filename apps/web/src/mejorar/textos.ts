@@ -4,7 +4,7 @@ import { guiaDeGiro, type MotivoSinSensor } from "./estado.ts";
 /** Título de la sección de la ficha. */
 export const TITULO_MEJORAR = "Mejorar la señal";
 
-const MIENTRAS = "Mientras, la barra simula el giro.";
+const MIENTRAS = "Mientras tanto, puedes simular el giro con la barra.";
 
 /** Lo que dice la brújula en cada estado. */
 export const TEXTOS_BRUJULA = {
@@ -12,13 +12,13 @@ export const TEXTOS_BRUJULA = {
     switch (motivo) {
       case "sin-lecturas":
         return {
-          titulo: "El móvil no da la brújula",
-          texto: `No ha llegado ninguna lectura. Puede que este móvil no tenga brújula o que el navegador no la dé. ${MIENTRAS}`,
+          titulo: "No llegan datos de la brújula",
+          texto: `Puede que este móvil no tenga brújula o que el navegador no deje leerla. ${MIENTRAS}`,
         };
       case "sin-api":
         return {
           titulo: "Giro simulado",
-          texto: `Este navegador no da la brújula del dispositivo. Mueve la barra para ver cómo giraría la flecha.`,
+          texto: `Este navegador no deja leer la brújula del dispositivo. Mueve la barra para ver cómo giraría la flecha.`,
         };
       default:
         return {
@@ -28,11 +28,11 @@ export const TEXTOS_BRUJULA = {
         };
     }
   },
-  apagada: `La flecha girará con el móvil. ${MIENTRAS}`,
+  apagada: `Cuando actives la brújula, la flecha girará con el móvil. ${MIENTRAS}`,
   explicando: {
     titulo: "Antes de usar la brújula",
     texto:
-      "Puede que tu navegador te pregunte si Celda puede leer el movimiento y la orientación del móvil. Solo sirve para girar la flecha. Se lee en tu dispositivo y no se guarda.",
+      "Es posible que el navegador te pida permiso para que Celda lea el movimiento y la orientación del móvil. Celda solo los usa en tu dispositivo para girar la flecha, y no los guarda.",
   },
   pidiendo: "Contesta al aviso del navegador.",
   denegada: {
@@ -44,8 +44,8 @@ export const TEXTOS_BRUJULA = {
     titulo: "Brújula del móvil",
     texto: (margen: number | undefined) =>
       margen === undefined
-        ? "Sostén el móvil plano, con la parte de arriba hacia donde apuntará la antena. Si la flecha no cuadra con la calle, mueve el móvil dibujando un ocho para calibrarla."
-        : `Sostén el móvil plano, con la parte de arriba hacia donde apuntará la antena. La brújula dice que puede fallar ±${String(Math.round(margen))}°.`,
+        ? "Sostén el móvil plano, con la parte de arriba hacia donde apuntará la antena. Si la flecha no coincide con la calle, mueve el móvil dibujando un ocho para calibrarla."
+        : `Sostén el móvil plano, con la parte de arriba hacia donde apuntará la antena. Según el propio móvil, la brújula puede desviarse ±${String(Math.round(margen))}°.`,
   },
   dudosa: {
     titulo: "La brújula puede estar mal calibrada",

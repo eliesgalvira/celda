@@ -134,8 +134,8 @@ export function PanelFicha(props: PanelFichaProps) {
                 </Boton>
               }
             >
-              El servidor de Celda no ha respondido. Puede fallar la conexión o estar bloqueado el
-              servidor. El mapa sigue funcionando.
+              El servidor de Celda no ha respondido. Puede que falle la conexión o que el servidor
+              esté bloqueado. Mientras, puedes seguir usando el mapa.
             </Aviso>
           </AvisoFicha>
         )}
@@ -173,9 +173,9 @@ function FichaInexistente(props: { readonly clave: string; readonly alCerrar: ()
           </Boton>
         }
       >
-        No hay ningún <Termino termino="emplazamiento">emplazamiento</Termino> con la clave{" "}
-        {props.clave}. Puede que se haya retirado después de publicarse el mapa, o que la dirección
-        esté mal copiada.
+        El enlace no lleva a ningún <Termino termino="emplazamiento">emplazamiento</Termino>. Puede
+        que el emplazamiento se retirara después de publicarse el mapa, o que el enlace esté mal
+        copiado.
       </Aviso>
     </AvisoFicha>
   );
@@ -238,9 +238,9 @@ function ContenidoFicha(props: {
       <For each={props.redUsada}>
         {(red) => (
           <RedUsadaFicha>
-            {textoDeRedUsada(red)}: donde {NOMBRE_COMPANIA[red.compania]} no tiene emplazamientos
-            propios, sus clientes se conectan a los de {NOMBRE_COMPANIA[red.red]}. Por eso sale con
-            su filtro, más claro.
+            {textoDeRedUsada(red)}. Donde {NOMBRE_COMPANIA[red.compania]} no tiene emplazamientos
+            propios, sus clientes se conectan a los de {NOMBRE_COMPANIA[red.red]}, y por eso este
+            sale más claro cuando se filtra por {NOMBRE_COMPANIA[red.compania]}.
           </RedUsadaFicha>
         )}
       </For>
@@ -338,8 +338,8 @@ function ContenidoFicha(props: {
           </NotaFicha>
         </Show>
         <NotaFicha>
-          ¿Algo no cuadra con lo que ves? Propón una corrección: la revisa la moderación y, si la
-          acepta, sale aquí al lado de lo que dice el registro.
+          Si algo no coincide con lo que ves en la calle, puedes proponer una corrección. La revisa
+          la moderación y, si la acepta, aparece en esta ficha junto a lo que dice el registro.
         </NotaFicha>
         <div>
           <Boton

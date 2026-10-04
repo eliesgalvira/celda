@@ -85,8 +85,8 @@ export function ComoEmite(props: { readonly clave: string }) {
             </Boton>
           }
         >
-          El modelo se calcula en tu navegador y esta vez ha fallado. El resto de la ficha no
-          depende de él.
+          Tu navegador no ha podido calcular el diagrama. El resto de la ficha se puede consultar
+          igual.
         </Aviso>
       )}
     >

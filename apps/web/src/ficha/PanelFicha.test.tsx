@@ -320,7 +320,7 @@ describe("panel del emplazamiento", () => {
     // También lo dicen los créditos del mapa; aquí cuenta el de la ficha.
     assert.isTrue(
       getAllByText(
-        "Las marcas y logotipos de las compañías son de sus titulares; Celda no está afiliada a ninguna.",
+        "Las marcas y los logotipos de las compañías pertenecen a sus titulares. Celda no está afiliada a ninguna de ellas.",
       ).some((aviso) => aviso.closest("article") !== null),
     );
   });
@@ -466,9 +466,9 @@ describe("panel del emplazamiento", () => {
     assert.isNotNull(getByText("Simulación"));
     assert.notInclude(diagrama.closest("figure")?.textContent, "diagrama-sector");
     assert.isNotNull(getByText("Sector 2 · 120°"));
-    // «Orientación» va subrayada: el párrafo se busca entero.
+    // «orientación» va subrayada: el párrafo se busca entero.
     const nota = Array.from(diagrama.closest("figure")?.querySelectorAll("p") ?? []).find((p) =>
-      (p.textContent ?? "").startsWith("Orientación supuesta. Ninguna fuente publica"),
+      (p.textContent ?? "").startsWith("La orientación es supuesta. Ninguna fuente publica"),
     );
     assert.isDefined(nota);
     assert.deepStrictEqual(terminosSubrayados(nota ?? diagrama), ["azimut", "sector"]);

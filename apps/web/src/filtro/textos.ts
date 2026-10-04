@@ -27,9 +27,9 @@ export const estadoDelFiltro = (filtro: FiltroDeCompanias): string =>
 
 /**
  * Lo que sale aparte, más claro, con las compañías del filtro que usan otra red, y por qué sus
- * celdas son solo una aproximación: «Más claros, los de Movistar, con sus celdas: Digi usa su red
- * donde no tiene la suya. Junto a uno de Digi, el móvil suele quedarse en él aunque haya otro de
- * Movistar más cerca.» Sin ninguna, `undefined`.
+ * celdas son solo una aproximación: «Los emplazamientos de Movistar salen más claros, con sus
+ * celdas, porque Digi usa su red donde no tiene la suya. Cerca de uno de Digi, el móvil suele
+ * conectarse a él aunque haya otro de Movistar más cerca.» Sin ninguna, `undefined`.
  */
 export const textoDeLaRedUsada = (filtro: FiltroDeCompanias): string | undefined => {
   const redes = redesUsadas(filtro);
@@ -37,10 +37,10 @@ export const textoDeLaRedUsada = (filtro: FiltroDeCompanias): string | undefined
   if (una === undefined) return undefined;
   const de = enumerar(redes.map((r) => NOMBRE_COMPANIA[r.red]));
   return redes.length === 1
-    ? `Más claros, los de ${de}, con sus celdas: ${NOMBRE_COMPANIA[una.compania]} usa su red donde no tiene la suya. Junto a uno de ${NOMBRE_COMPANIA[una.compania]}, el móvil suele quedarse en él aunque haya otro de ${de} más cerca.`
-    : `Más claros, los de ${de}, con sus celdas: ${enumerar(
+    ? `Los emplazamientos de ${de} salen más claros, con sus celdas, porque ${NOMBRE_COMPANIA[una.compania]} usa su red donde no tiene la suya. Cerca de uno de ${NOMBRE_COMPANIA[una.compania]}, el móvil suele conectarse a él aunque haya otro de ${de} más cerca.`
+    : `Los emplazamientos de ${de} salen más claros, con sus celdas, porque ${enumerar(
         redes.map((r) => `${NOMBRE_COMPANIA[r.compania]} usa la de ${NOMBRE_COMPANIA[r.red]}`),
-      )} donde no tienen la suya. Junto a uno propio, el móvil suele quedarse en él aunque haya otro más cerca.`;
+      )} donde no tienen la suya. Cerca de un emplazamiento propio, el móvil suele conectarse a él aunque haya otro más cerca.`;
 };
 
 /** La nota del panel: cómo se usa o, con un filtro, qué sale aparte. */
@@ -55,7 +55,7 @@ export const textoDelAviso = (filtro: FiltroDeCompanias): string =>
   `Solo ${nombresDelFiltro(filtro)}`;
 
 /**
- * Lo que sale aparte, en corto, para el aviso: «Más claros: la red de Movistar, que usa Digi.»
+ * Lo que sale aparte, en corto, para el aviso: «La red de Movistar que usa Digi sale más clara.»
  * El panel lo explica entero (`textoDeLaRedUsada`).
  */
 const redUsadaEnCorto = (filtro: FiltroDeCompanias): string | undefined => {
@@ -64,8 +64,8 @@ const redUsadaEnCorto = (filtro: FiltroDeCompanias): string | undefined => {
   const de = enumerar(redes.map((r) => NOMBRE_COMPANIA[r.red]));
   const quienes = enumerar(redes.map((r) => NOMBRE_COMPANIA[r.compania]));
   return redes.length === 1
-    ? `Más claros: la red de ${de}, que usa ${quienes}.`
-    : `Más claros: las redes de ${de}, que usan ${quienes}.`;
+    ? `La red de ${de} que usa ${quienes} sale más clara.`
+    : `Las redes de ${de} que usan ${quienes} salen más claras.`;
 };
 
 /**
@@ -77,5 +77,5 @@ export const detalleDelAviso = (
   deLejosSinFiltrar: boolean,
 ): string | undefined =>
   deLejosSinFiltrar
-    ? `De lejos aún se cuentan todas las compañías: acércate para ver solo ${nombresDelFiltro(filtro)}.`
+    ? `Con el mapa alejado, los números aún cuentan todas las compañías. Acerca el mapa para ver solo ${nombresDelFiltro(filtro)}.`
     : redUsadaEnCorto(filtro);

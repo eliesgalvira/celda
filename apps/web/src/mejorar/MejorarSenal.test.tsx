@@ -121,7 +121,7 @@ describe("mejorar la señal: consejos", () => {
     );
     assert.match(
       seccion()
-        .getByText(/Con un/u)
+        .getByText(/Si eliges un/u)
         .closest("p")?.textContent ?? "",
       /hacia qué ventana poner el router/u,
     );
@@ -200,7 +200,7 @@ describe("mejorar la señal: brújula", () => {
     pulsar("Usar la brújula del móvil");
     assert.match(
       seccion().getByText("Antes de usar la brújula").parentElement?.textContent ?? "",
-      /Solo sirve para girar la flecha\. Se lee en tu dispositivo y no se guarda\./u,
+      /Celda solo los usa en tu dispositivo para girar la flecha, y no los guarda\./u,
     );
     // Todavía no se ha pedido nada al navegador.
     assert.strictEqual(brujula.permisosPedidos(), 0);
@@ -311,7 +311,7 @@ describe("mejorar la señal: brújula", () => {
     });
     brujula.sinLecturas();
     await waitFor(() => {
-      assert.isNotNull(seccion().getByText("El móvil no da la brújula"));
+      assert.isNotNull(seccion().getByText("No llegan datos de la brújula"));
     });
     assert.isNotNull(seccion().getByRole("slider", { name: "Simular el giro" }));
   });

@@ -55,7 +55,7 @@ export const tituloDeAportacion = (aportacion: AportacionCompartible): string =>
     case "correccion-propuesta":
       return textoCambio(aportacion.cambio);
     case "corroboracion":
-      return "Respaldas una corrección";
+      return "Respaldo a una corrección";
   }
 };
 
@@ -164,12 +164,12 @@ export const textosDelFallo = (fallo: FalloAlCompartir, ahora: number): TextosDe
         case "dispositivo":
           return {
             titulo: "Has enviado varias seguidas",
-            texto: `El buzón recibe unas pocas de cada dispositivo a la vez. Podrás enviar esta dentro de ${espera}. ${SE_QUEDA}`,
+            texto: `El buzón solo admite unas pocas aportaciones seguidas desde cada dispositivo. Podrás enviar esta dentro de ${espera}. ${SE_QUEDA}`,
           };
         case "ip":
           return {
             titulo: "Muchas aportaciones desde tu red",
-            texto: `Desde tu conexión se han enviado muchas hoy. Pasa con los datos móviles o una red compartida, como la de una universidad. Prueba dentro de ${espera}. ${SE_QUEDA}`,
+            texto: `Hoy se han enviado muchas aportaciones desde tu conexión. Suele pasar con los datos móviles o en una red compartida, como la de una universidad. Prueba dentro de ${espera}. ${SE_QUEDA}`,
           };
         case "total":
           return {
@@ -186,7 +186,7 @@ export const textosDelFallo = (fallo: FalloAlCompartir, ahora: number): TextosDe
     case "BuzonSinRespuesta":
       return {
         titulo: "No se ha podido enviar",
-        texto: `El buzón no ha contestado: puede fallar la conexión o estar parado. El mapa sigue funcionando. ${SE_QUEDA}`,
+        texto: `El buzón no ha contestado. Puede que falle la conexión o que el buzón no esté funcionando. ${SE_QUEDA}`,
       };
     case "EnvioVetado":
       return {
@@ -199,14 +199,14 @@ export const textosDelFallo = (fallo: FalloAlCompartir, ahora: number): TextosDe
     case "EnvioNoValido":
       return {
         titulo: "El buzón no acepta esta aportación",
-        texto: `No es posible: ${fallo.motivo}.`,
+        texto: `No se ha aceptado porque ${fallo.motivo}.`,
       };
     // El motivo es el error del navegador, en inglés y técnico: no se enseña.
     case "AlmacenNoDisponible":
       return {
         titulo: "No se ha podido guardar en este dispositivo",
         texto:
-          "Sin guardarla no se envía. Este navegador no deja a Celda guardar datos en el dispositivo, como pasa en algunas ventanas privadas.",
+          "Para enviar una aportación, Celda tiene que guardarla antes en el dispositivo, y este navegador no lo permite. Pasa en algunas ventanas privadas.",
       };
   }
 };

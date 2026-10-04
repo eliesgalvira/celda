@@ -63,7 +63,7 @@ export const enumerar = (azimuts: ReadonlyArray<number>): string => {
     : `${partes.slice(0, -1).join(", ")} y ${partes.at(-1) ?? ""}`;
 };
 
-const ORIENTACION = termino("azimut", "Orientación");
+const ORIENTACION = termino("azimut", "orientación");
 
 export interface TextosDiagrama {
   readonly titulo: string;
@@ -76,22 +76,25 @@ export interface TextosDiagrama {
 /** Lo que dice el diagrama: que es un modelo, hacia dónde apunta cada sector y de dónde sale. */
 export const textosDiagrama = (orientacion: Orientacion): TextosDiagrama => {
   const n = orientacion.azimuts.length;
-  const sectores = n === 1 ? "Un sector" : `${n} sectores`;
-  const forma = marcado`Forma: ${termino("modelo", "modelo")} típico de antena de ${termino("sector", "sector")}, con un haz de ${String(SECTOR_TIPICO.anchoHazGrados)}°.`;
+  const sectores = n === 1 ? "un sector" : `${n} sectores`;
+  const forma = marcado`La forma sale de un ${termino("modelo", "modelo")} de antena de ${termino("sector", "sector")} típica, con un haz de ${String(SECTOR_TIPICO.anchoHazGrados)}°.`;
   const hacia =
     orientacion.tipo === "estimada"
       ? `con orientación estimada a ${enumerar(orientacion.azimuts)}, ±${orientacion.margen}°`
       : `con orientación supuesta a ${enumerar(orientacion.azimuts)}`;
   return {
     titulo: "Diagrama de radiación de los sectores",
-    descripcion: `Modelo, no medida. ${sectores} ${hacia}. Cada uno concentra la señal en un haz de ${SECTOR_TIPICO.anchoHazGrados}° y pierde hasta ${SECTOR_TIPICO.atenuacionMaximaDb} dB hacia atrás.`,
+    descripcion: `Este diagrama se calcula con un modelo de antena típica y muestra ${sectores} ${hacia}. Cada uno concentra la señal en un haz de ${SECTOR_TIPICO.anchoHazGrados}° y pierde hasta ${SECTOR_TIPICO.atenuacionMaximaDb} dB hacia atrás.`,
     leyenda: orientacion.azimuts.map(
       (azimut, k) => `Sector ${k + 1} · ${azimutDe(orientacion, azimut)}`,
     ),
     notas: (orientacion.tipo === "estimada"
-      ? [marcado`${ORIENTACION} estimada ±${String(orientacion.margen)}°.`, forma]
+      ? [
+          marcado`La ${ORIENTACION} es una estimación, con ±${String(orientacion.margen)}° de margen.`,
+          forma,
+        ]
       : [
-          marcado`${ORIENTACION} supuesta. Ninguna fuente publica hacia dónde apuntan los ${termino("sector", "sectores")} de este emplazamiento, así que se dibujan a ${enumerar(orientacion.azimuts)}, el reparto más común, solo para enseñar la forma.`,
+          marcado`La ${ORIENTACION} es supuesta. Ninguna fuente publica hacia dónde apuntan los ${termino("sector", "sectores")} de este emplazamiento, así que se dibujan a ${enumerar(orientacion.azimuts)}, que es el reparto más común, para enseñar su forma.`,
           forma,
         ]
     ).map(bloque()),

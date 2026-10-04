@@ -81,7 +81,8 @@ export function EsqueletoFicha() {
       </div>
       <div class="flex flex-col gap-3 px-5 py-4 md:px-6">
         <p class="animate-aparecer-tarde text-sm text-tinta-suave">
-          Tarda más de lo normal. Puede fallar la conexión o estar bloqueado el servidor de Celda.
+          La ficha tarda más de lo normal. Puede que falle la conexión o que el servidor de Celda
+          esté bloqueado.
         </p>
         <span aria-hidden="true" class="block h-4 w-1/2 bg-linea" />
         <span aria-hidden="true" class="block h-16 bg-linea" />

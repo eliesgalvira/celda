@@ -60,7 +60,7 @@ describe("consejos para mejorar la señal", () => {
     if (resultado.tipo !== "sin-punto") return;
     assert.strictEqual(
       textoPlano(resultado.llamada),
-      "Con un punto de referencia, Celda te dice hacia qué ventana poner el router y a qué rumbo apuntar la antena, y la brújula del móvil te ayuda a alinearla.",
+      "Si eliges un punto de referencia, Celda indica hacia qué ventana poner el router y a qué rumbo apuntar la antena, y puedes alinearla con la brújula del móvil.",
     );
   });
 
@@ -76,7 +76,7 @@ describe("consejos para mejorar la señal", () => {
     );
     assert.strictEqual(
       consejo(resultado, "antena"),
-      "Con una antena exterior direccional, apúntala a 48°. Ahí la orientación importa mucho, y la brújula de abajo ayuda a alinearla.",
+      "Si usas una antena exterior direccional, apúntala a 48°. La orientación importa mucho, y la brújula de abajo sirve para alinearla.",
     );
     assert.strictEqual(resultado.objetivo, 48);
   });
@@ -93,11 +93,11 @@ describe("consejos para mejorar la señal", () => {
   it("de frente a un sector y entre dos lo dice; algo fuera del eje no añade nada", () => {
     assert.strictEqual(
       consejo(consejos(punto()), "sector"),
-      "Estás casi de frente al sector 3, así que apuntar al emplazamiento es apuntar a su haz.",
+      "Estás casi de frente al sector 3, así que una antena apuntada al emplazamiento queda también de cara a su haz.",
     );
     assert.match(
       consejo(consejos(punto({ servicio: servicio(1, 55) })), "sector") ?? "",
-      /^Estás entre dos sectores, donde llega menos señal de cada uno\. Apunta igualmente al emplazamiento\./u,
+      /^Estás entre dos sectores, donde llega menos señal de cada uno\. Aun así, conviene apuntar al emplazamiento/u,
     );
     assert.isUndefined(consejo(consejos(punto({ servicio: servicio(0, 30) })), "sector"));
     // Mientras el modelo calcula, los consejos que no dependen de él ya están.

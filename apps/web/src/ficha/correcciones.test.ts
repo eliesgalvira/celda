@@ -21,7 +21,7 @@ describe("correcciones en la ficha", () => {
     const textos = textosCorrecciones(FICHA_CORREGIDA);
     assert.strictEqual(
       textoPlano(textos?.resumen ?? []),
-      "La comunidad corrige el registro oficial en este emplazamiento. Aquí están las dos versiones.",
+      "La comunidad ha corregido lo que dice el registro oficial de este emplazamiento. Debajo se ven las dos versiones.",
     );
     assert.deepStrictEqual(
       textos?.resumen.flatMap((f) => (f.termino === undefined ? [] : [f.termino])),
@@ -59,7 +59,7 @@ describe("correcciones en la ficha", () => {
     assert.strictEqual(contraste?.comunidad.dice, "La sitúa aquí");
     assert.strictEqual(
       textoPlano(textosCorrecciones(FICHA_NUEVA)?.resumen ?? []),
-      "El registro oficial no tiene este emplazamiento: lo han añadido los usuarios de la comunidad.",
+      "El registro oficial no tiene este emplazamiento. Lo ha añadido la comunidad de Celda.",
     );
   });
 

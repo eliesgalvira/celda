@@ -92,7 +92,7 @@ describe("estaciones de la vista de interferencia", () => {
   it("la cuenta de estaciones dice qué se supone, con el recuento", () => {
     assert.strictEqual(
       textoDeEstaciones({ confirmada: 3, supuesta: 820, "otra-banda": 32 }, "movistar", 1800),
-      "El registro confirma 3 estaciones base de Movistar en 1800 MHz. Las 820 que aún no tienen bandas leídas se suponen en esa banda. No cuentan las 32 que solo emiten en otras bandas.",
+      "El registro confirma 3 estaciones base de Movistar en 1800 MHz. Las 820 que aún no tienen bandas leídas se suponen en esa banda. No se cuentan las 32 que solo emiten en otras bandas.",
     );
     assert.strictEqual(
       textoDeEstaciones({ confirmada: 0, supuesta: 1, "otra-banda": 0 }, "digi", 3500),
@@ -100,7 +100,7 @@ describe("estaciones de la vista de interferencia", () => {
     );
     assert.strictEqual(
       textoDeEstaciones({ confirmada: 12, supuesta: 0, "otra-banda": 1 }, "orange", 800),
-      "Entran las 12 estaciones base de Orange que el registro da en 800 MHz. No cuenta la que solo emite en otras bandas.",
+      "Se cuentan las 12 estaciones base de Orange que el registro da en 800 MHz. No se cuenta la que solo emite en otras bandas.",
     );
     assert.strictEqual(
       textoDeEstaciones({ confirmada: 0, supuesta: 0, "otra-banda": 4 }, "vodafone", 700),

@@ -88,20 +88,20 @@ export const COMO_REACTIVAR =
 /** Qué ha pasado cuando la ubicación no llega. */
 export const TITULO_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
   denegado: "La ubicación está bloqueada",
-  "sin-senal": "Tu dispositivo no sabe dónde está",
-  "sin-fuente": "Este ordenador no sabe dónde está",
+  "sin-senal": "Tu dispositivo no ha encontrado su posición",
+  "sin-fuente": "Este ordenador no puede calcular su posición",
   "tiempo-agotado": "La ubicación no ha llegado a tiempo",
-  "no-disponible": "Este navegador no da la ubicación",
+  "no-disponible": "Este navegador no permite usar la ubicación",
 };
 
 export const EXPLICACION_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
   denegado: COMO_REACTIVAR,
   "sin-senal":
-    "No ha podido calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo apagada. Puedes volver a intentarlo o elegir el punto en el mapa.",
+    "El dispositivo no ha podido calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo desactivada. Puedes volver a intentarlo o elegir el punto en el mapa.",
   "sin-fuente":
-    "Los ordenadores no tienen GPS. El navegador saca la posición de un servicio que la calcula con las redes wifi cercanas, y el de este ordenador no tiene ninguno o no le ha contestado. Pasa a menudo con Chromium en Linux. No es un fallo de Celda: elige el punto en el mapa o busca una dirección. En el móvil sí puedes usar tu ubicación.",
+    "Los ordenadores no tienen GPS. El navegador obtiene la posición de un servicio que la calcula con las redes wifi cercanas, y en este ordenador ese servicio no existe o no ha respondido. Pasa a menudo con Chromium en Linux. Puedes elegir el punto en el mapa o buscar una dirección, y en el móvil sí podrás usar tu ubicación.",
   "tiempo-agotado":
-    "Tu dispositivo ha tardado demasiado en calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo apagada. Puedes volver a intentarlo o elegir el punto en el mapa.",
+    "Tu dispositivo ha tardado demasiado en calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo desactivada. Puedes volver a intentarlo o elegir el punto en el mapa.",
   "no-disponible":
     "El navegador no deja que la web pida la ubicación. Suele pasar si la página no va por https o si el navegador no lo admite. Puedes elegir el punto en el mapa.",
 };
@@ -148,11 +148,11 @@ export const textosFueraDeLosDatos = (
   if (referencia.tipo === "elegido") {
     return {
       titulo: "Celda aún no tiene datos de ese punto",
-      texto: `Los datos más cercanos que tiene quedan a ${lejos}. Que no se vean antenas alrededor del punto no quiere decir que no las haya: ese lugar todavía no está en el mapa.`,
+      texto: `Los datos más cercanos quedan a ${lejos}. Ese lugar todavía no está en el mapa, así que puede haber antenas alrededor del punto aunque no se vean.`,
     };
   }
   return {
     titulo: "Celda aún no tiene datos de donde estás",
-    texto: `Los datos más cercanos que tiene quedan a ${lejos} de ti. Que no veas antenas a tu alrededor no quiere decir que no las haya: ese lugar todavía no está en el mapa.`,
+    texto: `Los datos más cercanos quedan a ${lejos} de ti. Ese lugar todavía no está en el mapa, así que puede haber antenas a tu alrededor aunque no se vean.`,
   };
 };

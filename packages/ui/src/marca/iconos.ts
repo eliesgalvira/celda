@@ -171,7 +171,7 @@ const manifiesto = (colores: ColoresIcono): string => {
       name: "Celda",
       short_name: "Celda",
       description:
-        "Las antenas de telefonía móvil de España en un mapa: de qué compañía son y cómo llega su señal.",
+        "Mapa de las antenas de telefonía móvil de España, con la compañía de cada una y una estimación de cómo llega su señal.",
       lang: "es",
       start_url: "/",
       display: "standalone",

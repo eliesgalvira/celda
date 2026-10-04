@@ -985,7 +985,7 @@ export function PantallaMapa() {
     if (conPistaDeFoto()) {
       return (
         <Pista
-          texto="¿Cuál es el edificio? Míralo en la foto aérea."
+          texto="La foto aérea ayuda a reconocer el edificio."
           accion={
             <Boton variante="secundario" onClick={() => foto.encender()}>
               Ver foto
@@ -1201,7 +1201,7 @@ export function PantallaMapa() {
                 <>
                   <ControlDelMapa
                     etiqueta="Interferencia"
-                    detalle="Simula dónde se pisan las señales de una compañía."
+                    detalle="Simula dónde interfieren entre sí las señales de una compañía."
                     icono={<IconoOndas />}
                     activo={vistaActiva()}
                     disabled={!listo() || emplazamientos().length === 0}
@@ -1209,7 +1209,7 @@ export function PantallaMapa() {
                   />
                   <ControlDelMapa
                     etiqueta="Medir mi señal"
-                    detalle="Cómo leer en el móvil la señal que te llega."
+                    detalle="Explica cómo ver en el móvil la señal que recibes."
                     icono={<IconoSenal />}
                     aria-haspopup="dialog"
                     onClick={() => navegar(conMedir(ubicacion(), true))}
@@ -1225,7 +1225,7 @@ export function PantallaMapa() {
                   />
                   <ControlDelMapa
                     etiqueta="Foto aérea"
-                    detalle="Fotos aéreas del Instituto Geográfico Nacional bajo las calles."
+                    detalle="Pone las fotos aéreas del Instituto Geográfico Nacional bajo el callejero."
                     icono={<IconoFotoAerea />}
                     activo={foto.encendida()}
                     disabled={!listo()}
@@ -1245,7 +1245,7 @@ export function PantallaMapa() {
                   <Show when={ajustes.ajustes().modoEstudiante}>
                     <ControlDelMapa
                       etiqueta="Ejercicio"
-                      detalle="Los cálculos de un municipio o un barrio paso a paso, con sus fuentes."
+                      detalle="Calcula paso a paso los datos de un municipio o un barrio, con sus fuentes."
                       icono={<IconoEjercicio />}
                       activo={ejercicio() !== null}
                       onClick={() =>
@@ -1255,7 +1255,7 @@ export function PantallaMapa() {
                   </Show>
                   <ControlDelMapa
                     etiqueta="Tus aportaciones"
-                    detalle="Tus medidas y correcciones, y compartirlas con Celda."
+                    detalle="Muestra tus medidas y correcciones para enviarlas a Celda."
                     icono={<IconoAportaciones />}
                     aria-haspopup="dialog"
                     onClick={() => navegar(conAportaciones(ubicacion(), true))}
@@ -1384,8 +1384,8 @@ export function EstadoDeLaCapa(props: {
             </Boton>
           }
         >
-          {EXPLICACION_FALLO_CAPA[motivo()]} El mapa se ve, pero sin marcadores: eso no quiere decir
-          que no haya <Termino termino="emplazamiento">emplazamientos</Termino>.
+          {EXPLICACION_FALLO_CAPA[motivo()]} Mientras no se carguen, el mapa no muestra marcadores,
+          aunque haya <Termino termino="emplazamiento">emplazamientos</Termino> en la zona.
         </Aviso>
       </Match>
       <Match when={marca().tipo === "fallo-provincias"}>
@@ -1401,9 +1401,9 @@ export function EstadoDeLaCapa(props: {
             </Boton>
           }
         >
-          Puede fallar la conexión o estar bloqueado el servidor. Lo que se ve de esa provincia es
-          su resumen: eso no quiere decir que no haya{" "}
-          <Termino termino="emplazamiento">emplazamientos</Termino>.
+          Puede que falle la conexión o que el servidor esté bloqueado. De esa provincia solo se ve
+          el resumen, sin los marcadores de cada{" "}
+          <Termino termino="emplazamiento">emplazamiento</Termino>.
         </Aviso>
       </Match>
       <Match when={marca().tipo === "cargando-provincias"}>
@@ -1412,7 +1412,7 @@ export function EstadoDeLaCapa(props: {
       <Match when={marca().tipo === "sin-datos"}>
         <DatosDelMapa
           tono="limite"
-          texto="Celda aún no tiene datos de aquí"
+          texto="Celda aún no tiene datos de esta parte del mapa"
           detalle={detalleDeMarca(marca(), props.emplazamientos, props.donde)}
         />
       </Match>
@@ -1487,11 +1487,12 @@ const detalleDeMarca = (
 const EXPLICACION_FALLO_CAPA = {
   "sin-publicar": "Celda todavía no ha publicado ningún emplazamiento.",
   "sin-origen":
-    "El servidor de Celda no ha dicho qué datos cargar. Puede fallar la conexión o estar bloqueado el servidor.",
+    "El servidor de Celda no ha indicado qué datos cargar. Puede que falle la conexión o que el servidor esté bloqueado.",
   "sin-descarga":
-    "El fichero con los emplazamientos no ha llegado. Puede fallar la conexión o estar bloqueado el servidor.",
-  danada: "El fichero con los emplazamientos no es el que se esperaba. Es un error de Celda.",
-  interno: "Es un error de Celda, no de tu conexión.",
+    "No han llegado los datos de los emplazamientos. Puede que falle la conexión o que el servidor esté bloqueado.",
+  danada:
+    "Los datos de los emplazamientos no tienen el formato que se esperaba, por un fallo de Celda.",
+  interno: "Es un fallo de Celda, así que cambiar de conexión no lo arregla.",
 } as const;
 
 function AvisoMapa(props: {
@@ -1505,26 +1506,27 @@ function AvisoMapa(props: {
       <Match when={props.estado.tipo === "cargando"}>
         <Aviso tono="espera" titulo="Cargando el mapa base">
           {props.callejero === "reserva"
-            ? "OpenFreeMap no responde: el callejero llega desde el IGN."
-            : "El callejero llega desde OpenFreeMap."}
+            ? "OpenFreeMap no responde, así que el callejero se carga desde el IGN."
+            : "El callejero se carga desde OpenFreeMap."}
         </Aviso>
       </Match>
       <Match when={props.estado.tipo === "fallo" && props.estado.motivo === "sin-webgl"}>
         <Aviso tono="fallo" titulo="Este navegador no puede dibujar el mapa">
-          El mapa se dibuja con WebGL y este navegador lo tiene apagado o no lo admite. Prueba con
-          otro navegador o activa la aceleración gráfica en su configuración.
+          Para dibujar el mapa hace falta WebGL, que este navegador tiene desactivado o no admite.
+          Prueba con otro navegador o activa la aceleración gráfica en su configuración.
         </Aviso>
       </Match>
       <Match when={props.estado.tipo === "fallo" && props.estado.motivo === "sin-respuesta"}>
         <Aviso tono="fallo" titulo="No se ha podido cargar el mapa base" acciones={reintentar}>
           {props.callejero === "reserva"
-            ? "No ha llegado el callejero de OpenFreeMap ni el de reserva del IGN. Puede fallar la conexión o estar bloqueados los servidores."
-            : "El callejero viene de los servidores de OpenFreeMap y no ha llegado. Puede fallar la conexión o estar bloqueado el servidor."}
+            ? "No ha cargado el callejero de OpenFreeMap, y tampoco el del IGN, que se usa como reserva. Puede que falle la conexión o que los servidores estén bloqueados."
+            : "No ha cargado el callejero, que viene de los servidores de OpenFreeMap. Puede que falle la conexión o que el servidor esté bloqueado."}
         </Aviso>
       </Match>
       <Match when={props.estado.tipo === "fallo"}>
         <Aviso tono="fallo" titulo="Algo ha fallado al preparar el mapa" acciones={reintentar}>
-          Es un error de Celda, no de tu conexión. Si se repite al reintentar, recarga la página.
+          Es un fallo de Celda, así que cambiar de conexión no lo arregla. Si se repite al
+          reintentar, recarga la página.
         </Aviso>
       </Match>
     </Switch>
