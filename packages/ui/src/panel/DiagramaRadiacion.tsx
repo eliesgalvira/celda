@@ -220,7 +220,7 @@ export function DiagramaRadiacion(props: DiagramaRadiacionProps) {
   return (
     <figure class="flex flex-col items-center gap-3">
       <div class="flex w-full flex-wrap items-center gap-x-3 gap-y-1">
-        <Etiqueta tono="modelo">Modelo</Etiqueta>
+        <Etiqueta tono="modelo">Simulación</Etiqueta>
       </div>
       <svg
         viewBox={`0 0 ${TAMANO} ${TAMANO}`}

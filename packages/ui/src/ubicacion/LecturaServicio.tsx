@@ -67,7 +67,7 @@ export function LecturaServicio(props: LecturaServicioProps) {
       <p class="min-h-10 text-sm leading-relaxed">{props.veredicto}</p>
       <div class="flex flex-col gap-1">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Etiqueta tono="modelo">Modelo</Etiqueta>
+          <Etiqueta tono="modelo">Simulación</Etiqueta>
         </div>
         <p class="text-xs leading-snug text-tinta-suave">{props.nota}</p>
       </div>

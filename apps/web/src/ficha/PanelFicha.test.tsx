@@ -463,7 +463,7 @@ describe("panel del emplazamiento", () => {
       assert.lengthOf(diagrama.querySelectorAll("path"), 3);
     });
     assert.include(diagrama.querySelector("desc")?.textContent, "orientación supuesta");
-    assert.isNotNull(getByText("Modelo"));
+    assert.isNotNull(getByText("Simulación"));
     assert.notInclude(diagrama.closest("figure")?.textContent, "diagrama-sector");
     assert.isNotNull(getByText("Sector 2 · 120°"));
     // «Orientación» va subrayada: el párrafo se busca entero.

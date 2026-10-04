@@ -50,7 +50,7 @@ describe("DiagramaRadiacion", () => {
     assert.include(imagen.querySelector("desc")?.textContent, "orientación supuesta");
     assert.lengthOf(imagen.querySelectorAll("path"), 3);
     assert.strictEqual(imagen.querySelector("path")?.namespaceURI, "http://www.w3.org/2000/svg");
-    getByText("Modelo");
+    getByText("Simulación");
     assert.notMatch(document.body.textContent ?? "", /diagrama-sector|\bv\d/u);
     getByText("Sector 2 · 120°");
     getByText("Orientación supuesta.");
