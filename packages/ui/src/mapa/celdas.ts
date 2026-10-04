@@ -15,9 +15,6 @@ import { conFoto } from "./expresiones.ts";
  *
  * Sobre la foto aérea un trazo de 1 px del color primario se pierde: las líneas suben de opacidad
  * y llevan debajo un casco claro, de 3 px las de todas y de 5 px el de la seleccionada.
- *
- * Con un filtro de compañías, las celdas de la red usada (`redUsada` en sus propiedades) van a la
- * mitad de opacidad, como sus emplazamientos van más claros (ADR 0026). La seleccionada, no.
  */
 
 /** La fuente GeoJSON de las celdas. Cada polígono lleva la `clave` de su emplazamiento. */
@@ -41,28 +38,13 @@ const CAPA_SELECCIONADA_CONTORNO = "celda-seleccionada-contorno";
 const CAPA_CASCO = "celdas-casco";
 const CAPA_SELECCIONADA_CASCO = "celda-seleccionada-casco";
 
-/** Si la celda es de un emplazamiento de la red usada. */
-const DE_LA_RED_USADA: ExpressionSpecification = ["==", ["get", "redUsada"], true];
-
-/** Una opacidad que va más clara en las celdas de la red usada. */
-const conRedUsada = (
-  propia: ExpressionSpecification,
-  redUsada: ExpressionSpecification,
-): ExpressionSpecification => ["case", DE_LA_RED_USADA, redUsada, propia];
-
 /**
  * Opacidad de las líneas de todas las celdas, sin selección y con ella, y de su casco. Sin la foto
- * el casco no se ve. Las de la red usada, a la mitad.
+ * el casco no se ve.
  */
 const OPACIDAD_BORDES = {
-  normal: {
-    bordes: conRedUsada(conFoto(0.45, 0.85), conFoto(0.22, 0.42)),
-    casco: conRedUsada(conFoto(0, 0.5), conFoto(0, 0.25)),
-  },
-  apagada: {
-    bordes: conRedUsada(conFoto(0.14, 0.22), conFoto(0.07, 0.11)),
-    casco: conRedUsada(conFoto(0, 0.12), conFoto(0, 0.06)),
-  },
+  normal: { bordes: conFoto(0.45, 0.85), casco: conFoto(0, 0.5) },
+  apagada: { bordes: conFoto(0.14, 0.22), casco: conFoto(0, 0.12) },
 } as const;
 
 const conFundido = (

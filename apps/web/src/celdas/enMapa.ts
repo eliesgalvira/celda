@@ -47,11 +47,6 @@ export interface EntradaCeldas {
    */
   readonly emplazamientos: () => ReadonlyArray<EmplazamientoDeCapa>;
   /**
-   * Las claves de los emplazamientos de la red usada (ADR 0026): sus celdas se dibujan más claras.
-   * Cambia a la vez que `emplazamientos`. Sin ella, ninguno.
-   */
-  readonly redUsada?: () => ReadonlySet<string>;
-  /**
    * Las provincias con emplazamientos que no entran en el cálculo. Las celdas que podrían recortar
    * no se dibujan (`celdasDudosas`). Sin ellas, se dibujan todas.
    */
@@ -82,7 +77,6 @@ export interface CeldasCalculadas {
 }
 
 const NINGUNA_FUERA: ReadonlyArray<ProvinciaFuera> = [];
-const NINGUNA_DE_LA_RED_USADA: ReadonlySet<string> = new Set();
 
 export interface CeldasDelMapa {
   readonly calculo: () => CalculoCeldas;
@@ -130,7 +124,6 @@ export function crearCeldas(
         : {
             lienzo,
             emplazamientos: entrada.emplazamientos(),
-            redUsada: entrada.redUsada?.() ?? NINGUNA_DE_LA_RED_USADA,
             fuera: entrada.fuera?.() ?? NINGUNA_FUERA,
             caja: entrada.caja?.(),
             origen: entrada.origen?.(),
@@ -138,15 +131,7 @@ export function crearCeldas(
             intento: intento(),
           };
     },
-    ({
-      lienzo,
-      emplazamientos,
-      redUsada,
-      fuera,
-      caja,
-      origen: origenPedido,
-      pedidas: pedidasAhora,
-    }) => {
+    ({ lienzo, emplazamientos, fuera, caja, origen: origenPedido, pedidas: pedidasAhora }) => {
       if (pedidasAhora !== emplazamientos) {
         // Otra capa, todavía sin pedir: las celdas de la anterior ya no valen.
         lienzo.dibujar(SIN_CELDAS);
@@ -167,7 +152,7 @@ export function crearCeldas(
         return {
           resultado,
           dudosas,
-          enMapa: celdasEnMapa(resultado, emplazamientos, origen, dudosas, redUsada),
+          enMapa: celdasEnMapa(resultado, emplazamientos, origen, dudosas),
         };
       });
       void datos.runPromiseExit(calcular, { signal: cancelar.signal }).then((salida) => {

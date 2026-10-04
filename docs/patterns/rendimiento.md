@@ -356,7 +356,6 @@ Medido el 04/10/2026 en Chromium sin interfaz con SwiftShader, con la build loca
 - **Workers.** El de capas recibe 1 mensaje por provincia y filtro nuevo, y 0 al volver a uno de los cuatro últimos o a todas. Cuatro chips en menos de 150 ms entre uno y otro: 1 mensaje, el del último filtro, y 0 si ya estaba guardado. El de simulaciones, 0 a z12; a z15 o más, un cálculo de celdas por filtro aplicado.
 - **Quieto 20 s** tras los toques, en el móvil y en el escritorio: 0 peticiones y 0 llamadas a todo lo contado.
 - **Celdas.** En el Eixample a z16 en el móvil, 163 con solo Movistar y 14 con solo DIGI.
-- **Celdas con la red usada** (segunda decisión del 04/10/2026), en el móvil con el Eixample a z16: del toque a las celdas nuevas en el mapa, 179-214 ms con la espera; MapLibre acaba de pintar a los 521-574 ms, y a los 907 con un filtro nuevo que agrupa el Worker. Se ven 21 celdas con solo DIGI, todas claras, y 11 con solo Yoigo. Quieto 20 s: 0 peticiones y 0 llamadas.
 
 ## Qué entró
 

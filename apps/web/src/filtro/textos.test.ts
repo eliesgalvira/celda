@@ -23,17 +23,10 @@ describe("textos del filtro de compañías (ADR 0026)", () => {
     );
     assert.strictEqual(
       notaDelFiltro(["digi", "yoigo"]),
-      "Más claros, los de Movistar y Orange, con sus celdas: Digi usa la de Movistar y Yoigo usa la de Orange donde no tienen la suya. Junto a uno propio, el móvil suele quedarse en él aunque haya otro más cerca.",
-    );
-    assert.strictEqual(
-      notaDelFiltro(["digi"]),
-      "Más claros, los de Movistar, con sus celdas: Digi usa su red donde no tiene la suya. Junto a uno de Digi, el móvil suele quedarse en él aunque haya otro de Movistar más cerca.",
+      "Más claros, los de Movistar y Orange: Digi usa la de Movistar y Yoigo usa la de Orange donde no tienen la suya.",
     );
     assert.isUndefined(detalleDelAviso(["movistar", "digi"], false));
-    assert.match(
-      notaDelFiltro(["yoigo"]),
-      /^Más claros, los de Orange, con sus celdas: Yoigo usa su red/u,
-    );
+    assert.match(notaDelFiltro(["yoigo"]), /^Más claros, los de Orange: Yoigo usa su red/u);
   });
 
   it("con datos de antes, de lejos, dicen que los números aún son de todas", () => {

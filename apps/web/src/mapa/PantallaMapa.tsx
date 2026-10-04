@@ -74,7 +74,7 @@ import {
   type ZonaEnMapa,
 } from "../ejercicio/zona.ts";
 import { centroLibre, desplazamientoParaVer } from "../ficha/enfoque.ts";
-import { celdasDelFiltro, crearFiltro } from "../filtro/enMapa.ts";
+import { crearFiltro, propiosDelFiltro } from "../filtro/enMapa.ts";
 import { AvisoDelFiltro, ControlDeCompanias } from "../filtro/Filtro.tsx";
 import { crearFoto, FotoContexto, lienzoDeFoto } from "../foto/enMapa.ts";
 import { aPieDeCalle, CREDITO_FOTO_AEREA, pideVerFoto } from "../foto/foto.ts";
@@ -743,11 +743,8 @@ export function PantallaMapa() {
   const cargadasDeCeldas = createMemo(() => cargadasDe(provincias(), provinciasDeCeldas()), {
     equals: mismasListas,
   });
-  /**
-   * Con un filtro, las celdas son de los emplazamientos que salen: los de sus compañías y los de la
-   * red que usan, más claras (ADR 0026).
-   */
-  const emplazamientosDeCeldas = celdasDelFiltro(
+  /** Con un filtro, las celdas son solo de los emplazamientos de sus compañías (ADR 0026). */
+  const emplazamientosDeCeldas = propiosDelFiltro(
     () => cargadasDeCeldas().flatMap((p) => p.capa.emplazamientos),
     filtro.aplicado,
   );
@@ -815,8 +812,7 @@ export function PantallaMapa() {
       const actual = mapaListo();
       return actual === undefined ? undefined : lienzoDelMapa(actual);
     }),
-    emplazamientos: () => emplazamientosDeCeldas().emplazamientos,
-    redUsada: () => emplazamientosDeCeldas().redUsada,
+    emplazamientos: emplazamientosDeCeldas,
     fuera: fueraDeCeldas,
     caja: cajaDeCeldas,
     origen: origenDeCeldas,

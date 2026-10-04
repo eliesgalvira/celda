@@ -27,15 +27,15 @@ Frecuencia en MHz en la que emite una estación base. Las bajas llegan más lejo
 _Evitar_: canal, portadora, EARFCN
 
 **Celda**:
-Zona del mapa en la que un emplazamiento es el más cercano de todos, sea cual sea su compañía; con un filtro de compañías, el más cercano de los que salen con él, también los de la red usada. Es una simulación (celdas de Voronoi), no la zona a la que da servicio en la realidad.
+Zona del mapa en la que un emplazamiento es el más cercano de todos, sea cual sea su compañía; con un filtro de compañías, el más cercano de los de las compañías del filtro. Es una simulación (celdas de Voronoi), no la zona a la que da servicio en la realidad.
 _Evitar_: zona de cobertura, cobertura, hexágono
 
 **Filtro de compañías**:
-Las compañías que la persona elige ver en el mapa, con los chips de «Compañías». Sin filtro se ven todas. Con él, los emplazamientos, las agrupaciones y las zonas son solo los de las compañías del filtro, y las celdas son las de estos y las de la red usada; un compartido sale si alguna de las suyas está. El dispositivo lo recuerda, como los ajustes (ADR 0026).
+Las compañías que la persona elige ver en el mapa, con los chips de «Compañías». Sin filtro se ven todas. Con él, los emplazamientos, las agrupaciones, las zonas y las celdas son solo los de las compañías del filtro; un compartido sale si alguna de las suyas está. El dispositivo lo recuerda, como los ajustes (ADR 0026).
 _Evitar_: operador, filtro de operadoras, capa de compañía
 
 **Red usada**:
-La red de otra compañía a la que se conectan los clientes de una del filtro donde esta no tiene la suya: la de Movistar para DIGI y la de Orange para Yoigo. Con DIGI en el filtro y Movistar no, los emplazamientos de Movistar salen aparte, más claros, sin contar en las zonas ni en las agrupaciones. Tienen celda, también más clara.
+La red de otra compañía a la que se conectan los clientes de una del filtro donde esta no tiene la suya: la de Movistar para DIGI y la de Orange para Yoigo. Con DIGI en el filtro y Movistar no, los emplazamientos de Movistar salen aparte, más claros, sin contar en las zonas ni en las celdas.
 _Evitar_: itinerancia, roaming (en la interfaz), red prestada, cobertura
 
 **Sector que da servicio**:
@@ -372,7 +372,7 @@ _Evitar_: clientes, carga
 - Un **emplazamiento** de Barcelona cae en un solo **barrio**; uno de otro municipio, en ninguno.
 - Un **emplazamiento** cae en un **municipio** y en su **provincia**, o solo en una **provincia** si está en un **territorio compartido**.
 - Cada **emplazamiento** tiene una **celda**. Con un **punto de referencia**, la celda se divide en sectores y uno de ellos es el **sector que da servicio**.
-- Con un **filtro de compañías**, un **emplazamiento** es suyo si alguna de sus **compañías** está en el filtro, de la **red usada** si no tiene ninguna pero sí la red que usa una de ellas, y si no, no sale. Los suyos y los de la **red usada** tienen **celda**; solo los suyos cuentan en las **zonas** y las **agrupaciones**.
+- Con un **filtro de compañías**, un **emplazamiento** es suyo si alguna de sus **compañías** está en el filtro, de la **red usada** si no tiene ninguna pero sí la red que usa una de ellas, y si no, no sale. Solo los suyos tienen **celda** y cuentan en las **zonas** y las **agrupaciones**.
 - Una **fuente** produce **observaciones** en cada **ejecución de ingesta**. Una **corrección** es una observación.
 - La **fusión** convierte observaciones en **emplazamientos**, con su **confianza**, sus **conflictos** y su **estado**.
 - Una **zona de barrido** tiene uno o varios **cuadros**, y cada cuadro es de una sola zona. Un **barrido** recorre los cuadros de una zona y solo cuenta ausencias a las **observaciones** que caen en ellos.
@@ -392,7 +392,7 @@ _Evitar_: clientes, carga
 ## Ambigüedades señaladas
 
 - En telecomunicaciones, «celda» suele ser lo que aquí es un sector con su banda, y así la usaba el documento de UX v0 (`celda-ux.html`). Celda la usa como la zona de un emplazamiento. El «identificador de celda» de los datos técnicos conserva el sentido técnico, y la historia de usuario «ver la medida unida a la celda que me da servicio» se lee como unida al sector que da servicio.
-- La celda se calcula entre todos los emplazamientos, no por compañía (decidido el 26/09/2026). Desde el 04/10/2026, con un filtro de compañías, entre los que salen con el filtro, también los de la red usada (ADR 0026): son las celdas de una compañía, con la red que usa, o de las que se comparan, nunca cinco teselados a la vez. Junto a los emplazamientos de DIGI son una aproximación, porque el móvil prefiere su propia red donde la tiene. El mapa dibuja un marcador por emplazamiento, y con celdas por compañía saldrían cinco teselados superpuestos que se cruzan, justo las capas que se descartaron en los prototipos. Un móvil se conecta a las estaciones base de su compañía, así que la celda no es la zona a la que da servicio: esa pregunta, por compañía y banda, la contesta la vista de interferencia.
+- La celda se calcula entre todos los emplazamientos, no por compañía (decidido el 26/09/2026). Desde el 04/10/2026, con un filtro de compañías, entre los de las compañías del filtro (ADR 0026): son las celdas de una compañía o de las que se comparan, nunca cinco teselados a la vez. El mapa dibuja un marcador por emplazamiento, y con celdas por compañía saldrían cinco teselados superpuestos que se cruzan, justo las capas que se descartaron en los prototipos. Un móvil se conecta a las estaciones base de su compañía, así que la celda no es la zona a la que da servicio: esa pregunta, por compañía y banda, la contesta la vista de interferencia.
 - En un emplazamiento compartido cada compañía puede orientar sus sectores de otra forma. Falta decidir de qué estación base salen los tres sectores en que se divide la celda.
 - El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. Queda por decidir si los textos de primer uso lo aceptan como palabra de entrada.
 - Los ADR 0014 y 0015 y la investigación 08 llaman «celdas de 1°» a los cuadros y «grupos» a las zonas de barrido. Se escribieron antes de fijar estas palabras; «celda» ya era la de un emplazamiento.

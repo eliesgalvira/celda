@@ -59,11 +59,7 @@ export const pedirCeldas = (
 /** Una celda en GeoJSON, con la clave de su emplazamiento. */
 export interface CeldaEnMapa {
   readonly type: "Feature";
-  readonly properties: {
-    readonly clave: string;
-    /** Si el emplazamiento es de la red usada: su celda se dibuja más clara (ADR 0026). */
-    readonly redUsada: boolean;
-  };
+  readonly properties: { readonly clave: string };
   // Arrays modificables, como los tipos GeoJSON que acepta MapLibre.
   readonly geometry: {
     readonly type: "Polygon";
@@ -204,15 +200,13 @@ export const provinciasQueFaltan = (
 /**
  * Las celdas calculadas, de vuelta en longitud y latitud. El anillo de cada polígono se cierra
  * repitiendo su primer vértice, como pide GeoJSON, y va en sentido antihorario. Una celda vacía
- * (un emplazamiento repetido) no se dibuja, ni una de `sin`, las dudosas. Las de `redUsada`
- * llevan `redUsada: true`, y el mapa las dibuja más claras.
+ * (un emplazamiento repetido) no se dibuja, ni una de `sin`, las dudosas.
  */
 export const celdasEnMapa = (
   resultado: ResultadoCeldas,
   emplazamientos: ReadonlyArray<EmplazamientoDeCapa>,
   origen: Coordenada,
   sin: ReadonlyMap<string, unknown> = new Map(),
-  redUsada: ReadonlySet<string> = new Set(),
 ): CeldasEnMapa => ({
   type: "FeatureCollection",
   features: emplazamientos.flatMap((emplazamiento, k): Array<CeldaEnMapa> => {
@@ -231,7 +225,7 @@ export const celdasEnMapa = (
     return [
       {
         type: "Feature",
-        properties: { clave: emplazamiento.clave, redUsada: redUsada.has(emplazamiento.clave) },
+        properties: { clave: emplazamiento.clave },
         geometry: { type: "Polygon", coordinates: [anillo] },
       },
     ];

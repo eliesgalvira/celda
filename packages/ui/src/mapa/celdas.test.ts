@@ -31,21 +31,13 @@ const mapaDePrueba = () => {
   return { mapa, filtros, pinturas };
 };
 
-/**
- * La opacidad final de una expresión de fundido por zoom, con la foto aérea o sin ella, de una
- * celda propia o de la red usada.
- */
+/** La opacidad final de una expresión de fundido por zoom, con la foto aérea o sin ella. */
 const opacidadFinal = (
   valor: DataDrivenPropertyValueSpecification<number> | undefined,
   foto = false,
-  redUsada = false,
 ) => {
   const resuelto = conLaFoto(valor, foto);
-  const final: unknown = Array.isArray(resuelto) ? resuelto.at(-1) : resuelto;
-  if (!Array.isArray(final)) return Number(final);
-  // `["case", ["==", ["get", "redUsada"], true], deLaRedUsada, propia]`
-  assert.deepStrictEqual(final.slice(0, 2), ["case", ["==", ["get", "redUsada"], true]]);
-  return Number(redUsada ? final[2] : final[3]);
+  return Array.isArray(resuelto) ? Number(resuelto.at(-1)) : Number(resuelto);
 };
 
 describe("capas de las celdas", () => {
@@ -90,20 +82,6 @@ describe("capas de las celdas", () => {
 
     remarcarCelda(mapa, null);
     assert.strictEqual(opacidadFinal(pinturas.get("celdas.line-opacity")), normal);
-  });
-
-  it("las celdas de la red usada van a la mitad de opacidad, con selección y sin ella", () => {
-    const { mapa, pinturas } = mapaDePrueba();
-    for (const clave of [null, "movistar-0802532"]) {
-      remarcarCelda(mapa, clave);
-      for (const capa of ["celdas", "celdas-casco"]) {
-        for (const foto of [false, true]) {
-          const valor = pinturas.get(`${capa}.line-opacity`);
-          const propia = opacidadFinal(valor, foto);
-          assert.closeTo(opacidadFinal(valor, foto, true), propia / 2, 0.02, `${capa} ${clave}`);
-        }
-      }
-    }
   });
 
   it("sobre la foto aérea las líneas suben de opacidad y llevan un casco claro, que sin ella no se ve", () => {
