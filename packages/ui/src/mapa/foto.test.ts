@@ -54,7 +54,9 @@ describe("foto aérea en el estilo", () => {
   });
 
   it("encendida, las vías son líneas finas y claras, sin borde, y las autopistas amarillas", () => {
-    for (const id of ["vias", "vias-borde"]) {
+    const deVias = ids.filter((id) => /^vias-(borde-)?[a-z]+$/u.test(id) && id !== "vias-foto");
+    assert.isAbove(deVias.length, 10);
+    for (const id of deVias) {
       assert.strictEqual(visibilidad(id, false), "visible", id);
       assert.strictEqual(visibilidad(id, true), "none", id);
     }

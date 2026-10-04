@@ -188,7 +188,7 @@ const porClase = (valor: (via: ClaseDeVia) => Salida, defecto: Salida): Expressi
 
 /**
  * Una propiedad que cambia con el zoom y con la clase: en cada parada de cualquier clase, el valor
- * de cada una. Así todas las vías van en una sola capa, que MapLibre dibuja de una vez por tesela.
+ * de cada una. Solo en `vias-foto`, que solo existe con la foto encendida.
  */
 const porZoomYClase = (
   base: number,
@@ -203,37 +203,93 @@ const porZoomYClase = (
   ]),
 ];
 
-/** Cada vía, desde el zoom de su clase; los caminos, solo los peatonales. */
+/** El grosor del borde: el del relleno más `BORDE` en cada parada. */
+const conBorde = (pares: ReadonlyArray<number>): Array<number> =>
+  pares.map((valor, k) => (k % 2 === 0 ? valor : valor + BORDE));
+
+/** El orden dentro de `vias-foto`: la clase más importante, encima. */
+const ORDEN = porClase((via) => CLASES_DE_VIAS.indexOf(via), 0);
+
+/** Las vías de una clase; las calles peatonales llegan como caminos (`path`) peatonales. */
+const deLaClase = (via: ClaseDeVia): ExpressionSpecification =>
+  via.clase === "path"
+    ? ["all", ["==", ["get", "class"], "path"], ["==", ["get", "subclass"], "pedestrian"]]
+    : ["==", ["get", "class"], via.clase];
+
+/** Un grosor en píxeles que crece con el zoom como en Google: pares de zoom y grosor. */
+const grosorPorZoom = (pares: ReadonlyArray<number>): ExpressionSpecification => [
+  "interpolate",
+  ["exponential", 1.5],
+  ["zoom"],
+  ...pares,
+];
+
+/** Las capas de una clase de vía: su borde, si lo tiene, y su relleno. */
+interface CapasDeLaClase {
+  readonly borde: ReadonlyArray<LayerSpecification>;
+  readonly relleno: LayerSpecification;
+}
+
+/**
+ * El borde y el relleno de una clase. Tienen el mismo filtro, la misma disposición y los mismos
+ * zooms, así que MapLibre saca sus líneas del mismo cubo: cada tesela parte, manda al hilo
+ * principal y sube a la GPU las vías una vez y no dos. Las calles peatonales no llevan borde.
+ */
+const capasDeLaClase = (fuente: string, color: ColorDeToken, via: ClaseDeVia): CapasDeLaClase => {
+  const comun = {
+    type: "line",
+    source: fuente,
+    "source-layer": "transportation",
+    minzoom: via.desde,
+    filter: deLaClase(via),
+    layout: { ...REDONDO, visibility: ocultaConFoto },
+  } as const;
+  return {
+    borde: Number.isFinite(via.bordeDesde)
+      ? [
+          {
+            ...comun,
+            id: `vias-borde-${via.clase}`,
+            paint: {
+              "line-color": color(via.borde),
+              "line-width": grosorPorZoom(conBorde(via.grosor)),
+              "line-opacity": porZoom(via.bordeDesde, 0, via.bordeDesde + 1, 1),
+            },
+          },
+        ]
+      : [],
+    relleno: {
+      ...comun,
+      id: `vias-${via.clase}`,
+      // Las peatonales entran en medio zoom, como los caminos.
+      paint:
+        via.clase === "path"
+          ? {
+              "line-color": color(via.relleno),
+              "line-width": grosorPorZoom(via.grosor),
+              "line-opacity": porZoom(14, 0, 14.6, 1),
+            }
+          : { "line-color": color(via.relleno), "line-width": grosorPorZoom(via.grosor) },
+    },
+  };
+};
+
+/** Las vías sobre la foto: todas las clases, cada una desde su zoom. */
 const VIAS: ExpressionSpecification = [
   "all",
   ["any", ["!=", ["get", "class"], "path"], ["==", ["get", "subclass"], "pedestrian"]],
   porClase((via) => [">=", ["zoom"], via.desde], false),
 ];
 
-/** El grosor del borde: el del relleno más `BORDE` en cada parada. */
-const conBorde = (pares: ReadonlyArray<number>): Array<number> =>
-  pares.map((valor, k) => (k % 2 === 0 ? valor : valor + BORDE));
-
-/** La opacidad del borde: nada hasta `bordeDesde` y entero un zoom después. */
-const opacidadDelBorde = (via: ClaseDeVia): ReadonlyArray<number> =>
-  Number.isFinite(via.bordeDesde) ? [via.bordeDesde, 0, via.bordeDesde + 1, 1] : [0, 0];
-
-/** La opacidad del relleno: las peatonales entran en medio zoom, como los caminos. */
-const opacidadDelRelleno = (via: ClaseDeVia): ReadonlyArray<number> =>
-  via.clase === "path" ? [14, 0, 14.6, 1] : [0, 1];
-
-/** El orden dentro de la capa: la clase más importante, encima. */
-const ORDEN = porClase((via) => CLASES_DE_VIAS.indexOf(via), 0);
-
 /**
  * Las capas de las vías: el tren y los caminos, todos los bordes debajo y los rellenos encima, de
- * la clase menos importante a la más, para que los cruces no se corten con un borde. Bordes y
- * rellenos van en una capa cada uno, con el color, el grosor y el orden por clase: con una capa
- * por clase, el mapa gastaba un tercio más de JavaScript por fotograma al acercar (#61).
+ * la clase menos importante a la más, para que los cruces no se corten con un borde.
  *
- * Bordes y rellenos tienen el mismo filtro y la misma disposición, así que MapLibre saca sus
- * líneas del mismo cubo: cada tesela parte, manda al hilo principal y sube a la GPU las vías una
- * vez y no dos (#67). Las calles peatonales no llevan borde porque su borde es transparente.
+ * Cada clase va en sus capas, con su color, su grosor y su opacidad fijos o según el zoom. El #61
+ * las juntó en dos capas con el color, el grosor y la opacidad por clase, y así MapLibre guardaba
+ * esos tres valores en cada vértice de cada vía, para los bordes y para los rellenos: en
+ * Barcelona a z12, 25 MB más que las propias líneas, que había que mandar del worker al hilo
+ * principal y subir a la GPU en cada tesela que llega (#67).
  *
  * Con la foto aérea encendida, bordes y rellenos se esconden y se ve `vias-foto`, con líneas finas
  * y claras; el tren y los caminos pasan a blanco translúcido.
@@ -241,74 +297,51 @@ const ORDEN = porClase((via) => CLASES_DE_VIAS.indexOf(via), 0);
 export const capasVias = (
   fuente: string,
   color: ColorDeToken,
-): ReadonlyArray<LayerSpecification> => [
-  {
-    id: "tren",
-    type: "line",
-    source: fuente,
-    "source-layer": "transportation",
-    minzoom: 9,
-    filter: ["all", deClase("rail"), ["!=", ["get", "brunnel"], "tunnel"]],
-    paint: {
-      "line-color": conFoto(color("mapa-tren"), color("mapa-foto-linea")),
-      "line-width": porZoom(9, 0.6, 14, 1.2, 18, 2),
-      "line-opacity": conFoto(1, 0.45),
+): ReadonlyArray<LayerSpecification> => {
+  const clases = CLASES_DE_VIAS.map((via) => capasDeLaClase(fuente, color, via));
+  return [
+    {
+      id: "tren",
+      type: "line",
+      source: fuente,
+      "source-layer": "transportation",
+      minzoom: 9,
+      filter: ["all", deClase("rail"), ["!=", ["get", "brunnel"], "tunnel"]],
+      paint: {
+        "line-color": conFoto(color("mapa-tren"), color("mapa-foto-linea")),
+        "line-width": porZoom(9, 0.6, 14, 1.2, 18, 2),
+        "line-opacity": conFoto(1, 0.45),
+      },
     },
-  },
-  {
-    id: "caminos",
-    type: "line",
-    source: fuente,
-    "source-layer": "transportation",
-    minzoom: 14,
-    filter: ["all", deClase("path", "track"), ["!=", ["get", "subclass"], "pedestrian"]],
-    paint: {
-      "line-color": conFoto(color("mapa-camino"), color("mapa-foto-linea")),
-      "line-width": porZoom(14, 0.6, 18, 1.6),
-      "line-dasharray": [2, 1.5],
-      "line-opacity": porZoom(14, 0, 14.6, conFoto(1, 0.35)),
+    {
+      id: "caminos",
+      type: "line",
+      source: fuente,
+      "source-layer": "transportation",
+      minzoom: 14,
+      filter: ["all", deClase("path", "track"), ["!=", ["get", "subclass"], "pedestrian"]],
+      paint: {
+        "line-color": conFoto(color("mapa-camino"), color("mapa-foto-linea")),
+        "line-width": porZoom(14, 0.6, 18, 1.6),
+        "line-dasharray": [2, 1.5],
+        "line-opacity": porZoom(14, 0, 14.6, conFoto(1, 0.35)),
+      },
     },
-  },
-  {
-    id: "vias-borde",
-    type: "line",
-    source: fuente,
-    "source-layer": "transportation",
-    minzoom: 4,
-    filter: VIAS,
-    layout: { ...REDONDO, "line-sort-key": ORDEN, visibility: ocultaConFoto },
-    paint: {
-      "line-color": porClase((via) => color(via.borde), color("mapa-calle-borde")),
-      "line-width": porZoomYClase(1.5, (via) => conBorde(via.grosor)),
-      "line-opacity": porZoomYClase(1, opacidadDelBorde),
+    ...clases.flatMap((capas) => capas.borde),
+    ...clases.map((capas) => capas.relleno),
+    {
+      id: "vias-foto",
+      type: "line",
+      source: fuente,
+      "source-layer": "transportation",
+      minzoom: 4,
+      filter: VIAS,
+      layout: { ...REDONDO, "line-sort-key": ORDEN, visibility: visibleConFoto },
+      paint: {
+        "line-color": porClase((via) => color(via.sobreLaFoto.color), color("mapa-foto-linea")),
+        "line-width": porZoomYClase(1, (via) => via.sobreLaFoto.grosor),
+        "line-opacity": porZoomYClase(1, (via) => via.sobreLaFoto.opacidad),
+      },
     },
-  },
-  {
-    id: "vias",
-    type: "line",
-    source: fuente,
-    "source-layer": "transportation",
-    minzoom: 4,
-    filter: VIAS,
-    layout: { ...REDONDO, "line-sort-key": ORDEN, visibility: ocultaConFoto },
-    paint: {
-      "line-color": porClase((via) => color(via.relleno), color("mapa-calle")),
-      "line-width": porZoomYClase(1.5, (via) => via.grosor),
-      "line-opacity": porZoomYClase(1, opacidadDelRelleno),
-    },
-  },
-  {
-    id: "vias-foto",
-    type: "line",
-    source: fuente,
-    "source-layer": "transportation",
-    minzoom: 4,
-    filter: VIAS,
-    layout: { ...REDONDO, "line-sort-key": ORDEN, visibility: visibleConFoto },
-    paint: {
-      "line-color": porClase((via) => color(via.sobreLaFoto.color), color("mapa-foto-linea")),
-      "line-width": porZoomYClase(1, (via) => via.sobreLaFoto.grosor),
-      "line-opacity": porZoomYClase(1, (via) => via.sobreLaFoto.opacidad),
-    },
-  },
-];
+  ];
+};
