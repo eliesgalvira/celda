@@ -214,6 +214,16 @@ Medido el 04/10/2026 con `gzip -9`, contra `celda/v1` construida igual.
 - **Contorno de la Comunitat Valenciana:** 3.599 bytes con gzip, en su propio trozo. Lo importa `mapaBase.ts` y el buscador lo pide con `import()` al llegar su primera respuesta. Solo importa `poligono.ts`, sin dependencias: con `barrio.ts`, Vite sacaba a otro trozo lo que comparte con la primera pantalla y abrir costaba 7,1 KB, no 4,7.
 - **Estilo.** La expresión del nombre, con el contorno de 506 vértices, va en el `text-field` y en el filtro de las capas de lugares y en el `text-field` de los barrios. `within` solo se evalúa para los `name` con «/».
 
+## Límites de comunidades y provincias (#65)
+
+Medido el 04/10/2026 contra `celda/v1` (con la foto aérea del #64), con la build local servida como en Vercel (`tools/rendimiento/src/sitio.ts`), una capa sintética de 20.000 emplazamientos y OpenFreeMap de verdad, en Chromium sin interfaz con SwiftShader, a 390 × 844 y a 1400 × 900.
+
+- **El fichero.** `assets/limites-<huella>.json`: 19.811 bytes, 8.021 con `gzip -9` (6.968 con brotli). Llegan 8.321 bytes con las cabeceras, con `cache-control: public, max-age=31536000, immutable`. Son 79 líneas de comunidad y 68 de provincia. El ADR 0023 daba 20.569 y 8.179: el del prototipo llevaba además los puntos de las provincias.
+- **Cuándo se pide.** En el mismo milisegundo del primer `idle` de MapLibre, y las líneas están en la fuente de 10 a 30 ms después: en el móvil, primer pintado a 0,8 s, `idle` a 3,4 s y límites a 3,44 s; en el escritorio, 0,3, 3,89 y 3,92 s. Una sola petición en toda la visita, también tras nueve saltos de z5,5 a z14, encender y apagar la foto y volver a z6.
+- **JavaScript.** El trozo de la primera pantalla crece 0,5 KB con `gzip -9` (211.413 → 211.942 bytes): las capas de los límites, que van en el estilo. El del mapa, otros 0,5 KB (296.860 → 297.364): la carga y la lectura del fichero.
+- **Capas.** Cuatro capas de línea más, entre el suelo y las vías: país, comunidades, provincias y municipios.
+- **Quieto.** Al abrir y tras acercar, alejar y encender y apagar la foto, 20 s quieto en el móvil y en el escritorio: 0 peticiones, 0 `render` de MapLibre y 0 llamadas a `fetch`, XHR, `requestAnimationFrame`, `setTimeout`, `setInterval` y `postMessage`.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.
