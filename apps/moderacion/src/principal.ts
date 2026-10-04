@@ -82,8 +82,9 @@ const publicado = Layer.unwrap(
 );
 
 const programa = lanzarModerar(process.argv.slice(2)).pipe(
-  Effect.provide(Layer.mergeAll(buzon, publicado, salidaDelProceso)),
-  Effect.provide(NodeServices.layer),
+  Effect.provide(
+    Layer.mergeAll(buzon, publicado, salidaDelProceso).pipe(Layer.provideMerge(NodeServices.layer)),
+  ),
 );
 
 NodeRuntime.runMain(programa, { disableErrorReporting: true });
