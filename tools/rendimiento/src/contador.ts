@@ -26,6 +26,8 @@ declare global {
     __resistencia: {
       /** Cuántas veces se ha llamado a cada API desde que cargó la página. */
       readonly cuentas: () => Readonly<Record<string, number>>;
+      /** Los fotogramas pedidos que aún no han llegado ni se han cancelado. */
+      readonly fotogramasPendientes: () => number;
       /** Empieza a lanzar lecturas de la brújula, diez por segundo, girando poco a poco. */
       readonly girar: () => void;
     };
@@ -60,7 +62,32 @@ export const instalarContador = (): void => {
 
   contarEn(window, "setTimeout", "setTimeout", window.setTimeout);
   contarEn(window, "setInterval", "setInterval", window.setInterval);
-  contarEn(window, "requestAnimationFrame", "requestAnimationFrame", window.requestAnimationFrame);
+  // Los fotogramas se cuentan al pedirlos y se apuntan hasta que llegan: el mapa pide uno, y deja
+  // de escuchar su cancelación, al pintarlo. Uno pendiente es que la página aún no está quieta.
+  const pendientes = new Set<number>();
+  const pedirFotograma = window.requestAnimationFrame.bind(window);
+  const cancelarFotograma = window.cancelAnimationFrame.bind(window);
+  contarEn(
+    window,
+    "requestAnimationFrame",
+    "requestAnimationFrame",
+    (llamada: FrameRequestCallback) => {
+      const id = pedirFotograma((instante) => {
+        pendientes.delete(id);
+        llamada(instante);
+      });
+      pendientes.add(id);
+      return id;
+    },
+  );
+  Object.defineProperty(window, "cancelAnimationFrame", {
+    configurable: true,
+    writable: true,
+    value: (id: number) => {
+      pendientes.delete(id);
+      cancelarFotograma(id);
+    },
+  });
   contarEn(window, "fetch", "fetch", window.fetch);
   const eventos = EventTarget.prototype;
   contarEn(eventos, "addEventListener", "addEventListener", eventos.addEventListener);
@@ -82,6 +109,7 @@ export const instalarContador = (): void => {
   let rumbo = 0;
   window.__resistencia = {
     cuentas: () => ({ ...cuentas }),
+    fotogramasPendientes: () => pendientes.size,
     girar: () => {
       setIntervalOriginal(() => {
         rumbo = (rumbo + 1) % 360;

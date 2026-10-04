@@ -17,7 +17,10 @@ import { conFoto } from "./expresiones.ts";
  * y llevan debajo un casco claro, de 3 px las de todas y de 5 px el de la seleccionada.
  *
  * Con un filtro de compañías, las celdas de la red usada (`redUsada` en sus propiedades) van a la
- * mitad de opacidad, como sus emplazamientos van más claros (ADR 0026). La seleccionada, no.
+ * mitad de opacidad, como sus emplazamientos van más claros (ADR 0026). La seleccionada, no. Van en
+ * capas aparte, con un filtro fijo, y no con una opacidad que lea `redUsada`: una pintura que
+ * depende de cada celda hace que MapLibre vuelva a maquetar en sus workers todas las teselas de la
+ * fuente con cada `setPaintProperty`, y sin fundido.
  */
 
 /** La fuente GeoJSON de las celdas. Cada polígono lleva la `clave` de su emplazamiento. */
@@ -34,21 +37,18 @@ export const ZOOM_CELDAS = 15;
 const FUNDIDO = 0.5;
 
 const CAPA_BORDES = "celdas";
+const CAPA_BORDES_RED_USADA = "celdas-red-usada";
 const CAPA_SELECCIONADA = "celda-seleccionada";
 /** El contorno discontinuo de la seleccionada, que la sustituye con la vista de interferencia. */
 const CAPA_SELECCIONADA_CONTORNO = "celda-seleccionada-contorno";
 /** Los cascos claros, que solo se ven sobre la foto aérea. */
 const CAPA_CASCO = "celdas-casco";
+const CAPA_CASCO_RED_USADA = "celdas-red-usada-casco";
 const CAPA_SELECCIONADA_CASCO = "celda-seleccionada-casco";
 
-/** Si la celda es de un emplazamiento de la red usada. */
-const DE_LA_RED_USADA: ExpressionSpecification = ["==", ["get", "redUsada"], true];
-
-/** Una opacidad que va más clara en las celdas de la red usada. */
-const conRedUsada = (
-  propia: ExpressionSpecification,
-  redUsada: ExpressionSpecification,
-): ExpressionSpecification => ["case", DE_LA_RED_USADA, redUsada, propia];
+/** Las celdas de los emplazamientos propios y las de la red usada, cada una en sus capas. */
+const DE_LA_RED_USADA: FilterSpecification = ["==", ["get", "redUsada"], true];
+const PROPIAS: FilterSpecification = ["!=", ["get", "redUsada"], true];
 
 /**
  * Opacidad de las líneas de todas las celdas, sin selección y con ella, y de su casco. Sin la foto
@@ -56,12 +56,16 @@ const conRedUsada = (
  */
 const OPACIDAD_BORDES = {
   normal: {
-    bordes: conRedUsada(conFoto(0.45, 0.85), conFoto(0.22, 0.42)),
-    casco: conRedUsada(conFoto(0, 0.5), conFoto(0, 0.25)),
+    bordes: conFoto(0.45, 0.85),
+    casco: conFoto(0, 0.5),
+    bordesRedUsada: conFoto(0.22, 0.42),
+    cascoRedUsada: conFoto(0, 0.25),
   },
   apagada: {
-    bordes: conRedUsada(conFoto(0.14, 0.22), conFoto(0.07, 0.11)),
-    casco: conRedUsada(conFoto(0, 0.12), conFoto(0, 0.06)),
+    bordes: conFoto(0.14, 0.22),
+    casco: conFoto(0, 0.12),
+    bordesRedUsada: conFoto(0.07, 0.11),
+    cascoRedUsada: conFoto(0, 0.06),
   },
 } as const;
 
@@ -97,6 +101,7 @@ export const capasCeldas = (
     type: "line",
     source: FUENTE_CELDAS,
     minzoom: ZOOM_CELDAS,
+    filter: PROPIAS,
     layout: { "line-join": "round" },
     paint: {
       "line-color": colorCasco,
@@ -105,10 +110,37 @@ export const capasCeldas = (
     },
   },
   {
+    id: CAPA_CASCO_RED_USADA,
+    type: "line",
+    source: FUENTE_CELDAS,
+    minzoom: ZOOM_CELDAS,
+    filter: DE_LA_RED_USADA,
+    layout: { "line-join": "round" },
+    paint: {
+      "line-color": colorCasco,
+      "line-width": 3,
+      "line-opacity": conFundido(OPACIDAD_BORDES.normal.cascoRedUsada),
+    },
+  },
+  {
+    id: CAPA_BORDES_RED_USADA,
+    type: "line",
+    source: FUENTE_CELDAS,
+    minzoom: ZOOM_CELDAS,
+    filter: DE_LA_RED_USADA,
+    layout: { "line-join": "round" },
+    paint: {
+      "line-color": color,
+      "line-width": 1,
+      "line-opacity": conFundido(OPACIDAD_BORDES.normal.bordesRedUsada),
+    },
+  },
+  {
     id: CAPA_BORDES,
     type: "line",
     source: FUENTE_CELDAS,
     minzoom: ZOOM_CELDAS,
+    filter: PROPIAS,
     layout: { "line-join": "round" },
     paint: {
       "line-color": color,
@@ -176,6 +208,8 @@ export const remarcarCelda = (mapa: MapaConCeldas, clave: string | null): void =
   const opacidad = clave === null ? OPACIDAD_BORDES.normal : OPACIDAD_BORDES.apagada;
   mapa.setPaintProperty(CAPA_BORDES, "line-opacity", conFundido(opacidad.bordes));
   mapa.setPaintProperty(CAPA_CASCO, "line-opacity", conFundido(opacidad.casco));
+  mapa.setPaintProperty(CAPA_BORDES_RED_USADA, "line-opacity", conFundido(opacidad.bordesRedUsada));
+  mapa.setPaintProperty(CAPA_CASCO_RED_USADA, "line-opacity", conFundido(opacidad.cascoRedUsada));
 };
 
 /** Lo que hace falta del mapa de MapLibre para ocultar las celdas. */
@@ -196,7 +230,14 @@ export const ocultarCeldasSalvoContorno = (
   soloContorno: boolean,
 ): void => {
   const normal = soloContorno ? "none" : "visible";
-  for (const capa of [CAPA_CASCO, CAPA_BORDES, CAPA_SELECCIONADA_CASCO, CAPA_SELECCIONADA]) {
+  for (const capa of [
+    CAPA_CASCO,
+    CAPA_CASCO_RED_USADA,
+    CAPA_BORDES_RED_USADA,
+    CAPA_BORDES,
+    CAPA_SELECCIONADA_CASCO,
+    CAPA_SELECCIONADA,
+  ]) {
     mapa.setLayoutProperty(capa, "visibility", normal);
   }
   mapa.setLayoutProperty(

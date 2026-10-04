@@ -13,10 +13,12 @@ import { servirSitio } from "./sitio.ts";
 
 /**
  * Prueba de resistencia: abre Celda en Chromium sin interfaz, como un Android con el permiso de
- * ubicación dado, abre un emplazamiento, enciende el GPS, la brújula y la vista de interferencia
- * con las celdas calculadas, y la deja quieta. Mientras tanto el GPS da una lectura por segundo en
- * el mismo sitio y la brújula diez por segundo. Cuenta las llamadas a las API que abren algo y
- * falla si alguna crece más de lo que justifican esas lecturas. Ver docs/patterns/efectos.md.
+ * ubicación dado, abre un emplazamiento, enciende el GPS y la brújula, filtra por Digi (sus celdas
+ * cuentan también las de Movistar, la red que usa), abre la vista de interferencia con las celdas
+ * calculadas, espera a que la página quede quieta y la deja así. Mientras tanto el GPS da una
+ * lectura por segundo en el mismo sitio y la brújula diez por segundo. Cuenta las llamadas a las
+ * API que abren algo y falla si alguna crece más de lo que justifican esas lecturas, o si la página
+ * no llega a quedarse quieta. Ver docs/patterns/efectos.md.
  *
  *   pnpm run resistencia [--web ../../apps/web/dist] [--segundos 30] [--chromium <ruta>]
  *
@@ -86,6 +88,37 @@ const mapaBaseFalso = async (ruta: Route) => {
 
 const cuentas = (pagina: Page) => pagina.evaluate(() => window.__resistencia.cuentas());
 
+/** Tiempo sin que crezca nada, salvo `setTimeout`, y sin fotogramas pendientes: página quieta. */
+const QUIETA_MS = 2000;
+/** Lo más que se espera, tras prepararla, a que la página quede quieta. */
+const MAXIMO_HASTA_QUIETA_MS = 30_000;
+
+/**
+ * Espera a que acabe lo que ha abierto la preparación: los cálculos, las teselas que MapLibre
+ * maqueta en sus workers y el último fotograma que pinta. Con una pausa fija, en una máquina lenta
+ * ese fotograma llegaba ya dentro de la ventana quieta y su `removeEventListener` contaba como
+ * algo abierto sin que nadie tocara nada. Devuelve las API que seguían creciendo si no se queda
+ * quieta a tiempo: eso ya es un bucle.
+ */
+const esperarQuieta = async (pagina: Page): Promise<ReadonlyArray<Contada> | undefined> => {
+  const desde = Date.now();
+  let anterior = await cuentas(pagina);
+  let quietaDesde = Date.now();
+  let crecen: ReadonlyArray<Contada> = [];
+  while (Date.now() - desde < MAXIMO_HASTA_QUIETA_MS) {
+    await pausa(250);
+    const ahora = await cuentas(pagina);
+    const pendientes = await pagina.evaluate(() => window.__resistencia.fotogramasPendientes());
+    crecen = CONTADAS.filter(
+      (api) => api !== "setTimeout" && (ahora[api] ?? 0) !== (anterior[api] ?? 0),
+    );
+    anterior = ahora;
+    if (crecen.length > 0 || pendientes > 0) quietaDesde = Date.now();
+    else if (Date.now() - quietaDesde >= QUIETA_MS) return undefined;
+  }
+  return crecen.length > 0 ? crecen : ["requestAnimationFrame"];
+};
+
 const esperarTexto = (pagina: Page, texto: RegExp) =>
   pagina.getByText(texto).first().waitFor({ state: "visible", timeout: 20_000 });
 
@@ -149,13 +182,25 @@ const principal = async () => {
     if (await continuar.isVisible()) await continuar.click();
     await esperarTexto(pagina, /Brújula del móvil/u);
 
+    // Con Digi, las celdas se calculan con los suyos y los de Movistar, la red que usa (ADR 0026).
+    await pagina.getByRole("button", { name: "Compañías" }).click();
+    await pagina.getByRole("button", { name: /^Digi/u }).click();
+    await pagina.keyboard.press("Escape");
+    await esperarTexto(pagina, /Solo Digi/u);
+
     const funciones = pagina.getByRole("button", { name: "Funciones" });
     if (await funciones.isVisible()) await funciones.click();
     await pagina.getByRole("button", { name: /^Interferencia/u }).click();
     await esperarTexto(pagina, /frente a interferencia/u);
 
-    // Que acaben las transiciones y los cálculos de lo que se ha abierto.
-    await pausa(3000);
+    // Que acaben las transiciones, los cálculos y el pintado de lo que se ha abierto.
+    const sinAsentarse = await esperarQuieta(pagina);
+    if (sinAsentarse !== undefined) {
+      fallo = true;
+      console.log(
+        `✗ En ${MAXIMO_HASTA_QUIETA_MS / 1000} s la página no se quedó quieta: seguían creciendo ${sinAsentarse.join(", ")}.\n`,
+      );
+    }
     const antes = await cuentas(pagina);
 
     // QUIETO: nadie toca nada; el GPS repite el mismo sitio con otra precisión
