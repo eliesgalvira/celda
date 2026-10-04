@@ -7,6 +7,7 @@ import type {
 } from "maplibre-gl";
 
 import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
+import { conLaFoto } from "../pruebas/foto.ts";
 import { estiloMapa, FUENTE_MAPA_BASE } from "./estilo.ts";
 import { capasLimites, FUENTE_LIMITES, lineasDeLimites } from "./limites.ts";
 import { capasSuelo } from "./suelo.ts";
@@ -36,7 +37,9 @@ const enZoom = (
   return valorEnZoom(valor.slice(3).map(Number), zoom, 1);
 };
 
-const opacidad = (id: string, zoom: number) => enZoom(linea(id).paint?.["line-opacity"], zoom, 1);
+/** La opacidad de una capa en `zoom`, con la foto aérea apagada o encendida. */
+const opacidad = (id: string, zoom: number, foto = false) =>
+  enZoom(conLaFoto(linea(id).paint?.["line-opacity"], foto), zoom, 1);
 const grosor = (id: string, zoom: number) => enZoom(linea(id).paint?.["line-width"], zoom, 1);
 
 /** Si una capa de límites se ve en `zoom`: dentro de sus zooms y con opacidad. */
@@ -142,6 +145,26 @@ describe("límites en el mapa", () => {
     assert.strictEqual(opacidad("limites-municipios", 11.2), 1);
   });
 
+  it("con la foto aérea van todos en blanco y más translúcidos; sin ella, con sus tokens", () => {
+    for (const [id, token] of [
+      ["limites-municipios", "mapa-limite-municipio"],
+      ["limites-provincias", "mapa-limite-provincia"],
+      ["limites-comunidades", "mapa-limite-comunidad"],
+      ["limites-pais", "mapa-limite-pais"],
+    ] as const) {
+      const color = linea(id).paint?.["line-color"];
+      assert.strictEqual(conLaFoto(color, true), "mapa-foto-linea", id);
+      assert.strictEqual(conLaFoto(color, false), token, id);
+    }
+    assert.closeTo(opacidad("limites-comunidades", 9, true), 0.85, 1e-9);
+    assert.closeTo(opacidad("limites-comunidades", 13, true), 0.5, 1e-9);
+    assert.closeTo(opacidad("limites-provincias", 9, true), 0.6, 1e-9);
+    assert.closeTo(opacidad("limites-provincias", 13, true), 0.35, 1e-9);
+    assert.closeTo(opacidad("limites-municipios", 12, true), 0.45, 1e-9);
+    assert.closeTo(opacidad("limites-pais", 6, true), 0.9, 1e-9);
+    assert.strictEqual(opacidad("limites-pais", 6), 1);
+  });
+
   it("del zoom 5 al 14 siempre se ve algún límite de dentro de España", () => {
     for (let zoom = 5; zoom <= 14; zoom += 0.1) {
       assert.isTrue(
@@ -160,13 +183,14 @@ describe("límites en el mapa", () => {
       data: { type: "FeatureCollection", features: [] },
     });
     const ids = estilo.layers.map((c) => c.id);
+    const desde = ids.indexOf("limites-municipios");
     const suelo = capasSuelo(FUENTE_MAPA_BASE, () => "#000").map((c) => c.id);
     const vias = capasVias(FUENTE_MAPA_BASE, () => "#000").map((c) => c.id);
     assert.deepStrictEqual(
-      ids.slice(suelo.length, suelo.length + capas.length),
+      ids.slice(desde, desde + capas.length),
       capas.map((c) => c.id),
     );
-    assert.deepStrictEqual(ids.slice(0, suelo.length), suelo);
-    assert.strictEqual(ids[suelo.length + capas.length], vias[0]);
+    for (const id of suelo) assert.isBelow(ids.indexOf(id), desde, id);
+    assert.strictEqual(ids[desde + capas.length], vias[0]);
   });
 });

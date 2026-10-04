@@ -1,7 +1,7 @@
 import type { LimitesDeComunidadesYProvincias } from "@celda/dominio/limites";
 import type { ExpressionSpecification, FilterSpecification, LayerSpecification } from "maplibre-gl";
 
-import { porZoom } from "./expresiones.ts";
+import { conFoto, porZoom } from "./expresiones.ts";
 import type { ColorDeToken } from "./tokens.ts";
 
 /**
@@ -76,14 +76,18 @@ const deTipo = (tipo: TipoDeLimite): FilterSpecification => ["==", ["get", "limi
 
 /**
  * Comunidades y provincias, enteras hasta el zoom 11,5 y al 60 % desde el 12,5: entonces ya se
- * ven los municipios, que van a su escala.
+ * ven los municipios, que van a su escala. Sobre la foto aérea van en blanco y translúcidas, como
+ * en el modo híbrido de Google: las comunidades al 85 % y al 50 %, y las provincias al 60 % y al
+ * 35 %, para que se lean sin tapar la foto.
  */
-const OPACIDAD_PROPIA = porZoom(11.5, 1, 12.5, 0.6);
+const opacidadPropia = (conLaFoto: number, conLaFotoDeCerca: number) =>
+  porZoom(11.5, conFoto(1, conLaFoto), 12.5, conFoto(0.6, conLaFotoDeCerca));
 
 /**
  * Las capas de los límites, de abajo arriba: municipios, provincias, comunidades y país. Van entre
  * el suelo y las vías. Los municipios, discontinuos, entran del zoom 10,5 al 11,2; las provincias
- * son finas y discontinuas, y las comunidades, más gruesas y continuas.
+ * son finas y discontinuas, y las comunidades, más gruesas y continuas. Con la foto aérea
+ * encendida, todas van en blanco (`--mapa-foto-linea`).
  */
 export const capasLimites = (
   fuente: string,
@@ -98,10 +102,10 @@ export const capasLimites = (
     filter: deNivel(8),
     layout: { "line-join": "round" },
     paint: {
-      "line-color": color("mapa-limite-municipio"),
+      "line-color": conFoto(color("mapa-limite-municipio"), color("mapa-foto-linea")),
       "line-width": porZoom(11, 0.6, 16, 1.2),
       "line-dasharray": [3, 2],
-      "line-opacity": porZoom(10.5, 0, 11.2, 1),
+      "line-opacity": porZoom(10.5, 0, 11.2, conFoto(1, 0.45)),
     },
   },
   {
@@ -111,10 +115,10 @@ export const capasLimites = (
     filter: deTipo("provincia"),
     layout: { "line-join": "round" },
     paint: {
-      "line-color": color("mapa-limite-provincia"),
+      "line-color": conFoto(color("mapa-limite-provincia"), color("mapa-foto-linea")),
       "line-width": porZoom(4, 0.6, 9, 1.1, 14, 1.6),
       "line-dasharray": [4, 2],
-      "line-opacity": OPACIDAD_PROPIA,
+      "line-opacity": opacidadPropia(0.6, 0.35),
     },
   },
   {
@@ -124,9 +128,9 @@ export const capasLimites = (
     filter: deTipo("comunidad"),
     layout: { "line-join": "round" },
     paint: {
-      "line-color": color("mapa-limite-comunidad"),
+      "line-color": conFoto(color("mapa-limite-comunidad"), color("mapa-foto-linea")),
       "line-width": porZoom(4, 1, 9, 1.8, 14, 2.4),
-      "line-opacity": OPACIDAD_PROPIA,
+      "line-opacity": opacidadPropia(0.85, 0.5),
     },
   },
   {
@@ -137,8 +141,9 @@ export const capasLimites = (
     filter: deNivel(2, ["!=", ["get", "disputed"], 1]),
     layout: { "line-join": "round" },
     paint: {
-      "line-color": color("mapa-limite-pais"),
+      "line-color": conFoto(color("mapa-limite-pais"), color("mapa-foto-linea")),
       "line-width": porZoom(4, 1, 8, 1.8, 14, 2.6),
+      "line-opacity": conFoto(1, 0.9),
     },
   },
 ];
