@@ -172,6 +172,7 @@ const abrirContexto = async (
 
 const frenar = async (cdp: CDPSession, cpu: number) => {
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: cpu });
+  await cdp.send("Performance.enable");
   await cdp.send("Network.enable");
   await cdp.send("Network.emulateNetworkConditions", opciones.red === "sin" ? RED.sin : RED.fast4g);
 };
@@ -212,7 +213,28 @@ const seguirRed = (pagina: Page) => {
   };
 };
 
-const resumirFotogramas = (datos: FotogramasEnPagina) => {
+/** El tiempo del hilo principal en un gesto, en ms: todas sus tareas, el guion y estilo y maquetación. */
+interface TiempoDelHilo {
+  readonly tareas: number;
+  readonly guion: number;
+  readonly estilo: number;
+}
+
+/**
+ * Lo que lleva trabajado el hilo principal de la página, de `Performance.getMetrics` de CDP. Es
+ * más estable que los fps: no depende de en qué fotograma cae cada tarea.
+ */
+const tiempoDelHilo = async (cdp: CDPSession): Promise<TiempoDelHilo> => {
+  const { metrics } = await cdp.send("Performance.getMetrics");
+  const segundos = (nombre: string) => metrics.find((m) => m.name === nombre)?.value ?? 0;
+  return {
+    tareas: segundos("TaskDuration") * 1000,
+    guion: segundos("ScriptDuration") * 1000,
+    estilo: (segundos("RecalcStyleDuration") + segundos("LayoutDuration")) * 1000,
+  };
+};
+
+const resumirFotogramas = (datos: FotogramasEnPagina, hilo: TiempoDelHilo) => {
   const intervalos = [...datos.intervalos].sort((a, b) => a - b);
   const p = (q: number) =>
     intervalos[Math.min(intervalos.length - 1, Math.floor(q * intervalos.length))] ?? 0;
@@ -233,6 +255,7 @@ const resumirFotogramas = (datos: FotogramasEnPagina) => {
       guion: "",
     }),
     nodos: datos.nodos,
+    hilo,
   };
 };
 
@@ -270,11 +293,18 @@ const grabar = async (
     await cdp.send("Profiler.setSamplingInterval", { interval: 200 });
     await cdp.send("Profiler.start");
   }
+  const antes = await tiempoDelHilo(cdp);
   await pagina.evaluate(() => window.__celda.empezar());
   await accion();
   // Lo que pasa al asentarse (el `moveend`, el cambio de nivel) también cuenta.
   await esperar(900);
   const datos = await pagina.evaluate(() => window.__celda.parar());
+  const despues = await tiempoDelHilo(cdp);
+  const hilo = {
+    tareas: despues.tareas - antes.tareas,
+    guion: despues.guion - antes.guion,
+    estilo: despues.estilo - antes.estilo,
+  };
   if (opciones.perfil !== undefined) {
     const { profile } = await cdp.send("Profiler.stop");
     await NodeFSP.mkdir(opciones.perfil, { recursive: true });
@@ -306,8 +336,8 @@ const grabar = async (
     resumen = resumirTraza(eventos.traceEvents);
   }
   return resumen === undefined
-    ? { fotogramas: resumirFotogramas(datos) }
-    : { fotogramas: resumirFotogramas(datos), traza: resumen };
+    ? { fotogramas: resumirFotogramas(datos, hilo) }
+    : { fotogramas: resumirFotogramas(datos, hilo), traza: resumen };
 };
 
 const CENTRO = PANTALLA.centro;
@@ -405,7 +435,7 @@ const medirMemoria = async (pagina: Page, cdp: CDPSession) => {
       return medir === undefined ? undefined : (await medir.call(performance)).bytes;
     })
     .catch(() => undefined);
-  await cdp.send("Performance.enable");
+  // `frenar` ya ha encendido `Performance` en esta sesión.
   const { metrics } = await cdp.send("Performance.getMetrics");
   const hilo = metrics.find((m) => m.name === "JSHeapUsedSize")?.value;
   return { total, hilo };
@@ -1197,8 +1227,8 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
       );
     }
     lineas.push(
-      "\n| Gesto | fps | fps por ronda | p95 ms | máx ms | >20 ms | >50 ms | LoAF | peor LoAF |",
-      "|---|---|---|---|---|---|---|---|---|",
+      "\n| Gesto | fps | fps por ronda | hilo ms (guion · estilo) | hilo por ronda | p95 ms | máx ms | >20 ms | >50 ms | LoAF | peor LoAF |",
+      "|---|---|---|---|---|---|---|---|---|---|---|",
     );
     for (const gesto of Object.keys(suyas[0]?.gestos ?? {})) {
       const g = (leer: (x: Fotogramas) => number) =>
@@ -1213,7 +1243,7 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
         `| ${gesto} | ${f(
           g((x) => x.fps),
           1,
-        )} | ${dispersion(suyas.map((r) => r.gestos[gesto]?.fps))} | ${f(
+        )} | ${dispersion(suyas.map((r) => r.gestos[gesto]?.fps))} | ${f(g((x) => x.hilo.tareas))} (${f(g((x) => x.hilo.guion))} · ${f(g((x) => x.hilo.estilo))}) | ${dispersion(suyas.map((r) => r.gestos[gesto]?.hilo.tareas))} | ${f(
           g((x) => x.p95),
           1,
         )} | ${f(g((x) => x.maximo))} | ${f(g((x) => x.perdidos))} | ${f(g((x) => x.mas50))} | ${f(g((x) => x.loaf))} | ${peor === undefined || peor.duracion === 0 ? "—" : `${Math.round(peor.duracion)} ms (estilo ${Math.round(peor.estilo)}) ${peor.guion}`} |`,
