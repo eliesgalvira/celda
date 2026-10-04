@@ -19,15 +19,16 @@ import {
   provinciaDePrueba,
 } from "../capa/pruebas.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
+import type { CeldasEnMapa } from "../celdas/celdas.ts";
 import { crearCeldas } from "../celdas/enMapa.ts";
 import { ProveedorDeDatos, usarDatos } from "../datos.tsx";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 import {
+  celdasDelFiltro,
   crearFiltro,
   ESPERA_DEL_FILTRO_MS,
   type FiltroDelMapa,
-  propiosDelFiltro,
 } from "./enMapa.ts";
 
 const en = (clave: string, longitud: number, ...companias: ReadonlyArray<Compania>) => ({
@@ -47,6 +48,7 @@ const CAPA: CapaDePrueba = {
     en("d", 2.165, "digi"),
     en("d2", 2.175, "digi"),
     en("o", 2.18, "orange"),
+    en("y", 2.185, "yoigo"),
   ],
   barrios: [],
   fuenteDeBarrios: FUENTE_DE_BARRIOS,
@@ -73,6 +75,8 @@ interface Mandos {
   readonly filtro: FiltroDelMapa;
   /** Cada filtro que ha dibujado el mapa, en orden. */
   readonly aplicados: ReadonlyArray<string>;
+  /** Las celdas que ha dibujado el mapa, en orden. */
+  readonly dibujadas: ReadonlyArray<CeldasEnMapa>;
 }
 
 function Prueba(props: {
@@ -91,16 +95,24 @@ function Prueba(props: {
   createEffect(filtro.aplicado, (actual) => {
     aplicados.push(claveDeFiltro(actual));
   });
+  const dibujadas: Array<CeldasEnMapa> = [];
+  const deLasCeldas = celdasDelFiltro(
+    (): ReadonlyArray<EmplazamientoLeido> => provincia.capa.emplazamientos,
+    filtro.aplicado,
+  );
   crearCeldas(datos, {
-    lienzo: () => ({ dibujar: () => undefined, remarcar: () => undefined }),
-    emplazamientos: propiosDelFiltro(
-      (): ReadonlyArray<EmplazamientoLeido> => provincia.capa.emplazamientos,
-      filtro.aplicado,
-    ),
+    lienzo: () => ({
+      dibujar: (celdas) => {
+        dibujadas.push(celdas);
+      },
+      remarcar: () => undefined,
+    }),
+    emplazamientos: () => deLasCeldas().emplazamientos,
+    redUsada: () => deLasCeldas().redUsada,
     cerca: () => true,
     seleccionada: () => null,
   });
-  props.mandos({ filtro, aplicados });
+  props.mandos({ filtro, aplicados, dibujadas });
   return null;
 }
 
@@ -149,21 +161,60 @@ const montar = async (guardado: ReadonlyArray<Compania> = SIN_FILTRO, automatico
 const celdasPedidas = (worker: ReturnType<typeof workerDePrueba>) => worker.recibidas();
 
 describe("filtro de compañías en el mapa (ADR 0026)", () => {
-  it("el guardado vale al abrir, sin esperar, y las celdas salen solo con los suyos", async () => {
+  it("el guardado vale al abrir, sin esperar, y las celdas salen con los suyos y su red", async () => {
     const m = await montar(["digi"], false);
     // En el primer `flush` ya es el guardado: no hay espera.
     assert.strictEqual(m.aplicados.at(-1), "digi");
     await esperar(() => assert.deepStrictEqual(m.pedidas, ["08 digi"]));
     await esperar(() => assert.lengthOf(m.worker.pendientes(), 1));
-    // Solo los dos de Digi: los de Movistar, su red, no entran en las celdas.
+    // Los dos de Digi y los dos de Movistar, su red: el móvil puede conectarse a estos.
     const params = leerParams(m.worker.pendientes()[0]?.params);
     const cuantos = Option.match(params, {
       onNone: () => -1,
       onSome: (p) => p.emplazamientos.length,
     });
-    assert.strictEqual(cuantos, 2);
+    assert.strictEqual(cuantos, 4);
     assert.strictEqual(celdasPedidas(m.worker), 1);
     m.desmontar();
+  });
+
+  /** Las celdas dibujadas con un filtro guardado: la clave de cada una y si va más clara. */
+  const celdasCon = async (guardado: ReadonlyArray<Compania>) => {
+    const m = await montar(guardado);
+    await esperar(() => assert.isAbove(m.dibujadas.at(-1)?.features.length ?? 0, 0));
+    const celdas = Object.fromEntries(
+      (m.dibujadas.at(-1)?.features ?? []).map((c) => [c.properties.clave, c.properties.redUsada]),
+    );
+    m.desmontar();
+    return celdas;
+  };
+
+  it("solo Digi: celdas de los suyos y, más claras, de los de Movistar", async () => {
+    assert.deepStrictEqual(await celdasCon(["digi"]), { m: true, mv: true, d: false, d2: false });
+  });
+
+  it("solo Yoigo: celdas de los suyos y, más claras, de los de Orange", async () => {
+    assert.deepStrictEqual(await celdasCon(["yoigo"]), { o: true, y: false });
+  });
+
+  it("Digi y Movistar: cada emplazamiento tiene una celda, ninguna más clara", async () => {
+    assert.deepStrictEqual(await celdasCon(["movistar", "digi"]), {
+      m: false,
+      mv: false,
+      d: false,
+      d2: false,
+    });
+  });
+
+  it("todas: una celda por emplazamiento, ninguna más clara", async () => {
+    assert.deepStrictEqual(await celdasCon(SIN_FILTRO), {
+      m: false,
+      mv: false,
+      d: false,
+      d2: false,
+      o: false,
+      y: false,
+    });
   });
 
   it("varios toques seguidos dibujan solo el último, una vez, y el Worker no ve los de paso", async () => {

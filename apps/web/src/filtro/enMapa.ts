@@ -1,10 +1,10 @@
 import type { Compania } from "@celda/dominio/compania";
 import {
   claveDeFiltro,
+  deLasCeldas,
   type FiltroDeCompanias,
   hayFiltro,
   mismoFiltro,
-  separarPorPapel,
   SIN_FILTRO,
 } from "@celda/dominio/filtro";
 import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
@@ -134,10 +134,13 @@ export const crearFiltro = (
 };
 
 /**
- * Los emplazamientos de una lista que son de las compañías del filtro: con ellos se calculan las
- * celdas (ADR 0026). La red usada no entra: es aparte. Sin filtro, todos.
+ * Los emplazamientos de una lista con que se calculan las celdas con el filtro: los que salen, también
+ * los de la red usada, y aparte las claves de estos, cuyas celdas van más claras (ADR 0026). Sin
+ * filtro, todos.
  */
-export const propiosDelFiltro = <E extends { readonly companias: ReadonlyArray<Compania> }>(
+export const celdasDelFiltro = <
+  E extends { readonly clave: string; readonly companias: ReadonlyArray<Compania> },
+>(
   lista: () => ReadonlyArray<E>,
   filtro: () => FiltroDeCompanias,
-) => createMemo(() => separarPorPapel(lista(), filtro()).propios);
+) => createMemo(() => deLasCeldas(lista(), filtro()));

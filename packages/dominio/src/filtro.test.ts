@@ -7,6 +7,7 @@ import {
   combinacionesDe,
   conmutarCompania,
   contarConFiltro,
+  deLasCeldas,
   hayFiltro,
   mismoFiltro,
   nombresDelFiltro,
@@ -115,6 +116,47 @@ describe("filtro de compañías", () => {
       textoDeRedUsada({ compania: "digi", red: "movistar" }),
       "Digi usa aquí la red de Movistar",
     );
+  });
+
+  describe("los emplazamientos de las celdas", () => {
+    const deCeldas = (filtro: ReadonlyArray<Compania>) => {
+      const { emplazamientos, redUsada } = deLasCeldas(TODOS, filtro);
+      return { claves: claves(emplazamientos), redUsada: [...redUsada] };
+    };
+
+    it("solo Digi: los suyos y los de Movistar que usa, en su orden, y estos más claros", () => {
+      assert.deepStrictEqual(deCeldas(["digi"]), {
+        claves: ["m", "d", "mv", "md"],
+        redUsada: ["m", "mv"],
+      });
+    });
+
+    it("solo Yoigo: los suyos y los de Orange", () => {
+      assert.deepStrictEqual(deCeldas(["yoigo"]), {
+        claves: ["o", "y", "oy"],
+        redUsada: ["o"],
+      });
+    });
+
+    it("Digi y Movistar: cada uno una vez y ninguno aparte, también el compartido", () => {
+      const { claves: lista, redUsada } = deCeldas(["movistar", "digi"]);
+      assert.deepStrictEqual(lista, ["m", "d", "mv", "md"]);
+      assert.strictEqual(new Set(lista).size, lista.length);
+      assert.deepStrictEqual(redUsada, []);
+    });
+
+    it("todas: la misma lista, sin ninguno aparte", () => {
+      const { emplazamientos, redUsada } = deLasCeldas(TODOS, SIN_FILTRO);
+      assert.strictEqual(emplazamientos, TODOS);
+      assert.strictEqual(redUsada.size, 0);
+    });
+
+    it("solo Movistar: solo los suyos, como en el mapa", () => {
+      assert.deepStrictEqual(deCeldas(["movistar"]), {
+        claves: ["m", "mv", "md"],
+        redUsada: [],
+      });
+    });
   });
 
   it("el marcador resalta las compañías del filtro y las redes que usan", () => {
