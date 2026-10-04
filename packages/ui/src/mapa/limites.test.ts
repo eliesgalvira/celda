@@ -145,7 +145,7 @@ describe("límites en el mapa", () => {
     assert.strictEqual(opacidad("limites-municipios", 11.2), 1);
   });
 
-  it("con la foto aérea van todos en blanco y más translúcidos; sin ella, con sus tokens", () => {
+  it("con la foto aérea van todos en blanco; sin ella, con sus tokens", () => {
     for (const [id, token] of [
       ["limites-municipios", "mapa-limite-municipio"],
       ["limites-provincias", "mapa-limite-provincia"],
@@ -156,12 +156,12 @@ describe("límites en el mapa", () => {
       assert.strictEqual(conLaFoto(color, true), "mapa-foto-linea", id);
       assert.strictEqual(conLaFoto(color, false), token, id);
     }
-    assert.closeTo(opacidad("limites-comunidades", 9, true), 0.85, 1e-9);
-    assert.closeTo(opacidad("limites-comunidades", 13, true), 0.5, 1e-9);
-    assert.closeTo(opacidad("limites-provincias", 9, true), 0.6, 1e-9);
-    assert.closeTo(opacidad("limites-provincias", 13, true), 0.35, 1e-9);
-    assert.closeTo(opacidad("limites-municipios", 12, true), 0.45, 1e-9);
-    assert.closeTo(opacidad("limites-pais", 6, true), 0.9, 1e-9);
+    assert.closeTo(opacidad("limites-comunidades", 9, true), 0.95, 1e-9);
+    assert.closeTo(opacidad("limites-comunidades", 13, true), 0.7, 1e-9);
+    assert.closeTo(opacidad("limites-provincias", 9, true), 0.8, 1e-9);
+    assert.closeTo(opacidad("limites-provincias", 13, true), 0.55, 1e-9);
+    assert.closeTo(opacidad("limites-municipios", 12, true), 0.7, 1e-9);
+    assert.strictEqual(opacidad("limites-pais", 6, true), 1);
     assert.strictEqual(opacidad("limites-pais", 6), 1);
   });
 

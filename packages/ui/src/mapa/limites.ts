@@ -76,9 +76,9 @@ const deTipo = (tipo: TipoDeLimite): FilterSpecification => ["==", ["get", "limi
 
 /**
  * Comunidades y provincias, enteras hasta el zoom 11,5 y al 60 % desde el 12,5: entonces ya se
- * ven los municipios, que van a su escala. Sobre la foto aérea van en blanco y translúcidas, como
- * en el modo híbrido de Google: las comunidades al 85 % y al 50 %, y las provincias al 60 % y al
- * 35 %, para que se lean sin tapar la foto.
+ * ven los municipios, que van a su escala. Sobre la foto aérea van en blanco, algo translúcidas
+ * para no tapar la foto: las comunidades al 95 % y al 70 %, y las provincias al 80 % y al 55 %.
+ * El prototipo las ponía al 85 % y al 60 %, y sobre la foto de una ciudad apenas se leían.
  */
 const opacidadPropia = (conLaFoto: number, conLaFotoDeCerca: number) =>
   porZoom(11.5, conFoto(1, conLaFoto), 12.5, conFoto(0.6, conLaFotoDeCerca));
@@ -105,7 +105,7 @@ export const capasLimites = (
       "line-color": conFoto(color("mapa-limite-municipio"), color("mapa-foto-linea")),
       "line-width": porZoom(11, 0.6, 16, 1.2),
       "line-dasharray": [3, 2],
-      "line-opacity": porZoom(10.5, 0, 11.2, conFoto(1, 0.45)),
+      "line-opacity": porZoom(10.5, 0, 11.2, conFoto(1, 0.7)),
     },
   },
   {
@@ -118,7 +118,7 @@ export const capasLimites = (
       "line-color": conFoto(color("mapa-limite-provincia"), color("mapa-foto-linea")),
       "line-width": porZoom(4, 0.6, 9, 1.1, 14, 1.6),
       "line-dasharray": [4, 2],
-      "line-opacity": opacidadPropia(0.6, 0.35),
+      "line-opacity": opacidadPropia(0.8, 0.55),
     },
   },
   {
@@ -130,7 +130,7 @@ export const capasLimites = (
     paint: {
       "line-color": conFoto(color("mapa-limite-comunidad"), color("mapa-foto-linea")),
       "line-width": porZoom(4, 1, 9, 1.8, 14, 2.4),
-      "line-opacity": opacidadPropia(0.85, 0.5),
+      "line-opacity": opacidadPropia(0.95, 0.7),
     },
   },
   {
@@ -143,7 +143,6 @@ export const capasLimites = (
     paint: {
       "line-color": conFoto(color("mapa-limite-pais"), color("mapa-foto-linea")),
       "line-width": porZoom(4, 1, 8, 1.8, 14, 2.6),
-      "line-opacity": conFoto(1, 0.9),
     },
   },
 ];

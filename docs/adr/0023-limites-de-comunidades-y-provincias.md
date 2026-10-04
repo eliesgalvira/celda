@@ -22,7 +22,7 @@ Celda ya tiene en git los límites del IGN de los 8.132 municipios, partidos en 
 - **El fichero** lleva la fuente del IGN, la tolerancia, las unidades (milésimas de grado) y dos listas de líneas en diferencias, `comunidades` y `provincias`, con el formato `LimitesDeComunidadesYProvincias` de `packages/dominio/src/limites.ts`. Son 79 líneas de comunidad y 68 de provincia: 19.811 bytes, 8.021 con `gzip -9`, sin los puntos de las provincias que llevaba el del prototipo. `limitesReal.test.ts` comprueba que está al día, el tipo de once vecindades conocidas, que ningún tramo sale dos veces y que no pasa de 22.600 bytes ni de 9.000 con gzip.
 - **La carga.** `mapaBase.ts` importa el fichero con `?url`, así que Vite lo deja en `assets/` con la huella en el nombre y `vercel.json` le da la caché inmutable. Lo pide tras el primer `idle` y lo guarda para la visita (`apps/web/src/mapa/limites.ts`): si el mapa se vuelve a crear, recibe las mismas líneas sin pedir nada. Si falla, el siguiente mapa lo vuelve a pedir.
 - **El país** no estaba en el mapa base de `celda/v1` y entra con el resto de los límites, del nivel 2 de OpenFreeMap.
-- **Sobre la foto aérea** (#64) las cuatro clases van en blanco (`--mapa-foto-linea`) y translúcidas, con `conFoto` en cada capa: el país al 90 %, las comunidades al 85 % y las provincias al 60 % (al 50 % y al 35 % desde z12,5), y los municipios al 45 %.
+- **Sobre la foto aérea** (#64) las cuatro clases van en blanco (`--mapa-foto-linea`), con `conFoto` en cada capa: el país entero, las comunidades al 95 % y las provincias al 80 % (al 70 % y al 55 % desde z12,5), y los municipios al 70 %. Las opacidades del prototipo, más bajas, apenas se leían sobre la foto de una ciudad.
 
 ## Consecuencias
 
