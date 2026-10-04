@@ -231,6 +231,10 @@ const ORDEN = porClase((via) => CLASES_DE_VIAS.indexOf(via), 0);
  * rellenos van en una capa cada uno, con el color, el grosor y el orden por clase: con una capa
  * por clase, el mapa gastaba un tercio más de JavaScript por fotograma al acercar (#61).
  *
+ * Bordes y rellenos tienen el mismo filtro y la misma disposición, así que MapLibre saca sus
+ * líneas del mismo cubo: cada tesela parte, manda al hilo principal y sube a la GPU las vías una
+ * vez y no dos (#67). Las calles peatonales no llevan borde porque su borde es transparente.
+ *
  * Con la foto aérea encendida, bordes y rellenos se esconden y se ve `vias-foto`, con líneas finas
  * y claras; el tren y los caminos pasan a blanco translúcido.
  */
@@ -271,7 +275,7 @@ export const capasVias = (
     source: fuente,
     "source-layer": "transportation",
     minzoom: 4,
-    filter: ["all", VIAS, ["!=", ["get", "class"], "path"]],
+    filter: VIAS,
     layout: { ...REDONDO, "line-sort-key": ORDEN, visibility: ocultaConFoto },
     paint: {
       "line-color": porClase((via) => color(via.borde), color("mapa-calle-borde")),

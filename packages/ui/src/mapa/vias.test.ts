@@ -56,6 +56,23 @@ describe("capas de las vías", () => {
     assert.strictEqual(CLASES_DE_VIAS.at(-2)?.clase, "trunk");
   });
 
+  it("bordes y rellenos salen del mismo cubo: el mismo filtro, la misma disposición y los mismos zooms", () => {
+    const borde = capa("vias-borde");
+    const relleno = capa("vias");
+    assert.deepStrictEqual(borde?.type === "line" ? borde.filter : undefined, relleno?.type === "line" ? relleno.filter : undefined);
+    assert.deepStrictEqual(borde?.type === "line" ? borde.layout : undefined, relleno?.type === "line" ? relleno.layout : undefined);
+    assert.strictEqual(borde?.minzoom, relleno?.minzoom);
+    assert.strictEqual(borde?.maxzoom, relleno?.maxzoom);
+  });
+
+  it("las calles peatonales no tienen borde: el suyo es transparente en todas las paradas", () => {
+    const borde = capa("vias-borde");
+    const opacidad = borde?.type === "line" ? borde.paint?.["line-opacity"] : undefined;
+    const valores = valoresEnParadas(opacidad, "path");
+    assert.isAbove(valores.size, 0);
+    for (const valor of valores.values()) assert.strictEqual(valor, 0);
+  });
+
   it("sobre la foto cada clase tiene en su capa el grosor fino que le toca en sus paradas", () => {
     const foto = capa("vias-foto");
     const anchos = foto?.type === "line" ? foto.paint?.["line-width"] : undefined;
