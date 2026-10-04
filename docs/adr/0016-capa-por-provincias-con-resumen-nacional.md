@@ -103,6 +103,10 @@ La capa de provincia no lleva la marca: solo guarda las bandas conocidas, y una 
 
 La marca sale de la fusión (`EstacionBase.sinFichaEnRegistro`), así que marcarla, cambiar su fecha o quitarla cambia el emplazamiento y su ficha sale en la versión siguiente. Las comprobaciones siguen la espera de los reintentos (ADR 0014): un día, dos, cuatro, y así hasta 30. Son pocas versiones más.
 
+## Combinaciones de compañías (#69, 04/10/2026)
+
+El resumen lleva, por provincia, cuántos emplazamientos hay con cada combinación exacta de compañías (`provincias.combinaciones`), para contar de lejos con el filtro de compañías sin descargar ninguna capa. **El formato sigue siendo el 5**, como con `sinFichaEnRegistro`: es una clave opcional que la web de antes descarta y sin la que la nueva se las arregla. Una vigente sin ella se vuelve a publicar entera aunque no cambien los datos. Los detalles, en el [ADR 0026](0026-filtro-de-companias-con-la-red-que-usan.md).
+
 ## Consecuencias
 
 - Abrir la web descarga el resumen (de 2 a 4 KB con gzip, según cuántas zonas lleve) y las provincias de la vista inicial, no toda España.

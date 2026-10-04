@@ -97,7 +97,8 @@ La ortofoto PNOA del IGN como función aparte, apagada al abrir (ADR 0022). Va e
 - Los colores son los oficiales, en tokens `--compania-*`, iguales en los dos temas. Sobre la foto aérea los separa del fondo el borde blanco y la sombra de cada marcador.
 - Los créditos del mapa y la ficha, en «De dónde salen los datos», dicen que las marcas son de sus titulares y que Celda no está afiliada a ninguna (`AVISO_DE_MARCAS` en `@celda/dominio/compania`). En los créditos sale con la primera provincia que llega, que es cuando aparecen los logos, y en el móvil va en su forma corta.
 - Las condiciones de DIGI solo dejan reproducir su logotipo citando su web con un enlace. Donde puede salir, se cita: en los créditos del mapa, mientras alguna provincia que ha llegado tiene emplazamientos de DIGI, y en la ficha de un emplazamiento con DIGI («Logotipo de DIGI: digimobil.es», `CITA_DEL_LOGO_DE_DIGI`). Los dos avisos son créditos con `aviso`: van sin «©», y el de las marcas, sin enlace.
-- `MarcadorEmplazamiento` es un botón de 44 px con el logo a 34 px. No lleva el dibujo dentro: usa con `<use>` un símbolo que `CapaDeMarcadores` dibuja una vez por combinación de compañías. Con 700 marcadores a la vista son unos 3.000 nodos en lugar de unos 15.000.
+- `MarcadorEmplazamiento` es un botón de 44 px con el logo a 34 px. No lleva el dibujo dentro: usa con `<use>` un símbolo que `CapaDeMarcadores` dibuja una vez por logo (`LogoDeMarcador`: una combinación de compañías y, con un filtro, las que resalta). Con 700 marcadores a la vista son unos 3.000 nodos en lugar de unos 15.000.
+- Con un filtro de compañías (ADR 0026), el logo de un compartido apaga al 30 % las porciones de las compañías que no están en el filtro (`resaltadas`), y el símbolo lleva detrás las que resalta (`celda-logo-movistar-vodafone--vodafone`). Los de la red usada van con `tono="red-usada"`: el logo al 55 % y a 0,82, y la agrupación clara, con el borde discontinuo de `--tinta-suave` y al 80 %. Ver «Filtro de compañías».
 - `CapaDeMarcadores` monta la lámina dentro del contenedor del mapa con un `Portal`. Fuera de él, la rueda y los arrastres que empiezan sobre un marcador no llegan al mapa.
 - Una clase de posición que choca con la diana (`absolute` frente a `relative`) se une con `cn`, no con el `class` de `cva`: sin `tailwind-merge` gana la que llegue antes en el CSS, y los marcadores quedaban en fila.
 - `CapaDeMarcadores` lleva `isolate`: el `z-index` de los marcadores no compite con la cabecera ni con los controles.
@@ -291,11 +292,22 @@ Las piezas están en `buzon/Compartir.tsx`; cuándo se usan, en `apps/web/src/bu
 - La columna de la derecha reserva 12,5 rem de alto: pasar de un estado de la brújula a otro mueve poco la ficha. En el móvil el dial mide 6,5 rem y en escritorio 7,5.
 - La barra que simula el giro es el `Deslizador` de `Eleccion.tsx`, con la etiqueta «Simular el giro».
 
+## Filtro de compañías
+
+Las piezas están en `filtro/FiltroDeCompanias.tsx`; cuándo se usan, en `apps/web/src/filtro` (ADR 0026).
+
+- **La pastilla «Compañías»** (`MenuDeCompanias`), con un embudo (`IconoCompanias`), va la primera en `botonUbicacion`, encima de «Foto aérea». Lleva `aria-expanded` y, con un filtro puesto, `aria-pressed`. Abre encima un panel como el de «Ubicación» que no se cierra al tocar un chip, para poder elegir varias; Escape o un toque fuera lo cierran, y el foco vuelve a la pastilla. Al abrirse lleva el foco al primer chip pulsado.
+- **Los chips** (`ChipDeCompania`) son botones con `aria-pressed`, rectangulares y claros con borde de tinta, como los controles, con el logo a 22 px y el nombre escrito: no se confunden con los marcadores, que son redondos o hexagonales. Pulsado, en el primario. El de una compañía que no se ve lleva el logo al 40 % y en gris. Van en un `fieldset` con su `legend` («Compañías que se ven»), y debajo un `<output aria-live="polite">` dice qué se ve y una nota cómo se usa o qué sale aparte (`PanelDeCompanias`). El chip «Todas» lleva un hexágono oscuro en lugar de un logo.
+- **Desde todas, tocar una deja solo esa**; después cada toque añade o quita una. Lo decide `conmutarCompania` (`@celda/dominio/filtro`).
+- **El aviso** (`AvisoDeFiltro`) va bajo la fecha de los datos, en el sitio `filtro` de `DisposicionMapa`, solo con un filtro puesto: «Solo Movistar» en un `<output>` y «Ver todas», que lo quita de un toque. Con una red aparte, o con datos de antes de las combinaciones mirando de lejos, una línea más en `--tinta-suave` sobre `--control` (par en `mapa/color.test.ts`). Es un control, claro y con borde, como las pastillas.
+- **La ficha** de un emplazamiento de la red usada lo explica bajo el resumen, con `RedUsadaFicha`: un párrafo con el borde izquierdo discontinuo de las agrupaciones de la red.
+- Los textos están en `apps/web/src/filtro/textos.ts`, en castellano llano: «Más claros: la red de Movistar, que usa Digi.» No hablan de itinerancia ni de cómo se calcula.
+
 ## Controles del mapa
 
 Los controles eran hexágonos oscuros como las agrupaciones, en una columna de siete que tapaba grupos del mapa. Se probaron tres disposiciones en el móvil (28/09/2026; la rama `celda/diseno-logo-controles` las conserva en su historia) y se eligió la de un menú:
 
-- Abajo a la derecha solo hay dos pastillas claras: «Ubicación», que se usa también con la ficha abierta, y «Funciones». `MenuDeControles` despliega encima el resto, una fila por control con una línea que explica qué hace (`detalle`). Se cierra al usar uno, con Escape o tocando fuera.
+- Abajo a la derecha hay cuatro pastillas claras: «Compañías» (ver «Filtro de compañías»), «Foto aérea», «Ubicación», que se usa también con la ficha abierta, y «Funciones». `MenuDeControles` despliega encima el resto, una fila por control con una línea que explica qué hace (`detalle`). Se cierra al usar uno, con Escape o tocando fuera.
 - En escritorio, Acercar y Alejar van a la vista en dos losas pequeñas sobre «Ubicación». En el móvil van dentro de «Funciones», porque el mapa se amplía con dos dedos; así quien no puede hacer el gesto sigue teniendo un botón.
 - `ControlDelMapa` es el botón. Su aspecto lo pone `DisposicionMapa` con el contexto `AspectoDeControl`: `pastilla`, `zoom` o `fila`. Una pantalla solo pasa los controles en `zoom`, `controles`, `botonUbicacion` y `controlesSecundarios`.
 - Son claros (`--control`, `--control-tinta` y `--control-borde`) para no confundirse con las agrupaciones, que son los datos. `mapa/color.test.ts` exige 3:1 (WCAG 1.4.11) entre el borde y cada fondo del mapa, y entre el relleno y una agrupación.
