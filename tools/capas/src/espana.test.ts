@@ -3,7 +3,7 @@ import { areaKm2 } from "@celda/dominio/poblacion";
 import { assert, describe, it } from "@effect/vitest";
 import * as Result from "effect/Result";
 
-import { contornoDeEspana, type ContornoDeEspana, ficheroDeEspana } from "./espana.ts";
+import { contornoDeLaUnion, type Contorno, ficheroDeContorno } from "./espana.ts";
 import { unidadesDelGml } from "./gml.ts";
 import { limitesDelIgn } from "./municipios.ts";
 import {
@@ -31,7 +31,7 @@ const limitesDe = (municipios: ReadonlyArray<UnidadDePrueba>) =>
     ),
   );
 
-const dentro = (contorno: ContornoDeEspana, longitud: number, latitud: number) =>
+const dentro = (contorno: Contorno, longitud: number, latitud: number) =>
   contorno.coordinates.some((poligono) => dentroDelPoligono({ longitud, latitud }, poligono));
 
 /** Dos vecinos de unos 9 km² entre los dos, un islote de 0,2 km² y una isla de casi 4 km². */
@@ -43,7 +43,7 @@ const LIMITES = limitesDe([
 
 describe("contorno de España", () => {
   it("une los vecinos en un solo polígono, sin el límite que comparten", () => {
-    const contorno = Result.getOrThrow(contornoDeEspana(LIMITES, 400, 1));
+    const contorno = Result.getOrThrow(contornoDeLaUnion(LIMITES, 400, 1));
     assert.strictEqual(contorno.type, "MultiPolygon");
     assert.strictEqual(contorno.coordinates.length, 2);
     const vecinos = contorno.coordinates.find((poligono) =>
@@ -59,7 +59,7 @@ describe("contorno de España", () => {
   });
 
   it("cada anillo es un polígono cerrado y en el sentido contrario a las agujas del reloj", () => {
-    const contorno = Result.getOrThrow(contornoDeEspana(LIMITES, 400, 1));
+    const contorno = Result.getOrThrow(contornoDeLaUnion(LIMITES, 400, 1));
     for (const [anillo = [], ...agujeros] of contorno.coordinates) {
       assert.deepStrictEqual(agujeros, []);
       assert.deepStrictEqual(anillo[0], anillo.at(-1));
@@ -78,7 +78,7 @@ describe("contorno de España", () => {
       municipio("001", [rectangulo(2, 41, 2.06, 41.04), rectangulo(2.02, 41.01, 2.03, 41.02)]),
       municipio("002", [rectangulo(2.02, 41.01, 2.03, 41.02)]),
     ]);
-    const contorno = Result.getOrThrow(contornoDeEspana(limites, 400, 1));
+    const contorno = Result.getOrThrow(contornoDeLaUnion(limites, 400, 1));
     assert.strictEqual(contorno.coordinates.length, 1);
     assert.isTrue(dentro(contorno, 2.025, 41.015), "el enclave");
   });
@@ -87,14 +87,14 @@ describe("contorno de España", () => {
     const limites = limitesDe([
       municipio("001", [rectangulo(2, 41, 2.06, 41.04), rectangulo(2.02, 41.01, 2.03, 41.02)]),
     ]);
-    const resultado = contornoDeEspana(limites, 400, 0.01);
+    const resultado = contornoDeLaUnion(limites, 400, 0.01);
     assert.isTrue(Result.isFailure(resultado));
     if (Result.isFailure(resultado)) assert.include(resultado.failure.message, "agujero");
   });
 
   it("el fichero lleva la fuente, cómo se hizo y un polígono por línea", () => {
-    const contorno = Result.getOrThrow(contornoDeEspana(LIMITES, 400, 1));
-    const fichero = ficheroDeEspana(LIMITES, contorno, 400, 1);
+    const contorno = Result.getOrThrow(contornoDeLaUnion(LIMITES, 400, 1));
+    const fichero = ficheroDeContorno(LIMITES, contorno, 400, 1);
     assert.deepStrictEqual(JSON.parse(fichero), {
       fuente: FUENTE_DE_PRUEBA,
       toleranciaMetros: 400,

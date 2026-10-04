@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 import type { LayerSpecification } from "maplibre-gl";
 
-import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
+import { COMUNITAT_DE_PRUEBA, CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { conLaFoto } from "../pruebas/foto.ts";
 import { estiloMapa } from "./estilo.ts";
 import { FOTO_AEREA } from "./expresiones.ts";
@@ -14,7 +14,7 @@ import {
 } from "./foto.ts";
 import { CAPA_PORTALES } from "./rotulos.ts";
 
-const estilo = estiloMapa((token) => `token:${token}`, CONTORNO_DE_PRUEBA);
+const estilo = estiloMapa((token) => `token:${token}`, CONTORNO_DE_PRUEBA, COMUNITAT_DE_PRUEBA);
 const ids = estilo.layers.map((capa) => capa.id);
 const capa = (id: string): LayerSpecification | undefined => estilo.layers.find((c) => c.id === id);
 const visibilidad = (id: string, encendida: boolean) =>

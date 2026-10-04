@@ -33,7 +33,7 @@ export const AREA_MINIMA_ESPANA_KM2 = 1;
 const DECIMALES = 4;
 
 /** El contorno, como la geometría `MultiPolygon` de GeoJSON, en grados. */
-export interface ContornoDeEspana {
+export interface Contorno {
   readonly type: "MultiPolygon";
   readonly coordinates: ReadonlyArray<ReadonlyArray<Anillo>>;
 }
@@ -44,7 +44,7 @@ export class ContornoImposible extends Schema.TaggedError<ContornoImposible>()(
   { motivo: Schema.String },
 ) {
   override get message() {
-    return `No sale el contorno de España: ${this.motivo}`;
+    return `No sale el contorno: ${this.motivo}`;
   }
 }
 
@@ -176,7 +176,7 @@ const simplificarAnillo = (
 };
 
 /**
- * El contorno de España a partir de los límites: la unión de todos los recintos, con municipio,
+ * El contorno de los recintos de los límites, como el de España: la unión de todos, con municipio,
  * compartidos o sin provincia, sin las islas de menos de `areaMinimaKm2` y con cada anillo
  * simplificado a `toleranciaMetros`. Cada anillo es un polígono, en el sentido contrario a las
  * agujas del reloj, como pide GeoJSON. Gibraltar va dentro: el IGN lo da como territorio sin
@@ -185,13 +185,14 @@ const simplificarAnillo = (
  * La unión de los términos municipales no tiene agujeros: dentro de España no hay ningún
  * territorio de otro país (Llívia es al revés, España dentro de Francia, y sale como otro
  * polígono). Si algún día sale un agujero de `areaMinimaKm2` o más, o un borde abierto, falla en
- * lugar de dar un contorno que pinte como España lo que no lo es.
+ * lugar de dar un contorno que pinte como España lo que no lo es. Con los recintos de unas pocas
+ * provincias, como el contorno de la Comunitat Valenciana (`nombres.ts`), vale lo mismo.
  */
-export const contornoDeEspana = (
+export const contornoDeLaUnion = (
   limites: LimitesDeMunicipios,
   toleranciaMetros: number,
   areaMinimaKm2: number,
-): Result.Result<ContornoDeEspana, ContornoImposible> =>
+): Result.Result<Contorno, ContornoImposible> =>
   Result.flatMap(anillosDeLaUnion(limites), (anillos) => {
     const porGrado = limites.unidadesPorGrado;
     const enGrados = (anillo: ReadonlyArray<readonly [number, number]>): Anillo =>
@@ -214,9 +215,9 @@ export const contornoDeEspana = (
   });
 
 /** El fichero del contorno, con la fuente, cómo se hizo y un polígono por línea. */
-export const ficheroDeEspana = (
+export const ficheroDeContorno = (
   limites: LimitesDeMunicipios,
-  contorno: ContornoDeEspana,
+  contorno: Contorno,
   toleranciaMetros: number,
   areaMinimaKm2: number,
 ): string =>
@@ -238,9 +239,9 @@ export const escribirEspana = Effect.fn("Capas.escribirEspana")(function* (
   const fs = yield* FileSystem.FileSystem;
   const limites = yield* decodificarLimites(yield* fs.readFileString(municipios));
   const contorno = yield* Effect.fromResult(
-    contornoDeEspana(limites, TOLERANCIA_ESPANA_METROS, AREA_MINIMA_ESPANA_KM2),
+    contornoDeLaUnion(limites, TOLERANCIA_ESPANA_METROS, AREA_MINIMA_ESPANA_KM2),
   );
-  const fichero = ficheroDeEspana(
+  const fichero = ficheroDeContorno(
     limites,
     contorno,
     TOLERANCIA_ESPANA_METROS,

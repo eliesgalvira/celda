@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
+    "@maplibre/maplibre-gl-style-spec": "catalog:",
     "@solidjs/testing-library": "catalog:",
     "@solidjs/vite-plugin": "catalog:",
     "effect": "catalog:",

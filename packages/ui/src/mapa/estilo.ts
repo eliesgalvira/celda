@@ -1,3 +1,4 @@
+import type { Contorno } from "@celda/dominio/comunitatValenciana";
 import type { StyleSpecification } from "maplibre-gl";
 
 import { capasCeldas, FUENTE_CELDAS } from "./celdas.ts";
@@ -68,11 +69,16 @@ export const FUENTE_MAPA_BASE = "openmaptiles";
  * edificio que resalta «Ver el edificio» bajo los rótulos, y en cada capa del mapa base cómo se ve
  * sobre ella. Se enciende con el estado `FOTO_AEREA` (`ponerFotoAerea`).
  *
- * `espana` es el contorno con que los rótulos de lugar de fuera de España no salen de lejos. Llega
- * de fuera, y no de un `import` de este módulo, para que sus 24 KB vayan con el código del mapa y
- * no con el de la primera pantalla, que también usa este módulo.
+ * `espana` es el contorno con que los rótulos de lugar de fuera de España no salen de lejos, y
+ * `comunitatValenciana`, el que decide la forma de los nombres con «/» (ADR 0025). Llegan de fuera,
+ * y no de un `import` de este módulo, para que sus 24 y 3,5 KB vayan con el código del mapa y no
+ * con el de la primera pantalla, que también usa este módulo.
  */
-export const estiloMapa = (color: ColorDeToken, espana: ContornoDeEspana): StyleSpecification => ({
+export const estiloMapa = (
+  color: ColorDeToken,
+  espana: ContornoDeEspana,
+  comunitatValenciana: Contorno,
+): StyleSpecification => ({
   version: 8,
   glyphs: GLIFOS,
   state: { [MUNICIPIOS_DE_CELDA]: { default: [] }, [FOTO_AEREA]: { default: false } },
@@ -108,7 +114,9 @@ export const estiloMapa = (color: ColorDeToken, espana: ContornoDeEspana): Style
     ...capasServicioEncima(color("mapa-celda"), color("mapa-referencia")),
     ...capasZona(color("mapa-referencia")),
     ...capasEdificio(color),
-    ...capasRotulos(FUENTE_MAPA_BASE, color, espana, [capaNumeroDelEdificio(color)]),
+    ...capasRotulos(FUENTE_MAPA_BASE, color, espana, comunitatValenciana, [
+      capaNumeroDelEdificio(color),
+    ]),
   ],
 });
 

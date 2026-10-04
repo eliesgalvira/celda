@@ -4,13 +4,17 @@ import type {
   SymbolLayerSpecification,
 } from "maplibre-gl";
 
+import type { Contorno } from "@celda/dominio/comunitatValenciana";
+
 import { conFoto, deClase, porZoom, visibleConFoto } from "./expresiones.ts";
+import { nombreDelRotulo } from "./nombres.ts";
 import type { ColorDeToken, TokenMapa } from "./tokens.ts";
 
 /**
  * Los rótulos del mapa base: los nombres de lugar por importancia y zoom, los de las vías y el
  * agua, y pocos puntos de interés (ADR 0022). Los de lugar no salen de fuera de España por debajo
- * del zoom 9 (ADR 0024).
+ * del zoom 9 (ADR 0024). Los de lugar (la capa `place`) escriben el nombre de lugar, en una sola
+ * forma (`nombreDelRotulo`, ADR 0025); los demás, el `name` de OpenStreetMap.
  */
 
 /** La letra de los rótulos. */
@@ -58,14 +62,16 @@ export const MUNICIPIOS_DE_CELDA = "municipiosDeCelda";
 
 /**
  * Lo que quita Celda de las capas de lugares: los municipios que son zona, con su nombre bajo el
- * hexágono. Los dos nombres se pisarían. Se comparan en minúsculas, porque el mapa base escribe
- * «l'Hospitalet» y el IGN, «L'Hospitalet». Un nombre que no coincide deja los dos rótulos, que es
- * lo menos malo: quitar el del mapa base donde Celda no pone etiqueta dejaría esa parte del mapa
- * sin nombres.
+ * hexágono. Los dos nombres se pisarían. Se compara lo que escribe el rótulo (`nombre`) con el
+ * nombre de lugar de la zona, en minúsculas, porque el mapa base escribe «l'Hospitalet» y el IGN,
+ * «L'Hospitalet». Como los dos están en una sola forma, «Donostia / San Sebastián» y
+ * «Donostia/San Sebastián» quedan los dos en San Sebastián (ADR 0025). Un nombre que no coincide
+ * deja los dos rótulos, que es lo menos malo: quitar el del mapa base donde Celda no pone
+ * etiqueta dejaría esa parte del mapa sin nombres.
  */
-const SIN_LOS_DE_CELDA: ExpressionSpecification = [
+const sinLosDeCelda = (nombre: ExpressionSpecification): ExpressionSpecification => [
   "!",
-  ["in", ["downcase", ["to-string", ["get", "name"]]], ["global-state", MUNICIPIOS_DE_CELDA]],
+  ["in", ["downcase", nombre], ["global-state", MUNICIPIOS_DE_CELDA]],
 ];
 
 /** El rango de capital de OpenMapTiles: 2 la del país, 4 las de comunidad, 6 las de provincia. */
@@ -195,6 +201,7 @@ const capaDeLugares = (
   fuente: string,
   color: ColorDeToken,
   espana: ContornoDeEspana,
+  nombre: ExpressionSpecification,
   capa: CapaDeLugares,
 ): SymbolLayerSpecification => ({
   id: capa.id,
@@ -203,9 +210,9 @@ const capaDeLugares = (
   "source-layer": "place",
   minzoom: capa.desde,
   maxzoom: capa.hasta,
-  filter: ["all", soloDeEspana(espana), capa.propio, SIN_LOS_DE_CELDA],
+  filter: ["all", soloDeEspana(espana), capa.propio, sinLosDeCelda(nombre)],
   layout: {
-    "text-field": ["get", "name"],
+    "text-field": nombre,
     "text-font": [capa.letra],
     "text-size": capa.tamano,
     "symbol-sort-key": ["get", "rank"],
@@ -214,10 +221,21 @@ const capaDeLugares = (
   paint: { "text-color": tinta(color, color(capa.color)), ...halo(color, capa.halo) },
 });
 
-/** Los nombres del agua, de las vías, los puntos de interés y los barrios. */
+/**
+ * El `name` de OpenStreetMap tal cual, para los rótulos que no son nombres de lugar: el agua, las
+ * vías, los puntos de interés y los aeropuertos. Una vía como «Carretera Pamplona / Iruña - Tudela»
+ * lleva la barra dentro de su nombre, y la regla del nombre de lugar la cortaría.
+ */
+const NAME: ExpressionSpecification = ["get", "name"];
+
+/**
+ * Los nombres del agua, de las vías, los puntos de interés y los barrios. Solo los barrios, que
+ * son lugares (`place`), escriben `nombre`, el nombre de lugar (ADR 0025).
+ */
 const capasDeNombres = (
   fuente: string,
   color: ColorDeToken,
+  nombre: ExpressionSpecification,
 ): ReadonlyArray<SymbolLayerSpecification> => [
   {
     id: "nombres-de-rios",
@@ -228,7 +246,7 @@ const capasDeNombres = (
     filter: deClase("river", "canal"),
     layout: {
       "symbol-placement": "line",
-      "text-field": ["get", "name"],
+      "text-field": NAME,
       "text-font": [LETRA_CURSIVA],
       "text-size": 11.5,
       "text-letter-spacing": 0.05,
@@ -242,7 +260,7 @@ const capasDeNombres = (
     "source-layer": "water_name",
     filter: deClase("ocean", "sea", "bay", "strait"),
     layout: {
-      "text-field": ["get", "name"],
+      "text-field": NAME,
       "text-font": [LETRA_CURSIVA],
       "text-size": 13,
       "text-letter-spacing": 0.12,
@@ -258,7 +276,7 @@ const capasDeNombres = (
     minzoom: 10,
     filter: deClase("lake", "reservoir"),
     layout: {
-      "text-field": ["get", "name"],
+      "text-field": NAME,
       "text-font": [LETRA_CURSIVA],
       "text-size": 11.5,
       "text-max-width": 7,
@@ -278,7 +296,7 @@ const capasDeNombres = (
     ],
     layout: {
       "symbol-placement": "line",
-      "text-field": ["get", "name"],
+      "text-field": NAME,
       "text-font": [LETRA],
       "text-size": porZoom(15, 11, 18, 13.5),
     },
@@ -293,7 +311,7 @@ const capasDeNombres = (
     filter: deClase("primary", "secondary", "tertiary", "trunk"),
     layout: {
       "symbol-placement": "line",
-      "text-field": ["get", "name"],
+      "text-field": NAME,
       "text-font": [LETRA],
       "text-size": porZoom(12, 10.5, 15, 12, 18, 14.5),
       "symbol-sort-key": ["match", ["get", "class"], ["trunk", "primary"], 0, "secondary", 1, 2],
@@ -347,7 +365,7 @@ const capasDeNombres = (
       ],
     ],
     layout: {
-      "text-field": ["get", "name"],
+      "text-field": NAME,
       "text-font": [LETRA],
       "text-size": 11,
       "text-max-width": 8,
@@ -378,7 +396,7 @@ const capasDeNombres = (
     minzoom: 9,
     filter: ["has", "iata"],
     layout: {
-      "text-field": ["get", "name"],
+      "text-field": NAME,
       "text-font": [LETRA],
       "text-size": 11,
       "text-max-width": 8,
@@ -395,7 +413,7 @@ const capasDeNombres = (
     minzoom: 14,
     filter: deClase("suburb", "quarter", "neighbourhood"),
     layout: {
-      "text-field": ["get", "name"],
+      "text-field": nombre,
       "text-font": [LETRA],
       "text-size": porZoom(14, 11.5, 17, 13),
       "text-max-width": 7,
@@ -437,19 +455,23 @@ const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecifi
 /**
  * Las capas de rótulos, de abajo arriba: los nombres, los números de portal, lo que tenga que ir
  * `sobreLosPortales` (el número del edificio resaltado) y después los lugares, de menos a más
- * importantes.
+ * importantes. Con `comunitatValenciana`, los de lugar deciden la forma de los nombres con «/».
  */
 export const capasRotulos = (
   fuente: string,
   color: ColorDeToken,
   espana: ContornoDeEspana,
+  comunitatValenciana: Contorno,
   sobreLosPortales: ReadonlyArray<LayerSpecification> = [],
-): ReadonlyArray<LayerSpecification> => [
-  ...capasDeNombres(fuente, color),
-  capaDePortales(fuente, color),
-  ...sobreLosPortales,
-  ...LUGARES.toReversed().map((capa) => capaDeLugares(fuente, color, espana, capa)),
-];
+): ReadonlyArray<LayerSpecification> => {
+  const nombre = nombreDelRotulo(comunitatValenciana);
+  return [
+    ...capasDeNombres(fuente, color, nombre),
+    capaDePortales(fuente, color),
+    ...sobreLosPortales,
+    ...LUGARES.toReversed().map((capa) => capaDeLugares(fuente, color, espana, nombre, capa)),
+  ];
+};
 
 /** Lo que hace falta del mapa de MapLibre para quitar rótulos de lugar. */
 export interface MapaConRotulos {

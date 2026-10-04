@@ -7,6 +7,7 @@
     "build": "vp build",
     "espana": "vp build && node dist/capas.js espana",
     "municipios": "vp build && node dist/capas.js municipios",
+    "nombres": "vp build && node dist/capas.js nombres",
     "poblacion": "vp build && node dist/capas.js poblacion",
     "servir": "vp build && node dist/capas.js servir",
     "sintetica": "vp build && node dist/capas.js sintetica",

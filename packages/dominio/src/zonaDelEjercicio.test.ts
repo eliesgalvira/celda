@@ -28,6 +28,8 @@ const INDICE: IndiceDeZonas = {
     { codigo: "08", nombre: "Barcelona", caja: [1.36, 41.19, 2.78, 42.33] },
     { codigo: "17", nombre: "Girona", caja: [1.72, 41.65, 3.33, 42.5] },
     { codigo: "42", nombre: "Soria", caja: [-3.54, 41.05, -1.77, 42.15] },
+    { codigo: "03", nombre: "Alacant/Alicante", caja: [-1.09, 37.84, 0.24, 38.92] },
+    { codigo: "20", nombre: "Gipuzkoa", caja: [-2.61, 42.89, -1.73, 43.4] },
   ],
   municipios: [
     ["08019", "Barcelona"],
@@ -37,6 +39,9 @@ const INDICE: IndiceDeZonas = {
     ["17094", "Llívia"],
     ["42173", "Soria"],
     ["42071", "Fuentepinilla"],
+    ["03014", "Alacant/Alicante"],
+    ["03065", "Elx/Elche"],
+    ["20069", "Donostia/San Sebastián"],
   ],
 };
 
@@ -60,7 +65,22 @@ describe("zona del ejercicio", () => {
       zona: { tipo: "municipio", codigo: "17079" },
       nombre: "Girona",
       lugar: "Girona",
+      oficial: "Girona",
     });
+  });
+
+  it("un oficial bilingüe se ve con su nombre de lugar y se encuentra por cualquier forma", () => {
+    assert.deepStrictEqual(MUNICIPIOS.at(-2), {
+      zona: { tipo: "municipio", codigo: "03065" },
+      nombre: "Elx",
+      lugar: "Alacant",
+      oficial: "Elx/Elche",
+    });
+    assert.deepStrictEqual(nombres(buscarZonas("elche", MUNICIPIOS)), ["Elx"]);
+    assert.deepStrictEqual(nombres(buscarZonas("elx", MUNICIPIOS)), ["Elx"]);
+    assert.deepStrictEqual(nombres(buscarZonas("alicante", MUNICIPIOS)), ["Alacant"]);
+    assert.deepStrictEqual(nombres(buscarZonas("donostia", MUNICIPIOS)), ["San Sebastián"]);
+    assert.deepStrictEqual(nombres(buscarZonas("san sebastian", MUNICIPIOS)), ["San Sebastián"]);
   });
 
   it("busca sin tildes, mayúsculas ni apóstrofos", () => {

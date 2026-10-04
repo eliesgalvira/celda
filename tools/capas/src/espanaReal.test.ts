@@ -11,9 +11,9 @@ import * as Schema from "effect/Schema";
 
 import {
   AREA_MINIMA_ESPANA_KM2,
-  contornoDeEspana,
-  type ContornoDeEspana,
-  ficheroDeEspana,
+  contornoDeLaUnion,
+  type Contorno,
+  ficheroDeContorno,
   TOLERANCIA_ESPANA_METROS,
 } from "./espana.ts";
 
@@ -31,7 +31,7 @@ const leer = Effect.gen(function* () {
   };
 }).pipe(Effect.provide(NodeServices.layer));
 
-const dentro = (contorno: ContornoDeEspana, longitud: number, latitud: number) =>
+const dentro = (contorno: Contorno, longitud: number, latitud: number) =>
   contorno.coordinates.some((poligono) => dentroDelPoligono({ longitud, latitud }, poligono));
 
 /**
@@ -73,11 +73,11 @@ describe("contorno de España guardado en el repositorio", () => {
     Effect.gen(function* () {
       const { limites, guardado } = yield* leer;
       const contorno = Result.getOrThrow(
-        contornoDeEspana(limites, TOLERANCIA_ESPANA_METROS, AREA_MINIMA_ESPANA_KM2),
+        contornoDeLaUnion(limites, TOLERANCIA_ESPANA_METROS, AREA_MINIMA_ESPANA_KM2),
       );
       assert.strictEqual(
         guardado,
-        ficheroDeEspana(limites, contorno, TOLERANCIA_ESPANA_METROS, AREA_MINIMA_ESPANA_KM2),
+        ficheroDeContorno(limites, contorno, TOLERANCIA_ESPANA_METROS, AREA_MINIMA_ESPANA_KM2),
         "el contorno está desfasado: vuelve a escribirlo con `pnpm run espana`",
       );
     }),
@@ -87,9 +87,9 @@ describe("contorno de España guardado en el repositorio", () => {
     Effect.gen(function* () {
       const { limites } = yield* leer;
       const simplificado = Result.getOrThrow(
-        contornoDeEspana(limites, TOLERANCIA_ESPANA_METROS, AREA_MINIMA_ESPANA_KM2),
+        contornoDeLaUnion(limites, TOLERANCIA_ESPANA_METROS, AREA_MINIMA_ESPANA_KM2),
       );
-      const exacto = Result.getOrThrow(contornoDeEspana(limites, 0, AREA_MINIMA_ESPANA_KM2));
+      const exacto = Result.getOrThrow(contornoDeLaUnion(limites, 0, AREA_MINIMA_ESPANA_KM2));
       for (const [lugar, longitud, latitud, enEspana] of CASOS) {
         assert.strictEqual(
           dentro(exacto, longitud, latitud),

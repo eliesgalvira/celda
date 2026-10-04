@@ -33,6 +33,9 @@ catalogs:
     '@effect/vitest':
       specifier: 4.0.0-rc.117
       version: 4.0.0-rc.117
+    '@maplibre/maplibre-gl-style-spec':
+      specifier: 26.4.4
+      version: 26.4.4
     '@oxlint/plugins':
       specifier: 1.85.0
       version: 1.85.0
@@ -407,6 +410,9 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.0-rc.117(effect@4.0.0-rc.117)(vitest@5.0.1)
+      '@maplibre/maplibre-gl-style-spec':
+        specifier: 'catalog:'
+        version: 26.4.4
       '@solidjs/testing-library':
         specifier: 'catalog:'
         version: 1.0.0-beta.3(@solidjs/web@2.0.0-rc.9(solid-js@2.0.0-rc.9))(solid-js@2.0.0-rc.9)

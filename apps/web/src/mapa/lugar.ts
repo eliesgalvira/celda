@@ -5,6 +5,7 @@ import {
   type IndiceDeMunicipios,
   municipioDelPunto,
 } from "@celda/dominio/municipio";
+import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "@celda/dominio/nombreDeLugar";
 import type { ProvinciaConCaja, ProvinciasDeZonas } from "@celda/dominio/zonaDelEjercicio";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
@@ -113,6 +114,7 @@ export const nombraUnSitio = (vista: Vista | undefined): vista is Vista =>
  * - desde él, el municipio del centro o, en un territorio compartido, su provincia.
  *
  * Con el centro fuera de las provincias (en el mar o al otro lado de la frontera) dice «España».
+ * Los nombres son los de lugar, en una sola forma: «Elx», «San Sebastián» (ADR 0025).
  */
 export const lugarDeLaVista = (
   vista: Vista | undefined,
@@ -123,9 +125,11 @@ export const lugarDeLaVista = (
   if (asignacion === undefined) return undefined;
   const { municipio, provincia } = asignacion;
   if (Math.floor(vista.zoom) >= NIVEL_DE_MUNICIPIOS && municipio !== undefined) {
-    return municipio.nombre;
+    return nombreDeLugarDeMunicipio(municipio.codigo, municipio.nombre);
   }
-  return provincia?.nombre ?? ESPANA.nombre;
+  return provincia === undefined
+    ? ESPANA.nombre
+    : nombreDeLugarDeProvincia(provincia.codigo, provincia.nombre);
 };
 
 /** Cómo se descargan las provincias y sus contornos. En las pruebas, con respuestas de prueba. */

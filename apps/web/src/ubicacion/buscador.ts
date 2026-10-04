@@ -1,4 +1,5 @@
 import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area";
+import { nombreDeResultado } from "@celda/dominio/nombreDeLugar";
 import type { Credito } from "@celda/ui/Atribucion.tsx";
 import * as Cache from "effect/Cache";
 import * as Clock from "effect/Clock";
@@ -75,6 +76,8 @@ const Resultado = Schema.Struct({
   lat: Schema.FiniteFromString,
   lon: Schema.FiniteFromString,
   name: Schema.optional(Schema.String),
+  /** Todas las etiquetas `name*` del lugar: de aquí sale su `name:es`. */
+  namedetails: Schema.optional(Schema.NullOr(Schema.Record(Schema.String, Schema.String))),
   address: Schema.optional(
     Schema.Struct({
       road: Schema.optional(Schema.String),
@@ -129,22 +132,52 @@ const lugarDe = (
 
 /**
  * De un resultado de Nominatim a una dirección con un nombre corto, dónde queda y en qué
- * municipio y provincia.
+ * municipio y provincia. `enLaComunitat` dice si su punto cae en la Comunitat Valenciana.
  *
  * En España, Nominatim da el municipio en `municipality` cuando el límite municipal no está unido
  * a un núcleo (los concellos de Galicia) y si no, en `city`, `town` o `village`, por ese orden. En
  * un núcleo de un municipio mayor, `village` o `hamlet` es el núcleo y `town`, el municipio
  * (Bajamar, en San Cristóbal de La Laguna). La provincia llega en `state_district`; en las
  * comunidades de una sola provincia no llega, y se da la comunidad (Comunidad de Madrid).
+ *
+ * Con `accept-language=und`, Nominatim da el `name` de OpenStreetMap, que en los bilingües lleva
+ * las dos formas: «Donostia / San Sebastián», «Alacant / Alicante». Cada nombre va en una sola,
+ * como en el mapa base (ADR 0025, `nombreDeResultado`): la del resultado con su `name:es`, que
+ * llega en `namedetails`, y las de la dirección por la tabla de bilingües o, si no está, la
+ * primera.
  */
-export const direccionDe = (resultado: Resultado): Direccion | undefined => {
-  const direccion = resultado.address ?? {};
+export const direccionDe = (
+  resultado: Resultado,
+  enLaComunitat: boolean,
+): Direccion | undefined => {
+  const unaForma = (nombre: string | undefined, es?: string): string | undefined =>
+    nombre === undefined ? undefined : nombreDeResultado(nombre, es, enLaComunitat);
+  const original = resultado.address ?? {};
+  const direccion = {
+    road: unaForma(original.road),
+    pedestrian: unaForma(original.pedestrian),
+    house_number: original.house_number,
+    neighbourhood: unaForma(original.neighbourhood),
+    quarter: unaForma(original.quarter),
+    suburb: unaForma(original.suburb),
+    city_district: unaForma(original.city_district),
+    borough: unaForma(original.borough),
+    hamlet: unaForma(original.hamlet),
+    village: unaForma(original.village),
+    town: unaForma(original.town),
+    city: unaForma(original.city),
+    municipality: unaForma(original.municipality),
+    province: unaForma(original.province),
+    state_district: unaForma(original.state_district),
+    state: unaForma(original.state),
+  };
+  const name = unaForma(resultado.name, resultado.namedetails?.["name:es"]);
   const calle = direccion.road ?? direccion.pedestrian;
   const conNumero =
     calle === undefined
       ? undefined
       : [calle, direccion.house_number].filter((parte) => parte !== undefined).join(", ");
-  const nombre = resultado.name !== undefined && resultado.name !== "" ? resultado.name : conNumero;
+  const nombre = name !== undefined && name !== "" ? name : conNumero;
   if (nombre === undefined) return undefined;
   const municipio = direccion.municipality ?? direccion.city ?? direccion.town ?? direccion.village;
   const provincia = direccion.province ?? direccion.state_district;
@@ -166,11 +199,20 @@ export const direccionDe = (resultado: Resultado): Direccion | undefined => {
   };
 };
 
-/** Las direcciones de la respuesta, en su orden y sin repetir las que se leen igual. */
-export const direccionesDe = (resultados: ReadonlyArray<Resultado>): ReadonlyArray<Direccion> => {
+/**
+ * Las direcciones de la respuesta, en su orden y sin repetir las que se leen igual.
+ * `enLaComunitat` dice si un punto cae en la Comunitat Valenciana.
+ */
+export const direccionesDe = (
+  resultados: ReadonlyArray<Resultado>,
+  enLaComunitat: (posicion: Coordenada) => boolean,
+): ReadonlyArray<Direccion> => {
   const vistas = new Set<string>();
   return resultados.flatMap((resultado) => {
-    const direccion = direccionDe(resultado);
+    const direccion = direccionDe(
+      resultado,
+      enLaComunitat({ longitud: resultado.lon, latitud: resultado.lat }),
+    );
     if (direccion === undefined) return [];
     const clave = `${direccion.nombre}|${direccion.detalle}|${direccion.lugar}`;
     if (vistas.has(clave)) return [];
@@ -236,12 +278,16 @@ export const buscadorNominatim: Layer.Layer<BuscadorDeDirecciones, never, HttpCl
             q: consulta,
             format: "jsonv2",
             addressdetails: "1",
+            // El `name:es` de cada lugar, para escribir en una sola forma un nombre con dos
+            // (ADR 0025). Va en la misma respuesta: no es otra petición.
+            namedetails: "1",
             limit: String(RESULTADOS),
             countrycodes: "es",
             // Los topónimos, en su nombre oficial: Girona, A Coruña, Donostia / San Sebastián.
             // Sin este parámetro, Nominatim usa el idioma del navegador y daría «Gerona» o «La
             // Coruña». Con un idioma que ningún lugar tiene (`und`, «sin determinar»), usa la
-            // etiqueta `name` de OpenStreetMap, que es el nombre local.
+            // etiqueta `name` de OpenStreetMap, que es el nombre local. Los que llevan dos se
+            // quedan en una (`direccionDe`).
             "accept-language": "und",
           },
         });
@@ -249,7 +295,22 @@ export const buscadorNominatim: Layer.Layer<BuscadorDeDirecciones, never, HttpCl
       const sinRespuesta = (detalle: string) =>
         new BusquedaFallida({ motivo: "sin-respuesta", detalle });
 
-      const pedir = (consulta: string): Effect.Effect<ReadonlyArray<Direccion>, BusquedaFallida> =>
+      /**
+       * Si un punto cae en la Comunitat Valenciana. Su contorno (3,5 KB con gzip) se descarga con
+       * la primera respuesta, no con la primera pantalla, y se queda para las demás. Si no llega,
+       * la búsqueda falla y la siguiente lo vuelve a pedir.
+       */
+      const enLaComunitat = yield* Effect.tryPromise({
+        try: () => import("@celda/dominio/comunitatValenciana"),
+        catch: () => sinRespuesta("No ha llegado el contorno de la Comunitat Valenciana."),
+      }).pipe(
+        Effect.map((modulo) => modulo.enLaComunitatValenciana),
+        Effect.cachedWithTTL((salida) =>
+          Exit.isSuccess(salida) ? Duration.infinity : Duration.zero,
+        ),
+      );
+
+      const pedir = (consulta: string): Effect.Effect<ReadonlyArray<Resultado>, BusquedaFallida> =>
         Effect.gen(function* () {
           // Sin las cabeceras de trazas (`traceparent`, `b3`): con ellas el navegador manda antes
           // una petición OPTIONS de CORS, y cada búsqueda serían dos peticiones a Nominatim.
@@ -265,7 +326,7 @@ export const buscadorNominatim: Layer.Layer<BuscadorDeDirecciones, never, HttpCl
           const resultados = yield* HttpClientResponse.filterStatusOk(respuesta).pipe(
             Effect.flatMap(leerRespuesta),
           );
-          return direccionesDe(resultados);
+          return resultados;
         }).pipe(
           Effect.timeout(ESPERA_MAXIMA),
           Effect.catchTags({
@@ -298,7 +359,10 @@ export const buscadorNominatim: Layer.Layer<BuscadorDeDirecciones, never, HttpCl
         }
         if (normalizada.length < LETRAS_MINIMAS) return [];
         // La caché guarda la respuesta de Nominatim; el orden depende de lo que se vea ahora.
-        return ordenarPorEncuadre(yield* Cache.get(cache, normalizada), encuadre);
+        const resultados = yield* Cache.get(cache, normalizada);
+        // El contorno llega después de la respuesta, fuera del turno y de su espera máxima.
+        const direcciones = direccionesDe(resultados, yield* enLaComunitat);
+        return ordenarPorEncuadre(direcciones, encuadre);
       });
 
       return BuscadorDeDirecciones.of({ buscar, atribucion: ATRIBUCION_NOMINATIM });

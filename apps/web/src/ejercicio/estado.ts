@@ -3,6 +3,7 @@ import { dentroDelPoligono, type Poligono } from "@celda/dominio/barrio";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import type { ProvinciaConVecinas } from "@celda/dominio/ejercicio";
 import { type IndiceDeMunicipios, municipioDelPunto } from "@celda/dominio/municipio";
+import { nombreDeLugarDeMunicipio } from "@celda/dominio/nombreDeLugar";
 import type { PoblacionDeBarrios } from "@celda/dominio/poblacion";
 import type { ProvinciaDelResumen, ResumenLeido } from "@celda/dominio/provincias";
 import {
@@ -76,9 +77,14 @@ export interface DatosDeLaZona {
   readonly contornos: Descarga<IndiceDeMunicipios> | undefined;
 }
 
-/** El nombre de un municipio en el índice. */
-export const nombreDeMunicipio = (indice: IndiceDeZonas, codigo: string): string | undefined =>
-  indice.municipios.find(([otro]) => otro === codigo)?.[1];
+/**
+ * El nombre de lugar de un municipio del índice, que guarda el oficial: «Elx», no «Elx/Elche»
+ * (ADR 0025).
+ */
+export const nombreDeMunicipio = (indice: IndiceDeZonas, codigo: string): string | undefined => {
+  const oficial = indice.municipios.find(([otro]) => otro === codigo)?.[1];
+  return oficial === undefined ? undefined : nombreDeLugarDeMunicipio(codigo, oficial);
+};
 
 /** El nombre de una zona, si ya ha llegado lo que lo dice. */
 export const nombreDeZona = (

@@ -18,6 +18,8 @@ import {
   municipiosConHabitantes,
 } from "./municipio.ts";
 import {
+  type CapaDeProvincia,
+  capaConNombresDeLugar,
   cajaDeSituados,
   companiasDeSituados,
   type DatosDeProvincia,
@@ -36,8 +38,10 @@ import {
   leerParteDelIndice,
   leerResumen,
   LoteDeProvincia,
+  type MunicipioDeCapa,
   parteDeClave,
   PARTES_DEL_INDICE,
+  resumenConNombresDeLugar,
   situarEmplazamientos,
 } from "./provincias.ts";
 
@@ -365,6 +369,35 @@ describe("capa de una provincia", () => {
   });
 });
 
+describe("capa de una provincia con el nombre de lugar", () => {
+  it("cada municipio lleva el suyo, en una sola forma, con su código", () => {
+    const municipio = (codigo: string, nombre: string): MunicipioDeCapa => ({
+      codigo,
+      nombre,
+      etiqueta: { longitud: -0.7, latitud: 38.27 },
+      habitantes: 1,
+      areaKm2: 1,
+      emplazamientos: 4,
+      companias: [],
+    });
+    const capa: CapaDeProvincia = {
+      provincia: "03",
+      emplazamientos: [],
+      barrios: [],
+      fuenteDeBarrios: undefined,
+      municipios: [municipio("03065", "Elx/Elche"), municipio("03031", "Benidorm")],
+      lotes: [],
+    };
+    assert.deepStrictEqual(
+      capaConNombresDeLugar(capa).municipios.map((m) => [m.codigo, m.nombre]),
+      [
+        ["03065", "Elx"],
+        ["03031", "Benidorm"],
+      ],
+    );
+  });
+});
+
 describe("lote de fichas de una provincia", () => {
   const lugares = new Map(
     (situarEmplazamientos(TODOS, INDICE).get("08") ?? []).map((s) => [
@@ -531,6 +564,33 @@ describe("resumen nacional", () => {
         ["17", true, NOCHE],
         // Sin límites en la prueba no toca ningún cuadro: no se sabe nada de ella.
         ["43", false, null],
+      ],
+    );
+  });
+
+  it("el leído guarda el nombre oficial, y la web enseña el de lugar, en una sola forma", () => {
+    const conBilingue = provincias.map((p) =>
+      p.codigo === "43" ? { ...p, codigo: "46", nombre: "València/Valencia" } : p,
+    );
+    const contenido = generarResumen({
+      version: VERSION,
+      fuentes: FUENTES,
+      cobertura: [CAJA_DE_BARCELONA],
+      provincias: conBilingue,
+      cuadros: CUADROS,
+    });
+    const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
+    if (leido === undefined) return assert.fail("no se lee");
+    assert.deepStrictEqual(
+      leido.provincias.map((p) => p.nombre),
+      ["Barcelona", "Girona", "València/Valencia"],
+    );
+    assert.deepStrictEqual(
+      resumenConNombresDeLugar(leido).provincias.map((p) => [p.codigo, p.nombre]),
+      [
+        ["08", "Barcelona"],
+        ["17", "Girona"],
+        ["46", "València"],
       ],
     );
   });

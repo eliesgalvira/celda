@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Predicate from "effect/Predicate";
 import type { StyleSpecification } from "maplibre-gl";
 
-import { CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
+import { COMUNITAT_DE_PRUEBA, CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { tokensDelTema } from "../pruebas/tema.ts";
 import { leerOklch } from "./color.ts";
 import {
@@ -12,6 +12,7 @@ import {
   RECURSOS_INICIALES_MAPA_BASE,
   TOKENS_MAPA,
 } from "./estilo.ts";
+import { nombreDelRotulo } from "./nombres.ts";
 import {
   CAPAS_DE_LUGARES,
   type MapaConRotulos,
@@ -58,7 +59,7 @@ const coloresDelEstilo = (estilo: StyleSpecification) =>
       ),
   );
 
-const estiloDePrueba = () => estiloMapa(() => "#000", CONTORNO_DE_PRUEBA);
+const estiloDePrueba = () => estiloMapa(() => "#000", CONTORNO_DE_PRUEBA, COMUNITAT_DE_PRUEBA);
 
 /** Un mapa de prueba con las capas del estilo: guarda el estado como MapLibre. */
 const mapaDePrueba = (estilo: StyleSpecification | undefined) => {
@@ -76,10 +77,14 @@ const mapaDePrueba = (estilo: StyleSpecification | undefined) => {
 describe("estiloMapa", () => {
   it("pinta el mapa solo con tokens del tema", () => {
     const pedidos = new Set<string>();
-    const estilo = estiloMapa((token) => {
-      pedidos.add(token);
-      return `${MARCA}${token}`;
-    }, CONTORNO_DE_PRUEBA);
+    const estilo = estiloMapa(
+      (token) => {
+        pedidos.add(token);
+        return `${MARCA}${token}`;
+      },
+      CONTORNO_DE_PRUEBA,
+      COMUNITAT_DE_PRUEBA,
+    );
 
     const colores = coloresDelEstilo(estilo);
     assert.isAbove(colores.length, 0);
@@ -162,9 +167,14 @@ describe("estiloMapa", () => {
 
   it("las capas de lugares dejan fuera, sin mirar mayúsculas, los municipios que lleva Celda", () => {
     const estilo = estiloDePrueba();
+    // Se compara lo que escribe el rótulo, en una sola forma (`nombres.test.ts`).
     const sinLosDeCelda = [
       "!",
-      ["in", ["downcase", ["to-string", ["get", "name"]]], ["global-state", MUNICIPIOS_DE_CELDA]],
+      [
+        "in",
+        ["downcase", nombreDelRotulo(COMUNITAT_DE_PRUEBA)],
+        ["global-state", MUNICIPIOS_DE_CELDA],
+      ],
     ];
     assert.deepStrictEqual<unknown>(estilo.state?.[MUNICIPIOS_DE_CELDA], { default: [] });
     for (const capa of estilo.layers) {
