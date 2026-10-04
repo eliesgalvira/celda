@@ -13,7 +13,13 @@ import {
   TOKENS_MAPA,
 } from "./estilo.ts";
 import { nombreDelRotulo } from "./nombres.ts";
-import { CAPA_HUECOS, crearImagenesDeHuecos, imagenDeHueco, ponerHuecos } from "./huecos.ts";
+import {
+  CAPA_HUECOS,
+  crearImagenesDeHuecos,
+  type HuecosEnGeoJson,
+  imagenDeHueco,
+  puestaDeHuecos,
+} from "./huecos.ts";
 import {
   CAPAS_DE_CIUDADES,
   CAPAS_DE_LUGARES,
@@ -292,13 +298,17 @@ describe("rótulos de ciudad por encima de los datos (ADR 0024)", () => {
   });
 
   it("poner los mismos huecos otra vez no toca el mapa", () => {
-    let puestas = 0;
-    const mapa = { getSource: () => ({ setData: () => (puestas += 1) }) };
+    const puestas: Array<HuecosEnGeoJson> = [];
+    const poner = puestaDeHuecos((datos) => puestas.push(datos));
     const huecos = [{ longitud: 2.1, latitud: 41.4, ancho: 44, alto: 50, escala: 1 }];
-    ponerHuecos(mapa, huecos);
-    ponerHuecos(mapa, [...huecos]);
-    assert.strictEqual(puestas, 1);
-    ponerHuecos(mapa, []);
-    assert.strictEqual(puestas, 2);
+    poner(huecos);
+    poner([...huecos]);
+    assert.lengthOf(puestas, 1);
+    assert.deepStrictEqual(puestas[0]?.features[0]?.properties, {
+      imagen: "hueco:44x52",
+      escala: 1,
+    });
+    poner([]);
+    assert.lengthOf(puestas, 2);
   });
 });

@@ -1,13 +1,16 @@
 import type { Coordenada } from "@celda/dominio/area";
+import { habitantesDeRotulo, indiceDeCiudades } from "@celda/dominio/poblacionDeRotulos";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { quitarRotulosDeMunicipios } from "@celda/ui/mapa/estilo.ts";
+import { FUENTE_HUECOS, puestaDeHuecos } from "@celda/ui/mapa/huecos.ts";
 import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
+import { CapaDeRotulos, RotuloDeCiudad } from "@celda/ui/marcadores/RotuloDeCiudad.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
-import type { Map as MapaMapLibre } from "maplibre-gl";
-import { createEffect, createMemo, createSignal } from "solid-js";
+import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
+import { createEffect, createMemo, createSignal, For } from "solid-js";
 
 import { type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
-import { formasDeEtiquetas } from "../capa/etiquetas.ts";
+import { huecosDe, resolverChoques, type RotuloEnElMapa, tamanoDeNivel } from "../capa/choques.ts";
 import { cajaConMargen, combinacionesDe, type Vista } from "../capa/marcadores.ts";
 import {
   crearAgrupadorNacional,
@@ -17,6 +20,7 @@ import {
 import type { FichaPedida } from "../ficha/servicio.ts";
 import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
+import type { LecturaDeRotulos, LectorDeRotulos, RotuloLeido } from "./rotulosDeCiudad.ts";
 import { seguirVista } from "./vista.ts";
 
 const REDUCIR_MOVIMIENTO = "(prefers-reduced-motion: reduce)";
@@ -44,7 +48,24 @@ export interface MarcadoresProps {
   readonly alVer?: (pedidas: ReadonlyArray<FichaPedida>) => void;
   /** Cada vez que se decide qué se dibuja, la vista: con ella se piden las provincias. */
   readonly alCambiarVista?: (vista: Vista) => void;
+  /**
+   * Lee los rótulos de ciudad que MapLibre ha colocado, para dibujarlos encima de los marcadores
+   * (ADR 0024). Llega con el código del mapa. Sin él, no se copia ningún rótulo.
+   */
+  readonly lectorDeRotulos?: LectorDeRotulos | undefined;
+  /** Con la foto aérea encendida: los rótulos copiados van en blanco con halo oscuro. */
+  readonly conFoto?: boolean;
 }
+
+const SIN_ROTULOS: LecturaDeRotulos = { zoom: 0, rotulos: [] };
+
+/** Dos lecturas iguales: los mismos rótulos al mismo zoom. Así un `idle` sin cambios no cuesta. */
+const mismaLectura = (a: LecturaDeRotulos, b: LecturaDeRotulos): boolean =>
+  Math.abs(a.zoom - b.zoom) < 0.01 &&
+  mismasListas(
+    a.rotulos.map((r) => r.clave),
+    b.rotulos.map((r) => r.clave),
+  );
 
 /**
  * Los emplazamientos sobre el mapa, agrupados por zoom: el resumen por provincias de lejos y, de
@@ -146,15 +167,93 @@ export function Marcadores(props: MarcadoresProps) {
   );
 
   /**
-   * Las zonas (barrios, municipios y provincias) que caben enteras en la pantalla, con su nombre, y
-   * las que van compactas. Se decide con la escena, al pararse el mapa o al cambiar de nivel, como
-   * qué se dibuja.
+   * Los rótulos de ciudad colocados. Se leen cuando el mapa queda quieto y pintado (`idle`), que no
+   * vuelve a llegar mientras nada cambia: nunca en cada fotograma.
    */
-  const formas = createMemo(() => {
-    const proyectarAhora = proyectar();
-    return formasDeEtiquetas([...(escena()?.elementos.values() ?? [])], (elemento) =>
-      proyectarAhora(elemento.posicion),
-    );
+  const [lectura, setLectura] = createSignal<LecturaDeRotulos>(SIN_ROTULOS, {
+    equals: mismaLectura,
+  });
+  recurso(
+    "marcadores:rotulos",
+    () => (props.lectorDeRotulos === undefined ? undefined : props.mapa),
+    (mapa) => {
+      const lector = props.lectorDeRotulos;
+      if (lector === undefined) return undefined;
+      const leer = () => setLectura(lector.leer(mapa));
+      mapa.on("idle", leer);
+      return () => mapa.off("idle", leer);
+    },
+  );
+
+  /**
+   * Los municipios de las provincias que han llegado, por su nombre de lugar: de cerca dan los
+   * habitantes de cualquier rótulo, también de los pueblos que no están en la tabla del mapa.
+   */
+  const municipiosDeLasCapas = createMemo(() =>
+    indiceDeCiudades(
+      [...props.provincias.values()].flatMap((estado) =>
+        estado.tipo === "lista"
+          ? estado.provincia.capa.municipios.flatMap((m) =>
+              m.habitantes === null
+                ? []
+                : [{ nombre: m.nombre, etiqueta: m.etiqueta, habitantes: m.habitantes }],
+            )
+          : [],
+      ),
+    ),
+  );
+  const rotulosConHabitantes = createMemo((): ReadonlyArray<RotuloEnElMapa> => {
+    const lector = props.lectorDeRotulos;
+    const deCapas = municipiosDeLasCapas();
+    return lectura().rotulos.map((rotulo) => ({
+      ...rotulo,
+      habitantes:
+        lector === undefined
+          ? 0
+          : habitantesDeRotulo(rotulo.texto, rotulo.posicion, deCapas, lector.ciudades),
+    }));
+  });
+
+  /** Lo grande que van los hexágonos al zoom de la escena. */
+  const tamano = createMemo(() => tamanoDeNivel(escena()?.nivel ?? 0));
+
+  /**
+   * Qué se dibuja cuando rótulos y marcadores se pisan, y la forma de cada zona (ADR 0024). Se
+   * decide con la escena y con los rótulos, al pararse el mapa o al cambiar de nivel, como qué se
+   * dibuja.
+   */
+  const choques = createMemo(() => {
+    const lienzo = props.mapa.getContainer();
+    return resolverChoques({
+      elementos: [...(escena()?.elementos.values() ?? [])],
+      rotulos: rotulosConHabitantes(),
+      proyectar: proyectar(),
+      tamano: tamano(),
+      pantalla: { ancho: lienzo.clientWidth, alto: lienzo.clientHeight },
+    });
+  });
+  const formas = createMemo(() => choques().formas);
+  const ocultos = createMemo(() => choques().ocultos);
+
+  // Los huecos de los marcadores en el mapa base, para que sus rótulos los esquiven. Solo cambian
+  // al decidir; si son los mismos, no se toca el mapa.
+  const ponerHuecos = createMemo(() => {
+    const mapa = props.mapa;
+    return puestaDeHuecos((datos) => {
+      mapa.getSource<GeoJSONSource>(FUENTE_HUECOS)?.setData(datos);
+    });
+  });
+  createEffect(
+    () => huecosDe([...(escena()?.elementos.values() ?? [])], choques(), tamano()),
+    (huecos) => {
+      ponerHuecos()(huecos);
+    },
+  );
+
+  /** Los rótulos de ciudad que se copian encima: los colocados que no ceden su sitio. */
+  const rotulosEncima = createMemo(() => {
+    const fuera = choques().rotulosOcultos;
+    return lectura().rotulos.filter((rotulo) => !fuera.has(rotulo.clave));
   });
 
   /**
@@ -219,19 +318,62 @@ export function Marcadores(props: MarcadoresProps) {
   };
 
   return (
-    <CapaAgrupada
-      contenedor={props.mapa.getCanvasContainer()}
-      combinaciones={combinaciones()}
-      escena={escena()}
-      transicion={agrupador().transicion}
-      proyectar={proyectar()}
-      seVe={seVe()}
-      fotograma={fotograma()}
-      movimientoReducido={reducido()}
-      formas={formas()}
-      seleccionada={props.seleccionada}
-      alSeleccionar={(clave) => props.alSeleccionar(clave, provinciaDe(clave))}
-      alAbrir={abrir}
+    <>
+      <CapaAgrupada
+        contenedor={props.mapa.getCanvasContainer()}
+        combinaciones={combinaciones()}
+        escena={escena()}
+        transicion={agrupador().transicion}
+        proyectar={proyectar()}
+        seVe={seVe()}
+        fotograma={fotograma()}
+        movimientoReducido={reducido()}
+        formas={formas()}
+        ocultos={ocultos()}
+        tamano={tamano()}
+        seleccionada={props.seleccionada}
+        alSeleccionar={(clave) => props.alSeleccionar(clave, provinciaDe(clave))}
+        alAbrir={abrir}
+      />
+      <CapaDeRotulos contenedor={props.mapa.getCanvasContainer()}>
+        <For each={rotulosEncima()} keyed={(rotulo) => rotulo.clave}>
+          {(rotulo) => (
+            <RotuloEnPantalla
+              rotulo={rotulo()}
+              fotograma={fotograma()}
+              proyectar={proyectar()}
+              conFoto={props.conFoto ?? false}
+            />
+          )}
+        </For>
+      </CapaDeRotulos>
+    </>
+  );
+}
+
+/**
+ * Un rótulo de ciudad copiado encima de los marcadores. Se recoloca en cada fotograma del
+ * movimiento, como los marcadores, con su `transform`; su letra es la del zoom en que se leyó.
+ */
+function RotuloEnPantalla(props: {
+  readonly rotulo: RotuloLeido;
+  readonly fotograma: number;
+  readonly proyectar: (posicion: Coordenada) => Salto;
+  readonly conFoto: boolean;
+}) {
+  const punto = createMemo(() => {
+    // La proyección cambia con cada fotograma aunque no lo lea.
+    void props.fotograma;
+    return props.proyectar(props.rotulo.posicion);
+  });
+  return (
+    <RotuloDeCiudad
+      x={punto().x}
+      y={punto().y}
+      texto={props.rotulo.texto}
+      tamano={props.rotulo.tamano}
+      importancia={props.rotulo.importancia}
+      conFoto={props.conFoto}
     />
   );
 }

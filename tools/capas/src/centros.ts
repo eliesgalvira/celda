@@ -1,15 +1,12 @@
 import type { CentroDeProvincia, CentrosDeProvincia } from "@celda/dominio/centroVisual";
-import {
-  type Ciudad,
-  type HabitantesDeCiudades,
-  MINIMO_DE_HABITANTES,
-} from "@celda/dominio/habitantesDeCiudades";
+import type { Ciudad, HabitantesDeCiudades } from "@celda/dominio/habitantesDeCiudades";
 import {
   LimitesDeMunicipios,
   municipiosConHabitantes,
   PadronDeMunicipios,
 } from "@celda/dominio/municipio";
 import { nombreDeLugarDeMunicipio } from "@celda/dominio/nombreDeLugar";
+import { MINIMO_DE_HABITANTES } from "@celda/dominio/poblacionDeRotulos";
 import { dentroDelPoligono, type PoligonoEnGrados } from "@celda/dominio/poligono";
 import { areaKm2 } from "@celda/dominio/poblacion";
 import * as Effect from "effect/Effect";

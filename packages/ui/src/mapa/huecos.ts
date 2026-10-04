@@ -71,43 +71,40 @@ export const imagenDeHueco = (hueco: Hueco): string =>
 
 /** Un hueco como punto de GeoJSON, con la imagen y la escala de su icono. */
 interface PuntoDeHueco {
-  readonly type: "Feature";
-  readonly properties: { readonly imagen: string; readonly escala: number };
-  readonly geometry: { readonly type: "Point"; readonly coordinates: readonly [number, number] };
+  type: "Feature";
+  properties: { imagen: string; escala: number };
+  geometry: { type: "Point"; coordinates: [number, number] };
 }
 
-/** Los huecos que se mandan a la fuente. */
-interface Huecos {
-  readonly type: "FeatureCollection";
-  readonly features: ReadonlyArray<PuntoDeHueco>;
+/** Los huecos como los recibe la fuente, con `setData`. */
+export interface HuecosEnGeoJson {
+  type: "FeatureCollection";
+  features: Array<PuntoDeHueco>;
 }
-
-/** Lo que hace falta del mapa de MapLibre para poner los huecos. */
-export interface MapaConHuecos {
-  readonly getSource: (id: string) => { readonly setData?: (datos: Huecos) => void } | undefined;
-}
-
-const puestos = new WeakMap<object, string>();
 
 /**
- * Pone los huecos de los marcadores. Si son los mismos que los últimos, no toca el mapa: cada
+ * Lo que pone los huecos en el mapa: recibe `poner`, que los manda a la fuente (`setData`), y
+ * devuelve la función que los cambia. Si son los mismos que los últimos, no toca el mapa: cada
  * `setData` vuelve a colocar los rótulos y pinta otra vez.
  */
-export const ponerHuecos = (mapa: MapaConHuecos, huecos: ReadonlyArray<Hueco>): void => {
-  const features = huecos.map((hueco): PuntoDeHueco => ({
-    type: "Feature",
-    properties: { imagen: imagenDeHueco(hueco), escala: hueco.escala },
-    geometry: {
-      type: "Point",
-      coordinates: [Number(hueco.longitud.toFixed(6)), Number(hueco.latitud.toFixed(6))],
-    },
-  }));
-  const clave = JSON.stringify(features);
-  if (puestos.get(mapa) === clave) return;
-  const fuente = mapa.getSource(FUENTE_HUECOS);
-  if (fuente?.setData === undefined) return;
-  puestos.set(mapa, clave);
-  fuente.setData({ type: "FeatureCollection", features });
+export const puestaDeHuecos = (
+  poner: (datos: HuecosEnGeoJson) => void,
+): ((huecos: ReadonlyArray<Hueco>) => void) => {
+  let ultimos: string | undefined;
+  return (huecos) => {
+    const features = huecos.map((hueco): PuntoDeHueco => ({
+      type: "Feature",
+      properties: { imagen: imagenDeHueco(hueco), escala: hueco.escala },
+      geometry: {
+        type: "Point",
+        coordinates: [Number(hueco.longitud.toFixed(6)), Number(hueco.latitud.toFixed(6))],
+      },
+    }));
+    const clave = JSON.stringify(features);
+    if (clave === ultimos) return;
+    ultimos = clave;
+    poner({ type: "FeatureCollection", features });
+  };
 };
 
 /** Lo que hace falta del mapa de MapLibre para crear las imágenes de los huecos. */

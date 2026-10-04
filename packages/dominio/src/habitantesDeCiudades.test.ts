@@ -1,7 +1,8 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import { centroVisual, habitantesDeProvincia } from "./centroVisual.ts";
-import { CIUDADES, habitantesDeRotulo, indiceDeCiudades } from "./habitantesDeCiudades.ts";
+import { CIUDADES } from "./habitantesDeCiudades.ts";
+import { habitantesDeRotulo, indiceDeCiudades } from "./poblacionDeRotulos.ts";
 
 describe("habitantes de un rótulo de ciudad", () => {
   it("salen del municipio con su nombre de lugar más cercano", () => {
