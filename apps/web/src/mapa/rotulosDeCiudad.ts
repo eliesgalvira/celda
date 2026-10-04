@@ -48,9 +48,15 @@ export interface RasgoColocado {
   readonly layer: { readonly id: string };
 }
 
+/** De una capa del estilo, los zooms en que se ve: desde `minzoom` y hasta antes de `maxzoom`. */
+export interface ZoomsDeCapa {
+  readonly minzoom?: number | undefined;
+  readonly maxzoom?: number | undefined;
+}
+
 /** Lo que hace falta del mapa de MapLibre para leer sus rótulos. `Map` lo cumple. */
 export interface MapaConRotulosColocados {
-  readonly getLayer: (id: string) => object | undefined;
+  readonly getLayer: (id: string) => ZoomsDeCapa | undefined;
   readonly getZoom: () => number;
   readonly queryRenderedFeatures: (opciones: {
     layers: Array<string>;
@@ -100,14 +106,26 @@ const capitalDe = (rasgo: RasgoColocado): number =>
     ? 2
     : Number(rasgo.properties.capital ?? 99);
 
+/** Si una capa se ve a `zoom`, como lo decide MapLibre: un zoom 0 es como no tenerlo. */
+const seVeA = (capa: ZoomsDeCapa, zoom: number): boolean =>
+  (capa.minzoom === undefined || capa.minzoom === 0 || zoom >= capa.minzoom) &&
+  (capa.maxzoom === undefined || capa.maxzoom === 0 || zoom < capa.maxzoom);
+
 /**
  * Los rótulos de ciudad colocados ahora, cada uno una vez aunque salga en dos teselas, por orden
  * de clave. Su texto es el que pinta el mapa base, el nombre de lugar (ADR 0025). Valen las capas
  * de los dos mapas base: las de lejos del de reserva tienen la letra de las suyas de cerca.
+ *
+ * Solo pregunta por las capas de ciudades que se ven a este zoom. Con ninguna, como de cerca, desde
+ * el zoom 14, no pregunta: `queryRenderedFeatures` lee entero cada tesela a la vista, también las
+ * de la calle, que son las que más pesan, aunque sus capas no tengan nada colocado (#67).
  */
 export const leerRotulosDeCiudad = (mapa: MapaConRotulosColocados): LecturaDeRotulos => {
   const zoom = mapa.getZoom();
-  const capas = CAPAS.filter((id) => mapa.getLayer(id) !== undefined);
+  const capas = CAPAS.filter((id) => {
+    const capa = mapa.getLayer(id);
+    return capa !== undefined && seVeA(capa, zoom);
+  });
   if (capas.length === 0) return { zoom, rotulos: [] };
   const vistos = new Map<string, RotuloLeido>();
   for (const rasgo of mapa.queryRenderedFeatures({ layers: capas })) {
