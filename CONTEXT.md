@@ -154,6 +154,10 @@ _Evitar_: despliegue, exportación, subida
 Callejero de fondo sobre el que se dibujan las capas, con sus rótulos y sus límites. Celda le pone el estilo y los límites de comunidades y provincias, pero no produce sus teselas.
 _Evitar_: capa base, fondo
 
+**Mapa base de reserva**:
+El mapa base vectorial del IGN, con el mismo aspecto, que Celda pone si el de OpenFreeMap no llega al abrir, como pasa cuando las operadoras bloquean Cloudflare. Dura hasta la siguiente visita.
+_Evitar_: mapa de respaldo, fallback, mapa del IGN (en la interfaz)
+
 **Foto aérea**:
 Ortofoto del IGN que la persona puede poner bajo el mapa base, con las vías y los rótulos encima. Va apagada al abrir.
 _Evitar_: satélite, vista de satélite, ortofoto (en la interfaz)

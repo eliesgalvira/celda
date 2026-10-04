@@ -19,6 +19,7 @@ Celda será abierta del todo, y el usuario pidió «la más abierta» para lo qu
 | Padrón del INE | CC BY 4.0 | «Elaboración propia con datos extraídos del sitio web del INE: www.ine.es», con la fecha |
 | Barrios y población de Open Data BCN | CC BY 4.0 | «Ajuntament de Barcelona», con la licencia y la fecha (ADR 0004) |
 | Mapa base y búsqueda de direcciones, sobre OpenStreetMap | ODbL | El crédito de OpenStreetMap, con el del servicio (ADR 0013) |
+| Mapa base de reserva del IGN (#60) | CC BY 4.0 | «© Sistema Cartográfico Nacional · CC BY 4.0 scne.es», la fórmula de su servicio, solo mientras está puesto; en el móvil se queda a la vista con los demás créditos plegados |
 | Ortofoto PNOA del IGN, en la foto aérea | CC BY 4.0 | «PNOA · CC BY 4.0 scne.es», la fórmula de su servicio, mientras la foto está encendida (ADR 0022) |
 
 - **Lo publicado lleva esos créditos** y dice qué parte es CC0 y cuál de quién.
