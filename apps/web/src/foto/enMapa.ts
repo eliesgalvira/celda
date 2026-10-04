@@ -6,8 +6,9 @@ import { CAPA_PORTALES } from "@celda/ui/mapa/rotulos.ts";
 import { CAPA_EDIFICIOS } from "@celda/ui/mapa/suelo.ts";
 import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
 import * as Predicate from "effect/Predicate";
-import { createContext, createEffect, createSignal, untrack } from "solid-js";
+import { createContext, createEffect, createMemo, createSignal, untrack } from "solid-js";
 
+import type { Movimiento } from "../mapa/vistaInicial.ts";
 import {
   dibujoDelEdificio,
   type DibujoDelEdificio,
@@ -41,6 +42,14 @@ export interface LienzoDeFoto {
   ) => () => void;
   /** Quita el edificio resaltado. */
   readonly quitarEdificio: () => void;
+  /**
+   * Avisa de los vuelos de la cámara: `true` cuando la web la mueve con una animación (`flyTo`,
+   * `easeTo`, `fitBounds`) y `false` cuando se para, porque llega, porque empieza otro vuelo o
+   * porque la persona coge el mapa. Un gesto de una persona lleva el evento del navegador que lo
+   * empezó y no es un vuelo; un salto empieza y acaba en la misma tarea. Devuelve con qué dejar de
+   * avisar.
+   */
+  readonly seguirVuelos: (alCambiar: (volando: boolean) => void) => () => void;
 }
 
 type Pixel = [number, number];
@@ -52,8 +61,14 @@ export interface MapaParaFoto extends MapaConFoto {
     readonly zoom: number;
     readonly offset: [number, number];
   }) => void;
-  readonly on: (evento: "moveend" | "idle", escuchador: () => void) => void;
-  readonly off: (evento: "moveend" | "idle", escuchador: () => void) => void;
+  readonly on: (
+    evento: "movestart" | "moveend" | "idle",
+    escuchador: (movimiento: Movimiento) => void,
+  ) => void;
+  readonly off: (
+    evento: "movestart" | "moveend" | "idle",
+    escuchador: (movimiento: Movimiento) => void,
+  ) => void;
   readonly project: (punto: [number, number]) => { readonly x: number; readonly y: number };
   readonly getBounds: () => { readonly contains: (punto: [number, number]) => boolean };
   readonly queryRenderedFeatures: (
@@ -138,6 +153,20 @@ export const lienzoDeFoto = (mapa: MapaParaFoto): LienzoDeFoto => {
       };
     },
     quitarEdificio: () => pintar(SIN_EDIFICIO),
+    seguirVuelos: (alCambiar) => {
+      const alEmpezar = (movimiento: Movimiento) => {
+        alCambiar(movimiento.originalEvent === undefined);
+      };
+      const alParar = () => {
+        alCambiar(false);
+      };
+      mapa.on("movestart", alEmpezar);
+      mapa.on("moveend", alParar);
+      return () => {
+        mapa.off("movestart", alEmpezar);
+        mapa.off("moveend", alParar);
+      };
+    },
   };
 };
 
@@ -160,6 +189,8 @@ export interface EntradaFoto {
 export interface FotoDelMapa {
   /** Si la foto aérea está encendida. Apagada al abrir cada visita. */
   readonly encendida: () => boolean;
+  /** Si el mapa la enseña: encendida y con la cámara sin volar. */
+  readonly seVe: () => boolean;
   readonly alternar: () => void;
   readonly encender: () => void;
   /** Qué ha hecho «Ver el edificio» con el emplazamiento `clave`. */
@@ -176,22 +207,46 @@ const BUSCANDO: EstadoEdificio = { tipo: "buscando" };
 /**
  * La foto aérea en el mapa y «Ver el edificio». Encender la foto y volar al edificio abren cosas
  * en el mapa (teselas del PNOA, un vuelo y sus escuchadores), así que se abren con `recurso()`:
- * cada uno con una clave que solo cambia cuando la persona pulsa, cambia de emplazamiento o el
- * mapa se crea otra vez. Cambiar de emplazamiento o cerrar la ficha quita el resaltado.
+ * cada uno con una clave que solo cambia cuando la persona pulsa, cambia de emplazamiento, la
+ * cámara empieza o acaba un vuelo o el mapa se crea otra vez. Cambiar de emplazamiento o cerrar la
+ * ficha quita el resaltado.
+ *
+ * Mientras la cámara vuela, el mapa se ve sin la foto, como con ella apagada, y la foto vuelve al
+ * llegar (#67): un vuelo de España a la calle pedía las teselas de cada zoom del camino, que solo
+ * se ven de paso. Con la foto se apaga todo lo que cambia con ella (`conFoto`): las vías blancas
+ * sobre el fondo claro no se verían. Los gestos de la persona no son vuelos y no la apagan.
  */
 export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
   const [encendida, setEncendida] = createSignal(false);
+  // El lienzo cuya cámara está volando. Un lienzo nuevo empieza quieto aunque el viejo volara.
+  const [enVuelo, setEnVuelo] = createSignal<LienzoDeFoto>();
   const [pedido, setPedido] = createSignal<PedidoDeEdificio>();
+  // El último pedido cuyo vuelo ya ha empezado.
+  const [volado, setVolado] = createSignal<PedidoDeEdificio>();
   const [hallado, setHallado] = createSignal<{
     readonly pedido: PedidoDeEdificio;
     readonly encontrado: EdificioEncontrado | undefined;
   }>();
 
+  recurso("mapa:vuelos", entrada.lienzo, (lienzo) =>
+    lienzo.seguirVuelos((volando) => {
+      setEnVuelo(volando ? lienzo : undefined);
+    }),
+  );
+
+  // Un pedido de «Ver el edificio» cuyo vuelo aún no ha empezado cuenta ya como vuelo: así la foto
+  // no se pone en el punto de partida para quitarse en la misma tarea.
+  const seVe = createMemo(() => {
+    const lienzo = entrada.lienzo();
+    const porVolar = pedido() !== undefined && volado() !== pedido();
+    return encendida() && lienzo !== undefined && enVuelo() !== lienzo && !porVolar;
+  });
+
   recurso(
     "mapa:foto",
     () => {
       const lienzo = entrada.lienzo();
-      return lienzo === undefined ? undefined : { lienzo, encendida: encendida() };
+      return lienzo === undefined ? undefined : { lienzo, encendida: seVe() };
     },
     ({ lienzo, encendida: si }) => {
       lienzo.ponerFoto(si);
@@ -218,6 +273,7 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
         untrack(entrada.desplazamiento),
         (encontrado) => setHallado({ pedido: actual, encontrado }),
       );
+      setVolado(actual);
       return (siguiente) => {
         dejar();
         if (siguiente?.lienzo !== lienzo) lienzo.quitarEdificio();
@@ -240,6 +296,7 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
 
   return {
     encendida,
+    seVe,
     alternar: () => setEncendida((si) => !si),
     encender: () => setEncendida(true),
     edificio,

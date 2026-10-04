@@ -4,7 +4,7 @@ import type {
   RasterSourceSpecification,
 } from "maplibre-gl";
 
-import { FOTO_AEREA, visibleConFoto } from "./expresiones.ts";
+import { FOTO_AEREA } from "./expresiones.ts";
 import type { ColorDeToken } from "./tokens.ts";
 
 /**
@@ -37,12 +37,18 @@ export const fuenteFoto = (): RasterSourceSpecification => ({
 /**
  * La capa de la ortofoto, en color natural. Escondida, MapLibre no pide ninguna tesela de la foto:
  * con ella apagada, una visita no hace ninguna petición al PNOA.
+ *
+ * Su visibilidad no lee el estado del estilo: la pone `ponerFotoAerea`. MapLibre toma una
+ * visibilidad que lee el estado por maquetación y, con cada cambio del estado, recarga la fuente
+ * de la capa y vacía su caché de teselas. Con la foto fuera de los vuelos (#67), volver a una
+ * vista ya vista pedía otra vez su foto entera. Una capa de imagen escondida con
+ * `setLayoutProperty` no recarga su fuente.
  */
 export const capaFoto = (): LayerSpecification => ({
   id: CAPA_FOTO,
   type: "raster",
   source: FUENTE_FOTO,
-  layout: { visibility: visibleConFoto },
+  layout: { visibility: "none" },
 });
 
 /** Lo que dice de la foto el estado del estilo. */
@@ -54,16 +60,23 @@ export interface EstadoConFoto {
 export interface MapaConFoto {
   readonly getGlobalState: () => Readonly<EstadoConFoto>;
   readonly setGlobalStateProperty: (nombre: string, valor: boolean) => void;
+  readonly setLayoutProperty: (
+    capa: string,
+    propiedad: "visibility",
+    valor: "visible" | "none",
+  ) => void;
 }
 
 /**
- * Enciende o apaga la foto aérea. Solo cambia el estado del estilo: ni `setStyle` ni capas nuevas,
- * así que las capas de Celda, las celdas y la ficha abierta se quedan como estaban. Si ya estaba
- * así no toca el mapa, que con cualquier cambio de estado se vuelve a pintar.
+ * Enciende o apaga la foto aérea: el estado del estilo, que leen las capas que cambian sobre la
+ * foto, y la visibilidad de la capa de la foto. Ni `setStyle` ni capas nuevas, así que las capas
+ * de Celda, las celdas y la ficha abierta se quedan como estaban. Si ya estaba así no toca el
+ * mapa, que con cualquier cambio de estado se vuelve a pintar.
  */
 export const ponerFotoAerea = (mapa: MapaConFoto, encendida: boolean): void => {
   if ((mapa.getGlobalState()[FOTO_AEREA] ?? false) === encendida) return;
   mapa.setGlobalStateProperty(FOTO_AEREA, encendida);
+  mapa.setLayoutProperty(CAPA_FOTO, "visibility", encendida ? "visible" : "none");
 };
 
 /**

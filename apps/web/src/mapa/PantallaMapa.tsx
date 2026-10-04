@@ -1101,7 +1101,7 @@ export function PantallaMapa() {
                             alVer={precargarFichas}
                             alCambiarVista={alCambiarVista}
                             lectorDeRotulos={lectorDeRotulos()}
-                            conFoto={foto.encendida()}
+                            conFoto={foto.seVe()}
                           />
                         )}
                       </Show>
@@ -1117,17 +1117,19 @@ export function PantallaMapa() {
               pista={pista()}
               zoom={
                 <>
+                  {/* Como los controles de MapLibre, llevan el evento de la pulsación: son un
+                  gesto de la persona, no un vuelo, y no apagan la foto aérea (#67). */}
                   <ControlDelMapa
                     etiqueta="Acercar"
                     icono="+"
                     disabled={!listo()}
-                    onClick={() => mapa?.zoomIn()}
+                    onClick={(evento) => mapa?.zoomIn(undefined, { originalEvent: evento })}
                   />
                   <ControlDelMapa
                     etiqueta="Alejar"
                     icono="−"
                     disabled={!listo()}
-                    onClick={() => mapa?.zoomOut()}
+                    onClick={(evento) => mapa?.zoomOut(undefined, { originalEvent: evento })}
                   />
                 </>
               }
