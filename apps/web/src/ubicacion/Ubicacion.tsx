@@ -84,17 +84,17 @@ export function MenuDeUbicacion(props: MenuDeUbicacionProps) {
   const detalleUsar = createMemo(() => {
     if (referencia()?.tipo === "gps") return "Ya la estás usando.";
     if (control.ubicacion().permiso === "denegado") {
-      return "Bloqueada en este navegador. Actívala en los ajustes de la web.";
+      return "Está bloqueada en este navegador. Puedes activarla en los ajustes del sitio.";
     }
     const estado = actual();
     if (estado.tipo === "fallo" && sinGeolocalizacion(estado.motivo)) {
-      return "Este navegador no da la ubicación.";
+      return "Este navegador no permite usar la ubicación.";
     }
     if (control.ubicacion().estado.tipo === "pidiendo") return "La estamos buscando.";
     if (estado.tipo === "fallo" && estado.motivo === "sin-fuente") {
-      return "Este ordenador no sabe dónde está. Puedes volver a intentarlo.";
+      return "Este ordenador no ha podido calcular su posición. Puedes volver a intentarlo.";
     }
-    return "Te explicamos antes para qué sirve. No se guarda.";
+    return "Antes de pedirla te explicamos para qué sirve. Celda no la guarda.";
   });
   const puedeUsar = createMemo(() => {
     const estado = actual();
@@ -128,7 +128,7 @@ export function MenuDeUbicacion(props: MenuDeUbicacionProps) {
       <OpcionUbicacion
         tono="elegido"
         etiqueta="Elegir un punto en el mapa"
-        detalle="O busca una dirección."
+        detalle="También puedes buscar una dirección."
         onClick={elegir(control.elegirEnMapa)}
       />
       <Show when={referencia()}>
@@ -171,8 +171,9 @@ export function PasoPrevio() {
             <Termino termino="emplazamiento">emplazamientos</Termino>.
           </li>
           <li>
-            Se calcula en tu dispositivo. Celda no la guarda ni la envía a ningún servidor. El mapa
-            sí descarga de OpenFreeMap el callejero de la zona que enseña, como cuando lo mueves.
+            El cálculo se hace en tu dispositivo, y Celda no guarda tu ubicación ni la envía a
+            ningún servidor. Lo único que se descarga es el callejero de la zona desde OpenFreeMap,
+            igual que cuando mueves el mapa.
           </li>
           <li>Puedes quitarla cuando quieras desde el botón «Ubicación».</li>
         </ListaPasoPrevio>
@@ -193,7 +194,7 @@ const TEXTO_ALMACEN = {
   "sin-guardar": {
     titulo: "El punto no se ha guardado",
     texto:
-      "Este navegador no deja a Celda guardar datos en el dispositivo (pasa en algunas ventanas privadas). El punto sirve mientras no cierres la página.",
+      "Este navegador no deja a Celda guardar datos en el dispositivo, algo que pasa en algunas ventanas privadas. El punto se mantendrá hasta que cierres la página.",
   },
   "sin-borrar": {
     titulo: "El punto no se ha borrado del dispositivo",
@@ -288,8 +289,8 @@ export function AvisosDeUbicacion(props: {
             </>
           }
         >
-          Si tu navegador te pregunta, elige si la compartes con Celda. Si no llega, te lo diremos y
-          podrás elegir el punto en el mapa.
+          Si el navegador te pregunta, decide si compartes tu ubicación con Celda. Si no llega,
+          saldrá un aviso y podrás elegir el punto en el mapa.
         </Aviso>
       </Show>
       <Show when={control.avisoAlmacen()} keyed>
@@ -317,13 +318,14 @@ export function AvisosDeUbicacion(props: {
 }
 
 const SIN_RESULTADOS =
-  "No hay ninguna dirección así en España. Prueba con la calle, el número y el municipio.";
+  "No se ha encontrado esa dirección en España. Prueba a escribir la calle, el número y el municipio.";
 
 const TEXTO_FALLO_BUSQUEDA: Readonly<Record<BusquedaFallida["motivo"], string>> = {
-  apagada: "La búsqueda de direcciones está apagada ahora. Elige el punto en el mapa.",
-  limite: "El buscador pide que esperemos un poco. Vuelve a probar en unos segundos.",
+  apagada:
+    "La búsqueda de direcciones está desactivada en este momento. Puedes elegir el punto en el mapa.",
+  limite: "El buscador ha recibido demasiadas peticiones. Vuelve a probar en unos segundos.",
   "sin-respuesta":
-    "El buscador no responde. Puede fallar la conexión o estar caído el servicio. Puedes elegir el punto en el mapa.",
+    "El buscador no responde. Puede que falle la conexión o que el servicio no funcione. Mientras, puedes elegir el punto en el mapa.",
 };
 
 export interface EleccionConBuscadorProps {
@@ -466,7 +468,7 @@ export function ReferenciaEnFicha(props: {
       <Switch
         fallback={
           <SinReferencia
-            titulo="¿Desde dónde lo miramos?"
+            titulo="Distancia hasta el emplazamiento"
             texto={<TextoConTerminos texto={PARA_QUE_SIRVE} />}
             aviso={sinPunto().aviso}
             acciones={
@@ -556,7 +558,7 @@ function ServicioEnFicha(props: { readonly clave: string; readonly tipo: "gps" |
     const actual = textos();
     if (actual !== undefined) return <TextoConTerminos texto={actual.veredicto} />;
     return servicio.fallo()
-      ? "No se ha podido calcular el sector que da servicio. El modelo se calcula en tu navegador; prueba a mover el punto o a recargar la página."
+      ? "Tu navegador no ha podido calcular el sector que da servicio. Prueba a mover el punto o a recargar la página."
       : undefined;
   });
   return (

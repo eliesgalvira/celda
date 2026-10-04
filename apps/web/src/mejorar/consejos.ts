@@ -69,7 +69,7 @@ const DB = termino("decibelio", "dB");
 const MOVIL: Consejo = {
   clave: "movil",
   tono: "secundario",
-  texto: marcado`Girar el móvil en la mano apenas cambia la señal. Su antena recibe casi igual en todas direcciones, y la mano y el cuerpo cuentan más que hacia dónde apunte.`,
+  texto: marcado`Girar el móvil en la mano apenas cambia la señal. Su antena recibe casi igual en todas direcciones, y la mano y el cuerpo influyen más que hacia dónde apunte.`,
 };
 
 /** Grados enteros entre 0 y 359. */
@@ -96,7 +96,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
       {
         clave: "antena",
         tono: "principal",
-        texto: marcado`Una ${termino("antena-exterior", "antena exterior")} direccional hay que apuntarla al emplazamiento, y ahí la orientación importa mucho.`,
+        texto: marcado`Una ${termino("antena-exterior", "antena exterior")} direccional tiene que apuntar hacia el emplazamiento, así que su orientación importa mucho.`,
       },
       MOVIL,
     ];
@@ -104,7 +104,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
       tipo: "sin-punto",
       consejos: lista.map((consejo) => ({ ...consejo, texto: marcar(consejo.texto) })),
       llamada: marcar(
-        marcado`Con un ${termino("punto-de-referencia", "punto de referencia")}, Celda te dice hacia qué ventana poner el router y a qué ${termino("rumbo", "rumbo")} apuntar la antena, y la brújula del móvil te ayuda a alinearla.`,
+        marcado`Si eliges un ${termino("punto-de-referencia", "punto de referencia")}, Celda indica hacia qué ventana poner el router y a qué ${termino("rumbo", "rumbo")} apuntar la antena, y puedes alinearla con la brújula del móvil.`,
       ),
     };
   }
@@ -152,7 +152,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
     {
       clave: "antena",
       tono: "principal",
-      texto: marcado`Con una ${termino("antena-exterior", "antena exterior")} direccional, apúntala a ${String(rumbo)}°. Ahí la orientación importa mucho, y la brújula de abajo ayuda a alinearla.`,
+      texto: marcado`Si usas una ${termino("antena-exterior", "antena exterior")} direccional, apúntala a ${String(rumbo)}°. La orientación importa mucho, y la brújula de abajo sirve para alinearla.`,
     },
   ];
 
@@ -179,13 +179,13 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
       lista.push({
         clave: "sector",
         tono: "principal",
-        texto: marcado`${esta} casi de frente al ${sector}, así que apuntar al emplazamiento es apuntar a su haz.`,
+        texto: marcado`${esta} casi de frente al ${sector}, así que una antena apuntada al emplazamiento queda también de cara a su haz.`,
       });
     } else if (grados >= ENTRE_DOS_GRADOS) {
       lista.push({
         clave: "sector",
         tono: "principal",
-        texto: marcado`${esta} entre dos sectores, donde llega menos señal de cada uno. Apunta igualmente al emplazamiento. Qué sector da servicio lo decide la red, no la antena.`,
+        texto: marcado`${esta} entre dos sectores, donde llega menos señal de cada uno. Aun así, conviene apuntar al emplazamiento, porque el sector que da servicio lo elige la red.`,
       });
     }
     if (servicio.enCelda === false) {
@@ -226,4 +226,4 @@ const ordenar = (hacia: TextoMarcado, lista: ReadonlyArray<Consejo>, nota: Texto
 export const notaConsejos = (orientacion: Orientacion): TextoMarcado =>
   orientacion.tipo === "estimada"
     ? marcado`Los sectores tienen ${termino("azimut", "orientación estimada")}, con ±${String(orientacion.margen)}° de margen. El rumbo sale de la posición publicada del emplazamiento. Tómalo como punto de partida y ajusta mirando la señal del router.`
-    : marcado`Los sectores tienen ${termino("azimut", "orientación supuesta")}. Ninguna fuente publica hacia dónde apuntan, así que lo que se dice de ellos puede no cuadrar. El rumbo sale de la posición publicada del emplazamiento. Tómalo como punto de partida y ajusta mirando la señal del router.`;
+    : marcado`Los sectores tienen ${termino("azimut", "orientación supuesta")}. Ninguna fuente publica hacia dónde apuntan, así que lo que se dice de ellos puede no ser exacto. El rumbo sale de la posición publicada del emplazamiento. Tómalo como punto de partida y ajusta mirando la señal del router.`;

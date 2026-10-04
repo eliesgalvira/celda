@@ -19,10 +19,13 @@ describe("diagrama de radiación del panel", () => {
     assert.deepStrictEqual(textos.leyenda, ["Sector 1 · 0°", "Sector 2 · 120°", "Sector 3 · 240°"]);
     assert.match(
       textoPlano(textos.notas[0] ?? []),
-      /^Orientación supuesta\. Ninguna fuente publica/u,
+      /^La orientación es supuesta\. Ninguna fuente publica/u,
     );
     assert.include(textoPlano(textos.notas[0] ?? []), "0°, 120° y 240°");
-    assert.match(textos.descripcion, /^Modelo, no medida\. 3 sectores con orientación supuesta/u);
+    assert.match(
+      textos.descripcion,
+      /^Este diagrama se calcula con un modelo de antena típica y muestra 3 sectores con orientación supuesta/u,
+    );
     // Una orientación supuesta no lleva margen: no es una estimación.
     assert.notInclude(textos.leyenda.join(" "), "±");
   });
@@ -34,7 +37,10 @@ describe("diagrama de radiación del panel", () => {
       "Sector 2 · 160° ±15°",
       "Sector 3 · 280° ±15°",
     ]);
-    assert.strictEqual(textoPlano(textos.notas[0] ?? []), "Orientación estimada ±15°.");
+    assert.strictEqual(
+      textoPlano(textos.notas[0] ?? []),
+      "La orientación es una estimación, con ±15° de margen.",
+    );
     assert.include(textos.descripcion, "orientación estimada a 40°, 160° y 280°, ±15°");
   });
 

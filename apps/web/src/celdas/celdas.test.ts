@@ -184,7 +184,7 @@ describe("pista de las celdas", () => {
     const listas = pistaDeCeldas(true, "listas");
     assert.strictEqual(
       listas?.texto,
-      "Zona más cercana a cada emplazamiento. Simulación, no cobertura real.",
+      "Cada celda es la parte del mapa más cercana a un emplazamiento. Sirve como aproximación, porque la cobertura real depende del terreno y de la potencia de cada antena.",
     );
     assert.isFalse(listas?.reintentar);
     const fallo = pistaDeCeldas(true, "fallo");
@@ -194,9 +194,12 @@ describe("pista de las celdas", () => {
   it("mientras falta una provincia vecina lo dice, y si no llega ofrece pedirla otra vez", () => {
     const girona = { codigo: "17", nombre: "Girona" };
     const cargando = pistaDeCeldas(true, "listas", { tipo: "cargando", provincias: [girona] });
-    assert.strictEqual(cargando?.texto, "Cargando Girona para las celdas de junto al borde…");
+    assert.strictEqual(cargando?.texto, "Cargando Girona para dibujar las celdas junto al borde…");
     const fallo = pistaDeCeldas(true, "listas", { tipo: "fallo", provincias: [girona] });
-    assert.match(fallo?.texto ?? "", /^No han llegado los emplazamientos de Girona/u);
+    assert.match(
+      fallo?.texto ?? "",
+      /^Las celdas junto al borde con Girona no se dibujan porque no han llegado sus emplazamientos/u,
+    );
     assert.deepStrictEqual(fallo?.reintentar, ["17"]);
   });
 });

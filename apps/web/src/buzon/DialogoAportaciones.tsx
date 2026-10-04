@@ -131,8 +131,9 @@ export function DialogoAportaciones(props: DialogoAportacionesProps) {
         </Match>
         <Match when={vista().tipo === "lista"}>
           <p>
-            Lo que creas en Celda se guarda en este dispositivo, sin cuenta. Desde aquí lo puedes
-            compartir con Celda: antes de enviar ves qué sale y con qué licencia.
+            Las medidas y correcciones que creas en Celda se guardan en este dispositivo, sin
+            necesidad de cuenta. Desde aquí puedes enviarlas a Celda. Antes de enviar cada una verás
+            qué datos salen y con qué licencia.
           </p>
           <Show when={sinAlmacen()}>
             <Nota tono="aviso" titulo="No se puede leer lo guardado">
@@ -215,23 +216,30 @@ function SinAportaciones(props: {
       <Match when={props.tipo === "propia" && props.dispositivo === "ordenador"}>
         <Nota tono="aviso" titulo="En un ordenador no hay medidas propias">
           <p>
-            Una medida se registra en el móvil, con una captura de su{" "}
-            <Termino termino="modo-de-informacion">modo de información</Termino>, y se queda en ese
-            móvil. Compártela desde allí. Desde aquí puedes proponer correcciones y respaldarlas.
+            Las medidas se registran en el móvil con una captura de su{" "}
+            <Termino termino="modo-de-informacion">modo de información</Termino> y se guardan en él,
+            así que hay que compartirlas desde el móvil. En el ordenador puedes proponer
+            correcciones y respaldar las de otras personas.
           </p>
         </Nota>
       </Match>
       <Match when={props.tipo === "propia"}>
         <p>
           <Etiqueta tono="pronto">PRONTO</Etiqueta> Aún no se pueden registrar medidas a partir de
-          una captura. Cuando se pueda, saldrán aquí para compartirlas.
+          una captura. Cuando se pueda, aparecerán aquí para compartirlas.
         </p>
       </Match>
       <Match when={props.tipo === "correccion-propuesta"}>
-        <p>Ninguna. Puedes proponer una desde la ficha de cualquier emplazamiento.</p>
+        <p>
+          Todavía no has propuesto ninguna. Puedes hacerlo desde la ficha de cualquier
+          emplazamiento.
+        </p>
       </Match>
       <Match when={props.tipo === "corroboracion"}>
-        <p>Ninguna. Cuando una ficha enseñe una corrección de la comunidad, podrás respaldarla.</p>
+        <p>
+          Todavía no has respaldado ninguna. Las correcciones de la comunidad se respaldan desde la
+          ficha en la que aparecen.
+        </p>
       </Match>
     </Switch>
   );

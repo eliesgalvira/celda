@@ -148,7 +148,7 @@ describe("filtro de compañías (ADR 0026)", () => {
     const { findByRole, getByRole } = montar(["digi"]);
     await waitFor(() => assert.isNotNull(aviso()));
     assert.match(aviso()?.textContent ?? "", /Solo Digi/u);
-    assert.match(aviso()?.textContent ?? "", /Más claros: la red de Movistar, que usa Digi\./u);
+    assert.match(aviso()?.textContent ?? "", /La red de Movistar que usa Digi sale más clara\./u);
     fireEvent.click(await findByRole("button", { name: "Compañías" }));
     flush();
     assert.strictEqual(getByRole("button", { name: "Digi" }).getAttribute("aria-pressed"), "true");
@@ -160,7 +160,7 @@ describe("filtro de compañías (ADR 0026)", () => {
     await waitFor(() => assert.isNotNull(aviso()));
     assert.match(
       aviso()?.textContent ?? "",
-      /De lejos aún se cuentan todas las compañías: acércate para ver solo Movistar\./u,
+      /Con el mapa alejado, los números aún cuentan todas las compañías\. Acerca el mapa para ver solo Movistar\./u,
     );
   });
 
@@ -171,7 +171,7 @@ describe("filtro de compañías (ADR 0026)", () => {
     fichas.responder(FICHA.clave, FICHA);
     flush();
     await findByText(
-      /Digi usa aquí la red de Movistar: donde Digi no tiene emplazamientos propios/u,
+      /Digi usa aquí la red de Movistar\. Donde Digi no tiene emplazamientos propios/u,
     );
   });
 

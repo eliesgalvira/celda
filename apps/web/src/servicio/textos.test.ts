@@ -37,14 +37,14 @@ describe("textos del sector que da servicio", () => {
   it("algo fuera del eje dice los grados y los dB que se pierden", () => {
     assert.strictEqual(
       veredicto(lectura(0, 30)),
-      "Estás a 30° del eje del sector 1 (0°) y pierdes 2,6 dB, poca cosa.",
+      "Estás a 30° del eje del sector 1 (0°) y pierdes solo 2,6 dB.",
     );
   });
 
   it("entre dos sectores lo dice y redondea la pérdida", () => {
     assert.strictEqual(
       veredicto(lectura(1, -55)),
-      "Estás entre dos sectores, a 55° del eje del sector 2 (120°), y pierdes unos 9 dB. Es donde un sector le pasa el relevo al otro.",
+      "Estás entre dos sectores, a 55° del eje del sector 2 (120°), y pierdes unos 9 dB. En esa zona el servicio puede pasar de un sector al otro.",
     );
   });
 
@@ -61,7 +61,7 @@ describe("textos del sector que da servicio", () => {
   it("fuera de la celda avisa de que hay otro emplazamiento más cerca", () => {
     assert.match(
       veredicto(lectura(2, -18, { enCelda: false })),
-      /Además, estás fuera de la celda de este emplazamiento: hay otro más cerca, que puede ser el que te da servicio\.$/u,
+      /Además, estás fuera de la celda de este emplazamiento\. Hay otro más cerca y puede que sea ese el que te da servicio\.$/u,
     );
     assert.notMatch(veredicto(lectura(2, -18, { enCelda: undefined })), /fuera/u);
   });
@@ -84,7 +84,7 @@ describe("textos del sector que da servicio", () => {
     }
     assert.strictEqual(
       veredicto(lectura(0, 30), "elegido"),
-      "El punto está a 30° del eje del sector 1 (0°) y se pierden 2,6 dB, poca cosa.",
+      "El punto está a 30° del eje del sector 1 (0°) y se pierden solo 2,6 dB.",
     );
   });
 
@@ -104,7 +104,7 @@ describe("textos del sector que da servicio", () => {
     assert.notProperty(textos, "modelo");
     assert.match(
       textoPlano(textos.nota),
-      /^Orientación supuesta a 0°, 120° y 240°: ninguna fuente/u,
+      /^La orientación de 0°, 120° y 240° es supuesta, porque ninguna fuente/u,
     );
     assert.match(textoPlano(textos.nota), /puede ser otro\.$/u);
   });
@@ -115,7 +115,7 @@ describe("textos del sector que da servicio", () => {
     assert.match(textoPlano(textos.veredicto), /sector 1 \(30° ±15°\)/u);
     assert.match(
       textoPlano(textos.nota),
-      /^Orientación estimada, con ±15° de margen en cada eje\./u,
+      /^La orientación es una estimación, con ±15° de margen en cada eje\./u,
     );
   });
 

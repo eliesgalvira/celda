@@ -21,7 +21,7 @@ export const NOMBRE_COMPANIA: Readonly<Record<Compania, string>> = {
  * estación base (ver `docs/patterns/ui.md`, «Marcadores y logos»).
  */
 export const AVISO_DE_MARCAS =
-  "Las marcas y logotipos de las compañías son de sus titulares; Celda no está afiliada a ninguna.";
+  "Las marcas y los logotipos de las compañías pertenecen a sus titulares. Celda no está afiliada a ninguna de ellas.";
 
 /**
  * La cita que piden las condiciones de DIGI para reproducir su logotipo sin ánimo de lucro: la

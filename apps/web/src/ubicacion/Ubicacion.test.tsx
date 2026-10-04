@@ -145,7 +145,9 @@ const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
 describe("punto de referencia: pedir la ubicación", () => {
   it("sin punto, la ficha explica qué se gana con uno", async () => {
     const { panel } = await abrir();
-    assert.isNotNull(await panel().findByRole("heading", { name: "¿Desde dónde lo miramos?" }));
+    assert.isNotNull(
+      await panel().findByRole("heading", { name: "Distancia hasta el emplazamiento" }),
+    );
     assert.match(panel().getByRole("heading").parentElement?.textContent ?? "", /distancia/u);
     assert.isNotNull(panel().getByRole("button", { name: "Usar mi ubicación" }));
     assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
@@ -157,8 +159,8 @@ describe("punto de referencia: pedir la ubicación", () => {
     flush();
 
     const dialogo = await findByRole("dialog", { name: "Usar tu ubicación" });
-    assert.match(dialogo.textContent ?? "", /Se calcula en tu dispositivo/u);
-    assert.match(dialogo.textContent ?? "", /no la guarda/u);
+    assert.match(dialogo.textContent ?? "", /El cálculo se hace en tu dispositivo/u);
+    assert.match(dialogo.textContent ?? "", /no guarda tu ubicación/u);
     assert.match(dialogo.textContent ?? "", /quitarla cuando quieras/u);
     // Todavía no se ha pedido nada al navegador.
     assert.strictEqual(gps.pedidas(), 0);
@@ -201,7 +203,7 @@ describe("punto de referencia: pedir la ubicación", () => {
     assert.isNotNull(
       panel().getByText(
         textoEntero(
-          "Orientación supuesta a 0°, 120° y 240°: ninguna fuente publica hacia dónde apuntan los sectores, así que el sector que da servicio sale de esa suposición y puede ser otro.",
+          "La orientación de 0°, 120° y 240° es supuesta, porque ninguna fuente publica hacia dónde apuntan los sectores. El sector que da servicio sale de esa suposición y puede ser otro.",
         ),
       ),
     );
@@ -236,7 +238,7 @@ describe("punto de referencia: pedir la ubicación", () => {
     await waitFor(() => {
       assert.strictEqual(gps.abiertas(), 0);
     });
-    assert.isNotNull(panel().getByRole("heading", { name: "¿Desde dónde lo miramos?" }));
+    assert.isNotNull(panel().getByRole("heading", { name: "Distancia hasta el emplazamiento" }));
   });
 
   it("cada lectura pone al día la ubicación sin volver a pedirla", async () => {
@@ -278,7 +280,7 @@ describe("punto de referencia: volver a pedir la ubicación", () => {
     // Una lectura tardía de la vigilancia quitada no vuelve a poner la ubicación.
     gps.responderTarde(LECTURA);
     flush();
-    assert.isNotNull(panel().getByRole("heading", { name: "¿Desde dónde lo miramos?" }));
+    assert.isNotNull(panel().getByRole("heading", { name: "Distancia hasta el emplazamiento" }));
 
     fireEvent.click(panel().getByRole("button", { name: "Usar mi ubicación" }));
     flush();
@@ -358,8 +360,8 @@ describe("punto de referencia: volver a pedir la ubicación", () => {
     });
     gps.fallar("sin-fuente");
     const aviso = await panel().findByText(/Los ordenadores no tienen GPS/u);
-    assert.match(aviso.textContent ?? "", /No es un fallo de Celda/u);
-    assert.match(aviso.textContent ?? "", /busca una dirección/u);
+    assert.match(aviso.textContent ?? "", /Chromium en Linux/u);
+    assert.match(aviso.textContent ?? "", /buscar una dirección/u);
     assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
   });
 
@@ -402,7 +404,7 @@ describe("punto de referencia: ubicación denegada", () => {
     assert.isTrue(usar.hasAttribute("disabled"));
     assert.match(
       document.getElementById(usar.getAttribute("aria-describedby") ?? "")?.textContent ?? "",
-      /Bloqueada en este navegador/u,
+      /Está bloqueada en este navegador/u,
     );
   });
 
@@ -441,7 +443,7 @@ describe("punto de referencia: punto elegido", () => {
     await waitFor(() => {
       assert.deepStrictEqual(almacen.guardadas(), []);
     });
-    assert.isNotNull(panel().getByRole("heading", { name: "¿Desde dónde lo miramos?" }));
+    assert.isNotNull(panel().getByRole("heading", { name: "Distancia hasta el emplazamiento" }));
   });
 
   it("buscar una dirección y elegirla la guarda como punto, con su origen", async () => {
@@ -496,10 +498,7 @@ describe("punto de referencia: punto elegido", () => {
     fireEvent.click(await findByRole("button", { name: /Basílica de la Sagrada Familia/u }));
     flush();
     const titulo = await findByText("El punto no se ha guardado");
-    assert.match(
-      titulo.closest("[role=alert]")?.textContent ?? "",
-      /mientras no cierres la página/u,
-    );
+    assert.match(titulo.closest("[role=alert]")?.textContent ?? "", /hasta que cierres la página/u);
     // El punto se usa igual, aunque no se haya guardado.
     assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /el punto elegido/u);
   });
@@ -557,10 +556,7 @@ describe("punto de referencia: buscar una dirección en toda España", () => {
     const aviso = titulo.closest("section");
     assert.strictEqual(aviso?.getAttribute("role"), "status");
     // La distancia sale de la capa (solo Campus Nord), no de un nombre escrito a mano.
-    assert.match(
-      aviso?.textContent ?? "",
-      /Los datos más cercanos que tiene quedan a unos \d+\u00a0km/u,
-    );
+    assert.match(aviso?.textContent ?? "", /Los datos más cercanos quedan a unos \d+\u00a0km/u);
     assert.notMatch(aviso?.textContent ?? "", /Barcelona/u);
 
     fireEvent.click(within(aviso ?? document.body).getByRole("button", { name: "Cerrar" }));
@@ -588,7 +584,7 @@ describe("punto de referencia: buscar una dirección en toda España", () => {
 
   it("sin resultados, dice que no hay nada así en España y cómo afinar", async () => {
     const { eleccion } = await buscarEnLaEleccion("Calle Inventada 99", new Map());
-    const aviso = await eleccion.findByText(/No hay ninguna dirección así en España/u);
+    const aviso = await eleccion.findByText(/No se ha encontrado esa dirección en España/u);
     assert.match(aviso.textContent ?? "", /el municipio/u);
     assert.isNull(eleccion.queryByRole("list", { name: "Direcciones encontradas" }));
   });
@@ -609,6 +605,6 @@ describe("punto de referencia: buscar una dirección en toda España", () => {
       "Plaza Mayor",
       new Map([["Plaza Mayor", new BusquedaFallida({ motivo: "limite", detalle: "429" })]]),
     );
-    assert.isNotNull(await eleccion.findByText(/pide que esperemos/u));
+    assert.isNotNull(await eleccion.findByText(/demasiadas peticiones/u));
   });
 });

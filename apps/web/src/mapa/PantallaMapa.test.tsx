@@ -74,8 +74,8 @@ describe("capa de emplazamientos en el mapa", () => {
     const titulo = await findByText("No se han podido cargar los emplazamientos");
     const fallo = titulo.closest("[role=alert]");
     assert.isNotNull(fallo);
-    assert.match(fallo?.textContent ?? "", /no quiere decir que no haya emplazamientos/u);
-    assert.match(fallo?.textContent ?? "", /no ha llegado/u);
+    assert.match(fallo?.textContent ?? "", /aunque haya emplazamientos en la zona/u);
+    assert.match(fallo?.textContent ?? "", /No han llegado los datos/u);
 
     fireEvent.click(getByRole("button", { name: "Reintentar" }));
     flush();
@@ -125,7 +125,7 @@ describe("capa de emplazamientos en el mapa", () => {
     flush();
 
     const aviso = await findByText(
-      "Las marcas y logotipos de las compañías son de sus titulares; Celda no está afiliada a ninguna.",
+      "Las marcas y los logotipos de las compañías pertenecen a sus titulares. Celda no está afiliada a ninguna de ellas.",
     );
     assert.isNull(aviso.closest("a"));
     assert.isNull(queryByRole("link", { name: /digimobil\.es/u }));

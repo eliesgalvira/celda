@@ -153,7 +153,10 @@ export function Proponer(props: ProponerProps) {
                   props.emplazamiento.posicion,
                 )}
           </p>
-          <p>Es tu punto de referencia. Para proponer otro, muévelo en el mapa y vuelve aquí.</p>
+          <p>
+            Se usa tu punto de referencia. Si quieres proponer otro, mueve el punto en el mapa y
+            vuelve aquí.
+          </p>
         </Nota>
       )}
     </Show>
@@ -165,29 +168,27 @@ export function Proponer(props: ProponerProps) {
       fallback={
         <>
           <Show
-            when={props.emplazamiento}
+            when={props.emplazamiento !== undefined}
             fallback={
               <p>
-                Propones un <Termino termino="emplazamiento">emplazamiento</Termino> que el mapa no
-                tiene. No cambia nada hasta que la moderación lo acepte.
+                Vas a proponer un <Termino termino="emplazamiento">emplazamiento</Termino> que no
+                está en el mapa. El mapa no cambiará hasta que la moderación acepte la propuesta.
               </p>
             }
           >
-            {(emplazamiento) => (
-              <>
-                <p>
-                  Corriges el <Termino termino="emplazamiento">emplazamiento</Termino>{" "}
-                  {emplazamiento().clave}. No cambia nada hasta que la moderación lo acepte, y
-                  entonces sale al lado de lo que dice el registro, sin sustituirlo.
-                </p>
-                <Segmentado
-                  leyenda="Qué está mal"
-                  opciones={QUE_ESTA_MAL}
-                  valor={tipo() === "falta" ? undefined : tipo()}
-                  alCambiar={setTipo}
-                />
-              </>
-            )}
+            <>
+              <p>
+                Vas a corregir este <Termino termino="emplazamiento">emplazamiento</Termino>. El
+                mapa no cambia hasta que la moderación acepte la corrección. Si la acepta, aparecerá
+                junto a lo que dice el registro, que se sigue viendo.
+              </p>
+              <Segmentado
+                leyenda="Qué está mal"
+                opciones={QUE_ESTA_MAL}
+                valor={tipo() === "falta" ? undefined : tipo()}
+                alCambiar={setTipo}
+              />
+            </>
           </Show>
           <Switch>
             <Match when={tipo() === "posicion" || tipo() === "falta"}>{conPunto}</Match>
@@ -223,7 +224,7 @@ export function Proponer(props: ProponerProps) {
             valor={nota()}
             maximo={LARGO_MAXIMO_NOTA}
             alCambiar={setNota}
-            ayuda="Qué has visto y cómo lo sabes. Sin datos personales. No se pueden adjuntar fotos."
+            ayuda="Cuenta qué has visto y cómo lo sabes, sin incluir datos personales. No se pueden adjuntar fotos."
           />
           <AccionesDelPaso>
             <Boton variante="destacado" disabled={cambio() === undefined} onClick={revisar}>

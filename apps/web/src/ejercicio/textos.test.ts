@@ -61,6 +61,9 @@ describe("cadenas del ejercicio", () => {
       ["—", "—", "—", "—"],
     );
     assert.strictEqual(pasos[0]?.fuente, "El padrón aún no tiene esta zona");
-    assert.strictEqual(pasos[3]?.fuente, "Sin habitantes no hay líneas que repartir");
+    assert.strictEqual(
+      pasos[3]?.fuente,
+      "Faltan los habitantes de la zona para repartir las líneas",
+    );
   });
 });

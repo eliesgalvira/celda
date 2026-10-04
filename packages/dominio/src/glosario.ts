@@ -88,8 +88,7 @@ export const GLOSARIO: Glosario = {
     nombre: "Sector",
     explicacion:
       "Una estación base no emite igual hacia todos lados. Reparte la señal en porciones, " +
-      "casi siempre tres de unos 120 grados, como tres trozos de un pastel, y cada una tiene " +
-      "sus propias antenas.",
+      "casi siempre tres de unos 120 grados cada una, y cada porción tiene sus propias antenas.",
     tecnico: "sector",
     relacionados: ["azimut", "estacion-base", "celda"],
   },
@@ -115,8 +114,8 @@ export const GLOSARIO: Glosario = {
     nombre: "Celda",
     explicacion:
       "La zona del mapa en la que un emplazamiento es el más cercano, y por eso suele ser el " +
-      "que da servicio. Ojo, en los libros de telecomunicaciones «celda» suele ser otra cosa, " +
-      "un sector en una banda.",
+      "que da servicio. En los libros de telecomunicaciones la palabra «celda» se usa para " +
+      "otra cosa, un sector en una banda.",
     tecnico: "celda de Voronoi",
     relacionados: ["emplazamiento", "sector", "cobertura"],
   },
@@ -141,7 +140,7 @@ export const GLOSARIO: Glosario = {
   mhz: {
     nombre: "MHz",
     explicacion:
-      "La unidad con que se miden las frecuencias. Un megahercio es un millón de vueltas por " +
+      "La unidad con que se miden las frecuencias. Un megahercio es un millón de ciclos por " +
       "segundo, así que la señal de la banda de 700 MHz oscila 700 millones de veces por " +
       "segundo.",
     tecnico: "megahercio (MHz)",
@@ -218,8 +217,7 @@ export const GLOSARIO: Glosario = {
     nombre: "Actualizado después del mapa",
     explicacion:
       "La ficha se lee al abrirla y el mapa se publica cada cierto tiempo, así que la ficha " +
-      "puede ser más nueva que el mapa. Cuando pasa, Celda lo dice en lugar de dejar que se " +
-      "contradigan.",
+      "puede ser más nueva que el mapa. Cuando pasa, la ficha lo indica.",
     tecnico: "fecha de corte de la ficha",
     relacionados: ["version-de-los-datos"],
   },
@@ -242,8 +240,8 @@ export const GLOSARIO: Glosario = {
   modelo: {
     nombre: "Modelo",
     explicacion:
-      "Un cálculo que imita cómo se suele comportar la señal. No es una medida: Celda lo marca " +
-      "siempre como modelo para que no se confunda con un dato.",
+      "Un cálculo que imita cómo se suele comportar la señal. Celda lo marca siempre como " +
+      "modelo para que no se confunda con una medida.",
     tecnico: "simulación",
     relacionados: ["sector", "azimut"],
   },
@@ -267,8 +265,8 @@ export const GLOSARIO: Glosario = {
   interferencia: {
     nombre: "Interferencia",
     explicacion:
-      "La señal de otras antenas que llega a tu móvil y tapa la que le da servicio, como una " +
-      "conversación de fondo. Solo estorban las de la misma compañía en la misma banda.",
+      "La señal de otras antenas que llega a tu móvil y dificulta recibir la que le da " +
+      "servicio. Solo interfieren las de la misma compañía en la misma banda.",
     tecnico: "interferencia cocanal (reutilización 1)",
     relacionados: ["sinr", "ocupacion", "banda"],
   },
@@ -276,7 +274,8 @@ export const GLOSARIO: Glosario = {
     nombre: "Ocupación de la red",
     explicacion:
       "Qué parte de la capacidad de la red se está usando. Con mucha gente conectada, las " +
-      "antenas vecinas emiten más y se estorban más, sobre todo en los bordes entre celdas.",
+      "antenas vecinas emiten más e interfieren más entre sí, sobre todo en los bordes entre " +
+      "celdas.",
     tecnico: "carga de la celda",
     relacionados: ["interferencia", "sinr"],
   },
@@ -284,7 +283,8 @@ export const GLOSARIO: Glosario = {
     nombre: "Señal frente a interferencia",
     explicacion:
       "Cuánto destaca la señal que da servicio sobre la interferencia y el ruido, en dB. " +
-      "Por encima de 20 dB es limpia; por debajo de 0, la interferencia puede más que ella.",
+      "Por encima de 20 dB la señal llega limpia, y por debajo de 0 dB la interferencia es " +
+      "más fuerte que la señal.",
     tecnico: "SINR (relación señal a interferencia más ruido)",
     relacionados: ["interferencia", "ocupacion", "modelo"],
   },
@@ -301,7 +301,7 @@ export const GLOSARIO: Glosario = {
     explicacion:
       "Hasta dónde llega, más o menos, cada estación base de una compañía. En el ejercicio se " +
       "estima como la mitad de la distancia media a la estación más cercana de la misma " +
-      "compañía: a partir de ahí, lo normal es que dé servicio la otra.",
+      "compañía, porque a partir de ahí lo normal es que dé servicio la otra.",
     tecnico: "radio de celda",
     relacionados: ["estacion-base", "cobertura"],
   },

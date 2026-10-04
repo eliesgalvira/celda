@@ -53,10 +53,10 @@ export interface VistaInterferenciaProps {
 const textoDeEstado = (calculo: CalculoVista, cerca: boolean): string | undefined => {
   const faltan = enumerar((calculo.faltan ?? []).map((p) => p.nombre));
   if (calculo.estado === "esperando") {
-    return `Cargando los emplazamientos de ${faltan}: sin ellos, la interferencia junto al borde no sería cierta.`;
+    return `Cargando los emplazamientos de ${faltan}, que hacen falta para calcular la interferencia junto al borde…`;
   }
   if (calculo.estado === "sin-vecinas") {
-    return `No han llegado los emplazamientos de ${faltan}, y sin ellos la interferencia de aquí no sería cierta.`;
+    return `No han llegado los emplazamientos de ${faltan}, y sin ellos no se puede calcular bien la interferencia en esta zona.`;
   }
   if (calculo.estado === "calculando") return "Calculando la interferencia…";
   if (calculo.estado === "fallo") return "No se ha podido calcular la interferencia.";
@@ -132,7 +132,7 @@ export function VistaInterferencia(props: VistaInterferenciaProps) {
           ) : props.calculo.estado === "lista" ? (
             "No hay estaciones base de esta compañía en esta banda cerca del punto."
           ) : props.calculo.estado === "sin-vecinas" ? (
-            "Sin valor: faltan emplazamientos cerca del punto."
+            "No hay valor porque faltan emplazamientos cerca del punto."
           ) : (
             "Calculando el valor en el punto…"
           )

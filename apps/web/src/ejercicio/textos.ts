@@ -102,7 +102,7 @@ export const cadenaDeUsuarios = (
         c === undefined || c.estaciones === 0
           ? `${NOMBRE_COMPANIA[compania]} no tiene estaciones base en la zona`
           : c.usuariosPorEstacion === undefined
-            ? "Sin habitantes no hay líneas que repartir"
+            ? "Faltan los habitantes de la zona para repartir las líneas"
             : "Se supone que cada línea usa una estación base de la zona",
     },
   ];

@@ -70,7 +70,7 @@ describe("textosDelFallo", () => {
     assert.match(textosDelFallo(new BuzonCerrado(), AHORA).texto, /Se queda guardada/u);
     assert.match(
       textosDelFallo(new BuzonSinRespuesta({ motivo: "red" }), AHORA).texto,
-      /El mapa sigue funcionando/u,
+      /el buzón no esté funcionando/u,
     );
     assert.match(textosDelFallo(new EnvioVetado({ que: "ip" }), AHORA).texto, /esta red/u);
     assert.match(
@@ -81,7 +81,7 @@ describe("textosDelFallo", () => {
       new AlmacenNoDisponible({ motivo: "IndexedDB ha rechazado la operación" }),
       AHORA,
     ).texto;
-    assert.match(sinAlmacen, /Sin guardarla no se envía/u);
+    assert.match(sinAlmacen, /Celda tiene que guardarla antes en el dispositivo/u);
     // El error del navegador es técnico: no se enseña.
     assert.notInclude(sinAlmacen, "IndexedDB");
   });

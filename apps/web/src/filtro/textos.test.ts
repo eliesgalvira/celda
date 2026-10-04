@@ -15,31 +15,31 @@ describe("textos del filtro de compañías (ADR 0026)", () => {
   it("explican qué sale aparte cuando una compañía usa la red de otra", () => {
     assert.strictEqual(
       detalleDelAviso(["digi"], false),
-      "Más claros: la red de Movistar, que usa Digi.",
+      "La red de Movistar que usa Digi sale más clara.",
     );
     assert.strictEqual(
       detalleDelAviso(["digi", "yoigo"], false),
-      "Más claros: las redes de Movistar y Orange, que usan Digi y Yoigo.",
+      "Las redes de Movistar y Orange que usan Digi y Yoigo salen más claras.",
     );
     assert.strictEqual(
       notaDelFiltro(["digi", "yoigo"]),
-      "Más claros, los de Movistar y Orange, con sus celdas: Digi usa la de Movistar y Yoigo usa la de Orange donde no tienen la suya. Junto a uno propio, el móvil suele quedarse en él aunque haya otro más cerca.",
+      "Los emplazamientos de Movistar y Orange salen más claros, con sus celdas, porque Digi usa la de Movistar y Yoigo usa la de Orange donde no tienen la suya. Cerca de un emplazamiento propio, el móvil suele conectarse a él aunque haya otro más cerca.",
     );
     assert.strictEqual(
       notaDelFiltro(["digi"]),
-      "Más claros, los de Movistar, con sus celdas: Digi usa su red donde no tiene la suya. Junto a uno de Digi, el móvil suele quedarse en él aunque haya otro de Movistar más cerca.",
+      "Los emplazamientos de Movistar salen más claros, con sus celdas, porque Digi usa su red donde no tiene la suya. Cerca de uno de Digi, el móvil suele conectarse a él aunque haya otro de Movistar más cerca.",
     );
     assert.isUndefined(detalleDelAviso(["movistar", "digi"], false));
     assert.match(
       notaDelFiltro(["yoigo"]),
-      /^Más claros, los de Orange, con sus celdas: Yoigo usa su red/u,
+      /^Los emplazamientos de Orange salen más claros, con sus celdas, porque Yoigo usa su red/u,
     );
   });
 
   it("con datos de antes, de lejos, dicen que los números aún son de todas", () => {
     assert.strictEqual(
       detalleDelAviso(["vodafone"], true),
-      "De lejos aún se cuentan todas las compañías: acércate para ver solo Vodafone.",
+      "Con el mapa alejado, los números aún cuentan todas las compañías. Acerca el mapa para ver solo Vodafone.",
     );
   });
 

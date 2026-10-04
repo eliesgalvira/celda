@@ -40,7 +40,7 @@ function NoEncontrada() {
           </Enlace>
         }
       >
-        La dirección {ubicacion().pathname} no lleva a ninguna parte de Celda.
+        La dirección {ubicacion().pathname} no corresponde a ninguna página de Celda.
       </Aviso>
     </PantallaCentrada>
   );

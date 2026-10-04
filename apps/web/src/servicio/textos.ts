@@ -76,11 +76,11 @@ export const textosServicio = (
     grados < DE_FRENTE_GRADOS
       ? marcado`${esta} casi de frente al ${sector}, donde su haz manda más señal.`
       : grados < ENTRE_DOS_GRADOS
-        ? marcado`${esta} a ${String(grados)}° del eje del ${sector} y ${pierde} ${UN_DECIMAL.format(-lectura.gananciaDb)} ${db}, poca cosa.`
-        : marcado`${esta} entre dos sectores, a ${String(grados)}° del eje del ${sector}, y ${pierde} unos ${String(Math.round(-lectura.gananciaDb))} ${db}. Es donde un sector le pasa el relevo al otro.`;
+        ? marcado`${esta} a ${String(grados)}° del eje del ${sector} y ${pierde} solo ${UN_DECIMAL.format(-lectura.gananciaDb)} ${db}.`
+        : marcado`${esta} entre dos sectores, a ${String(grados)}° del eje del ${sector}, y ${pierde} unos ${String(Math.round(-lectura.gananciaDb))} ${db}. En esa zona el servicio puede pasar de un sector al otro.`;
   const fuera =
     lectura.enCelda === false
-      ? marcado` Además, ${tu ? "estás" : "el punto está"} fuera de la ${termino("celda", "celda")} de este emplazamiento: hay otro más cerca, que puede ser el que ${tu ? "te" : "le"} da servicio.`
+      ? marcado` Además, ${tu ? "estás" : "el punto está"} fuera de la ${termino("celda", "celda")} de este emplazamiento. Hay otro más cerca y puede que sea ese el que ${tu ? "te" : "le"} da servicio.`
       : [];
   return {
     datos: [
@@ -97,6 +97,6 @@ export const textosServicio = (
 export const notaServicio = (orientacion: Orientacion): TextoMarcado => {
   const servicio = termino("sector-que-da-servicio", "sector que da servicio");
   return orientacion.tipo === "estimada"
-    ? marcado`${termino("azimut", "Orientación")} estimada, con ±${String(orientacion.margen)}° de margen en cada eje. Cerca del límite entre dos sectores, el ${servicio} puede ser el de al lado.`
-    : marcado`${termino("azimut", "Orientación")} supuesta a ${enumerar(orientacion.azimuts)}: ninguna fuente publica hacia dónde apuntan los sectores, así que el ${servicio} sale de esa suposición y puede ser otro.`;
+    ? marcado`La ${termino("azimut", "orientación")} es una estimación, con ±${String(orientacion.margen)}° de margen en cada eje. Cerca del límite entre dos sectores, el ${servicio} puede ser el de al lado.`
+    : marcado`La ${termino("azimut", "orientación")} de ${enumerar(orientacion.azimuts)} es supuesta, porque ninguna fuente publica hacia dónde apuntan los sectores. El ${servicio} sale de esa suposición y puede ser otro.`;
 };

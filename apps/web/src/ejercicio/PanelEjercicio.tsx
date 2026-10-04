@@ -149,9 +149,9 @@ const textoSinFichaEnRegistro = (sinFicha: {
 }): string =>
   sinFicha.estaciones === 0
     ? ""
-    : ` ${sinFicha.estaciones === 1 ? "Una estación base no tiene" : `${entero(sinFicha.estaciones)} estaciones base no tienen`} ` +
-      `ficha en el registro, aunque su listado ${sinFicha.estaciones === 1 ? "la incluye" : "las incluye"} ` +
-      `(${enumerar(sinFicha.companias)}): ${sinFicha.estaciones === 1 ? "cuenta" : "cuentan"} aparte, y de sus bandas la tabla también dice «no consta».`;
+    : sinFicha.estaciones === 1
+      ? ` Una estación base de ${enumerar(sinFicha.companias)} aparece en el listado del registro pero no tiene ficha. Se cuenta aparte, y en sus bandas la tabla también pone «no consta».`
+      : ` ${entero(sinFicha.estaciones)} estaciones base de ${enumerar(sinFicha.companias)} aparecen en el listado del registro pero no tienen ficha. Se cuentan aparte, y en sus bandas la tabla también pone «no consta».`;
 
 /**
  * El ejercicio de emplazamientos del modo estudiante, en el panel de la izquierda o en la hoja del
@@ -601,7 +601,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
               titulo="No se han podido cargar las zonas"
               acciones={<Boton onClick={cargarZonas}>Reintentar</Boton>}
             >
-              Sin ellas no se puede elegir dónde hacer el ejercicio. Puede fallar la conexión con
+              Sin ellas no se puede elegir dónde hacer el ejercicio. Puede que falle la conexión con
               Celda.
             </Aviso>
           </SeccionFicha>
@@ -631,8 +631,8 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
             >
               <Nota titulo="Toca el mapa dentro de la zona">
                 <p>
-                  El ejercicio se hará en el municipio que toques. En Barcelona, en el barrio: luego
-                  puedes pasar al municipio entero.
+                  El ejercicio se hará en el municipio que toques. En Barcelona se hará en el
+                  barrio, y después podrás pasar al municipio entero.
                 </p>
                 <Show when={fueraDelMapa()}>
                   <p>Ahí no hay ningún municipio. Toca dentro de uno.</p>
@@ -718,9 +718,9 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                   <Show when={!actual().cubierta}>
                     <Nota tono="aviso" titulo="Solo una parte de la zona">
                       <p>
-                        Celda solo tiene los emplazamientos de una parte de {actual().nombre}: los
-                        recuentos se quedan cortos. Fuera de lo que ha leído del registro oficial,
-                        el mapa no enseña nada.
+                        Celda solo tiene los emplazamientos de una parte de {actual().nombre}, así
+                        que los recuentos se quedan cortos. El mapa solo muestra las zonas en las
+                        que ya ha leído el registro oficial.
                       </p>
                     </Nota>
                   </Show>
@@ -781,8 +781,8 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     <Nota titulo="Buscando vecinas al otro lado del borde">
                       <p>
                         Cargando los emplazamientos de{" "}
-                        {enumerar(vecinasPendientes().map(nombreDeProvincia))}: alguna estación del
-                        borde puede tener allí su vecina, y el radio aún puede cambiar.
+                        {enumerar(vecinasPendientes().map(nombreDeProvincia))}. Alguna estación del
+                        borde puede tener allí su vecina, así que el radio aún puede cambiar.
                       </p>
                     </Nota>
                   </Show>
@@ -791,7 +791,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       <p>
                         No han llegado los emplazamientos de{" "}
                         {enumerar(vecinasFallidas().map(nombreDeProvincia))}. Si alguna estación del
-                        borde tiene allí su vecina, el radio sale mayor que el de verdad.
+                        borde tiene allí su vecina, el radio calculado sale mayor que el real.
                       </p>
                       <AccionesEjercicio>
                         <Boton
@@ -808,7 +808,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       <p>
                         De {enumerar(borde().incompletas.map(nombreDeProvincia))} Celda solo tiene
                         los emplazamientos de una parte. Si la vecina de alguna estación está en la
-                        parte que falta, el radio de verdad es menor que este.
+                        parte que falta, el radio real es menor que este.
                       </p>
                     </Nota>
                   </Show>
@@ -819,8 +819,9 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                   <TextoEjercicio>
                     Las líneas de la zona salen de los habitantes y la{" "}
                     <Termino termino="penetracion">penetración</Termino>, y las de cada compañía, de
-                    su <Termino termino="cuota-de-lineas">cuota</Termino>. Por defecto son las de
-                    toda España según la CNMC ({FUENTE_DE_PARAMETROS.periodo}); puedes cambiarlas.
+                    su <Termino termino="cuota-de-lineas">cuota</Termino>. Por defecto se usan los
+                    valores de toda España que publica la CNMC para {FUENTE_DE_PARAMETROS.periodo},
+                    y puedes cambiarlos.
                   </TextoEjercicio>
                   <RejillaDeCampos>
                     <CampoNumero
@@ -877,8 +878,9 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                   <TextoEjercicio>
                     Las <Termino termino="banda">bandas</Termino> salen del registro oficial, tal
                     como las recoge el mapa de Celda. La ficha de cada emplazamiento, de la misma
-                    fecha, las da expediente a expediente. El registro no publica la tecnología: se
-                    deduce de la banda y por eso la tabla dice «probable» o «posible».
+                    fecha, las da expediente a expediente. Como el registro no publica la
+                    tecnología, se deduce de la banda, y por eso la tabla dice «probable» o
+                    «posible».
                   </TextoEjercicio>
                   {/*
                     Leídas una vez no hay nada que volver a leer: las fichas y la capa son de la
@@ -903,14 +905,14 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                   <Show when={leidas()}>
                     {(hecho) => (
                       <TextoEjercicio>
-                        Leídas {entero(enZona().length - hecho().leidas.fallidas.length)} de{" "}
+                        Se han leído {entero(enZona().length - hecho().leidas.fallidas.length)} de{" "}
                         {entero(enZona().length)} fichas.
                         {hecho().leidas.fallidas.length > 0
-                          ? ` ${entero(hecho().leidas.fallidas.length)} no han llegado: de sus bandas la tabla dice «no consta».`
+                          ? ` ${entero(hecho().leidas.fallidas.length)} no han llegado, y en sus bandas la tabla pone «no consta».`
                           : ""}
                         {textoSinFichaEnRegistro(sinFichaEnRegistro())}
                         {sinBandas() > 0
-                          ? ` ${entero(sinBandas())} no traen ninguna banda conocida: de ellas la tabla también dice «no consta».`
+                          ? ` ${entero(sinBandas())} no tienen ninguna banda conocida, y en ellas la tabla también pone «no consta».`
                           : ""}
                       </TextoEjercicio>
                     )}
@@ -921,8 +923,8 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                   {(hecha) => (
                     <SeccionFicha titulo="5 · Tabla">
                       <TextoEjercicio>
-                        Bajo cada magnitud se lee de dónde sale y de qué fecha es. En un ordenador,
-                        también al pasar el cursor por un valor.
+                        Debajo de cada magnitud se indica de dónde sale y de qué fecha es. En un
+                        ordenador también se ve al pasar el cursor por un valor.
                       </TextoEjercicio>
                       <TablaDelEjercicio
                         titulo={hecha().titulo}
@@ -1011,8 +1013,8 @@ function EstadoDeLaZona(props: {
       </Match>
       <Match when={props.estado.tipo === "sin-datos"}>
         <Aviso tono="limite" encaje="panel" titulo={`Celda aún no tiene datos de ${provincia()}`}>
-          Sin sus emplazamientos no se pueden contar las estaciones base de {nombre()}. Eso no
-          quiere decir que no haya: Celda aún no ha leído el registro oficial de esa provincia.
+          Celda aún no ha leído el registro oficial de esa provincia, así que no puede contar las
+          estaciones base de {nombre()}. Puede haberlas aunque aquí no salgan.
         </Aviso>
       </Match>
       <Match when={props.estado.tipo === "fallo"}>
@@ -1022,7 +1024,7 @@ function EstadoDeLaZona(props: {
           titulo={`No ha llegado lo que hace falta para ${nombre() === "" ? "la zona" : nombre()}`}
           acciones={<Boton onClick={() => props.alReintentar()}>Reintentar</Boton>}
         >
-          Puede fallar la conexión con Celda o estar bloqueado el servidor.
+          Puede que falle la conexión con Celda o que el servidor esté bloqueado.
         </Aviso>
       </Match>
     </Switch>

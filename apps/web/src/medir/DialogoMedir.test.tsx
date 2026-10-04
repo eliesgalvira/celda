@@ -52,7 +52,7 @@ describe("DialogoMedir en un ordenador", () => {
     const captura = getByRole("heading", { name: /Subir una captura que ya tengas/u });
     const opcion = captura.closest("section");
     assert.match(opcion?.textContent ?? "", /PRONTO/u);
-    assert.match(opcion?.textContent ?? "", /Todavía no funciona/u);
+    assert.match(opcion?.textContent ?? "", /Todavía no se puede/u);
     // Solo el término subrayado, que abre su explicación, es un botón.
     const botones = within(opcion ?? dialogo).queryAllByRole("button");
     assert.deepStrictEqual(
@@ -92,7 +92,7 @@ describe("DialogoMedir en un ordenador", () => {
     fireEvent.click(getByRole("radio", { name: "iPhone" }));
     flush();
     assert.isNotNull(getByText("*3001#12345#*"));
-    assert.isNotNull(getByText("Lo has elegido tú."));
+    assert.isNotNull(getByText("Has elegido el dispositivo a mano."));
     assert.isNull(queryByText("Desde un ordenador no se puede medir"));
   });
 
@@ -113,12 +113,12 @@ describe("DialogoMedir en Android", () => {
     assert.isNotNull(getByText(/La marca sale de tu navegador/u));
 
     // Abierto desde el principio: es lo que da confianza para marcar el código.
-    const queLePasa = getByRole("button", { name: "¿Qué le pasa a mi móvil?" });
+    const queLePasa = getByRole("button", { name: "Qué hace el código en el móvil" });
     assert.strictEqual(queLePasa.getAttribute("aria-expanded"), "true");
     const contenido = document.getElementById(queLePasa.getAttribute("aria-controls") ?? "");
     assert.isFalse(contenido?.hidden);
-    assert.match(contenido?.textContent ?? "", /No se instala nada ni cambia ningún ajuste/u);
-    assert.match(contenido?.textContent ?? "", /No es una llamada/u);
+    assert.match(contenido?.textContent ?? "", /No instala nada y no cambia ningún ajuste/u);
+    assert.match(contenido?.textContent ?? "", /no hace ninguna llamada/u);
     assert.match(contenido?.textContent ?? "", /Celda solo ve la captura que tú subas/u);
 
     assert.strictEqual(getByRole("combobox", { name: "Marca del móvil" }).tagName, "SELECT");

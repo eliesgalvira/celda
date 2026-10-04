@@ -104,7 +104,7 @@ export function BotonEdificio(props: BotonEdificioProps) {
         tamano="compacto"
         cargando={props.estado.tipo === "buscando"}
         aria-label={NOMBRE + resultado(props.estado)}
-        title="Acerca el mapa al emplazamiento, enciende la foto aérea y resalta su edificio"
+        title="Acerca el mapa al emplazamiento y resalta su edificio sobre la foto aérea"
         onClick={() => props.alPulsar()}
       >
         <IconoEdificio />
