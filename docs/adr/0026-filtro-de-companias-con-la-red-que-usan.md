@@ -1,6 +1,6 @@
 # Filtro de compañías, con la red que usa cada una aparte
 
-Estado: aceptada el 04/10/2026, con las decisiones del usuario del 04/10/2026 (#69). Añade al resumen nacional del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) una columna opcional, sin cambiar de formato, y cambia la definición de celda del glosario: con un filtro puesto, se calcula entre los emplazamientos de las compañías del filtro.
+Estado: aceptada el 04/10/2026, con las decisiones del usuario del 04/10/2026 (#69). Añade al resumen nacional del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) una columna opcional, sin cambiar de formato, y cambia la definición de celda del glosario: con un filtro puesto, se calcula entre los emplazamientos que salen con él, también los de la red que usan DIGI o Yoigo (segunda decisión del usuario del 04/10/2026).
 
 ## Contexto
 
@@ -16,7 +16,8 @@ Hay otra dificultad en los números. De lejos el mapa dibuja solo el resumen nac
 
 - **Varias a la vez.** Una fila de chips con las cinco compañías, que se encienden y se apagan por separado. Por defecto se ven todas.
 - **La red por la que se conecta cada una.** Con DIGI en el filtro y Movistar no, el mapa enseña los emplazamientos de DIGI y, aparte y más claros, los de Movistar. Lo mismo con Yoigo y Orange.
-- **Celdas recalculadas** solo con los emplazamientos del filtro.
+- **Celdas recalculadas** con los emplazamientos del filtro.
+- **Las celdas cuentan también la red usada.** Lo decidió en una segunda vuelta, con el filtro ya publicado. Con solo DIGI, las celdas se calculan entre los de DIGI y los de Movistar que usa; con solo Yoigo, entre los de Yoigo y los de Orange. El móvil puede conectarse a ese de Movistar que le queda más cerca. Las celdas de la red usada van más claras, como sus emplazamientos, y la red usada sigue sin contar en los hexágonos ni en las zonas. Tocar un chip desde «Todas» no cambia.
 - **Se recuerda en el dispositivo**, y un aviso visible dice que hay un filtro puesto y lo quita de un toque.
 
 ### Cómo se elige
@@ -42,7 +43,11 @@ La ficha de un emplazamiento de la red usada lo explica: «Digi usa aquí la red
 
 ### Las celdas
 
-Se calculan solo con los emplazamientos suyos, no con los de la red usada: la celda de un cliente de Movistar es la zona más cercana a un emplazamiento de Movistar. Con DIGI, las celdas son las de sus pocos emplazamientos, que en el campo quedan muy grandes. Meter la red usada en las celdas daría en Barcelona las celdas de Movistar, cuando allí los clientes de DIGI se conectan casi siempre a la red de DIGI. Ninguna de las dos es la zona a la que da servicio en la realidad; esta es la que cuenta lo que se ve.
+Se calculan con todos los emplazamientos que salen con el filtro: los suyos y los de la red usada (`deLasCeldas`). Con solo DIGI, el Voronoi se hace entre los de DIGI y los de Movistar sin DIGI; con DIGI y Movistar, entre los de las dos, y un compartido entra una vez. Con solo Movistar, entre los de Movistar, como antes: no usa ninguna red ajena.
+
+Cada celda lleva `redUsada` en sus propiedades, y las de la red usada se dibujan a la mitad de opacidad, con selección y sin ella, con la foto aérea y sin ella. La celda del emplazamiento seleccionado se remarca igual sea de quien sea.
+
+**Lo que se pierde.** En la realidad el móvil prefiere su propia red donde tiene cobertura: un cliente de DIGI cerca de un emplazamiento de DIGI suele quedarse en él aunque uno de Movistar esté más cerca. Celda no lo modela. Junto a los emplazamientos de DIGI, las celdas son una aproximación: la de DIGI sale más pequeña de lo que es su zona de servicio, y las de Movistar de alrededor, más grandes. Con solo los suyos el error era mayor: fuera de las ciudades, unas pocas celdas de DIGI muy grandes cubrían zonas donde el móvil se conecta a Movistar. La nota del panel de compañías lo cuenta en llano: «Junto a uno de Digi, el móvil suele quedarse en él aunque haya otro de Movistar más cerca.»
 
 ### Los números de lejos: combinaciones en el resumen
 
@@ -89,6 +94,7 @@ Si cambia un acuerdo, se cambia `RED_QUE_USA` y estas fuentes.
 
 - **Dominio.** `filtro.ts`: el filtro, su papel por emplazamiento, las redes usadas, lo que resalta cada logo y el recuento por combinaciones. `provincias.ts`: la columna y su lectura. `ajustes.ts`: la clave `companias`.
 - **Publicación.** `publicar.ts` escribe las combinaciones y vuelve a publicar entera una vigente sin ellas.
+- **Celdas con la red usada** (segunda decisión). `deLasCeldas` en `filtro.ts`, `celdasDelFiltro` en `filtro/enMapa.ts`, la propiedad `redUsada` de cada celda en `celdas/celdas.ts` y las opacidades de `packages/ui/src/mapa/celdas.ts`.
 - **Web.** `capa/nacional.ts`: `partesDelFiltro`, `agrupacionConFiltro` y el agrupador nacional con el filtro, la red usada en su propia parte de cada escena (claves `a:08r:…`) y el recuento de lejos (`cuentaDeProvincia`). `capa/indexador.ts`: la solicitud `filtro` del Worker, con las columnas transferidas. `capa/servicio.ts`: `agrupacion(codigo, filtro)`, con su turno y su caché. `filtro/enMapa.ts`: el filtro aplicado tras la espera, las agrupaciones de cada provincia y los emplazamientos de las celdas. `filtro/Filtro.tsx` y `filtro/textos.ts`: la pastilla, los chips y el aviso.
 - **Librería.** `filtro/FiltroDeCompanias.tsx` (pastilla, chips, panel y aviso), el tono `red-usada` de `MarcadorEmplazamiento` y `MarcadorAgrupacion`, las porciones apagadas de `LogoCompanias` y `RedUsadaFicha`.
 - **Medido** el 04/10/2026 en Chromium sin interfaz con SwiftShader, la build local y la publicación de toda España del 30/09/2026 rehecha con combinaciones (35.667 emplazamientos), en el móvil (390 × 844) y en el escritorio (1400 × 900), con Barcelona a z12 y todo cargado:
@@ -96,11 +102,17 @@ Si cambia un acuerdo, se cambia `RED_QUE_USA` y estas fuentes.
   - **Red:** 0 peticiones al tocar los chips.
   - **Worker de capas:** 1 mensaje por filtro nuevo y provincia, 0 al volver a uno. Cuatro toques seguidos: 1 mensaje, el del último filtro. Simulaciones: 0 a z12.
   - **Quieto 20 s** tras los toques: 0 peticiones y 0 llamadas a `fetch`, XHR, `setTimeout`, `setInterval`, `requestAnimationFrame` y `postMessage`.
-  - **Celdas** en el Eixample a z16: 163 con solo Movistar y 14 con solo DIGI, en el móvil.
+  - **Celdas** en el Eixample a z16: 163 con solo Movistar y 14 con solo DIGI, en el móvil, con las celdas solo de los suyos.
+- **Medido con la red usada en las celdas**, el 04/10/2026, en el mismo Chromium, la misma build y los mismos datos, en el móvil y con el Eixample a z16:
+  - **Celdas que se ven**: 21 con solo DIGI, todas claras, de Movistar; 11 con solo Yoigo, todas claras, de Orange; 21 con DIGI y Movistar, ninguna clara; 24 con todas. Calculadas en total: 1.515 con solo DIGI (1.424 claras) y 1.515 con DIGI y Movistar (0 claras): los mismos emplazamientos, cada uno una vez.
+  - **Del toque a las celdas nuevas en el mapa**, contando los 150 ms de espera: de 179 a 214 ms. MapLibre acaba de pintar, con sus fundidos, a los 521-574 ms, y a los 907 con un filtro nuevo que agrupa el Worker.
+  - **Quieto 20 s** con solo DIGI y con solo Yoigo: 0 peticiones y 0 llamadas a todo lo contado.
 
 ## Consecuencias
 
-- La celda deja de ser siempre entre todos los emplazamientos: con un filtro, es entre los de sus compañías. El glosario lo dice.
+- La celda deja de ser siempre entre todos los emplazamientos: con un filtro, es entre los que salen, también los de la red usada. El glosario lo dice.
+- Con solo DIGI o solo Yoigo, casi todas las celdas de una ciudad son claras, de la red usada. Junto a los emplazamientos propios son una aproximación (ver «Las celdas»).
+- Cambiar entre DIGI y DIGI con Movistar vuelve a calcular las celdas aunque los emplazamientos sean los mismos: solo cambia cuáles van claras. Es un cálculo en el Worker de simulaciones, unos 20 ms por cada 1.300 emplazamientos, y no compensa evitarlo.
 - De cerca, con DIGI o Yoigo, la red usada llena el mapa de hexágonos claros. Ceden ante lo suyo, las zonas y los rótulos, así que en una ciudad se ven sobre todo donde no hay nada de la compañía.
 - Cada provincia guarda hasta cuatro agrupaciones con filtro más la de siempre: los índices de supercluster de lo que sale con cada filtro.
 - La pastilla nueva sube la columna de controles 48 px: la vista inicial lo cuenta (`LO_QUE_TAPA_EN_EL_MOVIL` y `_EN_ESCRITORIO`).
@@ -114,5 +126,6 @@ Si cambia un acuerdo, se cambia `RED_QUE_USA` y estas fuentes.
 - **Agrupar con el filtro en el hilo principal.** Sin mensajes al Worker, pero indexar Barcelona entera con supercluster son decenas de milisegundos por provincia en el hilo de la interfaz, y más con la CPU de un móvil.
 - **Volver a mandar el texto de la capa al Worker** para cada filtro. Habría que guardarlo en el hilo principal y volver a leerlo; las columnas del filtro pesan mucho menos y se transfieren sin copiar.
 - **Contar la red usada en los hexágonos y las zonas.** «Solo DIGI» diría lo mismo que «solo Movistar» en casi todo el país. El usuario la quiso aparte y más clara.
-- **Meter la red usada en las celdas.** Ver «Las celdas».
+- **Celdas solo con los suyos**, lo que hubo primero. Con DIGI quedaban unas pocas celdas enormes que cubrían zonas donde el móvil se conecta a Movistar. El usuario lo cambió el 04/10/2026.
+- **Celdas de la red usada iguales que las propias.** No se distinguiría qué celdas son de la compañía y cuáles de la red que usa, cuando sus emplazamientos ya van más claros.
 - **Tocar un chip desde todas apaga solo esa** (cinco chips encendidos por defecto). Para ver solo una había que apagar cuatro.
