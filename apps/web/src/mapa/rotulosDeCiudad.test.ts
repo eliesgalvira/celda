@@ -4,6 +4,7 @@ import {
   leerRotulosDeCiudad,
   type MapaConRotulosColocados,
   type RasgoColocado,
+  type ZoomsDeCapa,
 } from "./rotulosDeCiudad.ts";
 
 /** Un rasgo de una capa de ciudades como lo devuelve `queryRenderedFeatures`. */
@@ -22,18 +23,18 @@ const rasgo = (
  * Los zooms de las capas de ciudades, como en `rotulos.ts`, con las de lejos del mapa base de
  * reserva, que en una prueba están a la vez que las del principal.
  */
-const ZOOMS: Readonly<Record<string, { readonly minzoom: number; readonly maxzoom: number }>> = {
-  "lugares-capitales": { minzoom: 4, maxzoom: 14 },
-  "lugares-grandes": { minzoom: 4.5, maxzoom: 14 },
-  "lugares-ciudades": { minzoom: 7, maxzoom: 14 },
-  "lugares-capitales-lejos": { minzoom: 4, maxzoom: 7 },
-  "lugares-grandes-lejos": { minzoom: 4.5, maxzoom: 7 },
-};
+const ZOOMS = new Map<string, ZoomsDeCapa>([
+  ["lugares-capitales", { minzoom: 4, maxzoom: 14 }],
+  ["lugares-grandes", { minzoom: 4.5, maxzoom: 14 }],
+  ["lugares-ciudades", { minzoom: 7, maxzoom: 14 }],
+  ["lugares-capitales-lejos", { minzoom: 4, maxzoom: 7 }],
+  ["lugares-grandes-lejos", { minzoom: 4.5, maxzoom: 7 }],
+]);
 
 const mapaCon = (rasgos: ReadonlyArray<RasgoColocado>, zoom = 8) => {
   const pedidas: Array<ReadonlyArray<string>> = [];
   const mapa: MapaConRotulosColocados = {
-    getLayer: (id) => ZOOMS[id] ?? {},
+    getLayer: (id) => ZOOMS.get(id) ?? {},
     getZoom: () => zoom,
     queryRenderedFeatures: (opciones) => {
       pedidas.push(opciones.layers);
