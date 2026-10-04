@@ -17,6 +17,7 @@ import type { Ficha } from "../../../packages/dominio/src/ficha.ts";
 import { repartirEnLotes } from "../../../packages/dominio/src/lotes.ts";
 import {
   cajaDeSituados,
+  combinacionesDeSituados,
   companiasDeSituados,
   type EmplazamientoSituado,
   ficheroDeCapaDeProvincia,
@@ -203,6 +204,7 @@ export const escribirCapaSintetica = async (base: string): Promise<CapaSintetica
         emplazamientos: situados.length,
         companias: companiasDeSituados(situados),
         fichero: ficheroCapa,
+        combinaciones: combinacionesDeSituados(situados),
       },
     ],
     cuadros: new Map(),
