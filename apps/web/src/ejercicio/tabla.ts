@@ -101,8 +101,8 @@ export interface ContextoDeTabla {
 }
 
 const ORIGEN_BANDAS = {
-  capa: { nombre: "Capa del mapa", en: "de la capa del mapa" },
-  fichas: { nombre: "Fichas publicadas", en: "de las fichas publicadas" },
+  capa: { nombre: "Mapa de Celda", en: "del mapa de Celda" },
+  fichas: { nombre: "Fichas de los emplazamientos", en: "de las fichas de los emplazamientos" },
 } as const;
 
 const ENTERO = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });

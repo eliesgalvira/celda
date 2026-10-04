@@ -4,12 +4,11 @@ import { createUniqueId, For, Show } from "solid-js";
 
 import { Boton } from "../Boton.tsx";
 import { cn } from "../cn.ts";
-import { Etiqueta } from "../Etiqueta.tsx";
 import { CORTES_SINR } from "../mapa/interferencia.ts";
 
 /**
  * Piezas del panel de la vista de interferencia, como en el prototipo v8: la marca de simulación
- * orientativa con su modelo, la frase clave, la compañía y la banda, la ocupación, la escala de
+ * orientativa, la frase clave, la compañía y la banda, la ocupación, la escala de
  * colores y el valor en el punto de referencia.
  */
 
@@ -34,8 +33,6 @@ export function IconoOndas() {
 
 export interface PanelInterferenciaProps {
   readonly titulo: string;
-  /** La simulación, `id@version`, que se escribe en la etiqueta de modelo. */
-  readonly modelo: string;
   readonly alCerrar: () => void;
   readonly children: JSX.Element;
 }
@@ -56,12 +53,9 @@ export function PanelInterferencia(props: PanelInterferenciaProps) {
     >
       <div class="flex items-start justify-between gap-2">
         <div class="flex min-w-0 flex-col gap-1">
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p class="font-mono text-[11px] tracking-[0.12em] text-aviso-tinta uppercase">
-              Simulación orientativa
-            </p>
-            <Etiqueta tono="modelo">Modelo {props.modelo}</Etiqueta>
-          </div>
+          <p class="font-mono text-[11px] tracking-[0.12em] text-aviso-tinta uppercase">
+            Simulación orientativa
+          </p>
           {/* En el móvil el título solo se lee con el lector: el botón «Interferencia» ya lo dice. */}
           <h2 id={titulo} class="font-titulo text-xl leading-6 max-md:sr-only">
             {props.titulo}

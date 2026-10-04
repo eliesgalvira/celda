@@ -82,8 +82,10 @@ const recibir = Effect.fn("Buzon.recibir")(function* (token: string, forma: Form
   const huellaIp = yield* huellaDeLaPeticion(clave);
   yield* comprobarVetos({ identidad: identidad._id, huellaIp });
 
+  // El detalle del esquema es técnico y en inglés: va al registro, y a quien envía, una frase.
   const aportacion = yield* leerAportacion(forma).pipe(
-    Effect.mapError((error) => noValida(error.message)),
+    Effect.tapError((error) => Effect.logWarning(`Aportación con otra forma: ${error.message}`)),
+    Effect.mapError(() => noValida("algún dato no tiene la forma que Celda espera")),
   );
   const previa = yield* reader
     .table("aportaciones")

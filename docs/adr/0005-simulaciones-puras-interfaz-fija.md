@@ -1,6 +1,6 @@
 # Simulaciones como funciones puras detrás de una interfaz fija, sin Bend en la v1
 
-Estado: aceptada el 24/09/2026.
+Estado: aceptada el 24/09/2026. El 04/10/2026 el usuario decidió que la interfaz no enseña el `id` ni la `version` de una simulación: es un detalle de implementación que nadie que use la web necesita. Sigue diciendo que es un modelo o una simulación. El `id` y la `version` quedan en el código, en los resultados de referencia y en lo que se exporte.
 
 Celda tiene que servir de base para experimentos de simulación, y quien investigue debe poder añadir uno sin tocar el resto de la aplicación. Toda simulación cumple esta interfaz:
 
@@ -12,7 +12,7 @@ interface Simulacion<Params, Resultado> {
 }
 ```
 
-En el navegador se ejecutan en un Web Worker orquestado con Effect. La implementación en TypeScript es la referencia. Cada `version` tiene ficheros de resultados de referencia, y cualquier otra implementación debe coincidir con ellos dentro de una tolerancia declarada. La interfaz muestra siempre «modelo» y la versión junto al resultado.
+En el navegador se ejecutan en un Web Worker orquestado con Effect. La implementación en TypeScript es la referencia. Cada `version` tiene ficheros de resultados de referencia, y cualquier otra implementación debe coincidir con ellos dentro de una tolerancia declarada. La interfaz dice siempre que el resultado es un modelo, sin su `id` ni su `version`.
 
 Las simulaciones de la v1 vienen del prototipo:
 

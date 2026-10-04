@@ -108,7 +108,9 @@ describe("ficha: correcciones aceptadas de la comunidad", () => {
     fireEvent.click(respaldar ?? pantalla.panel);
     flush();
     const abierto = await dialogo(pantalla, "Yo también lo veo");
-    const enviar = await within(abierto).findByRole("button", { name: "Enviar con CC0" });
+    const enviar = await within(abierto).findByRole("button", {
+      name: "Enviar al dominio público",
+    });
     const cc0 = within(abierto).getByRole("region", { name: "Dedicación al dominio público" });
     // La dedicación va antes del botón de enviar.
     assert.isTrue(Boolean(cc0.compareDocumentPosition(enviar) & Node.DOCUMENT_POSITION_FOLLOWING));
@@ -147,7 +149,7 @@ describe("ficha: correcciones aceptadas de la comunidad", () => {
     });
     assert.isNotNull(within(sale).getByText("Orange no está en este emplazamiento"));
     assert.isNotNull(within(sale).getByText("Quitaron sus antenas en verano."));
-    fireEvent.click(within(abierto).getByRole("button", { name: "Enviar con CC0" }));
+    fireEvent.click(within(abierto).getByRole("button", { name: "Enviar al dominio público" }));
     flush();
     await within(abierto).findByText("Recibida");
     const [recibida] = pantalla.dispositivo.buzon.recibidas();
@@ -192,7 +194,7 @@ describe("Tus aportaciones", () => {
     }
     assert.isNotNull(within(sale).getByText(/La captura no sale de tu dispositivo/u));
     assert.isNotNull(within(abierto).getByText(/dominio público con la CC0 1.0 Universal/u));
-    fireEvent.click(within(abierto).getByRole("button", { name: "Enviar con CC0" }));
+    fireEvent.click(within(abierto).getByRole("button", { name: "Enviar al dominio público" }));
     flush();
     await within(abierto).findByText("Recibida");
     assert.deepStrictEqual(pantalla.dispositivo.buzon.recibidas(), [MEDIDA]);
@@ -212,7 +214,7 @@ describe("Tus aportaciones", () => {
     fireEvent.click(await within(pantalla.abierto).findByRole("button", { name: "Compartir" }));
     flush();
     const abierto = await dialogo(pantalla, "Compartir una aportación");
-    fireEvent.click(within(abierto).getByRole("button", { name: "Enviar con CC0" }));
+    fireEvent.click(within(abierto).getByRole("button", { name: "Enviar al dominio público" }));
     flush();
     const aviso = await within(abierto).findByRole("alert");
     assert.isNotNull(within(aviso).getByText("Muchas aportaciones desde tu red"));

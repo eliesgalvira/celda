@@ -1,7 +1,6 @@
 import type { Mhz } from "@celda/dominio/banda";
 import type { EmplazamientoDeCapa } from "@celda/dominio/capa";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
-import { sinr } from "@celda/sim/sinr";
 import { Boton } from "@celda/ui/Boton.tsx";
 import { Deslizador, Selector } from "@celda/ui/Eleccion.tsx";
 import {
@@ -82,11 +81,7 @@ export function VistaInterferencia(props: VistaInterferenciaProps) {
   const porcentaje = () => Math.round(props.eleccion.ocupacion * 100);
 
   return (
-    <PanelInterferencia
-      titulo="Interferencia entre antenas"
-      modelo={`${sinr.id}@${sinr.version}`}
-      alCerrar={props.alCerrar}
-    >
+    <PanelInterferencia titulo="Interferencia entre antenas" alCerrar={props.alCerrar}>
       <TextoVista tono="clave">
         <TextoConTerminos texto={FRASE_CLAVE} />
       </TextoVista>

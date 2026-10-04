@@ -876,9 +876,9 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                 <SeccionFicha titulo="4 · Tecnologías y bandas">
                   <TextoEjercicio>
                     Las <Termino termino="banda">bandas</Termino> salen del registro oficial, tal
-                    como las recoge la capa del mapa. Las fichas, publicadas con la misma versión,
-                    las dan expediente a expediente. El registro no publica la tecnología: se deduce
-                    de la banda y por eso la tabla dice «probable» o «posible».
+                    como las recoge el mapa de Celda. La ficha de cada emplazamiento, de la misma
+                    fecha, las da expediente a expediente. El registro no publica la tecnología: se
+                    deduce de la banda y por eso la tabla dice «probable» o «posible».
                   </TextoEjercicio>
                   {/*
                     Leídas una vez no hay nada que volver a leer: las fichas y la capa son de la
@@ -895,7 +895,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       </Boton>
                     </AccionesEjercicio>
                     <TextoEjercicio>
-                      La capa del mapa trae bandas de {entero(conBandasEnCapa())} de los{" "}
+                      El mapa trae bandas de {entero(conBandasEnCapa())} de los{" "}
                       {entero(enZona().length)} emplazamientos de la zona. De los demás, la tabla
                       dice «no consta».
                     </TextoEjercicio>

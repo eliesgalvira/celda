@@ -90,7 +90,7 @@ export function PasoCompartir(props: PasoCompartirProps) {
         </p>
         <p>
           {esMedida()
-            ? "No se publica suelta: de las medidas solo se publican agregados."
+            ? "No se publica sola: de las medidas solo se publican resúmenes que juntan muchas."
             : "No cambia nada del mapa por sí sola: la revisa la moderación y, si la acepta, sale al lado de lo que dice el registro oficial."}
         </p>
       </QueSale>
@@ -99,7 +99,7 @@ export function PasoCompartir(props: PasoCompartirProps) {
           Al enviarla la dedicas al dominio público con la {DEDICACION_CC0.nombre}: cualquiera podrá
           copiarla, cambiarla y publicarla sin pedirte permiso ni citarte.
         </p>
-        <p>Es irrevocable: una vez enviada no se puede retirar de esta dedicación.</p>
+        <p>No tiene vuelta atrás: una vez enviada, no se puede sacar del dominio público.</p>
       </DedicacionCc0>
       <AccionesDelPaso>
         <Show
@@ -116,7 +116,7 @@ export function PasoCompartir(props: PasoCompartirProps) {
           }
         >
           <Boton variante="destacado" cargando={estado().tipo === "enviando"} onClick={enviar}>
-            {estado().tipo === "fallo" ? "Intentar otra vez" : "Enviar con CC0"}
+            {estado().tipo === "fallo" ? "Intentar otra vez" : "Enviar al dominio público"}
           </Boton>
           <Boton variante="secundario" onClick={() => props.alSalir()}>
             {props.textoSalir}

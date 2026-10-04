@@ -99,9 +99,9 @@ describe("textos del sector que da servicio", () => {
     assert.strictEqual(textoGanancia(-0.01), "0 dB");
   });
 
-  it("es un modelo con su versión y dice que la orientación es supuesta", () => {
+  it("no da el identificador del modelo y dice que la orientación es supuesta", () => {
     const textos = textosServicio(lectura(2, -18), "gps", SUPUESTA);
-    assert.strictEqual(textos.modelo, "sector-servicio v1");
+    assert.notProperty(textos, "modelo");
     assert.match(
       textoPlano(textos.nota),
       /^Orientación supuesta a 0°, 120° y 240°: ninguna fuente/u,

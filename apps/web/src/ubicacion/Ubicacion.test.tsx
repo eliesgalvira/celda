@@ -195,8 +195,9 @@ describe("punto de referencia: pedir la ubicación", () => {
       ["no", "no", "si"],
     );
     assert.strictEqual(diagrama.querySelector("[data-rumbo]")?.textContent, "TÚ");
-    // Es un modelo, con su versión, sobre una orientación supuesta.
-    assert.isNotNull(panel().getByText("sector-servicio v1"));
+    // Es un modelo, sin su identificador interno, sobre una orientación supuesta.
+    assert.isNotEmpty(panel().getAllByText("Modelo"));
+    assert.isNull(panel().queryByText(/sector-servicio/u));
     assert.isNotNull(
       panel().getByText(
         textoEntero(

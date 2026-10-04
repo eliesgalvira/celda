@@ -23,8 +23,9 @@ import {
   provinciaDePrueba,
   publicacionDePrueba,
 } from "../capa/pruebas.ts";
-import { estaEnElGlosario, terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
+import { estaEnElGlosario, jergaEn, terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
 import { navegar, ruta, ubicacion } from "../lib/rutas.ts";
+import { FICHA_CON_CORRECCIONES_ACEPTADAS, FICHA_CORREGIDA } from "./fichasCorregidas.ts";
 import { loteConFichas, type OrigenDePrueba, origenDePrueba } from "./pruebas.ts";
 import { fichasDelOrigen } from "./servicio.ts";
 import { ubicacionDePrueba } from "../ubicacion/pruebas.ts";
@@ -454,7 +455,7 @@ describe("panel del emplazamiento", () => {
     );
   });
 
-  it("dibuja cómo emite: un diagrama de modelo, con su versión y la orientación supuesta", async () => {
+  it("dibuja cómo emite: un diagrama de modelo, sin su identificador interno, y la orientación supuesta", async () => {
     const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
     await responder(origen, CAMPUS_NORD);
     const diagrama = await findByRole("img", { name: "Diagrama de radiación de los sectores" });
@@ -463,7 +464,7 @@ describe("panel del emplazamiento", () => {
     });
     assert.include(diagrama.querySelector("desc")?.textContent, "orientación supuesta");
     assert.isNotNull(getByText("Modelo"));
-    assert.isNotNull(getByText("diagrama-sector v1"));
+    assert.notInclude(diagrama.closest("figure")?.textContent, "diagrama-sector");
     assert.isNotNull(getByText("Sector 2 · 120°"));
     // «Orientación» va subrayada: el párrafo se busca entero.
     const nota = Array.from(diagrama.closest("figure")?.querySelectorAll("p") ?? []).find((p) =>
@@ -472,6 +473,37 @@ describe("panel del emplazamiento", () => {
     assert.isDefined(nota);
     assert.deepStrictEqual(terminosSubrayados(nota ?? diagrama), ["azimut", "sector"]);
   });
+
+  // Ni la ficha ni el mapa de detrás enseñan detalles de implementación (docs/patterns/ui.md):
+  // ni versiones de modelos o de capas, ni claves internas, ni en el texto ni en lo que oye un
+  // lector de pantalla. Se mira con los datos técnicos abiertos y el diagrama ya dibujado.
+  for (const [caso, ficha] of [
+    ["compartido, con una observación de la comunidad", FICHA_CORREGIDA],
+    ["con correcciones aceptadas", FICHA_CON_CORRECCIONES_ACEPTADAS],
+    [
+      "sin ficha en el registro",
+      {
+        ...CAMPUS_NORD,
+        estaciones: CAMPUS_NORD.estaciones.map((e) => ({
+          ...e,
+          bandas: [],
+          sinFichaEnRegistro: NOCHE + DIA,
+        })),
+      },
+    ],
+  ] as const) {
+    it(`un emplazamiento ${caso} no enseña detalles de implementación`, async () => {
+      const { findByRole, getByRole, origen } = abrir(CAMPUS_NORD.clave);
+      await responder(origen, ficha);
+      const diagrama = await findByRole("img", { name: "Diagrama de radiación de los sectores" });
+      await waitFor(() => {
+        assert.lengthOf(diagrama.querySelectorAll("path"), 3);
+      });
+      fireEvent.click(getByRole("button", { name: "Datos técnicos" }));
+      flush();
+      assert.deepStrictEqual(jergaEn(document.body), []);
+    });
+  }
 
   it("al cambiar de emplazamiento a medio calcular, cancela el diagrama anterior", async () => {
     const worker = workerDePrueba();

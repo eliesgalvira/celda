@@ -303,7 +303,7 @@ _Evitar_: bloqueo, ban
 ### Simulaciones
 
 **Simulación**:
-Cálculo con un modelo que da algo con aspecto de dato. Siempre se muestra marcado como «modelo» y con su versión.
+Cálculo con un modelo que da algo con aspecto de dato. Siempre se muestra marcado como modelo o simulación, con palabras llanas y sin su identificador ni su versión.
 _Evitar_: medida, predicción, estimación
 
 **Diagrama de radiación**:

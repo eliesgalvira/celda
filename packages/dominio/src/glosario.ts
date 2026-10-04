@@ -211,7 +211,7 @@ export const GLOSARIO: Glosario = {
     explicacion:
       "La fecha de los datos que se ven. Celda consulta las fuentes cada cierto tiempo y " +
       "publica el mapa entero de una vez, con la fecha de esa consulta.",
-    tecnico: "versión de capa",
+    tecnico: "fecha de corte de los datos",
     relacionados: ["marca-de-agua", "registro-oficial"],
   },
   "marca-de-agua": {
@@ -220,7 +220,7 @@ export const GLOSARIO: Glosario = {
       "La ficha se lee al abrirla y el mapa se publica cada cierto tiempo, así que la ficha " +
       "puede ser más nueva que el mapa. Cuando pasa, Celda lo dice en lugar de dejar que se " +
       "contradigan.",
-    tecnico: "marca de agua de los datos (watermark)",
+    tecnico: "fecha de corte de la ficha",
     relacionados: ["version-de-los-datos"],
   },
   "modo-de-informacion": {
@@ -243,7 +243,7 @@ export const GLOSARIO: Glosario = {
     nombre: "Modelo",
     explicacion:
       "Un cálculo que imita cómo se suele comportar la señal. No es una medida: Celda lo marca " +
-      "siempre como modelo, con su versión, para que no se confunda con un dato.",
+      "siempre como modelo para que no se confunda con un dato.",
     tecnico: "simulación",
     relacionados: ["sector", "azimut"],
   },

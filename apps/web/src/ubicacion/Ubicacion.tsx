@@ -29,7 +29,7 @@ import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid
 import { usarDatos } from "../datos.tsx";
 import { ServicioContexto } from "../servicio/enMapa.ts";
 import { lecturaDe } from "../servicio/servicio.ts";
-import { MODELO_SERVICIO, notaServicio, textosServicio } from "../servicio/textos.ts";
+import { notaServicio, textosServicio } from "../servicio/textos.ts";
 import {
   BuscadorDeDirecciones,
   type BusquedaFallida,
@@ -563,7 +563,6 @@ function ServicioEnFicha(props: { readonly clave: string; readonly tipo: "gps" |
     <LecturaServicio
       datos={textos()?.datos}
       veredicto={veredicto()}
-      modelo={MODELO_SERVICIO}
       nota={<TextoConTerminos texto={textos()?.nota ?? notaServicio(servicio.orientacion)} />}
     />
   );
