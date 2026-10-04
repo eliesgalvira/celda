@@ -1,3 +1,4 @@
+import { AVISO_DE_MARCAS, CITA_DEL_LOGO_DE_DIGI } from "@celda/dominio/compania";
 import type { Credito } from "@celda/ui/Atribucion.tsx";
 
 /** Por qué no se puede enseñar el mapa base. */
@@ -29,6 +30,20 @@ export const CREDITOS_RESERVA: ReadonlyArray<Credito> = [
     fijo: true,
   },
 ];
+
+/** Que las marcas de los logos son de sus compañías, mientras el mapa enseña alguno. */
+export const CREDITO_DE_MARCAS: Credito = {
+  texto: AVISO_DE_MARCAS,
+  corto: "Marcas y logotipos de sus titulares; Celda no está afiliada",
+  aviso: true,
+};
+
+/** La cita del logotipo de DIGI que piden sus condiciones, mientras el mapa puede enseñarlo. */
+export const CREDITO_DEL_LOGO_DE_DIGI: Credito = {
+  texto: `${CITA_DEL_LOGO_DE_DIGI.texto} ${CITA_DEL_LOGO_DE_DIGI.sitio}`,
+  enlace: CITA_DEL_LOGO_DE_DIGI.enlace,
+  aviso: true,
+};
 
 /** Si el navegador puede dibujar con WebGL, que MapLibre necesita. */
 export const hayWebgl = (): boolean => {

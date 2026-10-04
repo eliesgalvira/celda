@@ -120,6 +120,8 @@ export const variantesNota = cva("", {
 
 export type NotaFichaProps = VariantProps<typeof variantesNota> & {
   readonly children: JSX.Element;
+  /** Un enlace al final del párrafo, como la web de la que se cita algo. */
+  readonly enlace?: { readonly texto: string; readonly href: string };
 };
 
 /** Un párrafo del cuerpo de la ficha. */
@@ -127,6 +129,21 @@ export function NotaFicha(props: NotaFichaProps) {
   return (
     <p data-tono={props.tono ?? "texto"} class={variantesNota({ tono: props.tono })}>
       {props.children}
+      <Show when={props.enlace}>
+        {(enlace) => (
+          <>
+            {" "}
+            <a
+              href={enlace().href}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-primario-texto underline underline-offset-2 hover:text-tinta"
+            >
+              {enlace().texto}
+            </a>
+          </>
+        )}
+      </Show>
     </p>
   );
 }

@@ -1,3 +1,4 @@
+import type { JSX } from "@solidjs/web";
 import { createContext, createUniqueId, For, Show, useContext } from "solid-js";
 
 import { variantesDiana } from "./Boton.tsx";
@@ -5,7 +6,13 @@ import { cn } from "./cn.ts";
 
 export interface Credito {
   readonly texto: string;
-  readonly enlace: string;
+  /** Adónde lleva. Un aviso sin fuente que enlazar no lleva enlace. */
+  readonly enlace?: string;
+  /**
+   * Un aviso o una cita, no el crédito de unos datos: va sin «©». Lo son el de las marcas de las
+   * compañías y la cita del logotipo de DIGI.
+   */
+  readonly aviso?: boolean;
   /** Qué datos son, para quien pasa el puntero o usa un lector de pantalla. */
   readonly detalle?: string;
   /** Lo que se escribe en el móvil, donde los créditos tienen poco sitio, si es más corto. */
@@ -34,24 +41,67 @@ export interface AtribucionProps {
   readonly creditos: ReadonlyArray<Credito>;
 }
 
+const TEXTO = "inline-flex min-h-6 items-center";
+const ENLACE = `${TEXTO} underline-offset-2 hover:text-primario-texto hover:underline`;
+const CINTA =
+  "cinta flex flex-wrap items-center gap-x-2 bg-superficie/90 px-3 py-0.5 font-mono text-[10.5px] text-tinta [--pico:6px]";
+
+/** «© » delante de un crédito; nada delante de un aviso. */
+const simbolo = (credito: Credito): string => (credito.aviso === true ? "" : "© ");
+
 /** El texto de un crédito: entero y, en el móvil, el corto si lo tiene. */
 function TextoDelCredito(props: { readonly credito: Credito }) {
   return (
-    <Show when={props.credito.corto} fallback={<>© {props.credito.texto}</>}>
+    <Show
+      when={props.credito.corto}
+      fallback={
+        <>
+          {simbolo(props.credito)}
+          {props.credito.texto}
+        </>
+      }
+    >
       {(corto) => (
         <>
-          <span class="max-md:hidden">© {props.credito.texto}</span>
-          <span class="md:hidden">© {corto()}</span>
+          <span class="max-md:hidden">
+            {simbolo(props.credito)}
+            {props.credito.texto}
+          </span>
+          <span class="md:hidden">
+            {simbolo(props.credito)}
+            {corto()}
+          </span>
         </>
       )}
     </Show>
   );
 }
 
-const ENLACE =
-  "inline-flex min-h-6 items-center underline-offset-2 hover:text-primario-texto hover:underline";
-const CINTA =
-  "cinta flex flex-wrap items-center gap-x-2 bg-superficie/90 px-3 py-0.5 font-mono text-[10.5px] text-tinta [--pico:6px]";
+/** Un crédito: un enlace a su fuente o, si no tiene, solo su texto. */
+function UnCredito(props: { readonly credito: Credito; readonly children: JSX.Element }) {
+  return (
+    <Show
+      when={props.credito.enlace}
+      fallback={
+        <span title={props.credito.detalle} class={TEXTO}>
+          {props.children}
+        </span>
+      }
+    >
+      {(enlace) => (
+        <a
+          href={enlace()}
+          title={props.credito.detalle}
+          target="_blank"
+          rel="noopener noreferrer"
+          class={ENLACE}
+        >
+          {props.children}
+        </a>
+      )}
+    </Show>
+  );
+}
 
 /**
  * Los créditos de los datos del mapa, siempre a la vista o a un toque del botón «i». Los que son
@@ -96,15 +146,9 @@ export function Atribucion(props: AtribucionProps) {
       >
         <For each={props.creditos}>
           {(credito) => (
-            <a
-              href={credito.enlace}
-              title={credito.detalle}
-              target="_blank"
-              rel="noreferrer"
-              class={ENLACE}
-            >
+            <UnCredito credito={credito}>
               <TextoDelCredito credito={credito} />
-            </a>
+            </UnCredito>
           )}
         </For>
       </p>
@@ -112,15 +156,10 @@ export function Atribucion(props: AtribucionProps) {
         <p class={cn(CINTA, "flex-nowrap whitespace-nowrap md:hidden")}>
           <For each={fijos()}>
             {(credito) => (
-              <a
-                href={credito.enlace}
-                title={credito.detalle}
-                target="_blank"
-                rel="noreferrer"
-                class={ENLACE}
-              >
-                © {credito.corto ?? credito.texto}
-              </a>
+              <UnCredito credito={credito}>
+                {simbolo(credito)}
+                {credito.corto ?? credito.texto}
+              </UnCredito>
             )}
           </For>
         </p>

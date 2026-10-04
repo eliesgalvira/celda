@@ -11,6 +11,17 @@ const OPENSTREETMAP: Credito = {
   enlace: "https://www.openstreetmap.org/copyright",
 };
 
+const MARCAS: Credito = {
+  texto: "Las marcas son de sus titulares.",
+  corto: "Marcas de sus titulares",
+  aviso: true,
+};
+const CITA: Credito = {
+  texto: "Logotipo de DIGI: digimobil.es",
+  enlace: "https://www.digimobil.es/",
+  aviso: true,
+};
+
 const montar = (creditos: ReadonlyArray<Credito> = [OPENSTREETMAP]) => {
   const pantalla = render(() => (
     <DisposicionMapa
@@ -30,6 +41,17 @@ const montar = (creditos: ReadonlyArray<Credito> = [OPENSTREETMAP]) => {
 };
 
 describe("DisposicionMapa", () => {
+  it("un crédito lleva «©» y enlace; un aviso va sin «©», y sin enlace si no tiene fuente", () => {
+    const { getByRole, getByText } = montar([OPENSTREETMAP, MARCAS, CITA]);
+    const osm = getByRole("link", { name: "© OpenStreetMap" });
+    assert.strictEqual(osm.getAttribute("rel"), "noopener noreferrer");
+    assert.isNull(getByText("Las marcas son de sus titulares.").closest("a"));
+    assert.isNotNull(getByText("Marcas de sus titulares"), "en el móvil, el corto");
+    const cita = getByRole("link", { name: "Logotipo de DIGI: digimobil.es" });
+    assert.strictEqual(cita.getAttribute("href"), "https://www.digimobil.es/");
+    assert.strictEqual(cita.getAttribute("rel"), "noopener noreferrer");
+  });
+
   it("con los créditos abiertos, la disposición lo marca para apartar la pista en el móvil", () => {
     const { getByRole } = montar();
     const disposicion = getByRole("main", { name: "Mapa de España" }).parentElement;

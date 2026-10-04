@@ -33,7 +33,7 @@ Descargados y revisados el 04/10/2026.
 
 - **Qué es.** El logotipo «DIGI» en azul `#002BFF`. Celda usa solo su «D», en blanco sobre el azul, que es como la dibuja el icono de la web (`/images/favicon.png`).
 - **Origen.** La imagen de la cabecera de <https://www.digimobil.es/> («Logo DIGI - Ir al inicio»), un SVG en `data:` dentro de la página.
-- **Licencia.** «DIGI» es marca registrada de DIGI Spain Telecom, S.A. Su aviso legal (punto 6.2) deja reproducir en parte el contenido de la web sin ánimo de lucro si se dice la fuente, se enlaza la web y no se modifica; prohíbe modificar, transformar o imitar sus elementos. Celda no tiene ánimo de lucro y reproduce la «D» sin cambiarla; la fuente y el enlace están aquí. Wikimedia Commons trata el mismo logotipo como `PD-textlogo` ([Digi 2024 Logo.svg](https://commons.wikimedia.org/wiki/File:Digi_2024_Logo.svg)).
+- **Licencia.** «DIGI» es marca registrada de DIGI Spain Telecom, S.A. Su aviso legal (punto 6.2) deja reproducir en parte el contenido de la web sin ánimo de lucro si se dice la fuente, se enlaza la web y no se modifica; prohíbe modificar, transformar o imitar sus elementos. Celda no tiene ánimo de lucro y reproduce la «D» sin cambiarla. La cita con el enlace («Logotipo de DIGI: digimobil.es») sale en los créditos del mapa y en la ficha siempre que puede verse el logotipo. Wikimedia Commons trata el mismo logotipo como `PD-textlogo` ([Digi 2024 Logo.svg](https://commons.wikimedia.org/wiki/File:Digi_2024_Logo.svg)).
 
 ## Yoigo: sin logo
 
