@@ -177,6 +177,14 @@ describe("rasgos del mapa", () => {
       }),
       { numero: "1–5", punto: { longitud: 2.1, latitud: 41.3 } },
     );
+    // El mapa base de reserva del IGN da el número en `ref`.
+    assert.deepStrictEqual(
+      portalDeRasgo({
+        properties: { ref: "10 B" },
+        geometry: { type: "Point", coordinates: [2.1, 41.3] },
+      }),
+      { numero: "10 B", punto: { longitud: 2.1, latitud: 41.3 } },
+    );
     assert.isUndefined(
       portalDeRasgo({ properties: {}, geometry: { type: "Point", coordinates: [2.1, 41.3] } }),
     );

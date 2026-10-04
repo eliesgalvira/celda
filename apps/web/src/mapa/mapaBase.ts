@@ -3,12 +3,13 @@ import { CONTORNO_DE_LA_COMUNITAT_VALENCIANA } from "@celda/dominio/comunitatVal
 import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
 import { coloresDelTema, estiloMapa } from "@celda/ui/mapa/estilo.ts";
 import { FUENTE_LIMITES } from "@celda/ui/mapa/limites.ts";
+import { conLoDeCelda, estiloDeReserva } from "@celda/ui/mapa/reserva/estilo.ts";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import { type GeoJSONSource, Map as MapaMapLibre, prewarm, setWorkerUrl } from "maplibre-gl";
 import urlDelTrabajador from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
-import { type Avisos, vigilarCallejero } from "./callejero.ts";
+import { type Avisos, type Callejero, esperarDeVerdad, vigilarCallejero } from "./callejero.ts";
 import { leerLimites, limitesDeLaVisita } from "./limites.ts";
 import urlDeLimites from "./limites.json?url";
 import { zoomsSinPartir } from "./teselas.ts";
@@ -43,21 +44,26 @@ const TEXTOS_MAPLIBRE = {
  * y sin giros: se mueve con un dedo o el ratón y se acerca pellizcando, con
  * la rueda o con el teclado. Nace encuadrando `area.encuadre` sin lo que tapa
  * `relleno`.
+ *
+ * Nace con el callejero `desde`. Con el principal, si OpenFreeMap no responde, pasa al de reserva
+ * del IGN con `setStyle`, sin recargar ni perder la vista, las capas de Celda ni la ficha
+ * (`vigilarCallejero`). La web no le pide que vuelva: eso es en la siguiente visita.
  */
 export const crearMapaBase = (
   contenedor: HTMLElement,
   area: Area,
   avisos: Avisos,
   relleno: Relleno,
+  desde: Callejero,
 ): MapaMapLibre => {
   const { encuadre, limites } = area;
+  const colores = coloresDelTema(document.documentElement);
   const mapa = new MapaMapLibre({
     container: contenedor,
-    style: estiloMapa(
-      coloresDelTema(document.documentElement),
-      CONTORNO_DE_ESPANA,
-      CONTORNO_DE_LA_COMUNITAT_VALENCIANA,
-    ),
+    style:
+      desde === "reserva"
+        ? estiloDeReserva(colores)
+        : estiloMapa(colores, CONTORNO_DE_ESPANA, CONTORNO_DE_LA_COMUNITAT_VALENCIANA),
     bounds: [
       [encuadre.suroeste.longitud, encuadre.suroeste.latitud],
       [encuadre.noreste.longitud, encuadre.noreste.latitud],
@@ -80,7 +86,18 @@ export const crearMapaBase = (
   mapa.touchZoomRotate.disableRotation();
   mapa.keyboard.disableRotation();
 
-  vigilarCallejero(mapa, avisos);
+  vigilarCallejero(mapa, avisos, {
+    desde,
+    // El mapa compara el estilo que tiene con el de reserva y solo cambia el callejero. La fuente
+    // de los límites se queda con sus líneas, si ya habían llegado.
+    ponerReserva: () =>
+      mapa.setStyle(estiloDeReserva(colores), {
+        diff: true,
+        transformStyle: (anterior, reserva) =>
+          anterior === undefined ? reserva : conLoDeCelda(anterior, reserva),
+      }),
+    esperar: esperarDeVerdad,
+  });
   // Después del primer pintado completo: no compiten con el mapa base ni con los marcadores.
   ponerLimites({
     trasElPrimerPintado: (escuchar) => {
