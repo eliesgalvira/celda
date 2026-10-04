@@ -4,14 +4,51 @@ import { cva } from "class-variance-authority";
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
 import { Deslizable, type Movimiento } from "./Deslizable.tsx";
+import type { TonoDeMarcador } from "./MarcadorEmplazamiento.tsx";
 import { type TamanoDeMarcador, variantesDibujo, variantesTamano } from "./tamano.ts";
 
 /** Con cuatro cifras el número se achica para caber en el hexágono. */
-const variantesNumero = cva("relative font-mono font-semibold text-tinta-invertida", {
+const variantesNumero = cva("relative font-mono font-semibold", {
   variants: {
     cifras: {
       pocas: "text-base",
       muchas: "text-xs",
+    },
+    tono: {
+      propio: "text-tinta-invertida",
+      "red-usada": "text-tinta",
+    },
+  },
+});
+
+/**
+ * El hexágono: oscuro el de los emplazamientos, claro y con el borde discontinuo el de la red que
+ * usa una compañía del filtro (ADR 0026), que se ve aparte y más suave.
+ */
+const variantesRelleno = cva("transition-[fill] duration-150", {
+  variants: {
+    tono: {
+      propio: "fill-superficie-invertida group-hover:fill-primario-activo",
+      "red-usada": "fill-superficie-alta group-hover:fill-control-hover",
+    },
+  },
+});
+
+const variantesBorde = cva("", {
+  variants: {
+    tono: {
+      propio: "stroke-primario",
+      "red-usada": "stroke-tinta-suave [stroke-dasharray:3_3]",
+    },
+  },
+});
+
+/** La red usada va algo translúcida. */
+const variantesTonoAgrupacion = cva("", {
+  variants: {
+    tono: {
+      propio: "",
+      "red-usada": "opacity-80",
     },
   },
 });
@@ -28,6 +65,8 @@ export interface MarcadorAgrupacionProps {
   readonly movimiento?: Movimiento;
   /** Lo grande que va el hexágono según lo lejos que está el mapa. Sin él, `normal`. */
   readonly tamano?: TamanoDeMarcador;
+  /** `red-usada`: recoge emplazamientos de la red que usa una compañía del filtro. */
+  readonly tono?: TonoDeMarcador;
   readonly onClick?: JSX.EventHandler<HTMLButtonElement, MouseEvent>;
 }
 
@@ -47,6 +86,7 @@ export function MarcadorAgrupacion(props: MarcadorAgrupacionProps) {
       aria-label={props.nombre}
       inert={saliendo()}
       data-tamano={props.tamano ?? "normal"}
+      data-tono={props.tono ?? "propio"}
       class={cn(
         variantesDiana(),
         "absolute top-0 left-0 z-10 -mt-7 -ml-[25px] cursor-zoom-in will-change-transform",
@@ -57,7 +97,12 @@ export function MarcadorAgrupacion(props: MarcadorAgrupacionProps) {
     >
       <Deslizable forma="agrupacion" movimiento={props.movimiento ?? QUIETO}>
         <span class={variantesTamano({ tamano: props.tamano ?? "normal" })}>
-          <span class="relative grid h-14 w-[50px] place-items-center drop-shadow-marcador transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-95 motion-reduce:transition-none">
+          <span
+            class={cn(
+              "relative grid h-14 w-[50px] place-items-center drop-shadow-marcador transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-95 motion-reduce:transition-none",
+              variantesTonoAgrupacion({ tono: props.tono ?? "propio" }),
+            )}
+          >
             <svg
               viewBox="0 0 50 56"
               aria-hidden="true"
@@ -65,18 +110,21 @@ export function MarcadorAgrupacion(props: MarcadorAgrupacionProps) {
             >
               <polygon
                 points="25,2 48,15 48,41 25,54 2,41 2,15"
-                class="fill-superficie-invertida transition-[fill] duration-150 group-hover:fill-primario-activo"
+                class={variantesRelleno({ tono: props.tono ?? "propio" })}
               />
               <polygon
                 points="25,7 43.5,17.5 43.5,38.5 25,49 6.5,38.5 6.5,17.5"
                 fill="none"
                 stroke-width="1.4"
-                class="stroke-primario"
+                class={variantesBorde({ tono: props.tono ?? "propio" })}
               />
             </svg>
             <span
               aria-hidden="true"
-              class={variantesNumero({ cifras: props.cuantos >= 1000 ? "muchas" : "pocas" })}
+              class={variantesNumero({
+                cifras: props.cuantos >= 1000 ? "muchas" : "pocas",
+                tono: props.tono ?? "propio",
+              })}
             >
               {props.cuantos}
             </span>

@@ -5,6 +5,7 @@ import {
   VersionDistinta,
   type Vigente,
 } from "@celda/dominio/capa";
+import { claveDeFiltro, type FiltroDeCompanias, hayFiltro } from "@celda/dominio/filtro";
 import {
   leerParteDelIndice,
   leerResumen,
@@ -24,7 +25,14 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { IndexadorDeProvincias, type IndiceFallido } from "./indexador.ts";
-import { agrupadorDeProvincia, type ProvinciaCargada } from "./nacional.ts";
+import {
+  type AgrupacionConFiltro,
+  agrupacionConFiltro,
+  agrupacionSinFiltro,
+  agrupadorDeProvincia,
+  partesDelFiltro,
+  type ProvinciaCargada,
+} from "./nacional.ts";
 
 /** El origen no tiene todavía ninguna capa publicada: no hay `vigente.json`. */
 export class SinCapaPublicada extends Schema.TaggedError<SinCapaPublicada>()(
@@ -73,8 +81,24 @@ export class CapaEmplazamientos extends Context.Service<
      * resumen de antes del índice no sabe buscar, y da la de los enlaces viejos (Barcelona).
      */
     readonly provinciaDeClave: (clave: string) => Effect.Effect<Option.Option<string>, FalloCapa>;
+    /**
+     * Cómo se agrupa una provincia con un filtro de compañías (ADR 0026). La primera vez el Worker
+     * de capas indexa aparte lo que sale con el filtro; después se guarda: volver a un filtro no
+     * pide nada. Sin filtro es el agrupador de la provincia. No descarga nada que no se haya
+     * descargado ya: la capa es la que pide `provincia`.
+     */
+    readonly agrupacion: (
+      codigo: string,
+      filtro: FiltroDeCompanias,
+    ) => Effect.Effect<AgrupacionConFiltro, FalloCapa>;
   }
 >()("@celda/web/capa/servicio/CapaEmplazamientos") {}
+
+/**
+ * Cuántas agrupaciones con filtro se guardan por provincia, además de la de todas: las de los
+ * últimos filtros. Cada una son los índices de lo que sale con su filtro.
+ */
+export const AGRUPACIONES_GUARDADAS = 4;
 
 /**
  * De dónde se leen las capas y las fichas publicadas: `/capas`, en el mismo origen que la web, sin
@@ -212,6 +236,8 @@ export const capaDelOrigen = Layer.effect(
       });
 
     const cargas = new Map<string, Effect.Effect<ProvinciaCargada, FalloCapa>>();
+    /** El resumen que listó cada provincia leída: con él se agrupa con cualquier filtro. */
+    const suResumen = new Map<string, ResumenLeido>();
     const provincia = (codigo: string) => {
       let carga = cargas.get(codigo);
       if (carga === undefined) {
@@ -220,6 +246,7 @@ export const capaDelOrigen = Layer.effect(
           Effect.gen(function* () {
             // Su marca de agua y su cobertura son las del resumen que la listó.
             const { resumen: suyo, texto } = yield* textoDe(codigo);
+            suResumen.set(codigo, suyo);
             const cubierta = suyo.provincias.find((p) => p.codigo === codigo)?.cubierta === true;
             const { capa, indices } = yield* indexador.indexar(codigo, texto, cubierta);
             const cargada: ProvinciaCargada = {
@@ -270,6 +297,67 @@ export const capaDelOrigen = Layer.effect(
       return Option.fromNullishOr((yield* parte(fichero)).get(clave));
     });
 
-    return CapaEmplazamientos.of({ resumen, provincia, provinciaDeClave });
+    /** Las agrupaciones con filtro de cada provincia, de la más vieja a la más reciente. */
+    const agrupadas = new Map<string, Map<string, AgrupacionConFiltro>>();
+    /** Una agrupación de cada provincia a la vez: la siguiente espera y ya no repite el Worker. */
+    const turnos = new Map<string, Semaphore.Semaphore>();
+    const guardada = (codigo: string, clave: string): AgrupacionConFiltro | undefined => {
+      const suyas = agrupadas.get(codigo);
+      const hecha = suyas?.get(clave);
+      if (suyas !== undefined && hecha !== undefined) {
+        // La usada pasa a ser la más reciente.
+        suyas.delete(clave);
+        suyas.set(clave, hecha);
+      }
+      return hecha;
+    };
+    const guardar = (codigo: string, hecha: AgrupacionConFiltro) => {
+      const suyas = agrupadas.get(codigo) ?? new Map<string, AgrupacionConFiltro>();
+      suyas.set(hecha.filtro, hecha);
+      for (const clave of suyas.keys()) {
+        if (suyas.size <= AGRUPACIONES_GUARDADAS) break;
+        suyas.delete(clave);
+      }
+      agrupadas.set(codigo, suyas);
+    };
+
+    const agrupacion = Effect.fn("CapaEmplazamientos.agrupacion")(function* (
+      codigo: string,
+      filtro: FiltroDeCompanias,
+    ) {
+      const cargada = yield* provincia(codigo);
+      const clave = claveDeFiltro(filtro);
+      if (!hayFiltro(filtro)) return agrupacionSinFiltro(cargada);
+      const yaHecha = guardada(codigo, clave);
+      if (yaHecha !== undefined) return yaHecha;
+      const suyo = suResumen.get(codigo) ?? (yield* resumen);
+      const conFiltro = { companias: filtro, clave };
+      let turno = turnos.get(codigo);
+      if (turno === undefined) {
+        turno = Semaphore.makeUnsafe(1);
+        turnos.set(codigo, turno);
+      }
+      return yield* turno.withPermits(1)(
+        Effect.suspend(() => {
+          // Otro la ha hecho mientras se esperaba el turno.
+          const hecha = guardada(codigo, clave);
+          if (hecha !== undefined) return Effect.succeed(hecha);
+          const partes = partesDelFiltro(cargada.capa, suyo, filtro);
+          return indexador.indexarFiltro(codigo, partes.propios, partes.redUsada).pipe(
+            Effect.map((indices) => agrupacionConFiltro(cargada.capa, suyo, conFiltro, indices)),
+            // Si el Worker falla, se agrupa aquí: tarda más, pero el mapa no se queda sin ella.
+            Effect.catch(() =>
+              Effect.sync(() => agrupacionConFiltro(cargada.capa, suyo, conFiltro)),
+            ),
+            Effect.tap((hecha) => Effect.sync(() => guardar(codigo, hecha))),
+            // Lo que ya se ha mandado al Worker se termina y se guarda aunque nadie lo espere: así
+            // un cambio de lo que se ve no lo vuelve a mandar.
+            Effect.uninterruptible,
+          );
+        }),
+      );
+    });
+
+    return CapaEmplazamientos.of({ resumen, provincia, provinciaDeClave, agrupacion });
   }),
 );

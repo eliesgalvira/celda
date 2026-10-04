@@ -1,4 +1,5 @@
 import type { Coordenada } from "@celda/dominio/area";
+import { type FiltroDeCompanias, SIN_FILTRO } from "@celda/dominio/filtro";
 import { habitantesDeRotulo, indiceDeCiudades } from "@celda/dominio/poblacionDeRotulos";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { quitarRotulosDeMunicipios } from "@celda/ui/mapa/estilo.ts";
@@ -11,8 +12,9 @@ import { createEffect, createMemo, createSignal, For } from "solid-js";
 
 import { type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
 import { huecosDe, resolverChoques, type RotuloEnElMapa, tamanoDeNivel } from "../capa/choques.ts";
-import { cajaConMargen, combinacionesDe, type Vista } from "../capa/marcadores.ts";
+import { cajaConMargen, logosDe, type Vista } from "../capa/marcadores.ts";
 import {
+  type AgrupacionConFiltro,
   crearAgrupadorNacional,
   type EstadoProvincia,
   NIVEL_DE_PROVINCIAS,
@@ -37,6 +39,13 @@ export interface MarcadoresProps {
   readonly resumen: ResumenLeido;
   /** Cómo va cada provincia pedida. Las listas se agrupan aquí y se dibujan las de la vista. */
   readonly provincias: ReadonlyMap<string, EstadoProvincia>;
+  /** Las compañías que se ven (ADR 0026). Sin él, todas. */
+  readonly filtro?: FiltroDeCompanias;
+  /**
+   * Con un filtro, la agrupación de cada provincia lista: la del filtro o, mientras llega, la que
+   * ya se veía (`crearAgrupadorNacional`).
+   */
+  readonly agrupaciones?: ReadonlyMap<string, AgrupacionConFiltro>;
   /** Clave del emplazamiento con la ficha abierta. */
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento (con el ratón, el dedo o el teclado). */
@@ -74,12 +83,19 @@ const mismaLectura = (a: LecturaDeRotulos, b: LecturaDeRotulos): boolean =>
  * quitar nodos es lo caro.
  */
 export function Marcadores(props: MarcadoresProps) {
-  const agrupador = createMemo(() => crearAgrupadorNacional(props.resumen, props.provincias));
-  const combinaciones = createMemo(() =>
-    combinacionesDe(
+  const filtro = () => props.filtro ?? SIN_FILTRO;
+  const agrupador = createMemo(() =>
+    crearAgrupadorNacional(props.resumen, props.provincias, {
+      filtro: filtro(),
+      agrupaciones: props.agrupaciones,
+    }),
+  );
+  const logos = createMemo(() =>
+    logosDe(
       [...props.provincias.values()].flatMap((estado) =>
         estado.tipo === "lista" ? estado.provincia.capa.emplazamientos : [],
       ),
+      filtro(),
     ),
   );
   const [fotograma, setFotograma] = createSignal(0);
@@ -134,7 +150,10 @@ export function Marcadores(props: MarcadoresProps) {
   });
 
   // Precarga las fichas de los sueltos que se ven. La escena cambia también al seleccionar uno;
-  // si los que se ven son los mismos, no se vuelve a pedir nada.
+  // si los que se ven son los mismos, no se vuelve a pedir nada. Solo al mover el mapa o al
+  // llegar una provincia: cambiar el filtro de compañías no descarga nada (ADR 0026).
+  let vistaPrecargada: Vista | undefined;
+  let provinciasPrecargadas: ReadonlyMap<string, EstadoProvincia> | undefined;
   recurso(
     "fichas:precarga",
     () => {
@@ -151,17 +170,22 @@ export function Marcadores(props: MarcadoresProps) {
             ]
           : [],
       );
-      return pedidas.length > 0 ? pedidas : undefined;
+      return pedidas.length > 0
+        ? { pedidas, vista: vista(), provincias: props.provincias }
+        : undefined;
     },
-    (pedidas) => {
-      props.alVer?.(pedidas);
+    ({ pedidas, vista: vistaAhora, provincias }) => {
+      const porElFiltro = vistaAhora === vistaPrecargada && provincias === provinciasPrecargadas;
+      vistaPrecargada = vistaAhora;
+      provinciasPrecargadas = provincias;
+      if (!porElFiltro) props.alVer?.(pedidas);
       return undefined;
     },
     {
       iguales: (a, b) =>
         mismasListas(
-          a.map((p) => p.clave),
-          b.map((p) => p.clave),
+          a.pedidas.map((p) => p.clave),
+          b.pedidas.map((p) => p.clave),
         ),
     },
   );
@@ -235,6 +259,7 @@ export function Marcadores(props: MarcadoresProps) {
       proyectar: proyectar(),
       tamano: tamano(),
       pantalla: { ancho: lienzo.clientWidth, alto: lienzo.clientHeight },
+      seleccionada: props.seleccionada,
     });
   });
   const formas = createMemo(() => choques().formas);
@@ -330,7 +355,8 @@ export function Marcadores(props: MarcadoresProps) {
     <>
       <CapaAgrupada
         contenedor={props.mapa.getCanvasContainer()}
-        combinaciones={combinaciones()}
+        logos={logos()}
+        filtro={filtro()}
         escena={escena()}
         transicion={agrupador().transicion}
         proyectar={proyectar()}

@@ -7,7 +7,7 @@ import { Show } from "solid-js";
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
 import { Deslizable, type Movimiento } from "./Deslizable.tsx";
-import { idDeLogo, SimbolosDeLogos } from "./LogoCompanias.tsx";
+import { idDeLogo, type LogoDeMarcador, SimbolosDeLogos } from "./LogoCompanias.tsx";
 
 /** Hexágono pequeño en la esquina para lo que no está verificado, como en los prototipos. */
 const variantesSenal = cva("hexagono absolute -top-1 -right-1 h-3.5 w-3", {
@@ -25,6 +25,16 @@ export interface MarcadorEmplazamientoProps {
   readonly x: number;
   readonly y: number;
   readonly companias: ReadonlyArray<Compania>;
+  /**
+   * Con un filtro de compañías, las que se resaltan: las demás van apagadas en el logo (ADR
+   * 0026). Sin él, todas.
+   */
+  readonly resaltadas?: ReadonlyArray<Compania>;
+  /**
+   * `red-usada`: el emplazamiento es de la red que usa una compañía del filtro, no de ella. Va
+   * más claro, aparte de los suyos.
+   */
+  readonly tono?: TonoDeMarcador;
   readonly estado: Estado;
   /** Nombre accesible: qué compañías emiten allí y, si no está verificado, su estado. */
   readonly nombre: string;
@@ -36,6 +46,19 @@ export interface MarcadorEmplazamientoProps {
 }
 
 const QUIETO: Movimiento = { tipo: "quieto" };
+
+/** Cómo se ve un marcador con un filtro: los suyos, normales, o la red que usan, más claros. */
+export type TonoDeMarcador = "propio" | "red-usada";
+
+/** El logo de la red usada va translúcido y algo más pequeño. */
+const variantesTono = cva("block", {
+  variants: {
+    tono: {
+      propio: "",
+      "red-usada": "scale-[0.82] opacity-55",
+    },
+  },
+});
 
 /**
  * Marcador de un emplazamiento en el mapa: un botón con los logos de sus compañías, centrado
@@ -50,6 +73,7 @@ export function MarcadorEmplazamiento(props: MarcadorEmplazamientoProps) {
       type="button"
       aria-label={props.nombre}
       data-estado={props.estado}
+      data-tono={props.tono ?? "propio"}
       aria-current={props.seleccionado === true ? "true" : undefined}
       inert={saliendo()}
       // `cn` resuelve el choque entre el `relative` de la diana y el `absolute` del marcador.
@@ -72,8 +96,13 @@ export function MarcadorEmplazamiento(props: MarcadorEmplazamientoProps) {
               "scale-125 ring-3 ring-primario ring-offset-2 ring-offset-superficie group-hover:scale-125",
           )}
         >
-          <svg width="34" height="34" aria-hidden="true" class="block">
-            <use href={`#${idDeLogo(props.companias)}`} />
+          <svg
+            width="34"
+            height="34"
+            aria-hidden="true"
+            class={variantesTono({ tono: props.tono ?? "propio" })}
+          >
+            <use href={`#${idDeLogo(props.companias, props.resaltadas)}`} />
           </svg>
           <Show when={props.estado !== "verificado"}>
             <span aria-hidden="true" class={variantesSenal({ estado: props.estado })} />
@@ -92,8 +121,8 @@ export interface CapaDeMarcadoresProps {
    * va dentro, así que la rueda y los arrastres que empiezan sobre un marcador mueven el mapa.
    */
   readonly contenedor: HTMLElement;
-  /** Las combinaciones de compañías que pueden aparecer: se dibuja un logo de cada una. */
-  readonly combinaciones: ReadonlyArray<ReadonlyArray<Compania>>;
+  /** Los logos que pueden aparecer, con lo que resalta cada uno: se dibuja una vez cada uno. */
+  readonly logos: ReadonlyArray<LogoDeMarcador>;
   readonly children: JSX.Element;
 }
 
@@ -108,7 +137,7 @@ export function CapaDeMarcadores(props: CapaDeMarcadoresProps) {
         aria-label={props.nombre}
         class="pointer-events-none absolute inset-0 isolate overflow-hidden"
       >
-        <SimbolosDeLogos combinaciones={props.combinaciones} />
+        <SimbolosDeLogos logos={props.logos} />
         {props.children}
       </section>
     </Portal>

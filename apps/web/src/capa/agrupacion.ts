@@ -42,6 +42,11 @@ export interface ElementoEmplazamiento {
   readonly clave: string;
   readonly posicion: Coordenada;
   readonly emplazamiento: EmplazamientoLeido;
+  /**
+   * Es de la red que usa una compañía del filtro, no de ella (ADR 0026): se dibuja aparte, más
+   * claro.
+   */
+  readonly redUsada?: boolean;
 }
 
 /** Una agrupación: el hexágono con el número de emplazamientos que recoge. */
@@ -50,6 +55,8 @@ export interface ElementoAgrupacion {
   readonly clave: string;
   readonly posicion: Coordenada;
   readonly cuantos: number;
+  /** Recoge emplazamientos de la red que usa una compañía del filtro (ADR 0026). */
+  readonly redUsada?: boolean;
 }
 
 /** Un barrio en el nivel de barrios: su etiqueta, con su número de emplazamientos y sus ausencias. */
@@ -97,6 +104,18 @@ export interface ElementoProvincia {
    * provincia cubierta: de una a medias no se puede decir que falte nadie.
    */
   readonly ausentes: ReadonlyArray<Compania>;
+  /**
+   * El número que enseña: sus emplazamientos o, con un filtro de compañías, los de las compañías
+   * del filtro (ADR 0026).
+   */
+  readonly cuantos: number;
+  /** Con un filtro, los de la red que usan sus compañías, aparte. Sin filtro, 0. */
+  readonly deLaRed: number;
+  /**
+   * Con un filtro y un resumen publicado antes de las combinaciones de compañías, no se puede
+   * contar lo del filtro: `cuantos` es el de todas.
+   */
+  readonly sinFiltrar: boolean;
 }
 
 /** Lo que el mapa dibuja en un sitio. La clave identifica el mismo elemento entre escenas. */
@@ -198,6 +217,11 @@ export interface OpcionesAgrupador {
    * ellos, los niveles de municipios son de hexágonos.
    */
   readonly municipios?: ReadonlyArray<ResumenDeMunicipio>;
+  /**
+   * Los emplazamientos son de la red que usa una compañía del filtro (ADR 0026): sus logos y sus
+   * agrupaciones lo dicen, para dibujarse aparte.
+   */
+  readonly redUsada?: boolean;
 }
 
 /** El punto de `caja` más cercano a `punto`. */
@@ -240,6 +264,7 @@ export const crearAgrupador = (
   const prefijoFueraDeZonas = (nivel: number) => `s${nivel}:${prefijo}`;
   const idDeClave = (clave: string): number | undefined => idConPrefijo(clave, PREFIJO_AGRUPACION);
   const resumidos = opciones.municipios ?? [];
+  const marca = opciones.redUsada === true ? { redUsada: true } : {};
   const etiquetas = resumidos.map((resumen) => resumen.municipio);
   const indices = opciones.indices ?? indexarCapa(emplazamientos, barrios.length > 0, etiquetas);
   const indice = indices.todos;
@@ -338,6 +363,7 @@ export const crearAgrupador = (
         clave: `${prefijoAgrupacion}${propiedades.cluster_id}`,
         posicion,
         cuantos: propiedades.point_count,
+        ...marca,
       };
     }
     const emplazamiento = emplazamientos[propiedades.indice];
@@ -348,6 +374,7 @@ export const crearAgrupador = (
           clave: claveDeEmplazamiento(emplazamiento.clave),
           posicion: emplazamiento.posicion,
           emplazamiento,
+          ...marca,
         };
   };
 
@@ -407,6 +434,7 @@ export const crearAgrupador = (
         clave,
         posicion: suelto.posicion,
         emplazamiento: suelto,
+        ...marca,
       });
     }
     const hecha = { nivel, elementos };

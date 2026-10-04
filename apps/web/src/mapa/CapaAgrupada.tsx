@@ -1,5 +1,6 @@
-import type { Compania } from "@celda/dominio/compania";
+import { type FiltroDeCompanias, resaltadasDe, SIN_FILTRO } from "@celda/dominio/filtro";
 import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Deslizable.tsx";
+import type { LogoDeMarcador } from "@celda/ui/marcadores/LogoCompanias.tsx";
 import { MarcadorAgrupacion } from "@celda/ui/marcadores/MarcadorAgrupacion.tsx";
 import { type FormaDeZona, MarcadorZona } from "@celda/ui/marcadores/MarcadorZona.tsx";
 import type { TamanoDeMarcador } from "@celda/ui/marcadores/tamano.ts";
@@ -34,8 +35,13 @@ import {
 export interface CapaAgrupadaProps {
   /** El elemento del mapa que recibe los gestos; los marcadores van dentro (ver `CapaDeMarcadores`). */
   readonly contenedor: HTMLElement;
-  /** Todas las combinaciones de compañías de la capa. */
-  readonly combinaciones: ReadonlyArray<ReadonlyArray<Compania>>;
+  /** Los logos que pueden salir: cada combinación de compañías de la capa con lo que resalta. */
+  readonly logos: ReadonlyArray<LogoDeMarcador>;
+  /**
+   * Las compañías que se ven (ADR 0026): los marcadores resaltan las suyas, y los nombres
+   * accesibles dicen de quién son los emplazamientos que se cuentan. Sin él, todas.
+   */
+  readonly filtro?: FiltroDeCompanias;
   /** Lo que se ve ahora. Al cambiar de nivel, los marcadores se agrupan o se separan. */
   readonly escena: Escena | undefined;
   readonly transicion: (antes: Escena, despues: Escena) => Transicion;
@@ -136,11 +142,7 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
   });
 
   return (
-    <CapaDeMarcadores
-      nombre="Emplazamientos"
-      contenedor={props.contenedor}
-      combinaciones={props.combinaciones}
-    >
+    <CapaDeMarcadores nombre="Emplazamientos" contenedor={props.contenedor} logos={props.logos}>
       <For each={visibles()} keyed={(pintado) => pintado.elemento.clave}>
         {(pintado) => (
           <MarcadorPintado
@@ -149,6 +151,7 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
             proyectar={props.proyectar}
             formas={props.formas}
             tamano={props.tamano ?? "normal"}
+            filtro={props.filtro ?? SIN_FILTRO}
             seleccionada={props.seleccionada}
             alSeleccionar={(clave) => props.alSeleccionar(clave)}
             alAbrir={(elemento) => props.alAbrir(elemento)}
@@ -165,6 +168,7 @@ function MarcadorPintado(props: {
   readonly proyectar: Proyectar;
   readonly formas: ReadonlyMap<string, FormaDeZona>;
   readonly tamano: TamanoDeMarcador;
+  readonly filtro: FiltroDeCompanias;
   readonly seleccionada: string | null;
   readonly alSeleccionar: (clave: string) => void;
   readonly alAbrir: (elemento: ElementoAbrible) => void;
@@ -202,8 +206,14 @@ function MarcadorPintado(props: {
             x={punto().x}
             y={punto().y}
             companias={suelto().emplazamiento.companias}
+            resaltadas={resaltadasDe(suelto().emplazamiento.companias, props.filtro)}
+            tono={suelto().redUsada === true ? "red-usada" : "propio"}
             estado={suelto().emplazamiento.estado}
-            nombre={nombreDeMarcador(suelto().emplazamiento)}
+            nombre={nombreDeMarcador(
+              suelto().emplazamiento,
+              props.filtro,
+              suelto().redUsada === true,
+            )}
             seleccionado={props.seleccionada === suelto().emplazamiento.clave}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alSeleccionar(suelto().emplazamiento.clave)}
@@ -217,7 +227,12 @@ function MarcadorPintado(props: {
             y={punto().y}
             cuantos={agrupada().cuantos}
             tamano={props.tamano}
-            nombre={nombreDeAgrupacion(agrupada().cuantos)}
+            tono={agrupada().redUsada === true ? "red-usada" : "propio"}
+            nombre={nombreDeAgrupacion(
+              agrupada().cuantos,
+              props.filtro,
+              agrupada().redUsada === true,
+            )}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(agrupada())}
           />
@@ -233,7 +248,7 @@ function MarcadorPintado(props: {
             tamano={props.tamano}
             nombreDeZona={elegido().resumen.barrio.nombre}
             emplazamientos={elegido().resumen.emplazamientos}
-            nombre={nombreDeBarrio(elegido().resumen)}
+            nombre={nombreDeBarrio(elegido().resumen, props.filtro)}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(elegido())}
           />
@@ -249,7 +264,7 @@ function MarcadorPintado(props: {
             tamano={props.tamano}
             nombreDeZona={elegido().resumen.municipio.nombre}
             emplazamientos={elegido().resumen.emplazamientos}
-            nombre={nombreDeMunicipio(elegido().resumen)}
+            nombre={nombreDeMunicipio(elegido().resumen, props.filtro)}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(elegido())}
           />
@@ -264,10 +279,10 @@ function MarcadorPintado(props: {
             forma={props.formas.get(hexagono().clave) ?? "completa"}
             tamano={props.tamano}
             nombreDeZona={hexagono().provincia.nombre}
-            emplazamientos={hexagono().provincia.emplazamientos}
+            emplazamientos={hexagono().cuantos}
             cobertura={coberturaDe(hexagono())}
             carga={hexagono().carga}
-            nombre={nombreDeProvincia(hexagono())}
+            nombre={nombreDeProvincia(hexagono(), props.filtro)}
             movimiento={props.pintado.movimiento}
             onClick={() => props.alAbrir(hexagono())}
           />
