@@ -29,6 +29,7 @@ const fichero = (comunidades: ReadonlyArray<ReadonlyArray<number>>) =>
     },
     toleranciaMetros: 1000,
     unidadesPorGrado: 1000,
+    pais: [],
     comunidades,
     provincias: [[2040, 41000, 0, 20]],
   });

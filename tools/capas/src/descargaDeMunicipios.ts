@@ -98,46 +98,48 @@ const hexadecimal = (bytes: ArrayBuffer): string =>
 
 const texto = (respuesta: Respuesta): string => new TextDecoder().decode(respuesta.cuerpo);
 
-/** Dónde deja la orden lo que escribe y cómo pide. */
-export interface OpcionesDeMunicipios {
-  /** Fichero de límites en el repositorio. */
-  readonly municipios: string;
-  /** Fichero del padrón en el repositorio. */
-  readonly padron: string;
+/** Cómo se pide al IGN y dónde se guarda su ZIP. */
+export interface OpcionesDelIgn {
   /** Carpeta donde se guarda el ZIP del IGN, fuera de git, para no volver a pedirlo. */
   readonly cache: string;
   /** Espera entre el final de una respuesta y la siguiente petición al mismo sitio. */
   readonly pausa: Duration.Duration;
 }
 
+/** Dónde deja la orden lo que escribe y cómo pide. */
+export interface OpcionesDeMunicipios extends OpcionesDelIgn {
+  /** Fichero de límites en el repositorio. */
+  readonly municipios: string;
+  /** Fichero del padrón en el repositorio. */
+  readonly padron: string;
+}
+
+const opcionesDeCliente = (pausa: Duration.Duration): OpcionesCliente => ({
+  userAgent: USER_AGENT,
+  pausa,
+  maxPeticiones: 3,
+  espera: Duration.minutes(10),
+  reintentos: 2,
+});
+
+const pedirBien = (cliente: ClienteDeFuente, url: string) =>
+  cliente.pedir(url).pipe(
+    Effect.filterOrFail(
+      (respuesta) => respuesta.estado === 200,
+      (respuesta) => cambiada(`${url} responde ${respuesta.estado}`),
+    ),
+  );
+
 /**
- * Descarga, comprueba y guarda los límites y el padrón. Antes de pedir nada a un sitio lee su
- * `robots.txt`, y entre dos peticiones al mismo sitio espera la pausa. Son, como mucho, siete
- * peticiones: el `robots.txt` y el canal del IGN, el `robots.txt` y el ZIP del CNIG (66 MB, que
- * no se pide si ya está en la caché con la fecha del canal), y el `robots.txt`, el aviso legal y
- * el CSV del INE. Si la licencia deja de ser CC BY 4.0, si falta una fecha o si los municipios
- * de un lado no están en el otro, falla sin escribir nada.
+ * La descarga masiva de límites del IGN: lee su canal, comprueba la licencia y trae el ZIP del
+ * CNIG (66 MB), salvo que ya esté en la caché con la fecha del canal. Devuelve la fuente, con la
+ * huella del ZIP, y cómo leer un GML de dentro. La usan las órdenes `municipios` y `fronteras`.
  */
-export const descargarMunicipios = Effect.fn("Capas.descargarMunicipios")(function* (
-  opciones: OpcionesDeMunicipios,
+export const descargarDelIgn = Effect.fn("Capas.descargarDelIgn")(function* (
+  opciones: OpcionesDelIgn,
 ) {
   const fs = yield* FileSystem.FileSystem;
-  const deCliente: OpcionesCliente = {
-    userAgent: USER_AGENT,
-    pausa: opciones.pausa,
-    maxPeticiones: 3,
-    espera: Duration.minutes(10),
-    reintentos: 2,
-  };
-  const pedirBien = (cliente: ClienteDeFuente, url: string) =>
-    cliente.pedir(url).pipe(
-      Effect.filterOrFail(
-        (respuesta) => respuesta.estado === 200,
-        (respuesta) => cambiada(`${url} responde ${respuesta.estado}`),
-      ),
-    );
-
-  // Límites del IGN.
+  const deCliente = opcionesDeCliente(opciones.pausa);
   const ign = yield* clienteDeFuente(new URL(CANAL_IGN).origin, deCliente);
   const canal = yield* Effect.fromResult(leerCanalDelIgn(texto(yield* pedirBien(ign, CANAL_IGN))));
   if (canal.licencia !== LICENCIA && !canal.licencia.startsWith(`${LICENCIA} `)) {
@@ -157,12 +159,12 @@ export const descargarMunicipios = Effect.fn("Capas.descargarMunicipios")(functi
     yield* Effect.promise(() => globalThis.crypto.subtle.digest("SHA-256", zip)),
   );
   const entradas = yield* Effect.fromResult(entradasDelZip(zip));
+  /** El texto de un GML del ZIP. */
   const gml = (nombre: string) =>
     Effect.gen(function* () {
       const entrada = entradas.find((e) => e.nombre === nombre);
       if (entrada === undefined) return yield* cambiada(`el ZIP no trae ${nombre}`);
-      const bytes = yield* leerEntrada(zip, entrada);
-      return yield* Effect.fromResult(unidadesDelGml(new TextDecoder().decode(bytes)));
+      return new TextDecoder().decode(yield* leerEntrada(zip, entrada));
     });
   const fuente: FuenteDeMunicipios = {
     atribucion: "Instituto Geográfico Nacional",
@@ -172,8 +174,29 @@ export const descargarMunicipios = Effect.fn("Capas.descargarMunicipios")(functi
     fecha: canal.fecha,
     huella: `sha256:${huella}`,
   };
+  return { fuente, gml };
+});
+
+/**
+ * Descarga, comprueba y guarda los límites y el padrón. Antes de pedir nada a un sitio lee su
+ * `robots.txt`, y entre dos peticiones al mismo sitio espera la pausa. Son, como mucho, siete
+ * peticiones: el `robots.txt` y el canal del IGN, el `robots.txt` y el ZIP del CNIG (66 MB, que
+ * no se pide si ya está en la caché con la fecha del canal), y el `robots.txt`, el aviso legal y
+ * el CSV del INE. Si la licencia deja de ser CC BY 4.0, si falta una fecha o si los municipios
+ * de un lado no están en el otro, falla sin escribir nada.
+ */
+export const descargarMunicipios = Effect.fn("Capas.descargarMunicipios")(function* (
+  opciones: OpcionesDeMunicipios,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const deCliente = opcionesDeCliente(opciones.pausa);
+
+  // Límites del IGN.
+  const { fuente, gml } = yield* descargarDelIgn(opciones);
+  const unidades = (nombre: string) =>
+    Effect.flatMap(gml(nombre), (texto) => Effect.fromResult(unidadesDelGml(texto)));
   const limites = yield* Effect.fromResult(
-    limitesDelIgn(yield* gml(GML_MUNICIPIOS), yield* gml(GML_PROVINCIAS), fuente),
+    limitesDelIgn(yield* unidades(GML_MUNICIPIOS), yield* unidades(GML_PROVINCIAS), fuente),
   );
 
   // Padrón del INE.

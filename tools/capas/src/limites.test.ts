@@ -1,8 +1,15 @@
+import type { LimitesDeMunicipios } from "@celda/dominio/municipio";
 import { assert, describe, it } from "@effect/vitest";
 import * as Result from "effect/Result";
 
 import { unidadesDelGml } from "./gml.ts";
-import { ficheroDeLimites, limitesDeComunidadesYProvincias, tiposDeLimite } from "./limites.ts";
+import type { FronterasDeEspana } from "./fronteras.ts";
+import {
+  ficheroDeLimites,
+  limitesDeComunidadesYProvincias,
+  tiposDeLimite,
+  tramosDeFrontera,
+} from "./limites.ts";
 import { limitesDelIgn } from "./municipios.ts";
 import {
   FUENTE_DE_PRUEBA,
@@ -165,10 +172,79 @@ describe("límites de comunidades y provincias", () => {
       fuente: FUENTE_DE_PRUEBA,
       toleranciaMetros: 1000,
       unidadesPorGrado: 1000,
+      pais: [],
       comunidades: limites.comunidades,
       provincias: limites.provincias,
     });
-    // La cabecera, la apertura y el cierre de cada grupo con su línea, y el salto del final.
-    assert.strictEqual(fichero.split("\n").length, 1 + 3 + 3 + 1);
+    // La cabecera, la apertura y el cierre de cada grupo con su línea (la frontera, vacía), y el
+    // salto del final.
+    assert.strictEqual(fichero.split("\n").length, 1 + 3 + 3 + 3 + 1);
+  });
+});
+
+describe("tramos de frontera", () => {
+  /**
+   * Un recinto de una sola pieza, como Ceuta: un anillo cerrado de un solo arco, con el lado oeste
+   * en tierra, junto a otro país, y el resto en la costa. En cienmilésimas de grado.
+   */
+  const anillo = [
+    [0, 0],
+    [0, 500],
+    [0, 1000],
+    [1000, 1000],
+    [1000, 0],
+    [0, 0],
+  ] as const;
+  const recinto: LimitesDeMunicipios = {
+    fuente: FUENTE_DE_PRUEBA,
+    toleranciaMetros: 50,
+    unidadesPorGrado: 100_000,
+    provincias: [],
+    territorios: [
+      {
+        codigo: "51001",
+        tipo: "municipio",
+        nombre: "Recinto",
+        provincia: "51",
+        etiqueta: { longitud: 0.005, latitud: 0.005 },
+        areaKm2: 1,
+        poligonos: [[[0]]],
+      },
+    ],
+    arcos: [
+      anillo.flatMap(([x, y], k) =>
+        k === 0 ? [x, y] : [x - (anillo[k - 1]?.[0] ?? 0), y - (anillo[k - 1]?.[1] ?? 0)],
+      ),
+    ],
+  };
+  /** La frontera del IGN: el lado oeste, de (0, 0) a (0, 0,01). */
+  const fronteras: FronterasDeEspana = {
+    fuente: FUENTE_DE_PRUEBA,
+    toleranciaMetros: 20,
+    unidadesPorGrado: 100_000,
+    lineas: [{ vecino: "MA", linea: [0, 0, 0, 1000] }],
+  };
+
+  it("de un anillo con costa y frontera solo toma la parte que va por la frontera", () => {
+    assert.deepStrictEqual(tramosDeFrontera(recinto, fronteras), [[0, 0, 0, 500, 0, 1000]]);
+  });
+
+  it("sin fronteras, o con un arco que comparten dos recintos, no hay ninguno", () => {
+    assert.deepStrictEqual(tramosDeFrontera(recinto, undefined), []);
+    const [solo] = recinto.territorios;
+    assert.isDefined(solo);
+    if (solo === undefined) return;
+    const compartido: LimitesDeMunicipios = {
+      ...recinto,
+      territorios: [solo, { ...solo, codigo: "51002" }],
+    };
+    assert.deepStrictEqual(tramosDeFrontera(compartido, fronteras), []);
+  });
+
+  it("la frontera sale en el fichero en su propia lista", () => {
+    const limites = limitesDeComunidadesYProvincias(recinto, 0, 100_000, fronteras);
+    assert.deepStrictEqual(limites.pais, [[0, 0, 0, 500, 0, 500]]);
+    assert.deepStrictEqual(limites.comunidades, []);
+    assert.deepStrictEqual(limites.provincias, []);
   });
 });

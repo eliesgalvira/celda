@@ -7,6 +7,7 @@
     "build": "vp build",
     "centros": "vp build && node dist/capas.js centros",
     "espana": "vp build && node dist/capas.js espana",
+    "fronteras": "vp build && node dist/capas.js fronteras",
     "limites": "vp build && node dist/capas.js limites",
     "municipios": "vp build && node dist/capas.js municipios",
     "nombres": "vp build && node dist/capas.js nombres",

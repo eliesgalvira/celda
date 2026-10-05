@@ -372,6 +372,11 @@ Medido el 05/10/2026 en Chromium sin interfaz con SwiftShader, con la build loca
 - **Peso.** La primera pantalla crece 0,4 KB con `gzip -9` (229.535 → 229.894 bytes): `CargaDelMapa` y la precarga. El trozo del mapa, 0,3 KB (309.507 → 309.841): las capas de la silueta y la carga en dos niveles. El contorno ya iba en ese trozo.
 - **Límites.** Una sola petición del general en toda la visita: el `preload` empieza a los 273 ms y acaba a los 593, antes que el lienzo, con 8.321 bytes; la del código del mapa reutiliza esa respuesta. Antes se pedía tras el primer `idle`, que con el callejero retrasado llegaba después de los 3 s. El de detalle, 36.718 bytes con `gzip -9`, se pide una vez al pasar de z7.
 
+## La frontera de España (05/10/2026)
+
+- **Peso.** El fichero general crece 1.007 bytes con `gzip -9` (8.043 → 9.050), lo que la web descarga en cada visita; el de detalle, 5.639 (36.718 → 42.357), solo al pasar de z7. El JavaScript, igual: solo cambia el filtro de una capa y entra otra.
+- **Capas.** Una capa de línea más, `limites-pais`, de la fuente `limites`, que ya estaba.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.

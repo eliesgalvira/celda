@@ -23,12 +23,13 @@ import { descargarMunicipios } from "./descargaDeMunicipios.ts";
 import { escribirEspana } from "./espana.ts";
 import { FORMAS_CASTELLANAS } from "./formasCastellanas.ts";
 import { escribirNombres } from "./nombres.ts";
+import { descargarFronteras } from "./fronteras.ts";
 import { escribirLimites } from "./limites.ts";
 import { datosSinteticos, FECHA_SINTETICA } from "./sintetica.ts";
 import { escribirZonas } from "./zonas.ts";
 
 /**
- * Generador de capas. Diez órdenes:
+ * Generador de capas. Once órdenes:
  *
  * - `servir`: sirve una carpeta publicada como origen estático local, con las cabeceras de la
  *   CDN. La publica la ingesta nocturna (`pnpm run ingesta publicar`) o `sintetica`.
@@ -43,8 +44,11 @@ import { escribirZonas } from "./zonas.ts";
  *   mapa base esconde de lejos los rótulos de fuera (ADR 0024).
  * - `nombres`: escribe desde esos límites, sin descargar nada, la tabla de nombres de lugar de los
  *   oficiales bilingües y el contorno de la Comunitat Valenciana (ADR 0025).
- * - `limites`: escribe desde esos límites, sin descargar nada, los de comunidades autónomas y
- *   provincias que la web pinta en el mapa, el fichero general y el de detalle (ADR 0023).
+ * - `fronteras`: guarda en el repositorio las fronteras terrestres de España de la misma descarga
+ *   del IGN que `municipios`, sin la costa (ADR 0023).
+ * - `limites`: escribe desde esos límites y las fronteras, sin descargar nada, los de comunidades
+ *   autónomas y provincias y la frontera que la web pinta en el mapa, el fichero general y el de
+ *   detalle (ADR 0023).
  * - `centros`: escribe desde esos límites y el padrón, sin descargar nada, el centro visual y los
  *   habitantes de cada provincia y los habitantes de las ciudades, con los que el mapa decide
  *   dónde va el hexágono de cada provincia y qué se dibuja cuando un rótulo y un hexágono se
@@ -79,6 +83,9 @@ const configPoblacion = Config.String("CELDA_POBLACION").pipe(
 const configMunicipios = Config.all({
   municipios: Config.String("CELDA_MUNICIPIOS").pipe(
     Config.withDefault("../../packages/publicacion/datos/municipios.json"),
+  ),
+  fronteras: Config.String("CELDA_FRONTERAS").pipe(
+    Config.withDefault("../../packages/publicacion/datos/fronteras.json"),
   ),
   padron: Config.String("CELDA_PADRON").pipe(
     Config.withDefault("../../packages/publicacion/datos/padron.json"),
@@ -272,12 +279,28 @@ const nombres = Effect.gen(function* () {
   );
 });
 
+const fronteras = Effect.gen(function* () {
+  const opciones = yield* configMunicipios;
+  const { fronteras: escritas, fichero } = yield* descargarFronteras(
+    { cache: opciones.cache, pausa: PAUSA_MUNICIPIOS },
+    opciones.fronteras,
+  ).pipe(
+    // Punto de entrada de la orden: aquí se monta su cliente HTTP, una vez.
+    // @effect-diagnostics-next-line strictEffectProvide:off
+    Effect.provide(FetchHttpClient.layer),
+  );
+  yield* Effect.log(
+    `${escritas.lineas.length} líneas de frontera del IGN del ${escritas.fuente.fecha},`,
+    `${fichero.length} bytes, escritas en ${opciones.fronteras}`,
+  );
+});
+
 const comunidadesYProvincias = Effect.gen(function* () {
-  const { municipios } = yield* configMunicipios;
-  const escritos = yield* escribirLimites(municipios, yield* configLimites);
+  const { municipios, fronteras: deFronteras } = yield* configMunicipios;
+  const escritos = yield* escribirLimites(municipios, deFronteras, yield* configLimites);
   for (const { limites, fichero, destino } of escritos) {
     yield* Effect.log(
-      `${limites.comunidades.length} líneas de comunidad y ${limites.provincias.length} de provincia`,
+      `${limites.comunidades.length} líneas de comunidad, ${limites.provincias.length} de provincia y ${limites.pais.length} de frontera`,
       `a ${limites.toleranciaMetros} m, ${fichero.length} bytes, escritas en ${destino}`,
     );
   }
@@ -299,7 +322,7 @@ class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesc
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «zonas», «espana», «nombres», «limites», «centros» o «sintetica».`;
+    return `Orden desconocida «${this.orden}». Usa «servir», «barrios», «poblacion», «municipios», «fronteras», «zonas», «espana», «nombres», «limites», «centros» o «sintetica».`;
   }
 }
 
@@ -309,6 +332,7 @@ const principal = Effect.gen(function* () {
   if (orden === "barrios") return yield* barrios;
   if (orden === "poblacion") return yield* poblacion;
   if (orden === "municipios") return yield* municipios;
+  if (orden === "fronteras") return yield* fronteras;
   if (orden === "zonas") return yield* zonas;
   if (orden === "espana") return yield* espana;
   if (orden === "nombres") return yield* nombres;
