@@ -10,7 +10,9 @@ import {
   type EstadoConFoto,
   FUENTE_EDIFICIO,
   FUENTE_FOTO,
+  dejarDePrepararFoto,
   ponerFotoAerea,
+  prepararFotoAerea,
 } from "./foto.ts";
 import { CAPA_PORTALES } from "./rotulos.ts";
 
@@ -124,6 +126,41 @@ describe("foto aérea en el estilo", () => {
     assert.strictEqual(ids.indexOf("edificio-numero"), ids.indexOf(CAPA_PORTALES) + 1);
   });
 
+  it("preparada, la foto pide sus teselas transparente y el estado sigue apagado", () => {
+    const estado: EstadoConFoto = {};
+    const llamadas: Array<readonly [string, string | boolean]> = [];
+    const mapa = {
+      getGlobalState: () => estado,
+      setGlobalStateProperty: (nombre: string, valor: boolean) => {
+        if (nombre === FOTO_AEREA) estado[FOTO_AEREA] = valor;
+        llamadas.push([nombre, valor]);
+      },
+      setLayoutProperty: (capa: string, propiedad: string, valor: string) => {
+        llamadas.push([`${capa}.${propiedad}`, valor]);
+      },
+      setPaintProperty: (capa: string, propiedad: string, valor: number) => {
+        llamadas.push([`${capa}.${propiedad}`, String(valor)]);
+      },
+    };
+    prepararFotoAerea(mapa);
+    dejarDePrepararFoto(mapa);
+    prepararFotoAerea(mapa);
+    ponerFotoAerea(mapa, true);
+    // Ya enseñada, ni prepararla ni dejar de prepararla la tocan.
+    prepararFotoAerea(mapa);
+    dejarDePrepararFoto(mapa);
+    assert.deepStrictEqual(llamadas, [
+      [`${CAPA_FOTO}.raster-opacity`, "0"],
+      [`${CAPA_FOTO}.visibility`, "visible"],
+      [`${CAPA_FOTO}.visibility`, "none"],
+      [`${CAPA_FOTO}.raster-opacity`, "0"],
+      [`${CAPA_FOTO}.visibility`, "visible"],
+      [FOTO_AEREA, true],
+      [`${CAPA_FOTO}.visibility`, "visible"],
+      [`${CAPA_FOTO}.raster-opacity`, "1"],
+    ]);
+  });
+
   it("encender y apagar cambia el estado del estilo y la capa de la foto, y solo si cambia", () => {
     const estado: EstadoConFoto = {};
     const llamadas: Array<readonly [string, string | boolean]> = [];
@@ -136,6 +173,9 @@ describe("foto aérea en el estilo", () => {
       setLayoutProperty: (capa: string, propiedad: string, valor: string) => {
         llamadas.push([`${capa}.${propiedad}`, valor]);
       },
+      setPaintProperty: (capa: string, propiedad: string, valor: number) => {
+        llamadas.push([`${capa}.${propiedad}`, String(valor)]);
+      },
     };
     ponerFotoAerea(mapa, false);
     ponerFotoAerea(mapa, true);
@@ -144,6 +184,7 @@ describe("foto aérea en el estilo", () => {
     assert.deepStrictEqual(llamadas, [
       [FOTO_AEREA, true],
       [`${CAPA_FOTO}.visibility`, "visible"],
+      [`${CAPA_FOTO}.raster-opacity`, "1"],
       [FOTO_AEREA, false],
       [`${CAPA_FOTO}.visibility`, "none"],
     ]);

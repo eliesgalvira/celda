@@ -1,7 +1,13 @@
 import type { Coordenada } from "@celda/dominio/area";
 import { desdePlano } from "@celda/dominio/plano";
 import type { EstadoEdificio } from "@celda/ui/foto/FotoAerea.tsx";
-import { FUENTE_EDIFICIO, type MapaConFoto, ponerFotoAerea } from "@celda/ui/mapa/foto.ts";
+import {
+  dejarDePrepararFoto,
+  FUENTE_EDIFICIO,
+  type MapaConFoto,
+  ponerFotoAerea,
+  prepararFotoAerea,
+} from "@celda/ui/mapa/foto.ts";
 import { CAPA_PORTALES } from "@celda/ui/mapa/rotulos.ts";
 import { CAPA_EDIFICIOS } from "@celda/ui/mapa/suelo.ts";
 import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
@@ -28,10 +34,20 @@ import { ZOOM_EDIFICIO } from "./foto.ts";
  */
 const ALCANCE_EDIFICIOS_M = 1;
 
+/**
+ * Lo más que se espera a las teselas de la foto antes de enseñarla. Con una red lenta sale a
+ * medio cargar, como cualquier mapa.
+ */
+export const PLAZO_DE_LA_FOTO_MS = 4000;
+
 /** Lo que hace el mapa con la foto aérea. En las pruebas, un lienzo que apunta lo que recibe. */
 export interface LienzoDeFoto {
-  /** Enciende o apaga la foto. */
-  readonly ponerFoto: (encendida: boolean) => void;
+  /**
+   * Enciende o apaga la foto. Encenderla la pide sin enseñarla y la enseña de una vez cuando el
+   * mapa se queda quieto con sus teselas, o a los `PLAZO_DE_LA_FOTO_MS`. Devuelve con qué dejar de
+   * esperar, que quita la foto pedida si aún no se ha enseñado.
+   */
+  readonly ponerFoto: (encendida: boolean) => (() => void) | undefined;
   /**
    * Vuela al emplazamiento, a `desplazamiento` píxeles del centro, y cuando el mapa se queda
    * quieto con sus teselas, resalta su edificio y llama a `alAcabar` con lo encontrado, o sin nada
@@ -117,7 +133,7 @@ const comoPunto = (posicion: Coordenada): [number, number] => [posicion.longitud
  * borde, a unos 29 m en España. No se cosen: se resalta el trozo más grande que contiene el
  * emplazamiento (ADR 0022).
  */
-export const lienzoDeFoto = (mapa: MapaParaFoto): LienzoDeFoto => {
+export const lienzoDeFoto = (mapa: MapaParaFoto, esperar: Esperar): LienzoDeFoto => {
   const pintar = (dibujo: DibujoDelEdificio) => {
     const fuente = mapa.getSource(FUENTE_EDIFICIO);
     if (esRellenable(fuente)) fuente.setData(dibujo);
@@ -150,7 +166,30 @@ export const lienzoDeFoto = (mapa: MapaParaFoto): LienzoDeFoto => {
     return elegirEdificio(posicion, edificios, portales);
   };
   return {
-    ponerFoto: (encendida) => ponerFotoAerea(mapa, encendida),
+    ponerFoto: (encendida) => {
+      if (!encendida) {
+        ponerFotoAerea(mapa, false);
+        return undefined;
+      }
+      prepararFotoAerea(mapa);
+      let puesta = false;
+      const ponerla = () => {
+        dejarDeEsperar();
+        puesta = true;
+        ponerFotoAerea(mapa, true);
+      };
+      // `idle` llega cuando el mapa ha pintado con todas sus teselas, también las de la foto.
+      mapa.on("idle", ponerla);
+      const dejarElPlazo = esperar(PLAZO_DE_LA_FOTO_MS, ponerla);
+      const dejarDeEsperar = () => {
+        mapa.off("idle", ponerla);
+        dejarElPlazo();
+      };
+      return () => {
+        dejarDeEsperar();
+        if (!puesta) dejarDePrepararFoto(mapa);
+      };
+    },
     verEdificio: (posicion, desplazamiento, alAcabar) => {
       const alQuedarQuieto = () => {
         mapa.off("idle", alQuedarQuieto);
@@ -262,7 +301,8 @@ const BUSCANDO: EstadoEdificio = { tipo: "buscando" };
  *
  * Mientras la cámara vuela, el mapa se ve sin la foto, como con ella apagada, y la foto vuelve al
  * llegar (#67): un vuelo de España a la calle pedía las teselas de cada zoom del camino, que solo
- * se ven de paso. Con la foto se apaga todo lo que cambia con ella (`conFoto`): las vías blancas
+ * se ven de paso. Al llegar, la foto se pide sin enseñarla y sale de una vez cuando han llegado sus
+ * teselas (`ponerFoto`). Con la foto se apaga todo lo que cambia con ella (`conFoto`): las vías blancas
  * sobre el fondo claro no se verían. Los gestos de la persona no son vuelos y no la apagan. Más
  * lejos de `ZOOM_FOTO` tampoco se ve, con el control encendido.
  */
@@ -298,8 +338,8 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
       return lienzo === undefined ? undefined : { lienzo, encendida: seVe() };
     },
     ({ lienzo, encendida: si }) => {
-      lienzo.ponerFoto(si);
-      return undefined;
+      const dejar = lienzo.ponerFoto(si);
+      return dejar === undefined ? undefined : () => dejar();
     },
     { iguales: mismosCampos },
   );

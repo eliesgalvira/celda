@@ -23,6 +23,7 @@ import {
   lienzoDeFoto,
   type MapaParaFoto,
   PISTA_SIN_CONTORNO_MS,
+  PLAZO_DE_LA_FOTO_MS,
 } from "./enMapa.ts";
 import type { Movimiento } from "../mapa/vistaInicial.ts";
 import { ZOOM_EDIFICIO } from "./foto.ts";
@@ -70,7 +71,10 @@ const lienzoDePrueba = () => {
     },
   };
   const lienzo: LienzoDeFoto = {
-    ponerFoto: (encendida) => fotos.push(encendida),
+    ponerFoto: (encendida) => {
+      fotos.push(encendida);
+      return undefined;
+    },
     verEdificio: (posicion, desplazamiento, alAcabar) => {
       const vuelo: Vuelo = {
         posicion,
@@ -541,6 +545,7 @@ const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa
   const fuentesAntes = Object.keys(estilo.sources);
   const estado: EstadoConFoto = {};
   const visibles = new Map<string, string>();
+  const opacidades = new Map<string, number>();
   const escuchadores = new Map<string, Set<(movimiento: Movimiento) => void>>();
   const datos = new Map<string, DibujoDelEdificio>();
   const prohibidas: Array<string> = [];
@@ -559,6 +564,9 @@ const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa
     },
     setLayoutProperty: (capa, _propiedad, valor) => {
       visibles.set(capa, valor);
+    },
+    setPaintProperty: (capa, _propiedad, valor) => {
+      opacidades.set(capa, valor);
     },
     setStyle: prohibida("setStyle"),
     addLayer: prohibida("addLayer"),
@@ -609,6 +617,7 @@ const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa
     mapa,
     estado,
     visibles,
+    opacidades,
     datos,
     vuelos,
     prohibidas,
@@ -625,12 +634,57 @@ const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa
 };
 
 describe("lienzo de la foto en un mapa de MapLibre", () => {
+  it("encendida, pide la foto transparente y la enseña de una vez cuando el mapa queda quieto", () => {
+    const m = mapaDePrueba({});
+    const lienzo = lienzoDeFoto(m.mapa, relojDePrueba().esperar);
+    lienzo.ponerFoto(true);
+    // Mientras llegan las teselas, el mapa se ve como sin foto.
+    assert.notStrictEqual(m.estado[FOTO_AEREA], true);
+    assert.strictEqual(m.visibles.get(CAPA_FOTO), "visible");
+    assert.strictEqual(m.opacidades.get(CAPA_FOTO), 0);
+    m.emitir("idle");
+    assert.isTrue(m.estado[FOTO_AEREA]);
+    assert.strictEqual(m.opacidades.get(CAPA_FOTO), 1);
+    assert.strictEqual(m.escuchadores(), 0);
+  });
+
+  it("si las teselas tardan, la enseña a los cuatro segundos", () => {
+    const m = mapaDePrueba({});
+    const reloj = relojDePrueba();
+    const lienzo = lienzoDeFoto(m.mapa, reloj.esperar);
+    lienzo.ponerFoto(true);
+    reloj.avanzar(PLAZO_DE_LA_FOTO_MS - 1);
+    assert.notStrictEqual(m.estado[FOTO_AEREA], true);
+    reloj.avanzar(1);
+    assert.isTrue(m.estado[FOTO_AEREA]);
+    assert.strictEqual(m.escuchadores(), 0);
+    assert.strictEqual(reloj.pendientes(), 0);
+  });
+
+  it("apagada o en vuelo antes de enseñarla, deja de pedirla y de esperar", () => {
+    const m = mapaDePrueba({});
+    const reloj = relojDePrueba();
+    const lienzo = lienzoDeFoto(m.mapa, reloj.esperar);
+    const dejar = lienzo.ponerFoto(true);
+    dejar?.();
+    assert.strictEqual(m.visibles.get(CAPA_FOTO), "none");
+    assert.notStrictEqual(m.estado[FOTO_AEREA], true);
+    assert.strictEqual(m.escuchadores(), 0);
+    assert.strictEqual(reloj.pendientes(), 0);
+  });
+
   it("encender y apagar la foto diez veces solo cambia el estado del estilo", () => {
     const m = mapaDePrueba({});
-    const lienzo = lienzoDeFoto(m.mapa);
-    for (let vez = 0; vez < 10; vez++) lienzo.ponerFoto(vez % 2 === 0);
+    const lienzo = lienzoDeFoto(m.mapa, relojDePrueba().esperar);
+    let dejar: (() => void) | undefined;
+    for (let vez = 0; vez < 10; vez++) {
+      dejar?.();
+      dejar = lienzo.ponerFoto(vez % 2 === 0);
+      if (vez % 2 === 0) m.emitir("idle");
+    }
     assert.isFalse(m.estado[FOTO_AEREA]);
     assert.strictEqual(m.visibles.get(CAPA_FOTO), "none");
+    assert.strictEqual(m.escuchadores(), 0);
     assert.deepStrictEqual(m.prohibidas, []);
     assert.isTrue(m.sinCambiosEnElEstilo());
     // Las celdas y el edificio siguen con su fuente: nada se ha quitado ni añadido.
@@ -660,7 +714,7 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
         },
       ],
     });
-    const lienzo = lienzoDeFoto(m.mapa);
+    const lienzo = lienzoDeFoto(m.mapa, relojDePrueba().esperar);
     const encontrados: Array<EdificioEncontrado | undefined> = [];
     lienzo.verEdificio(SITIO, [0, -94], (encontrado) => encontrados.push(encontrado));
     assert.deepStrictEqual(m.vuelos, [
@@ -696,7 +750,7 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
         { properties: {}, geometry: { type: "Polygon", coordinates: cuadrado(10, 12) } },
       ],
     });
-    const lienzo = lienzoDeFoto(m.mapa);
+    const lienzo = lienzoDeFoto(m.mapa, relojDePrueba().esperar);
     const encontrados: Array<EdificioEncontrado | undefined> = [];
     lienzo.verEdificio(SITIO, [216, 0], (encontrado) => encontrados.push(encontrado));
     await m.emitirEnOtraTarea("moveend");
@@ -714,7 +768,7 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
 
   it("un movimiento de la web es un vuelo hasta que se para; uno de la persona, no", () => {
     const m = mapaDePrueba({});
-    const lienzo = lienzoDeFoto(m.mapa);
+    const lienzo = lienzoDeFoto(m.mapa, relojDePrueba().esperar);
     const avisos: Array<boolean> = [];
     const dejar = lienzo.seguirVuelos((volando) => avisos.push(volando));
     m.emitir("movestart");

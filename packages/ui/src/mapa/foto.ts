@@ -58,6 +58,8 @@ export const capaFoto = (): LayerSpecification => ({
   type: "raster",
   source: FUENTE_FOTO,
   layout: { visibility: "none" },
+  // Pasa de transparente a opaca de golpe, a la vez que las vías y los rótulos (`prepararFotoAerea`).
+  paint: { "raster-opacity": 1, "raster-opacity-transition": { duration: 0, delay: 0 } },
 });
 
 /** Lo que dice de la foto el estado del estilo. */
@@ -74,6 +76,7 @@ export interface MapaConFoto {
     propiedad: "visibility",
     valor: "visible" | "none",
   ) => void;
+  readonly setPaintProperty: (capa: string, propiedad: "raster-opacity", valor: number) => void;
 }
 
 /**
@@ -86,6 +89,24 @@ export const ponerFotoAerea = (mapa: MapaConFoto, encendida: boolean): void => {
   if ((mapa.getGlobalState()[FOTO_AEREA] ?? false) === encendida) return;
   mapa.setGlobalStateProperty(FOTO_AEREA, encendida);
   mapa.setLayoutProperty(CAPA_FOTO, "visibility", encendida ? "visible" : "none");
+  if (encendida) mapa.setPaintProperty(CAPA_FOTO, "raster-opacity", 1);
+};
+
+/**
+ * Pide la foto de la vista sin enseñarla: su capa visible pero transparente, y el estado del estilo
+ * sin tocar, así que el mapa se sigue viendo como sin foto. Cuando han llegado sus teselas,
+ * `ponerFotoAerea` la enseña de una vez, sin los huecos de las teselas que faltan.
+ */
+export const prepararFotoAerea = (mapa: MapaConFoto): void => {
+  if (mapa.getGlobalState()[FOTO_AEREA] === true) return;
+  mapa.setPaintProperty(CAPA_FOTO, "raster-opacity", 0);
+  mapa.setLayoutProperty(CAPA_FOTO, "visibility", "visible");
+};
+
+/** Deja de pedir la foto preparada que no se ha llegado a enseñar. */
+export const dejarDePrepararFoto = (mapa: MapaConFoto): void => {
+  if (mapa.getGlobalState()[FOTO_AEREA] === true) return;
+  mapa.setLayoutProperty(CAPA_FOTO, "visibility", "none");
 };
 
 /**

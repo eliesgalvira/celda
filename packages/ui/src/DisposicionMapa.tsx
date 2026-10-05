@@ -39,8 +39,8 @@ export interface DisposicionMapaProps {
   /** Una indicación breve abajo en el centro, como «acércate para ver…». */
   readonly pista?: JSX.Element;
   /**
-   * Acercar y Alejar. En escritorio van a la vista, sobre «Ubicación»; en el móvil, dentro de
-   * «Funciones», porque el mapa se amplía con dos dedos.
+   * Acercar y Alejar. En escritorio van a la vista, abajo a la izquierda sobre la «i» de los
+   * créditos; en el móvil, dentro de «Funciones», porque el mapa se amplía con dos dedos.
    */
   readonly zoom?: JSX.Element;
   /** Los controles de las funciones del mapa, como la interferencia o medir la señal. */
@@ -209,9 +209,6 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
             <AspectoDeControl value="pastilla">{props.controlEncima}</AspectoDeControl>
           </div>
         </Show>
-        <div class="mr-3 mb-1 flex flex-col gap-1 max-md:hidden">
-          <AspectoDeControl value="zoom">{props.zoom}</AspectoDeControl>
-        </div>
         <AspectoDeControl value="pastilla">
           {props.botonUbicacion}
           <MenuDeControles
@@ -225,6 +222,16 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
           </MenuDeControles>
         </AspectoDeControl>
       </div>
+
+      {/*
+        En escritorio, Acercar y Alejar van sobre la «i», a su sitio fijo: abrir los créditos no
+        los mueve. Con un panel abierto se apartan a su derecha, como los créditos.
+      */}
+      <Show when={props.zoom}>
+        <div class="absolute bottom-[calc(max(0.25rem,env(safe-area-inset-bottom))+3rem)] left-1 z-10 flex flex-col gap-1 max-md:hidden md:group-data-panel/mapa:left-[calc(27rem+0.5rem)] md:group-data-panel-ancho/mapa:left-[calc(min(46rem,100vw-8rem)+0.5rem)]">
+          <AspectoDeControl value="zoom">{props.zoom}</AspectoDeControl>
+        </div>
+      </Show>
 
       {/*
         Mientras se elige en el móvil, los créditos quedan por encima de la hoja, en su pie. En

@@ -595,7 +595,7 @@ export function PantallaMapa() {
   const foto = crearFoto({
     lienzo: createMemo(() => {
       const actual = mapaListo();
-      return actual === undefined ? undefined : lienzoDeFoto(actual);
+      return actual === undefined ? undefined : lienzoDeFoto(actual, esperarDeVerdad);
     }),
     seleccionada,
     deCerca: cercaDeLaFoto,
