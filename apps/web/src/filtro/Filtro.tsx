@@ -13,13 +13,7 @@ import {
 } from "@celda/ui/filtro/FiltroDeCompanias.tsx";
 import { For, Show } from "solid-js";
 
-import {
-  detalleDelAviso,
-  ETIQUETA_TODAS,
-  estadoDelFiltro,
-  notaDelFiltro,
-  textoDelAviso,
-} from "./textos.ts";
+import { detalleDelAviso, ETIQUETA_TODAS, estadoDelFiltro, textoDelAviso } from "./textos.ts";
 
 /**
  * La pastilla «Compañías» con sus chips (ADR 0026): «Todas» y una por compañía. Desde todas,
@@ -32,13 +26,17 @@ export function ControlDeCompanias(props: {
 }) {
   return (
     <MenuDeCompanias activo={hayFiltro(props.filtro)} disabled={props.disabled}>
-      <PanelDeCompanias estado={estadoDelFiltro(props.filtro)} nota={notaDelFiltro(props.filtro)}>
-        <ChipDeCompania
-          etiqueta={ETIQUETA_TODAS}
-          pulsado={!hayFiltro(props.filtro)}
-          incluida
-          onClick={() => props.alElegir(SIN_FILTRO)}
-        />
+      <PanelDeCompanias
+        estado={estadoDelFiltro(props.filtro)}
+        todas={
+          <ChipDeCompania
+            etiqueta={ETIQUETA_TODAS}
+            pulsado={!hayFiltro(props.filtro)}
+            incluida
+            onClick={() => props.alElegir(SIN_FILTRO)}
+          />
+        }
+      >
         <For each={Compania.literals}>
           {(compania) => (
             <ChipDeCompania
@@ -56,8 +54,8 @@ export function ControlDeCompanias(props: {
 }
 
 /**
- * El aviso de filtro puesto, bajo la fecha de los datos: qué compañías se ven, lo que sale aparte
- * y «Ver todas», que lo quita de un toque. Sin filtro no se ve.
+ * El aviso de filtro puesto, bajo la fecha de los datos: qué compañías se ven y «Ver todas», que
+ * lo quita de un toque, y una línea solo si algo sorprendería. Sin filtro no se ve.
  */
 export function AvisoDelFiltro(props: {
   readonly filtro: FiltroDeCompanias;

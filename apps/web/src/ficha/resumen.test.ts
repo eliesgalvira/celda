@@ -63,8 +63,8 @@ describe("fraseDeResumen", () => {
   it("una compañía con bandas bajas y altas: 4G y 5G, llega lejos y da velocidad", () => {
     assert.strictEqual(
       leer([estacion("movistar", [700, 800, 1800, 3500])]),
-      "Aquí emite Movistar. Por sus bandas, probablemente da 4G y 5G. Llega lejos y entra bien " +
-        "en los edificios, y tiene bandas altas que dan más velocidad.",
+      "Aquí emite Movistar. Por sus bandas, probablemente da 4G y 5G. Llega lejos, entra bien " +
+        "en los edificios y sus bandas altas dan más velocidad.",
     );
   });
 
@@ -76,8 +76,8 @@ describe("fraseDeResumen", () => {
         estacion("orange", [900, 1800]),
       ]),
       "Movistar, Vodafone y Orange comparten este emplazamiento. Por sus bandas, probablemente " +
-        "da 4G, y 5G con Movistar. Llega lejos y entra bien en los edificios, y tiene bandas " +
-        "altas que dan más velocidad.",
+        "da 4G, y 5G con Movistar. Llega lejos, entra bien en los edificios y sus bandas altas " +
+        "dan más velocidad.",
     );
   });
 
@@ -91,8 +91,8 @@ describe("fraseDeResumen", () => {
     const frase = leer([estacion("vodafone", [3500])]);
     assert.strictEqual(
       frase,
-      "Aquí emite Vodafone. Por sus bandas, probablemente da 5G. Tiene bandas altas que dan más " +
-        "velocidad, pero no bajas, que son las que llegan más lejos y entran mejor en los edificios.",
+      "Aquí emite Vodafone. Por sus bandas, probablemente da 5G. Sus bandas altas dan más " +
+        "velocidad, pero sin bajas llega menos lejos y entra peor en los edificios.",
     );
   });
 
@@ -100,7 +100,7 @@ describe("fraseDeResumen", () => {
     assert.strictEqual(
       leer([estacion("orange", [800, 900])]),
       "Aquí emite Orange. Por sus bandas, probablemente da 4G. Llega lejos y entra bien en los " +
-        "edificios, pero no tiene bandas altas, que son las que dan más velocidad.",
+        "edificios, pero sin bandas altas da menos velocidad.",
     );
   });
 
@@ -114,8 +114,8 @@ describe("fraseDeResumen", () => {
   it("sin bandas: dice que no se conocen y no deduce nada", () => {
     assert.strictEqual(
       leer([estacion("movistar", []), estacion("vodafone", [])]),
-      "Movistar y Vodafone comparten este emplazamiento. Aún no se conocen sus bandas, así que " +
-        "no se sabe si da 4G o 5G ni si llega lejos o da velocidad.",
+      "Movistar y Vodafone comparten este emplazamiento. Aún no se conocen sus bandas ni si da " +
+        "4G o 5G.",
     );
   });
 
@@ -128,7 +128,7 @@ describe("fraseDeResumen", () => {
         "De Vodafone aún no se conocen las bandas.",
     );
     // Con datos incompletos no afirma lo que falta: puede que Vodafone tenga bandas altas.
-    assert.notInclude(frase, "no tiene bandas altas");
+    assert.notInclude(frase, "sin bandas altas");
   });
 
   it("datos incompletos con solo bandas medias, como las de Digi en el registro", () => {
@@ -143,7 +143,7 @@ describe("fraseDeResumen", () => {
   it("un tramo que no encaja en ninguna banda cuenta como dato incompleto", () => {
     const frase = leer([estacion("movistar", [800, null])]);
     assert.include(frase, "Por las bandas que se conocen");
-    assert.notInclude(frase, "no tiene bandas altas");
+    assert.notInclude(frase, "sin bandas altas");
     assert.include(leer([estacion("movistar", [null])]), "Aún no se conocen sus bandas");
   });
 
@@ -153,8 +153,7 @@ describe("fraseDeResumen", () => {
     assert.strictEqual(
       textoPlano(sola),
       "Aquí emite Vodafone. El registro no tiene ficha para este emplazamiento " +
-        "(comprobado el 26 sept 2026). Sin sus bandas no se sabe si da 4G o 5G ni si llega " +
-        "lejos o da velocidad.",
+        "(comprobado el 26 sept 2026). Sin sus bandas no se sabe si da 4G o 5G.",
     );
     assert.deepStrictEqual(terminosDe([sola]), ["registro-oficial", "banda", "4g", "5g"]);
   });
@@ -171,9 +170,9 @@ describe("fraseDeResumen", () => {
     // Si ninguna tiene bandas, las demás siguen pendientes.
     assert.strictEqual(
       leer([orange, estacion("vodafone", [])]),
-      "Orange y Vodafone comparten este emplazamiento. Aún no se conocen sus bandas, así que " +
-        "no se sabe si da 4G o 5G ni si llega lejos o da velocidad. El registro no tiene ficha " +
-        "de Orange para este emplazamiento (comprobado el 26 sept 2026).",
+      "Orange y Vodafone comparten este emplazamiento. Aún no se conocen sus bandas ni si da " +
+        "4G o 5G. El registro no tiene ficha de Orange para este emplazamiento " +
+        "(comprobado el 26 sept 2026).",
     );
   });
 
@@ -254,7 +253,7 @@ describe("términos de la ficha", () => {
     assert.deepStrictEqual(terminosDe([TITULO_EJE]), ["banda", "mhz"]);
   });
 
-  it("la nota técnica explica la orientación y los identificadores de celda", () => {
-    assert.deepStrictEqual(terminosDe([NOTA_TECNICA]), ["azimut", "identificador-de-celda"]);
+  it("la nota técnica explica la orientación", () => {
+    assert.deepStrictEqual(terminosDe([NOTA_TECNICA]), ["azimut"]);
   });
 });

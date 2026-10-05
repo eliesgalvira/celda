@@ -120,8 +120,7 @@ describe("textos de la ficha", () => {
     const mismaNoche = CAPA + 80 * 60_000;
     assert.strictEqual(
       textosMarca(FICHA, compararConCapa(CAPA, mismaNoche)).detalle,
-      "Esta ficha es del 26 sept 2026 a las 03:04 y el mapa, del 26 sept 2026 a las 01:44. " +
-        "El marcador cambiará cuando se publique el mapa nuevo.",
+      "Esta ficha es del 26 sept 2026 a las 03:04 y el mapa, del 26 sept 2026 a las 01:44.",
     );
     const otroDia = CAPA + 86_400_000;
     assert.match(

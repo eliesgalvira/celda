@@ -131,7 +131,7 @@ const EMPLAZAMIENTO = termino("emplazamiento", "emplazamiento");
 
 const RESUMEN: Readonly<Record<Ficha["estado"], TextoMarcado>> = {
   verificado: llano("Las fuentes no se ponen de acuerdo en algún dato de este emplazamiento."),
-  corregido: marcado`La comunidad ha ${termino("correccion", "corregido")} lo que dice el ${REGISTRO} de este ${EMPLAZAMIENTO}. Debajo se ven las dos versiones.`,
+  corregido: marcado`La comunidad ha ${termino("correccion", "corregido")} lo que dice el ${REGISTRO} de este ${EMPLAZAMIENTO}.`,
   nuevo: marcado`El ${REGISTRO} no tiene este ${EMPLAZAMIENTO}. Lo ha añadido la comunidad de Celda.`,
 };
 

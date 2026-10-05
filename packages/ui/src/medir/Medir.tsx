@@ -135,7 +135,8 @@ export interface ValorDeSenal {
   readonly nombre: string;
   readonly valor: string;
   /** Qué quiere decir el valor. */
-  readonly explicacion: string;
+  /** Lo que quiere decir el valor, si no es evidente. */
+  readonly explicacion?: string;
   /** Rayas de cobertura de 0 a 4, para los valores que se pueden puntuar. */
   readonly rayas?: number;
 }
@@ -199,7 +200,9 @@ export function MedidaMostrada(props: MedidaMostradaProps) {
                 </Show>
                 {valor.valor}
               </dd>
-              <dd class="col-span-2 text-tinta-suave">{valor.explicacion}</dd>
+              <Show when={valor.explicacion}>
+                <dd class="col-span-2 text-tinta-suave">{valor.explicacion}</dd>
+              </Show>
             </div>
           )}
         </For>

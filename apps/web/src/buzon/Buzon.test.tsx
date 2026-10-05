@@ -116,7 +116,7 @@ describe("ficha: correcciones aceptadas de la comunidad", () => {
     assert.isTrue(Boolean(cc0.compareDocumentPosition(enviar) & Node.DOCUMENT_POSITION_FOLLOWING));
     fireEvent.click(enviar);
     flush();
-    await within(abierto).findByText("Recibida");
+    await within(abierto).findByText(/^Recibida el /u);
     const [recibida] = pantalla.dispositivo.buzon.recibidas();
     assert.strictEqual(recibida?.tipo, "corroboracion");
     assert.deepInclude(recibida, {
@@ -151,7 +151,7 @@ describe("ficha: correcciones aceptadas de la comunidad", () => {
     assert.isNotNull(within(sale).getByText("Quitaron sus antenas en verano."));
     fireEvent.click(within(abierto).getByRole("button", { name: "Enviar al dominio público" }));
     flush();
-    await within(abierto).findByText("Recibida");
+    await within(abierto).findByText(/^Recibida el /u);
     const [recibida] = pantalla.dispositivo.buzon.recibidas();
     assert.deepInclude(recibida, {
       tipo: "correccion-propuesta",
@@ -196,7 +196,7 @@ describe("Tus aportaciones", () => {
     assert.isNotNull(within(abierto).getByText(/dominio público con la CC0 1.0 Universal/u));
     fireEvent.click(within(abierto).getByRole("button", { name: "Enviar al dominio público" }));
     flush();
-    await within(abierto).findByText("Recibida");
+    await within(abierto).findByText(/^Recibida el /u);
     assert.deepStrictEqual(pantalla.dispositivo.buzon.recibidas(), [MEDIDA]);
 
     fireEvent.click(within(abierto).getByRole("button", { name: "Hecho" }));
@@ -219,7 +219,7 @@ describe("Tus aportaciones", () => {
     const aviso = await within(abierto).findByRole("alert");
     assert.isNotNull(within(aviso).getByText("Muchas aportaciones desde tu red"));
     assert.match(aviso.textContent ?? "", /dentro de 5 min/u);
-    assert.match(aviso.textContent ?? "", /Se queda guardada en este dispositivo/u);
+    assert.match(aviso.textContent ?? "", /Sigue guardada en este dispositivo/u);
     assert.deepStrictEqual(pantalla.dispositivo.almacen.guardadas(), [MEDIDA]);
     assert.strictEqual(pantalla.dispositivo.almacen.compartidas().size, 0);
     assert.isNotNull(within(abierto).getByRole("button", { name: "Intentar otra vez" }));

@@ -150,8 +150,8 @@ const textoSinFichaEnRegistro = (sinFicha: {
   sinFicha.estaciones === 0
     ? ""
     : sinFicha.estaciones === 1
-      ? ` Una estación base de ${enumerar(sinFicha.companias)} aparece en el listado del registro pero no tiene ficha. Se cuenta aparte, y en sus bandas la tabla también pone «no consta».`
-      : ` ${entero(sinFicha.estaciones)} estaciones base de ${enumerar(sinFicha.companias)} aparecen en el listado del registro pero no tienen ficha. Se cuentan aparte, y en sus bandas la tabla también pone «no consta».`;
+      ? ` Una estación base de ${enumerar(sinFicha.companias)} no tiene ficha en el registro, y en sus bandas la tabla pone «no consta».`
+      : ` ${entero(sinFicha.estaciones)} estaciones base de ${enumerar(sinFicha.companias)} no tienen ficha en el registro, y en sus bandas la tabla pone «no consta».`;
 
 /**
  * El ejercicio de emplazamientos del modo estudiante, en el panel de la izquierda o en la hoja del
@@ -601,8 +601,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
               titulo="No se han podido cargar las zonas"
               acciones={<Boton onClick={cargarZonas}>Reintentar</Boton>}
             >
-              Sin ellas no se puede elegir dónde hacer el ejercicio. Puede que falle la conexión con
-              Celda.
+              Puede que falle la conexión.
             </Aviso>
           </SeccionFicha>
         </Match>
@@ -630,10 +629,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
               }
             >
               <Nota titulo="Toca el mapa dentro de la zona">
-                <p>
-                  El ejercicio se hará en el municipio que toques. En Barcelona se hará en el
-                  barrio, y después podrás pasar al municipio entero.
-                </p>
+                <p>En Barcelona se elige el barrio, y después puedes pasar al municipio entero.</p>
                 <Show when={fueraDelMapa()}>
                   <p>Ahí no hay ningún municipio. Toca dentro de uno.</p>
                 </Show>
@@ -653,10 +649,6 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                 alCambiar={elegirZona}
               />
             </Show>
-            <TextoEjercicio>
-              El ejercicio se hace sobre un municipio de España, con los habitantes del padrón del
-              INE, o sobre uno de los 73 barrios de Barcelona, con el padrón del Ayuntamiento.
-            </TextoEjercicio>
             <EstadoDeLaZona
               estado={estado()}
               codigo={props.zona}
@@ -709,9 +701,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     <Nota tono="aviso" titulo="El padrón aún no tiene esta zona">
                       <p>
                         El padrón a {actual().origen.poblacion.referencia} no da habitantes de{" "}
-                        {actual().nombre}, como pasa con un municipio recién creado. El ejercicio
-                        cuenta sus estaciones base y su radio, pero no los habitantes ni los
-                        usuarios por estación base.
+                        {actual().nombre}. Sin ellos no salen los usuarios por estación base.
                       </p>
                     </Nota>
                   </Show>
@@ -719,8 +709,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     <Nota tono="aviso" titulo="Solo una parte de la zona">
                       <p>
                         Celda solo tiene los emplazamientos de una parte de {actual().nombre}, así
-                        que los recuentos se quedan cortos. El mapa solo muestra las zonas en las
-                        que ya ha leído el registro oficial.
+                        que los recuentos se quedan cortos.
                       </p>
                     </Nota>
                   </Show>
@@ -744,10 +733,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
           <Show when={resuelta() !== undefined && presentes().length === 0}>
             <SeccionFicha titulo="Estaciones base">
               <Nota tono="aviso" titulo="No hay emplazamientos en esta zona">
-                <p>
-                  El mapa no tiene ningún emplazamiento dentro de sus límites, así que no hay
-                  estaciones base que contar. Prueba con una zona vecina.
-                </p>
+                <p>Prueba con una zona vecina.</p>
               </Nota>
             </SeccionFicha>
           </Show>
@@ -772,17 +758,17 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     alCambiar={setElegida}
                   />
                   <TextoEjercicio>
-                    El radio de cada <Termino termino="estacion-base">estación base</Termino> es la
-                    mitad de la distancia media a su vecina más cercana de la misma compañía, esté
-                    dentro o fuera de la zona, aunque sea en otra provincia. En el mapa, cada línea
-                    naranja une una estación con su vecina.
+                    El radio es la mitad de la distancia media de cada{" "}
+                    <Termino termino="estacion-base">estación base</Termino> a su vecina más cercana
+                    de la misma compañía, esté o no en la zona. Cada línea naranja del mapa une una
+                    estación con su vecina.
                   </TextoEjercicio>
                   <Show when={vecinasPendientes().length > 0}>
                     <Nota titulo="Buscando vecinas al otro lado del borde">
                       <p>
                         Cargando los emplazamientos de{" "}
-                        {enumerar(vecinasPendientes().map(nombreDeProvincia))}. Alguna estación del
-                        borde puede tener allí su vecina, así que el radio aún puede cambiar.
+                        {enumerar(vecinasPendientes().map(nombreDeProvincia))}. El radio aún puede
+                        cambiar.
                       </p>
                     </Nota>
                   </Show>
@@ -790,8 +776,8 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     <Nota tono="aviso" titulo="Faltan vecinas al otro lado del borde">
                       <p>
                         No han llegado los emplazamientos de{" "}
-                        {enumerar(vecinasFallidas().map(nombreDeProvincia))}. Si alguna estación del
-                        borde tiene allí su vecina, el radio calculado sale mayor que el real.
+                        {enumerar(vecinasFallidas().map(nombreDeProvincia))}. El radio puede salir
+                        mayor que el real.
                       </p>
                       <AccionesEjercicio>
                         <Boton
@@ -807,8 +793,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     <Nota tono="aviso" titulo="Vecinas en una zona a medias">
                       <p>
                         De {enumerar(borde().incompletas.map(nombreDeProvincia))} Celda solo tiene
-                        los emplazamientos de una parte. Si la vecina de alguna estación está en la
-                        parte que falta, el radio real es menor que este.
+                        los emplazamientos de una parte, y el radio real puede ser menor.
                       </p>
                     </Nota>
                   </Show>
@@ -876,10 +861,8 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
 
                 <SeccionFicha titulo="4 · Tecnologías y bandas">
                   <TextoEjercicio>
-                    Las <Termino termino="banda">bandas</Termino> salen del registro oficial, tal
-                    como las recoge el mapa de Celda. La ficha de cada emplazamiento, de la misma
-                    fecha, las da expediente a expediente. Como el registro no publica la
-                    tecnología, se deduce de la banda, y por eso la tabla dice «probable» o
+                    Las <Termino termino="banda">bandas</Termino> salen del registro oficial. Como
+                    no publica la tecnología, se deduce de la banda y la tabla dice «probable» o
                     «posible».
                   </TextoEjercicio>
                   {/*
@@ -922,10 +905,6 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                 <Show when={tabla()}>
                   {(hecha) => (
                     <SeccionFicha titulo="5 · Tabla">
-                      <TextoEjercicio>
-                        Debajo de cada magnitud se indica de dónde sale y de qué fecha es. En un
-                        ordenador también se ve al pasar el cursor por un valor.
-                      </TextoEjercicio>
                       <TablaDelEjercicio
                         titulo={hecha().titulo}
                         columnas={hecha().companias.map((c) => ({
@@ -998,23 +977,17 @@ function EstadoDeLaZona(props: {
     <Switch>
       <Match when={props.estado.tipo === "sin-zona" && props.codigo !== ""}>
         <Nota tono="aviso" titulo="Esa zona no existe">
-          <p>
-            Ningún municipio ni barrio tiene el código «{props.codigo}». Búscalo por su nombre o
-            elígelo en el mapa.
-          </p>
+          <p>Búscala por su nombre o elígela en el mapa.</p>
         </Nota>
       </Match>
       <Match when={props.estado.tipo === "cargando"}>
         <TextoEjercicio>
-          {nombre() === ""
-            ? "Cargando la zona…"
-            : `Cargando los emplazamientos y el contorno de ${nombre()}…`}
+          {nombre() === "" ? "Cargando la zona…" : `Cargando ${nombre()}…`}
         </TextoEjercicio>
       </Match>
       <Match when={props.estado.tipo === "sin-datos"}>
         <Aviso tono="limite" encaje="panel" titulo={`Celda aún no tiene datos de ${provincia()}`}>
-          Celda aún no ha leído el registro oficial de esa provincia, así que no puede contar las
-          estaciones base de {nombre()}. Puede haberlas aunque aquí no salgan.
+          Puede haber estaciones base en {nombre()} aunque aquí no salgan.
         </Aviso>
       </Match>
       <Match when={props.estado.tipo === "fallo"}>
@@ -1024,7 +997,7 @@ function EstadoDeLaZona(props: {
           titulo={`No ha llegado lo que hace falta para ${nombre() === "" ? "la zona" : nombre()}`}
           acciones={<Boton onClick={() => props.alReintentar()}>Reintentar</Boton>}
         >
-          Puede que falle la conexión con Celda o que el servidor esté bloqueado.
+          Puede que falle la conexión o que el servidor esté bloqueado.
         </Aviso>
       </Match>
     </Switch>

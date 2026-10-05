@@ -13,7 +13,7 @@ import { AreaDeTexto, Casillas, Segmentado, Selector } from "@celda/ui/Eleccion.
 import { Nota } from "@celda/ui/medir/Medir.tsx";
 import { Termino } from "@celda/ui/termino/Termino.tsx";
 import * as Exit from "effect/Exit";
-import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js";
+import { createMemo, createSignal, Show, useContext } from "solid-js";
 
 import { usarDatos } from "../datos.tsx";
 import { posicionDe } from "../ubicacion/estado.ts";
@@ -129,9 +129,8 @@ export function Proponer(props: ProponerProps) {
   const sinPunto = (
     <Nota tono="aviso" titulo="Falta el punto">
       <p>
-        El punto que propones es tu{" "}
-        <Termino termino="punto-de-referencia">punto de referencia</Termino>. Márcalo en el mapa o
-        usa tu ubicación, y vuelve aquí.
+        Se propone tu <Termino termino="punto-de-referencia">punto de referencia</Termino>. Márcalo
+        y vuelve aquí.
       </p>
       <div>
         <Boton variante="secundario" onClick={() => props.alElegirPunto()}>
@@ -153,10 +152,7 @@ export function Proponer(props: ProponerProps) {
                   props.emplazamiento.posicion,
                 )}
           </p>
-          <p>
-            Se usa tu punto de referencia. Si quieres proponer otro, mueve el punto en el mapa y
-            vuelve aquí.
-          </p>
+          <p>Es tu punto de referencia. Para cambiarlo, muévelo en el mapa.</p>
         </Nota>
       )}
     </Show>
@@ -167,21 +163,8 @@ export function Proponer(props: ProponerProps) {
       when={borrador()}
       fallback={
         <>
-          <Show
-            when={props.emplazamiento !== undefined}
-            fallback={
-              <p>
-                Vas a proponer un <Termino termino="emplazamiento">emplazamiento</Termino> que no
-                está en el mapa. El mapa no cambiará hasta que la moderación acepte la propuesta.
-              </p>
-            }
-          >
+          <Show when={props.emplazamiento !== undefined}>
             <>
-              <p>
-                Vas a corregir este <Termino termino="emplazamiento">emplazamiento</Termino>. El
-                mapa no cambia hasta que la moderación acepte la corrección. Si la acepta, aparecerá
-                junto a lo que dice el registro, que se sigue viendo.
-              </p>
               <Segmentado
                 leyenda="Qué está mal"
                 opciones={QUE_ESTA_MAL}
@@ -190,12 +173,7 @@ export function Proponer(props: ProponerProps) {
               />
             </>
           </Show>
-          <Switch>
-            <Match when={tipo() === "posicion" || tipo() === "falta"}>{conPunto}</Match>
-            <Match when={tipo() === "ya-no-existe"}>
-              <p>Propones que lo han desmontado y ya no hay antenas en ese sitio.</p>
-            </Match>
-          </Switch>
+          <Show when={tipo() === "posicion" || tipo() === "falta"}>{conPunto}</Show>
           <Show when={tipo() === "compania"}>
             <Selector
               etiqueta="Compañía"
@@ -224,7 +202,7 @@ export function Proponer(props: ProponerProps) {
             valor={nota()}
             maximo={LARGO_MAXIMO_NOTA}
             alCambiar={setNota}
-            ayuda="Cuenta qué has visto y cómo lo sabes, sin incluir datos personales. No se pueden adjuntar fotos."
+            ayuda="Cuenta qué has visto, sin datos personales."
           />
           <AccionesDelPaso>
             <Boton variante="destacado" disabled={cambio() === undefined} onClick={revisar}>

@@ -60,12 +60,11 @@ export function DialogoMedir(props: DialogoMedirProps) {
   const detectado = createMemo(() => detectarDispositivo(props.navegador));
   const instrucciones = createMemo(() => instruccionesPara(detectado(), eleccion()));
 
-  const ayudaDelTipo = () => {
-    if (eleccion().tipo !== undefined) return "Has elegido el dispositivo a mano.";
-    return detectado().tipo === "desconocido"
-      ? "El navegador no indica qué dispositivo es, así que elígelo aquí."
-      : "Lo hemos deducido de tu navegador. Si no es correcto, cámbialo.";
-  };
+  /** Solo si lo ha deducido Celda: puede no ser el de la persona. */
+  const ayudaDelTipo = () =>
+    eleccion().tipo === undefined && detectado().tipo !== "desconocido"
+      ? "Sale de tu navegador. Cámbialo si no es el tuyo."
+      : undefined;
 
   const verEjemplo = (
     <Boton variante="secundario" onClick={() => setViendoEjemplo(true)}>
@@ -94,54 +93,40 @@ export function DialogoMedir(props: DialogoMedirProps) {
           <Match when={instrucciones().tipo === "ordenador"}>
             <Nota tono="aviso" titulo="Desde un ordenador no se puede medir">
               <p>
-                El móvil se conecta a las <Termino termino="estacion-base">estaciones base</Termino>{" "}
-                con su radio y su tarjeta SIM. Un ordenador no tiene esa radio, así que no puede
-                medir la señal móvil.
+                Hace falta la radio y la SIM de un móvil para recibir las{" "}
+                <Termino termino="estacion-base">estaciones base</Termino>.
               </p>
             </Nota>
-            <p>Tienes tres opciones:</p>
             <Opcion
               titulo="Abrir Celda en el móvil"
               lado={<CodigoQr texto={props.direccionMovil} nombre="Abre este paso en el móvil" />}
             >
-              <p>
-                Escanea este código con la cámara del móvil. Se abre esta misma página, ya en el
-                paso de medir, con el código para tu marca.
-              </p>
+              <p>Escanea el código con la cámara del móvil.</p>
             </Opcion>
             <Opcion
               titulo="Subir una captura que ya tengas"
               etiqueta={<Etiqueta tono="pronto">PRONTO</Etiqueta>}
             >
               <p>
-                Si ya tienes una captura del{" "}
-                <Termino termino="modo-de-informacion">modo de información</Termino> de tu móvil,
-                podrás subirla desde aquí. Todavía no se puede, porque falta decidir cómo leerá
-                Celda los números de la captura.
+                Aún no se puede, porque falta decidir cómo leerá Celda la captura del{" "}
+                <Termino termino="modo-de-informacion">modo de información</Termino>.
               </p>
             </Opcion>
             <Opcion titulo="Ver una medida de ejemplo" acciones={verEjemplo}>
-              <p>
-                Es una medida inventada en la que se explica qué quiere decir cada número. Está
-                marcada como ejemplo y no cuenta como medida tuya.
-              </p>
+              <p>Es una medida inventada con cada número explicado.</p>
             </Opcion>
           </Match>
           <Match when={instrucciones().tipo === "desconocido"}>
             <Nota titulo="No sabemos desde qué dispositivo abres Celda">
               <p>
-                Elige arriba si es un ordenador, un Android o un iPhone y te diremos cómo medir. Una
-                tableta sin la app Teléfono no puede marcar el código del{" "}
+                Elígelo arriba. Una tableta sin la app Teléfono no puede marcar el código del{" "}
                 <Termino termino="modo-de-informacion">modo de información</Termino>.
               </p>
             </Nota>
             <div>{verEjemplo}</div>
           </Match>
           <Match when={instrucciones().tipo === "iphone" || instrucciones().tipo === "android"}>
-            <p>
-              El móvil registra cómo le llega la señal, pero por privacidad el navegador no deja que
-              una web lea esos datos. Por eso la medida se hace a mano, en tres pasos.
-            </p>
+            <p>El navegador no deja que una web lea la señal del móvil, así que se mide a mano.</p>
             <Pasos>
               <Paso numero={1} titulo="Abre la app Teléfono y marca este código">
                 <Show when={instrucciones().tipo === "android"}>
@@ -158,7 +143,7 @@ export function DialogoMedir(props: DialogoMedirProps) {
                 </Show>
                 <CodigoDelModo
                   codigo={codigoVigente(instrucciones())?.codigo}
-                  vacio="Tu navegador no dice la marca del móvil. Elígela y aquí saldrá su código."
+                  vacio="Elige la marca para ver su código."
                 />
                 <Show when={codigoVigente(instrucciones())}>
                   {(codigo) => (
@@ -167,32 +152,23 @@ export function DialogoMedir(props: DialogoMedirProps) {
                 </Show>
               </Paso>
               <Paso numero={2} titulo="Haz una captura de pantalla">
-                <p>Hazla cuando se vean los números de la señal y luego vuelve aquí.</p>
+                <p>Hazla cuando se vean los números de la señal.</p>
               </Paso>
               <Paso numero={3} titulo="Súbela a Celda">
                 <p>
-                  <Etiqueta tono="pronto">PRONTO</Etiqueta> Todavía no se puede, porque falta
-                  decidir cómo leerá Celda los números de la captura. Si guardas la captura, podrás
-                  subirla más adelante.
+                  <Etiqueta tono="pronto">PRONTO</Etiqueta> Aún no se puede, porque falta decidir
+                  cómo leerá Celda la captura. Guárdala para más adelante.
                 </p>
               </Paso>
             </Pasos>
             <Desplegable titulo="Qué hace el código en el móvil" abierto variante="recuadro">
               <Puntos>
-                <li>
-                  El código abre una pantalla que el móvil trae de fábrica. No instala nada y no
-                  cambia ningún ajuste.
-                </li>
-                <li>Marcarlo no hace ninguna llamada y no tiene coste.</li>
+                <li>Abre una pantalla de fábrica del móvil. No instala ni cambia nada.</li>
+                <li>No llama ni cuesta nada.</li>
                 <Show when={instrucciones().tipo === "android"}>
-                  <li>
-                    En algunas marcas esa pantalla tiene botones de pruebas. No hace falta tocarlos.
-                    Para salir, usa el botón de volver.
-                  </li>
+                  <li>Si salen botones de pruebas, no los toques. Sal con el botón de volver.</li>
                 </Show>
-                <li>
-                  Celda solo ve la captura que tú subas, y de ella solo lee los números de la señal.
-                </li>
+                <li>De la captura que subas, Celda solo lee los números de la señal.</li>
               </Puntos>
             </Desplegable>
             <div>
@@ -235,16 +211,12 @@ function ComoSeAbre(props: { readonly codigo: CodigoModoInformacion; readonly de
         <Show when={props.codigo.despues}>{(despues) => ` ${despues()}`}</Show>
       </p>
       <Show when={props.deducida}>
-        <p>La marca sale de tu navegador. Si no es la tuya, cámbiala arriba.</p>
+        <p>Si no es tu marca, cámbiala arriba.</p>
       </Show>
       <Show when={props.codigo.nota}>{(nota) => <p>{nota()}</p>}</Show>
       <Show when={props.codigo.comprobacion === "sin-verificar"}>
         <Nota tono="aviso" titulo="Código sin comprobar">
-          <p>
-            Este código no aparece en ninguna fuente oficial, solo en guías de terceros. Si no abre
-            nada, prueba con «Otra marca», que da el código general de Android, o consulta la medida
-            de ejemplo.
-          </p>
+          <p>Sale de guías de terceros. Si no abre nada, prueba con «Otra marca».</p>
         </Nota>
       </Show>
     </>
@@ -262,15 +234,10 @@ function VistaEjemplo(props: { readonly volver: () => void }) {
         valores={valoresDeLaLectura(MEDIDA_DE_EJEMPLO.senal)}
       >
         <p>
-          Estos números son inventados y no cuentan como una medida tuya. Son los mismos datos que
-          enseña el <Termino termino="modo-de-informacion">modo de información</Termino> de un
-          móvil.
+          Son números inventados, como los del{" "}
+          <Termino termino="modo-de-informacion">modo de información</Termino> de un móvil.
         </p>
       </MedidaMostrada>
-      <p>
-        Cuando se puedan registrar medidas, cada una se verá en el mapa unida al{" "}
-        <Termino termino="emplazamiento">emplazamiento</Termino> que le daba servicio.
-      </p>
       <div>
         <Boton variante="secundario" onClick={() => props.volver()}>
           Volver

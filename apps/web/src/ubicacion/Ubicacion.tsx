@@ -43,7 +43,6 @@ import {
   COMO_REACTIVAR,
   EXPLICACION_FALLO,
   fueraDeLosDatos,
-  PARA_QUE_SIRVE,
   TITULO_FALLO,
   textosFueraDeLosDatos,
   textosReferencia,
@@ -84,7 +83,7 @@ export function MenuDeUbicacion(props: MenuDeUbicacionProps) {
   const detalleUsar = createMemo(() => {
     if (referencia()?.tipo === "gps") return "Ya la estás usando.";
     if (control.ubicacion().permiso === "denegado") {
-      return "Está bloqueada en este navegador. Puedes activarla en los ajustes del sitio.";
+      return "Está bloqueada en los ajustes del sitio.";
     }
     const estado = actual();
     if (estado.tipo === "fallo" && sinGeolocalizacion(estado.motivo)) {
@@ -92,9 +91,9 @@ export function MenuDeUbicacion(props: MenuDeUbicacionProps) {
     }
     if (control.ubicacion().estado.tipo === "pidiendo") return "La estamos buscando.";
     if (estado.tipo === "fallo" && estado.motivo === "sin-fuente") {
-      return "Este ordenador no ha podido calcular su posición. Puedes volver a intentarlo.";
+      return "Este ordenador no ha podido calcular su posición.";
     }
-    return "Antes de pedirla te explicamos para qué sirve. Celda no la guarda.";
+    return "Celda no la guarda.";
   });
   const puedeUsar = createMemo(() => {
     const estado = actual();
@@ -164,18 +163,16 @@ export function PasoPrevio() {
   return (
     <Show when={control.ubicacion().estado.tipo === "explicando"}>
       <Dialogo titulo="Usar tu ubicación" alCerrar={control.cancelar}>
-        <p>Ahora tu navegador te preguntará si quieres compartir tu ubicación con Celda.</p>
         <ListaPasoPrevio>
           <li>
-            Solo sirve para calcular a qué distancia y en qué dirección quedan los{" "}
+            Sirve para saber a qué distancia y hacia dónde quedan los{" "}
             <Termino termino="emplazamiento">emplazamientos</Termino>.
           </li>
           <li>
-            El cálculo se hace en tu dispositivo, y Celda no guarda tu ubicación ni la envía a
-            ningún servidor. Lo único que se descarga es el callejero de la zona desde OpenFreeMap,
-            igual que cuando mueves el mapa.
+            Se usa solo en tu dispositivo. Celda no la guarda ni la envía, y el callejero de la zona
+            se descarga de OpenFreeMap como al mover el mapa.
           </li>
-          <li>Puedes quitarla cuando quieras desde el botón «Ubicación».</li>
+          <li>La quitas desde «Ubicación».</li>
         </ListaPasoPrevio>
         <AccionesPasoPrevio>
           <Boton variante="secundario" onClick={() => control.elegirEnMapa()}>
@@ -194,12 +191,11 @@ const TEXTO_ALMACEN = {
   "sin-guardar": {
     titulo: "El punto no se ha guardado",
     texto:
-      "Este navegador no deja a Celda guardar datos en el dispositivo, algo que pasa en algunas ventanas privadas. El punto se mantendrá hasta que cierres la página.",
+      "Este navegador no deja guardar datos, como pasa en algunas ventanas privadas. Durará hasta que cierres la página.",
   },
   "sin-borrar": {
     titulo: "El punto no se ha borrado del dispositivo",
-    texto:
-      "Ya no se usa, pero puede volver a aparecer al recargar la página. Prueba a quitarlo otra vez.",
+    texto: "Puede volver al recargar la página. Quítalo otra vez.",
   },
 } as const;
 
@@ -288,10 +284,7 @@ export function AvisosDeUbicacion(props: {
               </Boton>
             </>
           }
-        >
-          Si el navegador te pregunta, decide si compartes tu ubicación con Celda. Si no llega,
-          saldrá un aviso y podrás elegir el punto en el mapa.
-        </Aviso>
+        />
       </Show>
       <Show when={control.avisoAlmacen()} keyed>
         {(aviso) => (
@@ -317,15 +310,12 @@ export function AvisosDeUbicacion(props: {
   );
 }
 
-const SIN_RESULTADOS =
-  "No se ha encontrado esa dirección en España. Prueba a escribir la calle, el número y el municipio.";
+const SIN_RESULTADOS = "No se ha encontrado. Prueba con la calle, el número y el municipio.";
 
 const TEXTO_FALLO_BUSQUEDA: Readonly<Record<BusquedaFallida["motivo"], string>> = {
-  apagada:
-    "La búsqueda de direcciones está desactivada en este momento. Puedes elegir el punto en el mapa.",
-  limite: "El buscador ha recibido demasiadas peticiones. Vuelve a probar en unos segundos.",
-  "sin-respuesta":
-    "El buscador no responde. Puede que falle la conexión o que el servicio no funcione. Mientras, puedes elegir el punto en el mapa.",
+  apagada: "El buscador está desactivado. Elige el punto en el mapa.",
+  limite: "Demasiadas búsquedas seguidas. Prueba en unos segundos.",
+  "sin-respuesta": "El buscador no responde. Elige el punto en el mapa o prueba más tarde.",
 };
 
 export interface EleccionConBuscadorProps {
@@ -396,7 +386,7 @@ export function EleccionConBuscador(props: EleccionConBuscadorProps) {
 
   const buscar = () => {
     if (normalizarConsulta(consulta()).length < LETRAS_MINIMAS) {
-      setEstado({ tipo: "aviso", texto: "Escribe al menos tres letras de la dirección." });
+      setEstado({ tipo: "aviso", texto: "Escribe al menos tres letras." });
       return;
     }
     setEstado({ tipo: "buscando" });
@@ -441,11 +431,15 @@ export function ReferenciaEnFicha(props: {
   const sinPunto = createMemo(() => {
     const actual = asentado(estado());
     if (actual.tipo === "denegada") {
-      return { aviso: COMO_REACTIVAR, puedeUsar: false, usar: "Usar mi ubicación" };
+      return {
+        aviso: `${TITULO_FALLO.denegado}. ${COMO_REACTIVAR}`,
+        puedeUsar: false,
+        usar: "Usar mi ubicación",
+      };
     }
     if (actual.tipo === "fallo") {
       return {
-        aviso: EXPLICACION_FALLO[actual.motivo],
+        aviso: `${TITULO_FALLO[actual.motivo]}. ${EXPLICACION_FALLO[actual.motivo]}`,
         puedeUsar: !sinGeolocalizacion(actual.motivo),
         usar: "Volver a intentarlo",
       };
@@ -469,7 +463,6 @@ export function ReferenciaEnFicha(props: {
         fallback={
           <SinReferencia
             titulo="Distancia hasta el emplazamiento"
-            texto={<TextoConTerminos texto={PARA_QUE_SIRVE} />}
             aviso={sinPunto().aviso}
             acciones={
               <>
@@ -498,10 +491,7 @@ export function ReferenciaEnFicha(props: {
           />
         </Match>
         <Match when={estado().tipo === "eligiendo"}>
-          <EsperandoReferencia
-            texto="Elige el punto en el mapa o busca una dirección."
-            acciones={cancelar()}
-          />
+          <EsperandoReferencia texto="Eligiendo el punto…" acciones={cancelar()} />
         </Match>
         <Match when={control.referencia()}>
           {(referencia) => {
@@ -558,7 +548,7 @@ function ServicioEnFicha(props: { readonly clave: string; readonly tipo: "gps" |
     const actual = textos();
     if (actual !== undefined) return <TextoConTerminos texto={actual.veredicto} />;
     return servicio.fallo()
-      ? "Tu navegador no ha podido calcular el sector que da servicio. Prueba a mover el punto o a recargar la página."
+      ? "No se ha podido calcular. Mueve el punto o recarga la página."
       : undefined;
   });
   return (

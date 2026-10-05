@@ -33,11 +33,9 @@ export function EleccionDePunto(props: EleccionDePuntoProps) {
           <h2 id={titulo} class="font-titulo text-lg leading-6">
             Elige un punto
           </h2>
-          <p class="text-sm text-tinta-suave max-md:hidden">
-            Haz clic en el mapa donde quieras, o busca una dirección.
-          </p>
+          <p class="text-sm text-tinta-suave max-md:hidden">Haz clic en el mapa.</p>
           <p class="text-sm text-tinta-suave md:hidden">
-            Mueve el mapa hasta que el pin quede donde quieras, o busca una dirección.
+            Mueve el mapa hasta dejar el pin en su sitio.
           </p>
         </div>
         <div class="max-md:hidden">

@@ -72,18 +72,15 @@ export const textosReferencia = (
     margen:
       precision > PRECISION_GRUESA || precision > metros / 2
         ? marcar(
-            marcado`Tu ubicación tiene un ${termino("precision", "margen")} de ${textoPrecision(precision)}, así que la distancia es aproximada.`,
+            marcado`Con un ${termino("precision", "margen")} de ${textoPrecision(precision)}, la distancia es aproximada.`,
           )
         : undefined,
   };
 };
 
-/** Qué se gana con un punto de referencia, en el panel sin punto. */
-export const PARA_QUE_SIRVE: TextoMarcado = marcado`Con un ${termino("punto-de-referencia", "punto")} te decimos a qué distancia queda este ${termino("emplazamiento", "emplazamiento")} y en qué dirección.`;
-
 /** Cómo reactivar la ubicación bloqueada (historia 25). */
 export const COMO_REACTIVAR =
-  "Has bloqueado la ubicación para esta web. Para activarla, toca el candado o el icono de ajustes junto a la dirección de la página, entra en «Ubicación» y elige «Permitir». Mientras tanto, puedes elegir el punto en el mapa.";
+  "Para activarla, toca el candado junto a la dirección de la página y permite la ubicación.";
 
 /** Qué ha pasado cuando la ubicación no llega. */
 export const TITULO_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
@@ -96,14 +93,10 @@ export const TITULO_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
 
 export const EXPLICACION_FALLO: Readonly<Record<MotivoFalloGps, string>> = {
   denegado: COMO_REACTIVAR,
-  "sin-senal":
-    "El dispositivo no ha podido calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo desactivada. Puedes volver a intentarlo o elegir el punto en el mapa.",
-  "sin-fuente":
-    "Los ordenadores no tienen GPS. El navegador obtiene la posición de un servicio que la calcula con las redes wifi cercanas, y en este ordenador ese servicio no existe o no ha respondido. Pasa a menudo con Chromium en Linux. Puedes elegir el punto en el mapa o buscar una dirección, y en el móvil sí podrás usar tu ubicación.",
-  "tiempo-agotado":
-    "Tu dispositivo ha tardado demasiado en calcular tu posición. Pasa a veces en interiores o con la ubicación del dispositivo desactivada. Puedes volver a intentarlo o elegir el punto en el mapa.",
-  "no-disponible":
-    "El navegador no deja que la web pida la ubicación. Suele pasar si la página no va por https o si el navegador no lo admite. Puedes elegir el punto en el mapa.",
+  "sin-senal": "Pasa en interiores o con la ubicación desactivada.",
+  "sin-fuente": "Busca una dirección o, en el móvil, usa tu ubicación.",
+  "tiempo-agotado": "Pasa en interiores o con la ubicación desactivada.",
+  "no-disponible": "Busca una dirección o elige el punto en el mapa.",
 };
 
 /**
@@ -148,11 +141,11 @@ export const textosFueraDeLosDatos = (
   if (referencia.tipo === "elegido") {
     return {
       titulo: "Celda aún no tiene datos de ese punto",
-      texto: `Los datos más cercanos quedan a ${lejos}. Ese lugar todavía no está en el mapa, así que puede haber antenas alrededor del punto aunque no se vean.`,
+      texto: `Los datos más cercanos quedan a ${lejos}. Puede haber antenas alrededor del punto aunque no se vean.`,
     };
   }
   return {
     titulo: "Celda aún no tiene datos de donde estás",
-    texto: `Los datos más cercanos quedan a ${lejos} de ti. Ese lugar todavía no está en el mapa, así que puede haber antenas a tu alrededor aunque no se vean.`,
+    texto: `Los datos más cercanos quedan a ${lejos} de ti. Puede haber antenas a tu alrededor aunque no se vean.`,
   };
 };

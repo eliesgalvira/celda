@@ -335,8 +335,8 @@ describe("panel del emplazamiento", () => {
       getByText(
         textoEntero(
           "Movistar y Vodafone comparten este emplazamiento. Por las bandas que se conocen, " +
-            "probablemente da 5G con Movistar. Llega lejos y entra bien en los edificios, y tiene " +
-            "bandas altas que dan más velocidad. De Vodafone aún no se conocen las bandas.",
+            "probablemente da 5G con Movistar. Llega lejos, entra bien en los edificios y sus " +
+            "bandas altas dan más velocidad. De Vodafone aún no se conocen las bandas.",
         ),
       ),
     );
@@ -377,8 +377,8 @@ describe("panel del emplazamiento", () => {
       getByText(
         textoEntero(
           "Movistar y Vodafone comparten este emplazamiento. Por las bandas que se conocen, " +
-            "probablemente da 5G con Movistar. Llega lejos y entra bien en los edificios, y tiene " +
-            "bandas altas que dan más velocidad. El registro no tiene ficha de Vodafone para " +
+            "probablemente da 5G con Movistar. Llega lejos, entra bien en los edificios y sus " +
+            "bandas altas dan más velocidad. El registro no tiene ficha de Vodafone para " +
             "este emplazamiento (comprobado el 27 sept 2026).",
         ),
       ),
@@ -443,8 +443,7 @@ describe("panel del emplazamiento", () => {
       getByText(
         textoEntero(
           "Aquí emite Orange. El registro no tiene ficha para este emplazamiento (comprobado " +
-            "el 26 sept 2026). Sin sus bandas no se sabe si da 4G o 5G ni si llega lejos o da " +
-            "velocidad.",
+            "el 26 sept 2026). Sin sus bandas no se sabe si da 4G o 5G.",
         ),
       ),
     );
@@ -468,7 +467,7 @@ describe("panel del emplazamiento", () => {
     assert.isNotNull(getByText("Sector 2 · 120°"));
     // «orientación» va subrayada: el párrafo se busca entero.
     const nota = Array.from(diagrama.closest("figure")?.querySelectorAll("p") ?? []).find((p) =>
-      (p.textContent ?? "").startsWith("La orientación es supuesta. Ninguna fuente publica"),
+      (p.textContent ?? "").startsWith("La orientación es supuesta, porque nadie publica"),
     );
     assert.isDefined(nota);
     assert.deepStrictEqual(terminosSubrayados(nota ?? diagrama), ["azimut", "sector"]);
@@ -562,7 +561,6 @@ describe("panel del emplazamiento", () => {
         "tramo",
         "tecnologia",
         "azimut",
-        "identificador-de-celda",
       ],
     );
     // Cada bloque de la ficha (cabecera, frase, marca de agua, secciones y datos técnicos)

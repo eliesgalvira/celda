@@ -988,10 +988,9 @@ export function PantallaMapa() {
     if (conPistaDeFoto()) {
       return (
         <Pista
-          texto="La foto aérea ayuda a reconocer el edificio."
           accion={
             <Boton variante="secundario" onClick={() => foto.encender()}>
-              Ver foto
+              Ver la foto aérea
             </Boton>
           }
         />
@@ -1210,7 +1209,7 @@ export function PantallaMapa() {
                 <>
                   <ControlDelMapa
                     etiqueta="Interferencia"
-                    detalle="Simula dónde interfieren entre sí las señales de una compañía."
+                    detalle="Simula dónde se pisan las señales de una compañía."
                     icono={<IconoOndas />}
                     activo={vistaActiva()}
                     disabled={!listo() || emplazamientos().length === 0}
@@ -1218,7 +1217,7 @@ export function PantallaMapa() {
                   />
                   <ControlDelMapa
                     etiqueta="Medir mi señal"
-                    detalle="Explica cómo ver en el móvil la señal que recibes."
+                    detalle="Cómo verla en el móvil."
                     icono={<IconoSenal />}
                     aria-haspopup="dialog"
                     onClick={() => navegar(conMedir(ubicacion(), true))}
@@ -1234,7 +1233,6 @@ export function PantallaMapa() {
                   />
                   <ControlDelMapa
                     etiqueta="Foto aérea"
-                    detalle="Pone las fotos aéreas del Instituto Geográfico Nacional bajo el callejero."
                     icono={<IconoFotoAerea />}
                     activo={foto.encendida()}
                     disabled={!listo()}
@@ -1254,7 +1252,7 @@ export function PantallaMapa() {
                   <Show when={ajustes.ajustes().modoEstudiante}>
                     <ControlDelMapa
                       etiqueta="Ejercicio"
-                      detalle="Calcula paso a paso los datos de un municipio o un barrio, con sus fuentes."
+                      detalle="Los datos de un municipio o un barrio, paso a paso."
                       icono={<IconoEjercicio />}
                       activo={ejercicio() !== null}
                       onClick={() =>
@@ -1264,14 +1262,13 @@ export function PantallaMapa() {
                   </Show>
                   <ControlDelMapa
                     etiqueta="Tus aportaciones"
-                    detalle="Muestra tus medidas y correcciones para enviarlas a Celda."
+                    detalle="Para enviar tus medidas y correcciones."
                     icono={<IconoAportaciones />}
                     aria-haspopup="dialog"
                     onClick={() => navegar(conAportaciones(ubicacion(), true))}
                   />
                   <ControlDelMapa
                     etiqueta="Ajustes"
-                    detalle="Las preferencias de Celda en este dispositivo."
                     icono={<IconoAjustes />}
                     aria-haspopup="dialog"
                     onClick={() => navegar(conAjustes(ubicacion(), true))}
@@ -1393,8 +1390,8 @@ export function EstadoDeLaCapa(props: {
             </Boton>
           }
         >
-          {EXPLICACION_FALLO_CAPA[motivo()]} Mientras no se carguen, el mapa no muestra marcadores,
-          aunque haya <Termino termino="emplazamiento">emplazamientos</Termino> en la zona.
+          {EXPLICACION_FALLO_CAPA[motivo()]} El mapa sale sin marcadores aunque haya{" "}
+          <Termino termino="emplazamiento">emplazamientos</Termino>.
         </Aviso>
       </Match>
       <Match when={marca().tipo === "fallo-provincias"}>
@@ -1410,9 +1407,7 @@ export function EstadoDeLaCapa(props: {
             </Boton>
           }
         >
-          Puede que falle la conexión o que el servidor esté bloqueado. De esa provincia solo se ve
-          el resumen, sin los marcadores de cada{" "}
-          <Termino termino="emplazamiento">emplazamiento</Termino>.
+          Puede que falle la conexión. De esa provincia solo se ve el total.
         </Aviso>
       </Match>
       <Match when={marca().tipo === "cargando-provincias"}>
@@ -1495,13 +1490,10 @@ const detalleDeMarca = (
 
 const EXPLICACION_FALLO_CAPA = {
   "sin-publicar": "Celda todavía no ha publicado ningún emplazamiento.",
-  "sin-origen":
-    "El servidor de Celda no ha indicado qué datos cargar. Puede que falle la conexión o que el servidor esté bloqueado.",
-  "sin-descarga":
-    "No han llegado los datos de los emplazamientos. Puede que falle la conexión o que el servidor esté bloqueado.",
-  danada:
-    "Los datos de los emplazamientos no tienen el formato que se esperaba, por un fallo de Celda.",
-  interno: "El fallo viene de Celda y no depende de tu conexión.",
+  "sin-origen": "Puede que falle la conexión o que el servidor esté bloqueado.",
+  "sin-descarga": "Puede que falle la conexión o que el servidor esté bloqueado.",
+  danada: "Es un fallo de Celda.",
+  interno: "Es un fallo de Celda.",
 } as const;
 
 function AvisoMapa(props: {

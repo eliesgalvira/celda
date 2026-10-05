@@ -268,13 +268,13 @@ export const pistaDeCeldas = (
     vecinas.tipo === "listas" ? "" : enumerar(vecinas.provincias.map((p) => p.nombre));
   if (vecinas.tipo === "fallo") {
     return {
-      texto: `Las celdas junto al borde con ${nombres} no se dibujan porque no han llegado sus emplazamientos`,
+      texto: `Faltan las celdas junto a ${nombres}`,
       reintentar: vecinas.provincias.map((p) => p.codigo),
     };
   }
   if (vecinas.tipo === "cargando") {
     return {
-      texto: `Cargando ${nombres} para dibujar las celdas junto al borde…`,
+      texto: `Cargando ${nombres}…`,
       reintentar: false,
     };
   }
@@ -284,8 +284,7 @@ export const pistaDeCeldas = (
       return { texto: "Calculando las celdas…", reintentar: false };
     case "listas":
       return {
-        texto:
-          "Cada celda es la zona más cercana a un emplazamiento. Es solo una aproximación de la cobertura.",
+        texto: "Cada celda es la zona más cercana a un emplazamiento y solo aproxima su cobertura.",
         reintentar: false,
       };
     case "fallo":

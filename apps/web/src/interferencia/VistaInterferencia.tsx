@@ -132,9 +132,9 @@ export function VistaInterferencia(props: VistaInterferenciaProps) {
           ) : props.calculo.estado === "lista" ? (
             "No hay estaciones base de esta compañía en esta banda cerca del punto."
           ) : props.calculo.estado === "sin-vecinas" ? (
-            "No hay valor porque faltan emplazamientos cerca del punto."
+            "Faltan emplazamientos cerca del punto."
           ) : (
-            "Calculando el valor en el punto…"
+            "Calculando…"
           )
         }
       />

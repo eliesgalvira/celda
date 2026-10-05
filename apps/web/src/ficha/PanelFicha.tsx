@@ -24,7 +24,7 @@ import { DatosTecnicos } from "@celda/ui/panel/DatosTecnicos.tsx";
 import { EjeFrecuencias } from "@celda/ui/panel/EjeFrecuencias.tsx";
 import type { AlturaHoja } from "@celda/ui/panel/hoja.ts";
 import { PanelEmplazamiento } from "@celda/ui/panel/PanelEmplazamiento.tsx";
-import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
+import { TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
@@ -134,8 +134,7 @@ export function PanelFicha(props: PanelFichaProps) {
                 </Boton>
               }
             >
-              El servidor de Celda no ha respondido. Puede que falle la conexión o que el servidor
-              esté bloqueado. Mientras, puedes seguir usando el mapa.
+              Puede que falle la conexión o que el servidor esté bloqueado.
             </Aviso>
           </AvisoFicha>
         )}
@@ -173,9 +172,7 @@ function FichaInexistente(props: { readonly clave: string; readonly alCerrar: ()
           </Boton>
         }
       >
-        El enlace no lleva a ningún <Termino termino="emplazamiento">emplazamiento</Termino>. Puede
-        que el emplazamiento se retirara después de publicarse el mapa, o que el enlace esté mal
-        copiado.
+        Puede que se haya retirado o que el enlace esté mal copiado.
       </Aviso>
     </AvisoFicha>
   );
@@ -237,11 +234,7 @@ function ContenidoFicha(props: {
       </ResumenFicha>
       <For each={props.redUsada}>
         {(red) => (
-          <RedUsadaFicha>
-            {textoDeRedUsada(red)}. Donde {NOMBRE_COMPANIA[red.compania]} no tiene emplazamientos
-            propios, sus clientes se conectan a los de {NOMBRE_COMPANIA[red.red]}, y por eso este
-            sale más claro cuando se filtra por {NOMBRE_COMPANIA[red.compania]}.
-          </RedUsadaFicha>
+          <RedUsadaFicha>{textoDeRedUsada(red)}. Por eso su marcador sale más claro.</RedUsadaFicha>
         )}
       </For>
       <MarcaDeAguaFicha
@@ -337,10 +330,6 @@ function ContenidoFicha(props: {
             {CITA_DEL_LOGO_DE_DIGI.texto}
           </NotaFicha>
         </Show>
-        <NotaFicha>
-          Si algo no coincide con lo que ves en la calle, puedes proponer una corrección. La revisa
-          la moderación y, si la acepta, aparece en esta ficha junto a lo que dice el registro.
-        </NotaFicha>
         <div>
           <Boton
             variante="secundario"

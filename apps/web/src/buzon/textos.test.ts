@@ -62,15 +62,15 @@ describe("textosDelFallo", () => {
       );
       assert.strictEqual(textos.titulo, titulo);
       assert.match(textos.texto, /dentro de 2 horas/u);
-      assert.match(textos.texto, /Se queda guardada en este dispositivo/u);
+      assert.match(textos.texto, /Sigue guardada en este dispositivo/u);
     }
   });
 
   it("el buzón cerrado o sin respuesta guardan la aportación; un veto y un rechazo lo dicen", () => {
-    assert.match(textosDelFallo(new BuzonCerrado(), AHORA).texto, /Se queda guardada/u);
+    assert.match(textosDelFallo(new BuzonCerrado(), AHORA).texto, /Sigue guardada/u);
     assert.match(
       textosDelFallo(new BuzonSinRespuesta({ motivo: "red" }), AHORA).texto,
-      /el buzón no esté funcionando/u,
+      /falle la conexión\. Sigue guardada/u,
     );
     assert.match(textosDelFallo(new EnvioVetado({ que: "ip" }), AHORA).texto, /esta red/u);
     assert.match(
@@ -81,7 +81,7 @@ describe("textosDelFallo", () => {
       new AlmacenNoDisponible({ motivo: "IndexedDB ha rechazado la operación" }),
       AHORA,
     ).texto;
-    assert.match(sinAlmacen, /Celda tiene que guardarla antes en el dispositivo/u);
+    assert.match(sinAlmacen, /no deja guardarla antes de enviarla/u);
     // El error del navegador es técnico: no se enseña.
     assert.notInclude(sinAlmacen, "IndexedDB");
   });

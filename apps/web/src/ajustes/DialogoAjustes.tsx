@@ -15,25 +15,16 @@ export function DialogoAjustes(props: { readonly alCerrar: () => void }) {
     <Dialogo titulo="Ajustes" antetitulo="ESTE DISPOSITIVO" alCerrar={props.alCerrar}>
       <Interruptor
         etiqueta="Modo estudiante"
-        descripcion="Está pensado para quien estudia redes móviles. Añade a los controles del mapa un ejercicio que calcula, para un municipio o un barrio, las estaciones base de cada compañía, su radio de cobertura y los usuarios por estación. Los resultados se pueden descargar en una tabla."
+        descripcion="Añade un ejercicio que calcula, para un municipio o un barrio, las estaciones base de cada compañía, su radio de cobertura y los usuarios por estación."
         encendido={control?.ajustes().modoEstudiante ?? false}
         disabled={control === undefined}
         alCambiar={(encendido) => control?.cambiarModoEstudiante(encendido)}
       />
       <Show when={control?.sinGuardar()}>
         <Nota tono="aviso" titulo="No se ha podido guardar">
-          <p>
-            Este navegador no deja a Celda guardar datos. El cambio se mantendrá hasta que cierres
-            la página.
-          </p>
+          <p>Este navegador no deja guardar datos. El cambio durará hasta que cierres la página.</p>
         </Nota>
       </Show>
-      <Nota>
-        <p>
-          El ajuste se guarda solo en este dispositivo y no necesita cuenta. Puedes desactivarlo
-          aquí cuando quieras.
-        </p>
-      </Nota>
     </Dialogo>
   );
 }

@@ -60,7 +60,7 @@ describe("consejos para mejorar la señal", () => {
     if (resultado.tipo !== "sin-punto") return;
     assert.strictEqual(
       textoPlano(resultado.llamada),
-      "Si eliges un punto de referencia, Celda indica hacia qué ventana poner el router y a qué rumbo apuntar la antena, y puedes alinearla con la brújula del móvil.",
+      "Con un punto de referencia, Celda te dice hacia qué ventana poner el router y a qué rumbo apuntar la antena.",
     );
   });
 
@@ -72,11 +72,11 @@ describe("consejos para mejorar la señal", () => {
     );
     assert.strictEqual(
       consejo(resultado, "router"),
-      "Con un router 4G/5G, ponlo junto a una ventana que dé al noreste. Una pared puede quitar 10 dB o más, y en un piso alto suele llegar mejor.",
+      "Pon el router 4G/5G junto a una ventana que dé al noreste. Una pared puede quitar 10 dB o más.",
     );
     assert.strictEqual(
       consejo(resultado, "antena"),
-      "Si usas una antena exterior direccional, apúntala a 48°. La orientación importa mucho, y la brújula de abajo sirve para alinearla.",
+      "Si usas una antena exterior direccional, apúntala a 48°. La brújula de abajo sirve para alinearla.",
     );
     assert.strictEqual(resultado.objetivo, 48);
   });
@@ -97,7 +97,7 @@ describe("consejos para mejorar la señal", () => {
     );
     assert.match(
       consejo(consejos(punto({ servicio: servicio(1, 55) })), "sector") ?? "",
-      /^Estás entre dos sectores, donde llega menos señal de cada uno\. Aun así, conviene apuntar al emplazamiento/u,
+      /^Estás entre dos sectores, donde llega menos señal\. Aun así, conviene apuntar al emplazamiento/u,
     );
     assert.isUndefined(consejo(consejos(punto({ servicio: servicio(0, 30) })), "sector"));
     // Mientras el modelo calcula, los consejos que no dependen de él ya están.
@@ -109,7 +109,7 @@ describe("consejos para mejorar la señal", () => {
   it("cerca y lejos cambian el consejo de la distancia", () => {
     assert.strictEqual(
       consejo(consejos(punto({ distancia: 150 })), "distancia"),
-      "A 150 m la señal suele llegar con fuerza, y con el router junto a la ventana normalmente basta.",
+      "A 150 m la señal suele llegar con fuerza.",
     );
     assert.isUndefined(consejo(consejos(punto()), "distancia"));
     assert.strictEqual(
@@ -158,12 +158,12 @@ describe("consejos para mejorar la señal", () => {
 
   it("dice que la orientación de los sectores es supuesta y no promete precisión", () => {
     const nota = textoPlano(conPunto(consejos(punto())).nota);
-    assert.match(nota, /^Los sectores tienen orientación supuesta\. Ninguna fuente publica/u);
-    assert.match(nota, /Tómalo como punto de partida/u);
+    assert.match(nota, /^La orientación de los sectores es supuesta\./u);
+    assert.match(nota, /Toma el rumbo como punto de partida/u);
     const estimada = textoPlano(
       conPunto(consejos(punto({ orientacion: orientacionDe([30, 150, 270]) }))).nota,
     );
-    assert.match(estimada, /orientación estimada, con ±15° de margen/u);
+    assert.match(estimada, /orientación de los sectores tiene ±15° de margen/u);
   });
 
   it("subraya cada término una vez en toda la sección, en orden de lectura", () => {

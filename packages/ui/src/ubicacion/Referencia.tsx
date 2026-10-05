@@ -20,19 +20,21 @@ export function SeccionReferencia(props: { readonly children: JSX.Element }) {
 
 export interface SinReferenciaProps {
   readonly titulo: string;
-  /** Qué se gana con un punto. Puede llevar términos. */
-  readonly texto: JSX.Element;
+  /** Una línea bajo el título, si hace falta. Puede llevar términos. */
+  readonly texto?: JSX.Element;
   /** Por qué no se puede usar la ubicación ahora, y qué hacer. */
   readonly aviso?: string | undefined;
   readonly acciones: JSX.Element;
 }
 
-/** Sin punto de referencia: qué se ganaría con uno y cómo darlo (historias 23 y 25). */
+/** Sin punto de referencia: cómo darlo y, si la ubicación falla, por qué (historias 23 y 25). */
 export function SinReferencia(props: SinReferenciaProps) {
   return (
     <div class="flex flex-col gap-2 bg-superficie-alta px-4 py-3">
       <h3 class="font-titulo text-lg leading-6">{props.titulo}</h3>
-      <p class="text-sm leading-relaxed">{props.texto}</p>
+      <Show when={props.texto}>
+        <p class="text-sm leading-relaxed">{props.texto}</p>
+      </Show>
       <Show when={props.aviso}>
         {(aviso) => (
           <p class="border-l-3 border-aviso bg-aviso-fondo px-3 py-1.5 text-sm leading-relaxed text-aviso-tinta">

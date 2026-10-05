@@ -66,7 +66,7 @@ export function PasoCompartir(props: PasoCompartirProps) {
             fallo === undefined
               ? {
                   titulo: "No se ha podido enviar",
-                  texto: "Algo ha fallado en Celda. Se queda guardada en este dispositivo.",
+                  texto: "Es un fallo de Celda. Sigue guardada en este dispositivo.",
                 }
               : // Fuera de Effect, en el manejador: la hora del navegador al llegar el fallo.
                 // @effect-diagnostics-next-line globalDate:off
@@ -84,22 +84,20 @@ export function PasoCompartir(props: PasoCompartirProps) {
           <p>Solo se envían estos números. La captura se queda en tu dispositivo.</p>
         </Show>
         <p>
-          Se envía con un identificador anónimo que el buzón asigna a este dispositivo. No lleva tu
-          nombre y no hace falta cuenta. Celda no guarda tu dirección IP. Para aplicar los límites
-          de envío guarda una huella cifrada de ella, que cambia cada día y se borra a las 24 horas.
+          Va con un identificador anónimo de este dispositivo, sin nombre ni cuenta. Celda no guarda
+          tu IP, solo una huella cifrada que se borra a las 24 horas.
         </p>
         <p>
           {esMedida()
-            ? "La medida no se publica por separado. Celda solo publica resúmenes que reúnen muchas medidas."
-            : "Enviarla no cambia el mapa. Primero la revisa la moderación y, si la acepta, aparece junto a lo que dice el registro oficial."}
+            ? "Solo se publican resúmenes de muchas medidas."
+            : "La revisa la moderación antes de que salga en el mapa."}
         </p>
       </QueSale>
       <DedicacionCc0 enlace={DEDICACION_CC0.enlace}>
         <p>
-          Al enviarla, la dedicas al dominio público con la {DEDICACION_CC0.nombre}. Eso permite que
-          cualquiera la use y la modifique sin pedirte permiso y sin citarte.
+          Al enviarla, la dedicas al dominio público con la {DEDICACION_CC0.nombre} y cualquiera
+          podrá usarla sin pedirte permiso ni citarte. No se puede retirar.
         </p>
-        <p>Una vez enviada, no se puede retirar del dominio público.</p>
       </DedicacionCc0>
       <AccionesDelPaso>
         <Show
@@ -135,9 +133,12 @@ export function PasoCompartir(props: PasoCompartirProps) {
             })()}
           >
             {(enviada) => (
-              <Aviso tono="hecho" encaje="panel" titulo="Recibida">
-                El buzón la recibió el {fechaYHora(enviada().compartidaEl)}. Hasta que la revise la
-                moderación, el mapa no cambia.
+              <Aviso
+                tono="hecho"
+                encaje="panel"
+                titulo={`Recibida el ${fechaYHora(enviada().compartidaEl)}`}
+              >
+                El mapa no cambia hasta que la revise la moderación.
               </Aviso>
             )}
           </Match>
