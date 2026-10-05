@@ -8,6 +8,7 @@ import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
 import * as Predicate from "effect/Predicate";
 import { createContext, createEffect, createMemo, createSignal, untrack } from "solid-js";
 
+import type { Esperar } from "../mapa/callejero.ts";
 import type { Movimiento } from "../mapa/vistaInicial.ts";
 import {
   dibujoDelEdificio,
@@ -176,7 +177,13 @@ interface PedidoDeEdificio {
   readonly posicion: Coordenada;
 }
 
-/** De dónde sale la foto aérea. Cada campo es una lectura reactiva. */
+/** Lo que ha encontrado el vuelo de un pedido, o nada si el emplazamiento ya no estaba a la vista. */
+interface Hallado {
+  readonly pedido: PedidoDeEdificio;
+  readonly encontrado: EdificioEncontrado | undefined;
+}
+
+/** De dónde sale la foto aérea. Las lecturas son reactivas. */
 export interface EntradaFoto {
   /** El mapa, cuando está listo. */
   readonly lienzo: () => LienzoDeFoto | undefined;
@@ -184,6 +191,8 @@ export interface EntradaFoto {
   readonly seleccionada: () => string | null;
   /** Dónde queda el centro de lo que deja libre el panel (`centroLibre`). */
   readonly desplazamiento: () => readonly [number, number];
+  /** Con qué se cuenta el rato que se ve la pista de un edificio sin dibujar. */
+  readonly esperar: Esperar;
 }
 
 export interface FotoDelMapa {
@@ -197,7 +206,18 @@ export interface FotoDelMapa {
   readonly edificio: (clave: string) => EstadoEdificio;
   /** «Ver el edificio»: enciende la foto, vuela al emplazamiento y resalta su edificio. */
   readonly verEdificio: (clave: string, posicion: Coordenada) => void;
+  /**
+   * Si la pista dice que OpenStreetMap no tiene dibujado el edificio: durante
+   * `PISTA_SIN_CONTORNO_MS` después de un «Ver el edificio» que no lo encuentra.
+   */
+  readonly sinContorno: () => boolean;
 }
+
+/** Lo que dice la pista cuando «Ver el edificio» no encuentra ningún edificio. */
+export const PISTA_SIN_CONTORNO = "OpenStreetMap no tiene dibujado este edificio.";
+
+/** Lo que se ve esa pista. */
+export const PISTA_SIN_CONTORNO_MS = 4000;
 
 export const FotoContexto = createContext<FotoDelMapa>();
 
@@ -209,7 +229,8 @@ const BUSCANDO: EstadoEdificio = { tipo: "buscando" };
  * en el mapa (teselas del PNOA, un vuelo y sus escuchadores), así que se abren con `recurso()`:
  * cada uno con una clave que solo cambia cuando la persona pulsa, cambia de emplazamiento, la
  * cámara empieza o acaba un vuelo o el mapa se crea otra vez. Cambiar de emplazamiento o cerrar la
- * ficha quita el resaltado.
+ * ficha quita el resaltado. Si no hay edificio que resaltar, la pista lo dice durante
+ * `PISTA_SIN_CONTORNO_MS`, con su espera abierta también con `recurso()`.
  *
  * Mientras la cámara vuela, el mapa se ve sin la foto, como con ella apagada, y la foto vuelve al
  * llegar (#67): un vuelo de España a la calle pedía las teselas de cada zoom del camino, que solo
@@ -223,10 +244,7 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
   const [pedido, setPedido] = createSignal<PedidoDeEdificio>();
   // El último pedido cuyo vuelo ya ha empezado.
   const [volado, setVolado] = createSignal<PedidoDeEdificio>();
-  const [hallado, setHallado] = createSignal<{
-    readonly pedido: PedidoDeEdificio;
-    readonly encontrado: EdificioEncontrado | undefined;
-  }>();
+  const [hallado, setHallado] = createSignal<Hallado>();
 
   recurso("mapa:vuelos", entrada.lienzo, (lienzo) =>
     lienzo.seguirVuelos((volando) => {
@@ -282,6 +300,23 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
     { iguales: mismosCampos },
   );
 
+  // Sin edificio a menos de 25 m, la pista lo dice un rato. Pulsar otra vez, cambiar de
+  // emplazamiento o cerrar la ficha la quitan antes.
+  const sinEdificio = createMemo(() => {
+    const resultado = hallado();
+    return resultado?.pedido === pedido() && resultado?.encontrado?.tipo === "ninguno"
+      ? resultado
+      : undefined;
+  });
+  const [pistaVista, setPistaVista] = createSignal<Hallado>();
+  recurso("mapa:edificio-pista", sinEdificio, (resultado) =>
+    entrada.esperar(PISTA_SIN_CONTORNO_MS, () => setPistaVista(resultado)),
+  );
+  const sinContorno = createMemo(() => {
+    const resultado = sinEdificio();
+    return resultado !== undefined && pistaVista() !== resultado;
+  });
+
   const edificio = (clave: string): EstadoEdificio => {
     const actual = pedido();
     if (actual === undefined || actual.clave !== clave) return PARADO;
@@ -304,5 +339,6 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
       setEncendida(true);
       setPedido({ clave, posicion });
     },
+    sinContorno,
   };
 }

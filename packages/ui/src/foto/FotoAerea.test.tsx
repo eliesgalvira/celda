@@ -16,35 +16,68 @@ describe("botón «Ver el edificio»", () => {
     assert.strictEqual(pulsado, 1);
   });
 
-  it("mientras busca no se pulsa otra vez; después dice el número de portal o «Sin contorno»", () => {
-    const [estado, setEstado] = createSignal<EstadoEdificio>({ tipo: "buscando" });
-    const { getByRole, getByText } = render(() => (
+  it("dice lo mismo en todos los estados; mientras busca, el hexágono va en el sitio del icono", () => {
+    const [estado, setEstado] = createSignal<EstadoEdificio>({ tipo: "parado" });
+    const { getByRole } = render(() => (
       <BotonEdificio estado={estado()} alPulsar={() => undefined} />
     ));
     const boton = getByRole("button", { name: "Ver el edificio" });
-    assert.isTrue(boton.hasAttribute("disabled"));
-    assert.strictEqual(boton.getAttribute("aria-busy"), "true");
+    const etiqueta = boton.textContent;
+    assert.strictEqual(etiqueta, "EdificioVer el edificio");
+    const icono = () => boton.querySelector("svg");
+    assert.isNotNull(icono());
+
+    const estados: ReadonlyArray<EstadoEdificio> = [
+      { tipo: "buscando" },
+      { tipo: "resaltado", numero: "251-259" },
+      { tipo: "resaltado", numero: undefined },
+      { tipo: "sin-contorno" },
+      { tipo: "parado" },
+    ];
+    for (const siguiente of estados) {
+      setEstado(siguiente);
+      flush();
+      assert.strictEqual(boton.getAttribute("aria-label"), "Ver el edificio", siguiente.tipo);
+      assert.strictEqual(boton.textContent, etiqueta, siguiente.tipo);
+      // La etiqueta se sigue viendo: nada dentro del botón queda invisible.
+      assert.isNull(boton.querySelector(".invisible"), siguiente.tipo);
+      const buscando = siguiente.tipo === "buscando";
+      assert.strictEqual(boton.hasAttribute("disabled"), buscando, siguiente.tipo);
+      assert.strictEqual(boton.getAttribute("aria-busy"), String(buscando), siguiente.tipo);
+      assert.strictEqual(icono() === null, buscando, siguiente.tipo);
+      assert.strictEqual(boton.querySelector(".animate-spin") !== null, buscando, siguiente.tipo);
+    }
+  });
+
+  it("anuncia al lector de pantalla lo que ha encontrado", () => {
+    const [estado, setEstado] = createSignal<EstadoEdificio>({ tipo: "buscando" });
+    const { getByRole } = render(() => (
+      <BotonEdificio estado={estado()} alPulsar={() => undefined} />
+    ));
+    const anuncio = () => getByRole("status").textContent;
+    assert.strictEqual(getByRole("status").getAttribute("aria-live"), "polite");
+    assert.strictEqual(anuncio(), "");
 
     setEstado({ tipo: "resaltado", numero: "251-259" });
     flush();
     assert.strictEqual(
-      getByRole("button").getAttribute("aria-label"),
-      "Ver el edificio, nº 251-259",
+      anuncio(),
+      "El edificio está resaltado en el mapa. En OpenStreetMap lleva el número 251-259.",
     );
-    assert.isNotNull(getByText("Nº 251-259"));
-    assert.match(getByRole("status").textContent ?? "", /número 251-259 de OpenStreetMap/u);
 
     setEstado({ tipo: "resaltado", numero: undefined });
     flush();
-    assert.isNotNull(getByText("Resaltado"));
+    assert.strictEqual(anuncio(), "El edificio está resaltado en el mapa.");
 
     setEstado({ tipo: "sin-contorno" });
     flush();
-    assert.isNotNull(getByText("Sin contorno"));
     assert.strictEqual(
-      getByRole("button").getAttribute("aria-label"),
-      "Ver el edificio, sin contorno",
+      anuncio(),
+      "OpenStreetMap no tiene dibujado ningún edificio a menos de 25 metros del emplazamiento.",
     );
-    assert.match(getByRole("status").textContent ?? "", /ningún edificio a menos de 25 metros/u);
+
+    setEstado({ tipo: "parado" });
+    flush();
+    assert.strictEqual(anuncio(), "");
   });
 });

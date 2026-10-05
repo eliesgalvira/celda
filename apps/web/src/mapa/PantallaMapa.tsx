@@ -77,7 +77,7 @@ import {
 import { centroLibre, desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { celdasDelFiltro, crearFiltro } from "../filtro/enMapa.ts";
 import { AvisoDelFiltro, ControlDeCompanias } from "../filtro/Filtro.tsx";
-import { crearFoto, FotoContexto, lienzoDeFoto } from "../foto/enMapa.ts";
+import { crearFoto, FotoContexto, lienzoDeFoto, PISTA_SIN_CONTORNO } from "../foto/enMapa.ts";
 import { aPieDeCalle, CREDITO_FOTO_AEREA, pideVerFoto } from "../foto/foto.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
@@ -595,6 +595,7 @@ export function PantallaMapa() {
     }),
     seleccionada,
     desplazamiento: () => centroLibre(escritorio()),
+    esperar: esperarDeVerdad,
   });
 
   // Un enlace sin provincia: se busca en el índice de claves del resumen y, si está, la dirección
@@ -1015,6 +1016,8 @@ export function PantallaMapa() {
   const pista = createMemo(() => {
     // Con la vista de interferencia, su panel dice qué es cada cosa y las celdas no se ven.
     if (vistaActiva()) return undefined;
+    // Si «Ver el edificio» no encuentra nada que resaltar, la pista lo dice un rato, porque sorprende.
+    if (foto.sinContorno()) return <Pista texto={PISTA_SIN_CONTORNO} />;
     if (conPistaDeFoto()) {
       return (
         <Pista
