@@ -14,6 +14,7 @@ import type { StyleSpecification } from "maplibre-gl";
 import { createSignal, flush, type Setter } from "solid-js";
 
 import { otraTarea } from "../lib/pruebas.ts";
+import type { Esperar } from "../mapa/callejero.ts";
 import type { DibujoDelEdificio, EdificioEncontrado, RasgoDelMapa } from "./edificio.ts";
 import {
   crearFoto,
@@ -21,6 +22,7 @@ import {
   type LienzoDeFoto,
   lienzoDeFoto,
   type MapaParaFoto,
+  PISTA_SIN_CONTORNO_MS,
 } from "./enMapa.ts";
 import type { Movimiento } from "../mapa/vistaInicial.ts";
 import { ZOOM_EDIFICIO } from "./foto.ts";
@@ -109,6 +111,27 @@ const lienzoDePrueba = () => {
   };
 };
 
+/** Un reloj de prueba: los plazos vencen al avanzarlo, como `setTimeout`. */
+const relojDePrueba = () => {
+  let ahora = 0;
+  let plazos: Array<{ readonly vence: number; readonly alVencer: () => void }> = [];
+  const esperar: Esperar = (ms, alVencer) => {
+    const plazo = { vence: ahora + ms, alVencer };
+    plazos.push(plazo);
+    return () => {
+      plazos = plazos.filter((otro) => otro !== plazo);
+    };
+  };
+  const avanzar = (ms: number) => {
+    ahora += ms;
+    const vencidos = plazos.filter((plazo) => plazo.vence <= ahora);
+    plazos = plazos.filter((plazo) => plazo.vence > ahora);
+    for (const plazo of vencidos) plazo.alVencer();
+    flush();
+  };
+  return { esperar, avanzar, pendientes: () => plazos.length };
+};
+
 interface Mandos {
   readonly foto: FotoDelMapa;
   readonly setSeleccionada: Setter<string | null>;
@@ -118,17 +141,23 @@ interface Mandos {
 
 const montar = () => {
   const prueba = lienzoDePrueba();
+  const reloj = relojDePrueba();
   let mandos: Mandos | undefined;
   const { unmount } = render(() => {
     const [seleccionada, setSeleccionada] = createSignal<string | null>("movistar-1");
     const [lienzo, setLienzo] = createSignal<LienzoDeFoto | undefined>(prueba.lienzo);
-    const foto = crearFoto({ lienzo, seleccionada, desplazamiento: () => [0, -94] });
+    const foto = crearFoto({
+      lienzo,
+      seleccionada,
+      desplazamiento: () => [0, -94],
+      esperar: reloj.esperar,
+    });
     mandos = { foto, setSeleccionada, setLienzo };
     return null;
   });
   flush();
   if (mandos === undefined) throw new Error("La prueba no ha montado");
-  return { ...prueba, ...mandos, desmontar: unmount };
+  return { ...prueba, ...mandos, reloj, desmontar: unmount };
 };
 
 const EDIFICIO: EdificioEncontrado = {
@@ -182,7 +211,7 @@ describe("foto aérea en el mapa", () => {
     m.desmontar();
   });
 
-  it("sin edificio a menos de 25 m dice «Sin contorno»; sin número, que está resaltado", async () => {
+  it("sin edificio a menos de 25 m queda sin contorno; sin número, resaltado", async () => {
     const m = montar();
     m.foto.verEdificio("movistar-1", SITIO);
     flush();
@@ -202,6 +231,55 @@ describe("foto aérea en el mapa", () => {
         numero: undefined,
       }),
     );
+    m.desmontar();
+  });
+
+  it("sin edificio que resaltar, la pista lo dice unos 4 s; con edificio, no sale", async () => {
+    const m = montar();
+    m.foto.verEdificio("movistar-1", SITIO);
+    flush();
+    assert.isFalse(m.foto.sinContorno());
+    m.vuelos[0]?.acabar(EDIFICIO);
+    await esperar(() => assert.strictEqual(m.foto.edificio("movistar-1").tipo, "resaltado"));
+    assert.isFalse(m.foto.sinContorno());
+    assert.strictEqual(m.reloj.pendientes(), 0);
+
+    m.foto.verEdificio("movistar-1", SITIO);
+    flush();
+    assert.isFalse(m.foto.sinContorno());
+    m.vuelos[1]?.acabar({ tipo: "ninguno" });
+    await esperar(() => assert.isTrue(m.foto.sinContorno()));
+    assert.strictEqual(m.reloj.pendientes(), 1);
+    m.reloj.avanzar(PISTA_SIN_CONTORNO_MS - 1);
+    assert.isTrue(m.foto.sinContorno());
+    m.reloj.avanzar(1);
+    assert.isFalse(m.foto.sinContorno());
+    // Lo que sigue diciendo el botón no la vuelve a sacar.
+    assert.deepStrictEqual(m.foto.edificio("movistar-1"), { tipo: "sin-contorno" });
+    m.reloj.avanzar(PISTA_SIN_CONTORNO_MS);
+    assert.isFalse(m.foto.sinContorno());
+    assert.strictEqual(m.reloj.pendientes(), 0);
+    m.desmontar();
+  });
+
+  it("pulsar otra vez o cerrar la ficha quita la pista y su espera", async () => {
+    const m = montar();
+    m.foto.verEdificio("movistar-1", SITIO);
+    flush();
+    m.vuelos[0]?.acabar({ tipo: "ninguno" });
+    await esperar(() => assert.isTrue(m.foto.sinContorno()));
+
+    m.foto.verEdificio("movistar-1", SITIO);
+    flush();
+    assert.isFalse(m.foto.sinContorno());
+    assert.strictEqual(m.reloj.pendientes(), 0);
+    m.vuelos[1]?.acabar({ tipo: "ninguno" });
+    await esperar(() => assert.isTrue(m.foto.sinContorno()));
+
+    m.setSeleccionada(null);
+    flush();
+    assert.isFalse(m.foto.sinContorno());
+    assert.strictEqual(m.reloj.pendientes(), 0);
     m.desmontar();
   });
 

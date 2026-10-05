@@ -1,6 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
-import { omit, Show } from "solid-js";
+import { children, omit, Show } from "solid-js";
 
 import { cn } from "./cn.ts";
 
@@ -50,9 +50,19 @@ export type VariantesBoton = VariantProps<typeof variantesBoton>;
 
 export type BotonProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "class" | "style"> &
   VariantesBoton & {
-    /** Muestra un hexágono girando sobre la etiqueta, que queda invisible: el ancho no cambia. */
+    /**
+     * Muestra un hexágono girando. Con `icono`, el hexágono ocupa el sitio del icono y la etiqueta
+     * se sigue viendo; sin él, va sobre la etiqueta, que queda invisible. El ancho no cambia.
+     */
     readonly cargando?: boolean;
+    /** Un icono de 16 px delante de la etiqueta. */
+    readonly icono?: JSX.Element;
   };
+
+/** El hexágono que gira mientras un botón espera. */
+function Girando() {
+  return <span class="hexagono size-3.5 animate-spin bg-primario motion-reduce:animate-none" />;
+}
 
 /** El botón de Celda. Si una pantalla necesita otro aspecto, se añade una variante aquí. */
 export function Boton(props: BotonProps) {
@@ -62,11 +72,15 @@ export function Boton(props: BotonProps) {
     "tamano",
     "ancho",
     "cargando",
+    "icono",
     "disabled",
     "children",
     "type",
   );
   const cargando = () => props.cargando === true;
+  // Se resuelve una vez: leer `props.icono` crea el icono otra vez.
+  const icono = children(() => props.icono);
+  const conIcono = () => icono.toArray().length > 0;
   return (
     <button
       type={props.type ?? "button"}
@@ -83,11 +97,20 @@ export function Boton(props: BotonProps) {
           ancho: props.ancho,
         })}
       >
-        <span class={cn("contents", cargando() && "invisible")}>{props.children}</span>
+        <Show when={conIcono()}>
+          <span class="grid size-4 shrink-0 place-items-center" aria-hidden="true">
+            <Show when={cargando()} fallback={icono()}>
+              <Girando />
+            </Show>
+          </span>
+        </Show>
+        <span class={cn("contents", cargando() && !conIcono() && "invisible")}>
+          {props.children}
+        </span>
       </span>
-      <Show when={cargando()}>
+      <Show when={cargando() && !conIcono()}>
         <span class="absolute inset-0 grid place-items-center" aria-hidden="true">
-          <span class="hexagono size-3.5 animate-spin bg-primario motion-reduce:animate-none" />
+          <Girando />
         </span>
       </Show>
     </button>
