@@ -13,7 +13,7 @@ import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
 import { ControlDelMapa } from "@celda/ui/ControlDelMapa.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
-import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
+import { CargaDelMapa, DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
 import { IconoOndas } from "@celda/ui/interferencia/PanelInterferencia.tsx";
 import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
@@ -60,7 +60,8 @@ import {
   rectanguloDePunto,
   VECINAS_LISTAS,
 } from "../capa/vecinas.ts";
-import { pistaDeCeldas, type ProvinciaFuera, provinciasQueFaltan } from "../celdas/celdas.ts";
+import { type ProvinciaFuera, provinciasQueFaltan } from "../celdas/celdas.ts";
+import { crearPistaDeCeldas } from "../celdas/pista.ts";
 import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { AjustesContexto, crearAjustes } from "../ajustes/ajustes.ts";
 import { DialogoAjustes } from "../ajustes/DialogoAjustes.tsx";
@@ -125,9 +126,10 @@ import {
   MenuDeUbicacion,
   PasoPrevio,
 } from "../ubicacion/Ubicacion.tsx";
-import type { Callejero } from "./callejero.ts";
+import { type Callejero, esperarDeVerdad } from "./callejero.ts";
 import {
   CREDITO_DE_MARCAS,
+  CREDITO_DE_LAS_CELDAS,
   CREDITO_DEL_LOGO_DE_DIGI,
   CREDITOS_MAPA_BASE,
   CREDITOS_RESERVA,
@@ -196,8 +198,8 @@ export function PantallaMapa() {
   /** El mapa, cuando ya enseña el callejero. */
   const [mapaListo, setMapaListo] = createSignal<MapaMapLibre>();
   /**
-   * El mapa, en cuanto existe. Los marcadores solo necesitan su proyección y salen ya, sobre el
-   * fondo, sin esperar a las teselas del callejero.
+   * El mapa, en cuanto pinta la silueta de España. Los marcadores solo necesitan su proyección y
+   * salen ya, sobre la silueta y los límites, sin esperar a las teselas del callejero.
    */
   const [mapaCreado, setMapaCreado] = createSignal<MapaMapLibre>();
   /** El lector de los rótulos de ciudad, que llega con el código del mapa (ADR 0024). */
@@ -314,7 +316,10 @@ export function PantallaMapa() {
       nuevo.once("load", mirarEncuadre);
       mapa = nuevo;
       setLectorDeRotulos(() => modulo.LECTOR_DE_ROTULOS);
-      setMapaCreado(nuevo);
+      // Los marcadores esperan a que se vea la silueta de España.
+      modulo.trasLaSilueta(nuevo, () => {
+        if (mapa === nuevo) setMapaCreado(nuevo);
+      });
     } catch (causa) {
       // MapLibre lanza un Error que nombra WebGL si no consigue el contexto.
       fallar(causa instanceof Error && /webgl/iu.test(causa.message) ? "sin-webgl" : "interno");
@@ -560,6 +565,7 @@ export function PantallaMapa() {
     const deLosLogos = [
       ...(conLogos() ? [CREDITO_DE_MARCAS] : []),
       ...(conDigi() ? [CREDITO_DEL_LOGO_DE_DIGI] : []),
+      ...(cerca() && !vistaActiva() ? [CREDITO_DE_LAS_CELDAS] : []),
     ];
     return fuentes === undefined
       ? [...delCallejero, ...deLosLogos]
@@ -823,6 +829,33 @@ export function PantallaMapa() {
     cerca,
     seleccionada,
   });
+  /** La pista de las celdas: la salvedad una vez por dispositivo y las esperas solo si tardan. */
+  const pistaCeldas = crearPistaDeCeldas({
+    cerca,
+    calculo: () => celdas.calculo(),
+    vecinas: vecinasDeCeldas,
+    salvedadVista: () =>
+      ajustes.leidos() ? ajustes.ajustes().salvedadDeCeldasVista === true : undefined,
+    marcarSalvedadVista: () => ajustes.marcarSalvedadDeCeldasVista(),
+    esperar: esperarDeVerdad,
+  });
+  // Con la salvedad a la vista, el primer gesto sobre el mapa la quita.
+  recurso(
+    "celdas:salvedad-gesto",
+    () => (pistaCeldas.conSalvedad() ? mapaCreado() : undefined),
+    (actual) => {
+      const lienzo = actual.getCanvasContainer();
+      const quitar = () => pistaCeldas.interactuar();
+      lienzo.addEventListener("pointerdown", quitar);
+      lienzo.addEventListener("wheel", quitar, { passive: true });
+      lienzo.addEventListener("keydown", quitar);
+      return () => {
+        lienzo.removeEventListener("pointerdown", quitar);
+        lienzo.removeEventListener("wheel", quitar);
+        lienzo.removeEventListener("keydown", quitar);
+      };
+    },
+  );
 
   // Si alguna celda que se ve es dudosa, se piden también las provincias que podrían recortarla.
   createEffect(
@@ -985,16 +1018,15 @@ export function PantallaMapa() {
     if (conPistaDeFoto()) {
       return (
         <Pista
-          texto="La foto aérea ayuda a reconocer el edificio."
           accion={
             <Boton variante="secundario" onClick={() => foto.encender()}>
-              Ver foto
+              Ver la foto aérea
             </Boton>
           }
         />
       );
     }
-    const actual = pistaDeCeldas(cerca(), celdas.calculo(), vecinasDeCeldas());
+    const actual = pistaCeldas.pista();
     if (actual === undefined) return undefined;
     const { reintentar } = actual;
     return (
@@ -1097,11 +1129,12 @@ export function PantallaMapa() {
     return redesUsadas(actual).filter((r) => suyo.companias.includes(r.red));
   });
 
+  /** Solo los fallos van en el centro. Mientras carga, la silueta y `CargaDelMapa` bastan. */
   const aviso = createMemo(() => {
     const actual = estado();
-    return actual.tipo === "listo" ? undefined : (
-      <AvisoMapa estado={actual} callejero={callejero()} reintentar={arrancar} />
-    );
+    return actual.tipo === "fallo" ? (
+      <AvisoMapa motivo={actual.motivo} callejero={callejero()} reintentar={arrancar} />
+    ) : undefined;
   });
 
   return (
@@ -1125,6 +1158,11 @@ export function PantallaMapa() {
                   reintentar={cargarCapa}
                   reintentarProvincias={reintentarProvincias}
                 />
+              }
+              carga={
+                estado().tipo === "cargando" ? (
+                  <CargaDelMapa texto="Cargando el mapa…" />
+                ) : undefined
               }
               filtro={
                 <AvisoDelFiltro
@@ -1201,7 +1239,7 @@ export function PantallaMapa() {
                 <>
                   <ControlDelMapa
                     etiqueta="Interferencia"
-                    detalle="Simula dónde interfieren entre sí las señales de una compañía."
+                    detalle="Simula dónde se pisan las señales de una compañía."
                     icono={<IconoOndas />}
                     activo={vistaActiva()}
                     disabled={!listo() || emplazamientos().length === 0}
@@ -1209,7 +1247,7 @@ export function PantallaMapa() {
                   />
                   <ControlDelMapa
                     etiqueta="Medir mi señal"
-                    detalle="Explica cómo ver en el móvil la señal que recibes."
+                    detalle="Cómo verla en el móvil."
                     icono={<IconoSenal />}
                     aria-haspopup="dialog"
                     onClick={() => navegar(conMedir(ubicacion(), true))}
@@ -1225,7 +1263,6 @@ export function PantallaMapa() {
                   />
                   <ControlDelMapa
                     etiqueta="Foto aérea"
-                    detalle="Pone las fotos aéreas del Instituto Geográfico Nacional bajo el callejero."
                     icono={<IconoFotoAerea />}
                     activo={foto.encendida()}
                     disabled={!listo()}
@@ -1245,7 +1282,7 @@ export function PantallaMapa() {
                   <Show when={ajustes.ajustes().modoEstudiante}>
                     <ControlDelMapa
                       etiqueta="Ejercicio"
-                      detalle="Calcula paso a paso los datos de un municipio o un barrio, con sus fuentes."
+                      detalle="Los datos de un municipio o un barrio, paso a paso."
                       icono={<IconoEjercicio />}
                       activo={ejercicio() !== null}
                       onClick={() =>
@@ -1255,14 +1292,13 @@ export function PantallaMapa() {
                   </Show>
                   <ControlDelMapa
                     etiqueta="Tus aportaciones"
-                    detalle="Muestra tus medidas y correcciones para enviarlas a Celda."
+                    detalle="Para enviar tus medidas y correcciones."
                     icono={<IconoAportaciones />}
                     aria-haspopup="dialog"
                     onClick={() => navegar(conAportaciones(ubicacion(), true))}
                   />
                   <ControlDelMapa
                     etiqueta="Ajustes"
-                    detalle="Las preferencias de Celda en este dispositivo."
                     icono={<IconoAjustes />}
                     aria-haspopup="dialog"
                     onClick={() => navegar(conAjustes(ubicacion(), true))}
@@ -1384,8 +1420,8 @@ export function EstadoDeLaCapa(props: {
             </Boton>
           }
         >
-          {EXPLICACION_FALLO_CAPA[motivo()]} Mientras no se carguen, el mapa no muestra marcadores,
-          aunque haya <Termino termino="emplazamiento">emplazamientos</Termino> en la zona.
+          {EXPLICACION_FALLO_CAPA[motivo()]} El mapa sale sin marcadores aunque haya{" "}
+          <Termino termino="emplazamiento">emplazamientos</Termino>.
         </Aviso>
       </Match>
       <Match when={marca().tipo === "fallo-provincias"}>
@@ -1401,9 +1437,7 @@ export function EstadoDeLaCapa(props: {
             </Boton>
           }
         >
-          Puede que falle la conexión o que el servidor esté bloqueado. De esa provincia solo se ve
-          el resumen, sin los marcadores de cada{" "}
-          <Termino termino="emplazamiento">emplazamiento</Termino>.
+          Puede que falle la conexión. De esa provincia solo se ve el total.
         </Aviso>
       </Match>
       <Match when={marca().tipo === "cargando-provincias"}>
@@ -1486,47 +1520,35 @@ const detalleDeMarca = (
 
 const EXPLICACION_FALLO_CAPA = {
   "sin-publicar": "Celda todavía no ha publicado ningún emplazamiento.",
-  "sin-origen":
-    "El servidor de Celda no ha indicado qué datos cargar. Puede que falle la conexión o que el servidor esté bloqueado.",
-  "sin-descarga":
-    "No han llegado los datos de los emplazamientos. Puede que falle la conexión o que el servidor esté bloqueado.",
-  danada:
-    "Los datos de los emplazamientos no tienen el formato que se esperaba, por un fallo de Celda.",
-  interno: "El fallo viene de Celda y no depende de tu conexión.",
+  "sin-origen": "Puede que falle la conexión o que el servidor esté bloqueado.",
+  "sin-descarga": "Puede que falle la conexión o que el servidor esté bloqueado.",
+  danada: "Es un fallo de Celda.",
+  interno: "Es un fallo de Celda.",
 } as const;
 
 function AvisoMapa(props: {
-  readonly estado: EstadoMapa;
+  readonly motivo: MotivoFallo;
   readonly callejero: Callejero;
   readonly reintentar: () => void;
 }) {
   const reintentar = <Boton onClick={() => props.reintentar()}>Reintentar</Boton>;
   return (
     <Switch>
-      <Match when={props.estado.tipo === "cargando"}>
-        <Aviso tono="espera" titulo="Cargando el mapa base">
-          {props.callejero === "reserva"
-            ? "OpenFreeMap no responde, así que el callejero se carga desde el IGN."
-            : "El callejero se carga desde OpenFreeMap."}
-        </Aviso>
-      </Match>
-      <Match when={props.estado.tipo === "fallo" && props.estado.motivo === "sin-webgl"}>
+      <Match when={props.motivo === "sin-webgl"}>
         <Aviso tono="fallo" titulo="Este navegador no puede dibujar el mapa">
-          Para dibujar el mapa hace falta WebGL, que este navegador tiene desactivado o no admite.
-          Prueba con otro navegador o activa la aceleración gráfica en su configuración.
+          Hace falta WebGL. Prueba con otro navegador o activa la aceleración gráfica.
         </Aviso>
       </Match>
-      <Match when={props.estado.tipo === "fallo" && props.estado.motivo === "sin-respuesta"}>
-        <Aviso tono="fallo" titulo="No se ha podido cargar el mapa base" acciones={reintentar}>
+      <Match when={props.motivo === "sin-respuesta"}>
+        <Aviso tono="fallo" titulo="No ha cargado el mapa base" acciones={reintentar}>
           {props.callejero === "reserva"
-            ? "No ha cargado el callejero de OpenFreeMap, y tampoco el del IGN, que se usa como reserva. Puede que falle la conexión o que los servidores estén bloqueados."
-            : "No ha cargado el callejero, que viene de los servidores de OpenFreeMap. Puede que falle la conexión o que el servidor esté bloqueado."}
+            ? "Tampoco ha cargado el de reserva del IGN. Puede que falle la conexión o que los servidores estén bloqueados."
+            : "Puede que falle la conexión o que el servidor esté bloqueado."}
         </Aviso>
       </Match>
-      <Match when={props.estado.tipo === "fallo"}>
+      <Match when={props.motivo === "interno"}>
         <Aviso tono="fallo" titulo="Algo ha fallado al preparar el mapa" acciones={reintentar}>
-          El fallo viene de Celda y no depende de tu conexión. Si se repite al reintentar, recarga
-          la página.
+          Si se repite al reintentar, recarga la página.
         </Aviso>
       </Match>
     </Switch>

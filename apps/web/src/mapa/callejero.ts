@@ -19,6 +19,8 @@ export const PLAZO_DEL_PRINCIPAL_MS = 4000;
 export interface Avisos {
   /** Ha llegado la primera tesela del callejero. */
   readonly listo: () => void;
+  /** Han llegado todas las teselas del callejero que se ven: ya se puede enseñar. */
+  readonly completo: () => void;
   readonly fallo: (motivo: MotivoFallo) => void;
   /** El principal no ha llegado y el mapa pasa al de reserva. */
   readonly aReserva: () => void;
@@ -30,6 +32,8 @@ export interface EventoDeFuente {
   readonly sourceId?: string | undefined;
   /** La tesela que ha llegado, en `sourcedata`. */
   readonly tile?: unknown;
+  /** Si ya han llegado todas las teselas de la fuente que se ven, en `sourcedata`. */
+  readonly isSourceLoaded?: boolean | undefined;
   /** Lo que ha fallado, en `error`: con `status` si es una respuesta HTTP. */
   readonly error?: { readonly status?: number | undefined } | undefined;
 }
@@ -70,8 +74,10 @@ const FUENTE: Record<Callejero, string> = {
 };
 
 /**
- * Avisa cuando llega la primera tesela del callejero (`listo`). El evento `load` de MapLibre llega
- * aunque el callejero no haya cargado, y eso dejaría un lienzo vacío pasando por mapa.
+ * Avisa cuando llega la primera tesela del callejero (`listo`) y, una vez, cuando han llegado
+ * todas las que se ven (`completo`), para fundir la silueta de España sin enseñar un callejero a
+ * medias. El evento `load` de MapLibre llega aunque el callejero no haya cargado, y eso dejaría un
+ * lienzo vacío pasando por mapa.
  *
  * Si antes llega un error del principal, o pasan `PLAZO_DEL_PRINCIPAL_MS` sin ninguna tesela, pasa
  * al de reserva (`aReserva`), una sola vez: un mapa no vuelve al principal. Con la reserva, un
@@ -90,6 +96,7 @@ export const vigilarCallejero = (
 ): void => {
   let callejero = opciones.desde;
   let conCallejero = false;
+  let completo = false;
   let fallado = false;
   let cancelarPlazo: (() => void) | undefined;
 
@@ -108,11 +115,17 @@ export const vigilarCallejero = (
   mapa.once("remove", () => cancelarPlazo?.());
 
   mapa.on("sourcedata", (evento) => {
-    if (conCallejero || evento.sourceId !== FUENTE[callejero] || evento.tile === undefined) return;
-    conCallejero = true;
-    cancelarPlazo?.();
-    cancelarPlazo = undefined;
-    avisos.listo();
+    if (evento.sourceId !== FUENTE[callejero]) return;
+    if (!conCallejero && evento.tile !== undefined) {
+      conCallejero = true;
+      cancelarPlazo?.();
+      cancelarPlazo = undefined;
+      avisos.listo();
+    }
+    if (conCallejero && !completo && evento.isSourceLoaded === true) {
+      completo = true;
+      avisos.completo();
+    }
   });
   mapa.on("error", (evento) => {
     if (conCallejero) return;

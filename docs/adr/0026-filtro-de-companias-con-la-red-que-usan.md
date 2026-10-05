@@ -47,7 +47,7 @@ Se calculan con todos los emplazamientos que salen con el filtro: los suyos y lo
 
 Cada celda lleva `redUsada` en sus propiedades, y las de la red usada se dibujan a la mitad de opacidad, con selección y sin ella, con la foto aérea y sin ella. La celda del emplazamiento seleccionado se remarca igual sea de quien sea.
 
-**Lo que se pierde.** En la realidad el móvil prefiere su propia red donde tiene cobertura: un cliente de DIGI cerca de un emplazamiento de DIGI suele quedarse en él aunque uno de Movistar esté más cerca. Celda no lo modela. Junto a los emplazamientos de DIGI, las celdas son una aproximación: la de DIGI sale más pequeña de lo que es su zona de servicio, y las de Movistar de alrededor, más grandes. Con solo los suyos el error era mayor: fuera de las ciudades, unas pocas celdas de DIGI muy grandes cubrían zonas donde el móvil se conecta a Movistar. La nota del panel de compañías lo cuenta en llano: «Junto a uno de Digi, el móvil suele quedarse en él aunque haya otro de Movistar más cerca.»
+**Lo que se pierde.** En la realidad el móvil prefiere su propia red donde tiene cobertura: un cliente de DIGI cerca de un emplazamiento de DIGI suele quedarse en él aunque uno de Movistar esté más cerca. Celda no lo modela. Junto a los emplazamientos de DIGI, las celdas son una aproximación: la de DIGI sale más pequeña de lo que es su zona de servicio, y las de Movistar de alrededor, más grandes. Con solo los suyos el error era mayor: fuera de las ciudades, unas pocas celdas de DIGI muy grandes cubrían zonas donde el móvil se conecta a Movistar. Hasta el 05/10/2026 la nota del panel de compañías lo contaba («Junto a uno de Digi, el móvil suele quedarse en él aunque haya otro de Movistar más cerca.»); con la regla de texto mínimo de `docs/patterns/ui.md` el panel ya no lleva nota y queda la línea del aviso.
 
 ### Los números de lejos: combinaciones en el resumen
 
@@ -64,7 +64,7 @@ Lo comprueban `provincias.test.ts` y `publicacion.test.ts` de la noche.
 
 **De los datos de antes a los nuevos.** Una noche sin cambios en los datos rehace solo el resumen desde el publicado (ADR 0016). Si el publicado no tiene combinaciones, la publicación lo rehace entero desde la base, como con una vigente del formato 4: las capas y los lotes salen iguales y no se reescriben, y cambian el resumen y `vigente.json`. La primera noche tras este cambio deja publicadas las combinaciones.
 
-**Mientras tanto, la web se las arregla.** Con un resumen sin combinaciones y un filtro puesto, de lejos los hexágonos de las provincias cuentan todas las compañías, y el aviso lo dice: «De lejos aún se cuentan todas las compañías: acércate para ver solo Movistar.» De cerca todo va bien: las capas de provincia tienen las compañías de cada emplazamiento.
+**Mientras tanto, la web se las arregla.** Con un resumen sin combinaciones y un filtro puesto, de lejos los hexágonos de las provincias cuentan todas las compañías, y el aviso lo dice: «Los números de lejos incluyen todas las compañías.» De cerca todo va bien: las capas de provincia tienen las compañías de cada emplazamiento.
 
 ### Sin trabajo de más al tocar los chips
 

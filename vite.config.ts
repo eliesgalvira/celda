@@ -40,6 +40,7 @@ export default defineConfig({
       "packages/dominio/datos/comunitat-valenciana.json",
       // Límites de comunidades y provincias que escribe `pnpm run limites`, con una línea por renglón.
       "apps/web/src/mapa/limites.json",
+      "apps/web/src/mapa/limites-detalle.json",
       // Centros de provincia y habitantes de las ciudades que escribe `pnpm run centros`, con una
       // fila por línea.
       "packages/dominio/datos/centros-de-provincia.json",

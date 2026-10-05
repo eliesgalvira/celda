@@ -228,9 +228,8 @@ describe("modo estudiante", () => {
       estaciones: sinFicha.estaciones.map((e) => ({ ...e, bandas: [], sinFichaEnRegistro: NOCHE })),
     });
     await findByText(
-      "Se han leído 2 de 2 fichas. 2 estaciones base de Movistar y Orange aparecen en el " +
-        "listado del registro pero no tienen ficha. Se cuentan aparte, y en sus bandas la tabla " +
-        "también pone «no consta».",
+      "Se han leído 2 de 2 fichas. 2 estaciones base de Movistar y Orange no tienen ficha en el " +
+        "registro, y en sus bandas la tabla pone «no consta».",
     );
     // No son fichas sin bandas conocidas ni fichas por leer.
     assert.isNull(queryByText(/no traen ninguna banda conocida|no han llegado/u));

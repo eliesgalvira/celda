@@ -61,7 +61,7 @@ describe("textos del sector que da servicio", () => {
   it("fuera de la celda avisa de que hay otro emplazamiento más cerca", () => {
     assert.match(
       veredicto(lectura(2, -18, { enCelda: false })),
-      /Además, estás fuera de la celda de este emplazamiento\. Hay otro más cerca y puede que sea ese el que te da servicio\.$/u,
+      /Además, estás fuera de su celda y otro emplazamiento puede darte servicio\.$/u,
     );
     assert.notMatch(veredicto(lectura(2, -18, { enCelda: undefined })), /fuera/u);
   });
@@ -104,7 +104,7 @@ describe("textos del sector que da servicio", () => {
     assert.notProperty(textos, "modelo");
     assert.match(
       textoPlano(textos.nota),
-      /^La orientación de 0°, 120° y 240° es supuesta, porque ninguna fuente/u,
+      /^La orientación es supuesta, así que el sector que da servicio/u,
     );
     assert.match(textoPlano(textos.nota), /puede ser otro\.$/u);
   });
@@ -115,7 +115,7 @@ describe("textos del sector que da servicio", () => {
     assert.match(textoPlano(textos.veredicto), /sector 1 \(30° ±15°\)/u);
     assert.match(
       textoPlano(textos.nota),
-      /^La orientación es una estimación, con ±15° de margen en cada eje\./u,
+      /^Con ±15° de margen en la orientación, cerca del límite entre dos sectores/u,
     );
   });
 

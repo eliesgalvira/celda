@@ -191,7 +191,7 @@ const principal = async () => {
     const funciones = pagina.getByRole("button", { name: "Funciones" });
     if (await funciones.isVisible()) await funciones.click();
     await pagina.getByRole("button", { name: /^Interferencia/u }).click();
-    await esperarTexto(pagina, /frente a interferencia/u);
+    await esperarTexto(pagina, /destaca la señal/u);
 
     // Que acaben las transiciones, los cálculos y el pintado de lo que se ha abierto.
     const sinAsentarse = await esperarQuieta(pagina);

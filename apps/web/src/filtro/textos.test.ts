@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import { detalleDelAviso, estadoDelFiltro, notaDelFiltro, textoDelAviso } from "./textos.ts";
+import { detalleDelAviso, estadoDelFiltro, textoDelAviso } from "./textos.ts";
 
 describe("textos del filtro de compañías (ADR 0026)", () => {
   it("dicen qué se ve, en castellano llano", () => {
@@ -12,7 +12,7 @@ describe("textos del filtro de compañías (ADR 0026)", () => {
     assert.strictEqual(textoDelAviso(["movistar"]), "Solo Movistar");
   });
 
-  it("explican qué sale aparte cuando una compañía usa la red de otra", () => {
+  it("dicen en una línea qué sale más claro cuando una compañía usa la red de otra", () => {
     assert.strictEqual(
       detalleDelAviso(["digi"], false),
       "La red de Movistar que usa Digi sale más clara.",
@@ -22,33 +22,28 @@ describe("textos del filtro de compañías (ADR 0026)", () => {
       "Las redes de Movistar y Orange que usan Digi y Yoigo salen más claras.",
     );
     assert.strictEqual(
-      notaDelFiltro(["digi", "yoigo"]),
-      "Los emplazamientos de Movistar y Orange salen más claros, con sus celdas, porque Digi usa la de Movistar y Yoigo usa la de Orange donde no tienen la suya. Cerca de un emplazamiento propio, el móvil suele conectarse a él aunque haya otro más cerca.",
-    );
-    assert.strictEqual(
-      notaDelFiltro(["digi"]),
-      "Los emplazamientos de Movistar salen más claros, con sus celdas, porque Digi usa su red donde no tiene la suya. Cerca de uno de Digi, el móvil suele conectarse a él aunque haya otro de Movistar más cerca.",
-    );
-    assert.isUndefined(detalleDelAviso(["movistar", "digi"], false));
-    assert.match(
-      notaDelFiltro(["yoigo"]),
-      /^Los emplazamientos de Orange salen más claros, con sus celdas, porque Yoigo usa su red/u,
+      detalleDelAviso(["yoigo"], false),
+      "La red de Orange que usa Yoigo sale más clara.",
     );
   });
 
-  it("con datos de antes, de lejos, dicen que los números aún son de todas", () => {
+  it("sin nada que sorprenda, no añaden ninguna línea", () => {
+    assert.isUndefined(detalleDelAviso(["movistar"], false));
+    assert.isUndefined(detalleDelAviso(["movistar", "digi"], false));
+  });
+
+  it("con datos de antes, de lejos, dicen en corto que los números aún son de todas", () => {
     assert.strictEqual(
       detalleDelAviso(["vodafone"], true),
-      "Con el mapa alejado, los números aún cuentan todas las compañías. Acerca el mapa para ver solo Vodafone.",
+      "Los números de lejos incluyen todas las compañías.",
     );
   });
 
   it("no hablan de cómo se calcula", () => {
     const todos = [
       estadoDelFiltro([]),
-      notaDelFiltro([]),
-      notaDelFiltro(["movistar"]),
-      notaDelFiltro(["digi"]),
+      estadoDelFiltro(["digi"]),
+      detalleDelAviso(["digi"], false) ?? "",
       detalleDelAviso(["digi"], true) ?? "",
     ].join(" ");
     assert.notMatch(todos, /roaming|itinerancia|máscara|resumen|capa|filtro de compañías|Worker/iu);

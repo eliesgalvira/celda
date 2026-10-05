@@ -74,8 +74,8 @@ describe("capa de emplazamientos en el mapa", () => {
     const titulo = await findByText("No se han podido cargar los emplazamientos");
     const fallo = titulo.closest("[role=alert]");
     assert.isNotNull(fallo);
-    assert.match(fallo?.textContent ?? "", /aunque haya emplazamientos en la zona/u);
-    assert.match(fallo?.textContent ?? "", /No han llegado los datos/u);
+    assert.match(fallo?.textContent ?? "", /sin marcadores aunque haya emplazamientos/u);
+    assert.match(fallo?.textContent ?? "", /Puede que falle la conexión/u);
 
     fireEvent.click(getByRole("button", { name: "Reintentar" }));
     flush();

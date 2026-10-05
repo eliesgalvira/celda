@@ -143,12 +143,12 @@ const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
 };
 
 describe("punto de referencia: pedir la ubicación", () => {
-  it("sin punto, la ficha explica qué se gana con uno", async () => {
+  it("sin punto, la ficha ofrece la ubicación o un punto del mapa, sin explicarlo", async () => {
     const { panel } = await abrir();
     assert.isNotNull(
       await panel().findByRole("heading", { name: "Distancia hasta el emplazamiento" }),
     );
-    assert.match(panel().getByRole("heading").parentElement?.textContent ?? "", /distancia/u);
+    assert.notMatch(panel().getByRole("heading").parentElement?.textContent ?? "", /te decimos/u);
     assert.isNotNull(panel().getByRole("button", { name: "Usar mi ubicación" }));
     assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
   });
@@ -159,9 +159,9 @@ describe("punto de referencia: pedir la ubicación", () => {
     flush();
 
     const dialogo = await findByRole("dialog", { name: "Usar tu ubicación" });
-    assert.match(dialogo.textContent ?? "", /El cálculo se hace en tu dispositivo/u);
-    assert.match(dialogo.textContent ?? "", /no guarda tu ubicación/u);
-    assert.match(dialogo.textContent ?? "", /quitarla cuando quieras/u);
+    assert.match(dialogo.textContent ?? "", /Se usa solo en tu dispositivo/u);
+    assert.match(dialogo.textContent ?? "", /Celda no la guarda ni la envía/u);
+    assert.match(dialogo.textContent ?? "", /La quitas desde «Ubicación»/u);
     // Todavía no se ha pedido nada al navegador.
     assert.strictEqual(gps.pedidas(), 0);
 
@@ -203,7 +203,7 @@ describe("punto de referencia: pedir la ubicación", () => {
     assert.isNotNull(
       panel().getByText(
         textoEntero(
-          "La orientación de 0°, 120° y 240° es supuesta, porque ninguna fuente publica hacia dónde apuntan los sectores. El sector que da servicio sale de esa suposición y puede ser otro.",
+          "La orientación es supuesta, así que el sector que da servicio puede ser otro.",
         ),
       ),
     );
@@ -318,7 +318,7 @@ describe("punto de referencia: volver a pedir la ubicación", () => {
       assert.strictEqual(gps.abiertas(), 1);
     });
     gps.fallar("tiempo-agotado");
-    await panel().findByText(/ha tardado demasiado/u);
+    await panel().findByText(/no ha llegado a tiempo\. Pasa en interiores/u);
     assert.strictEqual(gps.abiertas(), 0);
     assert.isNull(panel().queryByText("Buscando tu ubicación…"));
     assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
@@ -359,9 +359,8 @@ describe("punto de referencia: volver a pedir la ubicación", () => {
       assert.strictEqual(gps.abiertas(), 1);
     });
     gps.fallar("sin-fuente");
-    const aviso = await panel().findByText(/Los ordenadores no tienen GPS/u);
-    assert.match(aviso.textContent ?? "", /Chromium en Linux/u);
-    assert.match(aviso.textContent ?? "", /buscar una dirección/u);
+    const aviso = await panel().findByText(/Este ordenador no puede calcular su posición/u);
+    assert.match(aviso.textContent ?? "", /Busca una dirección/u);
     assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
   });
 
@@ -393,8 +392,8 @@ describe("punto de referencia: ubicación denegada", () => {
     });
     gps.fallar("denegado");
 
-    await panel().findByText(/Has bloqueado la ubicación para esta web/u);
-    assert.match(panel().getByText(/Has bloqueado/u).textContent ?? "", /«Permitir»/u);
+    await panel().findByText(/La ubicación está bloqueada\. Para activarla/u);
+    assert.match(panel().getByText(/Para activarla/u).textContent ?? "", /permite la ubicación/u);
     assert.isNull(panel().queryByRole("button", { name: "Usar mi ubicación" }));
     assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
 
@@ -404,13 +403,13 @@ describe("punto de referencia: ubicación denegada", () => {
     assert.isTrue(usar.hasAttribute("disabled"));
     assert.match(
       document.getElementById(usar.getAttribute("aria-describedby") ?? "")?.textContent ?? "",
-      /Está bloqueada en este navegador/u,
+      /Está bloqueada en los ajustes del sitio/u,
     );
   });
 
   it("si ya estaba bloqueada al abrir, lo dice sin pedir nada", async () => {
     const { panel, gps } = await abrir({ permiso: "denegado" });
-    await panel().findByText(/Has bloqueado la ubicación para esta web/u);
+    await panel().findByText(/La ubicación está bloqueada\. Para activarla/u);
     assert.strictEqual(gps.pedidas(), 0);
   });
 });
@@ -582,9 +581,9 @@ describe("punto de referencia: buscar una dirección en toda España", () => {
     assert.isNull(queryByRole("heading", { name: /aún no tiene datos/u }));
   });
 
-  it("sin resultados, dice que no hay nada así en España y cómo afinar", async () => {
+  it("sin resultados, lo dice y cómo afinar", async () => {
     const { eleccion } = await buscarEnLaEleccion("Calle Inventada 99", new Map());
-    const aviso = await eleccion.findByText(/No se ha encontrado esa dirección en España/u);
+    const aviso = await eleccion.findByText(/No se ha encontrado\. Prueba con la calle/u);
     assert.match(aviso.textContent ?? "", /el municipio/u);
     assert.isNull(eleccion.queryByRole("list", { name: "Direcciones encontradas" }));
   });
@@ -597,7 +596,7 @@ describe("punto de referencia: buscar una dirección en toda España", () => {
       ]),
     );
     const aviso = await eleccion.findByText(/El buscador no responde/u);
-    assert.match(aviso.textContent ?? "", /elegir el punto en el mapa/u);
+    assert.match(aviso.textContent ?? "", /Elige el punto en el mapa/u);
   });
 
   it("si el buscador pide esperar, lo dice como una espera y no como un fallo de Celda", async () => {
@@ -605,6 +604,6 @@ describe("punto de referencia: buscar una dirección en toda España", () => {
       "Plaza Mayor",
       new Map([["Plaza Mayor", new BusquedaFallida({ motivo: "limite", detalle: "429" })]]),
     );
-    assert.isNotNull(await eleccion.findByText(/demasiadas peticiones/u));
+    assert.isNotNull(await eleccion.findByText(/Demasiadas búsquedas seguidas/u));
   });
 });

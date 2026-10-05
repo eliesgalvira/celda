@@ -161,6 +161,8 @@
   --mapa-sinr-6: oklch(54% 0.08 205);
   /* La línea hasta el punto de referencia */
   --mapa-referencia: oklch(55% 0.15 50);
+  /* Lo que rodea la silueta de España mientras carga el mapa base (mapa/silueta.ts). */
+  --mapa-silueta-fuera: oklch(91% 0.014 240);
   /*
    * Sobre la foto aérea (ADR 0022), como el modo híbrido de Google: vías y límites claros, las
    * autopistas en amarillo y los rótulos en blanco con halo oscuro. El número del edificio
@@ -289,6 +291,7 @@
   --mapa-sinr-5: oklch(67% 0.07 200);
   --mapa-sinr-6: oklch(58% 0.09 205);
   --mapa-referencia: oklch(74% 0.14 55);
+  --mapa-silueta-fuera: oklch(28% 0.02 245);
   --mapa-foto-linea: oklch(100% 0 0);
   --mapa-foto-autopista: oklch(88.4% 0.124 88.3);
   --mapa-foto-rotulo: oklch(100% 0 0);

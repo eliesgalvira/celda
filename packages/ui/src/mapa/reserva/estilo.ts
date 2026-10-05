@@ -2,6 +2,8 @@ import type { LayerSpecification, StyleSpecification } from "maplibre-gl";
 
 import { capasDeCelda, estadoDelEstilo, FUENTE_MAPA_BASE, fuentesDeCelda } from "../estilo.ts";
 import { capaFoto, capaNumeroDelEdificio } from "../foto.ts";
+import type { ContornoDeEspana } from "../rotulos.ts";
+import { capasSilueta, fuentesSilueta } from "../silueta.ts";
 import type { ColorDeToken } from "../tokens.ts";
 import { capasLimitesDeReserva } from "./limites.ts";
 import { capasRotulosDeReserva } from "./rotulos.ts";
@@ -28,11 +30,15 @@ export const GLIFOS_RESERVA = `${IGN}/files/styles/fonts/pbf/{fontstack}/{range}
 
 /**
  * El estilo del mapa base de reserva sobre las teselas del IGN, con la paleta A, los mismos tokens,
- * los mismos límites y las mismas capas de Celda que el principal (`estiloMapa`). Fuera de la caja de España, con
+ * los mismos límites, la misma silueta mientras carga y las mismas capas de Celda que el principal
+ * (`estiloMapa`). Fuera de la caja de España, con
  * Canarias, no se pide nada: el IGN contesta 403 a lo que no tiene, el mar y el extranjero de
  * cerca, y desde lejos esa caja ya cubre Portugal, el sur de Francia y el norte de Marruecos.
  */
-export const estiloDeReserva = (color: ColorDeToken): StyleSpecification => ({
+export const estiloDeReserva = (
+  color: ColorDeToken,
+  espana: ContornoDeEspana,
+): StyleSpecification => ({
   version: 8,
   glyphs: GLIFOS_RESERVA,
   state: estadoDelEstilo(),
@@ -45,9 +51,11 @@ export const estiloDeReserva = (color: ColorDeToken): StyleSpecification => ({
       bounds: [-18.4, 27.5, 4.5, 44],
     },
     ...fuentesDeCelda(),
+    ...fuentesSilueta(espana),
   },
   layers: [
     ...capasSueloDeReserva(FUENTE_RESERVA, color, [capaFoto()]),
+    ...capasSilueta(color),
     ...capasLimitesDeReserva(FUENTE_RESERVA, color),
     ...capasViasDeReserva(FUENTE_RESERVA, color),
     ...capasDeCelda(color),

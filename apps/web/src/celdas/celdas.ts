@@ -253,42 +253,47 @@ export interface PistaCeldas {
   readonly reintentar: false | "calculo" | ReadonlyArray<string>;
 }
 
+/** Lo que la pista puede decir ahora, aparte de los fallos, que dice siempre. */
+export interface MomentoDeLaPista {
+  /** La salvedad de las celdas sale ahora: la primera vez en este dispositivo, unos segundos. */
+  readonly salvedad: boolean;
+  /** El primer cálculo, o la provincia vecina que hace falta, tarda más de lo normal. */
+  readonly lento: boolean;
+}
+
+/** La salvedad de las celdas: lo que son y que no son la cobertura real. */
+export const SALVEDAD_DE_LAS_CELDAS =
+  "Cada celda es la zona más cercana a un emplazamiento y solo aproxima su cobertura.";
+
 /**
  * La pista que acompaña a las celdas mientras se ven, es decir, con el mapa a su zoom o más
- * cerca. Cuando se dibujan, dice qué son y que son una simulación. Si falta alguna provincia vecina,
- * lo dice antes que nada: las celdas junto a su borde no se dibujan hasta que llega.
+ * cerca. Solo habla si algo sorprendería: un fallo, con su reintento, siempre; una espera, si el
+ * primer cálculo tarda (`lento`); y la salvedad, la vez que sale (`salvedad`). Volver a calcular
+ * al mover el mapa no dice nada.
  */
 export const pistaDeCeldas = (
   cerca: boolean,
   calculo: CalculoCeldas,
   vecinas: EstadoDeLasVecinas = VECINAS_LISTAS,
+  momento: MomentoDeLaPista = { salvedad: false, lento: false },
 ): PistaCeldas | undefined => {
   if (!cerca) return undefined;
   const nombres =
     vecinas.tipo === "listas" ? "" : enumerar(vecinas.provincias.map((p) => p.nombre));
   if (vecinas.tipo === "fallo") {
     return {
-      texto: `Las celdas junto al borde con ${nombres} no se dibujan porque no han llegado sus emplazamientos`,
+      texto: `Faltan las celdas junto a ${nombres}`,
       reintentar: vecinas.provincias.map((p) => p.codigo),
     };
   }
+  if (calculo === "fallo") {
+    return { texto: "No se han podido calcular las celdas", reintentar: "calculo" };
+  }
   if (vecinas.tipo === "cargando") {
-    return {
-      texto: `Cargando ${nombres} para dibujar las celdas junto al borde…`,
-      reintentar: false,
-    };
+    return momento.lento ? { texto: `Cargando ${nombres}…`, reintentar: false } : undefined;
   }
-  switch (calculo) {
-    case "sin-pedir":
-    case "calculando":
-      return { texto: "Calculando las celdas…", reintentar: false };
-    case "listas":
-      return {
-        texto:
-          "Cada celda es la zona más cercana a un emplazamiento. Es solo una aproximación de la cobertura.",
-        reintentar: false,
-      };
-    case "fallo":
-      return { texto: "No se han podido calcular las celdas", reintentar: "calculo" };
+  if (calculo === "listas") {
+    return momento.salvedad ? { texto: SALVEDAD_DE_LAS_CELDAS, reintentar: false } : undefined;
   }
+  return momento.lento ? { texto: "Calculando las celdas…", reintentar: false } : undefined;
 };

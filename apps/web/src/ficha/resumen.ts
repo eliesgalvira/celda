@@ -65,16 +65,16 @@ const queAlcance = (bandas: ReadonlyArray<Mhz>, completo: boolean): string => {
   const bajas = franjas.has("baja");
   const altas = franjas.has("alta");
   if (bajas && altas) {
-    return "llega lejos y entra bien en los edificios, y tiene bandas altas que dan más velocidad";
+    return "llega lejos, entra bien en los edificios y sus bandas altas dan más velocidad";
   }
   if (bajas) {
     return completo
-      ? "llega lejos y entra bien en los edificios, pero no tiene bandas altas, que son las que dan más velocidad"
+      ? "llega lejos y entra bien en los edificios, pero sin bandas altas da menos velocidad"
       : "llega lejos y entra bien en los edificios";
   }
   if (altas) {
     return completo
-      ? "tiene bandas altas que dan más velocidad, pero no bajas, que son las que llegan más lejos y entran mejor en los edificios"
+      ? "sus bandas altas dan más velocidad, pero sin bajas llega menos lejos y entra peor en los edificios"
       : "tiene bandas altas que dan más velocidad";
   }
   return completo
@@ -119,8 +119,8 @@ export const fraseDeResumen = (estaciones: ReadonlyArray<EstacionDeFicha>): Text
   if (bandas.length === 0) {
     // Si el registro no tiene la ficha de ninguna, no se da por pendiente.
     return sinFichas.length === estaciones.length
-      ? marcado`${quien}${deSinFicha} Sin sus ${BANDAS} no se sabe si da ${CUATRO_G} o ${CINCO_G} ni si llega lejos o da velocidad.`
-      : marcado`${quien} Aún no se conocen sus ${BANDAS}, así que no se sabe si da ${CUATRO_G} o ${CINCO_G} ni si llega lejos o da velocidad.${deSinFicha}`;
+      ? marcado`${quien}${deSinFicha} Sin sus ${BANDAS} no se sabe si da ${CUATRO_G} o ${CINCO_G}.`
+      : marcado`${quien} Aún no se conocen sus ${BANDAS} ni si da ${CUATRO_G} o ${CINCO_G}.${deSinFicha}`;
   }
 
   const completo = estaciones.every(conocidaDelTodo);
@@ -186,4 +186,4 @@ export const datosTecnicosDe = (
     })),
   }));
 
-export const NOTA_TECNICA: TextoMarcado = marcado`El registro oficial no publica la tecnología, la ${termino("azimut", "orientación de los sectores")}, la altura ni la potencia, y Celda aún no tiene los ${termino("identificador-de-celda", "identificadores de celda")}. La tecnología probable se deduce de la banda. En España, el 700 y el 3500 MHz se subastaron para 5G, y el resto se usa sobre todo para 4G.`;
+export const NOTA_TECNICA: TextoMarcado = marcado`El registro oficial no publica la tecnología, la ${termino("azimut", "orientación de los sectores")}, la altura ni la potencia. La tecnología probable sale de la banda: en España, el 700 y el 3500 MHz son de 5G y el resto, sobre todo de 4G.`;

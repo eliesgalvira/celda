@@ -1,6 +1,8 @@
 import { AVISO_DE_MARCAS, CITA_DEL_LOGO_DE_DIGI } from "@celda/dominio/compania";
 import type { Credito } from "@celda/ui/Atribucion.tsx";
 
+import { SALVEDAD_DE_LAS_CELDAS } from "../celdas/celdas.ts";
+
 /** Por qué no se puede enseñar el mapa base. */
 export type MotivoFallo = "sin-webgl" | "sin-respuesta" | "interno";
 
@@ -34,6 +36,16 @@ export const CREDITOS_RESERVA: ReadonlyArray<Credito> = [
 export const CREDITO_DE_MARCAS: Credito = {
   texto: AVISO_DE_MARCAS,
   corto: "Las marcas son de sus titulares y Celda no está afiliada",
+  aviso: true,
+};
+
+/**
+ * La salvedad de las celdas, entre los créditos mientras se ven: en la pista sale una sola vez
+ * por dispositivo, y aquí se puede volver a leer.
+ */
+export const CREDITO_DE_LAS_CELDAS: Credito = {
+  texto: SALVEDAD_DE_LAS_CELDAS,
+  corto: "Las celdas solo aproximan la cobertura",
   aviso: true,
 };
 

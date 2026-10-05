@@ -45,12 +45,13 @@ const montar = (desde: Callejero = "principal") => {
       alQuitar.push(escuchador);
     },
   };
-  const avisos: Array<"listo" | "reserva" | "estilo-de-reserva" | MotivoFallo> = [];
+  const avisos: Array<"listo" | "completo" | "reserva" | "estilo-de-reserva" | MotivoFallo> = [];
   const reloj = relojDePrueba();
   vigilarCallejero(
     mapa,
     {
       listo: () => avisos.push("listo"),
+      completo: () => avisos.push("completo"),
       fallo: (motivo) => avisos.push(motivo),
       aReserva: () => avisos.push("reserva"),
     },
@@ -140,6 +141,25 @@ describe("vigilar el callejero", () => {
     assert.deepStrictEqual(avisos, []);
     emitir("sourcedata", { sourceId: FUENTE_MAPA_BASE, tile: TESELA });
     assert.deepStrictEqual(avisos, ["listo"]);
+  });
+
+  it("está completo una sola vez, cuando han llegado todas las teselas que se ven", () => {
+    const { avisos, emitir } = montar();
+    // La silueta y los límites son fuentes de Celda: no cuentan.
+    emitir("sourcedata", { sourceId: "silueta", isSourceLoaded: true });
+    emitir("sourcedata", { sourceId: FUENTE_MAPA_BASE, tile: TESELA, isSourceLoaded: false });
+    assert.deepStrictEqual(avisos, ["listo"]);
+    emitir("sourcedata", { sourceId: FUENTE_MAPA_BASE, tile: TESELA, isSourceLoaded: true });
+    emitir("sourcedata", { sourceId: FUENTE_MAPA_BASE, tile: TESELA, isSourceLoaded: true });
+    assert.deepStrictEqual(avisos, ["listo", "completo"]);
+  });
+
+  it("con la reserva, está completo cuando han llegado las del IGN, también las vacías", () => {
+    const { avisos, emitir, reloj } = montar();
+    reloj.avanzar(PLAZO_DEL_PRINCIPAL_MS);
+    emitir("sourcedata", { sourceId: FUENTE_MAPA_BASE, isSourceLoaded: true });
+    emitir("sourcedata", { sourceId: FUENTE_RESERVA, tile: TESELA, isSourceLoaded: true });
+    assert.deepStrictEqual(avisos, ["reserva", "estilo-de-reserva", "listo", "completo"]);
   });
 
   it("al quitar el mapa se cancela el plazo: no se toca un mapa que ya no está", () => {

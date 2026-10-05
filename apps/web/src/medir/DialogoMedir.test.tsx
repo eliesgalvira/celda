@@ -41,8 +41,7 @@ describe("DialogoMedir en un ordenador", () => {
     const { dialogo, getByRole, getByText, queryByRole } = montar(ORDENADOR);
 
     const aviso = getByText("Desde un ordenador no se puede medir").parentElement;
-    assert.match(aviso?.textContent ?? "", /tarjeta SIM/u);
-    assert.match(aviso?.textContent ?? "", /no tiene esa radio/u);
+    assert.match(aviso?.textContent ?? "", /la radio y la SIM de un móvil/u);
 
     // El QR se dibuja aquí mismo y se nombra por su pie visible.
     const qr = getByRole("figure", { name: "Abre este paso en el móvil" });
@@ -52,7 +51,7 @@ describe("DialogoMedir en un ordenador", () => {
     const captura = getByRole("heading", { name: /Subir una captura que ya tengas/u });
     const opcion = captura.closest("section");
     assert.match(opcion?.textContent ?? "", /PRONTO/u);
-    assert.match(opcion?.textContent ?? "", /Todavía no se puede/u);
+    assert.match(opcion?.textContent ?? "", /Aún no se puede, porque/u);
     // Solo el término subrayado, que abre su explicación, es un botón.
     const botones = within(opcion ?? dialogo).queryAllByRole("button");
     assert.deepStrictEqual(
@@ -80,7 +79,7 @@ describe("DialogoMedir en un ordenador", () => {
     );
     assert.match(medida.textContent ?? "", /−95 dBm/u);
     assert.match(medida.textContent ?? "", /Su nombre técnico es RSRP/u);
-    assert.match(medida.textContent ?? "", /no cuentan como una medida tuya/u);
+    assert.match(medida.textContent ?? "", /Son números inventados/u);
 
     fireEvent.click(getByRole("button", { name: "Volver" }));
     flush();
@@ -92,7 +91,8 @@ describe("DialogoMedir en un ordenador", () => {
     fireEvent.click(getByRole("radio", { name: "iPhone" }));
     flush();
     assert.isNotNull(getByText("*3001#12345#*"));
-    assert.isNotNull(getByText("Has elegido el dispositivo a mano."));
+    // Elegido a mano, ya no dice que sale del navegador.
+    assert.isNull(queryByText(/Sale de tu navegador/u));
     assert.isNull(queryByText("Desde un ordenador no se puede medir"));
   });
 
@@ -108,25 +108,25 @@ describe("DialogoMedir en Android", () => {
     const { dialogo, getByText, getByRole } = montar(ANDROID("SM-S921B"));
 
     assert.isNotNull(getByText("*#0011#"));
-    assert.match(dialogo.textContent ?? "", /por privacidad el navegador no deja que una web lea/u);
+    assert.match(dialogo.textContent ?? "", /El navegador no deja que una web lea la señal/u);
     assert.isNotNull(getByText("Haz una captura de pantalla"));
-    assert.isNotNull(getByText(/La marca sale de tu navegador/u));
+    assert.isNotNull(getByText(/Si no es tu marca, cámbiala arriba/u));
 
     // Abierto desde el principio: es lo que da confianza para marcar el código.
     const queLePasa = getByRole("button", { name: "Qué hace el código en el móvil" });
     assert.strictEqual(queLePasa.getAttribute("aria-expanded"), "true");
     const contenido = document.getElementById(queLePasa.getAttribute("aria-controls") ?? "");
     assert.isFalse(contenido?.hidden);
-    assert.match(contenido?.textContent ?? "", /No instala nada y no cambia ningún ajuste/u);
-    assert.match(contenido?.textContent ?? "", /no hace ninguna llamada/u);
-    assert.match(contenido?.textContent ?? "", /Celda solo ve la captura que tú subas/u);
+    assert.match(contenido?.textContent ?? "", /No instala ni cambia nada/u);
+    assert.match(contenido?.textContent ?? "", /No llama ni cuesta nada/u);
+    assert.match(contenido?.textContent ?? "", /De la captura que subas, Celda solo lee/u);
 
     assert.strictEqual(getByRole("combobox", { name: "Marca del móvil" }).tagName, "SELECT");
   });
 
   it("sin marca reconocida lo dice y no enseña ningún código hasta que se elige", () => {
     const { dialogo, getByRole, getByText, queryByText } = montar(ANDROID());
-    assert.isNotNull(getByText(/Tu navegador no dice la marca del móvil/u));
+    assert.isNotNull(getByText(/Elige la marca para ver su código/u));
     assert.notMatch(dialogo.textContent ?? "", /\*#/u);
 
     fireEvent.change(getByRole("combobox", { name: "Marca del móvil" }), {

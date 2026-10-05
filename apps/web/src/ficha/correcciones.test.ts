@@ -21,7 +21,7 @@ describe("correcciones en la ficha", () => {
     const textos = textosCorrecciones(FICHA_CORREGIDA);
     assert.strictEqual(
       textoPlano(textos?.resumen ?? []),
-      "La comunidad ha corregido lo que dice el registro oficial de este emplazamiento. Debajo se ven las dos versiones.",
+      "La comunidad ha corregido lo que dice el registro oficial de este emplazamiento.",
     );
     assert.deepStrictEqual(
       textos?.resumen.flatMap((f) => (f.termino === undefined ? [] : [f.termino])),

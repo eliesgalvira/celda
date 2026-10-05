@@ -19,7 +19,7 @@ describe("diagrama de radiación del panel", () => {
     assert.deepStrictEqual(textos.leyenda, ["Sector 1 · 0°", "Sector 2 · 120°", "Sector 3 · 240°"]);
     assert.match(
       textoPlano(textos.notas[0] ?? []),
-      /^La orientación es supuesta\. Ninguna fuente publica/u,
+      /^La orientación es supuesta, porque nadie publica/u,
     );
     assert.include(textoPlano(textos.notas[0] ?? []), "0°, 120° y 240°");
     assert.match(

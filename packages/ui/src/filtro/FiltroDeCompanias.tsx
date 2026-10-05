@@ -35,7 +35,7 @@ export function IconoCompanias() {
 }
 
 const variantesChip = cva(
-  "flex min-h-9 items-center gap-2 border-[1.5px] py-1 pr-3 pl-1.5 font-texto text-sm font-semibold " +
+  "flex min-h-9 w-full items-center gap-2 border-[1.5px] py-1 pr-3 pl-2 font-texto text-sm font-semibold " +
     "transition-colors duration-150 motion-reduce:transition-none",
   {
     variants: {
@@ -47,8 +47,11 @@ const variantesChip = cva(
   },
 );
 
-/** El logo del chip, apagado si su compañía no se ve con el filtro. */
-const variantesLogoDelChip = cva("grid shrink-0 place-items-center", {
+/**
+ * El logo del chip, en una caja de 22 px para que todos, también el hexágono de «Todas», midan lo
+ * mismo y el nombre empiece a la misma altura. Apagado si su compañía no se ve con el filtro.
+ */
+const variantesLogoDelChip = cva("grid size-[22px] shrink-0 place-items-center", {
   variants: {
     incluida: { si: "", no: "opacity-40 grayscale" },
   },
@@ -75,7 +78,7 @@ export function ChipDeCompania(props: ChipDeCompaniaProps) {
       type="button"
       aria-pressed={props.pulsado ? "true" : "false"}
       data-compania={props.compania ?? "todas"}
-      class={variantesDiana()}
+      class={variantesDiana({ class: "w-full" })}
       onClick={() => props.onClick()}
     >
       <span class={variantesChip({ pulsado: props.pulsado ? "si" : "no" })}>
@@ -97,29 +100,30 @@ export function ChipDeCompania(props: ChipDeCompaniaProps) {
 }
 
 export interface PanelDeCompaniasProps {
-  /** Los chips: el de todas y uno por compañía (`ChipDeCompania`). */
+  /** El chip de todas (`ChipDeCompania` sin compañía). */
+  readonly todas: JSX.Element;
+  /** Un chip por compañía. */
   readonly children: JSX.Element;
-  /** Qué se ve ahora, en una frase: se anuncia al cambiar. */
+  /** Qué se ve ahora, en una frase. Solo la oye el lector de pantalla, al cambiar. */
   readonly estado: string;
-  /** Cómo se usa, o qué sale aparte con el filtro puesto. */
-  readonly nota: string;
 }
 
-/** Lo que se despliega: los chips en filas, lo que se ve y una nota. */
+/**
+ * Lo que se despliega: «Todas», una raya y las compañías, todos en una columna del mismo ancho.
+ * Lo que se ve ya lo dicen los chips pulsados; la frase de `estado` solo se anuncia.
+ */
 export function PanelDeCompanias(props: PanelDeCompaniasProps) {
-  const nota = createUniqueId();
   return (
     <>
-      <fieldset aria-describedby={nota} class="flex flex-wrap gap-x-1 gap-y-0.5">
+      <fieldset class="flex flex-col">
         <legend class="sr-only">Compañías que se ven</legend>
+        {props.todas}
+        <span aria-hidden="true" class="mx-1 my-1 border-t border-linea" />
         {props.children}
       </fieldset>
-      <output aria-live="polite" class="px-1 text-sm text-tinta">
+      <output aria-live="polite" class="sr-only">
         {props.estado}
       </output>
-      <p id={nota} class="px-1 text-xs leading-snug text-tinta-suave">
-        {props.nota}
-      </p>
     </>
   );
 }
@@ -187,8 +191,8 @@ export function MenuDeCompanias(props: MenuDeCompaniasProps) {
             );
           }}
           class={cn(
-            "chaflan absolute right-0 bottom-full z-20 mb-2 flex w-[min(20.5rem,calc(100vw-1rem))] flex-col gap-1.5",
-            "bg-superficie p-2 drop-shadow-panel [--corte:10px]",
+            "chaflan absolute right-0 bottom-full z-20 mb-2 flex w-48 flex-col",
+            "bg-superficie px-2 py-1.5 drop-shadow-panel [--corte:10px]",
           )}
         >
           {props.children}
@@ -201,37 +205,38 @@ export function MenuDeCompanias(props: MenuDeCompaniasProps) {
 export interface AvisoDeFiltroProps {
   /** Qué se ve: «Solo Movistar». */
   readonly texto: string;
-  /** Una línea más, como la de la red que usan o que de lejos aún se cuentan todas. */
+  /** Una línea más, solo si algo sorprendería: la red que usan o que de lejos se cuentan todas. */
   readonly detalle?: string | undefined;
   /** Quita el filtro de un toque. */
   readonly alQuitar: () => void;
 }
 
 /**
- * El aviso de que hay un filtro puesto, bajo la fecha de los datos: qué se ve y un botón para
- * volver a ver todas. Es un control, claro y con borde, como las pastillas.
+ * El aviso de que hay un filtro puesto, bajo la fecha de los datos: qué se ve y «Ver todas» en una
+ * línea, y debajo, a todo el ancho, el detalle si lo hay. Es un control, claro y con borde, como
+ * las pastillas. El botón queda a 10 px del borde por arriba, por abajo y por la derecha.
  */
 export function AvisoDeFiltro(props: AvisoDeFiltroProps) {
   return (
     <section
       aria-label="Filtro de compañías"
-      class="flex max-w-[min(24rem,calc(100vw-1.5rem))] items-center gap-1 border-[1.5px] border-control-borde bg-control py-0.5 pr-0.5 pl-2.5 text-control-tinta drop-shadow-marcador"
+      class="grid max-w-[min(24rem,calc(100vw-1.5rem))] grid-cols-[1fr_auto] items-center gap-x-2 border-[1.5px] border-control-borde bg-control py-[3.5px] pr-2.5 pl-3.5 text-control-tinta drop-shadow-marcador"
     >
-      <span class="flex min-w-0 flex-col py-0.5">
-        <output class="truncate font-texto text-sm font-semibold">{props.texto}</output>
-        <Show when={props.detalle}>
-          <span class="text-xs leading-snug text-tinta-suave">{props.detalle}</span>
-        </Show>
-      </span>
+      <output class="truncate font-texto text-sm font-semibold">{props.texto}</output>
       <button
         type="button"
-        class={variantesDiana({ class: "shrink-0 px-1" })}
+        class={variantesDiana({ class: "shrink-0" })}
         onClick={() => props.alQuitar()}
       >
-        <span class="border-[1.5px] border-control-borde bg-superficie px-2 py-1 font-texto text-sm font-semibold whitespace-nowrap text-control-tinta group-hover:bg-control-hover">
+        <span class="border-[1.5px] border-control-borde bg-superficie px-2.5 py-1 font-texto text-sm font-semibold whitespace-nowrap text-control-tinta group-hover:bg-control-hover">
           Ver todas
         </span>
       </button>
+      <Show when={props.detalle}>
+        <span class="col-span-2 -mt-2 pb-2 text-xs leading-snug text-tinta-suave">
+          {props.detalle}
+        </span>
+      </Show>
     </section>
   );
 }

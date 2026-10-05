@@ -69,7 +69,7 @@ const DB = termino("decibelio", "dB");
 const MOVIL: Consejo = {
   clave: "movil",
   tono: "secundario",
-  texto: marcado`Girar el móvil en la mano apenas cambia la señal. Su antena recibe casi igual en todas direcciones, y la mano y el cuerpo influyen más que hacia dónde apunte.`,
+  texto: marcado`Girar el móvil en la mano apenas cambia la señal. La mano y el cuerpo influyen más.`,
 };
 
 /** Grados enteros entre 0 y 359. */
@@ -96,7 +96,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
       {
         clave: "antena",
         tono: "principal",
-        texto: marcado`Una ${termino("antena-exterior", "antena exterior")} direccional tiene que apuntar hacia el emplazamiento, así que su orientación importa mucho.`,
+        texto: marcado`Una ${termino("antena-exterior", "antena exterior")} direccional tiene que apuntar hacia el emplazamiento.`,
       },
       MOVIL,
     ];
@@ -104,7 +104,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
       tipo: "sin-punto",
       consejos: lista.map((consejo) => ({ ...consejo, texto: marcar(consejo.texto) })),
       llamada: marcar(
-        marcado`Si eliges un ${termino("punto-de-referencia", "punto de referencia")}, Celda indica hacia qué ventana poner el router y a qué ${termino("rumbo", "rumbo")} apuntar la antena, y puedes alinearla con la brújula del móvil.`,
+        marcado`Con un ${termino("punto-de-referencia", "punto de referencia")}, Celda te dice hacia qué ventana poner el router y a qué ${termino("rumbo", "rumbo")} apuntar la antena.`,
       ),
     };
   }
@@ -129,12 +129,12 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
           {
             clave: "router",
             tono: "principal",
-            texto: marcado`Desde tan cerca no hace falta orientar el ${ROUTER}. Lo que más ayuda es ponerlo junto a una ventana, porque una pared puede quitar 10 ${DB} o más.`,
+            texto: marcado`Desde tan cerca no hace falta orientar el ${ROUTER}. Basta con ponerlo junto a una ventana.`,
           },
           {
             clave: "antena",
             tono: "principal",
-            texto: marcado`Tampoco sirve de mucho apuntar una ${termino("antena-exterior", "antena exterior")}, porque desde aquí no hay una dirección clara.`,
+            texto: marcado`Tampoco hace falta apuntar una ${termino("antena-exterior", "antena exterior")}.`,
           },
           MOVIL,
         ],
@@ -147,12 +147,12 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
     {
       clave: "router",
       tono: "principal",
-      texto: marcado`Con un ${ROUTER}, ponlo junto a una ventana que dé al ${lado}. Una pared puede quitar 10 ${DB} o más, y en un piso alto suele llegar mejor.`,
+      texto: marcado`Pon el ${ROUTER} junto a una ventana que dé al ${lado}. Una pared puede quitar 10 ${DB} o más.`,
     },
     {
       clave: "antena",
       tono: "principal",
-      texto: marcado`Si usas una ${termino("antena-exterior", "antena exterior")} direccional, apúntala a ${String(rumbo)}°. La orientación importa mucho, y la brújula de abajo sirve para alinearla.`,
+      texto: marcado`Si usas una ${termino("antena-exterior", "antena exterior")} direccional, apúntala a ${String(rumbo)}°. La brújula de abajo sirve para alinearla.`,
     },
   ];
 
@@ -160,7 +160,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
     lista.push({
       clave: "distancia",
       tono: "principal",
-      texto: marcado`A ${distancia} la señal suele llegar con fuerza, y con el router junto a la ventana normalmente basta.`,
+      texto: marcado`A ${distancia} la señal suele llegar con fuerza.`,
     });
   } else if (punto.distancia >= LEJOS_METROS) {
     lista.push({
@@ -185,7 +185,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
       lista.push({
         clave: "sector",
         tono: "principal",
-        texto: marcado`${esta} entre dos sectores, donde llega menos señal de cada uno. Aun así, conviene apuntar al emplazamiento, porque el sector que da servicio lo elige la red.`,
+        texto: marcado`${esta} entre dos sectores, donde llega menos señal. Aun así, conviene apuntar al emplazamiento.`,
       });
     }
     if (servicio.enCelda === false) {
@@ -225,5 +225,5 @@ const ordenar = (hacia: TextoMarcado, lista: ReadonlyArray<Consejo>, nota: Texto
 /** Cuánto fiarse de los consejos: el rumbo es de fiar y lo de los sectores, menos. */
 export const notaConsejos = (orientacion: Orientacion): TextoMarcado =>
   orientacion.tipo === "estimada"
-    ? marcado`Los sectores tienen ${termino("azimut", "orientación estimada")}, con ±${String(orientacion.margen)}° de margen. El rumbo sale de la posición publicada del emplazamiento. Tómalo como punto de partida y ajusta mirando la señal del router.`
-    : marcado`Los sectores tienen ${termino("azimut", "orientación supuesta")}. Ninguna fuente publica hacia dónde apuntan, así que lo que se dice de ellos puede no ser exacto. El rumbo sale de la posición publicada del emplazamiento. Tómalo como punto de partida y ajusta mirando la señal del router.`;
+    ? marcado`La ${termino("azimut", "orientación")} de los sectores tiene ±${String(orientacion.margen)}° de margen. Toma el rumbo como punto de partida y ajusta mirando la señal del router.`
+    : marcado`La ${termino("azimut", "orientación")} de los sectores es supuesta. Toma el rumbo como punto de partida y ajusta mirando la señal del router.`;

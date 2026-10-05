@@ -20,6 +20,10 @@ export interface ControlAjustes {
   readonly cambiarFiltro: (filtro: FiltroDeCompanias) => void;
   /** El último cambio no se ha podido guardar: vale hasta cerrar la página. */
   readonly sinGuardar: () => boolean;
+  /** Si ya se ha intentado leer lo guardado, haya llegado o no. */
+  readonly leidos: () => boolean;
+  /** Apunta en el dispositivo que ya se ha visto la salvedad de las celdas. */
+  readonly marcarSalvedadDeCeldasVista: () => void;
 }
 
 export const AjustesContexto = createContext<ControlAjustes>();
@@ -34,6 +38,7 @@ export const crearAjustes = (
 ): ControlAjustes => {
   const [ajustes, setAjustes] = createSignal<Ajustes>(AJUSTES_INICIALES);
   const [sinGuardar, setSinGuardar] = createSignal(false);
+  const [leidos, setLeidos] = createSignal(false);
   // Un cambio hecho antes de que llegue la lectura manda sobre ella.
   let cambiados = false;
 
@@ -46,6 +51,7 @@ export const crearAjustes = (
       )
       .then((salida) => {
         if (Exit.isSuccess(salida) && !cambiados) setAjustes(salida.value);
+        setLeidos(true);
       });
     return () => parar.abort();
   });
@@ -69,5 +75,10 @@ export const crearAjustes = (
       cambiar({ ...ajustes(), companias: [...nuevo] });
     },
     sinGuardar,
+    leidos,
+    marcarSalvedadDeCeldasVista: () => {
+      if (ajustes().salvedadDeCeldasVista === true) return;
+      cambiar({ ...ajustes(), salvedadDeCeldasVista: true });
+    },
   };
 };

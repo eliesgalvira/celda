@@ -22,7 +22,7 @@ import { conLoDeCelda, estiloDeReserva, FUENTE_RESERVA, GLIFOS_RESERVA } from ".
 import { CAPAS_DE_CIUDADES_DE_RESERVA } from "./rotulos.ts";
 
 const MARCA = "token:";
-const RESERVA = estiloDeReserva((token) => `${MARCA}${token}`);
+const RESERVA = estiloDeReserva((token) => `${MARCA}${token}`, CONTORNO_DE_PRUEBA);
 const PRINCIPAL = estiloMapa(
   (token) => `${MARCA}${token}`,
   CONTORNO_DE_PRUEBA,
@@ -54,7 +54,9 @@ const cadenas = (valor: ValorDelEstilo): ReadonlyArray<string> =>
 describe("estilo del mapa base de reserva", () => {
   it("es un estilo válido para MapLibre", () => {
     assert.deepStrictEqual(
-      validateStyleMin(estiloDeReserva(() => "#123456")).map((error) => error.message),
+      validateStyleMin(estiloDeReserva(() => "#123456", CONTORNO_DE_PRUEBA)).map(
+        (error) => error.message,
+      ),
       [],
     );
   });

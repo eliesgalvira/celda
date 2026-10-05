@@ -16,6 +16,11 @@ export interface DisposicionMapaProps {
   readonly cabecera: JSX.Element;
   /** Bajo la cabecera: la fecha de los datos del mapa. */
   readonly datos?: JSX.Element;
+  /**
+   * Justo debajo de la fecha, superpuesto, sin mover nada: que el mapa base aún carga
+   * (`CargaDelMapa`). No tapa los datos.
+   */
+  readonly carga?: JSX.Element;
   /** Bajo la fecha: el aviso de que hay un filtro de compañías puesto (`AvisoDeFiltro`). */
   readonly filtro?: JSX.Element;
   /**
@@ -45,7 +50,7 @@ export interface DisposicionMapaProps {
   /** Controles que van al final de «Funciones», como los ajustes. */
   readonly controlesSecundarios?: JSX.Element;
   readonly atribucion: JSX.Element;
-  /** Lo que se superpone al mapa mientras carga o si falla. */
+  /** Lo que se superpone en el centro del mapa si falla. */
   readonly aviso?: JSX.Element;
   /** El panel del emplazamiento seleccionado, con su propia posición (`PanelEmplazamiento`). */
   readonly panel?: JSX.Element;
@@ -133,7 +138,12 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
 
       <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-1.5 px-3 md:top-[18px]">
         {props.cabecera}
-        {props.datos}
+        <div class="relative flex flex-col items-center">
+          {props.datos}
+          <Show when={props.carga}>
+            <div class="absolute top-full mt-1.5">{props.carga}</div>
+          </Show>
+        </div>
         <Show when={props.filtro}>
           <div class="pointer-events-auto">{props.filtro}</div>
         </Show>

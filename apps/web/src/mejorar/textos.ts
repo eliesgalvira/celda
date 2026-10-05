@@ -4,7 +4,7 @@ import { guiaDeGiro, type MotivoSinSensor } from "./estado.ts";
 /** Título de la sección de la ficha. */
 export const TITULO_MEJORAR = "Mejorar la señal";
 
-const MIENTRAS = "Mientras tanto, puedes simular el giro con la barra.";
+const MIENTRAS = "Simula el giro con la barra.";
 
 /** Lo que dice la brújula en cada estado. */
 export const TEXTOS_BRUJULA = {
@@ -13,39 +13,38 @@ export const TEXTOS_BRUJULA = {
       case "sin-lecturas":
         return {
           titulo: "No llegan datos de la brújula",
-          texto: `Puede que este móvil no tenga brújula o que el navegador no deje leerla. ${MIENTRAS}`,
+          texto: `Puede que este móvil no tenga brújula. ${MIENTRAS}`,
         };
       case "sin-api":
         return {
           titulo: "Giro simulado",
-          texto: `Este navegador no deja leer la brújula del dispositivo. Mueve la barra para ver cómo giraría la flecha.`,
+          texto: `Este navegador no deja leer la brújula. ${MIENTRAS}`,
         };
       default:
         return {
           titulo: "Giro simulado",
-          texto:
-            "Un ordenador no tiene brújula. Mueve la barra para ver cómo giraría la flecha con el móvil en la mano.",
+          texto: `Un ordenador no tiene brújula. ${MIENTRAS}`,
         };
     }
   },
-  apagada: `Cuando actives la brújula, la flecha girará con el móvil. ${MIENTRAS}`,
+  apagada: "O simula el giro con la barra.",
   explicando: {
     titulo: "Antes de usar la brújula",
     texto:
-      "Es posible que el navegador te pida permiso para que Celda lea el movimiento y la orientación del móvil. Celda solo los usa en tu dispositivo para girar la flecha, y no los guarda.",
+      "El navegador puede pedirte permiso. Celda solo usa la orientación del móvil para girar la flecha, y no la guarda.",
   },
   pidiendo: "Contesta al aviso del navegador.",
   denegada: {
     titulo: "Sin permiso para la brújula",
-    texto: `Puede que el navegador no vuelva a preguntar hasta que cierres la pestaña y abras Celda de nuevo. ${MIENTRAS}`,
+    texto: `Puede que el navegador no vuelva a preguntar hasta que abras Celda de nuevo. ${MIENTRAS}`,
   },
   esperando: "Esperando a la brújula…",
   activa: {
     titulo: "Brújula del móvil",
     texto: (margen: number | undefined) =>
       margen === undefined
-        ? "Sostén el móvil plano, con la parte de arriba hacia donde apuntará la antena. Si la flecha no coincide con la calle, mueve el móvil dibujando un ocho para calibrarla."
-        : `Sostén el móvil plano, con la parte de arriba hacia donde apuntará la antena. Según el propio móvil, la brújula puede desviarse ±${String(Math.round(margen))}°.`,
+        ? "Sostén el móvil plano, con la parte de arriba hacia la antena. Si la flecha no cuadra con la calle, dibuja un ocho con el móvil."
+        : `Sostén el móvil plano, con la parte de arriba hacia la antena. Según el móvil, la brújula puede desviarse ±${String(Math.round(margen))}°.`,
   },
   dudosa: {
     titulo: "La brújula puede estar mal calibrada",

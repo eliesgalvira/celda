@@ -94,7 +94,7 @@ export const textosDiagrama = (orientacion: Orientacion): TextosDiagrama => {
           forma,
         ]
       : [
-          marcado`La ${ORIENTACION} es supuesta. Ninguna fuente publica hacia dónde apuntan los ${termino("sector", "sectores")} de este emplazamiento, así que se dibujan a ${enumerar(orientacion.azimuts)}, que es el reparto más común, para enseñar su forma.`,
+          marcado`La ${ORIENTACION} es supuesta, porque nadie publica hacia dónde apuntan los ${termino("sector", "sectores")}. Se dibujan a ${enumerar(orientacion.azimuts)}, el reparto más común.`,
           forma,
         ]
     ).map(bloque()),

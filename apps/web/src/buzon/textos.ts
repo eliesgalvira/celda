@@ -152,8 +152,7 @@ export interface TextosDelFallo {
   readonly texto: string;
 }
 
-const SE_QUEDA =
-  "Se queda guardada en este dispositivo y puedes enviarla más tarde desde «Tus aportaciones».";
+const SE_QUEDA = "Sigue guardada en este dispositivo para enviarla más tarde.";
 
 /** Qué ha pasado, por qué si se sabe y qué hacer. `ahora` es la hora local, en milisegundos. */
 export const textosDelFallo = (fallo: FalloAlCompartir, ahora: number): TextosDelFallo => {
@@ -164,29 +163,29 @@ export const textosDelFallo = (fallo: FalloAlCompartir, ahora: number): TextosDe
         case "dispositivo":
           return {
             titulo: "Has enviado varias seguidas",
-            texto: `El buzón solo admite unas pocas aportaciones seguidas desde cada dispositivo. Podrás enviar esta dentro de ${espera}. ${SE_QUEDA}`,
+            texto: `Prueba dentro de ${espera}. ${SE_QUEDA}`,
           };
         case "ip":
           return {
             titulo: "Muchas aportaciones desde tu red",
-            texto: `Hoy se han enviado muchas aportaciones desde tu conexión. Suele pasar con los datos móviles o en una red compartida, como la de una universidad. Prueba dentro de ${espera}. ${SE_QUEDA}`,
+            texto: `Pasa con los datos móviles o en una red compartida. Prueba dentro de ${espera}. ${SE_QUEDA}`,
           };
         case "total":
           return {
             titulo: "El buzón está lleno por hoy",
-            texto: `Celda recibe un número limitado de aportaciones al día para no quedarse sin servicio. Prueba dentro de ${espera}. ${SE_QUEDA}`,
+            texto: `Prueba dentro de ${espera}. ${SE_QUEDA}`,
           };
       }
     }
     case "BuzonCerrado":
       return {
         titulo: "El buzón está cerrado",
-        texto: `Ahora mismo Celda no recibe aportaciones. ${SE_QUEDA}`,
+        texto: SE_QUEDA,
       };
     case "BuzonSinRespuesta":
       return {
         titulo: "No se ha podido enviar",
-        texto: `El buzón no ha contestado. Puede que falle la conexión o que el buzón no esté funcionando. ${SE_QUEDA}`,
+        texto: `Puede que falle la conexión. ${SE_QUEDA}`,
       };
     case "EnvioVetado":
       return {
@@ -206,7 +205,7 @@ export const textosDelFallo = (fallo: FalloAlCompartir, ahora: number): TextosDe
       return {
         titulo: "No se ha podido guardar en este dispositivo",
         texto:
-          "Para enviar una aportación, Celda tiene que guardarla antes en el dispositivo, y este navegador no lo permite. Pasa en algunas ventanas privadas.",
+          "Este navegador no deja guardarla antes de enviarla, como pasa en algunas ventanas privadas.",
       };
   }
 };

@@ -143,6 +143,13 @@ describe("filtro de compañías (ADR 0026)", () => {
     await waitFor(() => assert.deepStrictEqual(almacen.ajustes().companias, []));
   });
 
+  it("con un filtro sin nada que sorprenda, el aviso es una sola línea", async () => {
+    navegar(ruta.mapa, { reemplazar: true });
+    montar(["movistar"]);
+    await waitFor(() => assert.isNotNull(aviso()));
+    assert.strictEqual(aviso()?.textContent, "Solo MovistarVer todas");
+  });
+
   it("al volver a abrir Celda en el mismo dispositivo el filtro sigue, y el aviso dice qué sale aparte", async () => {
     navegar(ruta.mapa, { reemplazar: true });
     const { findByRole, getByRole } = montar(["digi"]);
@@ -160,7 +167,7 @@ describe("filtro de compañías (ADR 0026)", () => {
     await waitFor(() => assert.isNotNull(aviso()));
     assert.match(
       aviso()?.textContent ?? "",
-      /Con el mapa alejado, los números aún cuentan todas las compañías\. Acerca el mapa para ver solo Movistar\./u,
+      /Los números de lejos incluyen todas las compañías\./u,
     );
   });
 
@@ -170,9 +177,7 @@ describe("filtro de compañías (ADR 0026)", () => {
     await waitFor(() => assert.include(fichas.abiertas(), FICHA.clave));
     fichas.responder(FICHA.clave, FICHA);
     flush();
-    await findByText(
-      /Digi usa aquí la red de Movistar\. Donde Digi no tiene emplazamientos propios/u,
-    );
+    await findByText(/Digi usa aquí la red de Movistar\. Por eso su marcador sale más claro\./u);
   });
 
   it("sin filtro la ficha no dice nada de redes", async () => {

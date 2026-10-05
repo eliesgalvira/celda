@@ -17,6 +17,7 @@ import {
   type ProvinciaFuera,
   provinciasQueFaltan,
 } from "./celdas.ts";
+import { VECINAS_LISTAS } from "../capa/vecinas.ts";
 
 const emplazamiento = (clave: string, longitud: number, latitud: number): EmplazamientoDeCapa => ({
   clave,
@@ -172,34 +173,42 @@ describe("celdas junto al borde entre dos provincias", () => {
 });
 
 describe("pista de las celdas", () => {
+  const SALVEDAD = { salvedad: true, lento: false };
+  const LENTO = { salvedad: false, lento: true };
+
   it("no dice nada lejos del zoom de las celdas", () => {
     for (const calculo of ["sin-pedir", "calculando", "listas", "fallo"] as const) {
-      assert.isUndefined(pistaDeCeldas(false, calculo));
+      assert.isUndefined(pistaDeCeldas(false, calculo, VECINAS_LISTAS, SALVEDAD));
     }
   });
 
-  it("dice que se calculan, qué son y que son una simulación, o que han fallado", () => {
-    assert.strictEqual(pistaDeCeldas(true, "calculando")?.texto, "Calculando las celdas…");
-    assert.strictEqual(pistaDeCeldas(true, "sin-pedir")?.texto, "Calculando las celdas…");
-    const listas = pistaDeCeldas(true, "listas");
+  it("sin nada que sorprenda no dice nada, ni al calcular ni con las celdas listas", () => {
+    for (const calculo of ["sin-pedir", "calculando", "listas"] as const) {
+      assert.isUndefined(pistaDeCeldas(true, calculo));
+    }
+  });
+
+  it("la salvedad, cuando toca; la espera, si tarda; el fallo, siempre", () => {
     assert.strictEqual(
-      listas?.texto,
-      "Cada celda es la zona más cercana a un emplazamiento. Es solo una aproximación de la cobertura.",
+      pistaDeCeldas(true, "listas", VECINAS_LISTAS, SALVEDAD)?.texto,
+      "Cada celda es la zona más cercana a un emplazamiento y solo aproxima su cobertura.",
     );
-    assert.isFalse(listas?.reintentar);
+    assert.strictEqual(
+      pistaDeCeldas(true, "calculando", VECINAS_LISTAS, LENTO)?.texto,
+      "Calculando las celdas…",
+    );
     const fallo = pistaDeCeldas(true, "fallo");
+    assert.strictEqual(fallo?.texto, "No se han podido calcular las celdas");
     assert.strictEqual(fallo?.reintentar, "calculo");
   });
 
-  it("mientras falta una provincia vecina lo dice, y si no llega ofrece pedirla otra vez", () => {
+  it("una provincia vecina: la espera si tarda, y si no llega ofrece pedirla otra vez", () => {
     const girona = { codigo: "17", nombre: "Girona" };
-    const cargando = pistaDeCeldas(true, "listas", { tipo: "cargando", provincias: [girona] });
-    assert.strictEqual(cargando?.texto, "Cargando Girona para dibujar las celdas junto al borde…");
+    const cargando = { tipo: "cargando", provincias: [girona] } as const;
+    assert.isUndefined(pistaDeCeldas(true, "listas", cargando));
+    assert.strictEqual(pistaDeCeldas(true, "listas", cargando, LENTO)?.texto, "Cargando Girona…");
     const fallo = pistaDeCeldas(true, "listas", { tipo: "fallo", provincias: [girona] });
-    assert.match(
-      fallo?.texto ?? "",
-      /^Las celdas junto al borde con Girona no se dibujan porque no han llegado sus emplazamientos/u,
-    );
+    assert.match(fallo?.texto ?? "", /^Faltan las celdas junto a Girona$/u);
     assert.deepStrictEqual(fallo?.reintentar, ["17"]);
   });
 });

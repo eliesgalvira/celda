@@ -227,8 +227,6 @@ export const textosMarca = (ficha: Ficha, comparacion: ComparacionConCapa): Text
   const [deLaFicha, delMapa] = fechasDistinguibles(comparacion.ficha, comparacion.capa);
   return {
     titulo: termino("marca-de-agua", "Actualizado después del mapa"),
-    detalle:
-      `Esta ficha es del ${deLaFicha} y el mapa, del ${delMapa}. ` +
-      "El marcador cambiará cuando se publique el mapa nuevo.",
+    detalle: `Esta ficha es del ${deLaFicha} y el mapa, del ${delMapa}.`,
   };
 };

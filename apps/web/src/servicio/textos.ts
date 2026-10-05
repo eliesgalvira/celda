@@ -1,7 +1,7 @@
 import { marcado, primeraVezEn, termino, type TextoMarcado } from "@celda/dominio/glosario";
 import type { DatoServicio } from "@celda/ui/ubicacion/LecturaServicio.tsx";
 
-import { azimutDe, enumerar, type Orientacion } from "../ficha/diagrama.ts";
+import { azimutDe, type Orientacion } from "../ficha/diagrama.ts";
 import type { Referencia } from "../ubicacion/estado.ts";
 import { nombreRumbo, textoDistancia } from "../ubicacion/textos.ts";
 import type { LecturaServicio } from "./servicio.ts";
@@ -80,7 +80,7 @@ export const textosServicio = (
         : marcado`${esta} entre dos sectores, a ${String(grados)}° del eje del ${sector}, y ${pierde} unos ${String(Math.round(-lectura.gananciaDb))} ${db}. En esa zona el servicio puede pasar de un sector al otro.`;
   const fuera =
     lectura.enCelda === false
-      ? marcado` Además, ${tu ? "estás" : "el punto está"} fuera de la ${termino("celda", "celda")} de este emplazamiento. Hay otro más cerca y puede que sea ese el que ${tu ? "te" : "le"} da servicio.`
+      ? marcado` Además, ${tu ? "estás" : "el punto está"} fuera de su ${termino("celda", "celda")} y otro emplazamiento puede ${tu ? "darte" : "darle"} servicio.`
       : [];
   return {
     datos: [
@@ -97,6 +97,6 @@ export const textosServicio = (
 export const notaServicio = (orientacion: Orientacion): TextoMarcado => {
   const servicio = termino("sector-que-da-servicio", "sector que da servicio");
   return orientacion.tipo === "estimada"
-    ? marcado`La ${termino("azimut", "orientación")} es una estimación, con ±${String(orientacion.margen)}° de margen en cada eje. Cerca del límite entre dos sectores, el ${servicio} puede ser el de al lado.`
-    : marcado`La ${termino("azimut", "orientación")} de ${enumerar(orientacion.azimuts)} es supuesta, porque ninguna fuente publica hacia dónde apuntan los sectores. El ${servicio} sale de esa suposición y puede ser otro.`;
+    ? marcado`Con ±${String(orientacion.margen)}° de margen en la ${termino("azimut", "orientación")}, cerca del límite entre dos sectores el ${servicio} puede ser el de al lado.`
+    : marcado`La ${termino("azimut", "orientación")} es supuesta, así que el ${servicio} puede ser otro.`;
 };

@@ -21,6 +21,11 @@ export const Ajustes = Schema.Struct({
    * antes del filtro no la llevan y se leen igual, sin cambiar de esquema.
    */
   companias: Schema.optionalKey(Schema.Array(Compania)),
+  /**
+   * Si este dispositivo ya ha visto la salvedad de las celdas, que sale una sola vez. Sin la clave,
+   * no: los ajustes de antes se leen igual, sin cambiar de esquema.
+   */
+  salvedadDeCeldasVista: Schema.optionalKey(Schema.Boolean),
 });
 export type Ajustes = typeof Ajustes.Type;
 

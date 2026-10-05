@@ -84,10 +84,7 @@ export function ComoEmite(props: { readonly clave: string }) {
               Reintentar
             </Boton>
           }
-        >
-          Tu navegador no ha podido calcular el diagrama. El resto de la ficha se puede consultar
-          igual.
-        </Aviso>
+        />
       )}
     >
       <DiagramaRadiacion

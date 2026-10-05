@@ -60,13 +60,8 @@ const JUSTIFICADOS: ReadonlyArray<Justificado> = [
   },
   {
     fichero: "apps/web/src/ejercicio/PanelEjercicio.tsx",
-    texto: "En Barcelona se hará en el",
+    texto: "En Barcelona se elige el barrio",
     motivo: "elegir en el mapa da un barrio solo en Barcelona",
-  },
-  {
-    fichero: "apps/web/src/ejercicio/PanelEjercicio.tsx",
-    texto: "73 barrios de Barcelona",
-    motivo: "el padrón por barrio es el del Ayuntamiento de Barcelona",
   },
   {
     fichero: "apps/web/src/ficha/fichasCorregidas.ts",
