@@ -20,6 +20,7 @@ import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
 import { IconoAjustes, IconoEjercicio } from "@celda/ui/ejercicio/Ejercicio.tsx";
 import { IconoFotoAerea } from "@celda/ui/foto/FotoAerea.tsx";
 import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
+import { ZOOM_FOTO } from "@celda/ui/mapa/foto.ts";
 import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
 import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
@@ -209,6 +210,8 @@ export function PantallaMapa() {
   const [cerca, setCerca] = createSignal(false);
   /** Si el mapa está a pie de calle, donde la pista ofrece la foto aérea. */
   const [calle, setCalle] = createSignal(false);
+  /** Si el mapa está al zoom de la foto aérea o más cerca. */
+  const [cercaDeLaFoto, setCercaDeLaFoto] = createSignal(false);
   /** Lo que se ve del mapa, puesto cada vez que se para. */
   const [encuadre, setEncuadre] = createSignal<Encuadre>();
   /** La vista de interferencia (historia 38) y lo que se ha elegido en ella. */
@@ -301,6 +304,7 @@ export function PantallaMapa() {
       const mirarZoom = () => {
         setCerca(nuevo.getZoom() >= ZOOM_CELDAS);
         setCalle(aPieDeCalle(nuevo.getZoom()));
+        setCercaDeLaFoto(nuevo.getZoom() >= ZOOM_FOTO);
       };
       nuevo.on("zoom", mirarZoom);
       mirarZoom();
@@ -594,6 +598,7 @@ export function PantallaMapa() {
       return actual === undefined ? undefined : lienzoDeFoto(actual);
     }),
     seleccionada,
+    deCerca: cercaDeLaFoto,
     desplazamiento: () => centroLibre(escritorio()),
     esperar: esperarDeVerdad,
   });

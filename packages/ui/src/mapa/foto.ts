@@ -20,16 +20,25 @@ export const FUENTE_FOTO = "foto-aerea";
 export const CAPA_FOTO = "foto-aerea";
 
 /**
+ * Desde este zoom del mapa se ve la foto; más lejos, el mapa sigue como con ella apagada aunque
+ * esté encendida. Hasta la tesela z13, el IGN sirve un mosaico Sentinel-2 de 10 m, que no deja
+ * reconocer un edificio y en invierno trae el Pirineo nevado; la ortofoto empieza en la z14. Con
+ * teselas de 256, MapLibre pide la z14 desde el zoom 12,5 del mapa.
+ */
+export const ZOOM_FOTO = 12.5;
+
+/**
  * La ortofoto PNOA de máxima actualidad por su TMS, que sirve Amazon CloudFront y no Cloudflare
  * (ADR 0018). En los cascos urbanos es ortofoto verdadera de 25 cm. Las filas van de sur a norte
  * (`tms`). Fuera de España, con Canarias, no se pide nada: fuera el PNOA solo tiene imagen de baja
- * resolución.
+ * resolución. No se piden las teselas del mosaico Sentinel-2 (`ZOOM_FOTO`).
  */
 export const fuenteFoto = (): RasterSourceSpecification => ({
   type: "raster",
   tiles: ["https://tms-pnoa-ma.idee.es/1.0.0/pnoa-ma/{z}/{x}/{y}.jpeg"],
   scheme: "tms",
   tileSize: 256,
+  minzoom: 14,
   maxzoom: 19,
   bounds: [-18.4, 27.5, 4.5, 44],
 });

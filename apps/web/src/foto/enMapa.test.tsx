@@ -137,6 +137,8 @@ interface Mandos {
   readonly setSeleccionada: Setter<string | null>;
   /** Cambia el mapa, como cuando se crea otra vez. */
   readonly setLienzo: Setter<LienzoDeFoto | undefined>;
+  /** Acerca o aleja el mapa del zoom de la foto. */
+  readonly setDeCerca: Setter<boolean>;
 }
 
 const montar = () => {
@@ -146,13 +148,15 @@ const montar = () => {
   const { unmount } = render(() => {
     const [seleccionada, setSeleccionada] = createSignal<string | null>("movistar-1");
     const [lienzo, setLienzo] = createSignal<LienzoDeFoto | undefined>(prueba.lienzo);
+    const [deCerca, setDeCerca] = createSignal(true);
     const foto = crearFoto({
       lienzo,
       seleccionada,
+      deCerca,
       desplazamiento: () => [0, -94],
       esperar: reloj.esperar,
     });
-    mandos = { foto, setSeleccionada, setLienzo };
+    mandos = { foto, setSeleccionada, setLienzo, setDeCerca };
     return null;
   });
   flush();
@@ -183,6 +187,23 @@ describe("foto aérea en el mapa", () => {
     flush();
     assert.isTrue(m.foto.encendida());
     assert.strictEqual(m.fotos.length, 10);
+    m.desmontar();
+  });
+
+  it("más lejos del zoom de la foto no se ve aunque esté encendida, y vuelve al acercarse", () => {
+    const m = montar();
+    m.foto.encender();
+    flush();
+    assert.deepStrictEqual(m.fotos, [false, true]);
+    m.setDeCerca(false);
+    flush();
+    assert.isTrue(m.foto.encendida());
+    assert.isFalse(m.foto.seVe());
+    assert.deepStrictEqual(m.fotos, [false, true, false]);
+    m.setDeCerca(true);
+    flush();
+    assert.isTrue(m.foto.seVe());
+    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
     m.desmontar();
   });
 

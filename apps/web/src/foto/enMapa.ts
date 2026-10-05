@@ -211,6 +211,8 @@ export interface EntradaFoto {
   readonly lienzo: () => LienzoDeFoto | undefined;
   /** El emplazamiento con la ficha abierta. */
   readonly seleccionada: () => string | null;
+  /** Si el mapa está al zoom de la foto (`ZOOM_FOTO`) o más cerca. */
+  readonly deCerca: () => boolean;
   /** Dónde queda el centro de lo que deja libre el panel (`centroLibre`). */
   readonly desplazamiento: () => readonly [number, number];
   /** Con qué se cuenta el rato que se ve la pista de un edificio sin dibujar. */
@@ -220,7 +222,7 @@ export interface EntradaFoto {
 export interface FotoDelMapa {
   /** Si la foto aérea está encendida. Apagada al abrir cada visita. */
   readonly encendida: () => boolean;
-  /** Si el mapa la enseña: encendida y con la cámara sin volar. */
+  /** Si el mapa la enseña: encendida, al zoom de la foto o más cerca y con la cámara sin volar. */
   readonly seVe: () => boolean;
   readonly alternar: () => void;
   readonly encender: () => void;
@@ -261,7 +263,8 @@ const BUSCANDO: EstadoEdificio = { tipo: "buscando" };
  * Mientras la cámara vuela, el mapa se ve sin la foto, como con ella apagada, y la foto vuelve al
  * llegar (#67): un vuelo de España a la calle pedía las teselas de cada zoom del camino, que solo
  * se ven de paso. Con la foto se apaga todo lo que cambia con ella (`conFoto`): las vías blancas
- * sobre el fondo claro no se verían. Los gestos de la persona no son vuelos y no la apagan.
+ * sobre el fondo claro no se verían. Los gestos de la persona no son vuelos y no la apagan. Más
+ * lejos de `ZOOM_FOTO` tampoco se ve, con el control encendido.
  */
 export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
   const [encendida, setEncendida] = createSignal(false);
@@ -283,7 +286,9 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
   const seVe = createMemo(() => {
     const lienzo = entrada.lienzo();
     const porVolar = pedido() !== undefined && volado() !== pedido();
-    return encendida() && lienzo !== undefined && enVuelo() !== lienzo && !porVolar;
+    return (
+      encendida() && entrada.deCerca() && lienzo !== undefined && enVuelo() !== lienzo && !porVolar
+    );
   });
 
   recurso(
