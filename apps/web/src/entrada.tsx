@@ -45,3 +45,4 @@ const raiz = document.getElementById("raiz");
 if (raiz !== null) {
   render(() => <App servicios={servicios} />, raiz);
 }
+// Prueba de la CI (sin efecto).
