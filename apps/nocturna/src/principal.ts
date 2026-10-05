@@ -202,3 +202,4 @@ const programa = ConfigProvider.layerAdd(credencialesDeSystemd).pipe(
 // El punto de entrada del programa monta aquí sus capas, una vez.
 // @effect-diagnostics-next-line strictEffectProvide:off
 NodeRuntime.runMain(principal.pipe(Effect.provide(programa)));
+// Prueba de la CI (sin efecto).
