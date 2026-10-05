@@ -328,7 +328,7 @@ const principal = Effect.gen(function* () {
 
 // El punto de entrada del generador monta aquí sus capas, una vez: el sistema de ficheros y el
 // cliente HTTP de las órdenes que descargan.
-// @effect-diagnostics-next-line strictEffectProvide:off
 NodeRuntime.runMain(
+  // @effect-diagnostics-next-line strictEffectProvide:off
   principal.pipe(Effect.provide(Layer.merge(NodeServices.layer, FetchHttpClient.layer))),
 );
