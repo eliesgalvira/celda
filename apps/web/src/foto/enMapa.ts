@@ -263,6 +263,7 @@ export interface FotoDelMapa {
   readonly encendida: () => boolean;
   /** Si el mapa la enseña: encendida, al zoom de la foto o más cerca y con la cámara sin volar. */
   readonly seVe: () => boolean;
+  /** Enciende o apaga la foto. Más lejos de `ZOOM_FOTO` no la cambia: saca la pista `acercate`. */
   readonly alternar: () => void;
   readonly encender: () => void;
   /** Qué ha hecho «Ver el edificio» con el emplazamiento `clave`. */
@@ -274,6 +275,11 @@ export interface FotoDelMapa {
    * `PISTA_SIN_CONTORNO_MS` después de un «Ver el edificio» que no lo encuentra.
    */
   readonly sinContorno: () => boolean;
+  /**
+   * Si la pista dice que hay que acercarse para ver la foto: durante `PISTA_ACERCATE_MS` después de
+   * pulsar el control más lejos de `ZOOM_FOTO`, o hasta llegar a ese zoom.
+   */
+  readonly acercate: () => boolean;
 }
 
 /**
@@ -285,6 +291,12 @@ export const PISTA_SIN_CONTORNO = "El mapa no tiene ningún edificio dibujado en
 
 /** Lo que se ve esa pista. */
 export const PISTA_SIN_CONTORNO_MS = 4000;
+
+/** Lo que dice la pista al pulsar «Foto aérea» desde demasiado lejos. */
+export const PISTA_ACERCATE = "Acércate más para ver la foto aérea.";
+
+/** Lo que se ve esa pista. */
+export const PISTA_ACERCATE_MS = 4000;
 
 export const FotoContexto = createContext<FotoDelMapa>();
 
@@ -388,6 +400,23 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
     return resultado !== undefined && pistaVista() !== resultado;
   });
 
+  // Pulsar el control desde demasiado lejos no cambia nada: la pista lo dice un rato. Otra
+  // pulsación es otro objeto y vuelve a contar el plazo.
+  const [pulsadoLejos, setPulsadoLejos] = createSignal<object>();
+  const [pulsadoVisto, setPulsadoVisto] = createSignal<object>();
+  recurso(
+    "mapa:foto-acercate",
+    () => {
+      const pulsado = pulsadoLejos();
+      return pulsado === undefined || entrada.deCerca() ? undefined : pulsado;
+    },
+    (pulsado) => entrada.esperar(PISTA_ACERCATE_MS, () => setPulsadoVisto(pulsado)),
+  );
+  const acercate = createMemo(() => {
+    const pulsado = pulsadoLejos();
+    return pulsado !== undefined && pulsadoVisto() !== pulsado && !entrada.deCerca();
+  });
+
   const edificio = (clave: string): EstadoEdificio => {
     const actual = pedido();
     if (actual === undefined || actual.clave !== clave) return PARADO;
@@ -403,7 +432,10 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
   return {
     encendida,
     seVe,
-    alternar: () => setEncendida((si) => !si),
+    alternar: () => {
+      if (untrack(entrada.deCerca)) setEncendida((si) => !si);
+      else setPulsadoLejos({});
+    },
     encender: () => setEncendida(true),
     edificio,
     verEdificio: (clave, posicion) => {
@@ -411,5 +443,6 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
       setPedido({ clave, posicion });
     },
     sinContorno,
+    acercate,
   };
 }

@@ -22,6 +22,7 @@ import {
   type LienzoDeFoto,
   lienzoDeFoto,
   type MapaParaFoto,
+  PISTA_ACERCATE_MS,
   PISTA_SIN_CONTORNO_MS,
   PLAZO_DE_LA_FOTO_MS,
 } from "./enMapa.ts";
@@ -208,6 +209,39 @@ describe("foto aérea en el mapa", () => {
     flush();
     assert.isTrue(m.foto.seVe());
     assert.deepStrictEqual(m.fotos, [false, true, false, true]);
+    m.desmontar();
+  });
+
+  it("pulsada desde demasiado lejos no cambia nada y la pista pide acercarse unos 4 s", () => {
+    const m = montar();
+    m.setDeCerca(false);
+    flush();
+    m.foto.alternar();
+    flush();
+    assert.isFalse(m.foto.encendida());
+    assert.isTrue(m.foto.acercate());
+    m.reloj.avanzar(PISTA_ACERCATE_MS - 1);
+    assert.isTrue(m.foto.acercate());
+    // Otra pulsación vuelve a contar el plazo.
+    m.foto.alternar();
+    flush();
+    m.reloj.avanzar(PISTA_ACERCATE_MS - 1);
+    assert.isTrue(m.foto.acercate());
+    m.reloj.avanzar(1);
+    assert.isFalse(m.foto.acercate());
+    assert.strictEqual(m.reloj.pendientes(), 0);
+
+    // Al acercarse, la pista se va antes y el control vuelve a encender la foto.
+    m.foto.alternar();
+    flush();
+    assert.isTrue(m.foto.acercate());
+    m.setDeCerca(true);
+    flush();
+    assert.isFalse(m.foto.acercate());
+    assert.strictEqual(m.reloj.pendientes(), 0);
+    m.foto.alternar();
+    flush();
+    assert.isTrue(m.foto.encendida());
     m.desmontar();
   });
 

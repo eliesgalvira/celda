@@ -11,7 +11,7 @@ import { cn } from "./cn.ts";
  */
 export const variantesDiana = cva(
   "group relative inline-flex min-h-11 min-w-11 shrink-0 select-none items-center justify-center " +
-    "cursor-pointer disabled:pointer-events-none aria-disabled:pointer-events-none",
+    "cursor-pointer disabled:pointer-events-none",
 );
 
 export const variantesBoton = cva(

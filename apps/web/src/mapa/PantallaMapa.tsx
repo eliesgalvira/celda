@@ -78,7 +78,13 @@ import {
 import { centroLibre, desplazamientoParaVer } from "../ficha/enfoque.ts";
 import { celdasDelFiltro, crearFiltro } from "../filtro/enMapa.ts";
 import { AvisoDelFiltro, ControlDeCompanias } from "../filtro/Filtro.tsx";
-import { crearFoto, FotoContexto, lienzoDeFoto, PISTA_SIN_CONTORNO } from "../foto/enMapa.ts";
+import {
+  crearFoto,
+  FotoContexto,
+  lienzoDeFoto,
+  PISTA_ACERCATE,
+  PISTA_SIN_CONTORNO,
+} from "../foto/enMapa.ts";
 import { aPieDeCalle, CREDITO_FOTO_AEREA, pideVerFoto } from "../foto/foto.ts";
 import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
@@ -1023,6 +1029,7 @@ export function PantallaMapa() {
     if (vistaActiva()) return undefined;
     // Si «Ver el edificio» no encuentra nada que resaltar, la pista lo dice un rato, porque sorprende.
     if (foto.sinContorno()) return <Pista texto={PISTA_SIN_CONTORNO} />;
+    if (foto.acercate()) return <Pista texto={PISTA_ACERCATE} />;
     if (conPistaDeFoto()) {
       return (
         <Pista
@@ -1262,22 +1269,20 @@ export function PantallaMapa() {
                   />
                 </>
               }
-              controlEncima={
-                <ControlDelMapa
-                  etiqueta="Foto aérea"
-                  icono={<IconoFotoAerea />}
-                  activo={foto.encendida()}
-                  disabled={!listo()}
-                  onClick={() => foto.alternar()}
-                />
-              }
-              controlEncimaVisible={cercaDeLaFoto()}
               botonUbicacion={
                 <>
                   <ControlDeCompanias
                     filtro={filtro.elegido()}
                     disabled={resumen() === undefined}
                     alElegir={filtro.elegir}
+                  />
+                  <ControlDelMapa
+                    etiqueta="Foto aérea"
+                    icono={<IconoFotoAerea />}
+                    activo={foto.encendida()}
+                    disabled={!listo()}
+                    aria-disabled={cercaDeLaFoto() ? undefined : "true"}
+                    onClick={() => foto.alternar()}
                   />
                   <MenuDeUbicacion
                     puedeCentrar={listo()}

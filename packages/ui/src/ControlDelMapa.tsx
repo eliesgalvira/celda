@@ -58,7 +58,7 @@ export function ControlDelMapa(props: ControlDelMapaProps) {
           class={variantesDiana({ class: "drop-shadow-marcador" })}
           {...resto}
         >
-          <span class="cinta grid bg-control-borde p-[2px] [--pico:14px] group-disabled:opacity-50">
+          <span class="cinta grid bg-control-borde p-[2px] [--pico:14px] group-disabled:opacity-50 group-aria-disabled:opacity-50">
             <span
               class={
                 "cinta flex h-11 w-[9.5rem] items-center gap-2 bg-control pr-4 pl-5 text-control-tinta [--pico:13px] " +
