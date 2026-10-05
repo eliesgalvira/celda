@@ -60,7 +60,8 @@ import {
   rectanguloDePunto,
   VECINAS_LISTAS,
 } from "../capa/vecinas.ts";
-import { pistaDeCeldas, type ProvinciaFuera, provinciasQueFaltan } from "../celdas/celdas.ts";
+import { type ProvinciaFuera, provinciasQueFaltan } from "../celdas/celdas.ts";
+import { crearPistaDeCeldas } from "../celdas/pista.ts";
 import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { AjustesContexto, crearAjustes } from "../ajustes/ajustes.ts";
 import { DialogoAjustes } from "../ajustes/DialogoAjustes.tsx";
@@ -125,9 +126,10 @@ import {
   MenuDeUbicacion,
   PasoPrevio,
 } from "../ubicacion/Ubicacion.tsx";
-import type { Callejero } from "./callejero.ts";
+import { type Callejero, esperarDeVerdad } from "./callejero.ts";
 import {
   CREDITO_DE_MARCAS,
+  CREDITO_DE_LAS_CELDAS,
   CREDITO_DEL_LOGO_DE_DIGI,
   CREDITOS_MAPA_BASE,
   CREDITOS_RESERVA,
@@ -563,6 +565,7 @@ export function PantallaMapa() {
     const deLosLogos = [
       ...(conLogos() ? [CREDITO_DE_MARCAS] : []),
       ...(conDigi() ? [CREDITO_DEL_LOGO_DE_DIGI] : []),
+      ...(cerca() && !vistaActiva() ? [CREDITO_DE_LAS_CELDAS] : []),
     ];
     return fuentes === undefined
       ? [...delCallejero, ...deLosLogos]
@@ -826,6 +829,33 @@ export function PantallaMapa() {
     cerca,
     seleccionada,
   });
+  /** La pista de las celdas: la salvedad una vez por dispositivo y las esperas solo si tardan. */
+  const pistaCeldas = crearPistaDeCeldas({
+    cerca,
+    calculo: () => celdas.calculo(),
+    vecinas: vecinasDeCeldas,
+    salvedadVista: () =>
+      ajustes.leidos() ? ajustes.ajustes().salvedadDeCeldasVista === true : undefined,
+    marcarSalvedadVista: () => ajustes.marcarSalvedadDeCeldasVista(),
+    esperar: esperarDeVerdad,
+  });
+  // Con la salvedad a la vista, el primer gesto sobre el mapa la quita.
+  recurso(
+    "celdas:salvedad-gesto",
+    () => (pistaCeldas.conSalvedad() ? mapaCreado() : undefined),
+    (actual) => {
+      const lienzo = actual.getCanvasContainer();
+      const quitar = () => pistaCeldas.interactuar();
+      lienzo.addEventListener("pointerdown", quitar);
+      lienzo.addEventListener("wheel", quitar, { passive: true });
+      lienzo.addEventListener("keydown", quitar);
+      return () => {
+        lienzo.removeEventListener("pointerdown", quitar);
+        lienzo.removeEventListener("wheel", quitar);
+        lienzo.removeEventListener("keydown", quitar);
+      };
+    },
+  );
 
   // Si alguna celda que se ve es dudosa, se piden también las provincias que podrían recortarla.
   createEffect(
@@ -996,7 +1026,7 @@ export function PantallaMapa() {
         />
       );
     }
-    const actual = pistaDeCeldas(cerca(), celdas.calculo(), vecinasDeCeldas());
+    const actual = pistaCeldas.pista();
     if (actual === undefined) return undefined;
     const { reintentar } = actual;
     return (
