@@ -112,10 +112,11 @@ describe("estilo del mapa base de reserva", () => {
     assert.strictEqual(new Set(ids).size, ids.length, "hay capas con el mismo nombre");
   });
 
-  it("tiene los mismos límites que el principal: los del fichero de Celda y, del IGN, el país y los municipios", () => {
+  it("tiene los mismos límites que el principal: los del fichero de Celda y, del IGN, los municipios", () => {
     const limites = (estilo: StyleSpecification) =>
       estilo.layers.filter((capa) => capa.id.startsWith("limites-"));
-    const principal = limites(PRINCIPAL);
+    // Las fronteras entre otros países no las da el IGN: la de España sale del fichero de Celda.
+    const principal = limites(PRINCIPAL).filter((capa) => capa.id !== "limites-paises");
     const reserva = limites(RESERVA);
     assert.deepStrictEqual(
       reserva.map((capa) => capa.id),

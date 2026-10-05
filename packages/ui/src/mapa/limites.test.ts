@@ -59,6 +59,7 @@ describe("límites en el mapa", () => {
       },
       toleranciaMetros: 1000,
       unidadesPorGrado: 1000,
+      pais: [[-7300, 38500, 50, 200]],
       comunidades: [[-1500, 40000, 250, -1000]],
       provincias: [
         [2040, 41000, 0, 10, 5, 10],
@@ -102,6 +103,17 @@ describe("límites en el mapa", () => {
             ],
           },
         },
+        {
+          type: "Feature",
+          properties: { limite: "pais" },
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [-7.3, 38.5],
+              [-7.25, 38.7],
+            ],
+          },
+        },
       ],
     });
   });
@@ -129,20 +141,35 @@ describe("límites en el mapa", () => {
     }
   });
 
-  it("los municipios y el país salen del mapa base, sin las líneas del mar", () => {
+  it("los municipios y las fronteras de otros países salen del mapa base, sin las del mar", () => {
     const municipios = linea("limites-municipios");
-    const pais = linea("limites-pais");
-    for (const c of [municipios, pais]) {
+    const paises = linea("limites-paises");
+    for (const c of [municipios, paises]) {
       assert.strictEqual(c.source, "fuente");
       assert.strictEqual(c["source-layer"], "boundary");
       assert.deepInclude<unknown>(c.filter, ["!=", ["get", "maritime"], 1]);
     }
     assert.deepInclude<unknown>(municipios.filter, ["==", ["get", "admin_level"], 8]);
-    assert.deepInclude<unknown>(pais.filter, ["==", ["get", "admin_level"], 2]);
+    assert.deepInclude<unknown>(paises.filter, ["==", ["get", "admin_level"], 2]);
     // Los municipios entran del zoom 10,5 al 11,2.
     assert.isFalse(seVe("limites-municipios", 10.4));
     assert.strictEqual(opacidad("limites-municipios", 10.5), 0);
     assert.strictEqual(opacidad("limites-municipios", 11.2), 1);
+  });
+
+  it("la frontera de España sale del fichero propio, con el aspecto de las demás", () => {
+    const pais = linea("limites-pais");
+    assert.strictEqual(pais.source, FUENTE_LIMITES);
+    assert.deepStrictEqual<unknown>(pais.filter, ["==", ["get", "limite"], "pais"]);
+    assert.deepStrictEqual(pais.paint, linea("limites-paises").paint);
+    // Del mapa base no sale ninguna línea con España a un lado, ni la del Guadiana de Olivenza,
+    // que viene como disputada.
+    const paises = linea("limites-paises").filter;
+    assert.deepInclude<unknown>(paises, ["!=", ["get", "adm0_l"], "ESP"]);
+    assert.deepInclude<unknown>(paises, ["!=", ["get", "adm0_r"], "ESP"]);
+    assert.deepInclude<unknown>(paises, ["!=", ["get", "disputed"], 1]);
+    // La de España va encima de todo.
+    assert.strictEqual(capas.at(-1)?.id, "limites-pais");
   });
 
   it("con la foto aérea van todos en blanco; sin ella, con sus tokens", () => {
@@ -151,6 +178,7 @@ describe("límites en el mapa", () => {
       ["limites-provincias", "mapa-limite-provincia"],
       ["limites-comunidades", "mapa-limite-comunidad"],
       ["limites-pais", "mapa-limite-pais"],
+      ["limites-paises", "mapa-limite-pais"],
     ] as const) {
       const color = linea(id).paint?.["line-color"];
       assert.strictEqual(conLaFoto(color, true), "mapa-foto-linea", id);

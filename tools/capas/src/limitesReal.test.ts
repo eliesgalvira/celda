@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
 
+import { FronterasDeEspana } from "./fronteras.ts";
 import {
   ficheroDeLimites,
   LIMITES_DE_DETALLE,
@@ -20,18 +21,20 @@ import {
 
 /** Los límites del repositorio y los ficheros que escribe `pnpm run limites` para la web. */
 const MUNICIPIOS = "../../packages/publicacion/datos/municipios.json";
+const FRONTERAS = "../../packages/publicacion/datos/fronteras.json";
 const LIMITES = "../../apps/web/src/mapa/limites.json";
 const LIMITES_DETALLE = "../../apps/web/src/mapa/limites-detalle.json";
 
 /**
- * Lo que puede pesar cada fichero. El general lo descarga la web en cada visita: el ADR 0023 lo
- * dejó en 20.569 bytes y 8.179 con gzip, y esto es un 10 % más. El de detalle, solo al acercarse:
- * pesaba 92.885 bytes y 36.661 con gzip el 05/10/2026, y esto también es un 10 % más.
+ * Lo que puede pesar cada fichero, un 10 % más de lo que pesaban el 05/10/2026 con la frontera:
+ * el general, que la web descarga en cada visita, 22.329 bytes y 9.050 con gzip; el de detalle,
+ * solo al acercarse, 106.418 bytes y 42.357 con gzip.
  */
-const PRESUPUESTO = { bytes: 22_600, gzip: 9_000 };
-const PRESUPUESTO_DETALLE = { bytes: 102_000, gzip: 40_500 };
+const PRESUPUESTO = { bytes: 24_600, gzip: 10_000 };
+const PRESUPUESTO_DETALLE = { bytes: 117_000, gzip: 46_500 };
 
 const decodificarLimites = Schema.decodeEffect(Schema.fromJsonString(LimitesDeMunicipios));
+const decodificarFronteras = Schema.decodeEffect(Schema.fromJsonString(FronterasDeEspana));
 const decodificarGuardados = Schema.decodeEffect(
   Schema.fromJsonString(LimitesDeComunidadesYProvincias),
 );
@@ -40,6 +43,7 @@ const leer = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   return {
     limites: yield* decodificarLimites(yield* fs.readFileString(MUNICIPIOS)),
+    fronteras: yield* decodificarFronteras(yield* fs.readFileString(FRONTERAS)),
     guardado: yield* fs.readFileString(LIMITES),
     detalle: yield* fs.readFileString(LIMITES_DETALLE),
   };
@@ -125,9 +129,18 @@ const cerca = (
   );
 
 /** El fichero que escribe la orden para un nivel. */
-const esperado = (limites: LimitesDeMunicipios, nivel: NivelDeLimites) =>
+const esperado = (
+  limites: LimitesDeMunicipios,
+  fronteras: FronterasDeEspana,
+  nivel: NivelDeLimites,
+) =>
   ficheroDeLimites(
-    limitesDeComunidadesYProvincias(limites, nivel.toleranciaMetros, nivel.unidadesPorGrado),
+    limitesDeComunidadesYProvincias(
+      limites,
+      nivel.toleranciaMetros,
+      nivel.unidadesPorGrado,
+      fronteras,
+    ),
   );
 
 /**
@@ -215,11 +228,11 @@ const lejosDeLosExtremos = (
 describe("límites de comunidades y provincias guardados en el repositorio", () => {
   it.effect("son los que salen de los límites de municipios, el general y el de detalle", () =>
     Effect.gen(function* () {
-      const { limites, guardado, detalle } = yield* leer;
+      const { limites, fronteras, guardado, detalle } = yield* leer;
       const desfasados =
         "los límites están desfasados: vuelve a escribirlos con `pnpm run limites`";
-      assert.strictEqual(guardado, esperado(limites, LIMITES_GENERALES), desfasados);
-      assert.strictEqual(detalle, esperado(limites, LIMITES_DE_DETALLE), desfasados);
+      assert.strictEqual(guardado, esperado(limites, fronteras, LIMITES_GENERALES), desfasados);
+      assert.strictEqual(detalle, esperado(limites, fronteras, LIMITES_DE_DETALLE), desfasados);
     }),
   );
 
@@ -299,7 +312,7 @@ describe("límites de comunidades y provincias guardados en el repositorio", () 
       for (const texto of [guardado, detalle]) {
         const fichero = yield* decodificarGuardados(texto);
         const vistos = new Set<string>();
-        for (const linea of [...fichero.comunidades, ...fichero.provincias]) {
+        for (const linea of [...fichero.pais, ...fichero.comunidades, ...fichero.provincias]) {
           const v = vertices(linea, 1);
           for (const [k, b] of v.slice(1).entries()) {
             const tramo = [String(v[k]), String(b)].toSorted().join(" ");
@@ -321,7 +334,7 @@ describe("límites de comunidades y provincias guardados en el repositorio", () 
     }),
   );
 
-  it.effect("ninguna línea de los dos ficheros va por el borde de España", () =>
+  it.effect("ninguna línea de comunidad o provincia va por el borde de España", () =>
     Effect.gen(function* () {
       const { limites, guardado, detalle } = yield* leer;
       const usos = usosDeArcos(limites);
@@ -380,6 +393,97 @@ describe("límites de comunidades y provincias guardados en el repositorio", () 
               );
             }
           }
+        }
+      }
+    }),
+  );
+  it.effect(
+    "las fronteras son las terrestres del IGN, de la misma descarga que los municipios",
+    () =>
+      Effect.gen(function* () {
+        const { limites, fronteras } = yield* leer;
+        assert.deepStrictEqual(fronteras.fuente, limites.fuente);
+        // Kilómetros de frontera con cada país: Portugal, Francia con Llívia, Andorra, y Marruecos
+        // en Ceuta, Melilla y el peñón de Vélez de la Gomera. La costa no va.
+        const km = new Map<string, number>();
+        for (const { vecino, linea } of fronteras.lineas) {
+          const v = vertices(linea, fronteras.unidadesPorGrado);
+          const largo = v
+            .slice(1)
+            .reduce((suma, b, k) => suma + distancia(b, v[k] ?? b, v[k] ?? b), 0);
+          km.set(vecino, (km.get(vecino) ?? 0) + largo / 1000);
+        }
+        for (const [vecino, minimo, maximo] of [
+          ["PT", 1200, 1400],
+          ["FR", 620, 750],
+          ["AD", 55, 75],
+          ["MA", 15, 25],
+        ] as const) {
+          assert.isAtLeast(km.get(vecino) ?? 0, minimo, vecino);
+          assert.isAtMost(km.get(vecino) ?? 0, maximo, vecino);
+        }
+      }),
+  );
+
+  it.effect(
+    "la frontera se dibuja entera, también el Guadiana de Olivenza, Andorra y Melilla",
+    () =>
+      Effect.gen(function* () {
+        const { fronteras, guardado, detalle } = yield* leer;
+        for (const [texto, margen] of [
+          [guardado, 1100],
+          [detalle, 200],
+        ] as const) {
+          const fichero = yield* decodificarGuardados(texto);
+          let delGuadiana = 0;
+          for (const { vecino, linea } of fronteras.lineas) {
+            for (const punto of vertices(linea, fronteras.unidadesPorGrado)) {
+              assert.isAtMost(
+                cerca(fichero.pais, punto, fichero.unidadesPorGrado),
+                margen,
+                `${vecino} ${String(punto)}`,
+              );
+              // El Guadiana entre el Caia y el Cuncos, el tramo que OpenFreeMap da por disputado.
+              const [x, y] = punto;
+              if (vecino === "PT" && y > 38.436 && y < 38.832 && x > -7.34 && x < -7.08) {
+                delGuadiana += 1;
+              }
+            }
+          }
+          assert.isAbove(delGuadiana, 100);
+        }
+      }),
+  );
+
+  it.effect("la frontera no va por la costa ni por el mar", () =>
+    Effect.gen(function* () {
+      const { fronteras, guardado, detalle } = yield* leer;
+      const lineasDeFrontera = fronteras.lineas.map(({ linea }) => linea);
+      for (const [texto, margen] of [
+        [guardado, 1100],
+        [detalle, 200],
+      ] as const) {
+        const fichero = yield* decodificarGuardados(texto);
+        assert.isNotEmpty(fichero.pais);
+        // Cada vértice de la frontera dibujada va por una línea de frontera del IGN.
+        for (const linea of fichero.pais) {
+          for (const punto of vertices(linea, fichero.unidadesPorGrado)) {
+            assert.isAtMost(
+              cerca(lineasDeFrontera, punto, fronteras.unidadesPorGrado),
+              margen,
+              String(punto),
+            );
+          }
+        }
+        // Y donde la frontera llega al mar, no sigue por la costa.
+        for (const [sitio, punto, minimo] of [
+          ["el cabo de Higuer, en Hondarribia", [-1.7936, 43.3934], 1000],
+          ["la playa de Isla Cristina", [-7.32, 37.195], 5000],
+          ["la costa de A Guarda", [-8.875, 41.895], 2000],
+          ["el puerto de Ceuta", [-5.315, 35.892], 2000],
+          ["el puerto de Melilla", [-2.93, 35.29], 1500],
+        ] as const) {
+          assert.isAtLeast(cerca(fichero.pais, punto, fichero.unidadesPorGrado), minimo, sitio);
         }
       }
     }),
