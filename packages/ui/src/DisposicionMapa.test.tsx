@@ -1,4 +1,4 @@
-import { assert, describe, it } from "@effect/vitest";
+import { assert, describe, it, vi } from "@effect/vitest";
 import { fireEvent, render } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 
@@ -75,6 +75,25 @@ describe("DisposicionMapa", () => {
     fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
     flush();
     assert.strictEqual(boton.getAttribute("aria-expanded"), "false");
+  });
+
+  it("abiertos, los créditos se pliegan solos a los cinco segundos", () => {
+    vi.useFakeTimers();
+    try {
+      const { getByRole } = montar();
+      const boton = getByRole("button", { name: "Créditos del mapa" });
+      fireEvent.click(boton);
+      flush();
+      assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
+      vi.advanceTimersByTime(4900);
+      flush();
+      assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
+      vi.advanceTimersByTime(200);
+      flush();
+      assert.strictEqual(boton.getAttribute("aria-expanded"), "false");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("plegados, el crédito fijo sigue a la vista en una línea, en su forma corta", () => {

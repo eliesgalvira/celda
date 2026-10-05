@@ -4,6 +4,7 @@ import { createSignal, Show } from "solid-js";
 import { PliegueDeCreditos } from "./Atribucion.tsx";
 import { AspectoDeControl } from "./controles/aspecto.ts";
 import { MenuDeControles } from "./controles/MenuDeControles.tsx";
+import { recurso } from "./recurso.ts";
 
 export interface DisposicionMapaProps {
   /** Recibe el elemento en el que se dibuja el mapa. */
@@ -63,6 +64,9 @@ export interface DisposicionMapaProps {
   readonly panelAncho?: boolean;
 }
 
+/** Lo más que se quedan abiertos los créditos. */
+const ABIERTOS_MS = 5000;
+
 /** Tres rayas: el botón «Funciones». */
 const IconoFunciones = () => (
   <svg
@@ -84,11 +88,19 @@ const IconoFunciones = () => (
  * cargar: el fondo ya tiene el color del mapa y el aviso se superpone.
  */
 export function DisposicionMapa(props: DisposicionMapaProps) {
-  // Los créditos empiezan plegados tras la «i», con los `fijo` a la vista, y tocar el mapa los
-  // vuelve a plegar.
+  // Los créditos empiezan plegados tras la «i». Abiertos, se vuelven a plegar al tocar el mapa o a
+  // los cinco segundos, por si se ha pulsado la «i» sin querer.
   const [plegada, setPlegada] = createSignal(true);
   const plegarAlTocar = () => setPlegada(true);
   const pliegue = { plegada, cambiar: setPlegada };
+  recurso(
+    "creditos:pliegue",
+    () => !plegada(),
+    () => {
+      const espera = window.setTimeout(plegarAlTocar, ABIERTOS_MS);
+      return () => window.clearTimeout(espera);
+    },
+  );
 
   return (
     <div
@@ -190,7 +202,7 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         Mientras se elige en el móvil, los créditos quedan por encima de la hoja, en su pie. En
         escritorio no llegan a la columna de los controles, aunque ocupen varias líneas.
       */}
-      <div class="absolute bottom-[max(0.25rem,env(safe-area-inset-bottom))] left-1 z-10 max-w-[calc(100%-1rem)] max-md:max-w-[calc(100%-10.5rem)] max-md:group-data-creditos/mapa:z-20 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.5rem)] max-md:group-data-eligiendo/mapa:z-30 md:max-w-[calc(100%-6rem)] md:group-data-panel/mapa:left-[calc(27rem+0.5rem)] md:group-data-panel/mapa:max-w-[calc(100%-27.5rem-6rem)] md:group-data-panel-ancho/mapa:left-[calc(min(46rem,100vw-8rem)+0.5rem)] md:group-data-panel-ancho/mapa:max-w-[calc(100%-min(46rem,100vw-8rem)-6.5rem)]">
+      <div class="absolute bottom-[max(0.25rem,env(safe-area-inset-bottom))] left-1 z-10 max-w-[calc(100%-1rem)] max-md:max-w-[calc(100%-10.5rem)] max-md:group-data-creditos/mapa:z-20 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.5rem)] max-md:group-data-eligiendo/mapa:z-30 md:max-w-[calc(100%-14rem)] md:group-data-panel/mapa:left-[calc(27rem+0.5rem)] md:group-data-panel/mapa:max-w-[calc(100%-27.5rem-14rem)] md:group-data-panel-ancho/mapa:left-[calc(min(46rem,100vw-8rem)+0.5rem)] md:group-data-panel-ancho/mapa:max-w-[calc(100%-min(46rem,100vw-8rem)-14.5rem)]">
         <PliegueDeCreditos value={pliegue}>{props.atribucion}</PliegueDeCreditos>
       </div>
 
