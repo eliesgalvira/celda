@@ -87,9 +87,14 @@ describe("foto aérea en el estilo", () => {
   });
 
   it("los números de portal solo salen con la foto, y por debajo del zoom 15 no se maquetan", () => {
-    assert.strictEqual(visibilidad(CAPA_PORTALES, false), "none");
-    assert.strictEqual(visibilidad(CAPA_PORTALES, true), "visible");
-    assert.strictEqual(capa(CAPA_PORTALES)?.minzoom, 15);
+    // Se quitan con el filtro y la capa sigue visible: así MapLibre deja los portales en las
+    // teselas que parte, también en las pedidas con la foto apagada, y «Ver el edificio» los lee.
+    const portales = capa(CAPA_PORTALES);
+    const filtro = portales !== undefined && "filter" in portales ? portales.filter : undefined;
+    assert.strictEqual(visibilidad(CAPA_PORTALES, false), "visible");
+    assert.isFalse(conLaFoto(filtro, false));
+    assert.isTrue(conLaFoto(filtro, true));
+    assert.strictEqual(portales?.minzoom, 15);
   });
 
   it("el degradado de la celda seleccionada baja al 35 % a pie de calle solo sobre la foto", () => {

@@ -13,18 +13,20 @@ import type { Movimiento } from "../mapa/vistaInicial.ts";
 import {
   dibujoDelEdificio,
   type DibujoDelEdificio,
-  DISTANCIA_AL_EDIFICIO_M,
   type EdificioEncontrado,
-  edificioDeRasgo,
+  edificiosDeRasgo,
   elegirEdificio,
-  portalDeRasgo,
+  portalesDeRasgo,
   type RasgoDelMapa,
   SIN_EDIFICIO,
 } from "./edificio.ts";
 import { ZOOM_EDIFICIO } from "./foto.ts";
 
-/** Hasta dónde, alrededor del emplazamiento, se miran los números de portal. */
-const ALCANCE_PORTALES_M = 90;
+/**
+ * La caja en que se buscan los edificios. Basta el punto del emplazamiento: solo cuenta el que lo
+ * contiene, y el mapa da cada rasgo entero.
+ */
+const ALCANCE_EDIFICIOS_M = 1;
 
 /** Lo que hace el mapa con la foto aérea. En las pruebas, un lienzo que apunta lo que recibe. */
 export interface LienzoDeFoto {
@@ -77,6 +79,13 @@ export interface MapaParaFoto extends MapaConFoto {
     opciones: { readonly layers: Array<string> },
   ) => ReadonlyArray<RasgoDelMapa>;
   readonly getSource: (fuente: string) => FuenteDelMapa | undefined;
+  readonly getLayer: (
+    capa: string,
+  ) => { readonly source: string; readonly sourceLayer?: string | undefined } | undefined;
+  readonly querySourceFeatures: (
+    fuente: string,
+    opciones: { readonly sourceLayer?: string },
+  ) => ReadonlyArray<RasgoDelMapa>;
 }
 
 /** Una fuente del estilo, como la da MapLibre. */
@@ -99,6 +108,14 @@ const comoPunto = (posicion: Coordenada): [number, number] => [posicion.longitud
  * busca en lo que el mapa ha pintado (`queryRenderedFeatures`) y no en las teselas: las partidas
  * por encima del zoom 15 dan las coordenadas desplazadas. Se busca en un radio de píxeles que a
  * ese zoom cubre la distancia que hace falta.
+ *
+ * Los números de portal se buscan en las teselas de su capa (`querySourceFeatures`) y no en lo
+ * pintado: MapLibre no pinta el número que queda bajo un marcador, y suele ser el del edificio.
+ * Con MapLibre 6.11 y las teselas partidas a z15, dan las mismas coordenadas que la tesela z14.
+ *
+ * Un edificio partido entre teselas llega en un trozo por tesela, cortado un poco más allá de su
+ * borde, a unos 29 m en España. No se cosen: se resalta el trozo más grande que contiene el
+ * emplazamiento (ADR 0022).
  */
 export const lienzoDeFoto = (mapa: MapaParaFoto): LienzoDeFoto => {
   const pintar = (dibujo: DibujoDelEdificio) => {
@@ -118,13 +135,18 @@ export const lienzoDeFoto = (mapa: MapaParaFoto): LienzoDeFoto => {
   const buscar = (posicion: Coordenada): EdificioEncontrado | undefined => {
     if (!mapa.getBounds().contains(comoPunto(posicion))) return undefined;
     const edificios = mapa
-      .queryRenderedFeatures(cajaDe(posicion, DISTANCIA_AL_EDIFICIO_M + 5), {
-        layers: [CAPA_EDIFICIOS],
-      })
-      .flatMap((rasgo) => edificioDeRasgo(rasgo) ?? []);
-    const portales = mapa
-      .queryRenderedFeatures(cajaDe(posicion, ALCANCE_PORTALES_M), { layers: [CAPA_PORTALES] })
-      .flatMap((rasgo) => portalDeRasgo(rasgo) ?? []);
+      .queryRenderedFeatures(cajaDe(posicion, ALCANCE_EDIFICIOS_M), { layers: [CAPA_EDIFICIOS] })
+      .flatMap(edificiosDeRasgo);
+    const capa = mapa.getLayer(CAPA_PORTALES);
+    const portales =
+      capa === undefined
+        ? []
+        : mapa
+            .querySourceFeatures(
+              capa.source,
+              capa.sourceLayer === undefined ? {} : { sourceLayer: capa.sourceLayer },
+            )
+            .flatMap(portalesDeRasgo);
     return elegirEdificio(posicion, edificios, portales);
   };
   return {
@@ -207,14 +229,18 @@ export interface FotoDelMapa {
   /** «Ver el edificio»: enciende la foto, vuela al emplazamiento y resalta su edificio. */
   readonly verEdificio: (clave: string, posicion: Coordenada) => void;
   /**
-   * Si la pista dice que OpenStreetMap no tiene dibujado el edificio: durante
+   * Si la pista dice que no hay ningún edificio dibujado en el emplazamiento: durante
    * `PISTA_SIN_CONTORNO_MS` después de un «Ver el edificio» que no lo encuentra.
    */
   readonly sinContorno: () => boolean;
 }
 
-/** Lo que dice la pista cuando «Ver el edificio» no encuentra ningún edificio. */
-export const PISTA_SIN_CONTORNO = "OpenStreetMap no tiene dibujado este edificio.";
+/**
+ * Lo que dice la pista cuando «Ver el edificio» no encuentra ningún edificio. No dice por qué,
+ * porque no se sabe. Lo más probable es que el emplazamiento esté en una torre, aunque también
+ * puede faltar el edificio en OpenStreetMap.
+ */
+export const PISTA_SIN_CONTORNO = "El mapa no tiene ningún edificio dibujado en el emplazamiento.";
 
 /** Lo que se ve esa pista. */
 export const PISTA_SIN_CONTORNO_MS = 4000;
@@ -300,8 +326,8 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
     { iguales: mismosCampos },
   );
 
-  // Sin edificio a menos de 25 m, la pista lo dice un rato. Pulsar otra vez, cambiar de
-  // emplazamiento o cerrar la ficha la quitan antes.
+  // Sin edificio que contenga el emplazamiento, la pista lo dice un rato. Pulsar otra vez,
+  // cambiar de emplazamiento o cerrar la ficha la quitan antes.
   const sinEdificio = createMemo(() => {
     const resultado = hallado();
     return resultado?.pedido === pedido() && resultado?.encontrado?.tipo === "ninguno"

@@ -71,10 +71,7 @@ describe("botón «Ver el edificio»", () => {
 
     setEstado({ tipo: "sin-contorno" });
     flush();
-    assert.strictEqual(
-      anuncio(),
-      "OpenStreetMap no tiene dibujado ningún edificio a menos de 25 metros del emplazamiento.",
-    );
+    assert.strictEqual(anuncio(), "El mapa no tiene ningún edificio dibujado en el emplazamiento.");
 
     setEstado({ tipo: "parado" });
     flush();

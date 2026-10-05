@@ -80,8 +80,8 @@ export const ponerFotoAerea = (mapa: MapaConFoto, encendida: boolean): void => {
 };
 
 /**
- * La fuente del edificio resaltado: su contorno (uno o varios polígonos, uno por trozo de
- * tesela) y, si lo tiene, el punto de su número de portal con `numero`.
+ * La fuente del edificio resaltado: su polígono y, si lo tiene, el punto de su número de portal
+ * con `numero`.
  */
 export const FUENTE_EDIFICIO = "edificio";
 
