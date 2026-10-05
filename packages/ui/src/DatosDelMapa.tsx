@@ -57,3 +57,19 @@ export function DatosDelMapa(props: DatosDelMapaProps) {
     </output>
   );
 }
+
+/**
+ * Que el mapa base aún carga, en pequeño bajo la fecha de los datos. Mientras, se ven la silueta
+ * de España y los límites. Sale a los 0,5 s: si el mapa base llega antes, no se ve.
+ */
+export function CargaDelMapa(props: { readonly texto: string }) {
+  return (
+    <output class="cinta inline-flex animate-aparecer items-center gap-1.5 bg-superficie/90 px-3 py-0.5 font-mono text-[11px] leading-5 text-tinta-suave [--pico:6px]">
+      <span
+        aria-hidden="true"
+        class="hexagono size-2 shrink-0 animate-pulse bg-primario motion-reduce:animate-none"
+      />
+      {props.texto}
+    </output>
+  );
+}

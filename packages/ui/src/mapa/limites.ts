@@ -7,9 +7,9 @@ import type { ColorDeToken } from "./tokens.ts";
 /**
  * Los límites del mapa (ADR 0023), para que ningún zoom se quede sin ellos: el país y, de cerca,
  * los municipios salen del mapa base; las comunidades autónomas y las provincias, de un fichero
- * propio sacado de los límites del IGN (`apps/web/src/mapa/limites.json`), que la web pone en
- * `FUENTE_LIMITES` después del primer pintado. A 1 km de tolerancia, de cerca la línea se separa
- * del límite real, así que desde el zoom 11 ceden el sitio a los municipales.
+ * propio sacado de los límites del IGN (`apps/web/src/mapa/limites.json`, a 1 km), que la web pone
+ * en `FUENTE_LIMITES` al arrancar y cambia por el de detalle (`limites-detalle.json`, a 150 m) la
+ * primera vez que el mapa pasa del zoom 7. Desde el 12,5 bajan al 60 % y mandan los municipales.
  */
 
 /** La fuente GeoJSON de las comunidades y las provincias, vacía hasta que llega el fichero. */

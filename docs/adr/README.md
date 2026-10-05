@@ -26,7 +26,7 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 | [0020](0020-buzon-de-aportaciones-en-convex.md) | Buzón de aportaciones en Convex, con límites por dispositivo, IP y en total, sin captcha, sin imágenes y con moderación |
 | [0021](0021-licencias.md) | CC0 para los datos y las aportaciones, 0BSD para el código, y los datos de terceros con su crédito |
 | [0022](0022-mapa-base-como-google-y-foto-aerea.md) | Mapa base al estilo de Google Maps (paleta A) y la foto aérea del PNOA como función aparte, con «Edificio» |
-| [0023](0023-limites-de-comunidades-y-provincias.md) | Límites de comunidades y provincias en un fichero propio de 8 KB, servido por la web |
+| [0023](0023-limites-de-comunidades-y-provincias.md) | Límites de comunidades y provincias en ficheros propios servidos por la web: uno general de 8 KB y uno de detalle de 37 KB desde z7 |
 | [0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md) | Datos discretos: hexágonos más pequeños de lejos, rótulos por población, centro visual de cada provincia, sin ausencias en el mapa y sin rótulos extranjeros por debajo de z9 |
 | [0025](0025-nombres-de-lugar-oficiales-en-una-sola-forma.md) | Nombres de lugar: el oficial, en una sola forma (la local en la Comunitat Valenciana, la castellana en el resto) |
 | [0026](0026-filtro-de-companias-con-la-red-que-usan.md) | Filtro de compañías en chips, con la red de Movistar que usa DIGI y la de Orange que usa Yoigo aparte, celdas del filtro y combinaciones de compañías en el resumen sin cambiar de formato |

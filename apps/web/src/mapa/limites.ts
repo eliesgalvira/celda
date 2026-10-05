@@ -7,11 +7,16 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 /**
- * Los límites de comunidades y provincias del mapa (ADR 0023). Son un fichero de la propia web
- * (`limites.json`, que escribe `pnpm run limites` en `tools/capas`), servido con la huella en el
- * nombre y una caché inmutable. No va en el JavaScript: se pide después del primer pintado
- * completo del mapa, para no quitarle red ni CPU al mapa base ni a los marcadores.
+ * Los límites de comunidades y provincias del mapa (ADR 0023), en dos ficheros de la propia web
+ * que escribe `pnpm run limites` en `tools/capas`, servidos con la huella en el nombre y una caché
+ * inmutable. El general (`limites.json`, simplificado a 1 km) se pide al arrancar y se dibuja con
+ * la silueta de España, antes que el mapa base. El de detalle (`limites-detalle.json`, a 150 m)
+ * se pide la primera vez que el mapa se acerca a `ZOOM_DEL_DETALLE` y sustituye al general en la
+ * misma fuente, sin parpadeo ni líneas dobles.
  */
+
+/** Desde este zoom, la línea a 1 km se separa a la vista de la real. */
+export const ZOOM_DEL_DETALLE = 7;
 
 /** El fichero de límites no ha llegado o no se puede leer. */
 export class LimitesNoDescargados extends Schema.TaggedError<LimitesNoDescargados>()(
@@ -35,8 +40,10 @@ export const leerLimites = Effect.fn("Mapa.leerLimites")(function* (url: string)
 
 /** Lo que hacen los límites con un mapa. En las pruebas, un mapa que apunta lo que recibe. */
 export interface MapaParaLimites {
-  /** Llama a `escuchar` una sola vez, cuando el mapa acaba su primer pintado completo. */
-  readonly trasElPrimerPintado: (escuchar: () => void) => void;
+  /** Llama a `escuchar` en cuanto el estilo del mapa puede recibir las líneas. */
+  readonly conEstilo: (escuchar: () => void) => void;
+  /** Llama a `escuchar` una sola vez, la primera vez que el mapa llega a `zoom` o más cerca. */
+  readonly alAcercarse: (zoom: number, escuchar: () => void) => void;
   /** Llama a `escuchar` cuando el mapa se quita: después ya no se le puede pedir nada. */
   readonly alQuitarse: (escuchar: () => void) => void;
   /** Pone las líneas en la fuente de los límites. */
@@ -44,17 +51,14 @@ export interface MapaParaLimites {
 }
 
 /**
- * Pone los límites en cada mapa que recibe, después de su primer pintado. El fichero se pide la
- * primera vez que hace falta y se guarda para toda la visita: mover el mapa no lo vuelve a pedir,
- * y si el mapa se crea otra vez, el nuevo recibe las mismas líneas. Si no llega, el mapa se queda
- * sin límites de comunidad y provincia y nada se reintenta solo; el siguiente mapa que se cree lo
- * vuelve a pedir.
+ * Un fichero que se pide la primera vez que hace falta y se guarda para toda la visita. Si no
+ * llega, da `undefined` y la siguiente vez se vuelve a pedir.
  */
-export const limitesDeLaVisita = (
+const unaVezPorVisita = (
   leer: Effect.Effect<LimitesDeComunidadesYProvincias, LimitesNoDescargados>,
-): ((mapa: MapaParaLimites) => void) => {
+): (() => Promise<LineasDeLimites | undefined>) => {
   let lineas: Promise<LineasDeLimites | undefined> | undefined;
-  const pedir = () => {
+  return () => {
     lineas ??= Effect.runPromiseExit(leer).then((salida) => {
       if (Exit.isSuccess(salida)) return lineasDeLimites(salida.value);
       lineas = undefined;
@@ -62,15 +66,44 @@ export const limitesDeLaVisita = (
     });
     return lineas;
   };
-  return (mapa) => {
-    let quitado = false;
-    mapa.alQuitarse(() => {
-      quitado = true;
-    });
-    mapa.trasElPrimerPintado(() => {
-      void pedir().then((llegadas) => {
-        if (llegadas !== undefined && !quitado) mapa.dibujar(llegadas);
+};
+
+/** Los dos ficheros de límites: el general, que va desde el principio, y el de detalle. */
+export interface LecturasDeLimites {
+  readonly general: Effect.Effect<LimitesDeComunidadesYProvincias, LimitesNoDescargados>;
+  readonly detalle: Effect.Effect<LimitesDeComunidadesYProvincias, LimitesNoDescargados>;
+}
+
+/**
+ * Los límites de la visita. `adelantar` pide ya el general, al cargarse el código del mapa.
+ * `poner` los dibuja en cada mapa que recibe: el general en cuanto el estilo puede recibirlo y el
+ * de detalle la primera vez que el mapa pasa de `ZOOM_DEL_DETALLE`. Una vez puesto el de detalle,
+ * el general ya no lo pisa aunque llegue tarde. Mover el mapa no vuelve a pedir nada, y si el mapa
+ * se crea otra vez, el nuevo recibe las mismas líneas. Si un fichero no llega, el mapa se queda
+ * con lo que tenga y nada se reintenta solo; el siguiente mapa que se cree lo vuelve a pedir.
+ */
+export const limitesDeLaVisita = (leer: LecturasDeLimites) => {
+  const general = unaVezPorVisita(leer.general);
+  const detalle = unaVezPorVisita(leer.detalle);
+  return {
+    adelantar: (): void => {
+      void general();
+    },
+    poner: (mapa: MapaParaLimites): void => {
+      let quitado = false;
+      let conDetalle = false;
+      mapa.alQuitarse(() => {
+        quitado = true;
       });
-    });
+      const conEstilo = new Promise<void>((resolver) => mapa.conEstilo(resolver));
+      const dibujar = (lineas: Promise<LineasDeLimites | undefined>, deDetalle: boolean) =>
+        void Promise.all([lineas, conEstilo]).then(([llegadas]) => {
+          if (llegadas === undefined || quitado || conDetalle) return;
+          conDetalle = deDetalle;
+          mapa.dibujar(llegadas);
+        });
+      dibujar(general(), false);
+      mapa.alAcercarse(ZOOM_DEL_DETALLE, () => dibujar(detalle(), true));
+    },
   };
 };

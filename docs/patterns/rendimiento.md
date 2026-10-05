@@ -358,11 +358,25 @@ Medido el 04/10/2026 en Chromium sin interfaz con SwiftShader, con la build loca
 - **Celdas.** En el Eixample a z16 en el móvil, 163 con solo Movistar y 14 con solo DIGI.
 - **Celdas con la red usada** (segunda decisión del 04/10/2026), en el móvil con el Eixample a z16: del toque a las celdas nuevas en el mapa, 179-214 ms con la espera; MapLibre acaba de pintar a los 521-574 ms, y a los 907 con un filtro nuevo que agrupa el Worker. Se ven 21 celdas con solo DIGI, todas claras, y 11 con solo Yoigo. Quieto 20 s: 0 peticiones y 0 llamadas.
 
+## Silueta y límites al arrancar (05/10/2026)
+
+Medido el 05/10/2026 en Chromium sin interfaz con SwiftShader, con la build local servida como en Vercel, la publicación de toda España del 30/09/2026 y OpenFreeMap retrasado 3 s con `page.route`. Móvil de 390 × 844 a DPR 2 con la CPU a ×4, cinco rondas alternadas contra `celda/v1` (ba690a3), medianas desde que se pide la página:
+
+| | `celda/v1` | Con la silueta |
+|---|---|---|
+| Primer pintado con contenido | 564 ms | 564 ms |
+| Lienzo del mapa creado | 855 ms | 832 ms |
+| Primeros marcadores | 1.298 ms, sobre el fondo liso | 1.551 ms, sobre la silueta con los límites |
+
+- **El coste** son unos 250 ms hasta los primeros marcadores, que ahora esperan a que MapLibre pinte la silueta: procesar el contorno en el worker y el primer fotograma, que con SwiftShader compila los sombreadores en la CPU. Con GPU debería ser menos; no se ha medido.
+- **Peso.** La primera pantalla crece 0,4 KB con `gzip -9` (229.535 → 229.894 bytes): `CargaDelMapa` y la precarga. El trozo del mapa, 0,3 KB (309.507 → 309.841): las capas de la silueta y la carga en dos niveles. El contorno ya iba en ese trozo.
+- **Límites.** Una sola petición del general en toda la visita: el `preload` empieza a los 273 ms y acaba a los 593, antes que el lienzo, con 8.321 bytes; la del código del mapa reutiliza esa respuesta. Antes se pedía tras el primer `idle`, que con el callejero retrasado llegaba después de los 3 s. El de detalle, 36.718 bytes con `gzip -9`, se pide una vez al pasar de z7.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.
 
-**Los marcadores salen en cuanto existe el mapa.** Solo necesitan su proyección, y la capa llega un segundo antes que la primera tesela. Se pintan sobre el fondo liso mientras sigue el aviso «Cargando el mapa base», como ya pedía el ADR 0010 si el callejero no llega. Con ×4, los primeros marcadores salen 1,1 s antes.
+**Los marcadores salen en cuanto existe el mapa.** Solo necesitan su proyección, y la capa llega un segundo antes que la primera tesela. Se pintaban sobre el fondo liso mientras seguía el aviso «Cargando el mapa base», como ya pedía el ADR 0010 si el callejero no llega. Con ×4, los primeros marcadores salen 1,1 s antes. Desde el 05/10/2026 esperan a la silueta de España, unos 250 ms más (ver «Silueta y límites al arrancar»).
 
 **La agrupación se decide al asentarse el mapa** (`apps/web/src/mapa/vista.ts`). Antes, cada vez que el zoom cruzaba un nivel, a mitad del gesto, se volvía a agrupar: crear y quitar decenas de nodos, en los fotogramas en que MapLibre también trabaja más. Un pellizco de tres niveles lo hacía tres veces. Ahora, al acercar, lo dibujado se separa con el zoom y la agrupación nueva llega al soltar, con su transición. Al alejar sí se agrupa por el camino, pero solo si además la vista se ha salido de la caja con margen ya dibujada, para que los bordes no queden vacíos. Es lo que quita los fotogramas de más de 50 ms con ×4.
 

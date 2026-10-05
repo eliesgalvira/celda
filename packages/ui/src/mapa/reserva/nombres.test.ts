@@ -6,6 +6,7 @@ import {
   featureFilter,
 } from "@maplibre/maplibre-gl-style-spec";
 
+import { CONTORNO_DE_PRUEBA } from "../../pruebas/contorno.ts";
 import { MUNICIPIOS_DE_CELDA } from "../rotulos.ts";
 import { estiloDeReserva } from "./estilo.ts";
 import { NOMBRE_DEL_IGN } from "./nombres.ts";
@@ -33,7 +34,7 @@ const escribe = (expresion: ExpressionSpecification, nombre: string): string => 
   return String(compilada.value.evaluate({ zoom: 12 }, lugar(nombre), {}));
 };
 
-const ESTILO = estiloDeReserva(() => "#000");
+const ESTILO = estiloDeReserva(() => "#000", CONTORNO_DE_PRUEBA);
 
 /** Si la capa `id` deja ver un lugar, con estos municipios de Celda. */
 const seVe = (

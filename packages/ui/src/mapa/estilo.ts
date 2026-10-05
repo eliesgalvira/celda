@@ -28,6 +28,7 @@ import {
   FUENTE_SERVICIO,
   FUENTE_SERVICIO_LINEA,
 } from "./servicio.ts";
+import { capasSilueta, fuentesSilueta } from "./silueta.ts";
 import { capasSuelo } from "./suelo.ts";
 import type { ColorDeToken } from "./tokens.ts";
 import { capasVias } from "./vias.ts";
@@ -116,7 +117,8 @@ export const capasDeCelda = (color: ColorDeToken): ReadonlyArray<LayerSpecificat
  * El estilo del mapa base de OpenFreeMap (esquema OpenMapTiles) con la paleta A del tema (ADR
  * 0022): el suelo, los límites, las vías por clase y los rótulos por importancia. No lleva ningún
  * color escrito: todos salen de `color`. Los límites de comunidades y provincias van en
- * `FUENTE_LIMITES`, vacía hasta que la web la llena después del primer pintado (ADR 0023). Lleva
+ * `FUENTE_LIMITES`, vacía hasta que la web la llena al arrancar (ADR 0023). Mientras carga el
+ * callejero, la silueta de España (`silueta.ts`) tapa el suelo. Lleva
  * también las capas de Celda (`capasDeCelda`), con sus fuentes vacías hasta que la web las llena
  * (`fuentesDeCelda`), entre las vías y los rótulos.
  *
@@ -124,7 +126,8 @@ export const capasDeCelda = (color: ColorDeToken): ReadonlyArray<LayerSpecificat
  * edificio que resalta «Ver el edificio» bajo los rótulos, y en cada capa del mapa base cómo se ve
  * sobre ella. Se enciende con el estado `FOTO_AEREA` (`ponerFotoAerea`).
  *
- * `espana` es el contorno con que los rótulos de lugar de fuera de España no salen de lejos, y
+ * `espana` es el contorno de la silueta y el que hace que los rótulos de lugar de fuera de España
+ * no salgan de lejos, y
  * `comunitatValenciana`, el que decide la forma de los nombres con «/» (ADR 0025). Llegan de fuera,
  * y no de un `import` de este módulo, para que sus 24 y 3,5 KB vayan con el código del mapa y no
  * con el de la primera pantalla, que también usa este módulo.
@@ -143,9 +146,11 @@ export const estiloMapa = (
   sources: {
     [FUENTE_MAPA_BASE]: { type: "vector", url: TILEJSON },
     ...fuentesDeCelda(),
+    ...fuentesSilueta(espana),
   },
   layers: [
     ...capasSuelo(FUENTE_MAPA_BASE, color, [capaFoto()]),
+    ...capasSilueta(color),
     ...capasLimites(FUENTE_MAPA_BASE, color),
     ...capasVias(FUENTE_MAPA_BASE, color),
     ...capasDeCelda(color),

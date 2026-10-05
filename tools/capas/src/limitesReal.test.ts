@@ -10,22 +10,26 @@ import * as Schema from "effect/Schema";
 
 import {
   ficheroDeLimites,
+  LIMITES_DE_DETALLE,
+  LIMITES_GENERALES,
   limitesDeComunidadesYProvincias,
+  type NivelDeLimites,
   type TipoDeLimite,
   tiposDeLimite,
-  TOLERANCIA_LIMITES_METROS,
-  UNIDADES_LIMITES_POR_GRADO,
 } from "./limites.ts";
 
-/** Los límites del repositorio y el fichero que escribe `pnpm run limites` para la web. */
+/** Los límites del repositorio y los ficheros que escribe `pnpm run limites` para la web. */
 const MUNICIPIOS = "../../packages/publicacion/datos/municipios.json";
 const LIMITES = "../../apps/web/src/mapa/limites.json";
+const LIMITES_DETALLE = "../../apps/web/src/mapa/limites-detalle.json";
 
 /**
- * Lo que puede pesar el fichero, que la web descarga en cada visita. El ADR 0023 lo dejó en
- * 20.569 bytes y 8.179 con gzip; esto es un 10 % más.
+ * Lo que puede pesar cada fichero. El general lo descarga la web en cada visita: el ADR 0023 lo
+ * dejó en 20.569 bytes y 8.179 con gzip, y esto es un 10 % más. El de detalle, solo al acercarse:
+ * pesaba 92.885 bytes y 36.661 con gzip el 05/10/2026, y esto también es un 10 % más.
  */
 const PRESUPUESTO = { bytes: 22_600, gzip: 9_000 };
+const PRESUPUESTO_DETALLE = { bytes: 102_000, gzip: 40_500 };
 
 const decodificarLimites = Schema.decodeEffect(Schema.fromJsonString(LimitesDeMunicipios));
 const decodificarGuardados = Schema.decodeEffect(
@@ -37,8 +41,19 @@ const leer = Effect.gen(function* () {
   return {
     limites: yield* decodificarLimites(yield* fs.readFileString(MUNICIPIOS)),
     guardado: yield* fs.readFileString(LIMITES),
+    detalle: yield* fs.readFileString(LIMITES_DETALLE),
   };
 }).pipe(Effect.provide(NodeServices.layer));
+
+/** Lo que pesa un fichero, tal cual y con gzip. */
+const pesoDe = (texto: string) =>
+  Effect.promise(async () => {
+    const bytes = new TextEncoder().encode(texto);
+    const conGzip = await new Response(
+      new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip")),
+    ).arrayBuffer();
+    return { bytes: bytes.length, gzip: conGzip.byteLength };
+  });
 
 /**
  * Pares de municipios vecinos, por su nombre en el IGN, y lo que separa el arco que comparten:
@@ -100,44 +115,80 @@ const vertices = (linea: ReadonlyArray<number>, porGrado: number) => {
 const cerca = (
   lineas: ReadonlyArray<ReadonlyArray<number>>,
   punto: readonly [number, number],
+  porGrado: number = LIMITES_GENERALES.unidadesPorGrado,
 ): number =>
   Math.min(
     ...lineas.flatMap((linea) => {
-      const v = vertices(linea, UNIDADES_LIMITES_POR_GRADO);
+      const v = vertices(linea, porGrado);
       return v.slice(1).map((b, k) => distancia(punto, v[k] ?? b, b));
     }),
   );
 
+/** El fichero que escribe la orden para un nivel. */
+const esperado = (limites: LimitesDeMunicipios, nivel: NivelDeLimites) =>
+  ficheroDeLimites(
+    limitesDeComunidadesYProvincias(limites, nivel.toleranciaMetros, nivel.unidadesPorGrado),
+  );
+
+/**
+ * Límites entre comunidades que siguen un río, donde la línea simplificada a 1 km cortaba los
+ * meandros: el Cabriel entre Cuenca y València junto a Utiel, el Ebro entre La Rioja y Navarra y
+ * el Tajo entre Madrid y Toledo en Aranjuez.
+ */
+const POR_UN_RIO: ReadonlyArray<readonly [string, string]> = [
+  ["Minglanilla", "Venta del Moro"],
+  ["Minglanilla", "Villargordo del Cabriel"],
+  ["Alcanadre", "Mendavia"],
+  ["Aranjuez", "Añover de Tajo"],
+];
+
 describe("límites de comunidades y provincias guardados en el repositorio", () => {
-  it.effect("son los que salen de los límites de municipios", () =>
+  it.effect("son los que salen de los límites de municipios, el general y el de detalle", () =>
     Effect.gen(function* () {
-      const { limites, guardado } = yield* leer;
-      const esperados = ficheroDeLimites(
-        limitesDeComunidadesYProvincias(
-          limites,
-          TOLERANCIA_LIMITES_METROS,
-          UNIDADES_LIMITES_POR_GRADO,
-        ),
-      );
-      assert.strictEqual(
-        guardado,
-        esperados,
-        "los límites están desfasados: vuelve a escribirlos con `pnpm run limites`",
-      );
+      const { limites, guardado, detalle } = yield* leer;
+      const desfasados =
+        "los límites están desfasados: vuelve a escribirlos con `pnpm run limites`";
+      assert.strictEqual(guardado, esperado(limites, LIMITES_GENERALES), desfasados);
+      assert.strictEqual(detalle, esperado(limites, LIMITES_DE_DETALLE), desfasados);
     }),
   );
 
   it.effect("caben en su presupuesto", () =>
     Effect.gen(function* () {
-      const { guardado } = yield* leer;
-      const bytes = new TextEncoder().encode(guardado);
-      const conGzip = yield* Effect.promise(() =>
-        new Response(
-          new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip")),
-        ).arrayBuffer(),
-      );
-      assert.isAtMost(bytes.length, PRESUPUESTO.bytes);
-      assert.isAtMost(conGzip.byteLength, PRESUPUESTO.gzip);
+      const { guardado, detalle } = yield* leer;
+      const general = yield* pesoDe(guardado);
+      assert.isAtMost(general.bytes, PRESUPUESTO.bytes);
+      assert.isAtMost(general.gzip, PRESUPUESTO.gzip);
+      const deDetalle = yield* pesoDe(detalle);
+      assert.isAtMost(deDetalle.bytes, PRESUPUESTO_DETALLE.bytes);
+      assert.isAtMost(deDetalle.gzip, PRESUPUESTO_DETALLE.gzip);
+    }),
+  );
+
+  it.effect("el de detalle va sobre la línea del IGN donde un río hace de límite", () =>
+    Effect.gen(function* () {
+      const { limites, detalle } = yield* leer;
+      const fichero = yield* decodificarGuardados(detalle);
+      const arcosDe = (nombre: string) => {
+        const territorio = limites.territorios.find((t) => t.nombre === nombre);
+        assert.isDefined(territorio, nombre);
+        return new Set(territorio?.poligonos.flat(2).map(arcoDe));
+      };
+      for (const [a, b] of POR_UN_RIO) {
+        const deB = arcosDe(b);
+        const comunes = [...arcosDe(a)].filter((arco) => deB.has(arco));
+        assert.isNotEmpty(comunes, `${a} y ${b} no son vecinos`);
+        // Cada vértice del IGN queda a menos de la tolerancia, con 20 m de margen por el redondeo.
+        for (const arco of comunes) {
+          for (const punto of vertices(limites.arcos[arco] ?? [], limites.unidadesPorGrado)) {
+            assert.isAtMost(
+              cerca(fichero.comunidades, punto, LIMITES_DE_DETALLE.unidadesPorGrado),
+              LIMITES_DE_DETALLE.toleranciaMetros + 20,
+              `${a} y ${b}, ${String(punto)}`,
+            );
+          }
+        }
+      }
     }),
   );
 
@@ -172,17 +223,19 @@ describe("límites de comunidades y provincias guardados en el repositorio", () 
     }),
   );
 
-  it.effect("ningún tramo sale dos veces", () =>
+  it.effect("ningún tramo sale dos veces, ni en el general ni en el de detalle", () =>
     Effect.gen(function* () {
-      const { guardado } = yield* leer;
-      const fichero = yield* decodificarGuardados(guardado);
-      const vistos = new Set<string>();
-      for (const linea of [...fichero.comunidades, ...fichero.provincias]) {
-        const v = vertices(linea, 1);
-        for (const [k, b] of v.slice(1).entries()) {
-          const tramo = [String(v[k]), String(b)].toSorted().join(" ");
-          assert.isFalse(vistos.has(tramo), `${tramo} sale dos veces`);
-          vistos.add(tramo);
+      const { guardado, detalle } = yield* leer;
+      for (const texto of [guardado, detalle]) {
+        const fichero = yield* decodificarGuardados(texto);
+        const vistos = new Set<string>();
+        for (const linea of [...fichero.comunidades, ...fichero.provincias]) {
+          const v = vertices(linea, 1);
+          for (const [k, b] of v.slice(1).entries()) {
+            const tramo = [String(v[k]), String(b)].toSorted().join(" ");
+            assert.isFalse(vistos.has(tramo), `${tramo} sale dos veces`);
+            vistos.add(tramo);
+          }
         }
       }
     }),

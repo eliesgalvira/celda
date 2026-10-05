@@ -44,7 +44,7 @@ import { escribirZonas } from "./zonas.ts";
  * - `nombres`: escribe desde esos límites, sin descargar nada, la tabla de nombres de lugar de los
  *   oficiales bilingües y el contorno de la Comunitat Valenciana (ADR 0025).
  * - `limites`: escribe desde esos límites, sin descargar nada, los de comunidades autónomas y
- *   provincias que la web pinta en el mapa (ADR 0023).
+ *   provincias que la web pinta en el mapa, el fichero general y el de detalle (ADR 0023).
  * - `centros`: escribe desde esos límites y el padrón, sin descargar nada, el centro visual y los
  *   habitantes de cada provincia y los habitantes de las ciudades, con los que el mapa decide
  *   dónde va el hexágono de cada provincia y qué se dibuja cuando un rótulo y un hexágono se
@@ -115,12 +115,17 @@ const configNombres = Config.all({
 });
 
 /**
- * Dónde escribe `limites` los de comunidades y provincias: la web los sirve como recurso
- * inmutable con la huella en el nombre.
+ * Dónde escribe `limites` los de comunidades y provincias, el general y el de detalle: la web los
+ * sirve como recursos inmutables con la huella en el nombre.
  */
-const configLimites = Config.String("CELDA_LIMITES").pipe(
-  Config.withDefault("../../apps/web/src/mapa/limites.json"),
-);
+const configLimites = Config.all({
+  general: Config.String("CELDA_LIMITES").pipe(
+    Config.withDefault("../../apps/web/src/mapa/limites.json"),
+  ),
+  detalle: Config.String("CELDA_LIMITES_DETALLE").pipe(
+    Config.withDefault("../../apps/web/src/mapa/limites-detalle.json"),
+  ),
+});
 
 /**
  * Dónde escribe `centros` el centro visual y los habitantes de cada provincia y los habitantes de
@@ -269,12 +274,13 @@ const nombres = Effect.gen(function* () {
 
 const comunidadesYProvincias = Effect.gen(function* () {
   const { municipios } = yield* configMunicipios;
-  const destino = yield* configLimites;
-  const { limites, fichero } = yield* escribirLimites(municipios, destino);
-  yield* Effect.log(
-    `${limites.comunidades.length} líneas de comunidad y ${limites.provincias.length} de provincia,`,
-    `${fichero.length} bytes, escritas en ${destino}`,
-  );
+  const escritos = yield* escribirLimites(municipios, yield* configLimites);
+  for (const { limites, fichero, destino } of escritos) {
+    yield* Effect.log(
+      `${limites.comunidades.length} líneas de comunidad y ${limites.provincias.length} de provincia`,
+      `a ${limites.toleranciaMetros} m, ${fichero.length} bytes, escritas en ${destino}`,
+    );
+  }
 });
 
 const centros = Effect.gen(function* () {

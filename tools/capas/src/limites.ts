@@ -9,19 +9,35 @@ import { codificarArco, simplificarArco } from "./topologia.ts";
 
 /**
  * Los límites de comunidades autónomas y provincias que pinta el mapa (ADR 0023), sacados de los
- * límites de municipios del IGN del repositorio sin descargar nada. La orden `limites` los vuelve
- * a escribir cuando cambian.
+ * límites de municipios del IGN del repositorio sin descargar nada, en dos ficheros: el general,
+ * a 1 km, y el de detalle, a 150 m. La orden `limites` los vuelve a escribir cuando cambian.
  */
+
+/** Con qué tolerancia y en qué unidades se escribe un fichero de límites. */
+export interface NivelDeLimites {
+  readonly toleranciaMetros: number;
+  /** Unidades por grado de las líneas: unas diez veces menos que la tolerancia, o menos. */
+  readonly unidadesPorGrado: number;
+}
 
 /**
- * Tolerancia de la simplificación. A 1 km el fichero pesa unos 8 KB con gzip y la línea se ve
- * en su sitio hasta el zoom 11, donde ceden el sitio a los límites municipales del mapa base
- * (prototipo del 02/10/2026).
+ * El fichero general, que la web pide al arrancar y pinta de lejos. A 1 km pesa unos 8 KB con
+ * gzip y se ve en su sitio hasta el zoom 7 (prototipo del 02/10/2026). Milésimas de grado: unos
+ * 100 m, de sobra para esa tolerancia.
  */
-export const TOLERANCIA_LIMITES_METROS = 1000;
+export const LIMITES_GENERALES: NivelDeLimites = { toleranciaMetros: 1000, unidadesPorGrado: 1000 };
 
-/** Milésimas de grado: unos 100 m, de sobra para una tolerancia de 1 km. */
-export const UNIDADES_LIMITES_POR_GRADO = 1000;
+/**
+ * El fichero de detalle, que la web pide la primera vez que el mapa pasa del zoom 7. A 150 m la
+ * línea va sobre la del IGN en los zooms en que se trabaja, de 9 a 11 (a z11 son unos 5 px), y
+ * pesa unos 37 KB con gzip; a 200 m pesaba 31 KB y a 100 m, 46 KB (05/10/2026). En
+ * diezmilésimas de grado, unos 10 m: con cincomilésimas pesaba 4 KB menos, pero al redondear
+ * una línea volvía sobre sí misma.
+ */
+export const LIMITES_DE_DETALLE: NivelDeLimites = {
+  toleranciaMetros: 150,
+  unidadesPorGrado: 10_000,
+};
 
 /** Qué separa un arco: dos comunidades autónomas o dos provincias de la misma. */
 export type TipoDeLimite = "comunidad" | "provincia";
@@ -166,22 +182,37 @@ export const ficheroDeLimites = (limites: LimitesDeComunidadesYProvincias): stri
 
 const decodificarLimites = Schema.decodeEffect(Schema.fromJsonString(LimitesDeMunicipios));
 
+/** Dónde escribe la orden `limites` cada fichero. */
+export interface DestinosDeLimites {
+  readonly general: string;
+  readonly detalle: string;
+}
+
 /**
- * Lee los límites de `municipios` y escribe en `destino` los de comunidades y provincias.
- * Devuelve lo escrito y el fichero.
+ * Lee los límites de `municipios` y escribe los de comunidades y provincias en sus dos ficheros,
+ * el general y el de detalle. Devuelve lo escrito en cada uno.
  */
 export const escribirLimites = Effect.fn("Capas.escribirLimites")(function* (
   municipios: string,
-  destino: string,
+  destinos: DestinosDeLimites,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const deMunicipios = yield* decodificarLimites(yield* fs.readFileString(municipios));
-  const limites = limitesDeComunidadesYProvincias(
-    deMunicipios,
-    TOLERANCIA_LIMITES_METROS,
-    UNIDADES_LIMITES_POR_GRADO,
-  );
-  const fichero = ficheroDeLimites(limites);
-  yield* fs.writeFileString(destino, fichero);
-  return { limites, fichero };
+  const escribir = Effect.fn("Capas.escribirNivelDeLimites")(function* (
+    nivel: NivelDeLimites,
+    destino: string,
+  ) {
+    const limites = limitesDeComunidadesYProvincias(
+      deMunicipios,
+      nivel.toleranciaMetros,
+      nivel.unidadesPorGrado,
+    );
+    const fichero = ficheroDeLimites(limites);
+    yield* fs.writeFileString(destino, fichero);
+    return { limites, fichero, destino };
+  });
+  return [
+    yield* escribir(LIMITES_GENERALES, destinos.general),
+    yield* escribir(LIMITES_DE_DETALLE, destinos.detalle),
+  ] as const;
 });

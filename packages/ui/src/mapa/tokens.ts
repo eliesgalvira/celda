@@ -55,6 +55,8 @@ export const TOKENS_MAPA = [
   "mapa-sinr-5",
   "mapa-sinr-6",
   "mapa-referencia",
+  // Lo que rodea la silueta de España mientras carga el mapa base.
+  "mapa-silueta-fuera",
   // Lo que va sobre la foto aérea: el mismo color en los dos temas, porque la foto no cambia.
   "mapa-foto-linea",
   "mapa-foto-autopista",

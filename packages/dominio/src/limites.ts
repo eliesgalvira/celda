@@ -5,7 +5,8 @@ import { FuenteDeMunicipios } from "./municipio.ts";
 /**
  * Los límites de comunidades autónomas y provincias que pinta el mapa (ADR 0023). Salen de los
  * límites de municipios del IGN del repositorio (ADR 0017) con la orden `limites` de
- * `tools/capas`, y la web los descarga una vez, después del primer pintado del mapa.
+ * `tools/capas`, en dos ficheros: el general, a 1 km, que la web descarga al arrancar, y el de
+ * detalle, a 150 m, que descarga la primera vez que el mapa se acerca.
  *
  * Cada línea es una cadena de arcos del IGN, como `[x0, y0, dx1, dy1, …]`: el primer vértice y la
  * diferencia de cada uno con el anterior, en enteros de `1 / unidadesPorGrado` grados, longitud

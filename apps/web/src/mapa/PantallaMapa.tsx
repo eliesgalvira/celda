@@ -13,7 +13,7 @@ import { Aviso } from "@celda/ui/Aviso.tsx";
 import { Boton } from "@celda/ui/Boton.tsx";
 import { ControlDelMapa } from "@celda/ui/ControlDelMapa.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
-import { DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
+import { CargaDelMapa, DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
 import { IconoOndas } from "@celda/ui/interferencia/PanelInterferencia.tsx";
 import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
@@ -196,8 +196,8 @@ export function PantallaMapa() {
   /** El mapa, cuando ya enseña el callejero. */
   const [mapaListo, setMapaListo] = createSignal<MapaMapLibre>();
   /**
-   * El mapa, en cuanto existe. Los marcadores solo necesitan su proyección y salen ya, sobre el
-   * fondo, sin esperar a las teselas del callejero.
+   * El mapa, en cuanto pinta la silueta de España. Los marcadores solo necesitan su proyección y
+   * salen ya, sobre la silueta y los límites, sin esperar a las teselas del callejero.
    */
   const [mapaCreado, setMapaCreado] = createSignal<MapaMapLibre>();
   /** El lector de los rótulos de ciudad, que llega con el código del mapa (ADR 0024). */
@@ -314,7 +314,10 @@ export function PantallaMapa() {
       nuevo.once("load", mirarEncuadre);
       mapa = nuevo;
       setLectorDeRotulos(() => modulo.LECTOR_DE_ROTULOS);
-      setMapaCreado(nuevo);
+      // Los marcadores esperan a que se vea la silueta de España.
+      modulo.trasLaSilueta(nuevo, () => {
+        if (mapa === nuevo) setMapaCreado(nuevo);
+      });
     } catch (causa) {
       // MapLibre lanza un Error que nombra WebGL si no consigue el contexto.
       fallar(causa instanceof Error && /webgl/iu.test(causa.message) ? "sin-webgl" : "interno");
@@ -1097,11 +1100,12 @@ export function PantallaMapa() {
     return redesUsadas(actual).filter((r) => suyo.companias.includes(r.red));
   });
 
+  /** Solo los fallos van en el centro. Mientras carga, la silueta y `CargaDelMapa` bastan. */
   const aviso = createMemo(() => {
     const actual = estado();
-    return actual.tipo === "listo" ? undefined : (
-      <AvisoMapa estado={actual} callejero={callejero()} reintentar={arrancar} />
-    );
+    return actual.tipo === "fallo" ? (
+      <AvisoMapa motivo={actual.motivo} callejero={callejero()} reintentar={arrancar} />
+    ) : undefined;
   });
 
   return (
@@ -1125,6 +1129,11 @@ export function PantallaMapa() {
                   reintentar={cargarCapa}
                   reintentarProvincias={reintentarProvincias}
                 />
+              }
+              carga={
+                estado().tipo === "cargando" ? (
+                  <CargaDelMapa texto="Cargando el mapa…" />
+                ) : undefined
               }
               filtro={
                 <AvisoDelFiltro
@@ -1496,37 +1505,28 @@ const EXPLICACION_FALLO_CAPA = {
 } as const;
 
 function AvisoMapa(props: {
-  readonly estado: EstadoMapa;
+  readonly motivo: MotivoFallo;
   readonly callejero: Callejero;
   readonly reintentar: () => void;
 }) {
   const reintentar = <Boton onClick={() => props.reintentar()}>Reintentar</Boton>;
   return (
     <Switch>
-      <Match when={props.estado.tipo === "cargando"}>
-        <Aviso tono="espera" titulo="Cargando el mapa base">
-          {props.callejero === "reserva"
-            ? "OpenFreeMap no responde, así que el callejero se carga desde el IGN."
-            : "El callejero se carga desde OpenFreeMap."}
-        </Aviso>
-      </Match>
-      <Match when={props.estado.tipo === "fallo" && props.estado.motivo === "sin-webgl"}>
+      <Match when={props.motivo === "sin-webgl"}>
         <Aviso tono="fallo" titulo="Este navegador no puede dibujar el mapa">
-          Para dibujar el mapa hace falta WebGL, que este navegador tiene desactivado o no admite.
-          Prueba con otro navegador o activa la aceleración gráfica en su configuración.
+          Hace falta WebGL. Prueba con otro navegador o activa la aceleración gráfica.
         </Aviso>
       </Match>
-      <Match when={props.estado.tipo === "fallo" && props.estado.motivo === "sin-respuesta"}>
-        <Aviso tono="fallo" titulo="No se ha podido cargar el mapa base" acciones={reintentar}>
+      <Match when={props.motivo === "sin-respuesta"}>
+        <Aviso tono="fallo" titulo="No ha cargado el mapa base" acciones={reintentar}>
           {props.callejero === "reserva"
-            ? "No ha cargado el callejero de OpenFreeMap, y tampoco el del IGN, que se usa como reserva. Puede que falle la conexión o que los servidores estén bloqueados."
-            : "No ha cargado el callejero, que viene de los servidores de OpenFreeMap. Puede que falle la conexión o que el servidor esté bloqueado."}
+            ? "Tampoco ha cargado el de reserva del IGN. Puede que falle la conexión o que los servidores estén bloqueados."
+            : "Puede que falle la conexión o que el servidor esté bloqueado."}
         </Aviso>
       </Match>
-      <Match when={props.estado.tipo === "fallo"}>
+      <Match when={props.motivo === "interno"}>
         <Aviso tono="fallo" titulo="Algo ha fallado al preparar el mapa" acciones={reintentar}>
-          El fallo viene de Celda y no depende de tu conexión. Si se repite al reintentar, recarga
-          la página.
+          Si se repite al reintentar, recarga la página.
         </Aviso>
       </Match>
     </Switch>
