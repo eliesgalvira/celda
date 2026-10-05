@@ -47,6 +47,13 @@ export interface DisposicionMapaProps {
   readonly controles: JSX.Element;
   /** El botón de ubicación con su menú (`MenuUbicacion`), siempre a la vista. */
   readonly botonUbicacion?: JSX.Element;
+  /**
+   * Un control que solo sale cuando hace algo, como «Foto aérea» de cerca. Va encima de la columna
+   * de los controles sin ocupar sitio en ella, así que aparecer y desaparecer no mueve nada.
+   */
+  readonly controlEncima?: JSX.Element;
+  /** Si `controlEncima` se ve. Escondido, no se ve, no se enfoca y no se lee. */
+  readonly controlEncimaVisible?: boolean;
   /** Controles que van al final de «Funciones», como los ajustes. */
   readonly controlesSecundarios?: JSX.Element;
   readonly atribucion: JSX.Element;
@@ -191,6 +198,17 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         abierta, y «Funciones», que despliega el resto con una línea que explica cada uno.
       */}
       <div class="absolute right-1.5 bottom-[max(0.25rem,env(safe-area-inset-bottom))] z-10 flex flex-col items-end gap-1 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.25rem)] max-md:group-data-vista/mapa:bottom-[calc(22.5rem+3.5rem)] max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-14">
+        <Show when={props.controlEncima}>
+          <div
+            inert={props.controlEncimaVisible !== true}
+            class={
+              "absolute right-0 bottom-full mb-1 transition-[opacity,visibility] duration-150 ease-out motion-reduce:transition-none " +
+              (props.controlEncimaVisible === true ? "visible opacity-100" : "invisible opacity-0")
+            }
+          >
+            <AspectoDeControl value="pastilla">{props.controlEncima}</AspectoDeControl>
+          </div>
+        </Show>
         <div class="mr-3 mb-1 flex flex-col gap-1 max-md:hidden">
           <AspectoDeControl value="zoom">{props.zoom}</AspectoDeControl>
         </div>

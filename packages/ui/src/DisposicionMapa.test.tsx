@@ -22,7 +22,7 @@ const CITA: Credito = {
   aviso: true,
 };
 
-const montar = (creditos: ReadonlyArray<Credito> = [OPENSTREETMAP]) => {
+const montar = (creditos: ReadonlyArray<Credito> = [OPENSTREETMAP], encimaVisible = false) => {
   const pantalla = render(() => (
     <DisposicionMapa
       nombre="Mapa de España"
@@ -32,6 +32,8 @@ const montar = (creditos: ReadonlyArray<Credito> = [OPENSTREETMAP]) => {
       zoom={<ControlDelMapa etiqueta="Acercar" icono="+" />}
       controles={<ControlDelMapa etiqueta="Interferencia" icono="≈" />}
       botonUbicacion={<ControlDelMapa etiqueta="Ubicación" icono="⌖" />}
+      controlEncima={<ControlDelMapa etiqueta="Foto aérea" icono="▣" />}
+      controlEncimaVisible={encimaVisible}
       controlesSecundarios={<ControlDelMapa etiqueta="Ajustes" icono="≡" />}
       atribucion={<Atribucion creditos={creditos} />}
     />
@@ -133,5 +135,19 @@ describe("DisposicionMapa", () => {
     flush();
     assert.isDefined(getByRole("button", { name: "Interferencia" }));
     assert.isDefined(getByRole("button", { name: "Ajustes" }));
+  });
+
+  it("el control de encima no ocupa sitio en la columna, y escondido no se enfoca ni se lee", () => {
+    const escondido = montar();
+    const foto = escondido.getByText("Foto aérea").closest("[inert]");
+    assert.isNotNull(foto);
+    assert.include(foto?.className ?? "", "absolute");
+    assert.include(foto?.className ?? "", "invisible");
+    escondido.unmount();
+
+    const visible = montar([OPENSTREETMAP], true);
+    const boton = visible.getByRole("button", { name: "Foto aérea" });
+    assert.isNull(boton.closest("[inert]"));
+    assert.notInclude(boton.parentElement?.closest(".absolute")?.className ?? "", "invisible");
   });
 });

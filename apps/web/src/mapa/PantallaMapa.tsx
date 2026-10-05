@@ -1262,19 +1262,22 @@ export function PantallaMapa() {
                   />
                 </>
               }
+              controlEncima={
+                <ControlDelMapa
+                  etiqueta="Foto aérea"
+                  icono={<IconoFotoAerea />}
+                  activo={foto.encendida()}
+                  disabled={!listo()}
+                  onClick={() => foto.alternar()}
+                />
+              }
+              controlEncimaVisible={cercaDeLaFoto()}
               botonUbicacion={
                 <>
                   <ControlDeCompanias
                     filtro={filtro.elegido()}
                     disabled={resumen() === undefined}
                     alElegir={filtro.elegir}
-                  />
-                  <ControlDelMapa
-                    etiqueta="Foto aérea"
-                    icono={<IconoFotoAerea />}
-                    activo={foto.encendida()}
-                    disabled={!listo()}
-                    onClick={() => foto.alternar()}
                   />
                   <MenuDeUbicacion
                     puedeCentrar={listo()}
