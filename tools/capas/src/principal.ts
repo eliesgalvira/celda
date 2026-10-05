@@ -194,11 +194,7 @@ const servir = Effect.gen(function* () {
 
 const barrios = Effect.gen(function* () {
   const destino = yield* configBarrios;
-  const limites = yield* descargarBarrios(destino).pipe(
-    // Punto de entrada de la orden: aquí se monta su cliente HTTP, una vez.
-    // @effect-diagnostics-next-line strictEffectProvide:off
-    Effect.provide(FetchHttpClient.layer),
-  );
+  const limites = yield* descargarBarrios(destino);
   yield* Effect.log(
     `${limites.barrios.length} barrios con fecha ${limites.fuente.fecha} escritos en ${destino}`,
   );
@@ -207,11 +203,7 @@ const barrios = Effect.gen(function* () {
 const poblacion = Effect.gen(function* () {
   const destino = yield* configPoblacion;
   const limites = yield* leerLimites(yield* configBarrios);
-  const escrita = yield* descargarPoblacion(destino, limites).pipe(
-    // Punto de entrada de la orden: aquí se monta su cliente HTTP, una vez.
-    // @effect-diagnostics-next-line strictEffectProvide:off
-    Effect.provide(FetchHttpClient.layer),
-  );
+  const escrita = yield* descargarPoblacion(destino, limites);
   const total = escrita.barrios.reduce((suma, b) => suma + b.habitantes, 0);
   yield* Effect.log(
     `${escrita.barrios.length} barrios y ${total} habitantes a ${escrita.fuente.referencia} escritos en ${destino}`,
@@ -223,11 +215,7 @@ const municipios = Effect.gen(function* () {
   const { limites, padron } = yield* descargarMunicipios({
     ...opciones,
     pausa: PAUSA_MUNICIPIOS,
-  }).pipe(
-    // Punto de entrada de la orden: aquí se monta su cliente HTTP, una vez.
-    // @effect-diagnostics-next-line strictEffectProvide:off
-    Effect.provide(FetchHttpClient.layer),
-  );
+  });
   const cuantos = limites.territorios.filter((t) => t.tipo === "municipio").length;
   const habitantes = padron.municipios.reduce((suma, m) => suma + m.habitantes, 0);
   yield* Effect.log(
@@ -284,10 +272,6 @@ const fronteras = Effect.gen(function* () {
   const { fronteras: escritas, fichero } = yield* descargarFronteras(
     { cache: opciones.cache, pausa: PAUSA_MUNICIPIOS },
     opciones.fronteras,
-  ).pipe(
-    // Punto de entrada de la orden: aquí se monta su cliente HTTP, una vez.
-    // @effect-diagnostics-next-line strictEffectProvide:off
-    Effect.provide(FetchHttpClient.layer),
   );
   yield* Effect.log(
     `${escritas.lineas.length} líneas de frontera del IGN del ${escritas.fuente.fecha},`,
@@ -342,6 +326,9 @@ const principal = Effect.gen(function* () {
   return yield* new OrdenDesconocida({ orden });
 });
 
-// El punto de entrada del generador monta aquí sus capas, una vez.
+// El punto de entrada del generador monta aquí sus capas, una vez: el sistema de ficheros y el
+// cliente HTTP de las órdenes que descargan.
 // @effect-diagnostics-next-line strictEffectProvide:off
-NodeRuntime.runMain(principal.pipe(Effect.provide(NodeServices.layer)));
+NodeRuntime.runMain(
+  principal.pipe(Effect.provide(Layer.merge(NodeServices.layer, FetchHttpClient.layer))),
+);
