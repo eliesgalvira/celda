@@ -25,10 +25,10 @@ export interface Credito {
 }
 
 /**
- * En el móvil los créditos se pliegan tras un botón «i». Se ven al cargar y se pliegan al tocar
- * el mapa o a los cinco segundos, como permiten las pautas de atribución de OpenStreetMap. En
- * escritorio se ven siempre. Lo decide `DisposicionMapa`, que sabe cuándo se toca el mapa; sin
- * ella, los créditos no se pliegan.
+ * Los créditos se pliegan tras un botón «i», en el móvil y en escritorio. Se ven al cargar y se
+ * pliegan al tocar el mapa o a los cinco segundos, como permiten las pautas de atribución de
+ * OpenStreetMap. Lo decide `DisposicionMapa`, que sabe cuándo se toca el mapa; sin ella, los
+ * créditos no se pliegan.
  */
 export interface PliegueCreditos {
   readonly plegada: () => boolean;
@@ -121,7 +121,7 @@ export function Atribucion(props: AtribucionProps) {
           aria-expanded={plegada() ? "false" : "true"}
           aria-controls={id}
           title="Créditos del mapa"
-          class={variantesDiana({ class: "drop-shadow-marcador md:hidden" })}
+          class={variantesDiana({ class: "drop-shadow-marcador" })}
           onClick={() => pliegue?.cambiar(!plegada())}
         >
           <span
@@ -139,9 +139,9 @@ export function Atribucion(props: AtribucionProps) {
         id={id}
         class={cn(
           CINTA,
-          // En el móvil, abiertos, pueden quedar sobre la pista o la vista: fondo opaco.
-          plegable() && "max-md:bg-superficie",
-          plegada() && "max-md:hidden",
+          // Abiertos pueden quedar sobre la pista o la vista: fondo opaco.
+          plegable() && "bg-superficie",
+          plegada() && "hidden",
         )}
       >
         <For each={props.creditos}>
@@ -153,7 +153,7 @@ export function Atribucion(props: AtribucionProps) {
         </For>
       </p>
       <Show when={plegada() && fijos().length > 0}>
-        <p class={cn(CINTA, "flex-nowrap whitespace-nowrap md:hidden")}>
+        <p class={cn(CINTA, "flex-nowrap whitespace-nowrap")}>
           <For each={fijos()}>
             {(credito) => (
               <UnCredito credito={credito}>

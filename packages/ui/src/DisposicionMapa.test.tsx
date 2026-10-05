@@ -80,7 +80,7 @@ describe("DisposicionMapa", () => {
     assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
   });
 
-  it("plegados en el móvil, el crédito fijo sigue a la vista en una línea, en su forma corta", () => {
+  it("plegados, el crédito fijo sigue a la vista en una línea, en su forma corta", () => {
     const reserva: Credito = {
       texto: "Sistema Cartográfico Nacional · CC BY 4.0 scne.es",
       corto: "CC BY 4.0 scne.es",
@@ -88,10 +88,10 @@ describe("DisposicionMapa", () => {
       fijo: true,
     };
     const { getByRole, getAllByRole } = montar([reserva, OPENSTREETMAP]);
-    /** Los enlaces que no esconde el pliegue en el móvil. */
+    /** Los enlaces que no esconde el pliegue. */
     const aLaVista = () =>
       getAllByRole("link").filter(
-        (enlace) => enlace.closest("p")?.classList.contains("max-md:hidden") !== true,
+        (enlace) => enlace.closest("p")?.classList.contains("hidden") !== true,
       );
     assert.lengthOf(aLaVista(), 2);
 

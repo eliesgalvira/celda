@@ -285,7 +285,7 @@ export const pistaDeCeldas = (
     case "listas":
       return {
         texto:
-          "Cada celda es la parte del mapa más cercana a un emplazamiento. Sirve como aproximación, porque la cobertura real depende del terreno y de la potencia de cada antena.",
+          "Cada celda es la zona más cercana a un emplazamiento. Es solo una aproximación de la cobertura.",
         reintentar: false,
       };
     case "fallo":
