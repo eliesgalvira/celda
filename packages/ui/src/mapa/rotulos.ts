@@ -6,7 +6,7 @@ import type {
 
 import type { Contorno } from "@celda/dominio/comunitatValenciana";
 
-import { conFoto, deClase, porZoom, textoDeRotulo, visibleConFoto } from "./expresiones.ts";
+import { conFoto, deClase, porZoom, soloConFoto, textoDeRotulo } from "./expresiones.ts";
 import { capaHuecos } from "./huecos.ts";
 import { nombreDelRotulo } from "./nombres.ts";
 import type { ColorDeToken, TokenMapa } from "./tokens.ts";
@@ -483,9 +483,11 @@ export const CAPA_PORTALES = "portales";
 
 /**
  * Los números de portal, como en Google, desde el zoom 18: a 17 llenan las manzanas. Solo con la
- * foto aérea encendida, así que sin ella no cuestan nada. El zoom mínimo es 15 y no 17: por
- * encima de 15 MapLibre no vuelve a maquetar las teselas (`zoomsSinPartir` en la web), y una capa
- * que empieza más arriba no saldría nunca. No apartan a los demás rótulos.
+ * foto aérea encendida, así que sin ella no se maquetan. Se quitan con un filtro y no con
+ * `visibility` (`soloConFoto`): así la capa `housenumber` sigue en las teselas, y «Ver el
+ * edificio» la lee aunque las pidiera un vuelo con la foto quitada. El zoom mínimo es 15 y no 17:
+ * por encima de 15 MapLibre no vuelve a maquetar las teselas (`zoomsSinPartir` en la web), y una
+ * capa que empieza más arriba no saldría nunca. No apartan a los demás rótulos.
  */
 const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecification => ({
   id: CAPA_PORTALES,
@@ -493,8 +495,8 @@ const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecifi
   source: fuente,
   "source-layer": "housenumber",
   minzoom: 15,
+  filter: soloConFoto,
   layout: {
-    visibility: visibleConFoto,
     "text-field": ["get", "housenumber"],
     "text-font": [LETRA],
     "text-size": 10.5,

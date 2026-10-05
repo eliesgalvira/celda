@@ -45,7 +45,7 @@ export type EstadoEdificio =
   | { readonly tipo: "buscando" }
   /** El edificio está resaltado; `numero` es su portal de OpenStreetMap, si lo tiene. */
   | { readonly tipo: "resaltado"; readonly numero: string | undefined }
-  /** OpenStreetMap no tiene dibujado ningún edificio que lo contenga ni a menos de 25 m. */
+  /** El mapa no tiene ningún edificio dibujado que contenga el emplazamiento. */
   | { readonly tipo: "sin-contorno" };
 
 export interface BotonEdificioProps {
@@ -63,7 +63,7 @@ const aviso = (estado: EstadoEdificio): string => {
         ? "El edificio está resaltado en el mapa."
         : `El edificio está resaltado en el mapa. En OpenStreetMap lleva el número ${estado.numero}.`;
     case "sin-contorno":
-      return "OpenStreetMap no tiene dibujado ningún edificio a menos de 25 metros del emplazamiento.";
+      return "El mapa no tiene ningún edificio dibujado en el emplazamiento.";
     default:
       return "";
   }

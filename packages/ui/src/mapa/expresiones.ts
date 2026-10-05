@@ -55,3 +55,12 @@ export const visibleConFoto: ExpressionSpecification = conFoto("none", "visible"
 
 /** Una capa que se esconde con la foto aérea encendida. */
 export const ocultaConFoto: ExpressionSpecification = conFoto("visible", "none");
+
+/**
+ * Un filtro que solo deja pasar los rasgos con la foto aérea encendida, para una capa del estilo
+ * que es la única que lee su capa de la tesela, como los números de portal. Escondida con
+ * `visibility`, MapLibre deja esa capa fuera de las teselas que parte por encima de su zoom máximo
+ * y guarda lo partido: al encender la foto, las teselas pedidas con ella apagada (durante un vuelo,
+ * por ejemplo) seguían sin números. Con el filtro la capa de la tesela siempre llega.
+ */
+export const soloConFoto: ExpressionSpecification = conFoto(false, true);

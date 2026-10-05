@@ -4,7 +4,7 @@ import type {
   SymbolLayerSpecification,
 } from "maplibre-gl";
 
-import { conFoto, porZoom, textoDeRotulo, visibleConFoto } from "../expresiones.ts";
+import { conFoto, porZoom, soloConFoto, textoDeRotulo } from "../expresiones.ts";
 import { capaHuecos } from "../huecos.ts";
 import { CAPA_PORTALES, MUNICIPIOS_DE_CELDA, ZOOM_DE_FUERA } from "../rotulos.ts";
 import type { ColorDeToken, TokenMapa } from "../tokens.ts";
@@ -446,8 +446,9 @@ const capasDeNombres = (
 ];
 
 /**
- * Los números de portal de CartoCiudad, solo con la foto aérea, como en el principal. La capa se
- * llama igual, porque «Ver el edificio» la busca; el IGN da el número en `ref`.
+ * Los números de portal de CartoCiudad, solo con la foto aérea y con el mismo filtro que en el
+ * principal. La capa se llama igual, porque «Ver el edificio» la busca; el IGN da el número en
+ * `ref`.
  */
 const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecification => ({
   id: CAPA_PORTALES,
@@ -455,8 +456,8 @@ const capaDePortales = (fuente: string, color: ColorDeToken): SymbolLayerSpecifi
   source: fuente,
   "source-layer": "portal_pto",
   minzoom: 15,
+  filter: soloConFoto,
   layout: {
-    visibility: visibleConFoto,
     "text-field": ["get", "ref"],
     "text-font": [LETRA],
     "text-size": 10.5,

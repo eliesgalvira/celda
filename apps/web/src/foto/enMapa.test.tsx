@@ -162,8 +162,7 @@ const montar = () => {
 
 const EDIFICIO: EdificioEncontrado = {
   tipo: "edificio",
-  como: "contiene",
-  poligonos: [],
+  poligono: [],
   portal: { numero: "251-259", punto: SITIO },
 };
 
@@ -211,7 +210,7 @@ describe("foto aérea en el mapa", () => {
     m.desmontar();
   });
 
-  it("sin edificio a menos de 25 m queda sin contorno; sin número, resaltado", async () => {
+  it("sin edificio que contenga el emplazamiento queda sin contorno; sin número, resaltado", async () => {
     const m = montar();
     m.foto.verEdificio("movistar-1", SITIO);
     flush();
@@ -507,8 +506,9 @@ interface MapaQueNoSeToca {
 
 /**
  * Un mapa con el estilo de Celda, como MapLibre: guarda el estado del estilo, entrega los eventos
- * en otra tarea y contesta a `queryRenderedFeatures` con lo que la prueba le da por capa. Apunta
- * cualquier llamada que cambie el estilo entero o sus capas.
+ * en otra tarea y contesta a `queryRenderedFeatures` con lo que la prueba le da por capa. A
+ * `querySourceFeatures` contesta con lo de las capas del estilo que leen esa capa de la tesela,
+ * aunque no se pinte. Apunta cualquier llamada que cambie el estilo entero o sus capas.
  */
 const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa>>>) => {
   const estilo: StyleSpecification = estiloMapa(
@@ -562,6 +562,18 @@ const mapaDePrueba = (pintado: Partial<Record<string, ReadonlyArray<RasgoDelMapa
         Math.abs(longitud - SITIO.longitud) < 0.001 && Math.abs(latitud - SITIO.latitud) < 0.001,
     }),
     queryRenderedFeatures: (_caja, { layers }) => layers.flatMap((capa) => pintado[capa] ?? []),
+    getLayer: (id) => {
+      const capa = estilo.layers.find((una) => una.id === id);
+      return capa !== undefined && "source" in capa
+        ? { source: capa.source, sourceLayer: capa["source-layer"] }
+        : undefined;
+    },
+    querySourceFeatures: (fuente, { sourceLayer }) =>
+      estilo.layers.flatMap((capa) =>
+        "source" in capa && capa.source === fuente && capa["source-layer"] === sourceLayer
+          ? (pintado[capa.id] ?? [])
+          : [],
+      ),
     getSource: (fuente) =>
       fuente in estilo.sources
         ? {
@@ -606,15 +618,20 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
   });
 
   it("vuela al zoom del edificio y, quieto el mapa, resalta su contorno con su número", async () => {
+    // Como en OpenFreeMap: los edificios de la misma altura llegan juntos en un rasgo, y los
+    // portales con el mismo número también.
     const m = mapaDePrueba({
       [CAPA_EDIFICIOS]: [
-        { id: 9, properties: {}, geometry: { type: "Polygon", coordinates: cuadrado(15) } },
-        { id: 10, properties: {}, geometry: { type: "Polygon", coordinates: cuadrado(10, 40) } },
+        {
+          id: 9,
+          properties: { render_height: 22 },
+          geometry: { type: "MultiPolygon", coordinates: [cuadrado(10, 40), cuadrado(15)] },
+        },
       ],
       [CAPA_PORTALES]: [
         {
           properties: { housenumber: "251;259" },
-          geometry: { type: "Point", coordinates: metrosAl(-10, 8) },
+          geometry: { type: "MultiPoint", coordinates: [metrosAl(40, 5), metrosAl(-10, 8)] },
         },
         {
           properties: { housenumber: "70" },
@@ -638,8 +655,8 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
     assert.strictEqual(encontrado?.tipo === "edificio" ? encontrado.portal?.numero : "", "251-259");
     const dibujo = m.datos.get(FUENTE_EDIFICIO);
     assert.deepStrictEqual(
-      dibujo?.features.map((rasgo) => rasgo.geometry.type),
-      ["Polygon", "Point"],
+      dibujo?.features.map((rasgo) => rasgo.geometry.coordinates),
+      [cuadrado(15), metrosAl(-10, 8)],
     );
     // Un solo `idle` basta: después no queda nada escuchando.
     assert.strictEqual(m.escuchadores(), 0);
@@ -651,8 +668,13 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
     assert.deepStrictEqual(m.prohibidas, []);
   });
 
-  it("sin edificio cerca no dibuja nada y lo dice; dejar de esperar quita los escuchadores", async () => {
-    const m = mapaDePrueba({});
+  it("sin edificio en el punto no dibuja nada y lo dice; dejar de esperar quita los escuchadores", async () => {
+    // El edificio de al lado, a 2 m, no cuenta.
+    const m = mapaDePrueba({
+      [CAPA_EDIFICIOS]: [
+        { properties: {}, geometry: { type: "Polygon", coordinates: cuadrado(10, 12) } },
+      ],
+    });
     const lienzo = lienzoDeFoto(m.mapa);
     const encontrados: Array<EdificioEncontrado | undefined> = [];
     lienzo.verEdificio(SITIO, [216, 0], (encontrado) => encontrados.push(encontrado));

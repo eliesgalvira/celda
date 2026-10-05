@@ -8,12 +8,16 @@ import * as Predicate from "effect/Predicate";
  * del edificio puede no ser el de la dirección del emplazamiento, sobre todo en una esquina.
  */
 
-/** Hasta dónde se busca el edificio más cercano si ninguno contiene el emplazamiento. */
-export const DISTANCIA_AL_EDIFICIO_M = 25;
-/** Hasta dónde vale un número de portal del propio edificio. */
-const DISTANCIA_AL_PORTAL_PROPIO_M = 80;
-/** Hasta dónde vale, si el edificio no tiene ninguno dentro, el número más cercano. */
-const DISTANCIA_A_OTRO_PORTAL_M = 30;
+/**
+ * Lo que mide como poco un edificio que se resalta. Las casetas de equipos al pie de una torre
+ * miden de 8 a 21 m², y las azoteas con antenas, al menos 50 m².
+ */
+export const AREA_MINIMA_M2 = 30;
+/**
+ * A cuánto del contorno cuenta todavía un número de portal como del edificio. El de una entrada
+ * es un punto de la fachada, y la tesela lo redondea a medio metro.
+ */
+const DISTANCIA_AL_CONTORNO_M = 1;
 
 /** Un punto de GeoJSON: longitud y latitud. */
 type Posicion = ReadonlyArray<number>;
@@ -22,12 +26,13 @@ type Posicion = ReadonlyArray<number>;
 export type Poligono = ReadonlyArray<ReadonlyArray<Posicion>>;
 
 /**
- * Un edificio tal como lo da el mapa. Un edificio partido entre dos teselas llega en dos trozos
- * con el mismo `id`.
+ * Un edificio tal como lo da el mapa: un polígono y la altura del rasgo, si la tiene. Un edificio
+ * partido entre dos teselas llega en dos trozos, cada uno cortado un poco más allá del borde de su
+ * tesela.
  */
 export interface Edificio {
-  readonly id: string | number | undefined;
-  readonly poligonos: ReadonlyArray<Poligono>;
+  readonly poligono: Poligono;
+  readonly altura: number | undefined;
 }
 
 /** Un número de portal de OpenStreetMap en su punto. */
@@ -40,17 +45,18 @@ export type EdificioEncontrado =
   | { readonly tipo: "ninguno" }
   | {
       readonly tipo: "edificio";
-      /** `contiene`: el emplazamiento cae dentro; `cerca`: el más cercano, a menos de 25 m. */
-      readonly como: "contiene" | "cerca";
-      /** Todos los trozos del edificio. */
-      readonly poligonos: ReadonlyArray<Poligono>;
+      /** El polígono que contiene el emplazamiento. */
+      readonly poligono: Poligono;
       readonly portal: Portal | undefined;
     };
 
 const enElPlano = (origen: Coordenada, [longitud = 0, latitud = 0]: Posicion): PuntoLocal =>
   aPlano(origen, { longitud, latitud });
 
-/** Si `punto` cae dentro del anillo, por la regla par-impar. */
+/**
+ * Si `punto` cae dentro del anillo, por la regla par-impar. Vale en grados o en metros: el plano
+ * local solo estira los grados, y lo de dentro sigue dentro.
+ */
 const dentroDelAnillo = (punto: PuntoLocal, anillo: ReadonlyArray<PuntoLocal>): boolean => {
   let dentro = false;
   for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
@@ -65,15 +71,36 @@ const dentroDelAnillo = (punto: PuntoLocal, anillo: ReadonlyArray<PuntoLocal>): 
   return dentro;
 };
 
+/** Un anillo en grados, con la longitud como `este` y la latitud como `norte`. */
+const enGrados = (anillo: ReadonlyArray<Posicion>): ReadonlyArray<PuntoLocal> =>
+  anillo.map(([este = 0, norte = 0]) => ({ este, norte }));
+
 /** Si `punto` cae dentro del polígono y no en uno de sus huecos. */
-const dentroDelPoligono = (origen: Coordenada, punto: Coordenada, poligono: Poligono): boolean => {
-  const [fuera, ...huecos] = poligono.map((anillo) => anillo.map((p) => enElPlano(origen, p)));
-  const local = aPlano(origen, punto);
+const dentroDelPoligono = (punto: Coordenada, poligono: Poligono): boolean => {
+  const [fuera, ...huecos] = poligono;
+  const enGradosDelPunto = { este: punto.longitud, norte: punto.latitud };
   return (
     fuera !== undefined &&
-    dentroDelAnillo(local, fuera) &&
-    !huecos.some((hueco) => dentroDelAnillo(local, hueco))
+    dentroDelAnillo(enGradosDelPunto, enGrados(fuera)) &&
+    !huecos.some((hueco) => dentroDelAnillo(enGradosDelPunto, enGrados(hueco)))
   );
+};
+
+/** Área en metros cuadrados de un anillo en el plano. */
+const areaDelAnillo = (anillo: ReadonlyArray<PuntoLocal>): number => {
+  let doble = 0;
+  for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
+    const a = anillo[i];
+    const b = anillo[j];
+    if (a !== undefined && b !== undefined) doble += b.este * a.norte - a.este * b.norte;
+  }
+  return Math.abs(doble) / 2;
+};
+
+/** Área en metros cuadrados del polígono, sin sus huecos, en el plano de `origen`. */
+export const areaDelPoligono = (origen: Coordenada, poligono: Poligono): number => {
+  const [fuera = [], ...huecos] = poligono.map((anillo) => anillo.map((p) => enElPlano(origen, p)));
+  return huecos.reduce((area, hueco) => area - areaDelAnillo(hueco), areaDelAnillo(fuera));
 };
 
 /** Distancia en metros de `p` al segmento de `a` a `b`, todo en el mismo plano. */
@@ -88,18 +115,16 @@ const distanciaAlSegmento = (p: PuntoLocal, a: PuntoLocal, b: PuntoLocal): numbe
   return Math.hypot(p.este - (a.este + t * de), p.norte - (a.norte + t * dn));
 };
 
-/** Distancia en metros de la posición al borde de fuera del edificio más cercano a ella. */
-const distanciaAlEdificio = (posicion: Coordenada, edificio: Edificio): number => {
-  let mejor = Infinity;
+/** Distancia en metros del punto al anillo de fuera del polígono. */
+const distanciaAlContorno = (punto: Coordenada, [fuera = []]: Poligono): number => {
+  const anillo = fuera.map((p) => enElPlano(punto, p));
   const origen = { este: 0, norte: 0 };
-  for (const [fuera = []] of edificio.poligonos) {
-    const anillo = fuera.map((p) => enElPlano(posicion, p));
-    for (let i = 1; i < anillo.length; i++) {
-      const a = anillo[i - 1];
-      const b = anillo[i];
-      if (a !== undefined && b !== undefined) {
-        mejor = Math.min(mejor, distanciaAlSegmento(origen, a, b));
-      }
+  let mejor = Infinity;
+  for (let i = 1; i < anillo.length; i++) {
+    const a = anillo[i - 1];
+    const b = anillo[i];
+    if (a !== undefined && b !== undefined) {
+      mejor = Math.min(mejor, distanciaAlSegmento(origen, a, b));
     }
   }
   return mejor;
@@ -110,53 +135,41 @@ const metros = (a: Coordenada, b: Coordenada): number => {
   return Math.hypot(este, norte);
 };
 
-/** El portal más cercano a `posicion` de `portales` a menos de `maximo` metros. */
-const masCercano = (
-  posicion: Coordenada,
-  portales: ReadonlyArray<Portal>,
-  maximo: number,
-): Portal | undefined =>
-  portales
-    .map((portal) => ({ portal, distancia: metros(posicion, portal.punto) }))
-    .filter(({ distancia }) => distancia < maximo)
-    .toSorted((a, b) => a.distancia - b.distancia)[0]?.portal;
-
 /**
- * El edificio de `edificios` que contiene `posicion` o, si ninguno, el más cercano a menos de
- * `DISTANCIA_AL_EDIFICIO_M`, con todos sus trozos. Su número es el portal que cae dentro de él más
- * cercano al emplazamiento o, si no tiene, el portal más cercano a menos de 30 m.
+ * El edificio que contiene `posicion`, si mide al menos `AREA_MINIMA_M2`, y su número de portal.
+ *
+ * - Si lo contienen varios polígonos, el más alto y, a igual altura, el más grande. Un bloque alto
+ *   dibujado como parte de un edificio más bajo gana a este, porque el emplazamiento suele estar
+ *   en el tejado más alto. El edificio entero gana a una parte suya de la misma altura, y el trozo
+ *   más entero de un edificio partido entre teselas gana a los demás.
+ * - Su número es el del portal dentro de él, o sobre su contorno, más cercano al emplazamiento.
+ *   Sin ninguno, va sin número: el portal más cercano de fuera suele ser el del vecino.
  */
 export const elegirEdificio = (
   posicion: Coordenada,
   edificios: ReadonlyArray<Edificio>,
   portales: ReadonlyArray<Portal>,
 ): EdificioEncontrado => {
-  const contiene = edificios.find((edificio) =>
-    edificio.poligonos.some((poligono) => dentroDelPoligono(posicion, posicion, poligono)),
-  );
-  const cerca =
-    contiene === undefined
-      ? edificios
-          .map((edificio) => ({ edificio, distancia: distanciaAlEdificio(posicion, edificio) }))
-          .filter(({ distancia }) => distancia < DISTANCIA_AL_EDIFICIO_M)
-          .toSorted((a, b) => a.distancia - b.distancia)[0]?.edificio
-      : undefined;
-  const elegido = contiene ?? cerca;
+  const elegido = edificios
+    .filter((edificio) => dentroDelPoligono(posicion, edificio.poligono))
+    .map((edificio) => ({
+      poligono: edificio.poligono,
+      altura: edificio.altura ?? 0,
+      area: areaDelPoligono(posicion, edificio.poligono),
+    }))
+    .filter(({ area }) => area >= AREA_MINIMA_M2)
+    .toSorted((a, b) => b.altura - a.altura || b.area - a.area)[0];
   if (elegido === undefined) return { tipo: "ninguno" };
-  const trozos =
-    elegido.id === undefined ? [elegido] : edificios.filter((e) => e.id === elegido.id);
-  const poligonos = trozos.flatMap((trozo) => trozo.poligonos);
-  const propios = portales.filter((portal) =>
-    poligonos.some((poligono) => dentroDelPoligono(posicion, portal.punto, poligono)),
-  );
-  return {
-    tipo: "edificio",
-    como: contiene === undefined ? "cerca" : "contiene",
-    poligonos,
-    portal:
-      masCercano(posicion, propios, DISTANCIA_AL_PORTAL_PROPIO_M) ??
-      masCercano(posicion, portales, DISTANCIA_A_OTRO_PORTAL_M),
-  };
+  const { poligono } = elegido;
+  const portal = portales
+    .filter(
+      (portal) =>
+        dentroDelPoligono(portal.punto, poligono) ||
+        distanciaAlContorno(portal.punto, poligono) <= DISTANCIA_AL_CONTORNO_M,
+    )
+    .map((portal) => ({ portal, distancia: metros(posicion, portal.punto) }))
+    .toSorted((a, b) => a.distancia - b.distancia)[0]?.portal;
+  return { tipo: "edificio", poligono, portal };
 };
 
 /**
@@ -171,7 +184,7 @@ export const abreviarPortal = (numero: string): string => {
   return partes.length > 2 ? `${partes[0] ?? ""}–${partes.at(-1) ?? ""}` : partes.join("-");
 };
 
-/** Un trozo del edificio resaltado o el punto de su número, en la fuente `edificio`. */
+/** El edificio resaltado o el punto de su número, en la fuente `edificio`. */
 export type RasgoDelEdificio =
   | {
       readonly type: "Feature";
@@ -192,22 +205,22 @@ export interface DibujoDelEdificio {
 
 export const SIN_EDIFICIO: DibujoDelEdificio = { type: "FeatureCollection", features: [] };
 
-/** Lo que dibuja el mapa del edificio encontrado: sus trozos y el punto de su número. */
+/** Lo que dibuja el mapa del edificio encontrado: su polígono y el punto de su número. */
 export const dibujoDelEdificio = (encontrado: EdificioEncontrado): DibujoDelEdificio => {
   if (encontrado.tipo === "ninguno") return SIN_EDIFICIO;
-  const trozos = encontrado.poligonos.map((poligono): RasgoDelEdificio => ({
+  const contorno: RasgoDelEdificio = {
     type: "Feature",
     properties: {},
-    geometry: { type: "Polygon", coordinates: poligono },
-  }));
+    geometry: { type: "Polygon", coordinates: encontrado.poligono },
+  };
   const { portal } = encontrado;
   return {
     type: "FeatureCollection",
     features:
       portal === undefined
-        ? trozos
+        ? [contorno]
         : [
-            ...trozos,
+            contorno,
             {
               type: "Feature",
               properties: { numero: portal.numero },
@@ -225,36 +238,56 @@ export interface RasgoDelMapa {
   readonly id?: string | number | undefined;
   /**
    * De un número de portal, `housenumber` en OpenFreeMap y `ref` en el mapa base de reserva del
-   * IGN; de un edificio no se lee nada.
+   * IGN; de un edificio, su altura en metros (`render_height`), que el IGN no da.
    */
   readonly properties: {
     readonly housenumber?: string | number;
     readonly ref?: string | number;
+    readonly render_height?: unknown;
   } | null;
   readonly geometry: { readonly type: string; readonly coordinates?: unknown };
 }
 
-/** El edificio de un rasgo de la capa de edificios, o nada si no es un polígono. */
-export const edificioDeRasgo = (rasgo: RasgoDelMapa): Edificio | undefined => {
+/**
+ * Los edificios de un rasgo de la capa de edificios, uno por polígono. OpenFreeMap junta en un
+ * `MultiPolygon` todos los edificios de la tesela con la misma altura y el mismo color: en el
+ * centro de Madrid, un rasgo lleva 4.193.
+ */
+export const edificiosDeRasgo = (rasgo: RasgoDelMapa): ReadonlyArray<Edificio> => {
   const { type, coordinates } = rasgo.geometry;
-  if (!Array.isArray(coordinates)) return undefined;
+  if (!Array.isArray(coordinates)) return [];
+  const altura = rasgo.properties?.render_height;
   // SAFETY: MapLibre da las coordenadas de un `Polygon` o un `MultiPolygon` en el orden de GeoJSON.
   const poligonos =
     type === "Polygon"
       ? [coordinates as Poligono]
       : type === "MultiPolygon"
         ? (coordinates as ReadonlyArray<Poligono>)
-        : undefined;
-  return poligonos === undefined ? undefined : { id: rasgo.id, poligonos };
+        : [];
+  return poligonos.map((poligono) => ({
+    poligono,
+    altura: Predicate.isNumber(altura) ? altura : undefined,
+  }));
 };
 
-/** El portal de un rasgo de la capa de portales, ya abreviado, o nada si no es un punto. */
-export const portalDeRasgo = (rasgo: RasgoDelMapa): Portal | undefined => {
+/**
+ * Los portales de un rasgo de la capa de portales, ya abreviados: uno de un `Point` y uno por punto
+ * de un `MultiPoint`. OpenFreeMap junta en un `MultiPoint` todos los portales de la tesela con el
+ * mismo número; así llegan nueve de cada diez.
+ */
+export const portalesDeRasgo = (rasgo: RasgoDelMapa): ReadonlyArray<Portal> => {
   const { type, coordinates } = rasgo.geometry;
   const numero = rasgo.properties?.["housenumber"] ?? rasgo.properties?.["ref"];
-  if (type !== "Point" || !Array.isArray(coordinates) || numero === undefined) return undefined;
-  const [longitud, latitud] = coordinates;
-  if (!Predicate.isNumber(longitud) || !Predicate.isNumber(latitud)) return undefined;
+  if (numero === undefined || !Array.isArray(coordinates)) return [];
   const texto = abreviarPortal(String(numero));
-  return texto === "" ? undefined : { numero: texto, punto: { longitud, latitud } };
+  if (texto === "") return [];
+  const posiciones: ReadonlyArray<unknown> =
+    type === "Point" ? [coordinates] : type === "MultiPoint" ? coordinates : [];
+  return posiciones.flatMap((posicion) => {
+    if (!Array.isArray(posicion)) return [];
+    const [longitud, latitud]: ReadonlyArray<unknown> = posicion;
+    return Predicate.isNumber(longitud) && Predicate.isNumber(latitud)
+      ? [{ numero: texto, punto: { longitud, latitud } }]
+      : [];
+  });
 };
