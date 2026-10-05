@@ -4,7 +4,6 @@ import { createSignal, Show } from "solid-js";
 import { PliegueDeCreditos } from "./Atribucion.tsx";
 import { AspectoDeControl } from "./controles/aspecto.ts";
 import { MenuDeControles } from "./controles/MenuDeControles.tsx";
-import { recursoFijo } from "./recurso.ts";
 
 export interface DisposicionMapaProps {
   /** Recibe el elemento en el que se dibuja el mapa. */
@@ -64,9 +63,6 @@ export interface DisposicionMapaProps {
   readonly panelAncho?: boolean;
 }
 
-/** Plegados a los cinco segundos, como mucho, según las pautas de atribución de OpenStreetMap. */
-const PLIEGUE_CREDITOS_MS = 5000;
-
 /** Tres rayas: el botón «Funciones». */
 const IconoFunciones = () => (
   <svg
@@ -88,25 +84,11 @@ const IconoFunciones = () => (
  * cargar: el fondo ya tiene el color del mapa y el aviso se superpone.
  */
 export function DisposicionMapa(props: DisposicionMapaProps) {
-  const [plegada, setPlegada] = createSignal(false);
-  // Se pliegan solos una vez; después solo los pliega o despliega el botón «i».
-  let plegarSolos = true;
-  const plegarAlTocar = () => {
-    if (!plegarSolos) return;
-    plegarSolos = false;
-    setPlegada(true);
-  };
-  recursoFijo("creditos:pliegue", () => {
-    const espera = window.setTimeout(plegarAlTocar, PLIEGUE_CREDITOS_MS);
-    return () => window.clearTimeout(espera);
-  });
-  const pliegue = {
-    plegada,
-    cambiar: (nueva: boolean) => {
-      plegarSolos = false;
-      setPlegada(nueva);
-    },
-  };
+  // Los créditos empiezan plegados tras la «i», con los `fijo` a la vista, y tocar el mapa los
+  // vuelve a plegar.
+  const [plegada, setPlegada] = createSignal(true);
+  const plegarAlTocar = () => setPlegada(true);
+  const pliegue = { plegada, cambiar: setPlegada };
 
   return (
     <div

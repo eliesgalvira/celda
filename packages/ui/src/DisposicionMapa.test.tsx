@@ -55,29 +55,26 @@ describe("DisposicionMapa", () => {
   it("con los créditos abiertos, la disposición lo marca para apartar la pista en el móvil", () => {
     const { getByRole } = montar();
     const disposicion = getByRole("main", { name: "Mapa de España" }).parentElement;
+    assert.isFalse(disposicion?.hasAttribute("data-creditos"));
+    fireEvent.click(getByRole("button", { name: "Créditos del mapa" }));
+    flush();
     assert.isTrue(disposicion?.hasAttribute("data-creditos"));
     fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
     flush();
     assert.isFalse(disposicion?.hasAttribute("data-creditos"));
   });
 
-  it("los créditos se ven al cargar y se pliegan al tocar el mapa", () => {
+  it("los créditos empiezan plegados; la «i» los abre y tocar el mapa los vuelve a plegar", () => {
     const { getByRole } = montar();
     const boton = getByRole("button", { name: "Créditos del mapa" });
-    assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
-    assert.isDefined(getByRole("link", { name: "© OpenStreetMap" }));
-
-    fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
-    flush();
     assert.strictEqual(boton.getAttribute("aria-expanded"), "false");
-    // Siguen en el documento: el botón los vuelve a enseñar.
     fireEvent.click(boton);
     flush();
     assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
-    // Tocar el mapa otra vez ya no los pliega: lo ha decidido quien los abrió.
+    assert.isDefined(getByRole("link", { name: "© OpenStreetMap" }));
     fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
     flush();
-    assert.strictEqual(boton.getAttribute("aria-expanded"), "true");
+    assert.strictEqual(boton.getAttribute("aria-expanded"), "false");
   });
 
   it("plegados, el crédito fijo sigue a la vista en una línea, en su forma corta", () => {
@@ -93,10 +90,6 @@ describe("DisposicionMapa", () => {
       getAllByRole("link").filter(
         (enlace) => enlace.closest("p")?.classList.contains("hidden") !== true,
       );
-    assert.lengthOf(aLaVista(), 2);
-
-    fireEvent.pointerDown(getByRole("main", { name: "Mapa de España" }));
-    flush();
     const [fijo, ...otros] = aLaVista();
     assert.lengthOf(otros, 0);
     assert.strictEqual(fijo?.textContent, "© CC BY 4.0 scne.es");

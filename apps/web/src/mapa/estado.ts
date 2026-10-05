@@ -18,8 +18,8 @@ export const CREDITOS_MAPA_BASE: ReadonlyArray<Credito> = [
 
 /**
  * El crédito del mapa base de reserva del IGN, mientras está puesto (ADR 0021). Es la fórmula de
- * la etiqueta `AccessConstraints` del servicio, y su licencia pide verla a pie de mapa: en el móvil
- * se queda a la vista, corto y en una línea, con los demás créditos plegados.
+ * la etiqueta `AccessConstraints` del servicio. Va plegado tras la «i» como los demás, por
+ * decisión del usuario (05/10/2026).
  */
 export const CREDITOS_RESERVA: ReadonlyArray<Credito> = [
   {
@@ -27,7 +27,6 @@ export const CREDITOS_RESERVA: ReadonlyArray<Credito> = [
     corto: "CC BY 4.0 scne.es",
     enlace: "https://www.scne.es/",
     detalle: "Mapa base del IGN, que Celda usa cuando no carga el de OpenFreeMap",
-    fijo: true,
   },
 ];
 
