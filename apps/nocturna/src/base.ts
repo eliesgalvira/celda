@@ -849,7 +849,9 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               // Un cambio masivo deshace la transacción: el cuadro se queda como estaba.
               const enElListado = new Set(recorrido.registros.map((r) => r.clave));
               const faltan = vigentes.filter((v) => !enElListado.has(v.clave)).length;
-              const cambios = creados + cambiados + faltan;
+              // Las altas no cuentan: añaden estaciones y no retiran ninguna, como las de un
+              // titular que Celda empieza a reconocer.
+              const cambios = cambiados + faltan;
               if (esCambioMasivo(cambios, vigentes.length, limite)) {
                 return yield* new CambioMasivo({
                   donde: `cuadro ${cuadro}`,

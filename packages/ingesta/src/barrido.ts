@@ -93,8 +93,8 @@ export const esCambioMasivo = (
 ): boolean => vigentes > 0 && cambios > limite.minimo && cambios > limite.fraccion * vigentes;
 
 /**
- * El registro cambia de golpe mucho más de lo normal en un cuadro o en una zona: altas, cambios
- * o estaciones que faltan. Lo probable es que haya cambiado cómo escribe algo, como la razón
+ * El registro cambia de golpe mucho más de lo normal en un cuadro o en una zona: cambios o
+ * estaciones que faltan. Las altas no cuentan, porque no retiran nada. Lo probable es que haya cambiado cómo escribe algo, como la razón
  * social de una compañía, y no que lo hayan hecho miles de estaciones a la vez. La noche se para
  * sin guardar ese cuadro, sin contar ausencias y sin publicar, hasta que alguien lo mire.
  */

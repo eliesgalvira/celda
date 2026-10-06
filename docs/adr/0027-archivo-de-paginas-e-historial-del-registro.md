@@ -75,13 +75,13 @@ Para un arreglo de la lectura basta con subir `VERSION_DE_LECTURA`, desplegar y 
 
 ## Cómo quedó (fase 3)
 
-**Dónde.** Al guardar cada cuadro (`aplicarCuadro`) se cuentan sus altas, sus cambios y sus vigentes que el listado ya no trae; al cerrar el barrido de una zona (`cerrarBarrido`), sus ausencias. Si pasan del límite (`esCambioMasivo` en `packages/ingesta/src/barrido.ts`: más de 50 y más del 20 % de las vigentes, por defecto), la transacción se deshace y falla con `CambioMasivo`, que cuenta los registros del listado de titulares desconocidos. Un cuadro sin vigentes nunca para. Los cambios de la limpieza no cuentan, porque no son cambios del registro (fase 2).
+**Dónde.** Al guardar cada cuadro (`aplicarCuadro`) se cuentan sus cambios y sus vigentes que el listado ya no trae, sin las altas, que no retiran nada; al cerrar el barrido de una zona (`cerrarBarrido`), sus ausencias. Si pasan del límite (`esCambioMasivo` en `packages/ingesta/src/barrido.ts`: más de 50 y más del 20 % de las vigentes, por defecto), la transacción se deshace y falla con `CambioMasivo`, que cuenta los registros del listado de titulares desconocidos. Un cuadro sin vigentes nunca para. Los cambios de la limpieza no cuentan, porque no son cambios del registro (fase 2).
 
 **Qué se para.** La noche no cierra ningún barrido, no lee fichas, no fusiona, no publica y no lanza el build de Vercel. La ejecución queda fallida con el motivo, el diario lo dice con un error y `Noche.publicacion` es `detenida`. Las copias de la base y del archivo se hacen. Los barridos de otras zonas que acabaron siguen en curso y se cierran la noche que se retomen. La noche siguiente vuelve a pararse mientras el registro siga igual.
 
 **Cuando el cambio es de verdad**, se sube el límite una noche (`CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO`, `registroOficial.cambioMasivo.porCiento` en el módulo de NixOS) y se vuelve a bajar.
 
-**Lo que no cubre.** Un cambio repartido por muchos cuadros, cada uno por debajo del límite, se guarda cuadro a cuadro antes de saberse. Si son ausencias, las para el cierre de la zona; si son cambios o altas, se guardan, con sus hechos, y la noche publica. Un límite por toda la noche necesitaría guardar los cuadros sin confirmar hasta el final.
+**Lo que no cubre.** Un cambio repartido por muchos cuadros, cada uno por debajo del límite, se guarda cuadro a cuadro antes de saberse. Si son ausencias, las para el cierre de la zona; si son cambios, se guardan, con sus hechos, y la noche publica. Un límite por toda la noche necesitaría guardar los cuadros sin confirmar hasta el final.
 
 ## Consecuencias
 
