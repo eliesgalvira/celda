@@ -151,6 +151,18 @@ const ZONAS = conCuadros({
     },
     municipios: [{ codigo: "08019", habitantes: 1_702_547 }],
   },
+  capitales: {
+    fuente: {
+      atribucion: "Instituto Geográfico Nacional",
+      producto: "Nomenclátor Geográfico Básico de España",
+      licencia: "CC BY 4.0",
+      enlace: "https://www.ign.es/wfs-inspire/ngbe?service=WFS&request=GetCapabilities",
+      fecha: "2026-05-28",
+    },
+    capitales: [
+      { codigo: "08019", nombre: "Barcelona", posicion: { longitud: 2.177, latitud: 41.383 } },
+    ],
+  },
 });
 
 /** Una noche que lee la fuente grabada y guarda en la base, sin publicar. */

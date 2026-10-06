@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { Coordenada } from "./area.ts";
+import { Coordenada, distanciaMetros } from "./area.ts";
 import { type Anillo, dentroDelPoligono, type Poligono } from "./barrio.ts";
 import { aPlano } from "./plano.ts";
 import { FuenteDePoblacion } from "./poblacion.ts";
@@ -8,8 +8,10 @@ import { FuenteDePoblacion } from "./poblacion.ts";
 /**
  * Municipios y provincias de España (ADR 0017). Los límites salen de la Base de Datos de Límites
  * Jurisdiccionales del IGN y los habitantes, del padrón del INE; los descarga a mano la orden
- * `municipios` de `tools/capas`, que los guarda simplificados en el repositorio. El publicador
- * pone a cada emplazamiento su municipio y su provincia con `municipioDelPunto`.
+ * `municipios` de `tools/capas`, que los guarda simplificados en el repositorio. La capital de
+ * cada municipio sale del Nomenclátor Geográfico Básico de España del IGN, con la orden
+ * `capitales`. El publicador pone a cada emplazamiento su municipio y su provincia con
+ * `municipioDelPunto`, y a cada municipio su punto en el mapa con `puntoDeMunicipio`.
  */
 
 /** De dónde salen los límites: lo que hay que citar en una obra derivada del IGN. */
@@ -87,6 +89,33 @@ export const LimitesDeMunicipios = Schema.Struct({
   arcos: Schema.Array(Schema.Array(Schema.Int)),
 });
 export type LimitesDeMunicipios = typeof LimitesDeMunicipios.Type;
+
+/** De dónde salen las capitales: lo que hay que citar en una obra derivada del IGN. */
+export const FuenteDeCapitales = Schema.Struct({
+  atribucion: Schema.String,
+  /** Nombre del producto tal como lo da el servicio del IGN. */
+  producto: Schema.String,
+  licencia: Schema.String,
+  /** Las capacidades del servicio WFS, que dicen la licencia. */
+  enlace: Schema.String,
+  /** El último cambio de alguna capital según el servicio, `AAAA-MM-DD`. */
+  fecha: Schema.String,
+});
+export type FuenteDeCapitales = typeof FuenteDeCapitales.Type;
+
+/**
+ * La capital de cada municipio: el punto oficial de su núcleo principal en el Nomenclátor
+ * Geográfico Básico de España del IGN, con el nombre del núcleo. La descarga a mano la orden
+ * `capitales` de `tools/capas`.
+ */
+export const CapitalesDeMunicipios = Schema.Struct({
+  fuente: FuenteDeCapitales,
+  /** Por código INE, ordenadas, una por municipio. */
+  capitales: Schema.Array(
+    Schema.Struct({ codigo: Schema.String, nombre: Schema.String, posicion: Coordenada }),
+  ),
+});
+export type CapitalesDeMunicipios = typeof CapitalesDeMunicipios.Type;
 
 /** Los habitantes de cada municipio en el padrón, con la fuente que hay que citar. */
 export const PadronDeMunicipios = Schema.Struct({
@@ -365,21 +394,26 @@ export interface MunicipioConHabitantes {
   readonly codigo: string;
   readonly nombre: string;
   readonly provincia: string;
+  /** La etiqueta de su recinto (`Territorio`). */
   readonly etiqueta: Coordenada;
+  /** `null` si las capitales aún no lo tienen, como un municipio recién creado. */
+  readonly capital: Coordenada | null;
   readonly areaKm2: number;
   /** `null` si el padrón aún no lo tiene, como un municipio recién creado. */
   readonly habitantes: number | null;
 }
 
 /**
- * Los municipios de los límites, por código, con los habitantes del padrón. Se cruzan por código
- * INE, nunca por nombre: el IGN escribe «La Roda» y el INE, «Roda, La».
+ * Los municipios de los límites, por código, con los habitantes del padrón y su capital. Se
+ * cruzan por código INE, nunca por nombre: el IGN escribe «La Roda» y el INE, «Roda, La».
  */
 export const municipiosConHabitantes = (
   limites: Pick<LimitesDeMunicipios, "territorios">,
   padron: PadronDeMunicipios,
+  capitales: Pick<CapitalesDeMunicipios, "capitales">,
 ): ReadonlyArray<MunicipioConHabitantes> => {
   const habitantes = new Map(padron.municipios.map((m) => [m.codigo, m.habitantes]));
+  const capital = new Map(capitales.capitales.map((c) => [c.codigo, c.posicion]));
   return limites.territorios.flatMap((t) =>
     t.tipo === "municipio" && t.provincia !== null
       ? [
@@ -388,10 +422,40 @@ export const municipiosConHabitantes = (
             nombre: t.nombre,
             provincia: t.provincia,
             etiqueta: t.etiqueta,
+            capital: capital.get(t.codigo) ?? null,
             areaKm2: t.areaKm2,
             habitantes: habitantes.get(t.codigo) ?? null,
           },
         ]
       : [],
   );
+};
+
+/**
+ * Hasta dónde llega el núcleo de un municipio alrededor de su capital. Medido el 06/10/2026 con
+ * la publicación de toda España: con 2 km, el punto queda a menos de 25 px de la capital en el
+ * zoom 11 en el 75 % de los municipios con emplazamientos (a 470 m de mediana) y en el 92 % de
+ * los de más de 100.000 habitantes (ADR 0017).
+ */
+export const RADIO_DEL_NUCLEO_METROS = 2000;
+
+/**
+ * Dónde va un municipio en el mapa: en la media de sus emplazamientos a menos de
+ * `RADIO_DEL_NUCLEO_METROS` de su capital o, si no tiene ninguno, en la capital. Así su hexágono
+ * cae en el pueblo aunque el término sea mucho mayor, como Gavà, que sube al Garraf. La media de
+ * todos sus emplazamientos caía en el mar o en otro municipio en 48 casos. Un municipio sin
+ * capital va a la etiqueta de su recinto.
+ */
+export const puntoDeMunicipio = (
+  municipio: Pick<MunicipioConHabitantes, "capital" | "etiqueta">,
+  posiciones: ReadonlyArray<Coordenada>,
+): Coordenada => {
+  const { capital } = municipio;
+  if (capital === null) return municipio.etiqueta;
+  const nucleo = posiciones.filter((p) => distanciaMetros(capital, p) < RADIO_DEL_NUCLEO_METROS);
+  if (nucleo.length === 0) return capital;
+  return {
+    longitud: nucleo.reduce((suma, p) => suma + p.longitud, 0) / nucleo.length,
+    latitud: nucleo.reduce((suma, p) => suma + p.latitud, 0) / nucleo.length,
+  };
 };

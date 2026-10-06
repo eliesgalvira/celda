@@ -1,6 +1,6 @@
 # Licencias: CC0 para los datos y las aportaciones, 0BSD para el código y créditos de terceros
 
-Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Responde a la nota de licencias que dejaron el ADR 0009 y `../arquitectura.md`. Los ficheros `LICENSE` se añaden cuando Celda pase a su propio repositorio; hasta entonces este ADR es lo que vale. Revisada el 03/10/2026 con el [ADR 0022](0022-mapa-base-como-google-y-foto-aerea.md): la tabla suma la ortofoto PNOA de la foto aérea.
+Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Responde a la nota de licencias que dejaron el ADR 0009 y `../arquitectura.md`. Los ficheros `LICENSE` se añaden cuando Celda pase a su propio repositorio; hasta entonces este ADR es lo que vale. Revisada el 03/10/2026 con el [ADR 0022](0022-mapa-base-como-google-y-foto-aerea.md): la tabla suma la ortofoto PNOA de la foto aérea. Revisada el 06/10/2026 con el ADR 0017: suma las capitales del Nomenclátor del IGN.
 
 ## Contexto
 
@@ -16,6 +16,7 @@ Celda será abierta del todo, y el usuario pidió «la más abierta» para lo qu
 |---|---|---|
 | Registro oficial (Infoantenas) | Ley 37/2007 y condiciones generales de reutilización del ministerio: citar la fuente, no desnaturalizar, dar la fecha y no sugerir que el ministerio lo apoya | «Origen de los datos: Ministerio para la Transformación Digital y de la Función Pública (Infoantenas)», con la fecha de consulta (investigación del registro, apartado 3) |
 | Límites de provincias y municipios del IGN | CC BY 4.0 | «Obra derivada de …», como piden sus condiciones (ADR 0017) |
+| Capitales de municipio del Nomenclátor Geográfico Básico de España del IGN | CC BY 4.0 | «Obra derivada de Nomenclátor Geográfico Básico de España <fecha> CC-BY 4.0 ign.es», con el punto de cada municipio (ADR 0017) |
 | Padrón del INE | CC BY 4.0 | «Elaboración propia con datos extraídos del sitio web del INE: www.ine.es», con la fecha |
 | Barrios y población de Open Data BCN | CC BY 4.0 | «Ajuntament de Barcelona», con la licencia y la fecha (ADR 0004) |
 | Mapa base y búsqueda de direcciones, sobre OpenStreetMap | ODbL | El crédito de OpenStreetMap, con el del servicio (ADR 0013) |

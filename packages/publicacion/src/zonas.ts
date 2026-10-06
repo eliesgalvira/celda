@@ -2,6 +2,7 @@ import type { Cuadro } from "@celda/dominio/barrido";
 import type { LimitesDeBarrios } from "@celda/dominio/barrio";
 import { cuadrosDeProvincias } from "@celda/dominio/cobertura";
 import {
+  CapitalesDeMunicipios,
   type IndiceDeMunicipios,
   indexarMunicipios,
   LimitesDeMunicipios,
@@ -10,6 +11,7 @@ import {
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import capitales from "../datos/capitales.json" with { type: "json" };
 import municipios from "../datos/municipios.json" with { type: "json" };
 import padron from "../datos/padron.json" with { type: "json" };
 import { limitesDeBarcelona } from "./barrios.ts";
@@ -18,12 +20,13 @@ import { limitesDeBarcelona } from "./barrios.ts";
  * Las zonas en que la publicación sitúa cada emplazamiento: el barrio de Barcelona, el municipio y
  * la provincia del IGN, y los habitantes de cada municipio en el padrón del INE (ADR 0004, 0016 y
  * 0017). La provincia decide en qué capa va; el municipio y el barrio van en esa capa y en la
- * ficha.
+ * ficha. La capital de cada municipio decide dónde va su punto en la capa.
  */
 export interface ZonasDePublicacion {
   readonly barrios: LimitesDeBarrios;
   readonly municipios: IndiceDeMunicipios;
   readonly padron: PadronDeMunicipios;
+  readonly capitales: CapitalesDeMunicipios;
   /**
    * Los cuadros con datos que toca cada provincia (`cuadrosDeProvincias`), para saber si una
    * provincia está cubierta. Se calculan una vez con los límites.
@@ -39,6 +42,7 @@ export const conCuadros = (zonas: Omit<ZonasDePublicacion, "cuadros">): ZonasDeP
 
 const decodificarMunicipios = Schema.decodeUnknownEffect(LimitesDeMunicipios);
 const decodificarPadron = Schema.decodeUnknownEffect(PadronDeMunicipios);
+const decodificarCapitales = Schema.decodeUnknownEffect(CapitalesDeMunicipios);
 
 /**
  * Los límites de municipios y provincias del IGN guardados en git junto a la publicación,
@@ -49,12 +53,19 @@ export const municipiosDeEspana = Effect.map(decodificarMunicipios(municipios), 
 /** Los habitantes de cada municipio en el padrón del INE, también de `pnpm run municipios`. */
 export const padronDeEspana = decodificarPadron(padron);
 
-/** Las zonas de verdad: los barrios de Open Data BCN, los municipios del IGN y el padrón. */
+/** La capital de cada municipio en el Nomenclátor del IGN, de `pnpm run capitales`. */
+export const capitalesDeEspana = decodificarCapitales(capitales);
+
+/**
+ * Las zonas de verdad: los barrios de Open Data BCN, los municipios y sus capitales del IGN y el
+ * padrón.
+ */
 export const zonasDePublicacion = Effect.map(
   Effect.all({
     barrios: limitesDeBarcelona,
     municipios: municipiosDeEspana,
     padron: padronDeEspana,
+    capitales: capitalesDeEspana,
   }),
   conCuadros,
 );

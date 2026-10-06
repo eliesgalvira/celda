@@ -6,6 +6,7 @@ import * as Exit from "effect/Exit";
 
 import {
   creditoDeBarrios,
+  creditoDeCapitales,
   creditoDeMunicipios,
   estadoDeCarga,
   estadoDeLaVista,
@@ -69,6 +70,20 @@ describe("estado de la capa", () => {
     assert.strictEqual(
       creditoDeMunicipios(FUENTE_DE_MUNICIPIOS).texto,
       "Obra derivada de Base de Datos de Límites Jurisdiccionales de España ago 2026 CC-BY 4.0 ign.es",
+    );
+    assert.deepStrictEqual(
+      creditoDeCapitales({
+        atribucion: "Instituto Geográfico Nacional",
+        producto: "Nomenclátor Geográfico Básico de España",
+        licencia: "CC BY 4.0",
+        enlace: "https://www.ign.es/wfs-inspire/ngbe?service=WFS&request=GetCapabilities",
+        fecha: "2026-05-28",
+      }),
+      {
+        texto: "Obra derivada de Nomenclátor Geográfico Básico de España may 2026 CC-BY 4.0 ign.es",
+        enlace: "https://www.ign.es/wfs-inspire/ngbe?service=WFS&request=GetCapabilities",
+        detalle: "Dónde va cada municipio, junto a su capital en el Nomenclátor del IGN",
+      },
     );
   });
 

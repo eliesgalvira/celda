@@ -18,7 +18,7 @@ import { indiceDeCiudades, type IndiceDeCiudades } from "./poblacionDeRotulos.ts
  * la primera pantalla.
  */
 
-/** Una ciudad: su nombre de lugar, la etiqueta de su municipio y sus habitantes. */
+/** Una ciudad: su nombre de lugar, el punto de su capital y sus habitantes. */
 export const Ciudad = Schema.Tuple([Schema.String, Schema.Finite, Schema.Finite, Schema.Int]);
 export type Ciudad = typeof Ciudad.Type;
 

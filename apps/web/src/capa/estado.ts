@@ -2,7 +2,7 @@ import { type Coordenada, contiene, ESPANA } from "@celda/dominio/area";
 import type { FuenteDeBarrios } from "@celda/dominio/barrio";
 import { distanciaALosDatos, seCortan } from "@celda/dominio/cobertura";
 import { marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
-import type { FuenteDeMunicipios } from "@celda/dominio/municipio";
+import type { FuenteDeCapitales, FuenteDeMunicipios } from "@celda/dominio/municipio";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import type { Credito } from "@celda/ui/Atribucion.tsx";
 import * as Cause from "effect/Cause";
@@ -124,18 +124,29 @@ export const creditoDeBarrios = (fuente: FuenteDeBarrios): Credito => {
 };
 
 /**
- * El crédito de los límites de municipios y provincias, como piden las condiciones del IGN para
- * una obra derivada: «Obra derivada de <producto> <fecha> CC-BY 4.0 ign.es» (ADR 0017).
+ * El crédito de unos datos del IGN, como piden sus condiciones para una obra derivada: «Obra
+ * derivada de <producto> <fecha> CC-BY 4.0 ign.es» (ADR 0017).
  */
-export const creditoDeMunicipios = (fuente: FuenteDeMunicipios): Credito => {
+const creditoDelIgn = (
+  fuente: FuenteDeMunicipios | FuenteDeCapitales,
+  detalle: string,
+): Credito => {
   const fecha = Date.parse(`${fuente.fecha}T12:00:00Z`);
   const cuando = Number.isNaN(fecha) ? fuente.fecha : MES.format(fecha).replace(".", "");
   return {
     texto: `Obra derivada de ${fuente.producto} ${cuando} CC-BY 4.0 ign.es`,
     enlace: fuente.enlace,
-    detalle: "Provincias y municipios de cada emplazamiento, con los límites del IGN",
+    detalle,
   };
 };
+
+/** El crédito de los límites de municipios y provincias. */
+export const creditoDeMunicipios = (fuente: FuenteDeMunicipios): Credito =>
+  creditoDelIgn(fuente, "Provincias y municipios de cada emplazamiento, con los límites del IGN");
+
+/** El crédito de las capitales, junto a las que va cada municipio (ADR 0017). */
+export const creditoDeCapitales = (fuente: FuenteDeCapitales): Credito =>
+  creditoDelIgn(fuente, "Dónde va cada municipio, junto a su capital en el Nomenclátor del IGN");
 
 /**
  * Dónde tiene Celda los emplazamientos, para el detalle de la marca de agua: España si todas las

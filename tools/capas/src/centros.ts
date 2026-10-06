@@ -1,9 +1,11 @@
 import type { CentroDeProvincia, CentrosDeProvincia } from "@celda/dominio/centroVisual";
 import type { Ciudad, HabitantesDeCiudades } from "@celda/dominio/habitantesDeCiudades";
 import {
+  CapitalesDeMunicipios,
   LimitesDeMunicipios,
   municipiosConHabitantes,
   PadronDeMunicipios,
+  puntoDeMunicipio,
 } from "@celda/dominio/municipio";
 import { nombreDeLugarDeMunicipio } from "@celda/dominio/nombreDeLugar";
 import { MINIMO_DE_HABITANTES } from "@celda/dominio/poblacionDeRotulos";
@@ -18,13 +20,13 @@ import { anillosDeLaUnion, type ContornoImposible } from "./espana.ts";
 import { type PoligonoPlano, poloDeInaccesibilidad } from "./poloDeInaccesibilidad.ts";
 
 /**
- * Lo que necesita la regla de choques del mapa (ADR 0024), sacado de los límites y el padrón del
- * repositorio sin descargar nada:
+ * Lo que necesita la regla de choques del mapa (ADR 0024), sacado de los límites, el padrón y las
+ * capitales del repositorio sin descargar nada:
  *
  * - el centro visual de cada provincia, donde va su hexágono de lejos, y sus habitantes;
  * - los habitantes de las ciudades que el mapa base rotula de lejos, por su nombre de lugar.
  *
- * La orden `centros` los vuelve a escribir cuando cambian los límites o el padrón.
+ * La orden `centros` los vuelve a escribir cuando cambian los límites, el padrón o las capitales.
  */
 
 /**
@@ -223,10 +225,11 @@ export interface ProvinciaConCentro {
 export const centrosDeProvincia = (
   limites: LimitesDeMunicipios,
   padron: PadronDeMunicipios,
+  capitales: Pick<CapitalesDeMunicipios, "capitales">,
   toleranciaMetros: number,
   precisionMetros: number,
 ): Result.Result<ReadonlyArray<ProvinciaConCentro>, ContornoImposible> => {
-  const municipios = municipiosConHabitantes(limites, padron);
+  const municipios = municipiosConHabitantes(limites, padron, capitales);
   const porGrado = limites.unidadesPorGrado;
   const provincias: Array<ProvinciaConCentro> = [];
   for (const { codigo } of limites.provincias) {
@@ -295,28 +298,29 @@ export const ficheroDeCentros = (tabla: CentrosDeProvincia): string =>
 const dosDecimales = (grados: number): number => Math.round(grados * 100) / 100;
 
 /**
- * Los municipios de `MINIMO_DE_HABITANTES` o más, con su nombre de lugar, la etiqueta del IGN y
- * sus habitantes, ordenados por nombre.
+ * Los municipios de `MINIMO_DE_HABITANTES` o más, con su nombre de lugar, su punto sin contar los
+ * emplazamientos (su capital) y sus habitantes, ordenados por nombre.
  */
 export const tablaDeCiudades = (
   limites: LimitesDeMunicipios,
   padron: PadronDeMunicipios,
+  capitales: Pick<CapitalesDeMunicipios, "capitales">,
 ): HabitantesDeCiudades => ({
   padron: padron.fuente,
   minimo: MINIMO_DE_HABITANTES,
-  ciudades: municipiosConHabitantes(limites, padron)
-    .flatMap((m): ReadonlyArray<Ciudad> =>
-      m.habitantes !== null && m.habitantes >= MINIMO_DE_HABITANTES
-        ? [
-            [
-              nombreDeLugarDeMunicipio(m.codigo, m.nombre),
-              dosDecimales(m.etiqueta.longitud),
-              dosDecimales(m.etiqueta.latitud),
-              m.habitantes,
-            ],
-          ]
-        : [],
-    )
+  ciudades: municipiosConHabitantes(limites, padron, capitales)
+    .flatMap((m): ReadonlyArray<Ciudad> => {
+      if (m.habitantes === null || m.habitantes < MINIMO_DE_HABITANTES) return [];
+      const punto = puntoDeMunicipio(m, []);
+      return [
+        [
+          nombreDeLugarDeMunicipio(m.codigo, m.nombre),
+          dosDecimales(punto.longitud),
+          dosDecimales(punto.latitud),
+          m.habitantes,
+        ],
+      ];
+    })
     .toSorted(([a, x], [b, y]) => a.localeCompare(b, "es") || x - y),
 });
 
@@ -327,25 +331,35 @@ export const ficheroDeCiudades = (tabla: HabitantesDeCiudades): string =>
 
 const decodificarLimites = Schema.decodeEffect(Schema.fromJsonString(LimitesDeMunicipios));
 const decodificarPadron = Schema.decodeEffect(Schema.fromJsonString(PadronDeMunicipios));
+const decodificarCapitales = Schema.decodeEffect(Schema.fromJsonString(CapitalesDeMunicipios));
 
 /**
- * Lee los límites de `municipios` y el padrón de `padron`, y escribe los centros en
- * `destinoCentros` y las ciudades en `destinoCiudades`. Si algo falla, no escribe ninguno.
+ * Lee los límites de `municipios`, el padrón de `padron` y las capitales de `capitales`, y escribe
+ * los centros en `destinoCentros` y las ciudades en `destinoCiudades`. Si algo falla, no escribe
+ * ninguno.
  */
 export const escribirCentros = Effect.fn("Capas.escribirCentros")(function* (
   municipios: string,
   padron: string,
+  capitales: string,
   destinoCentros: string,
   destinoCiudades: string,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const limites = yield* decodificarLimites(yield* fs.readFileString(municipios));
   const habitantes = yield* decodificarPadron(yield* fs.readFileString(padron));
+  const deCapitales = yield* decodificarCapitales(yield* fs.readFileString(capitales));
   const provincias = yield* Effect.fromResult(
-    centrosDeProvincia(limites, habitantes, TOLERANCIA_CENTROS_METROS, PRECISION_CENTROS_METROS),
+    centrosDeProvincia(
+      limites,
+      habitantes,
+      deCapitales,
+      TOLERANCIA_CENTROS_METROS,
+      PRECISION_CENTROS_METROS,
+    ),
   );
   const centros = ficheroDeCentros(tablaDeCentros(limites, habitantes, provincias));
-  const ciudades = tablaDeCiudades(limites, habitantes);
+  const ciudades = tablaDeCiudades(limites, habitantes, deCapitales);
   const ficheroCiudades = ficheroDeCiudades(ciudades);
   yield* fs.writeFileString(destinoCentros, centros);
   yield* fs.writeFileString(destinoCiudades, ficheroCiudades);

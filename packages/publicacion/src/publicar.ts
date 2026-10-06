@@ -314,6 +314,7 @@ const fuentesDe = (zonas: ZonasDePublicacion): FuentesDeZonas => ({
   barrios: zonas.barrios.fuente,
   municipios: zonas.municipios.fuente,
   padron: zonas.padron.fuente,
+  capitales: zonas.capitales.fuente,
 });
 
 /**
@@ -417,7 +418,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
     { concurrency: A_LA_VEZ },
   );
 
-  const municipios = municipiosConHabitantes(zonas.municipios, zonas.padron);
+  const municipios = municipiosConHabitantes(zonas.municipios, zonas.padron, zonas.capitales);
   const capas = yield* Effect.forEach([...situados], ([provincia, suyos]) =>
     Effect.gen(function* () {
       const suyosLotes: ReadonlyArray<LoteNombrado> = lotes

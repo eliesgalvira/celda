@@ -36,6 +36,9 @@ const limitesDe = (municipios: ReadonlyArray<UnidadDePrueba>) =>
     ),
   );
 
+/** Sin capitales, cada municipio va a la etiqueta de su recinto. */
+const SIN_CAPITALES = { capitales: [] };
+
 const padronDe = (habitantes: Readonly<Record<string, number>>): PadronDeMunicipios => ({
   fuente: {
     atribucion: "INE",
@@ -55,7 +58,13 @@ describe("centros de provincia", () => {
       municipio("08002", [rectangulo(2.2, 41, 2.4, 41.1)]),
     ]);
     const [barcelona] = Result.getOrThrow(
-      centrosDeProvincia(limites, padronDe({ "08001": 900_000, "08002": 1000 }), 300, 50),
+      centrosDeProvincia(
+        limites,
+        padronDe({ "08001": 900_000, "08002": 1000 }),
+        SIN_CAPITALES,
+        300,
+        50,
+      ),
     );
     assert.strictEqual(barcelona?.codigo, "08");
     assert.strictEqual(barcelona?.habitantes, 901_000);
@@ -72,7 +81,7 @@ describe("centros de provincia", () => {
       municipio("08002", [rectangulo(2.2, 41, 2.4, 41.1)]),
     ]);
     const [barcelona] = Result.getOrThrow(
-      centrosDeProvincia(limites, padronDe({ "08001": 0, "08002": 0 }), 300, 50),
+      centrosDeProvincia(limites, padronDe({ "08001": 0, "08002": 0 }), SIN_CAPITALES, 300, 50),
     );
     const [longitud = 0] = barcelona?.centro.centro ?? [];
     assert.closeTo(longitud, 2.3, 0.005);
@@ -87,7 +96,13 @@ describe("centros de provincia", () => {
       municipio("09001", [rectangulo(2.05, 41.02, 2.07, 41.04)]),
     ]);
     const provincias = Result.getOrThrow(
-      centrosDeProvincia(limites, padronDe({ "08001": 10, "08002": 10, "09001": 10 }), 300, 50),
+      centrosDeProvincia(
+        limites,
+        padronDe({ "08001": 10, "08002": 10, "09001": 10 }),
+        SIN_CAPITALES,
+        300,
+        50,
+      ),
     );
     const barcelona = provincias.find((p) => p.codigo === "08");
     // Un solo polígono, el de los dos municipios juntos, con el enclave como agujero.
@@ -113,7 +128,7 @@ describe("centros de provincia", () => {
     const tabla = tablaDeCentros(
       limites,
       padron,
-      Result.getOrThrow(centrosDeProvincia(limites, padron, 300, 200)),
+      Result.getOrThrow(centrosDeProvincia(limites, padron, SIN_CAPITALES, 300, 200)),
     );
     const fichero = ficheroDeCentros(tabla);
     assert.deepStrictEqual(JSON.parse(fichero), JSON.parse(JSON.stringify(tabla)));
@@ -126,15 +141,19 @@ describe("centros de provincia", () => {
       municipio("08001", [rectangulo(2, 41, 2.04, 41.03)]),
       municipio("08002", [rectangulo(2.04, 41, 2.08, 41.03)]),
     ]);
-    const tabla = tablaDeCiudades(limites, padronDe({ "08001": 20_000, "08002": 19_999 }));
+    const tabla = tablaDeCiudades(limites, padronDe({ "08001": 20_000, "08002": 19_999 }), {
+      capitales: [
+        { codigo: "08001", nombre: "Núcleo", posicion: { longitud: 2.011, latitud: 41.012 } },
+      ],
+    });
     assert.strictEqual(tabla.minimo, 20_000);
     assert.lengthOf(tabla.ciudades, 1);
     const [nombre, longitud, latitud, habitantes] = tabla.ciudades[0] ?? [];
     assert.strictEqual(nombre, "Municipio 08001");
     assert.strictEqual(habitantes, 20_000);
-    // Dos decimales: un kilómetro.
-    assert.strictEqual(longitud, Math.round((longitud ?? 0) * 100) / 100);
-    assert.strictEqual(latitud, Math.round((latitud ?? 0) * 100) / 100);
+    // En su capital, con dos decimales: un kilómetro.
+    assert.strictEqual(longitud, 2.01);
+    assert.strictEqual(latitud, 41.01);
     assert.deepStrictEqual(JSON.parse(ficheroDeCiudades(tabla)), JSON.parse(JSON.stringify(tabla)));
   });
 });

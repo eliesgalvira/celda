@@ -50,7 +50,8 @@ const ENTIDADES: ReadonlyMap<string, string> = new Map([
   ["&apos;", "'"],
 ]);
 
-const sinEntidades = (texto: string): string =>
+/** El texto de un elemento XML con sus entidades resueltas: «&amp;» es «&». */
+export const sinEntidades = (texto: string): string =>
   texto.replace(/&(?:amp|lt|gt|quot|apos);/gu, (entidad) => ENTIDADES.get(entidad) ?? entidad);
 
 /** Un `gml:posList` de latitud y longitud, como anillo cerrado en millonésimas. */
