@@ -8,6 +8,7 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
+import { ArchivoDePaginas, type PaginaDelRegistro } from "../archivo.ts";
 import type { OpcionesCliente } from "../cliente.ts";
 import {
   ExtractorPorCajas,
@@ -320,6 +321,107 @@ describe("fichas del registro oficial y bloqueos del geoportal", () => {
       if (salida._tag === "Success") {
         assert.strictEqual(salida.value._tag, "FuenteBloqueada");
       }
+    }),
+  );
+});
+
+describe("archivo de páginas", () => {
+  /** Un archivo en memoria que apunta cada página que le llega. */
+  const archivoEnMemoria = Effect.map(
+    Ref.make<ReadonlyArray<PaginaDelRegistro>>([]),
+    (paginas) => ({
+      paginas: Ref.get(paginas),
+      archivo: ArchivoDePaginas.of({
+        archivar: (pagina) => Ref.update(paginas, (p) => [...p, pagina]),
+      }),
+    }),
+  );
+
+  it.effect("archiva con sus bytes cada página que llega con HTTP 200, se pueda leer o no", () =>
+    Effect.gen(function* () {
+      const ficha = new Uint8Array(
+        yield* leerMuestra("detalle-telefonica-0800942.iso-8859-1.html"),
+      );
+      const sinFicha = new Uint8Array(
+        yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"),
+      );
+      const listado = elementos(1, "A", CAJA);
+      const ilegible = latin1('<table class="tablaDetalleEstacion"><tr><td>Obras</td></tr>');
+      const ajena = latin1("<html><body>Request rejected</body></html>");
+      const respuestas = new Map<string, Uint8Array<ArrayBuffer>>([
+        ["leida", ficha],
+        ["sin-ficha", sinFicha],
+        ["ilegible", ilegible],
+        ["ajena", ajena],
+      ]);
+      const { paginas, archivo } = yield* archivoEnMemoria;
+      const { salida } = yield* conExtractor(
+        (url) => {
+          if (url.pathname === "/robots.txt") return NO_HAY_ROBOTS;
+          if (url.pathname === "/VCTEL/infoantenasGeoJSON.do") {
+            return { estado: 200, cuerpo: listado };
+          }
+          const cuerpo = respuestas.get(url.searchParams.get("emplazamiento") ?? "");
+          return cuerpo === undefined
+            ? { estado: 403, cuerpo: "Forbidden" }
+            : { estado: 200, cuerpo };
+        },
+        (extractor) =>
+          Effect.gen(function* () {
+            yield* extractor.caja(CAJA);
+            for (const cual of ["leida", "sin-ficha", "ilegible", "ajena", "prohibida"]) {
+              const url = `https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=${cual}`;
+              yield* Effect.exit(extractor.ficha({ ...FICHA, clave: `C - ${cual}`, url }));
+            }
+          }).pipe(Effect.provideService(ArchivoDePaginas, archivo)),
+      );
+      assert.strictEqual(salida._tag, "Success");
+      const archivadas = yield* paginas;
+      // El 403 no se archiva: no trae nada del registro.
+      assert.deepStrictEqual(
+        archivadas.map((p) => [p.tipo, p.clave, p.resultado]),
+        [
+          ["listado", undefined, "leida"],
+          ["ficha", "C - leida", "leida"],
+          ["ficha", "C - sin-ficha", "sin-ficha"],
+          ["ficha", "C - ilegible", "ilegible"],
+          ["ficha", "C - ajena", "ajena"],
+        ],
+      );
+      // Los bytes tal como llegan, en ISO-8859-1 y sin decodificar.
+      assert.deepStrictEqual(
+        archivadas.map((p) => [...p.cuerpo]),
+        [listado, ficha, sinFicha, ilegible, ajena].map((bytes) => [...bytes]),
+      );
+      assert.strictEqual(
+        archivadas[0]?.url,
+        "https://geoportal.minetur.gob.es/VCTEL/infoantenasGeoJSON.do?idCapa=null&zoom=4&bbox=2.105000,41.382000,2.125000,41.392000",
+      );
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("un listado en HTML o que no se entiende también se archiva", () =>
+    Effect.gen(function* () {
+      const { paginas, archivo } = yield* archivoEnMemoria;
+      const cuerpos = [latin1("<html>Mantenimiento</html>"), latin1("Servicio no disponible")];
+      yield* conExtractor(
+        (url, intento) =>
+          url.pathname === "/robots.txt"
+            ? NO_HAY_ROBOTS
+            : { estado: 200, cuerpo: cuerpos[intento] ?? latin1("{}") },
+        (extractor) =>
+          Effect.gen(function* () {
+            yield* Effect.exit(extractor.caja(CAJA));
+            yield* Effect.exit(extractor.caja(CAJA));
+          }).pipe(Effect.provideService(ArchivoDePaginas, archivo)),
+      );
+      assert.deepStrictEqual(
+        (yield* paginas).map((p) => [p.tipo, p.resultado, [...p.cuerpo]]),
+        [
+          ["listado", "ajena", [...(cuerpos[0] ?? [])]],
+          ["listado", "ilegible", [...(cuerpos[1] ?? [])]],
+        ],
+      );
     }),
   );
 });

@@ -15,6 +15,8 @@ import type { OpcionesNoche } from "./programa.ts";
 export interface Configuracion {
   /** El fichero SQLite con el estado entre noches. */
   readonly base: string;
+  /** El fichero SQLite del archivo de páginas del registro (ADR 0027). */
+  readonly archivo: string;
   readonly noche: OpcionesNoche;
   readonly registroOficial: OpcionesCliente;
   /** Las del cliente de las fichas del registro oficial: su pausa es el ritmo de las fichas. */
@@ -34,6 +36,8 @@ export const COPIAS_CONSERVADAS = 14;
  * La configuración, desde variables de entorno:
  *
  * - `CELDA_INGESTA_BASE`: el fichero SQLite (`datos/ingesta.sqlite`).
+ * - `CELDA_INGESTA_ARCHIVO`: el fichero SQLite del archivo de páginas del registro
+ *   (`datos/archivo.sqlite`, ADR 0027). Sus paquetes van a la carpeta `archivo` de la de copias.
  * - `CELDA_INGESTA_COPIAS` y `CELDA_INGESTA_COPIAS_CONSERVADAS`: la carpeta de copias
  *   (`datos/copias`) y cuántas se conservan (14).
  * - `CELDA_PUBLICAR_REINTENTO_MINUTOS`: espera antes de repetir una publicación fallida (60).
@@ -61,6 +65,7 @@ export const COPIAS_CONSERVADAS = 14;
  */
 export const configuracion: Config.Config<Configuracion> = Config.all({
   base: Config.String("CELDA_INGESTA_BASE").pipe(Config.withDefault("datos/ingesta.sqlite")),
+  archivo: Config.String("CELDA_INGESTA_ARCHIVO").pipe(Config.withDefault("datos/archivo.sqlite")),
   carpetaDeCopias: Config.String("CELDA_INGESTA_COPIAS").pipe(Config.withDefault("datos/copias")),
   conservar: Config.Int("CELDA_INGESTA_COPIAS_CONSERVADAS").pipe(
     Config.withDefault(COPIAS_CONSERVADAS),
@@ -81,6 +86,7 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
 }).pipe(
   Config.map((c): Configuracion => ({
     base: c.base,
+    archivo: c.archivo,
     noche: {
       proceso: { zonas: c.zonas, fichas: c.fichas },
       reintento: Duration.minutes(Math.max(c.reintentoMinutos, 0)),

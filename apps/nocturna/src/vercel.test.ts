@@ -505,6 +505,46 @@ describe("las capas en Vercel", () => {
       ),
     );
 
+    it.effect("las copias de la base y el archivo de páginas del cubo nunca se montan", () =>
+      publicado((almacen, destino) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          for (const privado of [
+            "copias/ingesta-2026-09-26T02-15-00.000Z.sqlite.gz",
+            "archivo/archivo-2026-09-26T02-15-00.000Z.sqlite",
+          ]) {
+            yield* fs.makeDirectory(path.join(almacen, path.dirname(privado)), {
+              recursive: true,
+            });
+            yield* fs.writeFileString(path.join(almacen, privado), "privado");
+          }
+          yield* montar(almacen, destino);
+          const montados = yield* fs.readDirectory(destino, { recursive: true });
+          assert.isFalse(montados.some((f) => f.startsWith("copias") || f.startsWith("archivo")));
+
+          // Aunque un manifiesto lo liste por un error, el build falla sin escribir vigente.json.
+          const publicadas = yield* contenidoDe(almacen);
+          const sello = selloVigente(publicadas);
+          const manifiesto = yield* codificarManifiesto({
+            version: `sitios@${sello}`,
+            ficheros: [
+              ...listadosEn(publicadas, sello),
+              "archivo/archivo-2026-09-26T02-15-00.000Z.sqlite",
+            ],
+          });
+          yield* fs.writeFileString(path.join(almacen, ficheroDeManifiesto(sello)), manifiesto);
+          const otro = path.join(path.dirname(destino), "otras-capas");
+          const fallo = yield* Effect.flip(montar(almacen, otro));
+          assert.strictEqual(
+            porQue(fallo),
+            "un manifiesto lista ficheros privados: archivo/archivo-2026-09-26T02-15-00.000Z.sqlite",
+          );
+          assert.isFalse(yield* fs.exists(path.join(otro, FICHERO_VIGENTE)));
+        }),
+      ),
+    );
+
     it.effect("no monta en una carpeta que ya tiene algo", () =>
       publicado((almacen, destino) =>
         Effect.gen(function* () {

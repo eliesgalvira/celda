@@ -5,9 +5,9 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
-import type { AlmacenDeCopias, AlmacenDeFicheros } from "./almacen.ts";
+import type { AlmacenDeCopias, AlmacenDeFicheros, AlmacenDelArchivo } from "./almacen.ts";
 import { almacenEnCarpeta } from "./almacenes/carpeta.ts";
-import { almacenEnR2, copiasEnR2 } from "./almacenes/r2.ts";
+import { almacenEnR2, archivoEnR2, copiasEnR2 } from "./almacenes/r2.ts";
 import { type SitioEnVercel, sitioEnVercel } from "./vercel.ts";
 
 /**
@@ -64,6 +64,19 @@ export const copiasDesdeConfig = Effect.map(
   (r2): Option.Option<Layer.Layer<AlmacenDeCopias>> =>
     Option.map(r2, (credenciales) =>
       copiasEnR2(credenciales).pipe(Layer.provide(FetchHttpClient.layer)),
+    ),
+);
+
+/**
+ * El archivo de páginas del registro fuera de la máquina, en el cubo de R2 de la configuración
+ * (ADR 0027), o `None` si no hay cubo. Como las copias, una carpeta de `CELDA_ALMACEN_CARPETA` no
+ * cuenta: los paquetes del archivo ya se guardan en la carpeta de copias.
+ */
+export const archivoDesdeConfig = Effect.map(
+  configR2,
+  (r2): Option.Option<Layer.Layer<AlmacenDelArchivo>> =>
+    Option.map(r2, (credenciales) =>
+      archivoEnR2(credenciales).pipe(Layer.provide(FetchHttpClient.layer)),
     ),
 );
 

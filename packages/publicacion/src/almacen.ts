@@ -61,3 +61,21 @@ export class AlmacenDeCopias extends Context.Service<
     readonly borrar: (nombre: string) => Effect.Effect<void, AlmacenNoDisponible>;
   }
 >()("@celda/publicacion/almacen/AlmacenDeCopias") {}
+
+/**
+ * Dónde va, fuera de la máquina de la ingesta, el archivo de páginas del registro oficial: otro
+ * prefijo propio del cubo de R2 (ADR 0027). Cada paquete del archivo se sube una vez y no se borra
+ * nunca, así que no tiene `borrar`.
+ */
+export class AlmacenDelArchivo extends Context.Service<
+  AlmacenDelArchivo,
+  {
+    /** Sube un paquete. Si ya hay uno con ese nombre, lo sustituye. */
+    readonly guardar: (
+      nombre: string,
+      contenido: Uint8Array<ArrayBuffer>,
+    ) => Effect.Effect<void, AlmacenNoDisponible>;
+    /** Los nombres de los paquetes subidos, sin el prefijo. */
+    readonly listar: Effect.Effect<ReadonlyArray<string>, AlmacenNoDisponible>;
+  }
+>()("@celda/publicacion/almacen/AlmacenDelArchivo") {}

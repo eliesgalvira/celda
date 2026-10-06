@@ -11,8 +11,8 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import { codificarConsulta, codificarRuta, firmarV4, sha256DeBytes } from "./firma.ts";
-import { almacenEnR2, copiasEnR2, leerListado } from "./r2.ts";
-import { AlmacenDeCopias, AlmacenDeFicheros } from "../almacen.ts";
+import { almacenEnR2, archivoEnR2, copiasEnR2, leerListado } from "./r2.ts";
+import { AlmacenDeCopias, AlmacenDeFicheros, AlmacenDelArchivo } from "../almacen.ts";
 
 const PUNTO = "http://r2.prueba";
 const FICHERO = "sitios@2026-09-26T02:15:03Z.json";
@@ -99,7 +99,8 @@ const cuboDePrueba = Effect.gen(function* () {
     Layer.provide(http),
   );
   const copias = copiasEnR2(OPCIONES).pipe(Layer.provide(http));
-  return { almacen, copias, objetos, peticiones };
+  const archivo = archivoEnR2(OPCIONES).pipe(Layer.provide(http));
+  return { almacen, copias, archivo, objetos, peticiones };
 });
 
 describe("almacén de ficheros en R2", () => {
@@ -310,6 +311,48 @@ describe("almacén de ficheros en R2", () => {
         yield* copias.borrar("ingesta-2026-09-26T02-15-03.000Z.sqlite.gz");
         assert.lengthOf(yield* copias.listar, 2);
         assert.isTrue(Option.isSome(yield* almacen.leer(FICHERO)));
+      }),
+  );
+
+  it.effect(
+    "los paquetes del archivo van firmados bajo archivo/ y se listan sin ver las copias ni lo publicado",
+    () =>
+      Effect.gen(function* () {
+        const cubo = yield* cuboDePrueba;
+        const almacen = yield* Effect.service(AlmacenDeFicheros).pipe(Effect.provide(cubo.almacen));
+        const copias = yield* Effect.service(AlmacenDeCopias).pipe(Effect.provide(cubo.copias));
+        const archivo = yield* Effect.service(AlmacenDelArchivo).pipe(Effect.provide(cubo.archivo));
+        yield* almacen.guardar(FICHERO, "{}");
+        const contenido = new Uint8Array([0x53, 0x51, 0x4c, 0, 255]);
+        yield* copias.guardar("ingesta-2026-09-26T02-15-03.000Z.sqlite.gz", contenido);
+        yield* archivo.guardar("archivo-2026-09-26T02-15-03.000Z.sqlite", contenido);
+        yield* archivo.guardar("archivo-2026-09-27T02-15-03.000Z.sqlite", contenido);
+        yield* archivo.guardar("archivo-2026-09-28T02-15-03.000Z.sqlite", contenido);
+
+        const subida = (yield* Ref.get(cubo.peticiones)).find(
+          (p) => p.metodo === "PUT" && p.url.includes("/archivo/"),
+        );
+        assert.strictEqual(
+          subida?.url,
+          `${PUNTO}/${CUBO}/archivo/archivo-2026-09-26T02-15-03.000Z.sqlite`,
+        );
+        assert.strictEqual(subida?.bytes, contenido.length);
+        assert.strictEqual(
+          subida?.cabeceras["x-amz-content-sha256"],
+          yield* sha256DeBytes(contenido),
+        );
+        assert.deepStrictEqual(
+          [...(yield* archivo.listar)],
+          [
+            "archivo-2026-09-26T02-15-03.000Z.sqlite",
+            "archivo-2026-09-27T02-15-03.000Z.sqlite",
+            "archivo-2026-09-28T02-15-03.000Z.sqlite",
+          ],
+        );
+        assert.deepStrictEqual(
+          [...(yield* copias.listar)],
+          ["ingesta-2026-09-26T02-15-03.000Z.sqlite.gz"],
+        );
       }),
   );
 

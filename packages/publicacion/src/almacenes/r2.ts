@@ -10,6 +10,7 @@ import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
 import {
   AlmacenDeCopias,
+  AlmacenDelArchivo,
   AlmacenDeFicheros,
   AlmacenNoDisponible,
   FicheroInmutable,
@@ -245,6 +246,15 @@ export const almacenEnR2 = (opciones: OpcionesR2) =>
 /** El prefijo de las copias de la base en el cubo, aparte de lo publicado. */
 export const PREFIJO_COPIAS = "copias/";
 
+/** El prefijo del archivo de páginas del registro en el cubo, aparte de lo publicado (ADR 0027). */
+export const PREFIJO_ARCHIVO = "archivo/";
+
+/**
+ * Los prefijos del cubo que nunca se publican. El build de Vercel solo copia lo que listan los
+ * manifiestos, y falla si un manifiesto lista algo con uno de ellos.
+ */
+export const PREFIJOS_PRIVADOS: ReadonlyArray<string> = [PREFIJO_COPIAS, PREFIJO_ARCHIVO];
+
 /**
  * Las copias de la base de la ingesta en el mismo cubo de R2 que lo publicado, bajo
  * `PREFIJO_COPIAS` (ADR 0018). Cada copia se sube entera en una sola petición, firmada con su
@@ -278,6 +288,40 @@ export const copiasEnR2 = (opciones: OpcionesCubo) =>
         ),
         borrar: Effect.fn("CopiasEnR2.borrar")((nombre: string) =>
           cubo.borrar(`${PREFIJO_COPIAS}${nombre}`),
+        ),
+      });
+    }),
+  );
+
+/**
+ * El archivo de páginas del registro en el mismo cubo de R2, bajo `PREFIJO_ARCHIVO` (ADR 0027).
+ * Cada paquete se sube entero en una sola petición, firmada con su contenido. Nada lo borra.
+ */
+export const archivoEnR2 = (opciones: OpcionesCubo) =>
+  Layer.effect(
+    AlmacenDelArchivo,
+    Effect.gen(function* () {
+      const cubo = yield* cuboEnR2(opciones);
+
+      const guardar = Effect.fn("ArchivoEnR2.guardar")(function* (
+        nombre: string,
+        contenido: Uint8Array<ArrayBuffer>,
+      ) {
+        const clave = `${PREFIJO_ARCHIVO}${nombre}`;
+        const { estado, texto } = yield* cubo.pedir(
+          "PUT",
+          clave,
+          {},
+          { bytes: contenido, tipo: "application/vnd.sqlite3" },
+        );
+        if (estado !== 200) return yield* cubo.fallo("PUT", clave, estado, texto);
+      });
+
+      return AlmacenDelArchivo.of({
+        guardar,
+        listar: cubo.listar(PREFIJO_ARCHIVO).pipe(
+          Effect.map((claves) => claves.map((clave) => clave.slice(PREFIJO_ARCHIVO.length))),
+          Effect.withSpan("ArchivoEnR2.listar"),
         ),
       });
     }),

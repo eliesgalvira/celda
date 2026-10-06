@@ -2,7 +2,7 @@
 
 El flake de Celda exporta la ingesta nocturna (ADR 0015) de dos formas:
 
-- `packages.<sistema>.celda-nocturna`: el programa de `apps/nocturna` en un solo fichero, con el Node 24 de nixpkgs. Acepta las mismas órdenes que `pnpm run ingesta`: `noche`, `estado`, `publicar`, `copia` y `capas`.
+- `packages.<sistema>.celda-nocturna`: el programa de `apps/nocturna` en un solo fichero, con el Node 24 de nixpkgs. Acepta las mismas órdenes que `pnpm run ingesta`: `noche`, `estado`, `publicar`, `copia`, `releer-archivo`, `restaurar-archivo`, `capas` y `cuadros-de-borde`.
 - `nixosModules.celda-nocturna`: un servicio de systemd que lanza `noche` una vez al día con su temporizador, su usuario y sus directorios.
 
 El módulo no sabe nada de la máquina que lo usa. El horario, las rutas y las credenciales van en la configuración de esa máquina, en su propio repositorio.
@@ -17,7 +17,7 @@ nix run .#celda-nocturna -- estado
 nix flake check
 ```
 
-Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias/` del directorio desde el que se lanza, como `pnpm run ingesta`. La configuración y sus variables están en [convex.md](convex.md#configuración).
+Sin variables de entorno, el programa usa `datos/ingesta.sqlite`, `datos/archivo.sqlite` y `datos/copias/` del directorio desde el que se lanza, como `pnpm run ingesta`. La configuración y sus variables están en [convex.md](convex.md#configuración).
 
 `nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal, un R2, un Vercel y un buzón de Convex de mentira que contestan por HTTPS. El R2 es privado, como el de verdad (ADR 0018): no contesta nada sin firma, y con la clave de solo lectura del build no deja escribir ni borrar. El Vercel, en cada llamada al deploy hook, construye un despliegue con `celda-nocturna capas <carpeta>` y las variables de R2 del build, con esa clave, y si acaba bien lo sirve en `celda.prueba/capas`; si falla, sigue sirviendo el anterior. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. La prueba:
 
@@ -28,11 +28,12 @@ Sin variables de entorno, el programa usa `datos/ingesta.sqlite` y `datos/copias
 5. comprueba que, con las zonas por defecto, la primera noche barrió Cataluña con una petición por cuadro, y que la orden de estado dice, por zona, cuándo se barrió y cuántas fichas le faltan, y que la siguiente barre `centro`;
 6. comprueba que las fichas llegaron a una cada 4 s como mínimo, que pararon al cerrarse su ventana de 2 minutos con las demás en la cola, y que se publicó a mitad de la ventana y al cerrarla;
 7. comprueba que la noche llamó una vez al deploy hook y que Vercel monta las dos versiones de la noche, la vigente y su anterior, igual byte a byte que R2, leyendo con la clave de solo lectura y sin escribir nada con ella;
-8. publica a mano con `systemd-run`, como el servicio, y comprueba que con Vercel al día no se llama al hook;
-9. deja servido un despliegue de otra versión y hace que R2 no conteste al build: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo el anterior. Con R2 de vuelta, la siguiente publicación lo pone al día;
-10. lanza `celda-nocturna cuadros-de-borde` como el usuario del servicio y comprueba que pide una vez cada uno de los cuatro cuadros de borde, que en el Campus Nord no traen nada, y que no toca la base;
-11. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
-12. busca las dos claves de R2, sus secretos, el hook y la clave de publicación en todo el almacén de Nix de la máquina y no los encuentra.
+8. comprueba que el archivo de páginas tiene una lectura por cada respuesta del geoportal y un contenido por página distinta, que su paquete está en la carpeta de copias y, igual byte a byte, bajo `archivo/` en R2, que Vercel no monta nada de `archivo/` ni de `copias/` ni lo pide al cubo, y que `celda-nocturna releer-archivo` lee todas las fichas archivadas sin pedir nada al geoportal;
+9. publica a mano con `systemd-run`, como el servicio, y comprueba que con Vercel al día no se llama al hook;
+10. deja servido un despliegue de otra versión y hace que R2 no conteste al build: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo el anterior. Con R2 de vuelta, la siguiente publicación lo pone al día;
+11. lanza `celda-nocturna cuadros-de-borde` como el usuario del servicio y comprueba que pide una vez cada uno de los cuatro cuadros de borde, que en el Campus Nord no traen nada, y que no toca la base;
+12. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
+13. busca las dos claves de R2, sus secretos, el hook y la clave de publicación en todo el almacén de Nix de la máquina y no los encuentra.
 
 Con todo construido, la máquina virtual tarda unos 2 min 30 s en arrancar y pasar la prueba. Casi todo es la ventana de fichas.
 
@@ -147,9 +148,9 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `recuperarNochesPerdidas` | `true` | Si la máquina estaba apagada, lanza la noche al encenderse (`Persistent=`) |
 | `tiempoMaximo` | `fichas.ventana` + `reintentoDePublicacion` + 60 minutos, 8 h con los valores por defecto | Lo más que dura una noche (`TimeoutStartSec=`) |
 | `directorioDeEstado` | `celda-nocturna` | Directorio de la base dentro de `/var/lib` |
-| `copias.directorio` | `/var/lib/celda-nocturna/copias` | Dónde van las copias de la base |
+| `copias.directorio` | `/var/lib/celda-nocturna/copias` | Dónde van las copias de la base y, en su carpeta `archivo`, los paquetes del archivo de páginas |
 | `copias.conservar` | 14 | Copias que se conservan, en el disco y en R2 |
-| `credenciales.r2` | `null` | Fichero de credenciales de R2, con la clave que escribe; sin él no se publica ni se sube la copia |
+| `credenciales.r2` | `null` | Fichero de credenciales de R2, con la clave que escribe; sin él no se publica ni se suben la copia ni los paquetes del archivo |
 | `credenciales.vercel` | `null` | Fichero del deploy hook de Vercel; sin él no se lanza ningún build |
 | `credenciales.convex` | `null` | Fichero con la URL de las acciones HTTP del buzón y su clave de publicación (nunca una clave de despliegue); sin él no se publica lo aceptado en la moderación |
 | `origenPublico` | `null` | URL pública de las capas en Vercel, `https://celda.elies.site/capas` (`CELDA_ALMACEN_ORIGEN`) |
@@ -261,6 +262,24 @@ chown celda-nocturna:celda-nocturna /var/lib/celda-nocturna/ingesta.sqlite
 
 Una subida que falla queda en el diario («No se ha podido subir la copia de la base a R2: …») y la noche acaba bien; la copia del disco sigue ahí, y la noche siguiente sube la suya.
 
+### El archivo de páginas
+
+El archivo de páginas del registro (ADR 0027) es `/var/lib/celda-nocturna/archivo.sqlite`, y sus paquetes, `archivo-<fecha>.sqlite`, uno por noche, van a la carpeta `archivo` de `copias.directorio` y a `archivo/` del cubo de R2. Ninguno se borra. No hace falta ninguna opción ni credencial nueva. Para comprobarlo tras una noche:
+
+```sh
+journalctl --unit=celda-nocturna.service | grep 'Archivo de páginas'
+ls /var/lib/celda-nocturna/copias/archivo/
+sudo --user=celda-nocturna celda-nocturna releer-archivo   # sin red; dice cuántas fichas archivadas se leen
+```
+
+Para rehacerlo, para la ingesta, junta los paquetes en una carpeta (los de la carpeta de copias o los de `archivo/` en R2, bajados con la clave de la ingesta) y lanza:
+
+```sh
+sudo --user=celda-nocturna celda-nocturna restaurar-archivo /ruta/de/los/paquetes
+```
+
+Tras subir `VERSION_DE_LECTURA` y desplegar, `releer-archivo --aplicar`, también como el usuario del servicio y con la noche parada, lleva la lectura nueva a las fichas archivadas sin pedirlas otra vez ([convex.md](convex.md#el-archivo-de-páginas)).
+
 ## Consultar lo que hizo cada noche
 
 Por SSH, en la máquina:
@@ -272,7 +291,7 @@ systemctl list-timers celda-nocturna.timer         # la próxima noche
 sudo systemctl start celda-nocturna.service        # una noche ahora, con peticiones reales
 ```
 
-El módulo instala `celda-nocturna` con la configuración de la máquina pero sin credenciales. Sirve para `estado` y `copia`. Para una noche entera o para publicar, usa el servicio, que es el que tiene las credenciales.
+El módulo instala `celda-nocturna` con la configuración de la máquina pero sin credenciales. Sirve para `estado`, `releer-archivo` y `restaurar-archivo`, y para `copia` en el disco. Para una noche entera o para publicar, usa el servicio, que es el que tiene las credenciales.
 
 ### Los cuadros de borde
 

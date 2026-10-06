@@ -39,6 +39,7 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
+import { type CopiaDelArchivo, copiarArchivo } from "./archivo.ts";
 import { BaseNocturna } from "./base.ts";
 import { AceptadasDelBuzon } from "./buzon.ts";
 import { describirResumen, type Turno } from "./estado.ts";
@@ -162,7 +163,13 @@ export interface Noche {
   /** La copia de seguridad que se ha hecho, o `undefined` si ha fallado. */
   readonly copia: string | undefined;
   readonly copiaEnR2: CopiaEnR2;
+  /** Lo que ha hecho la copia del archivo de páginas, o `undefined` sin archivo. */
+  readonly archivo: CopiaDelArchivo | undefined;
 }
+
+/** La carpeta de los paquetes del archivo de páginas, dentro de la de copias (ADR 0027). */
+export const carpetaDelArchivo = (copias: OpcionesCopias) =>
+  Effect.map(Effect.service(Path.Path), (path) => path.join(copias.carpeta, "archivo"));
 
 const COPIA = /^ingesta-.+\.sqlite$/u;
 
@@ -436,6 +443,9 @@ const describirZona = (z: ZonaEnLaEjecucion): string =>
  *    Vercel sigue a lo que haya en el almacén.
  * 4. Copia la base a la carpeta de copias y deja las `conservar` últimas. Con un cubo de R2,
  *    sube también la copia comprimida y deja allí otras tantas.
+ * 5. Saca del archivo de páginas un paquete con lo nuevo de la noche, en la carpeta `archivo` de
+ *    la de copias, y sube a R2 los paquetes que aún no están allí (ADR 0027). Si falla, la noche
+ *    acaba bien y lo que falta va con el paquete siguiente.
  *
  * Una noche cortada a mitad deja su ejecución en curso; la siguiente la da por interrumpida y la
  * rehace, porque cada paso es idempotente. Un barrido de zona cortado se retoma por el primer
@@ -486,7 +496,15 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
     copia === undefined
       ? { tipo: "sin-subir" }
       : yield* subirCopia(copia, opciones.copias.conservar);
-  const hecha: Noche = { ejecuciones, publicacion: intento.resultado, vercel, copia, copiaEnR2 };
+  const archivo = yield* copiarArchivo(yield* carpetaDelArchivo(opciones.copias));
+  const hecha: Noche = {
+    ejecuciones,
+    publicacion: intento.resultado,
+    vercel,
+    copia,
+    copiaEnR2,
+    archivo,
+  };
   return hecha;
 });
 

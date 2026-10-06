@@ -20,6 +20,7 @@ import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
 import { AlmacenDeFicheros } from "./almacen.ts";
 import { sha256 } from "./almacenes/firma.ts";
+import { PREFIJOS_PRIVADOS } from "./almacenes/r2.ts";
 
 /**
  * Las capas, solo desde Vercel (ADR 0018). La web lee las capas y las fichas de `/capas`, en su
@@ -62,6 +63,10 @@ const selloDelManifiesto = (fichero: string): string | undefined =>
   /^ficheros@(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)\.json$/u.exec(fichero)?.[1];
 
 type Origen = AlmacenDeFicheros["Service"];
+
+/** Si un fichero del cubo es de un prefijo que nunca se publica, como `copias/` o `archivo/`. */
+export const esPrivado = (fichero: string): boolean =>
+  PREFIJOS_PRIVADOS.some((prefijo) => fichero.replace(/^\/+/u, "").startsWith(prefijo));
 
 /**
  * Lee un fichero que tiene que estar, y comprueba su huella si la lleva en el nombre. Un fallo del
@@ -177,6 +182,14 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
     })),
   ];
   const ficheros = [...new Set(manifiestos.flatMap((m) => m.ficheros))];
+  // Lo privado del cubo, las copias de la base y el archivo de páginas, nunca llega a la web,
+  // aunque un manifiesto lo liste por un error (ADR 0027).
+  const privados = ficheros.filter((fichero) => esPrivado(fichero));
+  if (privados.length > 0) {
+    return yield* new CapasIncompletas({
+      motivo: `un manifiesto lista ficheros privados: ${privados.join(", ")}`,
+    });
+  }
 
   const bytes = yield* Effect.forEach(
     ficheros,

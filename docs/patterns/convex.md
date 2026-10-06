@@ -27,7 +27,7 @@ convex/convex/             generado por Confect y Convex; no se edita
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (una de las siete de España cada noche, por defecto), la publicación, el build de Vercel si aún no sirve la versión vigente y una copia de la base, en el disco y en R2. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Es un programa de Node 24 que hace la noche entera y se para: el registro oficial de las zonas de barrido de la noche (una de las siete de España cada noche, por defecto), la publicación, el build de Vercel si aún no sirve la versión vigente, una copia de la base, en el disco y en R2, y el paquete del archivo de páginas. El paquete de Nix y el módulo de NixOS que la lanzan cada noche están en [nixos.md](nixos.md).
 
 ### Lanzarla en local
 
@@ -37,11 +37,14 @@ Desde la raíz de Celda, dentro de `nix develop`:
 pnpm run ingesta noche      # ingesta, publicación, build de Vercel y copia de seguridad
 pnpm run ingesta estado     # última ejecución de cada fuente, fichas en cola, errores y lo publicado
 pnpm run ingesta publicar   # publica lo que haya en la base, sin pedir nada a las fuentes
-pnpm run ingesta copia      # copia la base a la carpeta de copias y, con R2, también allí
+pnpm run ingesta copia      # copia la base a la carpeta de copias y, con R2, también allí; y el paquete del archivo
+pnpm run ingesta releer-archivo             # relee las fichas del archivo de páginas, sin red y sin cambiar nada
+pnpm run ingesta releer-archivo --aplicar   # y lleva a la base las que hacen falta
+pnpm run ingesta restaurar-archivo <carpeta>   # rehace el archivo de páginas con sus paquetes
 pnpm run ingesta cuadros-de-borde borde.json   # pide una vez los cuadros de borde, con peticiones reales
 ```
 
-Cada orden construye `apps/nocturna/dist/nocturna.js`, un solo fichero, y lo ejecuta en `apps/nocturna`. Las rutas relativas de la configuración cuentan desde ahí: sin tocar nada, la base es `apps/nocturna/datos/ingesta.sqlite` y las copias van a `apps/nocturna/datos/copias/`, las dos fuera de git.
+Cada orden construye `apps/nocturna/dist/nocturna.js`, un solo fichero, y lo ejecuta en `apps/nocturna`. Las rutas relativas de la configuración cuentan desde ahí: sin tocar nada, la base es `apps/nocturna/datos/ingesta.sqlite`, el archivo de páginas, `apps/nocturna/datos/archivo.sqlite`, y las copias van a `apps/nocturna/datos/copias/`, todo fuera de git.
 
 `noche` hace peticiones reales y, con los valores por defecto, dura seis horas de fichas. Para probar contra el geoportal sin leer fichas, que son la mayor parte de las peticiones:
 
@@ -60,6 +63,7 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | Variable | Por defecto | Qué es |
 |---|---|---|
 | `CELDA_INGESTA_BASE` | `datos/ingesta.sqlite` | La base SQLite |
+| `CELDA_INGESTA_ARCHIVO` | `datos/archivo.sqlite` | El archivo de páginas del registro ([El archivo de páginas](#el-archivo-de-páginas)) |
 | `CELDA_INGESTA_COPIAS` | `datos/copias` | Carpeta de las copias de seguridad |
 | `CELDA_INGESTA_COPIAS_CONSERVADAS` | 14 | Copias que se conservan |
 | `CELDA_INGESTA_MAX_FICHAS` | sin tope | Tope de fichas por noche; con 0 no se lee ninguna |
@@ -112,7 +116,26 @@ La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sq
 - `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero;
 - `aportaciones_aceptadas`: lo aceptado en la moderación que la noche ha leído del buzón, con su emplazamiento, el seudónimo de quien lo envió, cuándo se aceptó y la fecha de la ejecución que lo trajo (versión 6 del esquema, #57). Ni la identidad ni la huella de la IP salen del buzón.
 
+Las páginas del registro tal como llegan van en otro fichero, el archivo de páginas ([El archivo de páginas](#el-archivo-de-páginas)).
+
 El esquema lleva su versión en `PRAGMA user_version`, y una base vieja se pone al día al abrirla. La versión 5 borra la tabla `puntos` de la web de antenas que retiró el ADR 0019, y las observaciones, los barridos y las ejecuciones de las fuentes que ya no están en `Fuente`. La versión 7 añade a `observaciones` la versión de la lectura de cada ficha (`ficha_leida_con`, #73), y las leídas antes se quedan con la 1 ([Cuando cambia la lectura de la ficha](#cuando-cambia-la-lectura-de-la-ficha)). Cada paso de la noche escribe en su propia transacción. Si la noche se corta, su ejecución queda en curso; la siguiente la da por interrumpida y rehace el trabajo, y acaba igual que si no se hubiera cortado.
+
+### El archivo de páginas
+
+El extractor del registro guarda cada respuesta con HTTP 200 del listado y de las fichas, en bytes y antes de leerla, en el archivo de páginas: `archivo.sqlite`, otro fichero SQLite al lado de la base (`CELDA_INGESTA_ARCHIVO`, ADR 0027). Guarda también las fichas sin ficha en el registro, las ilegibles y las páginas que no son del geoportal, con lo que sacó la lectura de cada una. Tablas (`apps/nocturna/src/archivo.ts`):
+
+- `contenidos`: cada página distinta, comprimida con gzip, con su SHA-256. Una que no cambia no ocupa nada más;
+- `paginas`: cada URL leída, listado o ficha, con la clave de la estación base de una ficha;
+- `lecturas`: cada vez que se leyó una página, con su contenido, su hora y lo que sacó la lectura;
+- `paquetes`: los paquetes sacados para las copias.
+
+Nada se actualiza ni se borra. Al final de la noche, tras la copia de la base, sale un paquete con las filas nuevas, `archivo-<fecha>.sqlite`, en la carpeta `archivo` de la de copias, y se suben a `archivo/` del cubo de R2 los paquetes que aún no están allí (`copiarArchivo`). Si algo falla, lo dice el diario y la noche acaba bien; lo que falte va con el paquete o la subida siguientes. Si el archivo no se puede abrir o escribir, el diario lo dice y la noche sigue sin archivar.
+
+Para rehacer el archivo, se juntan los paquetes en una carpeta, de la de copias o bajados de `archivo/` en R2, y se lanza `restaurar-archivo <carpeta>`. Lo que ya estaba en el archivo no se duplica.
+
+`releer-archivo` pasa la lectura de hoy (`lecturaDeFicha`) por la última lectura archivada de cada ficha, sin pedir nada al registro, y dice cuántas se leen, cuántas no y por qué. Sirve para probar un arreglo de `leerFicha` con todas las fichas que se tienen. Con `--aplicar`, guarda en la base cada ficha leída como si se acabara de leer a la hora de su lectura archivada, salvo si la observación ya no está, si ha cambiado o se ha releído después, o si ya se leyó con la `VERSION_DE_LECTURA` de hoy y no está fallando. Así, tras subir `VERSION_DE_LECTURA`, lo nuevo llega a casi todas las fichas sin esperar diez noches. Lánzala con la noche parada. La fusión y la publicación de lo aplicado las hace la noche siguiente.
+
+El archivo nunca se publica. El build de Vercel solo monta lo que listan los manifiestos, y falla si uno lista algo de `copias/` o `archivo/` (`esPrivado` en `packages/publicacion/src/vercel.ts`).
 
 ### El barrido por zonas
 
@@ -175,7 +198,7 @@ Al pasar la mitad de la ventana con alguna ficha leída, la noche fusiona y publ
 
 Al final de la noche se publica siempre, además de a mitad de la ventana de fichas: sin cambios no se escribe nada, y si la noche anterior no pudo publicar, esta lo hace. Si falla porque el almacén o la base no responden, o porque los datos se movieron a mitad, se apunta en `publicaciones` y en las ejecuciones de la noche, se espera una hora y se intenta otra vez. Si vuelve a fallar, queda para la noche siguiente. Los datos ya están en la base.
 
-Después, `VACUUM INTO` copia la base a `ingesta-<fecha>.sqlite` en la carpeta de copias, y se borran las más viejas hasta dejar catorce. Con un cubo de R2 configurado, la copia se sube también, comprimida con gzip, a `copias/ingesta-<fecha>.sqlite.gz` del mismo cubo, y allí se borran las más viejas hasta dejar otras tantas (`subirCopia`, ADR 0018). Si la subida falla, lo dice el diario y la noche sigue. Para restaurar, para la ingesta y copia una de ellas encima de la base (una de R2, descomprimida con `gzip --decompress`):
+Después, `VACUUM INTO` copia la base a `ingesta-<fecha>.sqlite` en la carpeta de copias, y se borran las más viejas hasta dejar catorce. El archivo de páginas no entra en esas copias: tiene sus propios paquetes, que no se borran ([El archivo de páginas](#el-archivo-de-páginas)). Con un cubo de R2 configurado, la copia se sube también, comprimida con gzip, a `copias/ingesta-<fecha>.sqlite.gz` del mismo cubo, y allí se borran las más viejas hasta dejar otras tantas (`subirCopia`, ADR 0018). Si la subida falla, lo dice el diario y la noche sigue. Para restaurar, para la ingesta y copia una de ellas encima de la base (una de R2, descomprimida con `gzip --decompress`):
 
 ```sh
 cp datos/copias/ingesta-2026-09-28T21-40-45.318Z.sqlite datos/ingesta.sqlite
@@ -214,6 +237,8 @@ Para ver lo que cabe, `node --max-old-space-size=512 src/medida/espana.ts /tmp/e
 `apps/nocturna/src/programa.test.ts` lanza noches enteras con una base en una carpeta temporal, el almacén en carpeta y el registro oficial grabado de Campus Nord, que contesta cada caja como el geoportal (`capaGrabadaPorCajas`). Comprueba que una noche publica la capa y sus fichas, que repetirla sin cambios no escribe nada, que una noche cortada se retoma y deja la misma base y el mismo almacén, que una baja pide dos barridos, que las copias se abren y se restauran y solo quedan catorce, también las comprimidas en un R2 de prueba, que una subida fallida no tumba la noche, que una publicación fallida se repite a la hora o la noche siguiente, y el interruptor, el estado y la configuración. Las esperas de la publicación se prueban con el `TestClock`; la base y el almacén son ficheros de verdad, así que esas pruebas esperan también con el reloj real (`TestClock.withLive`) a que la noche llegue a publicar.
 
 `apps/nocturna/src/barrido.test.ts` prueba el barrido por zonas con dos zonas de un cuadro: que una pasada sin cambios pide solo las cajas guardadas, que una zona que falla no cuenta ausencias en ninguna, que retirar pide dos barridos de la misma zona también por turnos, que una estación que cambia de zona no se retira, que un cuadro vacío con estaciones es un fallo, que un barrido cortado se retoma sin repetir cuadros y deja la misma base, el tope tras ocho divisiones y una base de la versión 1 del esquema. `packages/ingesta/src/fichas.test.ts` prueba el orden de la cola y la lectura en la ventana con el extractor real, fichas grabadas y el reloj de prueba: el ritmo, el cierre de la ventana con el resto pendiente, la publicación a mitad, unas 5.500 fichas con los valores por defecto y respuestas de 0,9 s, una ficha cada segundo desde el final de la anterior y, a ese ritmo, el bloqueo por 401, 403 o una página que no es una ficha, el 429 y el 503 con `Retry-After`, los tres fallos seguidos, la espera tras un fallo y el tope. `apps/nocturna/src/fichas.test.ts` hace lo mismo con la base SQLite: una noche que cierra la ventana y la siguiente que sigue por donde iba, la provincia con prioridad, un bloqueo que queda en la ejecución, una ficha que espera un día tras fallar, unas fichas leídas con una versión anterior de la lectura que se releen al día siguiente, guardan sus medidas de exposición y las publican, y una base de la versión 3 del esquema que se pone al día sin perder su cola, y sin la tabla `puntos` ni nada de las fuentes retiradas. `packages/ingesta/src/barrido.test.ts` recorre con el extractor real los listados grabados de Barcelona y del centro de Madrid, servidos como el geoportal, con el tope de 1000: no pierde ningún registro y hace las mismas peticiones que la división en cuatro simulada en la prueba, la de la investigación 08.
+
+`apps/nocturna/src/archivo.test.ts` prueba el archivo de páginas con el extractor real sobre un geoportal de prueba que contesta el listado del Campus Nord y fichas grabadas en HTML: que una noche guarda lo que llega byte a byte con lo que sacó la lectura y una vez cada contenido; que el paquete lleva solo lo nuevo y que con los paquetes se rehace el mismo archivo; que una subida a R2 fallida se repite la noche siguiente; que un paquete de otra versión del esquema no se restaura; que releer las fichas no pide nada al registro y lleva a la base solo las que hacen falta, también una que la lectura de entonces no entendía; y que un archivo que no se abre o no escribe no para la noche. `packages/ingesta/src/registro-oficial/extractor.test.ts` prueba qué páginas archiva el extractor, y `apps/nocturna/src/vercel.test.ts`, que el build no monta nada de `copias/` ni de `archivo/`.
 
 `apps/nocturna/src/comunidad.test.ts` prueba lo aceptado con un buzón de prueba: que una corrección aceptada aparece en la ficha la noche siguiente, con el registro igual al lado, y una rechazada nunca; que leer dos veces lo mismo no duplica nada y una corroboración suma una persona; y que la noche sin Convex publica igual, queda fallida en la ejecución de la comunidad, lo dice el diario y la siguiente recoge lo que faltaba. Lee lo publicado con el mismo lector que la herramienta de moderación. `apps/nocturna/src/buzon.test.ts` prueba su cliente HTTP: la clave como `Bearer`, el cursor, un 401, una respuesta que no se entiende y los reintentos.
 

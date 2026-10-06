@@ -7,7 +7,11 @@ import { zonaDeBarrido } from "@celda/dominio/barrido";
 import type { OpcionesBarrido } from "@celda/ingesta/barrido";
 import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
 import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
-import { type AlmacenDeCopias, AlmacenDeFicheros } from "@celda/publicacion/almacen";
+import {
+  type AlmacenDeCopias,
+  AlmacenDeFicheros,
+  type AlmacenDelArchivo,
+} from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import type { SitioEnVercel } from "@celda/publicacion/vercel";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
@@ -22,6 +26,7 @@ import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
+import { archivoNocturno } from "../archivo.ts";
 import { baseNocturna } from "../base.ts";
 import type { AceptadasDelBuzon } from "../buzon.ts";
 import { COPIAS_CONSERVADAS, REINTENTO_DE_PUBLICACION } from "../configuracion.ts";
@@ -46,6 +51,8 @@ export const POR_LOTE = 8;
 /** Una carpeta temporal con la base, el almacén y las copias de una prueba. */
 export interface Entorno {
   readonly base: string;
+  /** El archivo de páginas, al lado de la base. */
+  readonly archivo: string;
   readonly almacen: string;
   readonly copias: string;
   /** Ficheros escritos en el almacén desde el principio de la prueba, en orden. */
@@ -86,6 +93,7 @@ export const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<
     );
     return yield* prueba({
       base: path.join(carpeta, "estado", "ingesta.sqlite"),
+      archivo: path.join(carpeta, "estado", "archivo.sqlite"),
       almacen,
       copias: path.join(carpeta, "copias"),
       escritos: Ref.get(registro),
@@ -124,6 +132,10 @@ export interface Variante {
   readonly vercel?: Layer.Layer<SitioEnVercel>;
   /** Las copias de la base en R2. Sin ellas, la copia se queda en el disco. */
   readonly copiasEnR2?: Layer.Layer<AlmacenDeCopias>;
+  /** El archivo de páginas en otro fichero que el del entorno. */
+  readonly archivo?: string;
+  /** Los paquetes del archivo de páginas en R2. Sin ellos, se quedan en la carpeta de copias. */
+  readonly archivoEnR2?: Layer.Layer<AlmacenDelArchivo>;
   readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
   /**
    * El buzón de Convex del que se lee lo aceptado. Con él, la comunidad tiene el interruptor
@@ -135,8 +147,9 @@ export interface Variante {
 }
 
 /**
- * Una noche como la lanza el programa, con el extractor que se le pase, la base del entorno, los
- * límites de barrio reales y el almacén vigilado. La base se abre y se cierra con la noche.
+ * Una noche como la lanza el programa, con el extractor que se le pase, la base y el archivo de
+ * páginas del entorno, los límites de barrio reales y el almacén vigilado. La base y el archivo se
+ * abren y se cierran con la noche.
  */
 export const unaNoche = (
   entorno: Entorno,
@@ -161,6 +174,8 @@ export const unaNoche = (
       ),
       Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
       variante.copiasEnR2 ?? Layer.empty,
+      variante.archivoEnR2 ?? Layer.empty,
+      archivoNocturno(variante.archivo ?? entorno.archivo),
     ).pipe(
       Layer.provideMerge(
         baseNocturna({

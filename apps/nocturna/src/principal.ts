@@ -7,11 +7,13 @@ import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
 import {
   almacenDesdeConfig,
+  archivoDesdeConfig,
   copiasDesdeConfig,
   vercelDesdeConfig,
 } from "@celda/publicacion/configuracion";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -20,6 +22,14 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 
+import {
+  archivoNocturno,
+  ArchivoNocturno,
+  copiarArchivo,
+  describirRelectura,
+  releerArchivo,
+  restaurarArchivo,
+} from "./archivo.ts";
 import { baseNocturna } from "./base.ts";
 import { aceptadasPorHttp } from "./buzon.ts";
 import { montarCapasEn } from "./capas.ts";
@@ -27,6 +37,7 @@ import { clienteHttpDelRegistro } from "./conexionDelRegistro.ts";
 import { configuracion } from "./configuracion.ts";
 import { credencialesDeSystemd } from "./credenciales.ts";
 import {
+  carpetaDelArchivo,
   copiarBase,
   estado,
   Extractores,
@@ -47,7 +58,12 @@ import { cuadrosDeBorde, pasadaDeBorde } from "./cuadros.ts";
  *   publicado.
  * - `publicar`: publica a mano lo que haya en la base, sin pedir nada a las fuentes, y lanza el
  *   build de Vercel si no sirve la versión vigente.
- * - `copia`: copia la base a la carpeta de copias y, con un cubo de R2, también allí.
+ * - `copia`: copia la base a la carpeta de copias y, con un cubo de R2, también allí, y saca y
+ *   sube el paquete del archivo de páginas.
+ * - `releer-archivo [--aplicar]`: relee con la lectura de hoy la última lectura archivada de cada
+ *   ficha, sin pedir nada al registro, y dice cuántas se leen. Con `--aplicar` lleva a la base las
+ *   que hacen falta (ADR 0027).
+ * - `restaurar-archivo <carpeta>`: rehace el archivo de páginas con los paquetes de `<carpeta>`.
  *
  * Y dos que no abren la base:
  *
@@ -66,7 +82,7 @@ class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesc
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «noche», «estado», «publicar», «copia», «capas» o «cuadros-de-borde».`;
+    return `Orden desconocida «${this.orden}». Usa «noche», «estado», «publicar», «copia», «releer-archivo», «restaurar-archivo», «capas» o «cuadros-de-borde».`;
   }
 }
 
@@ -85,6 +101,13 @@ class SinAlmacen extends Schema.TaggedError<SinAlmacen>()("SinAlmacen", {}) {
 }
 
 const codificarPasada = Schema.encodeEffect(Schema.fromJsonString(PasadaDeBorde));
+
+/** `restaurar-archivo` sin la carpeta de los paquetes. */
+class FaltaLaCarpeta extends Schema.TaggedError<FaltaLaCarpeta>()("FaltaLaCarpeta", {}) {
+  override get message() {
+    return "Uso: restaurar-archivo <carpeta>. La carpeta tiene los paquetes archivo-<fecha>.sqlite, de la de copias o bajados de archivo/ en R2.";
+  }
+}
 
 /** `cuadros-de-borde` sin el fichero en el que escribir. */
 class FaltaElFichero extends Schema.TaggedError<FaltaElFichero>()("FaltaElFichero", {}) {
@@ -140,6 +163,7 @@ const principal = Effect.gen(function* () {
   const almacen = yield* almacenDesdeConfig;
   const vercel = yield* vercelDesdeConfig;
   const copias = yield* copiasDesdeConfig;
+  const archivoEnR2 = yield* archivoDesdeConfig;
   const publicador = Option.match(almacen, {
     onNone: () => sinAlmacen,
     onSome: (capa) =>
@@ -166,6 +190,8 @@ const principal = Effect.gen(function* () {
     extractores,
     Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
     Option.getOrElse(copias, () => Layer.empty),
+    Option.getOrElse(archivoEnR2, () => Layer.empty),
+    archivoNocturno(c.archivo),
   ).pipe(Layer.provideMerge(base));
 
   const efecto = Effect.gen(function* () {
@@ -183,6 +209,25 @@ const principal = Effect.gen(function* () {
         const copia = yield* copiarBase(c.noche.copias);
         yield* Effect.logInfo(`Copia de la base en ${copia}`);
         yield* subirCopia(copia, c.noche.copias.conservar);
+        yield* copiarArchivo(yield* carpetaDelArchivo(c.noche.copias));
+        return;
+      }
+      case "releer-archivo": {
+        const aplicar = argumentos.includes("--aplicar");
+        const relectura = yield* releerArchivo(aplicar);
+        yield* Console.log(describirRelectura(relectura, aplicar));
+        return;
+      }
+      case "restaurar-archivo": {
+        const [carpeta] = argumentos;
+        if (carpeta === undefined) return yield* new FaltaLaCarpeta();
+        const restaurados = yield* restaurarArchivo(carpeta);
+        const archivo = yield* ArchivoNocturno;
+        const resumen = yield* archivo.resumen;
+        yield* Console.log(
+          `${restaurados.length} paquetes en ${archivo.fichero}: ${resumen.paginas} páginas, ` +
+            `${resumen.lecturas} lecturas y ${resumen.contenidos} contenidos`,
+        );
         return;
       }
       default:

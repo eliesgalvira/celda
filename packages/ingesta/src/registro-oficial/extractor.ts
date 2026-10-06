@@ -2,10 +2,10 @@ import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
 
+import { archivar } from "../archivo.ts";
 import { type ClienteDeFuente, clienteDeFuente, type OpcionesCliente } from "../cliente.ts";
 import {
   ExtractorPorCajas,
@@ -19,9 +19,7 @@ import { decodificarLatin1 } from "../texto.ts";
 import type { Caja } from "../zona.ts";
 import {
   AVISO_SIN_FICHA,
-  esFichaDelGeoportal,
-  esFichaSinEmplazamiento,
-  leerFicha,
+  lecturaDeFicha,
   listadoDeElementos,
   ORIGEN,
   RespuestaListado,
@@ -78,7 +76,8 @@ const ESTADOS_DE_BLOQUEO: ReadonlySet<number> = new Set([401, 403]);
  * pausa entre peticiones, no pasa de su tope y reintenta los fallos pasajeros con espera
  * exponencial. Un 401 o un 403, un listado en HTML o una página que no es una ficha son la fuente
  * bloqueando a Celda (`FuenteBloqueada`). La ficha con el aviso de código no válido es una
- * estación base sin ficha en el registro (`SinFichaEnElRegistro`).
+ * estación base sin ficha en el registro (`SinFichaEnElRegistro`). Cada página que llega con HTTP
+ * 200 va al archivo de páginas del contexto (`ArchivoDePaginas`, ADR 0027) antes de leerla.
  */
 const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
   const obtener = Effect.fn("RegistroOficial.obtener")(function* (
@@ -92,21 +91,32 @@ const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
     if (respuesta.estado !== 200) {
       return yield* new RespuestaInesperada({ url, motivo: `HTTP ${respuesta.estado}` });
     }
-    return { texto: decodificarLatin1(respuesta.cuerpo), bytes: respuesta.cuerpo.byteLength };
+    return {
+      texto: decodificarLatin1(respuesta.cuerpo),
+      cuerpo: respuesta.cuerpo,
+      bytes: respuesta.cuerpo.byteLength,
+    };
   });
 
   const decodificarListado = Schema.decodeUnknownEffect(RespuestaListado);
 
-  /** Los elementos de una caja tal como llegan. Una caja sin estaciones llega como `{}`. */
+  /**
+   * Los elementos de una caja tal como llegan. Una caja sin estaciones llega como `{}`. La
+   * respuesta se archiva antes de leerla, también si no se entiende (ADR 0027).
+   */
   const elementos = Effect.fn("RegistroOficial.elementos")(function* (caja: Caja) {
     const url = urlDeListado(caja);
-    const { texto, bytes } = yield* obtener(listado, url);
+    const { texto, cuerpo, bytes } = yield* obtener(listado, url);
+    const pagina = { tipo: "listado", url, clave: undefined, cuerpo } as const;
     if (texto.trimStart().startsWith("<")) {
+      yield* archivar({ ...pagina, resultado: "ajena" });
       return yield* new FuenteBloqueada({ url, motivo: "una página HTML en lugar del listado" });
     }
     const respuesta = yield* decodificarListado(texto).pipe(
+      Effect.tapError(() => archivar({ ...pagina, resultado: "ilegible" })),
       Effect.mapError((error) => new RespuestaInesperada({ url, motivo: error.message })),
     );
+    yield* archivar({ ...pagina, resultado: "leida" });
     return { elementos: "features" in respuesta ? respuesta.features : [], bytes };
   });
 
@@ -120,22 +130,31 @@ const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
     return leido;
   });
 
+  /** Lee la ficha de un registro, y la archiva antes, se pueda leer o no (ADR 0027). */
   const ficha = Effect.fn("RegistroOficial.ficha")(function* (registro: Registro) {
-    const { texto } = yield* obtener(fichas, registro.url);
-    if (!esFichaDelGeoportal(texto)) {
-      return yield* new FuenteBloqueada({
-        url: registro.url,
-        motivo: "una página que no es una ficha del geoportal",
-      });
+    const { url } = registro;
+    const { texto, cuerpo } = yield* obtener(fichas, url);
+    const lectura = lecturaDeFicha(texto);
+    yield* archivar({
+      tipo: "ficha",
+      url,
+      clave: registro.clave,
+      cuerpo,
+      resultado: lectura.resultado,
+    });
+    switch (lectura.resultado) {
+      case "ajena":
+        return yield* new FuenteBloqueada({
+          url,
+          motivo: "una página que no es una ficha del geoportal",
+        });
+      case "sin-ficha":
+        return yield* new SinFichaEnElRegistro({ url, motivo: AVISO_SIN_FICHA });
+      case "ilegible":
+        return yield* new RespuestaInesperada({ url, motivo: lectura.motivo });
+      case "leida":
+        return lectura.ficha;
     }
-    if (esFichaSinEmplazamiento(texto)) {
-      return yield* new SinFichaEnElRegistro({ url: registro.url, motivo: AVISO_SIN_FICHA });
-    }
-    const leida = leerFicha(texto);
-    if (Result.isFailure(leida)) {
-      return yield* new RespuestaInesperada({ url: registro.url, motivo: leida.failure });
-    }
-    return leida.success;
   });
 
   const peticiones =

@@ -349,7 +349,7 @@
                   maquina.succeed(f"grep --fixed-strings 'Credential={id_clave}/' /var/lib/fuentes-de-prueba/peticiones.log")
 
               with subtest("la copia de la base también va a R2, comprimida y bajo copias/"):
-                  local = maquina.succeed("ls /srv/copias/celda/").split()
+                  local = maquina.succeed("ls /srv/copias/celda/ | grep '^ingesta-'").split()
                   en_r2 = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/copias/").split()
                   assert en_r2 == [f"{copia}.gz" for copia in local], (local, en_r2)
                   maquina.succeed(
@@ -478,6 +478,54 @@
                   peticiones = maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
                   del_build = [linea.split()[1] for linea in peticiones if f"Credential={id_de_lectura}/" in linea]
                   assert del_build and set(del_build) == {"GET"}, set(del_build)
+
+              with subtest("el archivo de páginas guarda lo leído, y su paquete va a las copias y a R2, nunca a Vercel"):
+                  # Como el usuario del servicio, para que SQLite no deje ficheros de root a su lado.
+                  sqlite = "runuser --user=celda-nocturna -- ${pkgs.sqlite}/bin/sqlite3"
+                  archivo = "/var/lib/celda-nocturna/archivo.sqlite"
+                  maquina.succeed(f"test \"$(stat --format=%U {archivo})\" = celda-nocturna")
+                  geoportal = [
+                      linea.split()
+                      for linea in maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
+                      if " geoportal.minetur.gob.es " in linea and "/robots.txt" not in linea
+                  ]
+                  # Cada respuesta del geoportal es una lectura. Las fichas son todas la misma página,
+                  # y los listados, la del Campus Nord y la de un cuadro vacío: tres contenidos.
+                  lecturas, paginas, contenidos = maquina.succeed(
+                      f"{sqlite} -separator ' ' {archivo}"
+                      " 'SELECT (SELECT count(*) FROM lecturas), (SELECT count(*) FROM paginas), (SELECT count(*) FROM contenidos)'"
+                  ).split()
+                  assert int(lecturas) == len(geoportal), (lecturas, len(geoportal))
+                  assert int(paginas) == len(geoportal), (paginas, len(geoportal))
+                  assert contenidos == "3", contenidos
+                  paquetes = maquina.succeed("ls /srv/copias/celda/archivo/").split()
+                  assert len(paquetes) == 1 and paquetes[0].startswith("archivo-"), paquetes
+                  en_r2 = maquina.succeed(f"ls {r2}/archivo/").split()
+                  assert en_r2 == paquetes, (paquetes, en_r2)
+                  maquina.succeed(f"cmp {r2}/archivo/{en_r2[0]} /srv/copias/celda/archivo/{paquetes[0]}")
+                  en_paquete = maquina.succeed(
+                      f"{sqlite} /srv/copias/celda/archivo/{paquetes[0]} 'SELECT count(*) FROM lecturas'"
+                  ).strip()
+                  assert en_paquete == lecturas, (en_paquete, lecturas)
+                  assert "Archivo de páginas en R2: " in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
+                  # El build de Vercel no monta nada privado ni lo pide al cubo.
+                  maquina.fail(f"find -L {servida} -path '*archivo*' -o -path '*copias*' | grep .")
+                  peticiones = maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
+                  privadas = [
+                      linea for linea in peticiones
+                      if f"Credential={id_de_lectura}/" in linea and ("/celda/archivo/" in linea or "/celda/copias/" in linea)
+                  ]
+                  assert privadas == [], privadas
+
+              with subtest("las fichas se releen del archivo sin pedir nada al registro"):
+                  antes = maquina.succeed("grep --count geoportal.minetur.gob.es /var/lib/fuentes-de-prueba/peticiones.log").strip()
+                  relectura = maquina.succeed("runuser --user=celda-nocturna -- celda-nocturna releer-archivo 2>&1")
+                  print(relectura)
+                  fichas = len([campos for campos in geoportal if "/VCTEL/detalleEstacion.do" in campos[3]])
+                  assert f"Fichas archivadas: {fichas}" in relectura, relectura
+                  assert f"- leídas con la lectura de hoy: {fichas}," in relectura, relectura
+                  despues = maquina.succeed("grep --count geoportal.minetur.gob.es /var/lib/fuentes-de-prueba/peticiones.log").strip()
+                  assert antes == despues, (antes, despues)
 
               with subtest("con Vercel al día, publicar otra vez no llama al hook"):
                   salida = publicar_a_mano()

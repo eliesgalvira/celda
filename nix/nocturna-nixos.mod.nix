@@ -98,7 +98,7 @@
         directorioDeEstado = mkOption {
           type = strMatching "[^/].*";
           default = "celda-nocturna";
-          description = "Directorio de la base dentro de `/var/lib`. Lo crea systemd (`StateDirectory=`) y la base es `ingesta.sqlite`.";
+          description = "Directorio de la base dentro de `/var/lib`. Lo crea systemd (`StateDirectory=`). La base es `ingesta.sqlite`, y el archivo de páginas del registro, `archivo.sqlite` (ADR 0027).";
         };
 
         copias.directorio = mkOption {
@@ -106,7 +106,7 @@
           default = "/var/lib/${config.services.celda-nocturna.directorioDeEstado}/copias";
           defaultText = literalExpression ''"/var/lib/''${config.services.celda-nocturna.directorioDeEstado}/copias"'';
           example = "/srv/copias/celda";
-          description = "Dónde se guardan las copias de la base. Puede estar en otro disco: el servicio espera a que se monte, pero la noche corre aunque no se monte.";
+          description = "Dónde se guardan las copias de la base y, en su carpeta `archivo`, los paquetes del archivo de páginas (ADR 0027). Puede estar en otro disco: el servicio espera a que se monte, pero la noche corre aunque no se monte.";
         };
 
         copias.conservar = mkOption {
@@ -123,9 +123,10 @@
             Fichero con las credenciales del cubo privado de R2, fuera del almacén de Nix y legible
             solo por root. Va en formato `.env`, con `CELDA_R2_CUENTA`, `CELDA_R2_CUBO`,
             `CELDA_R2_ID_CLAVE` y `CELDA_R2_SECRETO`, de una clave que puede escribir en el cubo.
-            systemd lo pasa al servicio como credencial (`LoadCredential=`). La noche publica ahí y
-            sube a `copias/` la copia comprimida de la base (ADR 0018). Sin él, la noche ingiere pero
-            no publica, y la copia se queda en `copias.directorio`.
+            systemd lo pasa al servicio como credencial (`LoadCredential=`). La noche publica ahí,
+            sube a `copias/` la copia comprimida de la base (ADR 0018) y a `archivo/` los paquetes
+            del archivo de páginas que aún no están (ADR 0027). Sin él, la noche ingiere pero no
+            publica, y la copia y los paquetes se quedan en `copias.directorio`.
           '';
         };
 
@@ -388,6 +389,7 @@
             CELDA_ALMACEN_ORIGEN = mkIf (
               config.services.celda-nocturna.origenPublico != null
             ) config.services.celda-nocturna.origenPublico;
+            CELDA_INGESTA_ARCHIVO = "/var/lib/${config.services.celda-nocturna.directorioDeEstado}/archivo.sqlite";
             CELDA_INGESTA_BASE = "/var/lib/${config.services.celda-nocturna.directorioDeEstado}/ingesta.sqlite";
             CELDA_INGESTA_COPIAS = config.services.celda-nocturna.copias.directorio;
             CELDA_INGESTA_COPIAS_CONSERVADAS = toString config.services.celda-nocturna.copias.conservar;

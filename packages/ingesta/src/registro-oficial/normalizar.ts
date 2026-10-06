@@ -270,6 +270,27 @@ export const AVISO_SIN_FICHA = "La ficha dice «Código de emplazamiento no vál
 export const esFichaSinEmplazamiento = (html: string): boolean =>
   /c&oacute;digo de emplazamiento no v&aacute;lido|código de emplazamiento no válido/iu.test(html);
 
+/** Lo que se saca de una ficha en HTML, y con qué resultado se archiva. */
+export type LecturaDeFicha =
+  | { readonly resultado: "leida"; readonly ficha: FichaLeida }
+  | { readonly resultado: "sin-ficha" }
+  | { readonly resultado: "ilegible"; readonly motivo: string }
+  | { readonly resultado: "ajena" };
+
+/**
+ * Lee una ficha en HTML como la lee el extractor: una página que no es una ficha del geoportal es
+ * ajena, una con el aviso de código no válido es una estación base sin ficha en el registro, y el
+ * resto pasa por `leerFicha`. La usan también las relecturas del archivo (ADR 0027).
+ */
+export const lecturaDeFicha = (html: string): LecturaDeFicha => {
+  if (!esFichaDelGeoportal(html)) return { resultado: "ajena" };
+  if (esFichaSinEmplazamiento(html)) return { resultado: "sin-ficha" };
+  const leida = leerFicha(html);
+  return Result.isSuccess(leida)
+    ? { resultado: "leida", ficha: leida.success }
+    : { resultado: "ilegible", motivo: leida.failure };
+};
+
 /**
  * Filas de las dos tablas de la ficha en HTML: «Características técnicas» y «Niveles medidos en el
  * entorno». Una ficha sin la primera, o con el aviso de código no válido

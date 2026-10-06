@@ -96,6 +96,10 @@ _Evitar_: ficha pendiente, ficha rota, error de ficha
 Punto alrededor de una estación base donde se midió la exposición a campos electromagnéticos, tal como lo publica su ficha en el registro oficial: a qué distancia, en qué dirección vista desde la estación (acimut) y cuántos µW/cm². El ministerio no dice cuándo se midió. Sirve para comparar con los límites legales y no dice nada de la señal que recibe un móvil allí. Su acimut tampoco es la orientación de un sector. Es otra cosa que una medida.
 _Evitar_: medición, nivel de señal, potencia, cobertura, medida a secas
 
+**Archivo de páginas**:
+Copia privada de cada página del registro oficial que lee la ingesta, el listado de cada caja y la página de cada estación base, tal como llegó y con la fecha de cada lectura. Sirve para volver a leerlas sin pedirlas otra vez cuando cambia la forma de leerlas. Nunca se publica (ADR 0027).
+_Evitar_: caché, histórico, backup
+
 **Corrección**:
 Observación de la comunidad de Celda que contradice al registro oficial: una corrección propuesta que la moderación ha aceptado. Se publica al lado de lo que dice el registro, con su procedencia, y nunca lo sustituye.
 _Evitar_: enmienda, parche, edición

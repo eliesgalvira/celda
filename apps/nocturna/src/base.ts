@@ -24,7 +24,7 @@ import {
   SIN_CAMBIOS,
 } from "@celda/ingesta/ejecucion";
 import type { FichaEnCola } from "@celda/ingesta/fichas";
-import { Registro } from "@celda/ingesta/extractor";
+import { type FichaLeida, Registro } from "@celda/ingesta/extractor";
 import { VERSION_DE_LECTURA } from "@celda/ingesta/registro-oficial/normalizar";
 import {
   ObservacionGuardada,
@@ -242,6 +242,13 @@ const EmplazamientoEnJson = Schema.fromJsonString(Emplazamiento);
 const decodificarEmplazamiento = Schema.decodeEffect(EmplazamientoEnJson);
 
 const FilaObservacion = Schema.Struct({ id: Schema.Int, datos: ObservacionEnJson });
+/** Una observación con su cola de fichas, para aplicarle una ficha releída del archivo. */
+const FilaReleida = Schema.Struct({
+  id: Schema.Int,
+  datos: ObservacionEnJson,
+  ficha_leida_con: Schema.Int,
+  ficha_fallos: Schema.Int,
+});
 /** Una ficha de la cola: solo lo que dice el listado de su observación, sin lo de su ficha. */
 const FilaDeCola = Schema.Struct({
   id: Schema.Int,
@@ -442,6 +449,22 @@ export class BaseNocturna extends Context.Service<
       aceptadas: ReadonlyArray<AceptadaParaPublicar>,
       fecha: number,
     ) => Effect.Effect<number>;
+    /**
+     * Guarda lo que da releer del archivo de páginas la ficha de una observación vigente del
+     * registro oficial, leída en `leidaEn` (ADR 0027), como si se acabara de leer entonces. Solo
+     * si hace falta y si la página sigue valiendo:
+     *
+     * - `sin-observacion`: no hay observación vigente con esa clave;
+     * - `posterior`: la observación ha cambiado, o se ha leído su ficha, después de esa lectura,
+     *   así que la página archivada ya no es lo último que dice el registro;
+     * - `al-dia`: su ficha ya se leyó con la versión de la lectura de hoy y no está fallando;
+     * - `aplicada`: guardada como la guarda una noche (`trasFicha`), con la versión de hoy.
+     */
+    readonly aplicarFichaReleida: (
+      clave: string,
+      leida: FichaLeida,
+      leidaEn: number,
+    ) => Effect.Effect<"aplicada" | "al-dia" | "posterior" | "sin-observacion">;
   }
 >()("@celda/nocturna/base/BaseNocturna") {}
 
@@ -1089,6 +1112,31 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 nuevas += filas.length;
               }
               return nuevas;
+            }),
+          );
+        }, Effect.orDie),
+
+        aplicarFichaReleida: Effect.fn("BaseNocturna.aplicarFichaReleida")(function* (
+          clave,
+          leida,
+          leidaEn,
+        ) {
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const [fila] = yield* decodificar(FilaReleida)(
+                yield* sql`SELECT id, datos, ficha_leida_con, ficha_fallos FROM observaciones
+                  WHERE fuente = 'registro-oficial' AND clave = ${clave} AND retirada_en IS NULL`,
+              );
+              if (fila === undefined) return "sin-observacion" as const;
+              const { datos } = fila;
+              if (Math.max(datos.fecha, datos.fichaLeidaEn ?? 0) > leidaEn) {
+                return "posterior" as const;
+              }
+              if (fila.ficha_leida_con >= VERSION_DE_LECTURA && fila.ficha_fallos === 0) {
+                return "al-dia" as const;
+              }
+              yield* guardarObservacion(fila.id, trasFicha(datos, leida, leidaEn).guardada, true);
+              return "aplicada" as const;
             }),
           );
         }, Effect.orDie),
