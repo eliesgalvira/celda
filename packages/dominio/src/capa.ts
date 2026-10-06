@@ -38,13 +38,16 @@ export type EmplazamientoDeCapa = typeof EmplazamientoDeCapa.Type;
 
 /**
  * Las bandas de cada estación base que el registro ya ha dado, sin repetir. Una estación base de
- * la que no se conoce ninguna no aparece: en la capa, eso es «sin leer», no «sin bandas».
+ * la que no se conoce ninguna no aparece: en la capa, eso es «sin leer», no «sin bandas». Solo
+ * cuentan las bandas de su propia compañía: la ficha del registro de un emplazamiento compartido
+ * puede listar también las de otra, y no son de esta estación base.
  */
 const bandasConocidas = (
   estaciones: ReadonlyArray<Pick<EstacionBase, "compania" | "bandas">>,
 ): Array<BandasDeCapa> =>
   estaciones.flatMap(({ compania, bandas }) => {
-    const mhz = [...new Set(bandas.flatMap((b) => (b.mhz === null ? [] : [b.mhz])))].toSorted(
+    const suyas = bandas.filter((b) => b.compania === compania);
+    const mhz = [...new Set(suyas.flatMap((b) => (b.mhz === null ? [] : [b.mhz])))].toSorted(
       (a, b) => a - b,
     );
     return mhz.length === 0 ? [] : [{ compania, mhz }];

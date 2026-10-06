@@ -88,4 +88,24 @@ describe("capa de emplazamientos", () => {
     assert.deepStrictEqual(deCapa.companias, ["movistar", "orange"]);
     assert.deepStrictEqual(deCapa.bandas, [{ compania: "movistar", mhz: [800, 1800] }]);
   });
+
+  it("las bandas de otra compañía que lista la ficha de una estación base no van en la capa", () => {
+    const deCapa = emplazamientoDeCapa(
+      { clave: "vodafone-1", posicion: { longitud: 2.1, latitud: 41.4 }, estado: "verificado" },
+      [
+        {
+          compania: "vodafone",
+          bandas: [
+            { referencia: "a", compania: "vodafone", rangos: [], mhz: 800, anio: 2024 },
+            { referencia: "b", compania: "orange", rangos: [], mhz: 2600, anio: 2024 },
+          ],
+        },
+        {
+          compania: "yoigo",
+          bandas: [{ referencia: "c", compania: "orange", rangos: [], mhz: 1800, anio: 2024 }],
+        },
+      ],
+    );
+    assert.deepStrictEqual(deCapa.bandas, [{ compania: "vodafone", mhz: [800] }]);
+  });
 });
