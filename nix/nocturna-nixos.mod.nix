@@ -271,6 +271,24 @@
           description = "Tope de fichas por noche. Sin él, se leen hasta cerrar la ventana; con 0 solo se lee el listado.";
         };
 
+        registroOficial.cambioMasivo.porCiento = mkOption {
+          type = ints.unsigned;
+          default = 20;
+          example = 100;
+          description = ''
+            Parte de las observaciones vigentes de un cuadro o de una zona, en tanto por ciento,
+            que puede cambiar en una noche (altas, cambios y estaciones que faltan) antes de que la
+            noche se pare sin guardar ese cuadro, sin contar ausencias y sin publicar (ADR 0027).
+            Si el cambio es de verdad, se sube a 100 una noche y se vuelve a bajar.
+          '';
+        };
+
+        registroOficial.cambioMasivo.minimo = mkOption {
+          type = ints.unsigned;
+          default = 50;
+          description = "Por debajo de cuántos cambios en un cuadro o en una zona nunca se para la noche, sea cual sea la parte.";
+        };
+
         registroOficial.reintentos = mkOption {
           type = ints.unsigned;
           default = 3;
@@ -398,6 +416,8 @@
               <| toString config.services.celda-nocturna.registroOficial.fichas.maximo;
             CELDA_PUBLICAR_REINTENTO_MINUTOS = toString config.services.celda-nocturna.reintentoDePublicacion;
             CELDA_REGISTRO_ACTIVO = boolToString config.services.celda-nocturna.registroOficial.enable;
+            CELDA_REGISTRO_CAMBIO_MASIVO_MINIMO = toString config.services.celda-nocturna.registroOficial.cambioMasivo.minimo;
+            CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO = toString config.services.celda-nocturna.registroOficial.cambioMasivo.porCiento;
             CELDA_REGISTRO_ESPERA_SEGUNDOS = toString config.services.celda-nocturna.registroOficial.espera;
             CELDA_REGISTRO_FICHAS_PRIORIDAD = listaDelPrograma config.services.celda-nocturna.registroOficial.fichas.prioridad;
             CELDA_REGISTRO_FICHAS_RELECTURA_DIAS = toString config.services.celda-nocturna.registroOficial.fichas.relectura;

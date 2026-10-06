@@ -153,12 +153,20 @@ export interface EjecucionDeLaNoche {
   readonly ejecucion: string;
   readonly estado: "omitida" | "fallida" | "completada";
   readonly zonas: ReadonlyArray<ZonaEnLaEjecucion>;
+  /** Si la ejecución ha parado la noche por un cambio masivo en la fuente, por qué. */
+  readonly detenida?: string;
+}
+
+/** Una noche parada por un cambio masivo en una fuente: no publica ni lanza el build. */
+export interface PublicacionDetenida {
+  readonly tipo: "detenida";
+  readonly motivo: string;
 }
 
 /** Lo que ha hecho una noche. */
 export interface Noche {
   readonly ejecuciones: ReadonlyArray<EjecucionDeLaNoche>;
-  readonly publicacion: ResultadoPublicacion;
+  readonly publicacion: ResultadoPublicacion | PublicacionDetenida;
   readonly vercel: ResultadoVercel;
   /** La copia de seguridad que se ha hecho, o `undefined` si ha fallado. */
   readonly copia: string | undefined;
@@ -478,13 +486,27 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
   }
   const completadas = ejecuciones.filter((e) => e.estado === "completada").map((e) => e.ejecucion);
 
-  let intento = yield* publicarYApuntar(completadas);
-  if (intento.reintentar) {
-    yield* Effect.logInfo(`Se vuelve a publicar dentro de ${Duration.format(opciones.reintento)}`);
-    yield* Effect.sleep(opciones.reintento);
-    intento = yield* publicarYApuntar(completadas);
+  // Un cambio masivo en el registro para la noche antes de publicar (ADR 0027): lo publicado y lo
+  // que sirve Vercel se quedan como estaban hasta que alguien lo mire.
+  const detenida = ejecuciones.find((e) => e.detenida !== undefined)?.detenida;
+  let publicacion: ResultadoPublicacion | PublicacionDetenida;
+  let vercel: ResultadoVercel;
+  if (detenida === undefined) {
+    let intento = yield* publicarYApuntar(completadas);
+    if (intento.reintentar) {
+      yield* Effect.logInfo(
+        `Se vuelve a publicar dentro de ${Duration.format(opciones.reintento)}`,
+      );
+      yield* Effect.sleep(opciones.reintento);
+      intento = yield* publicarYApuntar(completadas);
+    }
+    publicacion = intento.resultado;
+    vercel = yield* ponerAlDiaYApuntarVercel;
+  } else {
+    yield* Effect.logError(`La noche no publica: ${detenida}`);
+    publicacion = { tipo: "detenida", motivo: detenida };
+    vercel = { tipo: "sin-hook" };
   }
-  const vercel = yield* ponerAlDiaYApuntarVercel;
 
   const copia = yield* copiarBase(opciones.copias).pipe(
     Effect.tap((destino) => Effect.logInfo(`Copia de la base en ${destino}`)),
@@ -499,7 +521,7 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
   const archivo = yield* copiarArchivo(yield* carpetaDelArchivo(opciones.copias));
   const hecha: Noche = {
     ejecuciones,
-    publicacion: intento.resultado,
+    publicacion,
     vercel,
     copia,
     copiaEnR2,

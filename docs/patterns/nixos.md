@@ -159,6 +159,7 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `memoria.alta` | el doble del montón, `1024M` | Desde dónde systemd frena el servicio (`MemoryHigh=`) |
 | `memoria.maxima` | el triple del montón, `1536M` | Lo más que puede usar antes de que systemd lo pare (`MemoryMax=`) |
 | `registroOficial.enable` | `true` | Interruptor del registro oficial |
+| `registroOficial.cambioMasivo.porCiento` y `.minimo` | 20 y 50 | Cuánto puede cambiar el registro en un cuadro o una zona antes de parar la noche sin publicar ([convex.md](convex.md#cambio-masivo)) |
 | `registroOficial.motivo` | `apagado en la configuración de la ingesta` | Lo que se apunta si está apagado |
 | `registroOficial.pausa` | 3 | Segundos entre peticiones del listado, entre 3 y 3600 |
 | `registroOficial.maxPeticiones` | 400 | Tope de peticiones del listado por noche; deja barrer toda España en una |

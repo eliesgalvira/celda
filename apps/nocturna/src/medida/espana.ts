@@ -144,7 +144,9 @@ const medir = Effect.gen(function* () {
 
   const registro = hecha.ejecuciones.find((e) => e.fuente === "registro-oficial");
   const escritos =
-    hecha.publicacion.tipo === "fallida" || hecha.publicacion.tipo === "sin-almacen"
+    hecha.publicacion.tipo === "fallida" ||
+    hecha.publicacion.tipo === "sin-almacen" ||
+    hecha.publicacion.tipo === "detenida"
       ? hecha.publicacion.tipo
       : `${hecha.publicacion.tipo}, ${hecha.publicacion.emplazamientos} emplazamientos, ` +
         `${hecha.publicacion.lotes} lotes, ${hecha.publicacion.escritos} ficheros escritos`;

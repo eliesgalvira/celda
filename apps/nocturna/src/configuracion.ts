@@ -1,5 +1,5 @@
 import type { Fuente } from "@celda/dominio/observacion";
-import { opcionesZonasDesdeConfig } from "@celda/ingesta/barrido";
+import { limiteDeCambiosDesdeConfig, opcionesZonasDesdeConfig } from "@celda/ingesta/barrido";
 import type { OpcionesCliente } from "@celda/ingesta/cliente";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
 import { opcionesClienteDeFichas, opcionesFichasDesdeConfig } from "@celda/ingesta/fichas";
@@ -50,6 +50,9 @@ export const COPIAS_CONSERVADAS = 14;
  *   `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS` (360), `CELDA_REGISTRO_FICHAS_RELECTURA_DIAS` (30),
  *   `CELDA_REGISTRO_FICHAS_PRIORIDAD` (`08`) y `CELDA_INGESTA_MAX_FICHAS` (sin tope)
  *   (`opcionesFichasDesdeConfig`).
+ * - `CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO` (20) y `CELDA_REGISTRO_CAMBIO_MASIVO_MINIMO` (50):
+ *   cuánto puede cambiar el registro en un cuadro o en una zona antes de parar la noche sin
+ *   publicar (`limiteDeCambiosDesdeConfig`, ADR 0027).
  * - Las del extractor del registro oficial: `CELDA_REGISTRO_PAUSA_SEGUNDOS`,
  *   `CELDA_REGISTRO_MAX_PETICIONES`, `CELDA_REGISTRO_USER_AGENT`, `CELDA_REGISTRO_REINTENTOS` y
  *   `CELDA_REGISTRO_ESPERA_SEGUNDOS` (`RegistroOficial.opcionesClienteDesdeConfig`).
@@ -72,6 +75,7 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
   ),
   fichas: opcionesFichasDesdeConfig,
   zonas: opcionesZonasDesdeConfig,
+  cambioMasivo: limiteDeCambiosDesdeConfig,
   reintentoMinutos: Config.Int("CELDA_PUBLICAR_REINTENTO_MINUTOS").pipe(
     Config.withDefault(Duration.toMinutes(REINTENTO_DE_PUBLICACION)),
   ),
@@ -88,7 +92,7 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
     base: c.base,
     archivo: c.archivo,
     noche: {
-      proceso: { zonas: c.zonas, fichas: c.fichas },
+      proceso: { zonas: c.zonas, fichas: c.fichas, cambioMasivo: c.cambioMasivo },
       reintento: Duration.minutes(Math.max(c.reintentoMinutos, 0)),
       copias: { carpeta: c.carpetaDeCopias, conservar: Math.max(c.conservar, 1) },
     },

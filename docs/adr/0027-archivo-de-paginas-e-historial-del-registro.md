@@ -1,6 +1,6 @@
 # Archivo privado de las páginas del registro e historial de cada registro
 
-Estado: aceptada el 06/10/2026, con el diseño acordado con el usuario el mismo día. Va por fases. La fase 1, el archivo de páginas, y la fase 2, el historial de cada registro, están hechas. Lo que se decidió al hacer cada una va en «Cómo quedó». El 07/10/2026 el usuario confirmó que el archivo se queda en el mismo cubo por ahora y que el punto de partida lleva la fecha más antigua que la base guarda de cada registro.
+Estado: aceptada el 06/10/2026, con el diseño acordado con el usuario el mismo día. Va por fases. La fase 1, el archivo de páginas, la fase 2, el historial de cada registro, y la fase 3, la parada ante un cambio masivo, están hechas. Lo que se decidió al hacer cada una va en «Cómo quedó». El 07/10/2026 el usuario confirmó que el archivo se queda en el mismo cubo por ahora y que el punto de partida lleva la fecha más antigua que la base guarda de cada registro.
 
 ## Contexto
 
@@ -37,6 +37,10 @@ Las ideas vienen de una aplicación con eventos que hizo el usuario. Tiene un re
 - **Un punto de partida que se distingue.** Cada registro que ya está en la base recibe un hecho «conocido antes», con la fecha más antigua que la base guarda de él. La base no guarda la ejecución que trajo cada registro, y una fecha posterior a la verdadera sigue siendo cierta en «en el registro antes del <fecha>». La web lo dice así y nunca como fecha de puesta en servicio, que no es pública.
 - **Se publica en los lotes de fichas.** La historia de cada estación base va en la ficha con una clave opcional, sin cambiar el formato, como `sinFichaEnRegistro` y `medidasDeExposicion` (ADR 0016). La web no cambia en esta fase.
 
+### Fase 3: parar ante un cambio masivo
+
+Comparar lo que escribe el registro no protege de que cambie cómo lo escribe. Si la razón social «ORANGE ESPAGNE» cambiase, la expresión que reconoce a cada compañía (`normalizar.ts`) dejaría de reconocer unas 19.000 estaciones, y dos barridos las retirarían. Cuando el registro cambia de golpe mucho más de lo normal, la noche se para sin guardar el cuadro, sin contar ausencias y sin publicar, y espera a que alguien lo mire.
+
 ## Cómo quedó (fase 1)
 
 **Dónde está.** `ArchivoDePaginas` (`packages/ingesta/src/archivo.ts`) es una referencia del contexto que por defecto no guarda nada; el extractor la llama con cada página (`packages/ingesta/src/registro-oficial/extractor.ts`). La nocturna pone la suya con `archivoNocturno` (`apps/nocturna/src/archivo.ts`), que también da `ArchivoNocturno`: el resumen, los paquetes, la restauración y el recorrido de las fichas archivadas. Las tablas son `contenidos` (huella, bytes y gzip), `paginas` (tipo, URL y clave de la estación base de una ficha), `lecturas` (página, contenido, hora y resultado) y `paquetes`.
@@ -68,6 +72,16 @@ Para un arreglo de la lectura basta con subir `VERSION_DE_LECTURA`, desplegar y 
 **Leer los hechos.** `leerHecho` lee cada tipo con su forma sin aceptar claves de más: un hecho que no encaja en su forma, de una forma desconocida o con un listado que lleva a la vez el crudo y el registro falla y no se lee a medias. `repetirHechos` repite el historial de un registro con la limpieza de hoy, y `comprobar-historial` lo compara con lo que publica la tabla de observaciones de cada registro. Sobre la copia del 30/09/2026, con su punto de partida, no hay ninguno distinto.
 
 **En la ficha.** Cada origen del registro oficial lleva `historial`, una lista de `{ tipo, fecha, antes? }` (`HechoDeFicha` en `packages/dominio/src/ficha.ts`) con los tipos `en-el-registro-antes`, `alta`, `cambio-de-listado`, `cambio-de-ficha`, `sin-ficha`, `retirada` y `vuelta`. Los hechos con `cambia` a `false` no se publican. La clave es opcional y el formato no cambia (ADR 0016). `desdeDelOrigen` dice cómo enseñar la fecha del origen: «en el registro antes del <fecha>» si lo último que dice viene del punto de partida o de un alta sin `antes`, y «desde el <fecha>» si no, con `antes` como cota si la hay. La historia de un emplazamiento sale de la de los orígenes de sus estaciones. Con la copia del 30/09/2026, los lotes de fichas pasan de 42 a 46 MB.
+
+## Cómo quedó (fase 3)
+
+**Dónde.** Al guardar cada cuadro (`aplicarCuadro`) se cuentan sus altas, sus cambios y sus vigentes que el listado ya no trae; al cerrar el barrido de una zona (`cerrarBarrido`), sus ausencias. Si pasan del límite (`esCambioMasivo` en `packages/ingesta/src/barrido.ts`: más de 50 y más del 20 % de las vigentes, por defecto), la transacción se deshace y falla con `CambioMasivo`, que cuenta los registros del listado de titulares desconocidos. Un cuadro sin vigentes nunca para. Los cambios de la limpieza no cuentan, porque no son cambios del registro (fase 2).
+
+**Qué se para.** La noche no cierra ningún barrido, no lee fichas, no fusiona, no publica y no lanza el build de Vercel. La ejecución queda fallida con el motivo, el diario lo dice con un error y `Noche.publicacion` es `detenida`. Las copias de la base y del archivo se hacen. Los barridos de otras zonas que acabaron siguen en curso y se cierran la noche que se retomen. La noche siguiente vuelve a pararse mientras el registro siga igual.
+
+**Cuando el cambio es de verdad**, se sube el límite una noche (`CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO`, `registroOficial.cambioMasivo.porCiento` en el módulo de NixOS) y se vuelve a bajar.
+
+**Lo que no cubre.** Un cambio repartido por muchos cuadros, cada uno por debajo del límite, se guarda cuadro a cuadro antes de saberse. Si son ausencias, las para el cierre de la zona; si son cambios o altas, se guardan, con sus hechos, y la noche publica. Un límite por toda la noche necesitaría guardar los cuadros sin confirmar hasta el final.
 
 ## Consecuencias
 

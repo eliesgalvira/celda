@@ -13,6 +13,8 @@ import { Fuente, type Observacion } from "@celda/dominio/observacion";
 import {
   type BarridoAbierto,
   BaseDeBarrido,
+  CambioMasivo,
+  esCambioMasivo,
   type EstadoDeZona,
   ZonaEnLaEjecucion,
 } from "@celda/ingesta/barrido";
@@ -412,6 +414,19 @@ const FilaPublicacion = Schema.Struct({
 const Cuenta = Schema.Struct({ n: Schema.Int });
 const Maximo = Schema.Struct({ v: Schema.NullOr(Schema.Finite) });
 
+const esCambioMasivoError = Schema.is(CambioMasivo);
+
+/**
+ * Deja pasar solo el fallo de un cambio masivo, que la noche trata; los de SQLite o de un JSON
+ * que no se entiende paran el programa, como en el resto de la base.
+ */
+const soloCambioMasivo = <A, E, R>(efecto: Effect.Effect<A, E | CambioMasivo, R>) =>
+  Effect.catchIf(
+    efecto,
+    (error): error is Exclude<E, CambioMasivo> => !esCambioMasivoError(error),
+    (error) => Effect.die(error),
+  );
+
 const decodificar = <S extends Schema.Top>(esquema: S) =>
   Schema.decodeUnknownEffect(Schema.Array(esquema));
 const codificarObservacion = Schema.encodeEffect(ObservacionEnJson);
@@ -785,6 +800,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           cuadro,
           fecha,
           recorrido,
+          limite,
         ) {
           return yield* sql.withTransaction(
             Effect.gen(function* () {
@@ -795,6 +811,10 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               let creados = 0;
               let cambiados = 0;
               if (fila === undefined) return { creados, cambiados };
+              // Las vigentes del cuadro antes de guardarlo, para ver si cambia de golpe.
+              const vigentes = yield* sql<{ readonly clave: string }>`SELECT clave
+                  FROM observaciones WHERE fuente = ${fila.fuente} AND cuadro = ${cuadro}
+                    AND retirada_en IS NULL`;
               // La última vez que se pidió este cuadro: un registro nuevo no estaba entonces.
               const [anterior] = yield* decodificar(Maximo)(
                 yield* sql`SELECT max(b.inicio) AS v FROM cuadros_barridos cb
@@ -826,6 +846,19 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 yield* sql`UPDATE observaciones SET vista_en = ${fecha}
                     WHERE fuente = ${fila.fuente} AND clave IN ${sql.in(claves)}`;
               }
+              // Un cambio masivo deshace la transacción: el cuadro se queda como estaba.
+              const enElListado = new Set(recorrido.registros.map((r) => r.clave));
+              const faltan = vigentes.filter((v) => !enElListado.has(v.clave)).length;
+              const cambios = creados + cambiados + faltan;
+              if (esCambioMasivo(cambios, vigentes.length, limite)) {
+                return yield* new CambioMasivo({
+                  donde: `cuadro ${cuadro}`,
+                  cambios,
+                  vigentes: vigentes.length,
+                  desconocidos: recorrido.avisos.filter((a) => a.startsWith("Titular desconocido"))
+                    .length,
+                });
+              }
               yield* sql`INSERT INTO cuadros ${sql.insert({
                 cuadro,
                 cajas: yield* codificarCajas(recorrido.cajas),
@@ -840,9 +873,14 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               return { creados, cambiados };
             }),
           );
-        }, Effect.orDie),
+        }, soloCambioMasivo),
 
-        cerrarBarrido: Effect.fn("BaseNocturna.cerrarBarrido")(function* (barrido, fecha, fin) {
+        cerrarBarrido: Effect.fn("BaseNocturna.cerrarBarrido")(function* (
+          barrido,
+          fecha,
+          fin,
+          limite,
+        ) {
           return yield* sql.withTransaction(
             Effect.gen(function* () {
               const [fila] = yield* decodificar(FilaBarrido)(
@@ -859,6 +897,24 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                             AND cuadro IN ${sql.in(fila.cuadros)}
                             AND (vista_en IS NULL OR vista_en < ${fila.inicio})`,
                     );
+              const [vigentes] =
+                fila.cuadros.length === 0
+                  ? []
+                  : yield* decodificar(Cuenta)(
+                      yield* sql`SELECT count(*) AS n FROM observaciones
+                          WHERE fuente = ${fila.fuente} AND retirada_en IS NULL
+                            AND cuadro IN ${sql.in(fila.cuadros)}`,
+                    );
+              if (esCambioMasivo(ausentes.length, vigentes?.n ?? 0, limite)) {
+                const [zona] = yield* sql<{ readonly zona: string }>`SELECT zona FROM barridos
+                    WHERE id = ${fila.id}`;
+                return yield* new CambioMasivo({
+                  donde: `zona ${zona?.zona ?? fila.id}`,
+                  cambios: ausentes.length,
+                  vigentes: vigentes?.n ?? 0,
+                  desconocidos: 0,
+                });
+              }
               let retirados = 0;
               for (const { id, datos, vista_en } of ausentes) {
                 const { guardada, retirada, hecho } = trasAusencia(datos, fecha);
@@ -873,7 +929,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               return { retirados };
             }),
           );
-        }, Effect.orDie),
+        }, soloCambioMasivo),
 
         fallarBarrido: Effect.fn("BaseNocturna.fallarBarrido")(function* (barrido, fin, motivo) {
           yield* sql`UPDATE barridos SET estado = 'fallido', fin = ${fin}, error = ${motivo}

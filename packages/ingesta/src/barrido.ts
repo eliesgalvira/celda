@@ -68,10 +68,57 @@ export class CuadroVacio extends Schema.TaggedError<CuadroVacio>()("CuadroVacio"
   }
 }
 
-export type FalloDeZona = ErrorDeExtractor | CuadroSinDividir | CuadroVacio;
+/**
+ * Cuánto puede cambiar el registro en una noche antes de que la ingesta se pare (ADR 0027, fase
+ * 3): una parte de las observaciones vigentes, y como mínimo un número de ellas.
+ */
+export interface LimiteDeCambios {
+  /** La parte de las vigentes, de 0 a 1. */
+  readonly fraccion: number;
+  /** Por debajo de este número nunca es un cambio masivo. */
+  readonly minimo: number;
+}
+
+/**
+ * Por defecto, una quinta parte y al menos 50. Una semana normal cambia mucho menos en un cuadro.
+ * Si el registro dejase de escribir «ORANGE ESPAGNE» como hoy, faltaría una de cada cuatro.
+ */
+export const LIMITE_DE_CAMBIOS: LimiteDeCambios = { fraccion: 0.2, minimo: 50 };
+
+/** Si `cambios` de `vigentes` observaciones pasan del límite. Un cuadro sin vigentes, nunca. */
+export const esCambioMasivo = (
+  cambios: number,
+  vigentes: number,
+  limite: LimiteDeCambios,
+): boolean => vigentes > 0 && cambios > limite.minimo && cambios > limite.fraccion * vigentes;
+
+/**
+ * El registro cambia de golpe mucho más de lo normal en un cuadro o en una zona: altas, cambios
+ * o estaciones que faltan. Lo probable es que haya cambiado cómo escribe algo, como la razón
+ * social de una compañía, y no que lo hayan hecho miles de estaciones a la vez. La noche se para
+ * sin guardar ese cuadro, sin contar ausencias y sin publicar, hasta que alguien lo mire.
+ */
+export class CambioMasivo extends Schema.TaggedError<CambioMasivo>()("CambioMasivo", {
+  /** El cuadro, o la zona si es al cerrar su barrido. */
+  donde: Schema.String,
+  cambios: Schema.Int,
+  vigentes: Schema.Int,
+  /** Registros del listado de titulares que Celda no reconoce, que suelen explicar el cambio. */
+  desconocidos: Schema.Int,
+}) {
+  override get message() {
+    const desconocidos =
+      this.desconocidos === 0
+        ? ""
+        : `; el listado trae ${this.desconocidos} registros de titulares desconocidos`;
+    return `${this.donde}: ${this.cambios} cambios de ${this.vigentes} observaciones vigentes, muchos más de lo normal${desconocidos}`;
+  }
+}
+
+export type FalloDeZona = ErrorDeExtractor | CuadroSinDividir | CuadroVacio | CambioMasivo;
 
 const describirFallo = (fallo: FalloDeZona): string =>
-  fallo._tag === "CuadroSinDividir" || fallo._tag === "CuadroVacio"
+  fallo._tag === "CuadroSinDividir" || fallo._tag === "CuadroVacio" || fallo._tag === "CambioMasivo"
     ? `${fallo._tag}: ${fallo.message}`
     : describirError(fallo);
 
@@ -233,16 +280,20 @@ export class BaseDeBarrido extends Context.Service<
       cuadro: Cuadro,
       fecha: number,
       recorrido: CuadroRecorrido,
-    ) => Effect.Effect<{ readonly creados: number; readonly cambiados: number }>;
+      limite: LimiteDeCambios,
+    ) => Effect.Effect<{ readonly creados: number; readonly cambiados: number }, CambioMasivo>;
     /**
      * Cierra un barrido: cuenta una ausencia (`trasAusencia`, con fecha `fecha`) a las
-     * observaciones vigentes de sus cuadros que no se han visto desde que empezó.
+     * observaciones vigentes de sus cuadros que no se han visto desde que empezó. Si son
+     * demasiadas para `limite` no cuenta ninguna y falla con `CambioMasivo`, con el barrido aún en
+     * curso.
      */
     readonly cerrarBarrido: (
       barrido: string,
       fecha: number,
       fin: number,
-    ) => Effect.Effect<{ readonly retirados: number }>;
+      limite: LimiteDeCambios,
+    ) => Effect.Effect<{ readonly retirados: number }, CambioMasivo>;
     /** Da un barrido por fallido: no cuenta ausencias y la próxima vez empieza otro. */
     readonly fallarBarrido: (barrido: string, fin: number, motivo: string) => Effect.Effect<void>;
     /**
@@ -384,7 +435,30 @@ export const opcionesZonasDesdeConfig: Config.Config<OpcionesZonas> = Config.all
 export interface OpcionesBarrido {
   readonly zonas: OpcionesZonas;
   readonly fichas: OpcionesFichas;
+  /** Cuánto puede cambiar el registro antes de parar la noche; `LIMITE_DE_CAMBIOS` sin él. */
+  readonly cambioMasivo?: LimiteDeCambios;
 }
+
+/**
+ * El límite de un cambio masivo desde variables de entorno:
+ *
+ * - `CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO`: la parte de las vigentes de un cuadro o de una
+ *   zona (20). Con 100 o más no para nunca.
+ * - `CELDA_REGISTRO_CAMBIO_MASIVO_MINIMO`: por debajo de cuántos cambios nunca para (50).
+ */
+export const limiteDeCambiosDesdeConfig: Config.Config<LimiteDeCambios> = Config.all({
+  porCiento: Config.Int("CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO").pipe(
+    Config.withDefault(LIMITE_DE_CAMBIOS.fraccion * 100),
+  ),
+  minimo: Config.Int("CELDA_REGISTRO_CAMBIO_MASIVO_MINIMO").pipe(
+    Config.withDefault(LIMITE_DE_CAMBIOS.minimo),
+  ),
+}).pipe(
+  Config.map(({ porCiento, minimo }): LimiteDeCambios => ({
+    fraccion: Math.max(porCiento, 0) / 100,
+    minimo: Math.max(minimo, 0),
+  })),
+);
 
 /** Por defecto: una zona por noche y las fichas a una cada 3 s durante 6 horas. */
 export const OPCIONES_BARRIDO: OpcionesBarrido = { zonas: OPCIONES_ZONAS, fichas: OPCIONES_FICHAS };
@@ -394,6 +468,8 @@ export interface Barrida {
   readonly ejecucion: string;
   readonly estado: "omitida" | "fallida" | "completada";
   readonly zonas: ReadonlyArray<ZonaEnLaEjecucion>;
+  /** Si la noche se ha parado por un cambio masivo, por qué. Entonces no se publica nada. */
+  readonly detenida?: string;
 }
 
 /**
@@ -433,6 +509,7 @@ const barrerZona = Effect.fn("Barrido.zona")(function* (
   ejecucion: string,
   zona: ZonaDeBarrido,
   fecha: number,
+  limite: LimiteDeCambios,
 ) {
   const extractor = yield* ExtractorPorCajas;
   const base = yield* BaseDeBarrido;
@@ -450,7 +527,14 @@ const barrerZona = Effect.fn("Barrido.zona")(function* (
       fallo = recorrido.failure;
       break;
     }
-    const escritos = yield* base.aplicarCuadro(abierto.barrido, cuadro, fecha, recorrido.success);
+    const aplicado = yield* Effect.result(
+      base.aplicarCuadro(abierto.barrido, cuadro, fecha, recorrido.success, limite),
+    );
+    if (Result.isFailure(aplicado)) {
+      fallo = aplicado.failure;
+      break;
+    }
+    const escritos = aplicado.success;
     cuenta.cuadros++;
     cuenta.bytes += recorrido.success.bytes;
     cuenta.creados += escritos.creados;
@@ -499,6 +583,7 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
   ejecucion: string,
   zonas: ReadonlyArray<ZonaDeBarrido>,
   fecha: number,
+  limite: LimiteDeCambios,
 ) {
   const base = yield* BaseDeBarrido;
   const hechas: Array<ZonaEnLaEjecucion> = [];
@@ -506,12 +591,13 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
   const vistos = new Set<string>();
   const errores: Array<string> = [];
   let parada: string | undefined;
+  let detenida: string | undefined;
   for (const zona of zonas) {
     if (parada !== undefined) {
       hechas.push(pendiente(zona, parada));
       continue;
     }
-    const recorrida = yield* barrerZona(ejecucion, zona, fecha);
+    const recorrida = yield* barrerZona(ejecucion, zona, fecha, limite);
     hechas.push(recorrida.hecha);
     errores.push(...recorrida.avisos);
     for (const clave of recorrida.vistos) vistos.add(clave);
@@ -523,15 +609,32 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
     errores.push(`Zona ${zona.nombre}: ${motivo}`);
     yield* base.fallarBarrido(recorrida.barrido, yield* Clock.currentTimeMillis, motivo);
     if (PARAN_LA_NOCHE.has(recorrida.fallo._tag)) parada = motivo;
+    if (recorrida.fallo._tag === "CambioMasivo") {
+      detenida = motivo;
+      parada = motivo;
+    }
   }
-  for (const { indice, barrido } of porCerrar) {
-    const { retirados } = yield* base.cerrarBarrido(barrido, fecha, yield* Clock.currentTimeMillis);
+  // Con un cambio masivo no se cierra ningún barrido: no se cuenta ninguna ausencia ni se retira
+  // nada. Los que acabaron bien siguen en curso y se cierran la noche que se retome.
+  for (const { indice, barrido } of detenida === undefined ? porCerrar : []) {
+    const cerrado = yield* Effect.result(
+      base.cerrarBarrido(barrido, fecha, yield* Clock.currentTimeMillis, limite),
+    );
     const hecha = hechas[indice];
+    if (Result.isFailure(cerrado)) {
+      const motivo = describirFallo(cerrado.failure);
+      errores.push(`Zona ${hecha?.zona ?? ""}: ${motivo}`);
+      detenida = motivo;
+      parada = motivo;
+      if (hecha !== undefined) hechas[indice] = { ...hecha, estado: "fallido", error: motivo };
+      break;
+    }
     if (hecha !== undefined) {
+      const { retirados } = cerrado.success;
       hechas[indice] = { ...hecha, observaciones: { ...hecha.observaciones, retirados } };
     }
   }
-  return { hechas, vistos: vistos.size, errores, parada };
+  return { hechas, vistos: vistos.size, errores, parada, detenida };
 });
 
 /**
@@ -546,7 +649,10 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
  *    cuadro falla, o vuelve vacío cuando tenía estaciones, el barrido de la zona falla y no
  *    cuenta ausencias; las demás zonas siguen. El tope de peticiones, `robots.txt`, una fuente
  *    caída o una que bloquea a Celda paran todas las zonas que quedan y las fichas.
- * 4. Cierra los barridos que han acabado bien (`barrerZonas`).
+ *    Un cuadro que cambia de golpe más de lo normal no se guarda (`CambioMasivo`, ADR 0027).
+ * 4. Cierra los barridos que han acabado bien (`barrerZonas`). Con un cambio masivo, en un cuadro
+ *    o en las ausencias de una zona, no cierra ninguno, no lee fichas ni fusiona, y la ejecución
+ *    queda fallida y `detenida`: la noche no publica.
  * 5. Lee las fichas de la cola en su orden (`ordenarFichas`, con las provincias de `Provincias`)
  *    hasta cerrar la ventana (`leerFichasEnLaVentana`). A mitad de la ventana fusiona y lanza
  *    `PublicacionAMitad`.
@@ -573,7 +679,13 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
   }
 
   const zonas = zonasDeLaNoche(opciones.zonas, yield* base.estadoDeZonas(fuente));
-  const { hechas, vistos, errores, parada } = yield* barrerZonas(ejecucion, zonas, inicio);
+  const limite = opciones.cambioMasivo ?? LIMITE_DE_CAMBIOS;
+  const { hechas, vistos, errores, parada, detenida } = yield* barrerZonas(
+    ejecucion,
+    zonas,
+    inicio,
+    limite,
+  );
 
   const emplazamientos = { creados: 0, cambiados: 0, retirados: 0 };
   let fusiones = 0;
@@ -613,7 +725,16 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
     errores.push("Fichas pendientes para la próxima ejecución");
   }
 
-  yield* fusionar;
+  if (detenida === undefined) {
+    yield* fusionar;
+  } else {
+    errores.push(`Noche parada sin fusionar ni publicar: ${detenida}`);
+    yield* Effect.logError(
+      `Cambio masivo en el registro: ${detenida}. La noche se para sin contar ausencias, sin ` +
+        "fusionar y sin publicar. Si el cambio es de verdad, sube el límite una noche " +
+        "(CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO)",
+    );
+  }
   const sumar = (campo: keyof Cuentas) =>
     hechas.reduce((suma, zona) => suma + zona.observaciones[campo], 0);
   const cierre = {
@@ -630,12 +751,14 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
     errores,
     zonas: hechas,
   };
-  const barrida = zonas.length === 0 || hechas.some((zona) => zona.estado === "completado");
+  const barrida =
+    detenida === undefined &&
+    (zonas.length === 0 || hechas.some((zona) => zona.estado === "completado"));
   if (barrida) {
     yield* base.completar(ejecucion, { ...cierre, registros: vistos });
   } else {
     yield* base.fallar(ejecucion, cierre);
   }
   const hecha: Barrida = { ejecucion, estado: barrida ? "completada" : "fallida", zonas: hechas };
-  return hecha;
+  return detenida === undefined ? hecha : { ...hecha, detenida };
 });
