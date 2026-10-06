@@ -263,7 +263,8 @@ describe("toda España en la ingesta nocturna (#50)", () => {
           // Los emplazamientos de la revisión de la fusión (investigación 08, ticket 49).
           const provincias = yield* resumenPublicado(entorno);
           assert.strictEqual(provincias.get("08")?.emplazamientos, 1294);
-          assert.strictEqual(provincias.get("28")?.emplazamientos, 1331);
+          // 1331 antes de reparar «Casta±eda», que ahora se junta con «CASTAÑEDA».
+          assert.strictEqual(provincias.get("28")?.emplazamientos, 1330);
           assert.isTrue(provincias.get("08")?.cubierta);
           assert.isFalse(provincias.get("28")?.cubierta);
         }),

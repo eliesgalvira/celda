@@ -29,6 +29,28 @@ describe("texto de la fuente", () => {
     );
   });
 
+  it("repara las eñes y la doble codificación de la copia del 30/09/2026", () => {
+    assert.deepStrictEqual(
+      [
+        "AV Espa±a, 18. FUENLABRADA, MADRID",
+        "CR Nacional VI (Madrid-Coru±a), S/N. TORRELODONES, MADRID",
+        "VP Polígono 96 Parcela 35 CAMINO POZO CA¥ADA, S/N. ALBACETE, ALBACETE",
+        "VP POLÃ?GONO 12, PARCELA 8, S/N. ARANJUEZ, MADRID",
+        "CL JOSÃ© MARÃ­A PEMÃ¡N, 3. CÃ¡DIZ, CÃ¡DIZ",
+        "CL Ã±u, 1. ¿Ã?, MADRID",
+      ].map(repararTexto),
+      [
+        "AV España, 18. FUENLABRADA, MADRID",
+        "CR Nacional VI (Madrid-Coruña), S/N. TORRELODONES, MADRID",
+        "VP Polígono 96 Parcela 35 CAMINO POZO CAÑADA, S/N. ALBACETE, ALBACETE",
+        "VP POLÍGONO 12, PARCELA 8, S/N. ARANJUEZ, MADRID",
+        "CL JOSé MARíA PEMáN, 3. CáDIZ, CáDIZ",
+        // Sin saber la letra perdida, `Ã?` se queda como está.
+        "CL ñu, 1. ¿Ã?, MADRID",
+      ],
+    );
+  });
+
   it("saca el texto visible del HTML de la ficha", () => {
     assert.strictEqual(
       textoDeHtml("<p>C&oacute;digo &#8211; <b>Espa&ntilde;a</b> &desconocida;</p>"),

@@ -239,7 +239,7 @@ movistar-2801543	movistar:2801543 orange:MADR3966A vodafone:50880
 movistar-2801546	movistar:2801546 orange:MADR0328I vodafone:067604,67604
 movistar-2801547	movistar:2801547 orange:MADR0198A vodafone:087314
 movistar-2801550	movistar:2801550
-movistar-2801571	movistar:2801571
+movistar-2801571	movistar:2801571 orange:MADR2449A
 movistar-2801602	movistar:2801602
 movistar-2801639	movistar:2801639 vodafone:144156
 movistar-2801644	movistar:2801644
@@ -1027,7 +1027,6 @@ orange-MADR2405A	orange:MADR2405A vodafone:057154,57154
 orange-MADR2411A	orange:MADR2411A
 orange-MADR2419A	orange:MADR2419A
 orange-MADR2420A	orange:MADR2420A vodafone:000205,00205,205
-orange-MADR2449A	orange:MADR2449A
 orange-MADR2484A	orange:MADR2484A vodafone:064003,64003
 orange-MADR2498A	orange:MADR2498A
 orange-MADR2691A	orange:MADR2691A

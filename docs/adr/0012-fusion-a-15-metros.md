@@ -67,7 +67,7 @@ Decisión. A los 15 m se añaden dos uniones más, también encadenadas:
 
 Consecuencias:
 
-- Centro de Madrid: de 1418 a 1331 emplazamientos, sin estaciones partidas ni azoteas partidas y con los mismos 15 emplazamientos con dos estaciones de una compañía. El mayor grupo mide 60 m: CL LIGULA, 4, con Vodafone `000073`, `00073` y `73`.
+- Centro de Madrid: de 1418 a 1331 emplazamientos (1330 desde que se repara `±` en las direcciones, el 07/10/2026), sin estaciones partidas ni azoteas partidas y con los mismos 15 emplazamientos con dos estaciones de una compañía. El mayor grupo mide 60 m: CL LIGULA, 4, con Vodafone `000073`, `00073` y `73`.
 - Caja de Barcelona: de 1318 a 1294. Cambian 24 emplazamientos, cada uno junta dos de los de antes, y los otros 1270 no cambian. Desaparecen 24 claves, las de los emplazamientos absorbidos. El único que junta dos estaciones de una compañía en direcciones distintas es la Fira de Montjuïc (Orange `CATR0817A` y `CATR2803A`). Campus Nord no cambia.
 - Centro de Valencia: de 415 a 389.
 - Quedan juntos tres grupos dudosos de Madrid, como con 15 m: dos estaciones de Movistar en CL JOSE ORTEGA Y GASSET, 91 y CL FRANCISCO SILVELA, 13, Movistar en CL ALCALA, 27 con Vodafone en el 28, y AV PUERTA DE HIERRO, 1 B con PS SENDA DEL REY, 16. Separarlos pediría ir a verlos.

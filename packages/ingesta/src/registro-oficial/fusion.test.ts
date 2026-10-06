@@ -130,8 +130,9 @@ describe("fusión de los listados grabados el 28/09/2026", () => {
         assert.deepStrictEqual(con("vodafone", "00073"), [
           ["movistar:2802294", "orange:MADR0375A", "vodafone:000073,00073,73"],
         ]);
-        // Con 15 m salían 1418.
-        assert.strictEqual(emplazamientos.length, 1331);
+        // Con 15 m salían 1418, y 1331 antes de reparar `±`: Telefónica escribe «Casta±eda» y
+        // Orange «CASTAÑEDA» en la misma dirección, a 17 m.
+        assert.strictEqual(emplazamientos.length, 1330);
       }).pipe(Effect.provide(NodeServices.layer)),
   );
 
