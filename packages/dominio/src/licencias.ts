@@ -57,6 +57,12 @@ export const LICENCIAS: Licencias = {
       enlace: "https://www.scne.es/",
     },
     {
+      datos: "Capitales de municipio del Nomenclátor Geográfico Básico de España del IGN",
+      condiciones: "CC BY 4.0",
+      credito: "Obra derivada del Nomenclátor Geográfico Básico de España del IGN (ign.es)",
+      enlace: "https://www.ign.es/",
+    },
+    {
       datos: "Padrón del INE",
       condiciones: "CC BY 4.0",
       credito: "Elaboración propia con datos extraídos del sitio web del INE: www.ine.es",

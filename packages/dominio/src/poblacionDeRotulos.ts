@@ -11,13 +11,13 @@ import type { Coordenada } from "./area.ts";
 export const MINIMO_DE_HABITANTES = 20_000;
 
 /**
- * Lo más lejos, en grados, que puede quedar el rótulo de la etiqueta del municipio que nombra:
- * unos 50 km. El punto de OpenStreetMap y la etiqueta del IGN no coinciden, y en un municipio
- * grande pueden quedar a decenas de kilómetros.
+ * Lo más lejos, en grados, que puede quedar el rótulo del punto del municipio que nombra: unos
+ * 50 km. Se fijó cuando ese punto era la etiqueta del recinto, que en un municipio grande quedaba
+ * a decenas de kilómetros del pueblo. Ahora va junto a su capital (`puntoDeMunicipio`).
  */
 export const DISTANCIA_MAXIMA_GRADOS = 0.5;
 
-/** Los municipios por su nombre de lugar: dónde está su etiqueta y cuántos habitantes tienen. */
+/** Los municipios por su nombre de lugar: dónde está su punto y cuántos habitantes tienen. */
 export type IndiceDeCiudades = ReadonlyMap<
   string,
   ReadonlyArray<{ readonly etiqueta: Coordenada; readonly habitantes: number }>

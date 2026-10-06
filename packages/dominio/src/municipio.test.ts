@@ -7,6 +7,8 @@ import {
   lugarDelPunto,
   municipioDelPunto,
   municipiosConHabitantes,
+  puntoDeMunicipio,
+  RADIO_DEL_NUCLEO_METROS,
   type Territorio,
 } from "./municipio.ts";
 
@@ -210,32 +212,70 @@ describe("municipio y provincia de un punto", () => {
 });
 
 describe("municipios con habitantes", () => {
-  it("cruza por código, solo los municipios, y deja null los que no están en el padrón", () => {
-    const municipios = municipiosConHabitantes(LIMITES, {
-      fuente: {
-        atribucion: "INE",
-        licencia: "CC BY 4.0",
-        enlace: "https://www.ine.es/jaxiT3/Tabla.htm?t=29005",
-        referencia: "2025-01-01",
-        publicada: "2025-12-11",
+  it("cruza por código, solo los municipios, y deja null lo que no está en el padrón o en las capitales", () => {
+    const municipios = municipiosConHabitantes(
+      LIMITES,
+      {
+        fuente: {
+          atribucion: "INE",
+          licencia: "CC BY 4.0",
+          enlace: "https://www.ine.es/jaxiT3/Tabla.htm?t=29005",
+          referencia: "2025-01-01",
+          publicada: "2025-12-11",
+        },
+        municipios: [
+          { codigo: "08001", habitantes: 1200 },
+          { codigo: "51001", habitantes: 83_595 },
+        ],
       },
-      municipios: [
-        { codigo: "08001", habitantes: 1200 },
-        { codigo: "51001", habitantes: 83_595 },
-      ],
-    });
+      {
+        capitales: [
+          { codigo: "08001", nombre: "Núcleo", posicion: punto(2.01, 41.01) },
+          { codigo: "52001", nombre: "Melilla", posicion: punto(-2.94, 35.29) },
+        ],
+      },
+    );
     assert.deepStrictEqual(
-      municipios.map((m) => [m.codigo, m.provincia, m.habitantes]),
+      municipios.map((m) => [m.codigo, m.provincia, m.habitantes, m.capital]),
       [
-        ["01001", "01", null],
-        ["08001", "08", 1200],
-        ["08002", "08", null],
-        ["08003", "08", null],
-        ["09001", "09", null],
-        ["38001", "38", null],
-        ["51001", "51", 83_595],
-        ["52001", "52", null],
+        ["01001", "01", null, null],
+        ["08001", "08", 1200, punto(2.01, 41.01)],
+        ["08002", "08", null, null],
+        ["08003", "08", null, null],
+        ["09001", "09", null, null],
+        ["38001", "38", null, null],
+        ["51001", "51", 83_595, null],
+        ["52001", "52", null, punto(-2.94, 35.29)],
       ],
     );
+  });
+});
+
+describe("punto de un municipio", () => {
+  const capital = punto(2, 41);
+  const etiqueta = punto(2.1, 41.1);
+  /** A `metros` al este de la capital. */
+  const alEste = (metros: number) =>
+    punto(2 + metros / (111_195 * Math.cos((41 * Math.PI) / 180)), 41);
+
+  it("es la media de sus emplazamientos a menos de 2 km de la capital", () => {
+    const cerca = alEste(500);
+    const tambien = alEste(1500);
+    const lejos = alEste(RADIO_DEL_NUCLEO_METROS + 100);
+    const enMedio = puntoDeMunicipio({ capital, etiqueta }, [cerca, lejos, tambien]);
+    assert.closeTo(enMedio.longitud, (cerca.longitud + tambien.longitud) / 2, 1e-9);
+    assert.strictEqual(enMedio.latitud, 41);
+  });
+
+  it("es la capital si todos sus emplazamientos quedan más lejos o no tiene ninguno", () => {
+    assert.deepStrictEqual(
+      puntoDeMunicipio({ capital, etiqueta }, [alEste(RADIO_DEL_NUCLEO_METROS + 1)]),
+      capital,
+    );
+    assert.deepStrictEqual(puntoDeMunicipio({ capital, etiqueta }, []), capital);
+  });
+
+  it("es la etiqueta de su recinto si no tiene capital", () => {
+    assert.deepStrictEqual(puntoDeMunicipio({ capital: null, etiqueta }, [alEste(100)]), etiqueta);
   });
 });

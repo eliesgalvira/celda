@@ -54,6 +54,10 @@ _Evitar_: zona, vecindario, distrito
 Uno de los 8.132 municipios de España, con los límites del IGN y los habitantes del padrón del INE. Se identifica por su código INE de cinco cifras, nunca por su nombre. Cada emplazamiento cae en uno, salvo en un territorio compartido. En los niveles de municipios del mapa, los de una provincia cubierta recogen sus emplazamientos con su número.
 _Evitar_: localidad, pueblo, ciudad, término municipal
 
+**Capital de municipio**:
+Núcleo principal de un municipio, con el punto oficial que le da el Nomenclátor Geográfico Básico de España del IGN. El hexágono de un municipio va junto a ella: en la media de sus emplazamientos a menos de 2 km o, si no tiene ninguno, en ella.
+_Evitar_: cabecera, centro del municipio, capital a secas (la de una provincia es otra)
+
 **Provincia**:
 Una de las 50 provincias, o Ceuta o Melilla. Su código son las dos primeras cifras del código INE de sus municipios.
 _Evitar_: región, comarca

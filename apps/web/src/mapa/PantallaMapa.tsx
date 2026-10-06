@@ -36,6 +36,7 @@ import { createEffect, createMemo, createSignal, Match, Show, Switch, untrack } 
 
 import {
   creditoDeBarrios,
+  creditoDeCapitales,
   creditoDeMunicipios,
   dondeHayDatos,
   type EstadoCapa,
@@ -558,8 +559,9 @@ export function PantallaMapa() {
     cargadas,
   });
   /**
-   * Los créditos del mapa base y, con el resumen, el de los límites de municipios. El de los
-   * límites de barrio, solo con una provincia con barrios cargada: la de Barcelona.
+   * Los créditos del mapa base y, con el resumen, el de los límites de municipios y el de las
+   * capitales, si el resumen las cita. El de los límites de barrio, solo con una provincia con
+   * barrios cargada: la de Barcelona.
    */
   const conBarrios = createMemo(() => cargadas().some((p) => p.capa.barrios.length > 0));
   /**
@@ -582,6 +584,7 @@ export function PantallaMapa() {
       : [
           ...delCallejero,
           creditoDeMunicipios(fuentes.municipios),
+          ...(fuentes.capitales === undefined ? [] : [creditoDeCapitales(fuentes.capitales)]),
           ...(conBarrios() ? [creditoDeBarrios(fuentes.barrios)] : []),
           ...deLosLogos,
         ];

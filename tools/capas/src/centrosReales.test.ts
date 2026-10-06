@@ -1,7 +1,11 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import type { Coordenada } from "@celda/dominio/area";
-import { LimitesDeMunicipios, PadronDeMunicipios } from "@celda/dominio/municipio";
+import {
+  CapitalesDeMunicipios,
+  LimitesDeMunicipios,
+  PadronDeMunicipios,
+} from "@celda/dominio/municipio";
 import { dentroDelPoligono } from "@celda/dominio/poligono";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
@@ -21,24 +25,34 @@ import {
   TOLERANCIA_CENTROS_METROS,
 } from "./centros.ts";
 
-/** Los límites y el padrón del repositorio, y lo que escribe `pnpm run centros`. */
+/** Los límites, el padrón y las capitales del repositorio, y lo que escribe `pnpm run centros`. */
 const MUNICIPIOS = "../../packages/publicacion/datos/municipios.json";
 const PADRON = "../../packages/publicacion/datos/padron.json";
+const CAPITALES = "../../packages/publicacion/datos/capitales.json";
 const CENTROS = "../../packages/dominio/datos/centros-de-provincia.json";
 const CIUDADES = "../../packages/dominio/datos/habitantes-de-ciudades.json";
 
 const decodificarLimites = Schema.decodeEffect(Schema.fromJsonString(LimitesDeMunicipios));
 const decodificarPadron = Schema.decodeEffect(Schema.fromJsonString(PadronDeMunicipios));
+const decodificarCapitales = Schema.decodeEffect(Schema.fromJsonString(CapitalesDeMunicipios));
 
 const leer = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const limites = yield* decodificarLimites(yield* fs.readFileString(MUNICIPIOS));
   const padron = yield* decodificarPadron(yield* fs.readFileString(PADRON));
+  const capitales = yield* decodificarCapitales(yield* fs.readFileString(CAPITALES));
   return {
     limites,
     padron,
+    capitales,
     provincias: Result.getOrThrow(
-      centrosDeProvincia(limites, padron, TOLERANCIA_CENTROS_METROS, PRECISION_CENTROS_METROS),
+      centrosDeProvincia(
+        limites,
+        padron,
+        capitales,
+        TOLERANCIA_CENTROS_METROS,
+        PRECISION_CENTROS_METROS,
+      ),
     ),
     centros: yield* fs.readFileString(CENTROS),
     ciudades: yield* fs.readFileString(CIUDADES),
@@ -82,12 +96,12 @@ const provincia = (provincias: ReadonlyArray<ProvinciaConCentro>, codigo: string
 };
 
 describe("centros de provincia de los límites del repositorio", () => {
-  it.effect("los ficheros están al día con los límites y el padrón", () =>
+  it.effect("los ficheros están al día con los límites, el padrón y las capitales", () =>
     Effect.gen(function* () {
-      const { limites, padron, provincias, centros, ciudades } = yield* leer;
+      const { limites, padron, capitales, provincias, centros, ciudades } = yield* leer;
       assert.lengthOf(provincias, 52);
       assert.strictEqual(centros, ficheroDeCentros(tablaDeCentros(limites, padron, provincias)));
-      assert.strictEqual(ciudades, ficheroDeCiudades(tablaDeCiudades(limites, padron)));
+      assert.strictEqual(ciudades, ficheroDeCiudades(tablaDeCiudades(limites, padron, capitales)));
     }),
   );
 

@@ -166,6 +166,13 @@ const FUENTES: FuentesDeZonas = {
     referencia: "2025-01-01",
     publicada: "2025-12-11",
   },
+  capitales: {
+    atribucion: "Instituto Geográfico Nacional",
+    producto: "Nomenclátor Geográfico Básico de España",
+    licencia: "CC BY 4.0",
+    enlace: "https://www.ign.es/wfs-inspire/ngbe?service=WFS&request=GetCapabilities",
+    fecha: "2026-05-28",
+  },
 };
 
 const emplazamiento = (
@@ -290,7 +297,16 @@ describe("capa de una provincia", () => {
     fuente: FUENTES.padron,
     municipios: [{ codigo: "08019", habitantes: 1_702_547 }],
   };
-  const municipios = municipiosConHabitantes(LIMITES, padron).filter((m) => m.provincia === "08");
+  // La capital de Barcelona queda a 1,4 km de un emplazamiento y a 7,5 km del de Pedralbes;
+  // L'Hospitalet no tiene.
+  const capitales = {
+    capitales: [
+      { codigo: "08019", nombre: "Barcelona", posicion: { longitud: 2.17, latitud: 41.44 } },
+    ],
+  };
+  const municipios = municipiosConHabitantes(LIMITES, padron, capitales).filter(
+    (m) => m.provincia === "08",
+  );
   const contenido = generarCapaDeProvincia({
     provincia: "08",
     situados,
@@ -337,6 +353,18 @@ describe("capa de una provincia", () => {
       [
         ["08019", 1_702_547, 101.35, 2, ["movistar", "vodafone", "orange"]],
         ["08101", null, 12.4, 1, ["orange"]],
+      ],
+    );
+  });
+
+  it("pone cada municipio en la media de sus emplazamientos junto a la capital, o en su etiqueta sin capital", () => {
+    const leida = leerCapaDeProvincia(contenido, "08");
+    if (Result.isFailure(leida)) return assert.fail(leida.failure.message);
+    assert.deepStrictEqual(
+      leida.success.municipios.map((m) => [m.codigo, m.etiqueta]),
+      [
+        ["08019", EN_BARCELONA.posicion],
+        ["08101", { longitud: 2.05, latitud: 41.4 }],
       ],
     );
   });

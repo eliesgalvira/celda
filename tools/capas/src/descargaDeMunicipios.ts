@@ -38,13 +38,13 @@ import { entradasDelZip, leerEntrada } from "./zip.ts";
  */
 
 /** Se presenta como Celda, con un contacto; «Celda» es lo que se busca en `robots.txt`. */
-const USER_AGENT = "Celda (generador de capas; contacto en celda.elies.site)";
+export const USER_AGENT = "Celda (generador de capas; contacto en celda.elies.site)";
 
 /** El aviso legal del INE, que dice con qué licencia se reutilizan sus datos. */
 export const AVISO_LEGAL_INE = "https://www.ine.es/dyngs/AYU/index.htm?cid=125";
 
 /** Solo se aceptan datos con esta licencia; si cambia, hay que revisar la atribución. */
-const LICENCIA = "CC BY 4.0";
+export const LICENCIA = "CC BY 4.0";
 
 /** La fuente ya no da lo que se esperaba: otra licencia, otro formato u otro fichero. */
 export class FuenteDeMunicipiosCambiada extends Schema.TaggedError<FuenteDeMunicipiosCambiada>()(
@@ -122,7 +122,8 @@ const opcionesDeCliente = (pausa: Duration.Duration): OpcionesCliente => ({
   reintentos: 2,
 });
 
-const pedirBien = (cliente: ClienteDeFuente, url: string) =>
+/** Pide `url` y falla si no responde 200. */
+export const pedirBien = (cliente: ClienteDeFuente, url: string) =>
   cliente.pedir(url).pipe(
     Effect.filterOrFail(
       (respuesta) => respuesta.estado === 200,

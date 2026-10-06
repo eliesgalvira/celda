@@ -31,11 +31,13 @@ import {
 import type { Compania } from "./compania.ts";
 import { Ficha } from "./ficha.ts";
 import {
+  FuenteDeCapitales,
   FuenteDeMunicipios,
   type IndiceDeMunicipios,
   type Lugar,
   type MunicipioConHabitantes,
   municipioDelPunto,
+  puntoDeMunicipio,
 } from "./municipio.ts";
 import { type Combinaciones, combinacionesDe } from "./filtro.ts";
 import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "./nombreDeLugar.ts";
@@ -234,6 +236,7 @@ const SIN_HABITANTES = -1;
 const TablaDeMunicipios = Schema.Struct({
   codigo: Schema.Array(Schema.String),
   nombre: Schema.Array(Schema.String),
+  /** Su punto en el mapa (`puntoDeMunicipio`). */
   lon: Schema.Array(Schema.Finite),
   lat: Schema.Array(Schema.Finite),
   /** Del padrón del INE, o `SIN_HABITANTES`. */
@@ -306,9 +309,10 @@ const porCodigo = <A extends { readonly codigo: string }>(a: A, b: A): number =>
 
 /**
  * La capa de una provincia: las columnas del formato 4, el municipio de cada emplazamiento con la
- * tabla de municipios de la provincia y, si alguno cae en un barrio de Barcelona, la columna y la
- * tabla de barrios. `situados` va por clave, como lo deja `situarEmplazamientos`, y `lotes` dice
- * en qué fichero está la ficha de cada uno. Es una función pura.
+ * tabla de municipios de la provincia, cada uno en su punto (`puntoDeMunicipio`), y, si alguno cae
+ * en un barrio de Barcelona, la columna y la tabla de barrios. `situados` va por clave, como lo
+ * deja `situarEmplazamientos`, y `lotes` dice en qué fichero está la ficha de cada uno. Es una
+ * función pura.
  */
 export const generarCapaDeProvincia = (capa: {
   readonly provincia: string;
@@ -324,14 +328,15 @@ export const generarCapaDeProvincia = (capa: {
   );
   const municipios = capa.municipios.slice().sort(porCodigo);
   const posicionDeMunicipio = new Map(municipios.map((m, i) => [m.codigo, i]));
-  const cuantos = municipios.map(() => 0);
+  const suyos = municipios.map((): Array<Coordenada> => []);
   const presentes = municipios.map(() => 0);
   for (const situado of situados) {
     const i = posicionDeMunicipio.get(situado.municipio ?? "");
     if (i === undefined) continue;
-    cuantos[i] = (cuantos[i] ?? 0) + 1;
+    suyos[i]?.push(situado.emplazamiento.posicion);
     presentes[i] = (presentes[i] ?? 0) | mascaraDeCompanias(situado.emplazamiento.companias);
   }
+  const puntos = municipios.map((m, i) => puntoDeMunicipio(m, suyos[i] ?? []));
 
   const alcance = cajaDeBarrios(capa.barrios);
   const barrios = capa.barrios.barrios.slice().sort(porCodigo);
@@ -350,11 +355,11 @@ export const generarCapaDeProvincia = (capa: {
     municipios: {
       codigo: municipios.map((m) => m.codigo),
       nombre: municipios.map((m) => m.nombre),
-      lon: municipios.map((m) => redondear(m.etiqueta.longitud)),
-      lat: municipios.map((m) => redondear(m.etiqueta.latitud)),
+      lon: puntos.map((p) => redondear(p.longitud)),
+      lat: puntos.map((p) => redondear(p.latitud)),
       habitantes: municipios.map((m) => m.habitantes ?? SIN_HABITANTES),
       area: municipios.map((m) => Math.round(m.areaKm2 * 100) / 100),
-      emplazamientos: cuantos,
+      emplazamientos: suyos.map((posiciones) => posiciones.length),
       companias: presentes,
     },
     lotes: capa.lotes.map((lote) => lote.fichero),
@@ -387,6 +392,10 @@ export const generarCapaDeProvincia = (capa: {
 export interface MunicipioDeCapa {
   readonly codigo: string;
   readonly nombre: string;
+  /**
+   * Dónde va su hexágono: junto a su capital, entre sus emplazamientos (`puntoDeMunicipio`). Las
+   * capas de antes de las capitales traen la etiqueta de su recinto.
+   */
   readonly etiqueta: Coordenada;
   /** `null` si el padrón aún no lo tiene. */
   readonly habitantes: number | null;
@@ -613,6 +622,8 @@ export const FuentesDeZonas = Schema.Struct({
   barrios: FuenteDeBarrios,
   municipios: FuenteDeMunicipios,
   padron: FuenteDePoblacion,
+  /** Las capitales con que va cada municipio a su punto. Los resúmenes de antes no la llevan. */
+  capitales: Schema.optionalKey(FuenteDeCapitales),
 });
 export type FuentesDeZonas = typeof FuentesDeZonas.Type;
 

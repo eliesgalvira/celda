@@ -140,6 +140,7 @@ export const espanaSintetica = (
     const habitantes = municipiosConHabitantes(
       { territorios: zonas.municipios.territorios },
       zonas.padron,
+      zonas.capitales,
     );
     const nombreDeProvincia = (codigo: string) =>
       zonas.municipios.provincias.get(codigo)?.nombre.toUpperCase() ?? "";
