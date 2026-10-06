@@ -4,7 +4,8 @@ import type { Coordenada } from "./area.ts";
  * Emplazamientos por lote de fichas. Con las fichas reales de Barcelona y cinco bandas por
  * estación base, un lote de 128 pesa unos 210 KB y 9 KB con gzip: cabe en la ventana inicial de
  * TCP (unos 14 KB), así que llega en un viaje. Barcelona son 11 ficheros por versión y toda España
- * (unos 100.000 emplazamientos), unos 800. Las medidas están en el ADR 0004.
+ * (unos 100.000 emplazamientos), unos 800. Las medidas están en el ADR 0004. Con las medidas de
+ * exposición del ministerio, un lote crece unos 8 KB con gzip y ya no cabe (ADR 0016, #73).
  */
 export const EMPLAZAMIENTOS_POR_LOTE = 128;
 

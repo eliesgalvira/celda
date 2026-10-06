@@ -1,5 +1,4 @@
 import type { Coordenada } from "@celda/dominio/area";
-import type { Banda } from "@celda/dominio/banda";
 import type { ZonaDeBarrido } from "@celda/dominio/barrido";
 import * as Clock from "effect/Clock";
 import * as Config from "effect/Config";
@@ -12,7 +11,12 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 import type { OpcionesCliente } from "./cliente.ts";
-import { describirError, type ErrorDeExtractor, type Registro } from "./extractor.ts";
+import {
+  describirError,
+  type ErrorDeExtractor,
+  type FichaLeida,
+  type Registro,
+} from "./extractor.ts";
 
 /**
  * Las fichas del registro oficial en la ingesta nocturna (ADR 0014): una cada `ritmo`, dentro de
@@ -248,7 +252,7 @@ export const ordenarFichas = (
 export interface Pendientes {
   /** Nuevas o con el listado cambiado: nunca se han leído así. */
   readonly nuevas: number;
-  /** Leídas hace más que la relectura. */
+  /** Leídas hace más que la relectura, o con una versión de la lectura anterior. */
   readonly porReleer: number;
   /** Esperando tras un fallo. */
   readonly enEspera: number;
@@ -370,9 +374,9 @@ export interface LecturaEnLaVentana {
   readonly opciones: OpcionesFichas;
   /** Cuándo empezó la noche: la ventana cuenta desde ahí. */
   readonly inicio: number;
-  readonly ficha: (registro: Registro) => Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor>;
-  /** Guarda las bandas de una ficha y borra sus fallos; `true` si han cambiado. */
-  readonly aplicar: (clave: string, bandas: ReadonlyArray<Banda>) => Effect.Effect<boolean>;
+  readonly ficha: (registro: Registro) => Effect.Effect<FichaLeida, ErrorDeExtractor>;
+  /** Guarda lo leído de una ficha y borra sus fallos; `true` si ha cambiado. */
+  readonly aplicar: (clave: string, leida: FichaLeida) => Effect.Effect<boolean>;
   /**
    * Apunta el fallo de una ficha y hasta cuándo espera, y si es porque el registro no la tiene,
    * la marca como sin ficha en el registro.
@@ -502,10 +506,10 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
       break;
     }
     pedidas++;
-    const bandas = yield* Effect.result(lectura.ficha(enCola.registro));
+    const leida = yield* Effect.result(lectura.ficha(enCola.registro));
     finAnterior = yield* Clock.currentTimeMillis;
-    if (Result.isFailure(bandas)) {
-      const fallo = bandas.failure;
+    if (Result.isFailure(leida)) {
+      const fallo = leida.failure;
       const motivo = describirError(fallo);
       if (PARAN_LAS_FICHAS.has(fallo._tag)) {
         parar(motivo);
@@ -553,7 +557,7 @@ export const leerFichasEnLaVentana = Effect.fn("Ingesta.fichasEnLaVentana")(func
     }
     seguidos = 0;
     yield* apuntarRacha(true);
-    const cambiada = yield* lectura.aplicar(enCola.registro.clave, bandas.success);
+    const cambiada = yield* lectura.aplicar(enCola.registro.clave, leida.success);
     leidas++;
     cambiadas += cambiada ? 1 : 0;
     if (leidas % 500 === 0) {

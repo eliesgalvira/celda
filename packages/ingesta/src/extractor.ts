@@ -2,6 +2,7 @@ import { Coordenada } from "@celda/dominio/area";
 import type { Banda } from "@celda/dominio/banda";
 import type { Caja } from "@celda/dominio/barrido";
 import { Compania } from "@celda/dominio/compania";
+import type { MedidaDeExposicion } from "@celda/dominio/exposicion";
 import type { Fuente } from "@celda/dominio/observacion";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
@@ -18,6 +19,13 @@ export const Registro = Schema.Struct({
   url: Schema.String,
 });
 export type Registro = typeof Registro.Type;
+
+/** Lo que se lee de la ficha de una estación base. */
+export interface FichaLeida {
+  readonly bandas: ReadonlyArray<Banda>;
+  /** Las medidas de exposición del ministerio, quizá ninguna. */
+  readonly medidasDeExposicion: ReadonlyArray<MedidaDeExposicion>;
+}
 
 /** Resultado de recorrer el listado entero de una fuente. */
 export interface Listado {
@@ -131,8 +139,8 @@ export class ExtractorPorCajas extends Context.Service<
     readonly fuente: Fuente;
     /** El listado de una caja, bordes incluidos. */
     readonly caja: (caja: Caja) => Effect.Effect<ListadoDeCaja, ErrorDeExtractor>;
-    /** Lee las bandas de la ficha de un registro. */
-    readonly ficha: (registro: Registro) => Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor>;
+    /** Lee la ficha de un registro. */
+    readonly ficha: (registro: Registro) => Effect.Effect<FichaLeida, ErrorDeExtractor>;
     /** Peticiones hechas a la fuente desde que se construyó, con los reintentos. */
     readonly peticiones: Effect.Effect<number>;
   }

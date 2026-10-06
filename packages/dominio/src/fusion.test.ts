@@ -401,6 +401,33 @@ describe("fusionar", () => {
     assert.notProperty(emplazamiento?.estaciones[0], "sinFichaEnRegistro");
   });
 
+  it("une las medidas de exposición de cada compañía sin repetir y por acimut, y sin leer no hay", () => {
+    const medida = (acimutGrados: number, microvatiosPorCm2 = 0.19165) => ({
+      distanciaMetros: 70,
+      acimutGrados,
+      microvatiosPorCm2,
+    });
+    const [emplazamiento] = fusionar([
+      {
+        ...observacion({ compania: "vodafone", codigo: "086040" }),
+        medidasDeExposicion: [medida(220), medida(30)],
+      },
+      {
+        ...observacion({ compania: "vodafone", codigo: "86040" }),
+        medidasDeExposicion: [medida(220)],
+      },
+      { ...observacion({ compania: "orange", codigo: "CATR0228A" }), medidasDeExposicion: [] },
+      { ...observacion({ compania: "orange", codigo: "CATR0228B" }), medidasDeExposicion: [] },
+      observacion({ compania: "movistar", codigo: "0802532" }),
+    ]);
+    const medidas = (compania: Compania) =>
+      emplazamiento?.estaciones.find((e) => e.compania === compania)?.medidasDeExposicion;
+    assert.deepStrictEqual(medidas("vodafone"), [medida(30), medida(220)]);
+    // Orange tiene sus fichas leídas sin medidas; de Movistar no se ha leído la del registro.
+    assert.deepStrictEqual(medidas("orange"), []);
+    assert.isUndefined(medidas("movistar"));
+  });
+
   it("no depende del orden de la entrada", () => {
     const entrada = [
       observacion({ compania: "orange", codigo: "CATR0228A" }),

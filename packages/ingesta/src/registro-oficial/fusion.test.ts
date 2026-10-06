@@ -21,7 +21,8 @@ const observacionesDeLaMuestra = Effect.map(muestraCampusNord, ({ listado, ficha
   listado.registros.map((registro): Observacion => ({
     ...registro,
     fuente: "registro-oficial",
-    bandas: fichas.get(registro.clave) ?? [],
+    bandas: fichas.get(registro.clave)?.bandas ?? [],
+    medidasDeExposicion: fichas.get(registro.clave)?.medidasDeExposicion ?? [],
     fecha: FECHA,
     afirma: "presente",
   })),
@@ -49,6 +50,11 @@ describe("fusión del registro oficial grabado en Campus Nord", () => {
           // Dos registros de Vodafone en el mismo punto, con expedientes distintos.
           ["vodafone", ["086040", "86040"], 4],
         ],
+      );
+      // Los dos registros de Vodafone publican la misma medida de exposición, que cuenta una vez.
+      assert.deepStrictEqual(
+        campus?.estaciones.map((e) => e.medidasDeExposicion?.length),
+        [5, 6, 1],
       );
       assert.strictEqual(campus?.estado, "verificado");
       assert.deepStrictEqual(campus?.conflictos, []);

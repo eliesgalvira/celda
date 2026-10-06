@@ -19,9 +19,9 @@ import { decodificarLatin1 } from "../texto.ts";
 import type { Caja } from "../zona.ts";
 import {
   AVISO_SIN_FICHA,
-  bandasDeFicha,
   esFichaDelGeoportal,
   esFichaSinEmplazamiento,
+  leerFicha,
   listadoDeElementos,
   ORIGEN,
   RespuestaListado,
@@ -131,11 +131,11 @@ const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
     if (esFichaSinEmplazamiento(texto)) {
       return yield* new SinFichaEnElRegistro({ url: registro.url, motivo: AVISO_SIN_FICHA });
     }
-    const bandas = bandasDeFicha(texto);
-    if (Result.isFailure(bandas)) {
-      return yield* new RespuestaInesperada({ url: registro.url, motivo: bandas.failure });
+    const leida = leerFicha(texto);
+    if (Result.isFailure(leida)) {
+      return yield* new RespuestaInesperada({ url: registro.url, motivo: leida.failure });
     }
-    return bandas.success;
+    return leida.success;
   });
 
   const peticiones =

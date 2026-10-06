@@ -1,0 +1,31 @@
+import * as Schema from "effect/Schema";
+
+/**
+ * Una medida de exposición del ministerio: un punto alrededor de la estación base donde se midió
+ * la exposición a campos electromagnéticos, tal como lo publica su ficha del registro oficial en
+ * «Niveles medidos en el entorno». Las toman los técnicos de las Jefaturas de Inspección o las
+ * certifican las compañías, y el ministerio no dice cuándo.
+ *
+ * Sirve para comparar con los niveles de referencia legales, el más restrictivo de 200 µW/cm².
+ * Nada dice de cómo funciona un móvil en ese punto: 0,02 µW/cm² en 1800 MHz son unos −34 dBm,
+ * millones de veces lo que necesita. Por eso es otro tipo que la `Medida` de Celda.
+ */
+export const MedidaDeExposicion = Schema.Struct({
+  /** Distancia del punto de medida a la estación base, en metros. */
+  distanciaMetros: Schema.Finite,
+  /**
+   * Dirección del punto de medida vista desde la estación base, en grados desde el norte
+   * geográfico en el sentido de las agujas del reloj. Dice dónde estuvo el técnico, y nada de
+   * hacia dónde miran los sectores.
+   */
+  acimutGrados: Schema.Finite,
+  /** Densidad de potencia medida, en µW/cm². */
+  microvatiosPorCm2: Schema.Finite,
+});
+export type MedidaDeExposicion = typeof MedidaDeExposicion.Type;
+
+/** Orden estable de las medidas: por acimut, por distancia y por valor. */
+export const compararMedidas = (a: MedidaDeExposicion, b: MedidaDeExposicion): number =>
+  a.acimutGrados - b.acimutGrados ||
+  a.distanciaMetros - b.distanciaMetros ||
+  a.microvatiosPorCm2 - b.microvatiosPorCm2;

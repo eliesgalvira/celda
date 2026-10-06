@@ -10,6 +10,7 @@ import type {
   EstacionBase,
   Procedencia,
 } from "./emplazamiento.ts";
+import { compararMedidas, type MedidaDeExposicion } from "./exposicion.ts";
 import { type Fuente, normalizarCodigo, type Observacion } from "./observacion.ts";
 
 /** Parámetros de la fusión. Ver el ADR 0012. */
@@ -183,6 +184,23 @@ const sinFichaEnRegistroDe = (
     : undefined;
 };
 
+/**
+ * Une las medidas de exposición del ministerio de las observaciones que las traen. Una medida
+ * repetida, como en los registros duplicados de Vodafone, cuenta una vez. Sin ninguna observación
+ * que las traiga, no se sabe cuáles son.
+ */
+const unirMedidas = (
+  observaciones: ReadonlyArray<Observacion>,
+): ReadonlyArray<MedidaDeExposicion> | undefined => {
+  if (observaciones.every((o) => o.medidasDeExposicion === undefined)) return undefined;
+  const unicas = new Map<string, MedidaDeExposicion>();
+  for (const medida of observaciones.flatMap((o) => o.medidasDeExposicion ?? [])) {
+    const clave = `${medida.distanciaMetros}|${medida.acimutGrados}|${medida.microvatiosPorCm2}`;
+    if (!unicas.has(clave)) unicas.set(clave, medida);
+  }
+  return [...unicas.values()].sort(compararMedidas);
+};
+
 const estacionDe = (
   compania: Compania,
   observaciones: ReadonlyArray<Observacion>,
@@ -196,7 +214,10 @@ const estacionDe = (
     observaciones: observaciones.map(procedencia),
   };
   const sinFichaEnRegistro = sinFichaEnRegistroDe(presentes, bandas);
-  return sinFichaEnRegistro === undefined ? estacion : { ...estacion, sinFichaEnRegistro };
+  const conMarca =
+    sinFichaEnRegistro === undefined ? estacion : { ...estacion, sinFichaEnRegistro };
+  const medidasDeExposicion = unirMedidas(presentes);
+  return medidasDeExposicion === undefined ? conMarca : { ...conMarca, medidasDeExposicion };
 };
 
 /** Conflictos que se ven dentro de un grupo de observaciones. */

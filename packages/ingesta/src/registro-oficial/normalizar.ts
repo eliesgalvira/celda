@@ -6,11 +6,12 @@ import {
   type Rango,
 } from "@celda/dominio/banda";
 import type { Compania } from "@celda/dominio/compania";
+import type { MedidaDeExposicion } from "@celda/dominio/exposicion";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import type { Listado, Registro } from "../extractor.ts";
+import type { FichaLeida, Listado, Registro } from "../extractor.ts";
 import { repararTexto, textoDeHtml } from "../texto.ts";
 import type { Caja } from "../zona.ts";
 
@@ -171,12 +172,85 @@ export const bandasDeFilas = (
   filas: ReadonlyArray<FilaFicha>,
 ): Result.Result<ReadonlyArray<Banda>, string> => Result.all(filas.map(bandaDeFila));
 
-/** Las bandas de una ficha en HTML, o por qué no se puede leer. */
-export const bandasDeFicha = (html: string): Result.Result<ReadonlyArray<Banda>, string> =>
-  Result.flatMap(filasDeFicha(html), bandasDeFilas);
+/** Fila de la tabla «Niveles medidos en el entorno» de la ficha, con el texto de cada celda. */
+export interface FilaDeNiveles {
+  readonly distancia: string;
+  readonly acimut: string;
+  readonly valor: string;
+}
+
+/**
+ * Un número de la tabla de niveles. El registro los escribe con punto decimal (`0.98806`); se
+ * acepta también la coma (`0,98806`) y el exponente (`1.0E-4`), por si cambia cómo los escribe.
+ * Cualquier otra cosa, como un separador de miles, no se da por número.
+ */
+const numeroDeNiveles = (texto: string): number | undefined => {
+  const numero = texto.replace(",", ".");
+  return /^\d+(\.\d*)?([eE][+-]?\d+)?$/u.test(numero) ? Number(numero) : undefined;
+};
+
+/** Convierte una fila de la tabla de niveles en una medida, o explica por qué no puede. */
+export const medidaDeFila = (fila: FilaDeNiveles): Result.Result<MedidaDeExposicion, string> => {
+  const distanciaMetros = numeroDeNiveles(fila.distancia);
+  const acimutGrados = numeroDeNiveles(fila.acimut);
+  const microvatiosPorCm2 = numeroDeNiveles(fila.valor);
+  return distanciaMetros === undefined ||
+    acimutGrados === undefined ||
+    microvatiosPorCm2 === undefined
+    ? Result.fail(
+        `Medida ilegible en la ficha: ${fila.distancia} m, ${fila.acimut}°, ${fila.valor} µW/cm²`,
+      )
+    : Result.succeed({ distanciaMetros, acimutGrados, microvatiosPorCm2 });
+};
+
+/**
+ * Las medidas de todas las filas, o el motivo de la primera que no se puede leer. Una fila con
+ * alguna celda vacía no es una medida: el registro publica alguna sin valor, como una de
+ * `CATR6190A` de Orange el 26/09/2026.
+ */
+export const medidasDeFilas = (
+  filas: ReadonlyArray<FilaDeNiveles>,
+): Result.Result<ReadonlyArray<MedidaDeExposicion>, string> =>
+  Result.all(
+    filas
+      .filter((fila) => fila.distancia !== "" && fila.acimut !== "" && fila.valor !== "")
+      .map(medidaDeFila),
+  );
+
+/**
+ * Versión de `leerFicha`. Una ficha leída con una versión anterior vuelve a la cola aunque no le
+ * toque la relectura, para que lo que se lee de más llegue a todas sin esperar a ella. Se sube
+ * cada vez que `leerFicha` saca algo nuevo de la ficha o lo saca de otra forma:
+ *
+ * 1. Las bandas.
+ * 2. Las medidas de exposición del ministerio (#73).
+ */
+export const VERSION_DE_LECTURA = 2;
+
+/** Las bandas y las medidas de exposición de una ficha en HTML, o por qué no se puede leer. */
+export const leerFicha = (html: string): Result.Result<FichaLeida, string> =>
+  Result.flatMap(filasDeFicha(html), ({ caracteristicas, niveles }) =>
+    Result.all({
+      bandas: bandasDeFilas(caracteristicas),
+      medidasDeExposicion: medidasDeFilas(niveles),
+    }),
+  );
 
 const celdas = (fila: string): ReadonlyArray<string> =>
   [...fila.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/giu)].map((celda) => textoDeHtml(celda[1] ?? ""));
+
+/**
+ * Las filas de tres celdas de un trozo de la ficha. La primera de cada tabla son sus títulos,
+ * que empiezan por `titulo`, y no cuenta.
+ */
+const filasDeTabla = (
+  tabla: string,
+  titulo: string,
+): ReadonlyArray<readonly [string, string, string]> =>
+  [...tabla.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/giu)]
+    .map((fila) => celdas(fila[1] ?? ""))
+    .filter((c) => c.length === 3 && !(c[0] ?? "").startsWith(titulo))
+    .map(([a = "", b = "", c = ""]) => [a, b, c] as const);
 
 /**
  * Si una página es una ficha del geoportal, aunque sea la del aviso de código no válido: todas
@@ -197,10 +271,20 @@ export const esFichaSinEmplazamiento = (html: string): boolean =>
   /c&oacute;digo de emplazamiento no v&aacute;lido|código de emplazamiento no válido/iu.test(html);
 
 /**
- * Filas de «Características técnicas» de la ficha en HTML. Una ficha sin esa tabla, o con el
- * aviso de código no válido (`esFichaSinEmplazamiento`), no es una estación sin bandas.
+ * Filas de las dos tablas de la ficha en HTML: «Características técnicas» y «Niveles medidos en el
+ * entorno». Una ficha sin la primera, o con el aviso de código no válido
+ * (`esFichaSinEmplazamiento`), no es una estación sin bandas. Una sin la segunda, o con la
+ * segunda vacía, es una estación de la que el registro no publica medidas.
  */
-export const filasDeFicha = (html: string): Result.Result<ReadonlyArray<FilaFicha>, string> => {
+export const filasDeFicha = (
+  html: string,
+): Result.Result<
+  {
+    readonly caracteristicas: ReadonlyArray<FilaFicha>;
+    readonly niveles: ReadonlyArray<FilaDeNiveles>;
+  },
+  string
+> => {
   if (esFichaSinEmplazamiento(html)) {
     return Result.fail(AVISO_SIN_FICHA);
   }
@@ -208,16 +292,17 @@ export const filasDeFicha = (html: string): Result.Result<ReadonlyArray<FilaFich
   if (inicio < 0) {
     return Result.fail("La ficha no tiene la tabla de características técnicas");
   }
-  const fin = html.indexOf("NIVELES MEDIDOS", inicio);
-  const tabla = html.slice(inicio, fin < 0 ? undefined : fin);
-  return Result.succeed(
-    [...tabla.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/giu)]
-      .map((fila) => celdas(fila[1] ?? ""))
-      .filter((c) => c.length === 3 && c[0] !== "Operador")
-      .map(([operador = "", referencia = "", bandaMhz = ""]) => ({
-        operador,
-        referencia,
-        bandaMhz,
-      })),
-  );
+  const niveles = html.indexOf("NIVELES MEDIDOS", inicio);
+  const tablaDeNiveles = niveles < 0 ? "" : html.slice(niveles, html.indexOf("</table>", niveles));
+  return Result.succeed({
+    caracteristicas: filasDeTabla(
+      html.slice(inicio, niveles < 0 ? undefined : niveles),
+      "Operador",
+    ).map(([operador, referencia, bandaMhz]) => ({ operador, referencia, bandaMhz })),
+    niveles: filasDeTabla(tablaDeNiveles, "Distancia").map(([distancia, acimut, valor]) => ({
+      distancia,
+      acimut,
+      valor,
+    })),
+  });
 };

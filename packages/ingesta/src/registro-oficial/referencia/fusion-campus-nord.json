@@ -22,7 +22,8 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800199"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       },
       {
         "compania": "orange",
@@ -35,7 +36,8 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR0510J"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       },
       {
         "compania": "vodafone",
@@ -48,7 +50,8 @@
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A.U. - 085206"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       }
     ],
     "fuentes": [
@@ -188,6 +191,18 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800268"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 41,
+            "acimutGrados": 89,
+            "microvatiosPorCm2": 0.18274
+          },
+          {
+            "distanciaMetros": 60,
+            "acimutGrados": 260,
+            "microvatiosPorCm2": 0.26526
+          }
         ]
       }
     ],
@@ -219,7 +234,8 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800307"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       },
       {
         "compania": "orange",
@@ -232,7 +248,8 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR6158A"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       },
       {
         "compania": "vodafone",
@@ -273,6 +290,33 @@
           {
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A. - 028723"
+          }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 50,
+            "acimutGrados": 90,
+            "microvatiosPorCm2": 0.09549
+          },
+          {
+            "distanciaMetros": 75,
+            "acimutGrados": 115,
+            "microvatiosPorCm2": 0.06112
+          },
+          {
+            "distanciaMetros": 78,
+            "acimutGrados": 172,
+            "microvatiosPorCm2": 0.04244
+          },
+          {
+            "distanciaMetros": 90,
+            "acimutGrados": 210,
+            "microvatiosPorCm2": 0.12629
+          },
+          {
+            "distanciaMetros": 50,
+            "acimutGrados": 290,
+            "microvatiosPorCm2": 0.12998
           }
         ]
       }
@@ -414,6 +458,33 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800351"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 69,
+            "acimutGrados": 3,
+            "microvatiosPorCm2": 0.04459
+          },
+          {
+            "distanciaMetros": 12,
+            "acimutGrados": 30,
+            "microvatiosPorCm2": 0.19618
+          },
+          {
+            "distanciaMetros": 52,
+            "acimutGrados": 80,
+            "microvatiosPorCm2": 0.71344
+          },
+          {
+            "distanciaMetros": 53,
+            "acimutGrados": 122,
+            "microvatiosPorCm2": 0.29245
+          },
+          {
+            "distanciaMetros": 97,
+            "acimutGrados": 331,
+            "microvatiosPorCm2": 0.06369
+          }
         ]
       }
     ],
@@ -445,7 +516,8 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800840"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       }
     ],
     "fuentes": [
@@ -505,6 +577,33 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800942"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 39,
+            "acimutGrados": 93,
+            "microvatiosPorCm2": 0.08618
+          },
+          {
+            "distanciaMetros": 91,
+            "acimutGrados": 133,
+            "microvatiosPorCm2": 0.10528
+          },
+          {
+            "distanciaMetros": 64,
+            "acimutGrados": 193,
+            "microvatiosPorCm2": 0.18274
+          },
+          {
+            "distanciaMetros": 63,
+            "acimutGrados": 234,
+            "microvatiosPorCm2": 0.12998
+          },
+          {
+            "distanciaMetros": 29,
+            "acimutGrados": 277,
+            "microvatiosPorCm2": 0.08923
+          }
         ]
       }
     ],
@@ -536,7 +635,8 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0801205"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       },
       {
         "compania": "orange",
@@ -646,6 +746,38 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR2756A"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 10,
+            "acimutGrados": 40,
+            "microvatiosPorCm2": 0.08024
+          },
+          {
+            "distanciaMetros": 85,
+            "acimutGrados": 130,
+            "microvatiosPorCm2": 0.0987
+          },
+          {
+            "distanciaMetros": 40,
+            "acimutGrados": 140,
+            "microvatiosPorCm2": 0.25475
+          },
+          {
+            "distanciaMetros": 70,
+            "acimutGrados": 150,
+            "microvatiosPorCm2": 0.32682
+          },
+          {
+            "distanciaMetros": 99,
+            "acimutGrados": 170,
+            "microvatiosPorCm2": 0.25998
+          },
+          {
+            "distanciaMetros": 95,
+            "acimutGrados": 310,
+            "microvatiosPorCm2": 0.11207
+          }
         ]
       },
       {
@@ -676,6 +808,13 @@
           {
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A.U. - 18172"
+          }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 89,
+            "acimutGrados": 0,
+            "microvatiosPorCm2": 0.73095
           }
         ]
       }
@@ -733,6 +872,33 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0801690"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 40,
+            "acimutGrados": 40,
+            "microvatiosPorCm2": 0.0586
+          },
+          {
+            "distanciaMetros": 30,
+            "acimutGrados": 100,
+            "microvatiosPorCm2": 0.06369
+          },
+          {
+            "distanciaMetros": 30,
+            "acimutGrados": 140,
+            "microvatiosPorCm2": 0.07173
+          },
+          {
+            "distanciaMetros": 40,
+            "acimutGrados": 180,
+            "microvatiosPorCm2": 0.07451
+          },
+          {
+            "distanciaMetros": 40,
+            "acimutGrados": 230,
+            "microvatiosPorCm2": 0.07451
+          }
         ]
       }
     ],
@@ -764,7 +930,8 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0801694"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       },
       {
         "compania": "orange",
@@ -777,7 +944,8 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR3021A"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       },
       {
         "compania": "vodafone",
@@ -831,6 +999,48 @@
           {
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A.U. - 54846"
+          }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 41,
+            "acimutGrados": 13,
+            "microvatiosPorCm2": 0.8031
+          },
+          {
+            "distanciaMetros": 20,
+            "acimutGrados": 64,
+            "microvatiosPorCm2": 0.52736
+          },
+          {
+            "distanciaMetros": 66,
+            "acimutGrados": 138,
+            "microvatiosPorCm2": 0.40131
+          },
+          {
+            "distanciaMetros": 80,
+            "acimutGrados": 164,
+            "microvatiosPorCm2": 0.36935
+          },
+          {
+            "distanciaMetros": 38,
+            "acimutGrados": 230,
+            "microvatiosPorCm2": 0.37563
+          },
+          {
+            "distanciaMetros": 63,
+            "acimutGrados": 239,
+            "microvatiosPorCm2": 0.5889
+          },
+          {
+            "distanciaMetros": 90,
+            "acimutGrados": 280,
+            "microvatiosPorCm2": 0.36935
+          },
+          {
+            "distanciaMetros": 88,
+            "acimutGrados": 288,
+            "microvatiosPorCm2": 1.24907
           }
         ]
       }
@@ -935,6 +1145,33 @@
           {
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802015"
+          }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 43,
+            "acimutGrados": 37,
+            "microvatiosPorCm2": 0.86901
+          },
+          {
+            "distanciaMetros": 55,
+            "acimutGrados": 75,
+            "microvatiosPorCm2": 0.70476
+          },
+          {
+            "distanciaMetros": 96,
+            "acimutGrados": 128,
+            "microvatiosPorCm2": 0.79389
+          },
+          {
+            "distanciaMetros": 83,
+            "acimutGrados": 230,
+            "microvatiosPorCm2": 0.68758
+          },
+          {
+            "distanciaMetros": 31,
+            "acimutGrados": 310,
+            "microvatiosPorCm2": 0.68758
           }
         ]
       },
@@ -1062,6 +1299,33 @@
           {
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A.U. - 00715"
+          }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 65,
+            "acimutGrados": 24,
+            "microvatiosPorCm2": 0.63728
+          },
+          {
+            "distanciaMetros": 61,
+            "acimutGrados": 58,
+            "microvatiosPorCm2": 0.69614
+          },
+          {
+            "distanciaMetros": 57,
+            "acimutGrados": 99,
+            "microvatiosPorCm2": 0.30369
+          },
+          {
+            "distanciaMetros": 70,
+            "acimutGrados": 168,
+            "microvatiosPorCm2": 0.21966
+          },
+          {
+            "distanciaMetros": 58,
+            "acimutGrados": 315,
+            "microvatiosPorCm2": 0.44142
           }
         ]
       }
@@ -1191,6 +1455,33 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802532"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 85,
+            "acimutGrados": 60,
+            "microvatiosPorCm2": 0.18717
+          },
+          {
+            "distanciaMetros": 39,
+            "acimutGrados": 114,
+            "microvatiosPorCm2": 0.38836
+          },
+          {
+            "distanciaMetros": 78,
+            "acimutGrados": 182,
+            "microvatiosPorCm2": 0.8031
+          },
+          {
+            "distanciaMetros": 79,
+            "acimutGrados": 245,
+            "microvatiosPorCm2": 1.45245
+          },
+          {
+            "distanciaMetros": 76,
+            "acimutGrados": 351,
+            "microvatiosPorCm2": 0.11207
+          }
         ]
       },
       {
@@ -1277,6 +1568,38 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR0228A"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 32,
+            "acimutGrados": 36,
+            "microvatiosPorCm2": 0.19618
+          },
+          {
+            "distanciaMetros": 89,
+            "acimutGrados": 125,
+            "microvatiosPorCm2": 0.5889
+          },
+          {
+            "distanciaMetros": 77,
+            "acimutGrados": 138,
+            "microvatiosPorCm2": 0.5889
+          },
+          {
+            "distanciaMetros": 51,
+            "acimutGrados": 146,
+            "microvatiosPorCm2": 0.42784
+          },
+          {
+            "distanciaMetros": 75,
+            "acimutGrados": 146,
+            "microvatiosPorCm2": 0.59683
+          },
+          {
+            "distanciaMetros": 80,
+            "acimutGrados": 175,
+            "microvatiosPorCm2": 0.98806
+          }
         ]
       },
       {
@@ -1344,6 +1667,13 @@
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A.U. - 86040"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 70,
+            "acimutGrados": 220,
+            "microvatiosPorCm2": 0.19165
+          }
         ]
       }
     ],
@@ -1375,7 +1705,8 @@
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0806642"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       }
     ],
     "fuentes": [
@@ -1435,6 +1766,33 @@
           {
             "fuente": "registro-oficial",
             "clave": "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0807566"
+          }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 79,
+            "acimutGrados": 58,
+            "microvatiosPorCm2": 0.22451
+          },
+          {
+            "distanciaMetros": 65,
+            "acimutGrados": 85,
+            "microvatiosPorCm2": 0.05371
+          },
+          {
+            "distanciaMetros": 99,
+            "acimutGrados": 112,
+            "microvatiosPorCm2": 0.0987
+          },
+          {
+            "distanciaMetros": 90,
+            "acimutGrados": 147,
+            "microvatiosPorCm2": 0.04035
+          },
+          {
+            "distanciaMetros": 47,
+            "acimutGrados": 319,
+            "microvatiosPorCm2": 0.03249
           }
         ]
       }
@@ -1588,6 +1946,33 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR0508Z"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 60,
+            "acimutGrados": 25,
+            "microvatiosPorCm2": 0.18274
+          },
+          {
+            "distanciaMetros": 30,
+            "acimutGrados": 75,
+            "microvatiosPorCm2": 0.12629
+          },
+          {
+            "distanciaMetros": 55,
+            "acimutGrados": 170,
+            "microvatiosPorCm2": 0.07173
+          },
+          {
+            "distanciaMetros": 99,
+            "acimutGrados": 265,
+            "microvatiosPorCm2": 0.29245
+          },
+          {
+            "distanciaMetros": 95,
+            "acimutGrados": 315,
+            "microvatiosPorCm2": 0.38197
+          }
         ]
       }
     ],
@@ -1668,6 +2053,18 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR0514A"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 90,
+            "acimutGrados": 40,
+            "microvatiosPorCm2": 0.31515
+          },
+          {
+            "distanciaMetros": 93,
+            "acimutGrados": 217,
+            "microvatiosPorCm2": 0.37563
+          }
         ]
       },
       {
@@ -1691,7 +2088,8 @@
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A.U. - 647"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       }
     ],
     "fuentes": [
@@ -1722,7 +2120,8 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR0515L"
           }
-        ]
+        ],
+        "medidasDeExposicion": []
       }
     ],
     "fuentes": [
@@ -1838,6 +2237,18 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR3023B"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 82,
+            "acimutGrados": 32,
+            "microvatiosPorCm2": 0.68758
+          },
+          {
+            "distanciaMetros": 30,
+            "acimutGrados": 325,
+            "microvatiosPorCm2": 0.41447
+          }
         ]
       },
       {
@@ -1880,6 +2291,18 @@
           {
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A.U. - 11481"
+          }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 87,
+            "acimutGrados": 0,
+            "microvatiosPorCm2": 0.67906
+          },
+          {
+            "distanciaMetros": 54,
+            "acimutGrados": 324,
+            "microvatiosPorCm2": 0.7666
           }
         ]
       }
@@ -1949,6 +2372,33 @@
             "fuente": "registro-oficial",
             "clave": "ORANGE ESPAGNE, S.A.U. - CATR6190A"
           }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 20,
+            "acimutGrados": 40,
+            "microvatiosPorCm2": 0.63728
+          },
+          {
+            "distanciaMetros": 20,
+            "acimutGrados": 190,
+            "microvatiosPorCm2": 0.33871
+          },
+          {
+            "distanciaMetros": 20,
+            "acimutGrados": 200,
+            "microvatiosPorCm2": 0.01061
+          },
+          {
+            "distanciaMetros": 20,
+            "acimutGrados": 270,
+            "microvatiosPorCm2": 0.02889
+          },
+          {
+            "distanciaMetros": 10,
+            "acimutGrados": 280,
+            "microvatiosPorCm2": 0.01528
+          }
         ]
       }
     ],
@@ -2004,6 +2454,13 @@
           {
             "fuente": "registro-oficial",
             "clave": "VODAFONE ESPAÑA, S.A.U. - 079808"
+          }
+        ],
+        "medidasDeExposicion": [
+          {
+            "distanciaMetros": 65,
+            "acimutGrados": 34,
+            "microvatiosPorCm2": 1.51518
           }
         ]
       }

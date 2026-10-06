@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import { Coordenada } from "./area.ts";
 import { Banda } from "./banda.ts";
 import { Compania } from "./compania.ts";
+import { MedidaDeExposicion } from "./exposicion.ts";
 import { Fuente } from "./observacion.ts";
 
 /** Cuánto fiarse de un emplazamiento. */
@@ -62,6 +63,11 @@ export const EstacionBase = Schema.Struct({
    * de sus observaciones del registro. Solo cuando ninguna tiene bandas y todas están sin ficha.
    */
   sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
+  /**
+   * Las medidas de exposición del ministerio de sus observaciones del registro, sin repetir y por
+   * acimut. Falta si ninguna se ha leído desde que Celda las guarda.
+   */
+  medidasDeExposicion: Schema.optionalKey(Schema.Array(MedidaDeExposicion)),
 });
 export type EstacionBase = typeof EstacionBase.Type;
 

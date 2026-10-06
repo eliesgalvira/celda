@@ -87,7 +87,10 @@ const desfasar = (espana: FuenteGrabada, desfase: number): FuenteGrabada => {
     fichas: new Map(
       claves.map((clave, i) => [
         clave,
-        espana.fichas.get(claves[(i + desfase) % claves.length] ?? clave) ?? [],
+        espana.fichas.get(claves[(i + desfase) % claves.length] ?? clave) ?? {
+          bandas: [],
+          medidasDeExposicion: [],
+        },
       ]),
     ),
   };

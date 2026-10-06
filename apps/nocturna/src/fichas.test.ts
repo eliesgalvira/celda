@@ -389,7 +389,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           // con bandas cuando el registro la tiene.
           const conBandas = (e: EstacionBase) =>
             e.observaciones.length === 1 &&
-            (grabada.fichas.get(e.observaciones[0]?.clave ?? "")?.length ?? 0) > 0;
+            (grabada.fichas.get(e.observaciones[0]?.clave ?? "")?.bandas.length ?? 0) > 0;
           const compartido = fusionar(
             grabada.listado.registros.map((r) => ({
               ...r,
@@ -526,7 +526,75 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
   );
 
   it.effect(
-    "una base de la versión 3 se pone al día, pierde lo de las fuentes retiradas y su cola sigue donde estaba",
+    "las fichas leídas con una versión anterior de la lectura se releen sin esperar a la relectura, y sus medidas de exposición se guardan y se publican",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
+          yield* TestClock.setTime(NOCHE);
+          yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas));
+          assert.lengthOf(yield* Ref.get(pedidas), 40);
+
+          // Cinco fichas con medidas como las dejaba la lectura de antes, que no las sacaba.
+          const viejas = grabada.listado.registros
+            .filter((r) => (grabada.fichas.get(r.clave)?.medidasDeExposicion.length ?? 0) > 0)
+            .slice(0, 5)
+            .map((r) => r.clave);
+          yield* Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            yield* sql`UPDATE observaciones SET ficha_leida_con = 1,
+                datos = json_remove(datos, '$.medidasDeExposicion')
+              WHERE clave IN ${sql.in(viejas)}`;
+          }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
+          const resumen = yield* conBase(
+            entorno.base,
+            Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+          );
+          assert.strictEqual(
+            resumen.fuentes.find((f) => f.fuente === "registro-oficial")?.porReleer,
+            5,
+          );
+
+          // Al día siguiente se piden solo esas cinco. Una de ellas publica ahora otras medidas,
+          // que sustituyen a las de antes.
+          const [cambia = "", ...igualesQueAntes] = viejas;
+          const otras = [{ distanciaMetros: 12, acimutGrados: 300, microvatiosPorCm2: 0.02 }];
+          const fichas = new Map(grabada.fichas);
+          const antes = grabada.fichas.get(cambia);
+          assert.isDefined(antes);
+          fichas.set(cambia, { ...antes, medidasDeExposicion: otras });
+          yield* Ref.set(pedidas, []);
+          yield* TestClock.setTime(NOCHE + DIA);
+          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, fichas }, pedidas));
+          assert.deepStrictEqual(new Set(yield* Ref.get(pedidas)), new Set(viejas));
+          const cambiada = yield* observacionEn(entorno, cambia);
+          assert.deepStrictEqual(cambiada.datos.medidasDeExposicion, otras);
+          assert.strictEqual(cambiada.datos.fecha, NOCHE + DIA);
+          for (const clave of igualesQueAntes) {
+            const releida = yield* observacionEn(entorno, clave);
+            assert.deepStrictEqual(
+              releida.datos.medidasDeExposicion,
+              grabada.fichas.get(clave)?.medidasDeExposicion,
+            );
+          }
+          const publicada = (yield* fichasPublicadas(entorno))
+            .flatMap((f) => f.estaciones)
+            .find((e) => e.origenes.some((o) => o.clave === cambia));
+          assert.deepStrictEqual(publicada?.medidasDeExposicion, otras);
+
+          // Ya están leídas con la lectura de hoy: la noche siguiente no pide ninguna.
+          yield* Ref.set(pedidas, []);
+          yield* TestClock.setTime(NOCHE + 2 * DIA);
+          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, fichas }, pedidas));
+          assert.deepStrictEqual(yield* Ref.get(pedidas), []);
+        }),
+      ),
+    30_000,
+  );
+
+  it.effect(
+    "una base de la versión 3 se pone al día, pierde lo de las fuentes retiradas y su cola sigue donde estaba, con las leídas al final",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -625,7 +693,8 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             vigentes: 40,
           });
 
-          // La noche pide solo las 30 sin leer, y la que falla queda esperando.
+          // La noche pide primero las 30 sin leer, y la que falla queda esperando. Luego relee las
+          // 10 leídas, que se leyeron sin las medidas de exposición.
           const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
           const ultima = registros.at(-1);
           assert.isDefined(ultima);
@@ -640,8 +709,9 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             }),
           );
           const pedidasEnLaNoche = yield* Ref.get(pedidas);
-          assert.strictEqual(pedidasEnLaNoche.length, 30);
-          assert.isFalse(pedidasEnLaNoche.some((clave) => leidas.has(clave)));
+          assert.strictEqual(pedidasEnLaNoche.length, 40);
+          assert.isFalse(pedidasEnLaNoche.slice(0, 30).some((clave) => leidas.has(clave)));
+          assert.deepStrictEqual(new Set(pedidasEnLaNoche.slice(30)), leidas);
           const trasLaNoche = yield* leidasEn(entorno);
           assert.strictEqual(trasLaNoche.leidas.length, 39);
           assert.deepStrictEqual(

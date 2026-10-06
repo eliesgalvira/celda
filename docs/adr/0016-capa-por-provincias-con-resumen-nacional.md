@@ -107,6 +107,14 @@ La marca sale de la fusión (`EstacionBase.sinFichaEnRegistro`), así que marcar
 
 El resumen lleva, por provincia, cuántos emplazamientos hay con cada combinación exacta de compañías (`provincias.combinaciones`), para contar de lejos con el filtro de compañías sin descargar ninguna capa. **El formato sigue siendo el 5**, como con `sinFichaEnRegistro`: es una clave opcional que la web de antes descarta y sin la que la nueva se las arregla. Una vigente sin ella se vuelve a publicar entera aunque no cambien los datos. Los detalles, en el [ADR 0026](0026-filtro-de-companias-con-la-red-que-usan.md).
 
+## Medidas de exposición del ministerio (#73, 06/10/2026)
+
+La estación base de la ficha lleva las medidas de exposición del ministerio que publica el registro en sus fichas (`medidasDeExposicion`): distancia, acimut del punto de medida y µW/cm², por acimut. Salen de la fusión (`EstacionBase.medidasDeExposicion`), como `sinFichaEnRegistro`, así que un cambio en ellas cambia el emplazamiento y su ficha sale en la versión siguiente. La capa de provincia no las lleva.
+
+**El formato sigue siendo el 5.** Es otra clave opcional en la estación base: la web de antes la descarta, y la de ahora lee los lotes de antes, que no la llevan. Una estación base sin la clave es una de la que Celda aún no ha leído ninguna ficha desde el #73; con la clave y la lista vacía, el registro no publica medidas. Lo comprueba una prueba de `packages/dominio/src/provincias.test.ts`.
+
+Cuánto pesan, estimado con el listado de Barcelona del 28/09/2026 (1.294 emplazamientos de la provincia en 11 lotes), las bandas de Campus Nord y medidas al azar con el reparto de las de Campus Nord (de 1 a 9 por ficha, unas 4,2 de media, y los valores en pasos de 0,01 V/m): los lotes pasan de 142 KB a 237 KB con gzip, unos 73 bytes más por emplazamiento. Para toda España son unos 2,6 MB más con gzip sobre unos 4 MB. Un lote de 128 pasa de unos 13 KB a unos 21 KB con gzip y deja de caber en la ventana inicial de TCP, que es por lo que `EMPLAZAMIENTOS_POR_LOTE` vale 128: abrir una ficha puede costar un viaje más. Cuando se decida cómo las enseña el panel, se puede revisar el tamaño del lote o sacar las medidas a un fichero aparte. Escribir cada medida como un trío de números en lugar de un objeto ahorraría una quinta parte de eso con gzip, y casi nada con brotli; se quedan como objetos, como las bandas.
+
 ## Consecuencias
 
 - Abrir la web descarga el resumen (de 2 a 4 KB con gzip, según cuántas zonas lleve) y las provincias de la vista inicial, no toda España.

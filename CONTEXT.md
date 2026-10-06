@@ -92,6 +92,10 @@ _Evitar_: registro, entrada, dato
 Estación base que el listado del registro oficial incluye pero cuya página de detalle el registro da por no válida («Código de emplazamiento no válido»). La ficha lo dice, con la fecha en que se comprobó, en lugar de darla por pendiente.
 _Evitar_: ficha pendiente, ficha rota, error de ficha
 
+**Medida de exposición del ministerio**:
+Punto alrededor de una estación base donde se midió la exposición a campos electromagnéticos, tal como lo publica su ficha en el registro oficial: a qué distancia, en qué dirección vista desde la estación (acimut) y cuántos µW/cm². El ministerio no dice cuándo se midió. Sirve para comparar con los límites legales y no dice nada de la señal que recibe un móvil allí. Su acimut tampoco es la orientación de un sector. Es otra cosa que una medida.
+_Evitar_: medición, nivel de señal, potencia, cobertura, medida a secas
+
 **Corrección**:
 Observación de la comunidad de Celda que contradice al registro oficial: una corrección propuesta que la moderación ha aceptado. Se publica al lado de lo que dice el registro, con su procedencia, y nunca lo sustituye.
 _Evitar_: enmienda, parche, edición

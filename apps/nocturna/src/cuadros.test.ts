@@ -86,7 +86,7 @@ describe("cuadros de las zonas desde el registro oficial (#55)", () => {
               new FuenteBloqueada({ url: "https://geoportal", motivo: "HTTP 403" }),
             );
           },
-          ficha: () => Effect.succeed([]),
+          ficha: () => Effect.succeed({ bandas: [], medidasDeExposicion: [] }),
           peticiones: Effect.sync(() => pedidas.length),
         }),
       );

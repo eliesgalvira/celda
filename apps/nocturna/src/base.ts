@@ -25,6 +25,7 @@ import {
 } from "@celda/ingesta/ejecucion";
 import type { FichaEnCola } from "@celda/ingesta/fichas";
 import { Registro } from "@celda/ingesta/extractor";
+import { VERSION_DE_LECTURA } from "@celda/ingesta/registro-oficial/normalizar";
 import {
   ObservacionGuardada,
   observacionDe,
@@ -92,6 +93,10 @@ export interface OpcionesBase {
  * emplazamiento, el seudónimo de quien la envió (para contar a cada persona una vez), cuándo se
  * aceptó y la fecha de la ejecución que la trajo. Ni la identidad ni la huella de la IP salen del
  * buzón.
+ *
+ * La versión 7 trae, en `observaciones`, la versión de la lectura con que se leyó cada ficha
+ * (`VERSION_DE_LECTURA`, #73). Las leídas antes se quedan con la 1, la que solo sacaba las bandas,
+ * y vuelven a la cola para traer sus medidas de exposición del ministerio.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -228,6 +233,7 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
       ON aportaciones_aceptadas (emplazamiento, tipo)`,
     `CREATE INDEX aportaciones_aceptadas_por_aceptacion ON aportaciones_aceptadas (aceptada_en)`,
   ],
+  [`ALTER TABLE observaciones ADD COLUMN ficha_leida_con INTEGER NOT NULL DEFAULT 1`],
 ];
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
@@ -236,7 +242,7 @@ const EmplazamientoEnJson = Schema.fromJsonString(Emplazamiento);
 const decodificarEmplazamiento = Schema.decodeEffect(EmplazamientoEnJson);
 
 const FilaObservacion = Schema.Struct({ id: Schema.Int, datos: ObservacionEnJson });
-/** Una ficha de la cola: solo lo que dice el listado de su observación, sin las bandas. */
+/** Una ficha de la cola: solo lo que dice el listado de su observación, sin lo de su ficha. */
 const FilaDeCola = Schema.Struct({
   id: Schema.Int,
   cuadro: Schema.NullOr(Schema.String),
@@ -374,7 +380,10 @@ export interface ResumenDeFuente {
   readonly vigentes: number;
   /** Fichas que no se han leído nunca, o que cambiaron en el listado. */
   readonly sinLeer: number;
-  /** Fichas leídas antes de la fecha de rotación, que se vuelven a leer. */
+  /**
+   * Fichas leídas antes de la fecha de rotación, o con una versión de la lectura anterior, que se
+   * vuelven a leer.
+   */
   readonly porReleer: number;
   /** Fichas que esperan tras un fallo para volver a pedirse. */
   readonly enEspera: number;
@@ -487,8 +496,9 @@ export const baseNocturna = (opciones: OpcionesBase) =>
       });
 
       /**
-       * Guarda una observación. Con `sinFallos`, su ficha vuelve a la cola sin espera: se acaba de
-       * leer, o el listado ha cambiado y hay que leerla otra vez.
+       * Guarda una observación. Con `sinFallos`, su ficha vuelve a la cola sin espera y con la
+       * versión de la lectura de hoy: se acaba de leer, o el listado ha cambiado y hay que leerla
+       * otra vez, y entonces la versión no cuenta porque no tiene fecha de lectura.
        */
       const guardarObservacion = Effect.fn("BaseNocturna.guardarObservacion")(function* (
         id: number | undefined,
@@ -510,8 +520,8 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         if (sinFallos) {
           yield* sql`UPDATE observaciones
             SET ficha_leida_en = ${o.fichaLeidaEn}, retirada_en = ${o.retiradaEn},
-              cuadro = ${cuadroDe(o.posicion)}, datos = ${datos},
-              ficha_fallos = 0, ficha_espera_hasta = NULL, ficha_error = NULL
+              cuadro = ${cuadroDe(o.posicion)}, datos = ${datos}, ficha_fallos = 0,
+              ficha_espera_hasta = NULL, ficha_error = NULL, ficha_leida_con = ${VERSION_DE_LECTURA}
             WHERE id = ${id}`;
           return;
         }
@@ -737,10 +747,11 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         colaDeFichas: Effect.fn("BaseNocturna.colaDeFichas")(function* (fuente, leidasAntesDe) {
           const filas = yield* decodificar(FilaDeCola)(
             yield* sql`SELECT id, cuadro, ficha_leida_en, ficha_fallos, ficha_espera_hasta,
-                json_remove(datos, '$.bandas') AS datos
+                json_remove(datos, '$.bandas', '$.medidasDeExposicion') AS datos
                 FROM observaciones
                 WHERE fuente = ${fuente} AND retirada_en IS NULL
-                  AND (ficha_leida_en IS NULL OR ficha_leida_en < ${leidasAntesDe})`,
+                  AND (ficha_leida_en IS NULL OR ficha_leida_en < ${leidasAntesDe}
+                    OR ficha_leida_con < ${VERSION_DE_LECTURA})`,
           );
           return filas.map((fila): FichaEnCola => ({
             registro: registroDe(fila.datos),
@@ -756,11 +767,11 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           fuente,
           clave,
           fecha,
-          bandas,
+          leida,
         ) {
           const previa = (yield* observacionesDe(fuente, [clave])).get(clave);
           if (previa === undefined) return false;
-          const { guardada, cambiada } = trasFicha(previa.datos, bandas, fecha);
+          const { guardada, cambiada } = trasFicha(previa.datos, leida, fecha);
           yield* guardarObservacion(previa.id, guardada, true);
           return cambiada;
         }, Effect.orDie),
@@ -1012,7 +1023,8 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                     WHERE fuente = ${fuente} AND retirada_en IS NULL AND ficha_leida_en IS NULL`),
                 porReleer: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
                     WHERE fuente = ${fuente} AND retirada_en IS NULL
-                      AND ficha_leida_en < ${leidasAntesDe}`),
+                      AND (ficha_leida_en < ${leidasAntesDe}
+                        OR (ficha_leida_en IS NOT NULL AND ficha_leida_con < ${VERSION_DE_LECTURA}))`),
                 enEspera: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
                     WHERE fuente = ${fuente} AND retirada_en IS NULL
                       AND ficha_espera_hasta > ${ahora}`),

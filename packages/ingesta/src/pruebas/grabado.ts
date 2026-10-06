@@ -1,4 +1,4 @@
-import { type Banda, compararTexto } from "@celda/dominio/banda";
+import { compararTexto } from "@celda/dominio/banda";
 import type { Fuente } from "@celda/dominio/observacion";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -11,6 +11,7 @@ import * as Schema from "effect/Schema";
 import {
   type ErrorDeExtractor,
   ExtractorPorCajas,
+  type FichaLeida,
   type Listado,
   type ListadoDeCaja,
   type Registro,
@@ -19,9 +20,10 @@ import {
 } from "../extractor.ts";
 import {
   AVISO_SIN_FICHA,
-  bandasDeFicha,
   bandasDeFilas,
+  leerFicha,
   listadoDeElementos,
+  medidasDeFilas,
   RespuestaListado,
   TOPE_LISTADO,
 } from "../registro-oficial/normalizar.ts";
@@ -29,10 +31,10 @@ import type { Respondedor } from "./http.ts";
 import { decodificarLatin1 } from "../texto.ts";
 import { type Caja, enCaja } from "../zona.ts";
 
-/** Lo que devolvería una fuente: su listado y las bandas de cada ficha, por clave. */
+/** Lo que devolvería una fuente: su listado y lo que se lee de cada ficha, por clave. */
 export interface FuenteGrabada {
   readonly listado: Listado;
-  readonly fichas: ReadonlyMap<string, ReadonlyArray<Banda>>;
+  readonly fichas: ReadonlyMap<string, FichaLeida>;
   /**
    * Claves cuya ficha dice «Código de emplazamiento no válido», como la de `061723` de Vodafone
    * y la de `CLMR6422A` de Orange el 02/10/2026: el registro no tiene su ficha, aunque las liste.
@@ -46,14 +48,14 @@ export interface FuenteGrabada {
  */
 const fichaGrabada =
   (grabada: FuenteGrabada) =>
-  (registro: Registro): Effect.Effect<ReadonlyArray<Banda>, ErrorDeExtractor> => {
+  (registro: Registro): Effect.Effect<FichaLeida, ErrorDeExtractor> => {
     if (grabada.sinFicha?.has(registro.clave) === true) {
       return Effect.fail(new SinFichaEnElRegistro({ url: registro.url, motivo: AVISO_SIN_FICHA }));
     }
-    const bandas = grabada.fichas.get(registro.clave);
-    return bandas === undefined
+    const leida = grabada.fichas.get(registro.clave);
+    return leida === undefined
       ? Effect.fail(new RespuestaInesperada({ url: registro.url, motivo: "ficha no grabada" }))
-      : Effect.succeed(bandas);
+      : Effect.succeed(leida);
   };
 
 /** Bytes por registro en el listado del registro oficial (investigación 08). */
@@ -130,6 +132,13 @@ const FichasEnJson = Schema.fromJsonString(
             banda_mhz: Schema.String,
           }),
         ),
+        niveles_medidos: Schema.Array(
+          Schema.Struct({
+            distancia_m: Schema.String,
+            acimut_grados: Schema.String,
+            valor_uw_cm2: Schema.String,
+          }),
+        ),
       }),
     ),
   }),
@@ -145,8 +154,8 @@ const FICHAS_HTML: ReadonlyArray<readonly [string, string]> = [
 
 /**
  * El registro oficial grabado en Campus Nord el 26/09/2026: el listado de 40 elementos y 23
- * fichas. Las fichas en HTML pasan por el mismo analizador que en producción;
- * las demás salen de su conversión a JSON en la investigación.
+ * fichas, con sus bandas y sus medidas de exposición. Las fichas en HTML pasan por el mismo
+ * analizador que en producción; las demás salen de su conversión a JSON en la investigación.
  */
 export const muestraCampusNord = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -158,32 +167,41 @@ export const muestraCampusNord = Effect.gen(function* () {
   const respuesta = yield* decodificarListado(yield* leer("geojson-campus-nord.iso-8859-1.json"));
   const listado = listadoDeElementos("features" in respuesta ? respuesta.features : []);
 
-  const fichas = new Map<string, ReadonlyArray<Banda>>();
+  const fichas = new Map<string, FichaLeida>();
   const json = yield* decodificarFichas(
     new TextDecoder().decode(yield* fs.readFile(path.join(carpeta, "fichas-campus-nord.json"))),
   );
   for (const ficha of json.fichas) {
-    const bandas = bandasDeFilas(
-      ficha.caracteristicas.map((c) => ({
-        operador: c.operador,
-        referencia: c.referencia,
-        bandaMhz: c.banda_mhz,
-      })),
-    );
-    if (Result.isSuccess(bandas)) {
-      fichas.set(ficha.codigo, bandas.success);
+    const leida = Result.all({
+      bandas: bandasDeFilas(
+        ficha.caracteristicas.map((c) => ({
+          operador: c.operador,
+          referencia: c.referencia,
+          bandaMhz: c.banda_mhz,
+        })),
+      ),
+      medidasDeExposicion: medidasDeFilas(
+        ficha.niveles_medidos.map((n) => ({
+          distancia: n.distancia_m,
+          acimut: n.acimut_grados,
+          valor: n.valor_uw_cm2,
+        })),
+      ),
+    });
+    if (Result.isSuccess(leida)) {
+      fichas.set(ficha.codigo, leida.success);
     }
   }
   for (const [clave, fichero] of FICHAS_HTML) {
-    const bandas = bandasDeFicha(yield* leer(fichero));
-    if (Result.isSuccess(bandas)) {
-      fichas.set(clave, bandas.success);
+    const leida = leerFicha(yield* leer(fichero));
+    if (Result.isSuccess(leida)) {
+      fichas.set(clave, leida.success);
     }
   }
-  // De los 40 registros hay 23 fichas grabadas; las demás cuentan como fichas sin bandas.
+  // De los 40 registros hay 23 fichas grabadas; las demás cuentan como fichas sin bandas ni medidas.
   for (const registro of listado.registros) {
     if (!fichas.has(registro.clave)) {
-      fichas.set(registro.clave, []);
+      fichas.set(registro.clave, { bandas: [], medidasDeExposicion: [] });
     }
   }
   const grabada: FuenteGrabada = { listado, fichas };

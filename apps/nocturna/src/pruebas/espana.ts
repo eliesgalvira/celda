@@ -1,9 +1,9 @@
 import type { Coordenada } from "@celda/dominio/area";
-import type { Banda } from "@celda/dominio/banda";
 import { type Cuadro, cajaDeCuadro, cuadroDe } from "@celda/dominio/barrido";
 import type { Compania } from "@celda/dominio/compania";
 import { cuadrosDelRegistro } from "@celda/dominio/cuadrosDelRegistro";
 import { type MunicipioConHabitantes, municipiosConHabitantes } from "@celda/dominio/municipio";
+import type { FichaLeida } from "@celda/ingesta/extractor";
 import {
   type FuenteGrabada,
   geoportalGrabado,
@@ -30,8 +30,8 @@ import * as Schema from "effect/Schema";
  * que crece con los habitantes del padrón más despacio que ellos: las ciudades tienen más
  * emplazamientos pero menos por habitante, como en el registro. Un cuadro sin ninguna etiqueta,
  * como el del norte de Menorca, usa los municipios más cercanos de sus provincias y pone sus
- * emplazamientos en su borde. Cada ficha da las bandas de una ficha grabada del Campus Nord de su
- * compañía.
+ * emplazamientos en su borde. Cada ficha da las bandas y las medidas de exposición de una ficha
+ * grabada del Campus Nord de su compañía.
  */
 
 /** Cómo crece el peso de un municipio con sus habitantes (ver arriba). */
@@ -102,14 +102,14 @@ const plantillasDe = (nombre: string) =>
     return [...porPunto.values()].map((suyos): Plantilla => ({ elementos: suyos }));
   });
 
-/** Bandas de las fichas grabadas del Campus Nord, por compañía, sin las fichas vacías. */
-const bandasPorCompania = Effect.map(muestraCampusNord, (grabada) => {
-  const porCompania = new Map<Compania, Array<ReadonlyArray<Banda>>>();
+/** Las fichas grabadas del Campus Nord, por compañía, sin las que no tienen bandas. */
+const fichasPorCompania = Effect.map(muestraCampusNord, (grabada) => {
+  const porCompania = new Map<Compania, Array<FichaLeida>>();
   for (const registro of grabada.listado.registros) {
-    const bandas = grabada.fichas.get(registro.clave) ?? [];
-    if (bandas.length === 0) continue;
+    const leida = grabada.fichas.get(registro.clave);
+    if (leida === undefined || leida.bandas.length === 0) continue;
     const suyas = porCompania.get(registro.compania) ?? [];
-    suyas.push(bandas);
+    suyas.push(leida);
     porCompania.set(registro.compania, suyas);
   }
   return porCompania;
@@ -136,7 +136,7 @@ export const espanaSintetica = (
       ...(yield* plantillasDe("barcelona")),
       ...(yield* plantillasDe("valencia-centro")),
     ];
-    const bandas = yield* bandasPorCompania;
+    const grabadas = yield* fichasPorCompania;
     const habitantes = municipiosConHabitantes(
       { territorios: zonas.municipios.territorios },
       zonas.padron,
@@ -224,11 +224,14 @@ export const espanaSintetica = (
     }
 
     const listado = listadoDeElementos(elementos);
-    const fichas = new Map<string, ReadonlyArray<Banda>>();
+    const fichas = new Map<string, FichaLeida>();
     const porCuadro = new Map<Cuadro, number>();
     for (const [i, registro] of listado.registros.entries()) {
-      const suyas = bandas.get(registro.compania) ?? [];
-      fichas.set(registro.clave, suyas[i % Math.max(suyas.length, 1)] ?? []);
+      const suyas = grabadas.get(registro.compania) ?? [];
+      fichas.set(
+        registro.clave,
+        suyas[i % Math.max(suyas.length, 1)] ?? { bandas: [], medidasDeExposicion: [] },
+      );
       const cuadro = cuadroDe(registro.posicion);
       porCuadro.set(cuadro, (porCuadro.get(cuadro) ?? 0) + 1);
     }

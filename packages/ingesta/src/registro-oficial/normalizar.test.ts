@@ -8,10 +8,11 @@ import * as Result from "effect/Result";
 import { leerMuestra, muestraCampusNord } from "../pruebas/grabado.ts";
 import { decodificarLatin1 } from "../texto.ts";
 import {
-  bandasDeFicha,
   companiaDeTitular,
   esFichaSinEmplazamiento,
+  leerFicha,
   listadoDeElementos,
+  medidasDeFilas,
   municipioDeDireccion,
 } from "./normalizar.ts";
 
@@ -100,13 +101,34 @@ describe("listado del registro oficial", () => {
   });
 });
 
+/** Lo que lee `leerFicha` de una ficha grabada, que tiene que poder leerse. */
+const fichaGrabada = (nombre: string) =>
+  Effect.map(leerMuestra(nombre), (bytes) =>
+    Result.getOrThrow(leerFicha(decodificarLatin1(bytes))),
+  );
+
+/** Una ficha mínima con la cabecera de cada tabla como la escribe el geoportal. */
+const fichaCon = (niveles: string | undefined) =>
+  `<table class="tablaDetalleEstacion"><tr><td><h2>CARACTERISTICAS T&Eacute;CNICAS</h2></td></tr>
+  <tr><td><table><tr><td><h3>Operador</h3></td><td><h3>Referencia</h3></td>
+  <td><h3>Banda Asignada (MHz)</h3></td></tr>
+  <tr><td><p>ORANGE ESPAGNE, S.A.U.</p></td><td><p>B B -2403167</p></td>
+  <td><p>2120.00 - 2140.00</p></td></tr></table></td></tr>` +
+  (niveles === undefined
+    ? ""
+    : `<tr><td><h2>NIVELES MEDIDOS EN EL ENTORNO</h2></td></tr><tr><td><table>
+  <tr><td><h3>Distancia (m)</h3></td><td><h3>(*) Acimut (&ordm;)</h3></td>
+  <td><h3>Valor Medido (&micro;W/cm<sup>2</sup>)</h3></td></tr>${niveles}</table></td></tr>
+  <tr><td><p>Los niveles medidos cumplen la normativa legal vigente.</p></td></tr>`) +
+  "</table>";
+
+const fila = (distancia: string, acimut: string, valor: string) =>
+  `<tr><td><p>${distancia}</p></td><td><p>${acimut}</p></td><td><p>${valor}</p></td></tr>`;
+
 describe("ficha del registro oficial", () => {
   it.effect("lee las bandas igual que la conversión de la investigación", () =>
     Effect.gen(function* () {
-      const html = decodificarLatin1(
-        yield* leerMuestra("detalle-orange-CATR0228A.iso-8859-1.html"),
-      );
-      const bandas = Result.getOrThrow(bandasDeFicha(html));
+      const { bandas } = yield* fichaGrabada("detalle-orange-CATR0228A.iso-8859-1.html");
       assert.deepStrictEqual(
         bandas.map((b) => [b.referencia, b.mhz, b.anio]),
         [
@@ -122,12 +144,93 @@ describe("ficha del registro oficial", () => {
     }).pipe(conMuestras),
   );
 
+  it.effect("lee las medidas de exposición en el orden de la ficha", () =>
+    Effect.gen(function* () {
+      const { medidasDeExposicion } = yield* fichaGrabada(
+        "detalle-orange-CATR0228A.iso-8859-1.html",
+      );
+      assert.deepStrictEqual(
+        medidasDeExposicion.map((m) => [m.distanciaMetros, m.acimutGrados, m.microvatiosPorCm2]),
+        [
+          [80, 175, 0.98806],
+          [75, 146, 0.59683],
+          [32, 36, 0.19618],
+          [89, 125, 0.5889],
+          [77, 138, 0.5889],
+          [51, 146, 0.42784],
+        ],
+      );
+    }).pipe(conMuestras),
+  );
+
+  it.effect("lee las medidas de las demás fichas grabadas igual que la conversión a JSON", () =>
+    Effect.gen(function* () {
+      const { fichas } = yield* muestraCampusNord;
+      const cuantas = (clave: string) => fichas.get(clave)?.medidasDeExposicion.length;
+      assert.strictEqual(cuantas("TELEFONICA MOVILES ESPAÑA, S.A.U. - 0800942"), 5);
+      assert.strictEqual(
+        (yield* fichaGrabada("detalle-digi-0800143.iso-8859-1.html")).medidasDeExposicion.length,
+        9,
+      );
+      assert.strictEqual(
+        (yield* fichaGrabada("registro-oficial/detalleEstacion_0802314.html")).medidasDeExposicion
+          .length,
+        6,
+      );
+      // La conversión de la investigación tiene una fila sin valor, que no es una medida.
+      assert.strictEqual(cuantas("ORANGE ESPAGNE, S.A.U. - CATR6190A"), 5);
+    }).pipe(conMuestras),
+  );
+
+  it("una ficha sin la tabla de niveles, o con ella vacía, no tiene medidas y sí bandas", () => {
+    for (const html of [fichaCon(undefined), fichaCon("")]) {
+      const leida = Result.getOrThrow(leerFicha(html));
+      assert.deepStrictEqual(leida.medidasDeExposicion, []);
+      assert.deepStrictEqual(
+        leida.bandas.map((b) => b.referencia),
+        ["B B -2403167"],
+      );
+    }
+  });
+
+  it("acepta la coma decimal y el exponente, y se salta las filas con celdas vacías", () => {
+    const leida = leerFicha(
+      fichaCon(
+        fila("80.0", "175.0", "0,98806") +
+          fila("20", "280", "") +
+          fila("10.5", "0", "1.0E-4") +
+          fila("", "90.0", "0.1"),
+      ),
+    );
+    assert.deepStrictEqual(
+      Result.map(leida, (l) => l.medidasDeExposicion),
+      Result.succeed([
+        { distanciaMetros: 80, acimutGrados: 175, microvatiosPorCm2: 0.98806 },
+        { distanciaMetros: 10.5, acimutGrados: 0, microvatiosPorCm2: 0.0001 },
+      ]),
+    );
+  });
+
+  it("una medida que no es un número hace ilegible la ficha, como una banda ilegible", () => {
+    for (const [html, valor] of [
+      ["1.234,5", "1.234,5"],
+      ["&lt; 0.01", "< 0.01"],
+      ["-0.5", "-0.5"],
+      ["0.5 &micro;W", "0.5 µW"],
+    ] as const) {
+      assert.deepStrictEqual(
+        leerFicha(fichaCon(fila("80.0", "175.0", html))),
+        Result.fail(`Medida ilegible en la ficha: 80.0 m, 175.0°, ${valor} µW/cm²`),
+      );
+    }
+    assert.isTrue(
+      Result.isFailure(medidasDeFilas([{ distancia: "1,234.5", acimut: "10", valor: "0.1" }])),
+    );
+  });
+
   it.effect("un expediente con dos rangos es una sola banda", () =>
     Effect.gen(function* () {
-      const html = decodificarLatin1(
-        yield* leerMuestra("detalle-telefonica-0800942.iso-8859-1.html"),
-      );
-      const bandas = Result.getOrThrow(bandasDeFicha(html));
+      const { bandas } = yield* fichaGrabada("detalle-telefonica-0800942.iso-8859-1.html");
       assert.deepStrictEqual(bandas[0]?.rangos, [
         { desdeMhz: 1910, hastaMhz: 1915 },
         { desdeMhz: 2155, hastaMhz: 2170 },
@@ -139,22 +242,16 @@ describe("ficha del registro oficial", () => {
 
   it.effect("lee la ficha de Digi y la de CRLF de otra investigación", () =>
     Effect.gen(function* () {
-      const digi = bandasDeFicha(
-        decodificarLatin1(yield* leerMuestra("detalle-digi-0800143.iso-8859-1.html")),
-      );
-      const crlf = bandasDeFicha(
-        decodificarLatin1(yield* leerMuestra("registro-oficial/detalleEstacion_0802314.html")),
-      );
-      assert.isTrue(Result.isSuccess(digi));
-      assert.isTrue(Result.isSuccess(crlf));
+      const digi = yield* fichaGrabada("detalle-digi-0800143.iso-8859-1.html");
+      const crlf = yield* fichaGrabada("registro-oficial/detalleEstacion_0802314.html");
       assert.deepStrictEqual(
-        Result.getOrThrow(digi).map((b) => [b.mhz, b.anio]),
+        digi.bandas.map((b) => [b.mhz, b.anio]),
         [
           [1800, 2026],
           [2100, 2026],
         ],
       );
-      assert.isAbove(Result.getOrThrow(crlf).length, 0);
+      assert.isAbove(crlf.bandas.length, 0);
     }).pipe(conMuestras),
   );
 
@@ -164,7 +261,7 @@ describe("ficha del registro oficial", () => {
         yield* leerMuestra("detalle-codigo-no-valido.iso-8859-1.html"),
       );
       assert.deepStrictEqual(
-        bandasDeFicha(html),
+        leerFicha(html),
         Result.fail("La ficha dice «Código de emplazamiento no válido»"),
       );
       // Es su propio caso: el registro no tiene ficha de esa estación base.
@@ -178,6 +275,6 @@ describe("ficha del registro oficial", () => {
   );
 
   it("una página sin la tabla de características es un error", () => {
-    assert.isTrue(Result.isFailure(bandasDeFicha("<html><body>Mantenimiento</body></html>")));
+    assert.isTrue(Result.isFailure(leerFicha("<html><body>Mantenimiento</body></html>")));
   });
 });

@@ -1,8 +1,9 @@
 import { Banda } from "@celda/dominio/banda";
+import { MedidaDeExposicion } from "@celda/dominio/exposicion";
 import { type Fuente, Observacion } from "@celda/dominio/observacion";
 import * as Schema from "effect/Schema";
 
-import { Registro } from "./extractor.ts";
+import { type FichaLeida, Registro } from "./extractor.ts";
 
 /**
  * Lo último que dice una fuente de una estación base, tal como lo guarda la ingesta entre
@@ -25,6 +26,7 @@ export const BARRIDOS_PARA_RETIRAR = 2;
 
 const mismoRegistro = Schema.toEquivalence(Registro);
 const mismasBandas = Schema.toEquivalence(Schema.Array(Banda));
+const mismasMedidas = Schema.toEquivalence(Schema.Array(MedidaDeExposicion));
 
 /** Los campos del listado de una observación guardada. */
 export const registroDe = (o: Registro): Registro => ({
@@ -111,19 +113,24 @@ export interface TrasAusencia {
 
 /**
  * La observación tras leer su ficha en una ejecución con fecha `fecha`. La fecha de la
- * observación solo cambia si cambian las bandas; la de lectura, siempre. Una lectura buena quita
- * la marca de sin ficha en el registro, y eso también cuenta como cambio.
+ * observación solo cambia si cambian las bandas o las medidas de exposición, que una guardada
+ * antes de leerlas no tiene; la de lectura, siempre. Una lectura buena quita la marca de sin ficha
+ * en el registro, y eso también cuenta como cambio.
  */
 export const trasFicha = (
   previa: ObservacionGuardada,
-  bandas: ReadonlyArray<Banda>,
+  { bandas, medidasDeExposicion }: FichaLeida,
   fecha: number,
 ): TrasFicha => {
-  const iguales = mismasBandas(previa.bandas, bandas);
+  const iguales =
+    mismasBandas(previa.bandas, bandas) &&
+    previa.medidasDeExposicion !== undefined &&
+    mismasMedidas(previa.medidasDeExposicion, medidasDeExposicion);
   return {
     guardada: conFicha({
       ...previa,
       bandas,
+      medidasDeExposicion,
       fecha: iguales ? previa.fecha : fecha,
       fichaLeidaEn: fecha,
     }),
@@ -167,6 +174,8 @@ export const observacionDe = (o: ObservacionGuardada): Observacion => {
     fecha: o.fecha,
     afirma: o.afirma,
   };
-  const { sinFichaEnRegistro } = o;
-  return sinFichaEnRegistro === undefined ? observacion : { ...observacion, sinFichaEnRegistro };
+  const { sinFichaEnRegistro, medidasDeExposicion } = o;
+  const conMarca =
+    sinFichaEnRegistro === undefined ? observacion : { ...observacion, sinFichaEnRegistro };
+  return medidasDeExposicion === undefined ? conMarca : { ...conMarca, medidasDeExposicion };
 };

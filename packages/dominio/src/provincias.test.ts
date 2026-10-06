@@ -219,6 +219,16 @@ const LoteDeAntes = Schema.Struct({
 });
 const leerLoteDeAntes = Schema.decodeUnknownResult(Schema.fromJsonString(LoteDeAntes));
 
+/** El lote tal como lo lee la web de antes de las medidas de exposición del ministerio (#73). */
+const { medidasDeExposicion: _medidas, ...estacionSinMedidas } = EstacionDeFicha.fields;
+const LoteSinMedidas = Schema.Struct({
+  ...LoteDeProvincia.fields,
+  fichas: Schema.Array(
+    Schema.Struct({ ...Ficha.fields, estaciones: Schema.Array(Schema.Struct(estacionSinMedidas)) }),
+  ),
+});
+const leerLoteSinMedidas = Schema.decodeUnknownResult(Schema.fromJsonString(LoteSinMedidas));
+
 /** Lo que la web de antes de las combinaciones de compañías lee de un resumen (ADR 0026). */
 const ResumenDeAntes = Schema.Struct({
   version: Schema.String,
@@ -516,6 +526,30 @@ describe("lote de fichas de una provincia", () => {
       fichas[0]?.estaciones.map((e) => e.sinFichaEnRegistro);
     assert.deepStrictEqual(marcas(deAntes.success), [undefined, undefined]);
     assert.deepStrictEqual(marcas(nuevo.success), [undefined, NOCHE]);
+  });
+
+  // Las medidas de exposición del ministerio tampoco suben el formato (#73).
+  const medida = { distanciaMetros: 80, acimutGrados: 175, microvatiosPorCm2: 0.98806 };
+  const conMedidas: Ficha = {
+    ...ficha(EN_PEDRALBES),
+    estaciones: [{ ...orange, medidasDeExposicion: [medida] }],
+  };
+
+  it("la web de antes lee un lote con medidas de exposición, y la de ahora uno sin ellas", () => {
+    const contenido = generarLoteDeProvincia("08", [conMedidas], lugares, FUENTE_IGN);
+    assert.include(contenido, `"medidasDeExposicion":[${JSON.stringify(medida)}]`);
+    const deAntes = leerLoteSinMedidas(contenido);
+    if (Result.isFailure(deAntes)) return assert.fail(deAntes.failure.message);
+    assert.notProperty(deAntes.success.fichas[0]?.estaciones[0], "medidasDeExposicion");
+
+    const nuevo = leerLoteDeProvincia(contenido, "08");
+    const sinMedidas = leerLoteDeProvincia(
+      generarLoteDeProvincia("08", [conEstaciones(false)], lugares, FUENTE_IGN),
+      "08",
+    );
+    if (Result.isFailure(nuevo) || Result.isFailure(sinMedidas)) return assert.fail("ilegible");
+    assert.deepStrictEqual(nuevo.success[0]?.estaciones[0]?.medidasDeExposicion, [medida]);
+    assert.isUndefined(sinMedidas.success[0]?.estaciones[1]?.medidasDeExposicion);
   });
 });
 

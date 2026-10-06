@@ -1,4 +1,4 @@
-import { type Banda, compararTexto } from "@celda/dominio/banda";
+import { compararTexto } from "@celda/dominio/banda";
 import {
   Caja,
   cajaDeCuadro,
@@ -24,6 +24,7 @@ import {
   describirError,
   type ErrorDeExtractor,
   ExtractorPorCajas,
+  type FichaLeida,
   type Registro,
 } from "./extractor.ts";
 import {
@@ -246,19 +247,22 @@ export class BaseDeBarrido extends Context.Service<
     readonly fallarBarrido: (barrido: string, fin: number, motivo: string) => Effect.Effect<void>;
     /**
      * La cola de fichas de la fuente, sin ordenar: las observaciones vigentes que no se han leído
-     * nunca, o que cambiaron en el listado, y las leídas antes de `leidasAntesDe`, con las que
-     * esperan tras un fallo.
+     * nunca, o que cambiaron en el listado, y las leídas antes de `leidasAntesDe` o con una versión
+     * de la lectura anterior a la de hoy, con las que esperan tras un fallo.
      */
     readonly colaDeFichas: (
       fuente: Fuente,
       leidasAntesDe: number,
     ) => Effect.Effect<ReadonlyArray<FichaEnCola>>;
-    /** Guarda las bandas de una ficha (`trasFicha`) y borra sus fallos; `true` si han cambiado. */
+    /**
+     * Guarda lo leído de una ficha (`trasFicha`), con la versión de la lectura, y borra sus
+     * fallos; `true` si ha cambiado.
+     */
     readonly aplicarFicha: (
       fuente: Fuente,
       clave: string,
       fecha: number,
-      bandas: ReadonlyArray<Banda>,
+      leida: FichaLeida,
     ) => Effect.Effect<boolean>;
     /** Apunta el fallo de una ficha: cuántos van seguidos y hasta cuándo espera. */
     readonly fallarFicha: (
@@ -598,7 +602,7 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
       opciones: opciones.fichas,
       inicio,
       ficha: extractor.ficha,
-      aplicar: (clave, bandas) => base.aplicarFicha(fuente, clave, inicio, bandas),
+      aplicar: (clave, leida) => base.aplicarFicha(fuente, clave, inicio, leida),
       fallar: (clave, fallo) => base.fallarFicha(fuente, clave, fallo),
       aMitad: Effect.andThen(fusionar, aMitad.publicar),
     });

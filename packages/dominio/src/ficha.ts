@@ -11,6 +11,7 @@ import {
   Estado,
   type EstacionBase,
 } from "./emplazamiento.ts";
+import { MedidaDeExposicion } from "./exposicion.ts";
 import { Lugar } from "./municipio.ts";
 import { Afirmacion, Fuente, type Observacion } from "./observacion.ts";
 
@@ -39,6 +40,14 @@ export const EstacionDeFicha = Schema.Struct({
    * web de antes ignora la clave (ADR 0016).
    */
   sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
+  /**
+   * Las medidas de exposición del ministerio que publica el registro oficial en las fichas de sus
+   * observaciones, por acimut. El ministerio no las fecha: desde cuándo las publica es la `fecha`
+   * de esos orígenes. Una lista vacía es que el registro no publica ninguna. Falta si Celda aún no
+   * ha leído sus fichas desde que las guarda, y en las fichas publicadas antes; la web de antes
+   * ignora la clave (ADR 0016).
+   */
+  medidasDeExposicion: Schema.optionalKey(Schema.Array(MedidaDeExposicion)),
 });
 export type EstacionDeFicha = typeof EstacionDeFicha.Type;
 
@@ -140,8 +149,10 @@ export const fichaDe = (
           afirma,
         })),
       };
-      const { sinFichaEnRegistro } = estacion;
-      return sinFichaEnRegistro === undefined ? deFicha : { ...deFicha, sinFichaEnRegistro };
+      const { sinFichaEnRegistro, medidasDeExposicion } = estacion;
+      const conMarca =
+        sinFichaEnRegistro === undefined ? deFicha : { ...deFicha, sinFichaEnRegistro };
+      return medidasDeExposicion === undefined ? conMarca : { ...conMarca, medidasDeExposicion };
     }),
   datosDel: emplazamiento.datosDel,
   version,

@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import { Coordenada } from "./area.ts";
 import { Banda } from "./banda.ts";
 import { Compania } from "./compania.ts";
+import { MedidaDeExposicion } from "./exposicion.ts";
 
 /**
  * Origen de las observaciones sobre emplazamientos: el registro oficial, la comunidad de Celda con
@@ -40,6 +41,12 @@ export const Observacion = Schema.Struct({
    * no válido». Una lectura buena de la ficha la quita.
    */
   sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
+  /**
+   * Las medidas de exposición del ministerio que publica la ficha del registro oficial, quizá
+   * ninguna. Su fecha es `fecha`, como la de las bandas. Falta si la ficha no se ha leído desde que
+   * Celda las guarda, y en las demás fuentes.
+   */
+  medidasDeExposicion: Schema.optionalKey(Schema.Array(MedidaDeExposicion)),
 });
 export type Observacion = typeof Observacion.Type;
 

@@ -240,8 +240,17 @@ Por operador, en Barcelona: Telefónica 701, Vodafone 624 (540 como S.A.U. y 84 
 | Banda | «Banda asignada» → tabla del apartado 1 | se guarda el rango original y la banda deducida. La banda de 800 viene con el rango de subida. Un rango doble con `;` es una sola entrada. |
 | Tecnología | no existe | se deduce de la banda y se marca como estimación |
 | Sector | no existe | no hay azimut ni número de sectores. Todos los sectores de Celda son **modelo**. El acimut de los niveles medidos **no** sirve para esto. |
-| (sin término) | niveles medidos | fuera de la v1. Si se usan, como «medida de exposición del ministerio», un tipo distinto de las medidas propias. |
+| Medida de exposición del ministerio | niveles medidos | se guardan desde el #73: distancia, acimut del punto de medida y µW/cm², con la observación de cada registro y en su estación base de la ficha publicada (`medidasDeExposicion`). Es un tipo distinto de las medidas propias. Ver abajo qué no significan. |
 | Fecha del dato | año del expediente (inferido) | se puede enseñar «banda autorizada en 2024» si se acepta la inferencia |
+
+**Medidas de exposición del ministerio (#73).** La ingesta lee la tabla «Niveles medidos en el entorno» de cada ficha (`leerFicha` en `packages/ingesta/src/registro-oficial/normalizar.ts`) y guarda cada fila como una medida de exposición del ministerio: distancia en metros, acimut en grados y valor en µW/cm². Los números llegan con punto decimal (`0.98806`); el lector acepta también la coma y el exponente, y una celda con otra cosa hace ilegible la ficha entera, como una banda ilegible. Una ficha sin la tabla, o con la tabla vacía, es una estación base de la que el registro no publica medidas. Una fila con alguna celda vacía no cuenta: la conversión de Campus Nord tiene una, en `CATR6190A` de Orange (20 m, 280°, sin valor).
+
+Qué no significan:
+
+- No dicen nada de la cobertura ni de la calidad de la señal en ese punto. Comparan la exposición con los niveles de referencia legales, de 200 µW/cm² el más restrictivo. 0,02 µW/cm² a 1800 MHz son unos −34 dBm, millones de veces lo que necesita un móvil.
+- El acimut es la dirección del punto de medida vista desde la estación base. No dice hacia dónde apuntan los sectores.
+- El ministerio no las fecha. La fecha que guarda Celda es la de la observación: desde cuándo la ficha publica esas medidas y esas bandas, según las lecturas de Celda.
+- Son unos pocos puntos, de 1 a 9 por ficha en Campus Nord, donde estuvo el técnico. Entre ellos no se puede interpolar un mapa.
 
 **Para cruzar con otras fuentes** (lo aprovecha la investigación de antenasmoviles.es y OpenCelliD):
 
