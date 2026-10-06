@@ -3,6 +3,7 @@ import type { FichaLeida } from "@celda/ingesta/extractor";
 import { lecturaDeFicha } from "@celda/ingesta/registro-oficial/normalizar";
 import { decodificarLatin1 } from "@celda/ingesta/texto";
 import { AlmacenDelArchivo } from "@celda/publicacion/almacen";
+import { sha256DeBytes } from "@celda/publicacion/almacenes/firma";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -16,7 +17,6 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
-import * as NodeCrypto from "node:crypto";
 import * as NodeZlib from "node:zlib";
 
 import { BaseNocturna } from "./base.ts";
@@ -167,9 +167,6 @@ export class ArchivoNocturno extends Context.Service<
   }
 >()("@celda/nocturna/archivo/ArchivoNocturno") {}
 
-const sha256 = (bytes: Uint8Array): string =>
-  NodeCrypto.createHash("sha256").update(bytes).digest("hex");
-
 const Cuentas = Schema.Struct({
   contenidos: Schema.NullOr(Schema.Int),
   paginas: Schema.NullOr(Schema.Int),
@@ -252,7 +249,7 @@ const archivoSobre = (fichero: string, sql: SqlClient.SqlClient) =>
     const archivar = (pagina: PaginaDelRegistro) =>
       Effect.gen(function* () {
         const leidaEn = yield* Clock.currentTimeMillis;
-        const huella = sha256(pagina.cuerpo);
+        const huella = yield* sha256DeBytes(new Uint8Array(pagina.cuerpo));
         yield* sql.withTransaction(
           Effect.gen(function* () {
             const [suyo] = yield* sql<{ readonly id: number }>`SELECT id FROM contenidos
