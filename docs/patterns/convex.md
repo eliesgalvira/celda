@@ -117,6 +117,7 @@ La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sq
 - `ejecuciones`: cada pasada de un extractor, con sus cambios, sus errores, lo que hizo cada zona (cuadros, peticiones, bytes, registros y cambios) y cómo acabó la publicación de su noche;
 - `publicaciones`: cada intento de publicar;
 - `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero;
+- `otros_titulares`: los registros del listado de titulares que no son compañías de Celda, las licencias locales de 2,6 GHz en TDD (Teleast Digital, Tele Caravaca, la UTE Aire-Alvi-TV Horadada y Desarrollos Urbanos Laurentino Cordero), con lo que escribió el registro y la primera y la última vez que salieron (versión 9 del esquema). No van a la fusión ni al mapa, y sus bandas en la ficha de otra estación base se dejan fuera. `RETEVISION MOVIL SA`, la razón social de Amena, es Orange;
 - `hechos`: el historial de cada registro del ministerio (versión 8 del esquema, ADR 0027), ver [El historial de cada registro](#el-historial-de-cada-registro);
 - `aportaciones_aceptadas`: lo aceptado en la moderación que la noche ha leído del buzón, con su emplazamiento, el seudónimo de quien lo envió, cuándo se aceptó y la fecha de la ejecución que lo trajo (versión 6 del esquema, #57). Ni la identidad ni la huella de la IP salen del buzón.
 

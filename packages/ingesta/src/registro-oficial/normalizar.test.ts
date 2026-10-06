@@ -9,6 +9,7 @@ import { leerMuestra, muestraCampusNord } from "../pruebas/grabado.ts";
 import { decodificarLatin1 } from "../texto.ts";
 import {
   bandaDeFila,
+  bandasDeFilas,
   companiaDeTitular,
   esFichaSinEmplazamiento,
   leerFicha,
@@ -65,6 +66,48 @@ describe("listado del registro oficial", () => {
       assert.strictEqual(registro?.direccion, "VP Eusebi Güell, 6. BARCELONA, BARCELONA");
     }).pipe(conMuestras),
   );
+
+  it("Retevisión Móvil, la de Amena, es Orange, y las licencias locales van aparte", () => {
+    const elemento = (id: string, codigo: string) => ({
+      id,
+      geometry: { coordinates: [-1.86, 38.1] },
+      properties: { Gis_ID: codigo, Dirección: "CL X, 1. CARAVACA DE LA CRUZ, MURCIA" },
+    });
+    const listado = listadoDeElementos([
+      elemento("RETEVISION MOVIL SA - 300123", "300123"),
+      elemento("TELE CARAVACA, S.L. - TC01", "TC01"),
+      elemento("TELEAST DIGITAL, S.L. - 77", "77"),
+    ]);
+    assert.deepStrictEqual(
+      listado.registros.map((r) => [r.clave, r.compania]),
+      [["RETEVISION MOVIL SA - 300123", "orange"]],
+    );
+    assert.deepStrictEqual(
+      (listado.otros ?? []).map((o) => [o.titular, o.crudo.gisId]),
+      [
+        ["TELE CARAVACA, S.L.", "TC01"],
+        ["TELEAST DIGITAL, S.L.", "77"],
+      ],
+    );
+    assert.deepStrictEqual(listado.avisos, []);
+    // En la ficha de otra estación base, sus bandas se dejan fuera.
+    const bandas = bandasDeFilas([
+      {
+        operador: "RETEVISION MOVIL SA",
+        referencia: "B B -0001234",
+        bandaMhz: "1805.00 - 1820.00",
+      },
+      {
+        operador: "TELE CARAVACA, S.L.",
+        referencia: "B B -1701234",
+        bandaMhz: "2570.00 - 2620.00",
+      },
+    ]);
+    assert.deepStrictEqual(
+      Result.isSuccess(bandas) ? bandas.success.map((b) => [b.compania, b.mhz]) : [],
+      [["orange", 1800]],
+    );
+  });
 
   it("un titular desconocido es un aviso, no un registro", () => {
     const listado = listadoDeElementos([
@@ -152,10 +195,9 @@ describe("ficha del registro oficial", () => {
       referencia: "B B -2201234",
       bandaMhz: "3410.00 - 3500.00",
     });
-    assert.deepStrictEqual(
-      Result.isSuccess(otra) ? otra.success.rangos : [],
-      [{ desdeMhz: 3410, hastaMhz: 3500 }],
-    );
+    assert.deepStrictEqual(Result.isSuccess(otra) ? otra.success.rangos : [], [
+      { desdeMhz: 3410, hastaMhz: 3500 },
+    ]);
   });
 
   it.effect("lee las bandas igual que la conversión de la investigación", () =>

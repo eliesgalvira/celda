@@ -81,6 +81,17 @@ export interface Listado {
   readonly registros: ReadonlyArray<Registro>;
   /** Elementos que no se han podido leer, con el motivo. No paran la ejecución. */
   readonly avisos: ReadonlyArray<string>;
+  /**
+   * Registros de otros titulares, que no son compañías de Celda pero que la ingesta guarda aparte
+   * sin enseñarlos en el mapa, como las licencias locales de 2,6 GHz. Sin repetir.
+   */
+  readonly otros?: ReadonlyArray<RegistroDeOtroTitular>;
+}
+
+/** Un registro del listado de otro titular, como lo escribe el registro. */
+export interface RegistroDeOtroTitular {
+  readonly titular: string;
+  readonly crudo: ListadoCrudo;
 }
 
 /** La fuente no ha respondido bien ni después de los reintentos. */
@@ -168,6 +179,8 @@ export interface ListadoDeCaja {
   /** Sin repetir y ordenados por clave. */
   readonly registros: ReadonlyArray<Registro>;
   readonly avisos: ReadonlyArray<string>;
+  /** Los registros de otros titulares, que no van al mapa (`Listado.otros`). */
+  readonly otros?: ReadonlyArray<RegistroDeOtroTitular>;
   /**
    * Si la respuesta llega al tope de elementos de la fuente. Entonces le pueden faltar
    * registros sin que la fuente avise, y la caja hay que dividirla.

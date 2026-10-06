@@ -26,7 +26,7 @@ import {
   SIN_CAMBIOS,
 } from "@celda/ingesta/ejecucion";
 import type { FichaEnCola } from "@celda/ingesta/fichas";
-import { type FichaLeida, Registro } from "@celda/ingesta/extractor";
+import { type FichaLeida, ListadoCrudo, Registro } from "@celda/ingesta/extractor";
 import { VERSION_DE_LECTURA } from "@celda/ingesta/registro-oficial/normalizar";
 import { conAntes, datosDeHecho, type HechoNuevo, idDeHecho } from "@celda/ingesta/hecho";
 import {
@@ -114,6 +114,10 @@ export interface OpcionesBase {
  * determinista único, para que una noche repetida no escriba dos veces el mismo hecho. Cada
  * observación que ya estaba recibe un hecho «conocido antes» con la fecha más antigua que la base
  * guarda de ella. Se escriben en la misma transacción que la observación (`apuntarHecho`).
+ *
+ * La versión 9 trae `otros_titulares`: los registros del listado de titulares que no son compañías
+ * de Celda, como las licencias locales de 2,6 GHz, con lo que escribió el registro, la primera y
+ * la última vez que salieron. No van a la fusión ni al mapa.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -281,9 +285,19 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
         json_object('forma', 1, 'observacion', json(datos))
       FROM observaciones ORDER BY id`,
   ],
+  [
+    `CREATE TABLE otros_titulares (
+      clave TEXT PRIMARY KEY,
+      titular TEXT NOT NULL,
+      crudo TEXT NOT NULL,
+      visto_desde INTEGER NOT NULL,
+      vista_en INTEGER NOT NULL
+    )`,
+  ],
 ];
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
+const codificarCrudo = Schema.encodeEffect(Schema.fromJsonString(ListadoCrudo));
 const ZonasEnJson = Schema.fromJsonString(Schema.Array(ZonaEnLaEjecucion));
 const EmplazamientoEnJson = Schema.fromJsonString(Emplazamiento);
 const decodificarEmplazamiento = Schema.decodeEffect(EmplazamientoEnJson);
@@ -845,6 +859,16 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 }
                 yield* sql`UPDATE observaciones SET vista_en = ${fecha}
                     WHERE fuente = ${fila.fuente} AND clave IN ${sql.in(claves)}`;
+              }
+              for (const { titular, crudo } of recorrido.otros ?? []) {
+                yield* sql`INSERT INTO otros_titulares ${sql.insert({
+                  clave: crudo.id,
+                  titular,
+                  crudo: yield* codificarCrudo(crudo),
+                  visto_desde: fecha,
+                  vista_en: fecha,
+                })} ON CONFLICT (clave) DO UPDATE SET crudo = excluded.crudo,
+                    titular = excluded.titular, vista_en = excluded.vista_en`;
               }
               // Un cambio masivo deshace la transacción: el cuadro se queda como estaba.
               const enElListado = new Set(recorrido.registros.map((r) => r.clave));

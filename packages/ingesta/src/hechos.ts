@@ -186,7 +186,14 @@ const registroDelListado = (
 ): Result.Result<Registro, string> => {
   if ("registro" in listado) return Result.succeed(listado.registro);
   const leido = registroDeCrudo(listado.crudo);
-  return leido.tipo === "registro" ? Result.succeed(leido.registro) : Result.fail(leido.aviso);
+  switch (leido.tipo) {
+    case "registro":
+      return Result.succeed(leido.registro);
+    case "otro-titular":
+      return Result.fail(`${listado.crudo.id} es de otro titular, ${leido.titular}`);
+    case "aviso":
+      return Result.fail(leido.aviso);
+  }
 };
 
 /** Lo que dice la ficha de un hecho, con la limpieza de hoy, y sus tablas si las tiene. */

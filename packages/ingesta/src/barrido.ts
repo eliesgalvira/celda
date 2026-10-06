@@ -26,6 +26,7 @@ import {
   ExtractorPorCajas,
   type FichaLeida,
   type Registro,
+  type RegistroDeOtroTitular,
 } from "./extractor.ts";
 import {
   type FalloDeFicha,
@@ -140,6 +141,8 @@ export interface CuadroRecorrido {
   /** Sin repetir y ordenados por clave. */
   readonly registros: ReadonlyArray<Registro>;
   readonly avisos: ReadonlyArray<string>;
+  /** Los registros de otros titulares, sin repetir, que se guardan aparte y no van al mapa. */
+  readonly otros?: ReadonlyArray<RegistroDeOtroTitular>;
   /** Las cajas pedidas que no llegaron al tope, para pedirlas directamente la próxima vez. */
   readonly cajas: ReadonlyArray<Caja>;
   readonly bytes: number;
@@ -157,6 +160,7 @@ export const recorrerCuadro = Effect.fn("Barrido.recorrerCuadro")(function* (
 ) {
   const extractor = yield* ExtractorPorCajas;
   const registros = new Map<string, Registro>();
+  const otros = new Map<string, RegistroDeOtroTitular>();
   const avisos: Array<string> = [];
   const cajas: Array<Caja> = [];
   let bytes = 0;
@@ -178,6 +182,9 @@ export const recorrerCuadro = Effect.fn("Barrido.recorrerCuadro")(function* (
     for (const registro of listado.registros) {
       if (!registros.has(registro.clave)) registros.set(registro.clave, registro);
     }
+    for (const otro of listado.otros ?? []) {
+      if (!otros.has(otro.crudo.id)) otros.set(otro.crudo.id, otro);
+    }
   }
   const recorrido: CuadroRecorrido = {
     registros: [...registros.values()].sort((a, b) => compararTexto(a.clave, b.clave)),
@@ -185,7 +192,7 @@ export const recorrerCuadro = Effect.fn("Barrido.recorrerCuadro")(function* (
     cajas,
     bytes,
   };
-  return recorrido;
+  return otros.size === 0 ? recorrido : { ...recorrido, otros: [...otros.values()] };
 });
 
 /** Cómo le fue a una zona de barrido en una ejecución. */

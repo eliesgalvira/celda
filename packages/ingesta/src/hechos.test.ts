@@ -20,7 +20,7 @@ const CRUDO: ListadoCrudo = {
 
 const registroDe = (crudo: ListadoCrudo): Registro => {
   const leido = registroDeCrudo(crudo);
-  if (leido.tipo !== "registro") return assert.fail(leido.aviso);
+  if (leido.tipo !== "registro") return assert.fail(`${crudo.id} no es de una compañía`);
   return leido.registro;
 };
 

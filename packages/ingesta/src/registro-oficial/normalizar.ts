@@ -19,6 +19,7 @@ import type {
   Listado,
   ListadoCrudo,
   Registro,
+  RegistroDeOtroTitular,
 } from "../extractor.ts";
 import { repararTexto, textoDeHtml } from "../texto.ts";
 import type { Caja } from "../zona.ts";
@@ -27,13 +28,15 @@ export const ORIGEN = "https://geoportal.minetur.gob.es";
 
 /**
  * Razones sociales del registro y su compañía. El registro conserva nombres antiguos:
- * `VODAFONE ESPAÑA, S.A.` junto a `S.A.U.`, `ORANGE ESPAGNE` tras la fusión en MasOrange y
- * `DS MOBILE NETWORKS`, la sociedad de red de Digi.
+ * `VODAFONE ESPAÑA, S.A.` junto a `S.A.U.`, `ORANGE ESPAGNE` tras la fusión en MasOrange,
+ * `RETEVISION MOVIL SA`, la de Amena antes de ser Orange, y `DS MOBILE NETWORKS`, la sociedad de
+ * red de Digi.
  */
 const TITULARES: ReadonlyArray<readonly [RegExp, Compania]> = [
   [/^TELEF[OÓ]NICA M[OÓ]VILES/iu, "movistar"],
   [/^VODAFONE ESPA[NÑ]A/iu, "vodafone"],
   [/^ORANGE ESPAG?[NÑ]/iu, "orange"],
+  [/^RETEVISI[OÓ]N M[OÓ]VIL/iu, "orange"],
   [/^DS MOBILE NETWORKS/iu, "digi"],
   [/^DIGI SPAIN TELECOM/iu, "digi"],
   [/^XFERA M[OÓ]VILES/iu, "yoigo"],
@@ -41,6 +44,22 @@ const TITULARES: ReadonlyArray<readonly [RegExp, Compania]> = [
 
 export const companiaDeTitular = (titular: string): Compania | undefined =>
   TITULARES.find(([patron]) => patron.test(titular.trim()))?.[1];
+
+/**
+ * Titulares del registro que no son compañías de Celda: las licencias locales de la banda de
+ * 2,6 GHz en TDD, que dan servicio en un solo municipio. Sus registros se guardan aparte y no van
+ * al mapa, y sus bandas en la ficha de otra estación base se dejan fuera.
+ */
+const OTROS_TITULARES: ReadonlyArray<RegExp> = [
+  /^TELEAST/iu,
+  /^TELE CARAVACA/iu,
+  /^UTE AIRE.?ALVI/iu,
+  /^DESARROLLOS URBANOS LAURENTINO/iu,
+];
+
+/** Si una razón social es de otro titular, que no es una compañía de Celda. */
+export const esOtroTitular = (titular: string): boolean =>
+  OTROS_TITULARES.some((patron) => patron.test(titular.trim()));
 
 /** La dirección tiene la forma «vía, número. MUNICIPIO, PROVINCIA». */
 export const municipioDeDireccion = (direccion: string): string => {
@@ -83,6 +102,7 @@ export const TOPE_LISTADO = 1000;
 
 export type Lectura =
   | { readonly tipo: "registro"; readonly registro: Registro }
+  | { readonly tipo: "otro-titular"; readonly titular: string; readonly crudo: ListadoCrudo }
   | { readonly tipo: "aviso"; readonly aviso: string };
 
 /** Lo que escribe el registro de un elemento del listado, sin limpiar (ADR 0027). */
@@ -103,7 +123,9 @@ export const registroDeCrudo = (crudo: ListadoCrudo): Lectura => {
   const titular = separador > 0 ? crudo.id.slice(0, separador) : crudo.id;
   const compania = companiaDeTitular(titular);
   if (compania === undefined) {
-    return { tipo: "aviso", aviso: `Titular desconocido: ${crudo.id}` };
+    return esOtroTitular(titular)
+      ? { tipo: "otro-titular", titular, crudo }
+      : { tipo: "aviso", aviso: `Titular desconocido: ${crudo.id}` };
   }
   const direccion = repararTexto(crudo.direccion);
   const codigo = crudo.gisId.trim();
@@ -134,6 +156,7 @@ const decodificarElemento = Schema.decodeUnknownOption(Elemento);
  */
 export const listadoDeElementos = (elementos: ReadonlyArray<unknown>): Listado => {
   const registros = new Map<string, Registro>();
+  const otros = new Map<string, RegistroDeOtroTitular>();
   const avisos: Array<string> = [];
   for (const elemento of elementos) {
     const lectura = Option.map(decodificarElemento(elemento), registroDeElemento);
@@ -141,14 +164,23 @@ export const listadoDeElementos = (elementos: ReadonlyArray<unknown>): Listado =
       avisos.push("Elemento del listado con un formato desconocido");
     } else if (lectura.value.tipo === "aviso") {
       avisos.push(lectura.value.aviso);
+    } else if (lectura.value.tipo === "otro-titular") {
+      const { titular, crudo } = lectura.value;
+      if (!otros.has(crudo.id)) otros.set(crudo.id, { titular, crudo });
     } else if (!registros.has(lectura.value.registro.clave)) {
       registros.set(lectura.value.registro.clave, lectura.value.registro);
     }
   }
-  return {
+  const listado: Listado = {
     registros: [...registros.values()].sort((a, b) => compararTexto(a.clave, b.clave)),
     avisos,
   };
+  return otros.size === 0
+    ? listado
+    : {
+        ...listado,
+        otros: [...otros.values()].sort((a, b) => compararTexto(a.crudo.id, b.crudo.id)),
+      };
 };
 
 /**
@@ -200,10 +232,14 @@ export const bandaDeFila = (fila: FilaFicha): Result.Result<Banda, string> => {
   });
 };
 
-/** Las bandas de todas las filas, o el motivo de la primera que no se puede leer. */
+/**
+ * Las bandas de todas las filas, o el motivo de la primera que no se puede leer. Las de otros
+ * titulares, que no son compañías de Celda, se dejan fuera.
+ */
 export const bandasDeFilas = (
   filas: ReadonlyArray<FilaFicha>,
-): Result.Result<ReadonlyArray<Banda>, string> => Result.all(filas.map(bandaDeFila));
+): Result.Result<ReadonlyArray<Banda>, string> =>
+  Result.all(filas.filter((fila) => !esOtroTitular(fila.operador)).map(bandaDeFila));
 
 /**
  * Un número de la tabla de niveles. El registro los escribe con punto decimal (`0.98806`); se
