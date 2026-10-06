@@ -314,6 +314,8 @@ Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 
 ## Foto aérea fuera de los vuelos (#67)
 
+Deshecho el 06/10/2026 por decisión del usuario: la foto ya no se quita en los vuelos, porque el parpadeo al despegar y al llegar molestaba más que lo que ahorraba (ADR 0022). Las medidas de abajo dicen lo que cuesta tenerla.
+
 Con la foto encendida, mientras la web mueve la cámara con una animación el mapa va sin ella, y la foto vuelve al pararse (`apps/web/src/foto/enMapa.ts`, [ui.md](ui.md#foto-aérea)). Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --foto` en el móvil (390 × 844, DPR 2,6, CPU ×4, «Fast 4G», GPU), la capa de `celda-noche`, OpenFreeMap y el PNOA de verdad, rondas alternadas de `celda/v1` (81cc535) y esta rama. Los bytes son los de la primera página, con la caché vacía; los fps, los de las páginas medidas, con las teselas ya en la caché HTTP.
 
 | Medida | `celda/v1` | Esta rama |
@@ -376,6 +378,28 @@ Medido el 05/10/2026 en Chromium sin interfaz con SwiftShader, con la build loca
 
 - **Peso.** El fichero general crece 1.007 bytes con `gzip -9` (8.043 → 9.050), lo que la web descarga en cada visita; el de detalle, 5.639 (36.718 → 42.357), solo al pasar de z7. El JavaScript, igual: solo cambia el filtro de una capa y entra otra.
 - **Capas.** Una capa de línea más, `limites-pais`, de la fuente `limites`, que ya estaba.
+
+## Marcadores en el fotograma del mapa (06/10/2026)
+
+Los marcadores se recolocaban en un `requestAnimationFrame` pedido desde el `move` de MapLibre, que corre en el fotograma siguiente, antes de que MapLibre mueva la cámara: iban un fotograma por detrás del lienzo en el 38 al 100 % de los fotogramas en movimiento, hasta 20 px al arrastrar y 104 px en un vuelo en el escritorio. Ahora `seguirVista` (`apps/web/src/mapa/vista.ts`) avisa en el mismo `move`, y los marcadores y los rótulos copiados van en dos láminas: a un mismo zoom se mueve la lámina con un `transform` y cada marcador solo se vuelve a colocar al cambiar el zoom (`Lamina`). El punto GPS también se recoloca en el mismo `move`. Al llegar una provincia, leer la respuesta del Worker, agruparla y dibujar sus marcadores van en tres tareas (`dejarPintar` en `capa/servicio.ts`): juntas eran un fotograma de 200 a 300 ms en el móvil a ×4.
+
+Medido con `pnpm run medir` (móvil 390 × 844, CPU ×4, la publicación de producción con 35 680 emplazamientos), dos rondas alternadas por web y otro proceso en la máquina, así que diferencias de menos de 2 o 3 fps no separan las webs:
+
+| Gesto | Antes | Ahora | Hilo principal |
+|---|---|---|---|
+| Arrastrar (lejos, medio, cerca) | 59,6–59,9 fps | 59,6–60,0 fps | −9 % a −16 % |
+| Pellizcar lejos / a media distancia | 53,8 / 56,1 | 51,3 / 53,7 | +8 % / +11 % |
+| Rueda lejos / a media distancia | 59,8 / 59,8 | 59,5 / 59,5 | +24 % / +36 % |
+| Botones Acercar y Alejar | 52,7–59,3 | 53,0–58,5 | −10 % a +8 % |
+| Vuelos (Cataluña, Barcelona, Eixample, España) | 48,4–58,8 | 44,9–55,5 | +2 % a +31 % |
+| Marcadores un fotograma tarde | 38–100 % de los fotogramas | 0 % | |
+
+Al cambiar el zoom, cada marcador se mueve ahora en todos los fotogramas, y antes solo en algo más de la mitad: por eso los pellizcos y los vuelos cuestan algo más. El usuario lo aceptó: prefiere los marcadores en su sitio y sus animaciones a esos fps. Probado y descartado:
+
+- **Una sola capa del compositor** para toda la lámina, sin la de cada marcador: al acercar, el navegador volvía a pintar la lámina entera en cada fotograma y los vuelos perdían hasta 5 fps más.
+- **Esconder los marcadores en los vuelos de la web**, como hacía la foto: ganaba de 3 a 8 fps en los vuelos, pero los marcadores desaparecen y reaparecen en cada vuelo. El usuario no lo quiere: prefiere ver la animación.
+
+`tools/rendimiento` mide además, por gesto, cuántos marcadores hay y cuánto se separan del lienzo (columna «desfase»), así que un regreso al retraso se ve en la tabla.
 
 ## Qué entró
 
