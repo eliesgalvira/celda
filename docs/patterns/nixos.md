@@ -2,7 +2,7 @@
 
 El flake de Celda exporta la ingesta nocturna (ADR 0015) de dos formas:
 
-- `packages.<sistema>.celda-nocturna`: el programa de `apps/nocturna` en un solo fichero, con el Node 24 de nixpkgs. Acepta las mismas órdenes que `pnpm run ingesta`: `noche`, `estado`, `publicar`, `copia`, `releer-archivo`, `restaurar-archivo`, `capas` y `cuadros-de-borde`.
+- `packages.<sistema>.celda-nocturna`: el programa de `apps/nocturna` en un solo fichero, con el Node 24 de nixpkgs. Acepta las mismas órdenes que `pnpm run ingesta`: `noche`, `estado`, `publicar`, `copia`, `releer-archivo`, `restaurar-archivo`, `comprobar-historial`, `capas` y `cuadros-de-borde`.
 - `nixosModules.celda-nocturna`: un servicio de systemd que lanza `noche` una vez al día con su temporizador, su usuario y sus directorios.
 
 El módulo no sabe nada de la máquina que lo usa. El horario, las rutas y las credenciales van en la configuración de esa máquina, en su propio repositorio.
@@ -28,7 +28,7 @@ Sin variables de entorno, el programa usa `datos/ingesta.sqlite`, `datos/archivo
 5. comprueba que, con las zonas por defecto, la primera noche barrió Cataluña con una petición por cuadro, y que la orden de estado dice, por zona, cuándo se barrió y cuántas fichas le faltan, y que la siguiente barre `centro`;
 6. comprueba que las fichas llegaron a una cada 4 s como mínimo, que pararon al cerrarse su ventana de 2 minutos con las demás en la cola, y que se publicó a mitad de la ventana y al cerrarla;
 7. comprueba que la noche llamó una vez al deploy hook y que Vercel monta las dos versiones de la noche, la vigente y su anterior, igual byte a byte que R2, leyendo con la clave de solo lectura y sin escribir nada con ella;
-8. comprueba que el archivo de páginas tiene una lectura por cada respuesta del geoportal y un contenido por página distinta, que su paquete está en la carpeta de copias y, igual byte a byte, bajo `archivo/` en R2, que Vercel no monta nada de `archivo/` ni de `copias/` ni lo pide al cubo, y que `celda-nocturna releer-archivo` lee todas las fichas archivadas sin pedir nada al geoportal;
+8. comprueba que el archivo de páginas tiene una lectura por cada respuesta del geoportal y un contenido por página distinta, que su paquete está en la carpeta de copias y, igual byte a byte, bajo `archivo/` en R2, que Vercel no monta nada de `archivo/` ni de `copias/` ni lo pide al cubo, que `celda-nocturna releer-archivo` lee todas las fichas archivadas sin pedir nada al geoportal y que `celda-nocturna comprobar-historial` da el historial de los 40 registros igual que la tabla de observaciones;
 9. publica a mano con `systemd-run`, como el servicio, y comprueba que con Vercel al día no se llama al hook;
 10. deja servido un despliegue de otra versión y hace que R2 no conteste al build: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo el anterior. Con R2 de vuelta, la siguiente publicación lo pone al día;
 11. lanza `celda-nocturna cuadros-de-borde` como el usuario del servicio y comprueba que pide una vez cada uno de los cuatro cuadros de borde, que en el Campus Nord no traen nada, y que no toca la base;

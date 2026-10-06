@@ -45,6 +45,14 @@ describe("listado del registro oficial", () => {
         direccion: "PZ Eusebi Güell, 1. BARCELONA, BARCELONA",
         municipio: "BARCELONA",
         url: "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0802532&codEmplazamiento=TELEFONICA%20MOVILES%20ESPA%C3%91A%2C%20S.A.U.%20-%200802532",
+        // Lo que escribió el registro, sin limpiar (ADR 0027).
+        crudo: {
+          id: "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802532",
+          gisId: "0802532",
+          direccion: "PZ Eusebi Güell, 1. BARCELONA, BARCELONA",
+          longitud: 2.113628,
+          latitud: 41.388344,
+        },
       });
     }).pipe(conMuestras),
   );

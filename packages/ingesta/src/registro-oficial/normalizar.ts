@@ -11,7 +11,15 @@ import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import type { FichaLeida, Listado, Registro } from "../extractor.ts";
+import type {
+  FichaCruda,
+  FichaLeida,
+  FilaDeNiveles,
+  FilaFicha,
+  Listado,
+  ListadoCrudo,
+  Registro,
+} from "../extractor.ts";
 import { repararTexto, textoDeHtml } from "../texto.ts";
 import type { Caja } from "../zona.ts";
 
@@ -77,29 +85,46 @@ export type Lectura =
   | { readonly tipo: "registro"; readonly registro: Registro }
   | { readonly tipo: "aviso"; readonly aviso: string };
 
-/** Convierte un elemento del listado en un registro con la compañía y el texto reparados. */
-export const registroDeElemento = (elemento: Elemento): Lectura => {
-  const separador = elemento.id.lastIndexOf(" - ");
-  const titular = separador > 0 ? elemento.id.slice(0, separador) : elemento.id;
+/** Lo que escribe el registro de un elemento del listado, sin limpiar (ADR 0027). */
+export const crudoDeElemento = (elemento: Elemento): ListadoCrudo => ({
+  id: elemento.id,
+  gisId: elemento.properties.Gis_ID,
+  direccion: elemento.properties.Dirección,
+  longitud: elemento.geometry.coordinates[0],
+  latitud: elemento.geometry.coordinates[1],
+});
+
+/**
+ * Un registro con la compañía y el texto reparados, a partir de lo que escribe el registro. Es la
+ * limpieza de Celda: se puede volver a hacer con lo guardado cuando cambia, sin pedir nada.
+ */
+export const registroDeCrudo = (crudo: ListadoCrudo): Lectura => {
+  const separador = crudo.id.lastIndexOf(" - ");
+  const titular = separador > 0 ? crudo.id.slice(0, separador) : crudo.id;
   const compania = companiaDeTitular(titular);
   if (compania === undefined) {
-    return { tipo: "aviso", aviso: `Titular desconocido: ${elemento.id}` };
+    return { tipo: "aviso", aviso: `Titular desconocido: ${crudo.id}` };
   }
-  const [longitud, latitud] = elemento.geometry.coordinates;
-  const direccion = repararTexto(elemento.properties.Dirección);
+  const direccion = repararTexto(crudo.direccion);
+  const codigo = crudo.gisId.trim();
   return {
     tipo: "registro",
     registro: {
-      clave: elemento.id,
+      clave: crudo.id,
       compania,
-      codigo: elemento.properties.Gis_ID.trim(),
-      posicion: { longitud, latitud },
+      codigo,
+      posicion: { longitud: crudo.longitud, latitud: crudo.latitud },
       direccion,
       municipio: municipioDeDireccion(direccion),
-      url: urlDeFicha(elemento.properties.Gis_ID.trim(), elemento.id),
+      url: urlDeFicha(codigo, crudo.id),
+      crudo,
     },
   };
 };
+
+/** Convierte un elemento del listado en un registro con la compañía y el texto reparados. */
+export const registroDeElemento = (elemento: Elemento): Lectura =>
+  registroDeCrudo(crudoDeElemento(elemento));
 
 const decodificarElemento = Schema.decodeUnknownOption(Elemento);
 
@@ -125,13 +150,6 @@ export const listadoDeElementos = (elementos: ReadonlyArray<unknown>): Listado =
     avisos,
   };
 };
-
-/** Fila de la tabla «Características técnicas» de la ficha. */
-export interface FilaFicha {
-  readonly operador: string;
-  readonly referencia: string;
-  readonly bandaMhz: string;
-}
 
 /** «1910.00 - 1915.00; 2155.00 - 2170.00» son dos rangos de un mismo expediente. */
 const rangosDeTexto = (texto: string): ReadonlyArray<Rango> | undefined => {
@@ -171,13 +189,6 @@ export const bandaDeFila = (fila: FilaFicha): Result.Result<Banda, string> => {
 export const bandasDeFilas = (
   filas: ReadonlyArray<FilaFicha>,
 ): Result.Result<ReadonlyArray<Banda>, string> => Result.all(filas.map(bandaDeFila));
-
-/** Fila de la tabla «Niveles medidos en el entorno» de la ficha, con el texto de cada celda. */
-export interface FilaDeNiveles {
-  readonly distancia: string;
-  readonly acimut: string;
-  readonly valor: string;
-}
 
 /**
  * Un número de la tabla de niveles. El registro los escribe con punto decimal (`0.98806`); se
@@ -227,13 +238,23 @@ export const medidasDeFilas = (
  */
 export const VERSION_DE_LECTURA = 2;
 
+/**
+ * Las bandas y las medidas de exposición de las tablas de una ficha tal como las escribe el
+ * registro, o por qué no se pueden leer. Es la limpieza de Celda: se puede volver a hacer con lo
+ * guardado cuando cambia (ADR 0027).
+ */
+export const fichaDeCruda = (
+  cruda: FichaCruda,
+): Result.Result<Pick<FichaLeida, "bandas" | "medidasDeExposicion">, string> =>
+  Result.all({
+    bandas: bandasDeFilas(cruda.caracteristicas),
+    medidasDeExposicion: medidasDeFilas(cruda.niveles),
+  });
+
 /** Las bandas y las medidas de exposición de una ficha en HTML, o por qué no se puede leer. */
 export const leerFicha = (html: string): Result.Result<FichaLeida, string> =>
-  Result.flatMap(filasDeFicha(html), ({ caracteristicas, niveles }) =>
-    Result.all({
-      bandas: bandasDeFilas(caracteristicas),
-      medidasDeExposicion: medidasDeFilas(niveles),
-    }),
+  Result.flatMap(filasDeFicha(html), (cruda) =>
+    Result.map(fichaDeCruda(cruda), (leida): FichaLeida => ({ ...leida, cruda })),
   );
 
 const celdas = (fila: string): ReadonlyArray<string> =>

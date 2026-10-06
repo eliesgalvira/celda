@@ -2,7 +2,7 @@ import { Caja as CajaEsquema, Cuadro, cuadroDe, ZONAS_DE_BARRIDO } from "@celda/
 import { compararTexto } from "@celda/dominio/banda";
 import { type EmplazamientoDeCapa, emplazamientoDeCapa } from "@celda/dominio/capa";
 import { Emplazamiento, type Estado } from "@celda/dominio/emplazamiento";
-import { fichaDe } from "@celda/dominio/ficha";
+import { fichaDe, type HechoDeFicha } from "@celda/dominio/ficha";
 import { fusionar } from "@celda/dominio/fusion";
 import {
   AceptadaParaPublicar,
@@ -26,6 +26,14 @@ import {
 import type { FichaEnCola } from "@celda/ingesta/fichas";
 import { type FichaLeida, Registro } from "@celda/ingesta/extractor";
 import { VERSION_DE_LECTURA } from "@celda/ingesta/registro-oficial/normalizar";
+import { conAntes, datosDeHecho, type HechoNuevo, idDeHecho } from "@celda/ingesta/hecho";
+import {
+  camposDistintos,
+  hechoDeFicha,
+  leerHecho,
+  registroPublicado,
+  repetirHechos,
+} from "@celda/ingesta/hechos";
 import {
   ObservacionGuardada,
   observacionDe,
@@ -48,6 +56,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import type * as SqlError from "effect/unstable/sql/SqlError";
@@ -97,6 +106,12 @@ export interface OpcionesBase {
  * La versión 7 trae, en `observaciones`, la versión de la lectura con que se leyó cada ficha
  * (`VERSION_DE_LECTURA`, #73). Las leídas antes se quedan con la 1, la que solo sacaba las bandas,
  * y vuelven a la cola para traer sus medidas de exposición del ministerio.
+ *
+ * La versión 8 trae el historial de cada registro (ADR 0027): `hechos`, al que solo se añade, con
+ * un número de orden global (`secuencia`), una versión por registro con índice único y un `id`
+ * determinista único, para que una noche repetida no escriba dos veces el mismo hecho. Cada
+ * observación que ya estaba recibe un hecho «conocido antes» con la fecha más antigua que la base
+ * guarda de ella. Se escriben en la misma transacción que la observación (`apuntarHecho`).
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -107,6 +122,16 @@ const sueloDe = (eje: "longitud" | "latitud") => {
   const valor = `json_extract(datos, '$.posicion.${eje}')`;
   return `(CAST(${valor} AS INTEGER) - (${valor} < CAST(${valor} AS INTEGER)))`;
 };
+
+/**
+ * La fecha más antigua que la base guarda de una observación, en SQL: la de la observación, la de
+ * su ficha, la del último listado que la trajo y la de su marca de sin ficha, la menor que haya.
+ */
+const masAntigua = (() => {
+  const fecha = `json_extract(datos, '$.fecha')`;
+  const otras = ["ficha_leida_en", "vista_en", `json_extract(datos, '$.sinFichaEnRegistro')`];
+  return `min(${fecha}, ${otras.map((otra) => `coalesce(${otra}, ${fecha})`).join(", ")})`;
+})();
 
 /** Las fuentes de hoy, como lista de SQL: `('registro-oficial', …)`. */
 const FUENTES = `(${Fuente.literals.map((fuente) => `'${fuente}'`).join(", ")})`;
@@ -234,6 +259,26 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
     `CREATE INDEX aportaciones_aceptadas_por_aceptacion ON aportaciones_aceptadas (aceptada_en)`,
   ],
   [`ALTER TABLE observaciones ADD COLUMN ficha_leida_con INTEGER NOT NULL DEFAULT 1`],
+  [
+    `CREATE TABLE hechos (
+      secuencia INTEGER PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      fuente TEXT NOT NULL,
+      clave TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      tipo TEXT NOT NULL,
+      fecha INTEGER NOT NULL,
+      datos TEXT NOT NULL,
+      UNIQUE (fuente, clave, version)
+    )`,
+    // El punto de partida: un hecho «conocido antes» por observación, con la observación entera y
+    // la fecha más antigua que la base guarda de ella. Una retirada lo lleva en su observación.
+    `INSERT INTO hechos (id, fuente, clave, version, tipo, fecha, datos)
+      SELECT 'conocido-antes:' || fuente || ':' || clave, fuente, clave, 1, 'conocido-antes',
+        ${masAntigua},
+        json_object('forma', 1, 'observacion', json(datos))
+      FROM observaciones ORDER BY id`,
+  ],
 ];
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
@@ -241,7 +286,30 @@ const ZonasEnJson = Schema.fromJsonString(Schema.Array(ZonaEnLaEjecucion));
 const EmplazamientoEnJson = Schema.fromJsonString(Emplazamiento);
 const decodificarEmplazamiento = Schema.decodeEffect(EmplazamientoEnJson);
 
-const FilaObservacion = Schema.Struct({ id: Schema.Int, datos: ObservacionEnJson });
+const FilaObservacion = Schema.Struct({
+  id: Schema.Int,
+  datos: ObservacionEnJson,
+  /** Cuándo la trajo un listado por última vez, si se ha pedido. */
+  vista_en: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+});
+/** Un hecho del historial tal como está en la base, para repetirlo. */
+const FilaHecho = Schema.Struct({
+  fuente: Fuente,
+  clave: Schema.String,
+  tipo: Schema.String,
+  fecha: Schema.Finite,
+  datos: Schema.String,
+});
+
+/** Lo que publica la ficha de un hecho del historial. */
+const FilaHistorial = Schema.Struct({
+  tipo: Schema.String,
+  fecha: Schema.Finite,
+  antes: Schema.NullOr(Schema.Finite),
+  /** `json_extract` da 1 o 0 por `true` o `false`, y nulo si el hecho no lo lleva. */
+  cambia: Schema.NullOr(Schema.Int),
+});
+
 /** Una observación con su cola de fichas, para aplicarle una ficha releída del archivo. */
 const FilaReleida = Schema.Struct({
   id: Schema.Int,
@@ -405,6 +473,14 @@ export interface ResumenDeZona extends EstadoDeZona {
   readonly zona: string;
 }
 
+/** Lo que da comparar el historial con la tabla `observaciones` (`comprobarHistorial`). */
+export interface ComprobacionDelHistorial {
+  readonly comprobadas: number;
+  readonly distintas: number;
+  /** Las primeras que no coinciden, con el motivo. */
+  readonly primeras: ReadonlyArray<{ readonly clave: string; readonly motivo: string }>;
+}
+
 /** El estado de la base para la orden `estado`. */
 export interface Resumen {
   readonly fuentes: ReadonlyArray<ResumenDeFuente>;
@@ -460,6 +536,11 @@ export class BaseNocturna extends Context.Service<
      * - `al-dia`: su ficha ya se leyó con la versión de la lectura de hoy y no está fallando;
      * - `aplicada`: guardada como la guarda una noche (`trasFicha`), con la versión de hoy.
      */
+    /**
+     * Repite el historial de cada observación y lo compara con lo que publica la tabla (ADR 0027).
+     * Devuelve cuántas ha comprobado y las que no coinciden, como mucho `maximo`.
+     */
+    readonly comprobarHistorial: (maximo: number) => Effect.Effect<ComprobacionDelHistorial>;
     readonly aplicarFichaReleida: (
       clave: string,
       leida: FichaLeida,
@@ -512,10 +593,28 @@ export const baseNocturna = (opciones: OpcionesBase) =>
       ) {
         if (claves.length === 0) return new Map<string, typeof FilaObservacion.Type>();
         const filas = yield* decodificar(FilaObservacion)(
-          yield* sql`SELECT id, datos FROM observaciones
+          yield* sql`SELECT id, datos, vista_en FROM observaciones
             WHERE fuente = ${fuente} AND clave IN ${sql.in(claves)}`,
         );
         return new Map(filas.map((fila) => [fila.datos.clave, fila]));
+      });
+
+      /**
+       * Añade un hecho al historial de un registro, con la fecha de la ejecución que lo ve (ADR
+       * 0027). Va dentro de la transacción de quien guarda la observación. Su versión es la
+       * siguiente del registro, y un hecho con el mismo `id` ya escrito no se repite.
+       */
+      const apuntarHecho = Effect.fn("BaseNocturna.apuntarHecho")(function* (
+        fuente: Fuente,
+        clave: string,
+        fecha: number,
+        hecho: HechoNuevo,
+      ) {
+        yield* sql`INSERT INTO hechos (id, fuente, clave, version, tipo, fecha, datos)
+          SELECT ${idDeHecho(hecho.tipo, fecha, fuente, clave)}, ${fuente}, ${clave},
+            coalesce(max(version), 0) + 1, ${hecho.tipo}, ${fecha}, ${datosDeHecho(hecho)}
+          FROM hechos WHERE fuente = ${fuente} AND clave = ${clave}
+          ON CONFLICT (id) DO NOTHING`;
       });
 
       /**
@@ -696,12 +795,19 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               let creados = 0;
               let cambiados = 0;
               if (fila === undefined) return { creados, cambiados };
+              // La última vez que se pidió este cuadro: un registro nuevo no estaba entonces.
+              const [anterior] = yield* decodificar(Maximo)(
+                yield* sql`SELECT max(b.inicio) AS v FROM cuadros_barridos cb
+                    JOIN barridos b ON b.id = cb.barrido
+                    WHERE cb.cuadro = ${cuadro} AND b.fuente = ${fila.fuente}
+                      AND b.id <> ${fila.id} AND b.inicio < ${fila.inicio}`,
+              );
               for (const lote of trozos(recorrido.registros, LOTE)) {
                 const claves = lote.map((registro) => registro.clave);
                 const previas = yield* observacionesDe(fila.fuente, claves);
                 for (const registro of lote) {
                   const previa = previas.get(registro.clave);
-                  const { guardar, cuenta } = trasListado(
+                  const { guardar, cuenta, hecho } = trasListado(
                     previa?.datos,
                     registro,
                     fila.fuente,
@@ -709,6 +815,10 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                   );
                   if (guardar !== undefined) {
                     yield* guardarObservacion(previa?.id, guardar, cuenta !== undefined);
+                  }
+                  if (hecho !== undefined) {
+                    const antes = hecho.tipo === "alta" ? anterior?.v : previa?.vista_en;
+                    yield* apuntarHecho(fila.fuente, registro.clave, fecha, conAntes(hecho, antes));
                   }
                   creados += cuenta === "creada" ? 1 : 0;
                   cambiados += cuenta === "cambiada" ? 1 : 0;
@@ -744,15 +854,18 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 fila.cuadros.length === 0
                   ? []
                   : yield* decodificar(FilaObservacion)(
-                      yield* sql`SELECT id, datos FROM observaciones
+                      yield* sql`SELECT id, datos, vista_en FROM observaciones
                           WHERE fuente = ${fila.fuente} AND retirada_en IS NULL
                             AND cuadro IN ${sql.in(fila.cuadros)}
                             AND (vista_en IS NULL OR vista_en < ${fila.inicio})`,
                     );
               let retirados = 0;
-              for (const { id, datos } of ausentes) {
-                const { guardada, retirada } = trasAusencia(datos, fecha);
+              for (const { id, datos, vista_en } of ausentes) {
+                const { guardada, retirada, hecho } = trasAusencia(datos, fecha);
                 yield* guardarObservacion(id, guardada);
+                if (hecho !== undefined) {
+                  yield* apuntarHecho(fila.fuente, datos.clave, fecha, conAntes(hecho, vista_en));
+                }
                 retirados += retirada ? 1 : 0;
               }
               yield* sql`UPDATE barridos SET estado = 'completado', fin = ${fin}
@@ -792,11 +905,16 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           fecha,
           leida,
         ) {
-          const previa = (yield* observacionesDe(fuente, [clave])).get(clave);
-          if (previa === undefined) return false;
-          const { guardada, cambiada } = trasFicha(previa.datos, leida, fecha);
-          yield* guardarObservacion(previa.id, guardada, true);
-          return cambiada;
+          return yield* sql.withTransaction(
+            Effect.gen(function* () {
+              const previa = (yield* observacionesDe(fuente, [clave])).get(clave);
+              if (previa === undefined) return false;
+              const { guardada, cambiada, hecho } = trasFicha(previa.datos, leida, fecha);
+              yield* guardarObservacion(previa.id, guardada, true);
+              if (hecho !== undefined) yield* apuntarHecho(fuente, clave, fecha, hecho);
+              return cambiada;
+            }),
+          );
         }, Effect.orDie),
 
         fallarFicha: Effect.fn("BaseNocturna.fallarFicha")(function* (fuente, clave, fallo) {
@@ -806,10 +924,9 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               if (sinFichaEnRegistro !== undefined) {
                 const previa = (yield* observacionesDe(fuente, [clave])).get(clave);
                 if (previa !== undefined) {
-                  yield* guardarObservacion(
-                    previa.id,
-                    trasSinFicha(previa.datos, sinFichaEnRegistro),
-                  );
+                  const { guardada, hecho } = trasSinFicha(previa.datos, sinFichaEnRegistro);
+                  yield* guardarObservacion(previa.id, guardada);
+                  yield* apuntarHecho(fuente, clave, sinFichaEnRegistro, hecho);
                 }
               }
               yield* sql`UPDATE observaciones SET ficha_fallos = ${fallo.fallos},
@@ -902,6 +1019,30 @@ export const baseNocturna = (opciones: OpcionesBase) =>
       const noDisponible = (error: { readonly message: string }) =>
         new DatosNoDisponibles({ motivo: `la base SQLite: ${error.message}` });
 
+      /**
+       * Lo que la ficha publica del historial de un registro (ADR 0027): sus hechos que cambian algo
+       * que se enseña, en orden, sin leer lo que guarda cada uno.
+       */
+      const historialDe = Effect.fn("BaseNocturna.historialDe")(function* (
+        fuente: Fuente,
+        clave: string,
+      ) {
+        const filas = yield* decodificar(FilaHistorial)(
+          yield* sql`SELECT tipo, fecha, json_extract(datos, '$.antes') AS antes,
+              json_extract(datos, '$.cambia') AS cambia
+            FROM hechos WHERE fuente = ${fuente} AND clave = ${clave} ORDER BY version`,
+        );
+        return filas.flatMap((fila): ReadonlyArray<HechoDeFicha> => {
+          const tipo = hechoDeFicha(fila.tipo, fila.cambia === null ? null : fila.cambia === 1);
+          if (tipo === undefined) return [];
+          return [
+            fila.antes === null
+              ? { tipo, fecha: fila.fecha }
+              : { tipo, fecha: fila.fecha, antes: fila.antes },
+          ];
+        });
+      });
+
       const fichaDeClave = Effect.fn("BaseNocturna.ficha")(function* (clave: string) {
         const [fila] = yield* decodificar(FilaEmplazamiento)(
           yield* sql`SELECT clave, version, datos FROM emplazamientos WHERE clave = ${clave}`,
@@ -910,14 +1051,15 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         const estaciones = yield* Effect.forEach(fila.datos.estaciones, (estacion) =>
           Effect.map(
             Effect.forEach(estacion.observaciones, ({ fuente, clave: claveFuente }) =>
-              Effect.map(observacionesDe(fuente, [claveFuente]), (encontradas) => [
-                ...encontradas.values(),
-              ]),
+              Effect.gen(function* () {
+                const encontradas = [...(yield* observacionesDe(fuente, [claveFuente])).values()];
+                const historial = yield* historialDe(fuente, claveFuente);
+                return encontradas.map(({ datos }) =>
+                  historial.length === 0 ? datos : { ...datos, historial },
+                );
+              }),
             ),
-            (encontradas) => ({
-              estacion,
-              observaciones: encontradas.flat().map((encontrada) => encontrada.datos),
-            }),
+            (encontradas) => ({ estacion, observaciones: encontradas.flat() }),
           ),
         );
         const ficha = fichaDe(fila.datos, fila.version, estaciones);
@@ -1116,6 +1258,58 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           );
         }, Effect.orDie),
 
+        comprobarHistorial: Effect.fn("BaseNocturna.comprobarHistorial")(function* (maximo) {
+          let comprobadas = 0;
+          let distintas = 0;
+          const primeras: Array<{ readonly clave: string; readonly motivo: string }> = [];
+          const apuntar = (clave: string, motivo: string) => {
+            distintas++;
+            if (primeras.length < maximo) primeras.push({ clave, motivo });
+          };
+          for (let desde = 0; ;) {
+            const pagina = yield* decodificar(FilaObservacion)(
+              yield* sql`SELECT id, datos FROM observaciones
+                  WHERE id > ${desde} ORDER BY id LIMIT ${PAGINA}`,
+            );
+            const ultima = pagina.at(-1);
+            if (ultima === undefined) break;
+            desde = ultima.id;
+            const filas = yield* decodificar(FilaHecho)(
+              yield* sql`SELECT fuente, clave, tipo, fecha, datos FROM hechos
+                  WHERE clave IN ${sql.in(pagina.map((f) => f.datos.clave))}
+                  ORDER BY fuente, clave, version`,
+            );
+            const porClave = new Map<string, Array<typeof FilaHecho.Type>>();
+            for (const fila of filas) {
+              const llave = `${fila.fuente}\u0000${fila.clave}`;
+              porClave.set(llave, [...(porClave.get(llave) ?? []), fila]);
+            }
+            for (const { datos } of pagina) {
+              comprobadas++;
+              const suyas = porClave.get(`${datos.fuente}\u0000${datos.clave}`) ?? [];
+              const leidos = Result.all(suyas.map((h) => leerHecho(h.tipo, h.fecha, h.datos)));
+              if (Result.isFailure(leidos)) {
+                apuntar(datos.clave, leidos.failure);
+                continue;
+              }
+              const repetido = repetirHechos(datos.fuente, leidos.success);
+              if (Result.isFailure(repetido)) {
+                apuntar(datos.clave, repetido.failure);
+                continue;
+              }
+              const distintos = camposDistintos(repetido.success, registroPublicado(datos));
+              if (distintos.length > 0) {
+                apuntar(
+                  datos.clave,
+                  `el historial no da lo de la tabla en ${distintos.join(", ")}`,
+                );
+              }
+            }
+          }
+          const hecha: ComprobacionDelHistorial = { comprobadas, distintas, primeras };
+          return hecha;
+        }, Effect.orDie),
+
         aplicarFichaReleida: Effect.fn("BaseNocturna.aplicarFichaReleida")(function* (
           clave,
           leida,
@@ -1135,7 +1329,11 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               if (fila.ficha_leida_con >= VERSION_DE_LECTURA && fila.ficha_fallos === 0) {
                 return "al-dia" as const;
               }
-              yield* guardarObservacion(fila.id, trasFicha(datos, leida, leidaEn).guardada, true);
+              const { guardada, hecho } = trasFicha(datos, leida, leidaEn);
+              yield* guardarObservacion(fila.id, guardada, true);
+              if (hecho !== undefined) {
+                yield* apuntarHecho("registro-oficial", clave, leidaEn, hecho);
+              }
               return "aplicada" as const;
             }),
           );

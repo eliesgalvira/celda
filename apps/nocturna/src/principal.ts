@@ -30,7 +30,7 @@ import {
   releerArchivo,
   restaurarArchivo,
 } from "./archivo.ts";
-import { baseNocturna } from "./base.ts";
+import { BaseNocturna, baseNocturna } from "./base.ts";
 import { aceptadasPorHttp } from "./buzon.ts";
 import { montarCapasEn } from "./capas.ts";
 import { clienteHttpDelRegistro } from "./conexionDelRegistro.ts";
@@ -64,6 +64,8 @@ import { cuadrosDeBorde, pasadaDeBorde } from "./cuadros.ts";
  *   ficha, sin pedir nada al registro, y dice cuántas se leen. Con `--aplicar` lleva a la base las
  *   que hacen falta (ADR 0027).
  * - `restaurar-archivo <carpeta>`: rehace el archivo de páginas con los paquetes de `<carpeta>`.
+ * - `comprobar-historial`: repite el historial de cada registro y comprueba que da lo que publica
+ *   la tabla de observaciones (ADR 0027). Acaba con error si alguno no coincide.
  *
  * Y dos que no abren la base:
  *
@@ -82,7 +84,7 @@ class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesc
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «noche», «estado», «publicar», «copia», «releer-archivo», «restaurar-archivo», «capas» o «cuadros-de-borde».`;
+    return `Orden desconocida «${this.orden}». Usa «noche», «estado», «publicar», «copia», «releer-archivo», «restaurar-archivo», «comprobar-historial», «capas» o «cuadros-de-borde».`;
   }
 }
 
@@ -101,6 +103,15 @@ class SinAlmacen extends Schema.TaggedError<SinAlmacen>()("SinAlmacen", {}) {
 }
 
 const codificarPasada = Schema.encodeEffect(Schema.fromJsonString(PasadaDeBorde));
+
+/** El historial de algún registro no da lo que publica la tabla de observaciones. */
+class HistorialDistinto extends Schema.TaggedError<HistorialDistinto>()("HistorialDistinto", {
+  distintas: Schema.Int,
+}) {
+  override get message() {
+    return `${this.distintas} registros cuyo historial no da lo que publica la tabla de observaciones`;
+  }
+}
 
 /** `restaurar-archivo` sin la carpeta de los paquetes. */
 class FaltaLaCarpeta extends Schema.TaggedError<FaltaLaCarpeta>()("FaltaLaCarpeta", {}) {
@@ -216,6 +227,20 @@ const principal = Effect.gen(function* () {
         const aplicar = argumentos.includes("--aplicar");
         const relectura = yield* releerArchivo(aplicar);
         yield* Console.log(describirRelectura(relectura, aplicar));
+        return;
+      }
+      case "comprobar-historial": {
+        const base = yield* BaseNocturna;
+        const comprobacion = yield* base.comprobarHistorial(20);
+        yield* Console.log(
+          [
+            `Registros comprobados: ${comprobacion.comprobadas}, distintos: ${comprobacion.distintas}`,
+            ...comprobacion.primeras.map((p) => `- ${p.clave}: ${p.motivo}`),
+          ].join("\n"),
+        );
+        if (comprobacion.distintas > 0) {
+          return yield* new HistorialDistinto({ distintas: comprobacion.distintas });
+        }
         return;
       }
       case "restaurar-archivo": {

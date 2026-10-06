@@ -8,7 +8,51 @@ import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-/** Una estación base tal como sale del listado de una fuente, antes de leer su ficha. */
+/**
+ * Un elemento del listado del registro oficial tal como lo escribe el registro, antes de que Celda
+ * lo limpie (ADR 0027): su `id` (razón social y código), su `Gis_ID`, su `Dirección` y sus
+ * coordenadas. Con él se comparan dos listados, así que cambiar la limpieza no cambia nada.
+ */
+export const ListadoCrudo = Schema.Struct({
+  id: Schema.String,
+  gisId: Schema.String,
+  direccion: Schema.String,
+  longitud: Schema.Finite,
+  latitud: Schema.Finite,
+});
+export type ListadoCrudo = typeof ListadoCrudo.Type;
+
+/** Una fila de «Características técnicas» de la ficha, con el texto de cada celda. */
+export const FilaFicha = Schema.Struct({
+  operador: Schema.String,
+  referencia: Schema.String,
+  bandaMhz: Schema.String,
+});
+export type FilaFicha = typeof FilaFicha.Type;
+
+/** Una fila de «Niveles medidos en el entorno» de la ficha, con el texto de cada celda. */
+export const FilaDeNiveles = Schema.Struct({
+  distancia: Schema.String,
+  acimut: Schema.String,
+  valor: Schema.String,
+});
+export type FilaDeNiveles = typeof FilaDeNiveles.Type;
+
+/**
+ * Las dos tablas de una ficha tal como las escribe el registro, con el texto de cada celda sin
+ * limpiar (ADR 0027). Con ellas se comparan dos lecturas de la ficha.
+ */
+export const FichaCruda = Schema.Struct({
+  caracteristicas: Schema.Array(FilaFicha),
+  niveles: Schema.Array(FilaDeNiveles),
+});
+export type FichaCruda = typeof FichaCruda.Type;
+
+/**
+ * Una estación base tal como sale del listado de una fuente, antes de leer su ficha. `crudo` es
+ * lo que escribió el registro oficial; falta en las fuentes que no lo dan y en las observaciones
+ * guardadas antes del ADR 0027.
+ */
 export const Registro = Schema.Struct({
   clave: Schema.String,
   compania: Compania,
@@ -17,6 +61,7 @@ export const Registro = Schema.Struct({
   direccion: Schema.String,
   municipio: Schema.String,
   url: Schema.String,
+  crudo: Schema.optionalKey(ListadoCrudo),
 });
 export type Registro = typeof Registro.Type;
 
@@ -25,6 +70,10 @@ export interface FichaLeida {
   readonly bandas: ReadonlyArray<Banda>;
   /** Las medidas de exposición del ministerio, quizá ninguna. */
   readonly medidasDeExposicion: ReadonlyArray<MedidaDeExposicion>;
+  /** Las tablas tal como las escribe el registro, si la fuente las da (ADR 0027). */
+  readonly cruda?: FichaCruda;
+  /** El SHA-256 de la página de la que sale, la del archivo de páginas (ADR 0027). */
+  readonly pagina?: string;
 }
 
 /** Resultado de recorrer el listado entero de una fuente. */

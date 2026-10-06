@@ -563,7 +563,8 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           const fichas = new Map(grabada.fichas);
           const antes = grabada.fichas.get(cambia);
           assert.isDefined(antes);
-          fichas.set(cambia, { ...antes, medidasDeExposicion: otras });
+          // Sin las tablas en crudo de la muestra, que dirían las medidas de antes.
+          fichas.set(cambia, { bandas: antes?.bandas ?? [], medidasDeExposicion: otras });
           yield* Ref.set(pedidas, []);
           yield* TestClock.setTime(NOCHE + DIA);
           yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, fichas }, pedidas));

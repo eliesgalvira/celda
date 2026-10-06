@@ -123,6 +123,8 @@ export interface FichaArchivada {
   readonly resultado: string;
   /** La página en HTML, decodificada de ISO-8859-1 como en el extractor. */
   readonly html: string;
+  /** El SHA-256 de la página, el nombre de su contenido. */
+  readonly huella: string;
 }
 
 /** El archivo no se ha podido abrir o no responde. */
@@ -185,6 +187,7 @@ const FilaFicha = Schema.Struct({
   url: Schema.String,
   leida_en: Schema.Finite,
   resultado: Schema.String,
+  huella: Schema.String,
   gzip: Schema.Uint8Array,
 });
 const decodificar = <S extends Schema.Top>(esquema: S) =>
@@ -410,15 +413,16 @@ const archivoSobre = (fichero: string, sql: SqlClient.SqlClient) =>
     const recorrerFichas = <E, R>(cada: (ficha: FichaArchivada) => Effect.Effect<void, E, R>) =>
       Effect.gen(function* () {
         for (let desde = 0; ;) {
-          const filas = yield* sql`SELECT p.id, p.clave, p.url, l.leida_en, l.resultado, c.gzip
+          const filas =
+            yield* sql`SELECT p.id, p.clave, p.url, l.leida_en, l.resultado, c.huella, c.gzip
               FROM paginas p
               JOIN lecturas l ON l.id = (SELECT max(id) FROM lecturas WHERE pagina = p.id)
               JOIN contenidos c ON c.id = l.contenido
               WHERE p.tipo = 'ficha' AND p.id > ${desde}
               ORDER BY p.id LIMIT ${PAGINA}`.pipe(
-            Effect.flatMap(decodificar(FilaFicha)),
-            Effect.mapError(noDisponible),
-          );
+              Effect.flatMap(decodificar(FilaFicha)),
+              Effect.mapError(noDisponible),
+            );
           for (const fila of filas) {
             if (fila.clave === null) continue;
             const html = yield* Effect.try({
@@ -434,6 +438,7 @@ const archivoSobre = (fichero: string, sql: SqlClient.SqlClient) =>
               leidaEn: fila.leida_en,
               resultado: fila.resultado,
               html,
+              huella: fila.huella,
             });
           }
           const ultima = filas.at(-1);
@@ -652,7 +657,11 @@ export const releerArchivo = Effect.fn("Archivo.releer")(function* (aplicar: boo
       case "leida":
         cuenta.leidas++;
         if (archivada.resultado !== "leida") cuenta.arregladas++;
-        return aplicarLeida(archivada.clave, lectura.ficha, archivada.leidaEn);
+        return aplicarLeida(
+          archivada.clave,
+          { ...lectura.ficha, pagina: archivada.huella },
+          archivada.leidaEn,
+        );
     }
   });
   const hecha: Relectura = { ...cuenta, ilegibles, aplicadas };

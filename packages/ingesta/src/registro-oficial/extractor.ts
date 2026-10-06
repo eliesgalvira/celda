@@ -1,7 +1,9 @@
 import * as Config from "effect/Config";
+import * as Crypto from "effect/Crypto";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type * as HttpClient from "effect/unstable/http/HttpClient";
 
@@ -66,6 +68,19 @@ export const opcionesClienteDesdeConfig: Config.Config<OpcionesCliente> = Config
     pausa: Duration.seconds(Math.max(pausaSegundos, 3)),
   })),
 );
+
+/**
+ * El SHA-256 de una página en hexadecimal, el nombre de su contenido en el archivo (ADR 0027), con
+ * el `Crypto` del contexto. Sin él, o si falla, la ficha no lo lleva.
+ */
+const huellaDe = Effect.fn("RegistroOficial.huella")(function* (cuerpo: Uint8Array) {
+  const crypto = yield* Effect.serviceOption(Crypto.Crypto);
+  if (Option.isNone(crypto)) return undefined;
+  const bytes = yield* Effect.option(crypto.value.digest("SHA-256", cuerpo));
+  return Option.isNone(bytes)
+    ? undefined
+    : [...bytes.value].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+});
 
 /** Estados con los que el geoportal estaría negando el paso a Celda. */
 const ESTADOS_DE_BLOQUEO: ReadonlySet<number> = new Set([401, 403]);
@@ -152,8 +167,10 @@ const geoportal = (listado: ClienteDeFuente, fichas: ClienteDeFuente) => {
         return yield* new SinFichaEnElRegistro({ url, motivo: AVISO_SIN_FICHA });
       case "ilegible":
         return yield* new RespuestaInesperada({ url, motivo: lectura.motivo });
-      case "leida":
-        return lectura.ficha;
+      case "leida": {
+        const pagina = yield* huellaDe(cuerpo);
+        return pagina === undefined ? lectura.ficha : { ...lectura.ficha, pagina };
+      }
     }
   });
 

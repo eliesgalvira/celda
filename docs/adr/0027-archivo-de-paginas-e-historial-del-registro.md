@@ -1,6 +1,6 @@
 # Archivo privado de las páginas del registro e historial de cada registro
 
-Estado: aceptada el 06/10/2026, con el diseño acordado con el usuario el mismo día. Va por fases. La fase 1, el archivo de páginas, está hecha (rama `celda/archivo-e-historial`); la fase 2, el historial, está decidida aquí y pendiente. Lo que se decidió al hacer la fase 1 va en «Cómo quedó».
+Estado: aceptada el 06/10/2026, con el diseño acordado con el usuario el mismo día. Va por fases. La fase 1, el archivo de páginas, y la fase 2, el historial de cada registro, están hechas. Lo que se decidió al hacer cada una va en «Cómo quedó». El 07/10/2026 el usuario confirmó que el archivo se queda en el mismo cubo por ahora y que el punto de partida lleva la fecha más antigua que la base guarda de cada registro.
 
 ## Contexto
 
@@ -25,7 +25,7 @@ La noche conserva catorce copias enteras de la base en el disco y otras catorce,
 - **Nunca se publica.** El build de Vercel solo copia el `vigente.json`, el resumen y los manifiestos de las versiones, y los ficheros que listan esos manifiestos (ADR 0018). Ahora además falla, sin escribir `vigente.json`, si un manifiesto lista algo de `copias/` o de `archivo/`. La retención de la publicación solo borra nombres con el sello de una versión y lo que listan sus manifiestos. La clave de solo lectura del build puede leer `archivo/`, como ya lee `copias/`, porque R2 da permisos por cubo. La base que hay en `copias/` tiene más que el archivo, así que esto no abre nada nuevo.
 - **Se relee sin red.** `lecturaDeFicha` (`packages/ingesta/src/registro-oficial/normalizar.ts`) lee una ficha como el extractor, y la usan los dos. `releer-archivo` pasa la lectura de hoy por la última lectura archivada de cada ficha y dice cuántas se leen, cuántas no y por qué. Con `--aplicar` lleva a la base las que hacen falta.
 
-### Fase 2: el historial de cada registro (pendiente)
+### Fase 2: el historial de cada registro
 
 Las ideas vienen de una aplicación con eventos que hizo el usuario. Tiene un registro de hechos al que solo se añade, con un número de orden global, una versión por flujo con índice único y un identificador determinista único, para que un reintento no duplique nada. Las cargas viejas se guardan con su JSON de entonces y se leen con adaptadores que fallan ante una forma ambigua en lugar de adivinar. Los ficheros en bruto se guardan aparte por su huella, y el registro de hechos solo la cita.
 
@@ -34,7 +34,7 @@ Las ideas vienen de una aplicación con eventos que hizo el usuario. Tiene un re
 - **Un hecho de ficha cita su página.** Lleva la huella de la página de la que sale, que está en el archivo de la fase 1.
 - **La tabla `observaciones` se queda.** Guarda también la cola de fichas (lecturas, fallos, esperas) y la noche la necesita. Se escribe en la misma transacción que los hechos. Una prueba, y si sale barato una orden como `comprobar`, comprueba que repetir los hechos da los campos publicados de la tabla.
 - **Escribir dos veces no duplica.** El identificador de cada hecho sale de la clave, la ejecución y el tipo, con un índice único: una noche retomada o repetida tras un corte no escribe nada dos veces.
-- **Un punto de partida que se distingue.** Cada registro que ya está en la base recibe un hecho «conocido antes», con la fecha de la ejecución que lo trajo o, si la base no la tiene, la más antigua que guarda de él. La web lo leerá como «en el registro antes del <fecha>» y nunca como fecha de puesta en servicio, que no es pública.
+- **Un punto de partida que se distingue.** Cada registro que ya está en la base recibe un hecho «conocido antes», con la fecha más antigua que la base guarda de él. La base no guarda la ejecución que trajo cada registro, y una fecha posterior a la verdadera sigue siendo cierta en «en el registro antes del <fecha>». La web lo dice así y nunca como fecha de puesta en servicio, que no es pública.
 - **Se publica en los lotes de fichas.** La historia de cada estación base va en la ficha con una clave opcional, sin cambiar el formato, como `sinFichaEnRegistro` y `medidasDeExposicion` (ADR 0016). La web no cambia en esta fase.
 
 ## Cómo quedó (fase 1)
@@ -54,6 +54,20 @@ Las ideas vienen de una aplicación con eventos que hizo el usuario. Tiene un re
 Para un arreglo de la lectura basta con subir `VERSION_DE_LECTURA`, desplegar y lanzar `releer-archivo --aplicar` con la noche parada. Lo que no esté en el archivo, o haya cambiado después, se relee en las noches siguientes como siempre. La fusión y la publicación de lo aplicado las hace la noche siguiente.
 
 **Lo que ocupa.** Con las muestras del registro, una ficha comprimida son unos 2,2 KB, así que las de España son unos 150 MB, más unos 30 MB de URL y claves. Durante la relectura de diez noches, cada paquete son unos 20 MB. Después crece con lo que cambia: unos 40 MB al año de lecturas, los listados que cambian (como mucho unos 100 MB al año si cambiasen todos los cuadros cada semana) y las fichas que cambian. Va una vez en el disco de la base, otra en la carpeta de copias y otra en R2.
+
+## Cómo quedó (fase 2)
+
+**La tabla.** `hechos`, en la versión 8 del esquema de la base: `secuencia` (el orden global), `id` (único: tipo, fecha de la ejecución, fuente y clave), `fuente` y `clave`, `version` (única por registro), `tipo`, `fecha` (la de la ejecución que lo ve, como la de las observaciones) y `datos`, el JSON del hecho con su `forma`. La versión 8 escribe en SQL el punto de partida, un hecho `conocido-antes` por observación con la observación entera, fechado con la menor de la fecha de la observación, la de su ficha, la del último listado que la trajo y la de su marca de sin ficha. Sobre la copia de la base del 30/09/2026 (69.612 registros) la base pasa de 97 a 170 MB.
+
+**Los tipos.** Se escriben con `packages/ingesta/src/hecho.ts` y se leen con `hechos.ts`: `conocido-antes`, `alta`, `listado`, `vuelta`, `ficha`, `sin-ficha` y `retirada`. `listado`, `vuelta` y `ficha` llevan `cambia`: si cambia lo que Celda enseña, y con ello la fecha de la observación. Un hecho con `cambia` a `false` es lo que escribe el registro cuando cambia sin que cambie lo limpio, o la primera vez que Celda lo guarda. `antes` es la última vez que Celda vio lo anterior: el último listado del registro, su última ficha o, en un alta, la última vez que se pidió su cuadro. Sin `antes`, un alta es de un cuadro que se pedía por primera vez. Cada ficha leída lleva `pagina`, el SHA-256 de su página en el archivo, con el `Crypto` de Effect.
+
+**Lo crudo y lo limpio.** El extractor da en cada registro lo que escribió el registro (`crudo`: `id`, `Gis_ID`, `Dirección` y coordenadas) y en cada ficha sus tablas como texto (`cruda`). La observación los guarda. `trasListado` y `trasFicha` (`packages/ingesta/src/guardado.ts`) comparan eso: si el registro escribe lo mismo no hay hecho ni cambia la fecha, aunque la limpieza dé otra cosa. `alDia` vuelve a sacar de lo crudo la compañía, el código, la dirección, el municipio, la URL, las bandas y las medidas cada vez que la fusión lee una observación, así que un arreglo de la limpieza llega en la noche siguiente sin mover ninguna fecha. Lo que se guardó antes del historial no tiene crudo: el primer listado y la primera ficha que lo traen lo guardan con un hecho que no cambia nada, salvo si lo limpio también es distinto.
+
+**La primera ficha de un alta** no cambia la fecha de la observación, que es la del alta, aunque se lea unas noches después: lo que dice ya lo decía el registro cuando apareció.
+
+**Leer los hechos.** `leerHecho` lee cada tipo con su forma sin aceptar claves de más: un hecho que no encaja en su forma, de una forma desconocida o con un listado que lleva a la vez el crudo y el registro falla y no se lee a medias. `repetirHechos` repite el historial de un registro con la limpieza de hoy, y `comprobar-historial` lo compara con lo que publica la tabla de observaciones de cada registro. Sobre la copia del 30/09/2026, con su punto de partida, no hay ninguno distinto.
+
+**En la ficha.** Cada origen del registro oficial lleva `historial`, una lista de `{ tipo, fecha, antes? }` (`HechoDeFicha` en `packages/dominio/src/ficha.ts`) con los tipos `en-el-registro-antes`, `alta`, `cambio-de-listado`, `cambio-de-ficha`, `sin-ficha`, `retirada` y `vuelta`. Los hechos con `cambia` a `false` no se publican. La clave es opcional y el formato no cambia (ADR 0016). `desdeDelOrigen` dice cómo enseñar la fecha del origen: «en el registro antes del <fecha>» si lo último que dice viene del punto de partida o de un alta sin `antes`, y «desde el <fecha>» si no, con `antes` como cota si la hay. La historia de un emplazamiento sale de la de los orígenes de sus estaciones. Con la copia del 30/09/2026, los lotes de fichas pasan de 42 a 46 MB.
 
 ## Consecuencias
 

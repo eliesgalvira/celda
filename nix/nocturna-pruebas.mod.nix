@@ -527,6 +527,11 @@
                   despues = maquina.succeed("grep --count geoportal.minetur.gob.es /var/lib/fuentes-de-prueba/peticiones.log").strip()
                   assert antes == despues, (antes, despues)
 
+              with subtest("el historial de cada registro da lo que publica la tabla de observaciones"):
+                  comprobacion = maquina.succeed("runuser --user=celda-nocturna -- celda-nocturna comprobar-historial 2>&1")
+                  print(comprobacion)
+                  assert "Registros comprobados: 40, distintos: 0" in comprobacion, comprobacion
+
               with subtest("con Vercel al día, publicar otra vez no llama al hook"):
                   salida = publicar_a_mano()
                   assert "Vercel ya sirve sitios@" in salida, salida

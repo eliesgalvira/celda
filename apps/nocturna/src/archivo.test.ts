@@ -2,15 +2,11 @@
 // @effect-diagnostics strictEffectProvide:off
 import { archivar, type PaginaDelRegistro } from "@celda/ingesta/archivo";
 import { ObservacionGuardada } from "@celda/ingesta/guardado";
-import { leerMuestra } from "@celda/ingesta/pruebas/grabado";
-import { clienteDePrueba, NO_HAY_ROBOTS, type Peticion } from "@celda/ingesta/pruebas/http";
-import { capaPorCajas, OPCIONES } from "@celda/ingesta/registro-oficial/extractor";
 import { lecturaDeFicha, VERSION_DE_LECTURA } from "@celda/ingesta/registro-oficial/normalizar";
 import { decodificarLatin1 } from "@celda/ingesta/texto";
 import { AlmacenDelArchivo, AlmacenNoDisponible } from "@celda/publicacion/almacen";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
 import { assert, describe, it } from "@effect/vitest";
-import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -27,111 +23,16 @@ import {
   releerArchivo,
   restaurarArchivo,
 } from "./archivo.ts";
+import { BaseNocturna } from "./base.ts";
 import { conBase, conEntorno, type Entorno, unaNoche } from "./pruebas/entorno.ts";
+import { fichasGrabadas, geoportal, latin1 } from "./pruebas/geoportal.ts";
 
 const NOCHE = Date.UTC(2026, 9, 7, 2, 15);
 const DIA = 86_400_000;
 
-/** Bytes en ISO-8859-1, como los manda el geoportal. */
-const latin1 = (texto: string): Uint8Array<ArrayBuffer> =>
-  Uint8Array.from(texto, (caracter) => caracter.charCodeAt(0));
-
-const ElementoGrabado = Schema.Struct({
-  id: Schema.String,
-  geometry: Schema.Struct({ coordinates: Schema.Tuple([Schema.Finite, Schema.Finite]) }),
-});
-const decodificarListado = Schema.decodeEffect(
-  Schema.fromJsonString(Schema.Struct({ features: Schema.Array(Schema.Unknown) })),
-);
-const decodificarElemento = Schema.decodeUnknownEffect(ElementoGrabado);
 const decodificarObservacion = Schema.decodeUnknownEffect(
   Schema.fromJsonString(ObservacionGuardada),
 );
-
-/** Lo que contesta el geoportal de prueba a cada ficha, por su código. */
-type Fichas = (codigo: string) => Uint8Array<ArrayBuffer>;
-
-/**
- * El geoportal con el listado grabado en el Campus Nord, que contesta cada caja con los elementos
- * que caen en ella, y cada ficha con lo que diga `fichas`. Apunta cada petición.
- */
-const geoportal = (fichas: Ref.Ref<Fichas>) =>
-  Effect.gen(function* () {
-    const grabado = yield* decodificarListado(
-      decodificarLatin1(yield* leerMuestra("geojson-campus-nord.iso-8859-1.json")),
-    );
-    const elementos = yield* Effect.forEach(grabado.features, (crudo) =>
-      Effect.map(decodificarElemento(crudo), (e) => ({
-        crudo,
-        longitud: e.geometry.coordinates[0],
-        latitud: e.geometry.coordinates[1],
-      })),
-    );
-    const peticiones = yield* Ref.make<ReadonlyArray<Peticion>>([]);
-    return {
-      peticiones,
-      /** El extractor real sobre ese geoportal, sin pausas, para que el reloj no tenga que andar. */
-      extractor: Effect.map(Ref.get(fichas), (deFicha) =>
-        capaPorCajas(
-          { ...OPCIONES, pausa: Duration.zero },
-          { ...OPCIONES, pausa: Duration.zero, maxPeticiones: 1000 },
-        ).pipe(
-          Layer.provide(
-            clienteDePrueba(peticiones, (url) => {
-              if (url.pathname === "/robots.txt") return NO_HAY_ROBOTS;
-              if (url.pathname === "/VCTEL/detalleEstacion.do") {
-                return {
-                  estado: 200,
-                  cuerpo: deFicha(url.searchParams.get("emplazamiento") ?? ""),
-                };
-              }
-              const [oeste = 0, sur = 0, este = 0, norte = 0] = (url.searchParams.get("bbox") ?? "")
-                .split(",")
-                .map(Number);
-              const dentro = elementos
-                .filter(
-                  (e) =>
-                    e.longitud >= oeste &&
-                    e.longitud <= este &&
-                    e.latitud >= sur &&
-                    e.latitud <= norte,
-                )
-                .map((e) => e.crudo);
-              return {
-                estado: 200,
-                cuerpo: latin1(dentro.length === 0 ? "{}" : JSON.stringify({ features: dentro })),
-              };
-            }),
-          ),
-        ),
-      ),
-    };
-  });
-
-/** Las fichas grabadas: tres en HTML, el aviso de código no válido y una que no se puede leer. */
-const fichasGrabadas = Effect.gen(function* () {
-  const muestra = (nombre: string) => Effect.map(leerMuestra(nombre), (b) => new Uint8Array(b));
-  const telefonica = yield* muestra("detalle-telefonica-0800942.iso-8859-1.html");
-  const orange = yield* muestra("detalle-orange-CATR0228A.iso-8859-1.html");
-  const digi = yield* muestra("detalle-digi-0800143.iso-8859-1.html");
-  const sinFicha = yield* muestra("detalle-codigo-no-valido.iso-8859-1.html");
-  const ilegible = latin1('<table class="tablaDetalleEstacion"><tr><td>Obras</td></tr>');
-  const fichas: Fichas = (codigo) => {
-    switch (codigo) {
-      case "0800942":
-        return telefonica;
-      case "CATR0228A":
-        return orange;
-      case "079808":
-        return sinFicha;
-      case "0800199":
-        return ilegible;
-      default:
-        return digi;
-    }
-  };
-  return { fichas, telefonica, orange, digi, sinFicha, ilegible };
-});
 
 /** Las filas de cada tabla de un archivo, leídas con su propio cliente, para comparar dos. */
 const tablasDelArchivo = (fichero: string) =>
@@ -509,6 +410,12 @@ describe("archivo de páginas del registro (ADR 0027)", () => {
           );
           assert.strictEqual(otraVez.aplicadas["al-dia"], 39);
           assert.strictEqual(otraVez.aplicadas.aplicada, 0);
+          // Lo aplicado va también al historial de cada registro (ADR 0027).
+          const comprobacion = yield* conBase(
+            entorno.base,
+            Effect.flatMap(BaseNocturna, (base) => base.comprobarHistorial(5)),
+          );
+          assert.deepStrictEqual(comprobacion.primeras, []);
         }),
       ),
   );

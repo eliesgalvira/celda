@@ -15,6 +15,37 @@ import { MedidaDeExposicion } from "./exposicion.ts";
 import { Lugar } from "./municipio.ts";
 import { Afirmacion, Fuente, type Observacion } from "./observacion.ts";
 
+/**
+ * Un hecho del historial de un registro del ministerio, tal como lo cuenta la ficha (ADR 0027):
+ *
+ * - `en-el-registro-antes`: el punto de partida del historial. Lo que dice el registro ya estaba
+ *   en él en `fecha`, y quizá mucho antes. No es una fecha de alta ni de puesta en servicio.
+ * - `alta`: Celda vio el registro por primera vez en `fecha`, y no estaba en `antes`, la última
+ *   vez que pidió su cuadro. Sin `antes`, era la primera vez que lo pedía.
+ * - `cambio-de-listado`: cambió su dirección, su posición o su código.
+ * - `cambio-de-ficha`: cambiaron sus bandas o sus medidas de exposición.
+ * - `sin-ficha`: el registro dijo que no tiene su ficha («Código de emplazamiento no válido»).
+ * - `retirada`: faltó en dos barridos seguidos.
+ * - `vuelta`: volvió a salir en el listado tras retirarse.
+ *
+ * `fecha` es cuándo lo vio Celda. `antes`, si está, es la última vez que vio lo anterior: el
+ * cambio llegó al registro entre las dos.
+ */
+export const HechoDeFicha = Schema.Struct({
+  tipo: Schema.Literals([
+    "en-el-registro-antes",
+    "alta",
+    "cambio-de-listado",
+    "cambio-de-ficha",
+    "sin-ficha",
+    "retirada",
+    "vuelta",
+  ]),
+  fecha: Schema.Finite,
+  antes: Schema.optionalKey(Schema.Finite),
+});
+export type HechoDeFicha = typeof HechoDeFicha.Type;
+
 /** De dónde sale un dato de la ficha: la observación de una fuente, con su fecha y su enlace. */
 export const OrigenDeFicha = Schema.Struct({
   fuente: Fuente,
@@ -25,8 +56,52 @@ export const OrigenDeFicha = Schema.Struct({
   /** Desde cuándo lo dice la fuente, en milisegundos. */
   fecha: Schema.Finite,
   afirma: Afirmacion,
+  /**
+   * El historial del registro en la fuente, del hecho más viejo al más nuevo (ADR 0027). Solo lo
+   * tiene el registro oficial. Es opcional, como `sinFichaEnRegistro`: las fichas publicadas antes
+   * no lo llevan, y la web de antes ignora la clave (ADR 0016). Cómo se dice `fecha` con él:
+   * `desdeDelOrigen`.
+   */
+  historial: Schema.optionalKey(Schema.Array(HechoDeFicha)),
 });
 export type OrigenDeFicha = typeof OrigenDeFicha.Type;
+
+/** Los hechos que dicen desde cuándo dice el registro lo que dice. */
+const ESTABLECEN: ReadonlySet<HechoDeFicha["tipo"]> = new Set([
+  "en-el-registro-antes",
+  "alta",
+  "cambio-de-listado",
+  "cambio-de-ficha",
+]);
+
+/**
+ * Cómo decir desde cuándo dice la fuente lo que dice (ADR 0027):
+ *
+ * - `antes-del`: lo que dice ya estaba en el registro en `fecha`, y Celda no sabe desde cuándo:
+ *   estaba cuando empezó el historial, o salió en la primera vez que Celda pidió su cuadro, y no
+ *   ha cambiado. La web dice «en el registro antes del <fecha>», nunca «desde».
+ * - `desde`: lo vio Celda por primera vez en `fecha`, y si hay `antes`, llegó entre `antes` y
+ *   `fecha`. La web dice «desde el <fecha>».
+ *
+ * Sin historial, como en las fichas publicadas antes, es `desde` con la `fecha` del origen.
+ */
+export const desdeDelOrigen = (
+  origen: Pick<OrigenDeFicha, "fecha" | "historial">,
+):
+  | { readonly tipo: "antes-del"; readonly fecha: number }
+  | { readonly tipo: "desde"; readonly fecha: number; readonly antes?: number } => {
+  const ultimo = (origen.historial ?? []).findLast((hecho) => ESTABLECEN.has(hecho.tipo));
+  if (ultimo === undefined) return { tipo: "desde", fecha: origen.fecha };
+  if (
+    ultimo.tipo === "en-el-registro-antes" ||
+    (ultimo.tipo === "alta" && ultimo.antes === undefined)
+  ) {
+    return { tipo: "antes-del", fecha: ultimo.fecha };
+  }
+  return ultimo.antes === undefined
+    ? { tipo: "desde", fecha: ultimo.fecha }
+    : { tipo: "desde", fecha: ultimo.fecha, antes: ultimo.antes };
+};
 
 /** Una estación base tal como la cuenta la ficha: sus bandas y las observaciones de las que sale. */
 export const EstacionDeFicha = Schema.Struct({
@@ -113,7 +188,9 @@ export interface EstacionConOrigenes {
   readonly estacion: EstacionBase;
   /** Las observaciones de `estacion.observaciones` que se han encontrado, en su orden. */
   readonly observaciones: ReadonlyArray<
-    Pick<Observacion, "fuente" | "clave" | "url" | "fecha" | "afirma">
+    Pick<Observacion, "fuente" | "clave" | "url" | "fecha" | "afirma"> & {
+      readonly historial?: ReadonlyArray<HechoDeFicha>;
+    }
   >;
 }
 
@@ -141,13 +218,10 @@ export const fichaDe = (
         compania: estacion.compania,
         codigos: estacion.codigos,
         bandas: estacion.bandas.toSorted(compararBandas),
-        origenes: observaciones.map(({ fuente, clave, url, fecha, afirma }) => ({
-          fuente,
-          clave,
-          url,
-          fecha,
-          afirma,
-        })),
+        origenes: observaciones.map(({ fuente, clave, url, fecha, afirma, historial }) => {
+          const origen: OrigenDeFicha = { fuente, clave, url, fecha, afirma };
+          return historial === undefined ? origen : { ...origen, historial };
+        }),
       };
       const { sinFichaEnRegistro, medidasDeExposicion } = estacion;
       const conMarca =

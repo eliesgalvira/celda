@@ -41,6 +41,7 @@ pnpm run ingesta copia      # copia la base a la carpeta de copias y, con R2, ta
 pnpm run ingesta releer-archivo             # relee las fichas del archivo de páginas, sin red y sin cambiar nada
 pnpm run ingesta releer-archivo --aplicar   # y lleva a la base las que hacen falta
 pnpm run ingesta restaurar-archivo <carpeta>   # rehace el archivo de páginas con sus paquetes
+pnpm run ingesta comprobar-historial        # repite el historial de cada registro y lo compara con la tabla
 pnpm run ingesta cuadros-de-borde borde.json   # pide una vez los cuadros de borde, con peticiones reales
 ```
 
@@ -114,6 +115,7 @@ La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sq
 - `ejecuciones`: cada pasada de un extractor, con sus cambios, sus errores, lo que hizo cada zona (cuadros, peticiones, bytes, registros y cambios) y cómo acabó la publicación de su noche;
 - `publicaciones`: cada intento de publicar;
 - `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero;
+- `hechos`: el historial de cada registro del ministerio (versión 8 del esquema, ADR 0027), ver [El historial de cada registro](#el-historial-de-cada-registro);
 - `aportaciones_aceptadas`: lo aceptado en la moderación que la noche ha leído del buzón, con su emplazamiento, el seudónimo de quien lo envió, cuándo se aceptó y la fecha de la ejecución que lo trajo (versión 6 del esquema, #57). Ni la identidad ni la huella de la IP salen del buzón.
 
 Las páginas del registro tal como llegan van en otro fichero, el archivo de páginas ([El archivo de páginas](#el-archivo-de-páginas)).
@@ -136,6 +138,23 @@ Para rehacer el archivo, se juntan los paquetes en una carpeta, de la de copias 
 `releer-archivo` pasa la lectura de hoy (`lecturaDeFicha`) por la última lectura archivada de cada ficha, sin pedir nada al registro, y dice cuántas se leen, cuántas no y por qué. Sirve para probar un arreglo de `leerFicha` con todas las fichas que se tienen. Con `--aplicar`, guarda en la base cada ficha leída como si se acabara de leer a la hora de su lectura archivada, salvo si la observación ya no está, si ha cambiado o se ha releído después, o si ya se leyó con la `VERSION_DE_LECTURA` de hoy y no está fallando. Así, tras subir `VERSION_DE_LECTURA`, lo nuevo llega a casi todas las fichas sin esperar diez noches. Lánzala con la noche parada. La fusión y la publicación de lo aplicado las hace la noche siguiente.
 
 El archivo nunca se publica. El build de Vercel solo monta lo que listan los manifiestos, y falla si uno lista algo de `copias/` o `archivo/` (`esPrivado` en `packages/publicacion/src/vercel.ts`).
+
+### El historial de cada registro
+
+Cada vez que la ingesta ve algo nuevo de un registro del ministerio lo apunta en `hechos`, en la misma transacción que guarda su observación (ADR 0027). Los hechos son de registros, por su clave, y no de emplazamientos, que cambian de clave cuando la fusión junta o separa. Nunca se cambian ni se borran. Cada uno tiene su número de orden global (`secuencia`), su versión en el registro (única) y un `id` único hecho de su tipo, la fecha de la ejecución y el registro, así que una noche repetida no escribe dos veces lo mismo.
+
+Los tipos (`packages/ingesta/src/hecho.ts`, y su lectura en `hechos.ts`):
+
+- `conocido-antes`: el punto de partida, uno por observación que ya estaba al pasar a la versión 8, con la observación entera y la fecha más antigua que la base guardaba de ella;
+- `alta`: un registro que la base no tenía, con lo que escribió el registro en el listado;
+- `listado` y `vuelta`: el listado escribe otra cosa de un registro, o vuelve a traer uno retirado;
+- `ficha`: la ficha escribe otra cosa, o vuelve a estar tras «Código de emplazamiento no válido», con sus tablas y el SHA-256 de su página en el archivo;
+- `sin-ficha`: cada vez que la ficha dice «Código de emplazamiento no válido»;
+- `retirada`: falta en dos barridos seguidos.
+
+Se compara lo que escribe el registro, antes de la limpieza de Celda (`repararTexto`, `municipioDeDireccion` y la compañía de cada razón social). La observación lo guarda (`crudo` y `fichaCruda`), y la fusión vuelve a limpiarlo cada noche (`alDia`). Así, cambiar la limpieza no es un hecho, no cuenta como cambio y no mueve ninguna fecha: llega a lo publicado en la siguiente fusión. `cambia`, en los hechos de listado y de ficha, dice si cambia lo que Celda enseña; solo entonces cambia la fecha de la observación. `antes` es la última vez que Celda vio lo anterior.
+
+`pnpm run ingesta comprobar-historial` repite el historial de cada registro con la limpieza de hoy y lo compara con lo que publica la tabla `observaciones`. Dice cuántos ha comprobado y, de los que no coinciden, en qué campos, y acaba con error si hay alguno.
 
 ### El barrido por zonas
 
@@ -240,6 +259,8 @@ Para ver lo que cabe, `node --max-old-space-size=512 src/medida/espana.ts /tmp/e
 
 `apps/nocturna/src/archivo.test.ts` prueba el archivo de páginas con el extractor real sobre un geoportal de prueba que contesta el listado del Campus Nord y fichas grabadas en HTML: que una noche guarda lo que llega byte a byte con lo que sacó la lectura y una vez cada contenido; que el paquete lleva solo lo nuevo y que con los paquetes se rehace el mismo archivo; que una subida a R2 fallida se repite la noche siguiente; que un paquete de otra versión del esquema no se restaura; que releer las fichas no pide nada al registro y lleva a la base solo las que hacen falta, también una que la lectura de entonces no entendía; y que un archivo que no se abre o no escribe no para la noche. `packages/ingesta/src/registro-oficial/extractor.test.ts` prueba qué páginas archiva el extractor, y `apps/nocturna/src/vercel.test.ts`, que el build no monta nada de `copias/` ni de `archivo/`.
 
+`apps/nocturna/src/historial.test.ts` prueba el historial con el extractor real y una base de la versión 7: el punto de partida con la fecha más antigua de cada observación, sin repetirse al abrir otra vez; que una noche apunta altas, fichas, cambios de listado y retiradas con su cota, que la ficha publica el historial y `desdeDelOrigen` dice «antes del» o «desde»; que una noche repetida no escribe nada dos veces; que un cambio de la limpieza no es un hecho ni mueve fechas pero llega a lo publicado; y que repetir el historial da lo de la tabla. `packages/ingesta/src/hechos.test.ts` prueba cada hecho, la lectura estricta de sus formas y la repetición, y `packages/dominio/src/ficha.test.ts`, `desdeDelOrigen`.
+
 `apps/nocturna/src/comunidad.test.ts` prueba lo aceptado con un buzón de prueba: que una corrección aceptada aparece en la ficha la noche siguiente, con el registro igual al lado, y una rechazada nunca; que leer dos veces lo mismo no duplica nada y una corroboración suma una persona; y que la noche sin Convex publica igual, queda fallida en la ejecución de la comunidad, lo dice el diario y la siguiente recoge lo que faltaba. Lee lo publicado con el mismo lector que la herramienta de moderación. `apps/nocturna/src/buzon.test.ts` prueba su cliente HTTP: la clave como `Bearer`, el cursor, un 401, una respuesta que no se entiende y los reintentos.
 
 `apps/nocturna/src/espana.test.ts` prueba toda España con la España sintética, que copia emplazamientos de los listados grabados de Barcelona y Valencia y los reparte por los municipios del padrón con los registros de cada cuadro en el listado propio del registro (`cuadros-del-registro.json`). Comprueba que por defecto se barre una zona cada noche, en su orden; que una provincia queda cubierta en el resumen cuando se han barrido todos sus cuadros, y antes no; que toda España cabe en una noche con `CELDA_REGISTRO_ZONAS_POR_NOCHE=7` y dentro del tope de peticiones; el orden de las fichas, y lo que dice `estado` de cada zona. Con los listados grabados de Barcelona y del centro de Madrid, la primera noche barre Cataluña, la segunda `centro`, y publican los 1.294 y 1.331 emplazamientos de la revisión de la fusión. Tarda unos 30 s.
@@ -307,7 +328,14 @@ Las pruebas están en `apps/nocturna/src/vercel.test.ts`, con un Vercel de menti
 
 ## Ficha
 
-La publicación pide a la base la `Ficha` de `packages/dominio/src/ficha.ts` de cada emplazamiento, que sale de `fichaDe` con el emplazamiento y las observaciones de sus estaciones. La ficha lleva la dirección y el municipio tal como los escribe la fuente, cada estación base con sus bandas ordenadas por frecuencia, sus medidas de exposición del ministerio por acimut (`medidasDeExposicion`, sin repetir entre sus observaciones, y sin la clave si ninguna ficha suya se ha leído desde el #73) y, por cada código, la observación de la que sale, con su fuente, su enlace y desde cuándo lo dice. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene. El municipio y la provincia del IGN (`lugar`) no salen de la base: los pone la publicación, y el lote cita su fuente una vez.
+La publicación pide a la base la `Ficha` de `packages/dominio/src/ficha.ts` de cada emplazamiento, que sale de `fichaDe` con el emplazamiento y las observaciones de sus estaciones. La ficha lleva la dirección y el municipio de la fuente, con la limpieza de hoy, cada estación base con sus bandas ordenadas por frecuencia, sus medidas de exposición del ministerio por acimut (`medidasDeExposicion`, sin repetir entre sus observaciones, y sin la clave si ninguna ficha suya se ha leído desde el #73) y, por cada código, la observación de la que sale, con su fuente, su enlace, desde cuándo lo dice y, del registro oficial, su historial (`historial`, ADR 0027).
+
+El historial de un origen es una lista de `{ tipo, fecha, antes? }`, del más viejo al más nuevo, con los hechos que cambian algo que se enseña: `en-el-registro-antes` (el punto de partida), `alta`, `cambio-de-listado`, `cambio-de-ficha`, `sin-ficha`, `retirada` y `vuelta`. Es opcional, como `sinFichaEnRegistro` y `medidasDeExposicion`, y el formato de los lotes no cambia (ADR 0016). Para decir desde cuándo dice la fuente lo que dice, la web usa `desdeDelOrigen` (`packages/dominio/src/ficha.ts`):
+
+- `{ tipo: "antes-del", fecha }`: lo que dice ya estaba en el registro en esa fecha y Celda no sabe desde cuándo. Es el punto de partida, o un alta en un cuadro que se pedía por primera vez. Se dice «en el registro antes del <fecha>», nunca «desde».
+- `{ tipo: "desde", fecha, antes? }`: Celda lo vio por primera vez en esa fecha; si hay `antes`, llegó al registro entre las dos. Se dice «desde el <fecha>».
+
+Una ficha publicada antes del historial no lo lleva, y entonces es `desde` con la `fecha` del origen, como hasta ahora. Su `version` es la del emplazamiento, que cambia también cuando cambia una de sus estaciones. Ninguna fuente da nombre ni barrio a los emplazamientos, así que la ficha tampoco los tiene. El municipio y la provincia del IGN (`lugar`) no salen de la base: los pone la publicación, y el lote cita su fuente una vez.
 
 La web la lee con el servicio `FichasPublicadas` (`apps/web/src/ficha/servicio.ts`): busca el lote en la capa del mapa, lo descarga una vez por visita y, si el origen ya no tiene esa versión, lee la vigente. Así la marca de agua solo es posterior al mapa en ese caso (ADR 0004).
 

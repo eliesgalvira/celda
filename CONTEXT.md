@@ -100,6 +100,10 @@ _Evitar_: medición, nivel de señal, potencia, cobertura, medida a secas
 Copia privada de cada página del registro oficial que lee la ingesta, el listado de cada caja y la página de cada estación base, tal como llegó y con la fecha de cada lectura. Sirve para volver a leerlas sin pedirlas otra vez cuando cambia la forma de leerlas. Nunca se publica (ADR 0027).
 _Evitar_: caché, histórico, backup
 
+**Historial de un registro**:
+Lo que la ingesta ha visto de un registro del registro oficial, hecho a hecho y con la fecha en que lo vio: cuándo apareció, cuándo cambiaron su dirección o sus bandas, cuándo se retiró. Su punto de partida es lo que ya estaba en el registro cuando empezó el historial, que se dice «en el registro antes del <fecha>» (ADR 0027).
+_Evitar_: log, eventos, histórico de cambios
+
 **Corrección**:
 Observación de la comunidad de Celda que contradice al registro oficial: una corrección propuesta que la moderación ha aceptado. Se publica al lado de lo que dice el registro, con su procedencia, y nunca lo sustituye.
 _Evitar_: enmienda, parche, edición
