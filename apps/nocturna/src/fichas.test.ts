@@ -556,8 +556,8 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             5,
           );
 
-          // Al día siguiente se piden solo esas cinco. Una de ellas publica ahora otras medidas,
-          // que sustituyen a las de antes.
+          // Al día siguiente se piden solo esas cinco. Una de ellas publica ahora otras medidas
+          // que las de la muestra, y son las que se guardan.
           const [cambia = "", ...igualesQueAntes] = viejas;
           const otras = [{ distanciaMetros: 12, acimutGrados: 300, microvatiosPorCm2: 0.02 }];
           const fichas = new Map(grabada.fichas);
@@ -570,9 +570,12 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           assert.deepStrictEqual(new Set(yield* Ref.get(pedidas)), new Set(viejas));
           const cambiada = yield* observacionEn(entorno, cambia);
           assert.deepStrictEqual(cambiada.datos.medidasDeExposicion, otras);
-          assert.strictEqual(cambiada.datos.fecha, NOCHE + DIA);
+          // Son las primeras medidas que lee de ellas: el registro ya las publicaba, así que la
+          // fecha de la observación no se mueve.
+          assert.strictEqual(cambiada.datos.fecha, NOCHE);
           for (const clave of igualesQueAntes) {
             const releida = yield* observacionEn(entorno, clave);
+            assert.strictEqual(releida.datos.fecha, NOCHE);
             assert.deepStrictEqual(
               releida.datos.medidasDeExposicion,
               grabada.fichas.get(clave)?.medidasDeExposicion,

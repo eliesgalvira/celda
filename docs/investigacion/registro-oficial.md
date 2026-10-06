@@ -249,7 +249,7 @@ Qué no significan:
 
 - No dicen nada de la cobertura ni de la calidad de la señal en ese punto. Comparan la exposición con los niveles de referencia legales, de 200 µW/cm² el más restrictivo. 0,02 µW/cm² a 1800 MHz son unos −34 dBm, millones de veces lo que necesita un móvil.
 - El acimut es la dirección del punto de medida vista desde la estación base. No dice hacia dónde apuntan los sectores.
-- El ministerio no las fecha. La fecha que guarda Celda es la de la observación: desde cuándo la ficha publica esas medidas y esas bandas, según las lecturas de Celda.
+- El ministerio no las fecha. La fecha que guarda Celda es la de la observación: desde cuándo la ficha publica esas medidas y esas bandas, según las lecturas de Celda. Al leerlas por primera vez no se mueve, porque ya estaban publicadas.
 - Son unos pocos puntos, de 1 a 9 por ficha en Campus Nord, donde estuvo el técnico. Entre ellos no se puede interpolar un mapa.
 
 **Para cruzar con otras fuentes** (lo aprovecha la investigación de antenasmoviles.es y OpenCelliD):

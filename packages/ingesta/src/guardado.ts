@@ -113,19 +113,20 @@ export interface TrasAusencia {
 
 /**
  * La observación tras leer su ficha en una ejecución con fecha `fecha`. La fecha de la
- * observación solo cambia si cambian las bandas o las medidas de exposición, que una guardada
- * antes de leerlas no tiene; la de lectura, siempre. Una lectura buena quita la marca de sin ficha
- * en el registro, y eso también cuenta como cambio.
+ * observación solo cambia si cambian las bandas o las medidas de exposición; la de lectura,
+ * siempre. Una guardada antes de que Celda leyera las medidas no las tiene: leerlas por primera vez
+ * es un cambio que se publica, pero no mueve la fecha, porque el registro ya las publicaba. Una
+ * lectura buena quita la marca de sin ficha en el registro, y eso también cuenta como cambio.
  */
 export const trasFicha = (
   previa: ObservacionGuardada,
   { bandas, medidasDeExposicion }: FichaLeida,
   fecha: number,
 ): TrasFicha => {
+  const primerasMedidas = previa.medidasDeExposicion === undefined;
   const iguales =
     mismasBandas(previa.bandas, bandas) &&
-    previa.medidasDeExposicion !== undefined &&
-    mismasMedidas(previa.medidasDeExposicion, medidasDeExposicion);
+    (primerasMedidas || mismasMedidas(previa.medidasDeExposicion, medidasDeExposicion));
   return {
     guardada: conFicha({
       ...previa,
@@ -134,7 +135,7 @@ export const trasFicha = (
       fecha: iguales ? previa.fecha : fecha,
       fichaLeidaEn: fecha,
     }),
-    cambiada: !iguales || previa.sinFichaEnRegistro !== undefined,
+    cambiada: !iguales || primerasMedidas || previa.sinFichaEnRegistro !== undefined,
   };
 };
 
