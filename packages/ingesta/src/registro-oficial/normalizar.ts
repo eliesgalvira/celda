@@ -151,6 +151,21 @@ export const listadoDeElementos = (elementos: ReadonlyArray<unknown>): Listado =
   };
 };
 
+/**
+ * La banda de 26 GHz (de 24,25 a 27,5 GHz), que el registro escribe en GHz en la columna de MHz,
+ * como «25.70 - 26.70» en la ficha `0802073` de Telefónica.
+ */
+const BANDA_DE_26_GHZ = { desde: 24.25, hasta: 27.5 };
+
+/**
+ * Un rango en MHz. Uno que cae entero en la banda de 26 GHz escrita en GHz se pasa a MHz: en MHz
+ * no hay ninguna banda móvil por debajo de 100.
+ */
+const rangoEnMhz = (desde: number, hasta: number): Rango =>
+  desde >= BANDA_DE_26_GHZ.desde && hasta <= BANDA_DE_26_GHZ.hasta && desde <= hasta
+    ? { desdeMhz: Math.round(desde * 1000), hastaMhz: Math.round(hasta * 1000) }
+    : { desdeMhz: desde, hastaMhz: hasta };
+
 /** «1910.00 - 1915.00; 2155.00 - 2170.00» son dos rangos de un mismo expediente. */
 const rangosDeTexto = (texto: string): ReadonlyArray<Rango> | undefined => {
   const rangos = texto.split(";").map((parte) => {
@@ -159,7 +174,7 @@ const rangosDeTexto = (texto: string): ReadonlyArray<Rango> | undefined => {
       hasta !== undefined &&
       Number.isFinite(desde) &&
       Number.isFinite(hasta)
-      ? { desdeMhz: desde, hastaMhz: hasta }
+      ? rangoEnMhz(desde, hasta)
       : undefined;
   });
   return rangos.every((r) => r !== undefined) ? rangos : undefined;

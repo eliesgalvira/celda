@@ -8,6 +8,7 @@ import * as Result from "effect/Result";
 import { leerMuestra, muestraCampusNord } from "../pruebas/grabado.ts";
 import { decodificarLatin1 } from "../texto.ts";
 import {
+  bandaDeFila,
   companiaDeTitular,
   esFichaSinEmplazamiento,
   leerFicha,
@@ -134,6 +135,29 @@ const fila = (distancia: string, acimut: string, valor: string) =>
   `<tr><td><p>${distancia}</p></td><td><p>${acimut}</p></td><td><p>${valor}</p></td></tr>`;
 
 describe("ficha del registro oficial", () => {
+  it("la banda de 26 GHz escrita en GHz se lee en MHz, sin banda nominal aún", () => {
+    const banda = bandaDeFila({
+      operador: "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+      referencia: "B B -2201234",
+      bandaMhz: "25.70 - 26.70",
+    });
+    assert.isTrue(Result.isSuccess(banda));
+    if (Result.isSuccess(banda)) {
+      assert.deepStrictEqual(banda.success.rangos, [{ desdeMhz: 25700, hastaMhz: 26700 }]);
+      assert.isNull(banda.success.mhz);
+    }
+    // Un rango en MHz de verdad no cambia.
+    const otra = bandaDeFila({
+      operador: "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+      referencia: "B B -2201234",
+      bandaMhz: "3410.00 - 3500.00",
+    });
+    assert.deepStrictEqual(
+      Result.isSuccess(otra) ? otra.success.rangos : [],
+      [{ desdeMhz: 3410, hastaMhz: 3500 }],
+    );
+  });
+
   it.effect("lee las bandas igual que la conversión de la investigación", () =>
     Effect.gen(function* () {
       const { bandas } = yield* fichaGrabada("detalle-orange-CATR0228A.iso-8859-1.html");
