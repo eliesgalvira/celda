@@ -7,6 +7,10 @@ export interface Salto {
   readonly y: number;
 }
 
+/** El `transform` de una lámina desplazada `salto` píxeles. */
+export const trasladoDeLamina = (salto: Salto): string =>
+  `translate(${salto.x.toFixed(1)}px, ${salto.y.toFixed(1)}px)`;
+
 /**
  * Cómo aparece o se va un marcador cuando el mapa agrupa o separa emplazamientos.
  *

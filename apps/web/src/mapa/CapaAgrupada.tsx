@@ -45,11 +45,14 @@ export interface CapaAgrupadaProps {
   /** Lo que se ve ahora. Al cambiar de nivel, los marcadores se agrupan o se separan. */
   readonly escena: Escena | undefined;
   readonly transicion: (antes: Escena, despues: Escena) => Transicion;
+  /** Dónde cae un punto del mapa en la lámina, que va desplazada `salto` respecto a la pantalla. */
   readonly proyectar: Proyectar;
-  /** Si un punto de la pantalla se ve: solo se anima lo que se ve. */
+  /** Si un punto de la lámina se ve en la pantalla: solo se anima lo que se ve. */
   readonly seVe: (punto: Salto) => boolean;
-  /** Cambia en cada fotograma en que se mueve el mapa: los marcadores se vuelven a colocar. */
-  readonly fotograma: number;
+  /** El zoom al que se colocan los marcadores: al cambiar, se vuelven a colocar. */
+  readonly zoom: number;
+  /** Lo que se ha desplazado el mapa desde que se colocaron: lo que se mueve su lámina. */
+  readonly salto: Salto;
   /** La preferencia de reducir movimiento: sin transiciones. */
   readonly movimientoReducido: boolean;
   /** Qué forma toma la etiqueta de cada zona; la que no esté aquí va completa. */
@@ -142,12 +145,17 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
   });
 
   return (
-    <CapaDeMarcadores nombre="Emplazamientos" contenedor={props.contenedor} logos={props.logos}>
+    <CapaDeMarcadores
+      nombre="Emplazamientos"
+      contenedor={props.contenedor}
+      logos={props.logos}
+      salto={props.salto}
+    >
       <For each={visibles()} keyed={(pintado) => pintado.elemento.clave}>
         {(pintado) => (
           <MarcadorPintado
             pintado={pintado()}
-            fotograma={props.fotograma}
+            zoom={props.zoom}
             proyectar={props.proyectar}
             formas={props.formas}
             tamano={props.tamano ?? "normal"}
@@ -164,7 +172,8 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
 
 function MarcadorPintado(props: {
   readonly pintado: Pintado;
-  readonly fotograma: number;
+  /** El zoom al que se colocan: la proyección cambia con él aunque no lo lea. */
+  readonly zoom: number;
   readonly proyectar: Proyectar;
   readonly formas: ReadonlyMap<string, FormaDeZona>;
   readonly tamano: TamanoDeMarcador;
@@ -174,8 +183,7 @@ function MarcadorPintado(props: {
   readonly alAbrir: (elemento: ElementoAbrible) => void;
 }) {
   const punto = createMemo(() => {
-    // La proyección cambia con cada fotograma aunque no lo lea.
-    void props.fotograma;
+    void props.zoom;
     return props.proyectar(props.pintado.elemento.posicion);
   });
   const emplazamiento = () => {

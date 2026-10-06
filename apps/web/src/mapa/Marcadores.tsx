@@ -8,7 +8,7 @@ import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { CapaDeRotulos, RotuloDeCiudad } from "@celda/ui/marcadores/RotuloDeCiudad.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
-import { createEffect, createMemo, createSignal, For } from "solid-js";
+import { createEffect, createMemo, createSignal, For, untrack } from "solid-js";
 
 import { type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
 import { huecosDe, resolverChoques, type RotuloEnElMapa, tamanoDeNivel } from "../capa/choques.ts";
@@ -23,7 +23,7 @@ import type { FichaPedida } from "../ficha/servicio.ts";
 import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
 import type { LecturaDeRotulos, LectorDeRotulos, RotuloLeido } from "./rotulosDeCiudad.ts";
-import { seguirVista } from "./vista.ts";
+import { type Lamina, seguirVista } from "./vista.ts";
 
 const REDUCIR_MOVIMIENTO = "(prefers-reduced-motion: reduce)";
 
@@ -78,8 +78,9 @@ const mismaLectura = (a: LecturaDeRotulos, b: LecturaDeRotulos): boolean =>
 
 /**
  * Los emplazamientos sobre el mapa, agrupados por zoom: el resumen por provincias de lejos y, de
- * cerca, las provincias que han llegado (ADR 0016). Los marcadores se recolocan en cada fotograma
- * del movimiento, pero qué se dibuja se decide al asentarse el mapa (ver `seguirVista`): crear y
+ * cerca, las provincias que han llegado (ADR 0016). Los marcadores y los rótulos copiados van en
+ * dos láminas que siguen al mapa en cada fotograma; cada marcador solo se vuelve a colocar al
+ * cambiar el zoom, y qué se dibuja se decide al asentarse el mapa (ver `seguirVista`): crear y
  * quitar nodos es lo caro.
  */
 export function Marcadores(props: MarcadoresProps) {
@@ -98,7 +99,9 @@ export function Marcadores(props: MarcadoresProps) {
       filtro(),
     ),
   );
-  const [fotograma, setFotograma] = createSignal(0);
+  const [lamina, setLamina] = createSignal<Lamina>({ zoom: 0, salto: { x: 0, y: 0 } });
+  /** El zoom al que se colocan los marcadores: no cambia mientras solo se mueve la lámina. */
+  const zoomColocado = createMemo(() => lamina().zoom);
   const [vista, setVista] = createSignal<Vista>();
   const [reducido, setReducido] = createSignal(false);
 
@@ -107,7 +110,7 @@ export function Marcadores(props: MarcadoresProps) {
     () => props.mapa,
     (mapa) =>
       seguirVista(mapa, {
-        fotograma: () => setFotograma((n) => n + 1),
+        lamina: setLamina,
         vista: (nueva) => {
           setVista(nueva);
           props.alCambiarVista?.(nueva);
@@ -147,6 +150,25 @@ export function Marcadores(props: MarcadoresProps) {
       punto.y > -MEDIO_MARCADOR &&
       punto.x < lienzo.clientWidth + MEDIO_MARCADOR &&
       punto.y < lienzo.clientHeight + MEDIO_MARCADOR;
+  });
+  /**
+   * `proyectar` y `seVe` dentro de las láminas, que van desplazadas `salto`. Lo leen sin seguirlo:
+   * un marcador nuevo se coloca donde está la lámina, y los demás no se recolocan al moverla.
+   */
+  const proyectarEnLamina = createMemo(() => {
+    const enPantalla = proyectar();
+    return (posicion: Coordenada) => {
+      const punto = enPantalla(posicion);
+      const { salto } = untrack(lamina);
+      return { x: punto.x - salto.x, y: punto.y - salto.y };
+    };
+  });
+  const seVeEnLamina = createMemo(() => {
+    const enPantalla = seVe();
+    return (punto: Salto) => {
+      const { salto } = untrack(lamina);
+      return enPantalla({ x: punto.x + salto.x, y: punto.y + salto.y });
+    };
   });
 
   // Precarga las fichas de los sueltos que se ven. La escena cambia también al seleccionar uno;
@@ -359,9 +381,10 @@ export function Marcadores(props: MarcadoresProps) {
         filtro={filtro()}
         escena={escena()}
         transicion={agrupador().transicion}
-        proyectar={proyectar()}
-        seVe={seVe()}
-        fotograma={fotograma()}
+        proyectar={proyectarEnLamina()}
+        seVe={seVeEnLamina()}
+        zoom={zoomColocado()}
+        salto={lamina().salto}
         movimientoReducido={reducido()}
         formas={formas()}
         ocultos={ocultos()}
@@ -370,13 +393,13 @@ export function Marcadores(props: MarcadoresProps) {
         alSeleccionar={(clave) => props.alSeleccionar(clave, provinciaDe(clave))}
         alAbrir={abrir}
       />
-      <CapaDeRotulos contenedor={props.mapa.getCanvasContainer()}>
+      <CapaDeRotulos contenedor={props.mapa.getCanvasContainer()} salto={lamina().salto}>
         <For each={rotulosEncima()} keyed={(rotulo) => rotulo.clave}>
           {(rotulo) => (
             <RotuloEnPantalla
               rotulo={rotulo()}
-              fotograma={fotograma()}
-              proyectar={proyectar()}
+              zoom={zoomColocado()}
+              proyectar={proyectarEnLamina()}
               conFoto={props.conFoto ?? false}
             />
           )}
@@ -387,18 +410,18 @@ export function Marcadores(props: MarcadoresProps) {
 }
 
 /**
- * Un rótulo de ciudad copiado encima de los marcadores. Se recoloca en cada fotograma del
- * movimiento, como los marcadores, con su `transform`; su letra es la del zoom en que se leyó.
+ * Un rótulo de ciudad copiado encima de los marcadores. Se vuelve a colocar al cambiar el zoom,
+ * como los marcadores; su letra es la del zoom en que se leyó.
  */
 function RotuloEnPantalla(props: {
   readonly rotulo: RotuloLeido;
-  readonly fotograma: number;
+  /** El zoom al que se colocan: la proyección cambia con él aunque no lo lea. */
+  readonly zoom: number;
   readonly proyectar: (posicion: Coordenada) => Salto;
   readonly conFoto: boolean;
 }) {
   const punto = createMemo(() => {
-    // La proyección cambia con cada fotograma aunque no lo lea.
-    void props.fotograma;
+    void props.zoom;
     return props.proyectar(props.rotulo.posicion);
   });
   return (

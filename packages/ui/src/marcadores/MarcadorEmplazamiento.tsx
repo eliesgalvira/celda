@@ -6,7 +6,7 @@ import { Show } from "solid-js";
 
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
-import { Deslizable, type Movimiento } from "./Deslizable.tsx";
+import { Deslizable, type Movimiento, type Salto, trasladoDeLamina } from "./Deslizable.tsx";
 import { idDeLogo, type LogoDeMarcador, SimbolosDeLogos } from "./LogoCompanias.tsx";
 
 /** Hexágono pequeño en la esquina para lo que no está verificado, como en los prototipos. */
@@ -123,19 +123,26 @@ export interface CapaDeMarcadoresProps {
   readonly contenedor: HTMLElement;
   /** Los logos que pueden aparecer, con lo que resalta cada uno: se dibuja una vez cada uno. */
   readonly logos: ReadonlyArray<LogoDeMarcador>;
+  /** Lo que se ha desplazado el mapa desde que se colocaron los marcadores (`seguirVista`). */
+  readonly salto: Salto;
   readonly children: JSX.Element;
 }
 
 /**
  * La lámina donde van los marcadores, encima del mapa y dentro de su contenedor. No recoge los
- * gestos: solo los marcadores son pulsables.
+ * gestos: solo los marcadores son pulsables. Al arrastrar se mueve ella entera, con un solo
+ * `transform`, y los marcadores no. Cada marcador sigue en su propia capa del compositor: sin ella,
+ * al acercar, el navegador volvía a pintar la lámina entera en cada fotograma y un vuelo perdía
+ * hasta 5 fps en un móvil. No recorta: el contenedor del mapa ya lo hace, y la lámina desplazada
+ * cortaría los marcadores que entran por el otro lado.
  */
 export function CapaDeMarcadores(props: CapaDeMarcadoresProps) {
   return (
     <Portal mount={props.contenedor}>
       <section
         aria-label={props.nombre}
-        class="pointer-events-none absolute inset-0 isolate overflow-hidden"
+        class="pointer-events-none absolute inset-0 isolate will-change-transform"
+        style={{ transform: trasladoDeLamina(props.salto) }}
       >
         <SimbolosDeLogos logos={props.logos} />
         {props.children}

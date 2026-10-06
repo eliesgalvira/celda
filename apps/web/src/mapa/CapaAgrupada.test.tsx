@@ -79,7 +79,8 @@ const montar = (reducido: boolean, seleccionada: string | null = null, barrios =
       transicion={agrupador.transicion}
       proyectar={proyectar}
       seVe={() => true}
-      fotograma={0}
+      zoom={0}
+      salto={{ x: 0, y: 0 }}
       movimientoReducido={reducido}
       formas={new Map()}
       seleccionada={seleccionada}
@@ -223,7 +224,8 @@ describe("capa agrupada por provincias", () => {
           y: (42 - posicion.latitud) * 2000,
         })}
         seVe={() => true}
-        fotograma={0}
+        zoom={0}
+        salto={{ x: 0, y: 0 }}
         movimientoReducido={reducido}
         formas={new Map()}
         seleccionada={null}
@@ -415,7 +417,8 @@ describe("capa agrupada con la regla de choques (ADR 0024)", () => {
         transicion={agrupador.transicion}
         proyectar={(p) => ({ x: p.longitud * 100, y: p.latitud * 100 })}
         seVe={() => true}
-        fotograma={0}
+        zoom={0}
+        salto={{ x: 0, y: 0 }}
         movimientoReducido={true}
         formas={new Map()}
         ocultos={ocultos()}
@@ -464,7 +467,8 @@ describe("capa agrupada a todos los zooms", () => {
         transicion={agrupador.transicion}
         proyectar={proyectarEspana}
         seVe={() => true}
-        fotograma={0}
+        zoom={0}
+        salto={{ x: 0, y: 0 }}
         movimientoReducido={reducido}
         formas={new Map()}
         seleccionada={null}

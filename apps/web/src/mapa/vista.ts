@@ -1,4 +1,5 @@
 import { contiene, type Rectangulo } from "@celda/dominio/area";
+import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 
 import { nivelDeZoom } from "../capa/agrupacion.ts";
 import { cajaConMargen, type Vista } from "../capa/marcadores.ts";
@@ -16,6 +17,8 @@ export interface MapaQueSeMueve {
     getNorth(): number;
   };
   readonly getZoom: () => number;
+  readonly getCenter: () => { readonly lng: number; readonly lat: number };
+  readonly project: (lugar: [number, number]) => { readonly x: number; readonly y: number };
 }
 
 /** La vista que enseña ahora el mapa. */
@@ -33,26 +36,33 @@ export const vistaDe = (mapa: MapaQueSeMueve): Vista => {
 const dentro = (fuera: Rectangulo, caja: Rectangulo): boolean =>
   contiene(fuera, caja.suroeste) && contiene(fuera, caja.noreste);
 
+/**
+ * Dónde va la lámina de los marcadores. A un mismo zoom todo el mapa se desplaza lo mismo en la
+ * pantalla, así que los marcadores se colocan una vez y lo que se mueve es su lámina.
+ */
+export interface Lamina {
+  /** El zoom al que se colocaron los marcadores. Al cambiar, hay que volver a colocarlos. */
+  readonly zoom: number;
+  /** Lo que se ha desplazado el mapa desde que se colocaron: lo que se mueve la lámina. */
+  readonly salto: Salto;
+}
+
 export interface Seguimiento {
-  /** En cada fotograma en que se mueve el mapa, como mucho una vez: hay que recolocar. */
-  readonly fotograma: () => void;
+  /**
+   * En cada `move`, dentro del fotograma en que MapLibre mueve la cámara. Uno pedido desde ahí con
+   * `requestAnimationFrame` llegaba un fotograma tarde, y los marcadores iban detrás del mapa.
+   */
+  readonly lamina: (lamina: Lamina) => void;
   /** Hay que volver a decidir qué se dibuja para esta vista (y su caja con margen). */
   readonly vista: (vista: Vista) => void;
 }
 
-export interface Reloj {
-  readonly pedir: (f: () => void) => number;
-  readonly cancelar: (id: number) => void;
-}
-
-const RELOJ_DEL_NAVEGADOR: Reloj = {
-  pedir: (f) => requestAnimationFrame(f),
-  cancelar: (id) => cancelAnimationFrame(id),
-};
+const QUIETA: Salto = { x: 0, y: 0 };
 
 /**
- * Sigue el movimiento del mapa para los marcadores. Recolocarlos es barato y se hace en cada
- * fotograma. Decidir qué se dibuja (agrupar, crear y quitar nodos) es lo caro, y se hace:
+ * Sigue el movimiento del mapa para los marcadores. Mover su lámina es barato y se hace en cada
+ * `move`; colocar cada marcador, solo al cambiar el zoom. Decidir qué se dibuja (agrupar, crear y
+ * quitar nodos) es lo caro, y se hace:
  *
  * - al asentarse el mapa (`moveend`), aunque haya cruzado varios niveles de zoom por el camino;
  * - durante el movimiento, solo al cambiar de nivel si además la vista se ha salido de la caja con
@@ -61,39 +71,44 @@ const RELOJ_DEL_NAVEGADOR: Reloj = {
  *
  * Devuelve la función que deja de seguirlo.
  */
-export const seguirVista = (
-  mapa: MapaQueSeMueve,
-  seguimiento: Seguimiento,
-  reloj: Reloj = RELOJ_DEL_NAVEGADOR,
-): (() => void) => {
-  let pendiente = 0;
-  let dibujada: Vista | undefined;
+export const seguirVista = (mapa: MapaQueSeMueve, seguimiento: Seguimiento): (() => void) => {
+  let dibujada = vistaDe(mapa);
   const decidir = () => {
     dibujada = vistaDe(mapa);
     seguimiento.vista(dibujada);
   };
-  const recolocar = () => {
-    pendiente = 0;
-    seguimiento.fotograma();
+  /** Dónde se colocaron los marcadores: el zoom y en qué píxel caía entonces el centro. */
+  const colocar = () => {
+    const { lng, lat } = mapa.getCenter();
+    const centro: [number, number] = [lng, lat];
+    return { zoom: mapa.getZoom(), centro, punto: mapa.project(centro) };
+  };
+  let colocados = colocar();
+  const alMover = () => {
+    if (mapa.getZoom() === colocados.zoom) {
+      const punto = mapa.project(colocados.centro);
+      seguimiento.lamina({
+        zoom: colocados.zoom,
+        salto: { x: punto.x - colocados.punto.x, y: punto.y - colocados.punto.y },
+      });
+    } else {
+      colocados = colocar();
+      seguimiento.lamina({ zoom: colocados.zoom, salto: QUIETA });
+    }
     const ahora = vistaDe(mapa);
     if (
-      dibujada === undefined ||
-      (nivelDeZoom(ahora.zoom) !== nivelDeZoom(dibujada.zoom) &&
-        !dentro(cajaConMargen(dibujada.caja), ahora.caja))
+      nivelDeZoom(ahora.zoom) !== nivelDeZoom(dibujada.zoom) &&
+      !dentro(cajaConMargen(dibujada.caja), ahora.caja)
     ) {
       decidir();
     }
   };
-  // Como mucho una vez por fotograma: el mapa emite varios `move` entre dos.
-  const alMover = () => {
-    if (pendiente === 0) pendiente = reloj.pedir(recolocar);
-  };
   mapa.on("move", alMover);
   mapa.on("moveend", decidir);
+  seguimiento.lamina({ zoom: colocados.zoom, salto: QUIETA });
   decidir();
   return () => {
     mapa.off("move", alMover);
     mapa.off("moveend", decidir);
-    reloj.cancelar(pendiente);
   };
 };

@@ -30,6 +30,21 @@ export interface FotogramasEnPagina {
   }>;
   /** Cuántos elementos tenía la lámina de marcadores al terminar. */
   readonly nodos: number;
+  /**
+   * Cuánto se separan los marcadores del sitio que les toca en el lienzo, en px CSS, medido al
+   * final de cada fotograma que pinta MapLibre (`render`): la media, el máximo y en cuántos
+   * fotogramas. Un marcador que va un fotograma por detrás del mapa se separa lo que el mapa se
+   * mueve en ese fotograma.
+   */
+  readonly desfase: {
+    readonly media: number;
+    readonly maximo: number;
+    readonly muestras: number;
+    /** De los fotogramas con el mapa en movimiento, en qué parte iba el marcador un fotograma tarde. */
+    readonly tarde: number;
+  };
+  /** Cuántos marcadores había en la lámina al terminar. */
+  readonly marcadores: number;
 }
 
 export interface Interaccion {
@@ -51,6 +66,9 @@ export interface CamaraEnPagina {
   readonly project: (lugar: Centro) => { readonly x: number; readonly y: number };
   readonly getZoom: () => number;
   readonly once: (evento: "idle", oyente: () => void) => void;
+  readonly on: (evento: "render", oyente: () => void) => void;
+  readonly off: (evento: "render", oyente: () => void) => void;
+  readonly unproject: (punto: readonly [number, number]) => { lng: number; lat: number };
   readonly triggerRepaint: () => void;
 }
 
@@ -88,9 +106,10 @@ export const instalar = (): void => {
   let avisoVisto = false;
   const tareasLargas: Array<{ inicio: number; duracion: number }> = [];
 
+  /** La cinta `CargaDelMapa`, un `<output>` con «Cargando el mapa…». */
   const hayAvisoDeMapa = (): boolean =>
-    [...document.querySelectorAll("[role=status] h2")].some((h) =>
-      (h.textContent ?? "").includes("Cargando el mapa base"),
+    [...document.querySelectorAll("output")].some((salida) =>
+      (salida.textContent ?? "").includes("Cargando el mapa"),
     );
   const mirarCarga = (): void => {
     if (mapaBase === undefined) {
@@ -215,6 +234,83 @@ export const instalar = (): void => {
     }
   }).observe({ type: "long-animation-frame", buffered: false });
 
+  // El desfase de los marcadores: hasta cinco botones de la lámina que se ven al empezar.
+  const trasladoDe = (elemento: HTMLElement | null): [number, number] | undefined => {
+    const m = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/u.exec(elemento?.style.transform ?? "");
+    return m === null ? undefined : [Number(m[1]), Number(m[2])];
+  };
+  // El botón va en su sitio dentro de la lámina, y la lámina puede ir desplazada entera.
+  const posicionDe = (boton: HTMLElement): [number, number] | undefined => {
+    const propio = trasladoDe(boton);
+    if (propio === undefined) return undefined;
+    const lamina = trasladoDe(boton.parentElement) ?? [0, 0];
+    return [propio[0] + lamina[0], propio[1] + lamina[1]];
+  };
+  // Cada marcador seguido lleva su sitio en el mapa y dónde tocaba en el fotograma anterior. En
+  // cada fotograma en que el mapa se mueve más de 1 px, el marcador está «a tiempo» (donde toca
+  // ahora), «tarde» (donde tocaba en el fotograma anterior: se separa lo que se ha movido el mapa)
+  // o en otro sitio, porque la web lo ha recolocado (al agrupar): entonces se vuelve a anclar.
+  let seguidos: Array<{
+    boton: HTMLElement;
+    lugar: [number, number];
+    antes: { x: number; y: number } | undefined;
+  }> = [];
+  let aTiempo = 0;
+  let tarde: Array<number> = [];
+  let alPintar: (() => void) | undefined;
+  const seguirMarcadores = () => {
+    const mapa = window.__celdaMapa;
+    seguidos = [];
+    aTiempo = 0;
+    tarde = [];
+    if (mapa === undefined) return;
+    const lamina = document.querySelector('section[aria-label="Emplazamientos"]');
+    const ancho = innerWidth;
+    const alto = innerHeight;
+    for (const boton of lamina?.querySelectorAll<HTMLElement>(":scope > button") ?? []) {
+      const p = posicionDe(boton);
+      if (p === undefined || p[0] < 0 || p[1] < 0 || p[0] > ancho || p[1] > alto) continue;
+      const l = mapa.unproject(p);
+      seguidos.push({ boton, lugar: [l.lng, l.lat], antes: undefined });
+      if (seguidos.length >= 5) break;
+    }
+    alPintar = () => {
+      // Tras el `flush` de Solid, que va en una microtarea pedida antes que esta.
+      queueMicrotask(() => {
+        for (const seguido of seguidos) {
+          if (!seguido.boton.isConnected) continue;
+          const p = posicionDe(seguido.boton);
+          if (p === undefined) continue;
+          const ahora = mapa.project(seguido.lugar);
+          const antes = seguido.antes;
+          seguido.antes = { x: ahora.x, y: ahora.y };
+          if (antes === undefined) continue;
+          const paso = Math.hypot(ahora.x - antes.x, ahora.y - antes.y);
+          if (paso < 1) continue;
+          if (Math.hypot(p[0] - ahora.x, p[1] - ahora.y) < 0.6) aTiempo += 1;
+          else if (Math.hypot(p[0] - antes.x, p[1] - antes.y) < 0.6) tarde.push(paso);
+          else {
+            const l = mapa.unproject(p);
+            seguido.lugar = [l.lng, l.lat];
+            seguido.antes = undefined;
+          }
+        }
+      });
+    };
+    mapa.on("render", alPintar);
+  };
+  const dejarDeSeguir = () => {
+    if (alPintar !== undefined) window.__celdaMapa?.off("render", alPintar);
+    alPintar = undefined;
+    const muestras = aTiempo + tarde.length;
+    return {
+      media: muestras === 0 ? 0 : tarde.reduce((a, b) => a + b, 0) / muestras,
+      maximo: Math.max(0, ...tarde),
+      muestras,
+      tarde: muestras === 0 ? 0 : tarde.length / muestras,
+    };
+  };
+
   window.__celda = {
     carga: () => ({
       mapaBase: mapaBase === -1 ? undefined : mapaBase,
@@ -231,11 +327,16 @@ export const instalar = (): void => {
       ultimo = 0;
       intervalos = [];
       largos = [];
+      seguirMarcadores();
       requestAnimationFrame(latir(grabacion));
     },
     parar: () => {
       grabando = false;
+      const desfase = dejarDeSeguir();
       return {
+        desfase,
+        marcadores: document.querySelectorAll('section[aria-label="Emplazamientos"] > button')
+          .length,
         intervalos,
         duracion: performance.now() - inicio,
         largos,

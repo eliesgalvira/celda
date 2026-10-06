@@ -95,6 +95,13 @@ export class CapaEmplazamientos extends Context.Service<
 >()("@celda/web/capa/servicio/CapaEmplazamientos") {}
 
 /**
+ * Deja pintar al navegador antes de seguir: con el planificador de Effect, `yieldNow` sigue en
+ * otra tarea. Leer la respuesta del Worker, agrupar una provincia y dibujar sus marcadores iban en
+ * una sola tarea, de 200 a 300 ms en un móvil, y el mapa se paraba al llegar la provincia.
+ */
+const dejarPintar = Effect.yieldNow;
+
+/**
  * Cuántas agrupaciones con filtro se guardan por provincia, además de la de todas: las de los
  * últimos filtros. Cada una son los índices de lo que sale con su filtro.
  */
@@ -249,6 +256,7 @@ export const capaDelOrigen = Layer.effect(
             suResumen.set(codigo, suyo);
             const cubierta = suyo.provincias.find((p) => p.codigo === codigo)?.cubierta === true;
             const { capa, indices } = yield* indexador.indexar(codigo, texto, cubierta);
+            yield* dejarPintar;
             const cargada: ProvinciaCargada = {
               codigo,
               version: suyo.version,
@@ -256,6 +264,7 @@ export const capaDelOrigen = Layer.effect(
               capa,
               agrupador: agrupadorDeProvincia(capa, suyo, indices),
             };
+            yield* dejarPintar;
             return cargada;
           }),
         );

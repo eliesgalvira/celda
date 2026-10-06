@@ -90,7 +90,7 @@ Con ×4, los fotogramas de más de 50 ms pasan de 6 a 0 en toda la sesión, y el
 
 La primera ficha tardaba lo que tarda su lote por la red. Ahora el lote ya está cuando se toca, y la ficha sale entera en la misma interacción. Por eso el INP sube: antes esa interacción solo pintaba el esqueleto de la ficha y el resto llegaba con la red, fuera de la medida. La ficha se ve antes, pero ese primer pintado cuesta más, sobre todo por compilar y montar por primera vez el código del panel. Las siguientes fichas salen en 70 ms con ×4.
 
-Qué cuesta ahora el peor fotograma, en las trazas con ×4: el de reagrupar al asentarse dura unos 45 ms, con 11 de estilo, 8 de JavaScript de la web, 3 de maquetación y 4 de MapLibre. Antes, el peor era el de cruzar al nivel de barrios a mitad del zoom: 102 ms, con 27 de JavaScript, 27 de estilo y 13 de maquetación, sobre todo del texto de las 73 etiquetas de barrio. En los arrastres el hilo principal se va casi entero en MapLibre (`_render`, `draw`, `_calcMatrices`); los marcadores solo cambian su `transform`.
+Qué cuesta ahora el peor fotograma, en las trazas con ×4: el de reagrupar al asentarse dura unos 45 ms, con 11 de estilo, 8 de JavaScript de la web, 3 de maquetación y 4 de MapLibre. Antes, el peor era el de cruzar al nivel de barrios a mitad del zoom: 102 ms, con 27 de JavaScript, 27 de estilo y 13 de maquetación, sobre todo del texto de las 73 etiquetas de barrio. En los arrastres el hilo principal se va casi entero en MapLibre (`_render`, `draw`, `_calcMatrices`); desde el 06/10/2026 los marcadores ni cambian su `transform`, se mueve su lámina (ver «Marcadores en el fotograma del mapa»).
 
 ## Capa por provincias (#43)
 

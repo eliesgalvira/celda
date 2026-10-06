@@ -8,7 +8,7 @@ describe("RotuloDeCiudad", () => {
     const contenedor = document.createElement("div");
     document.body.append(contenedor);
     render(() => (
-      <CapaDeRotulos contenedor={contenedor}>
+      <CapaDeRotulos contenedor={contenedor} salto={{ x: 0, y: 0 }}>
         <RotuloDeCiudad
           x={120.04}
           y={80}

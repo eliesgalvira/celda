@@ -76,6 +76,8 @@ const { values: opciones } = NodeUtil.parseArgs({
     grupos: { type: "string" },
     // Enciende la foto aérea al abrir cada página.
     foto: { type: "boolean", default: false },
+    // La densidad de píxeles de la pantalla, en lugar de la de cada pantalla (2,6 y 1).
+    dpr: { type: "string" },
   },
 });
 
@@ -135,7 +137,11 @@ const PANTALLAS = {
   escritorio: { ancho: 1400, alto: 900, dpr: 1, tactil: false, centro: { x: 700, y: 450 } },
 } as const;
 
-const PANTALLA = opciones.pantalla === "escritorio" ? PANTALLAS.escritorio : PANTALLAS.movil;
+const ELEGIDA = opciones.pantalla === "escritorio" ? PANTALLAS.escritorio : PANTALLAS.movil;
+const PANTALLA = {
+  ...ELEGIDA,
+  dpr: opciones.dpr === undefined ? ELEGIDA.dpr : Number(opciones.dpr),
+};
 const ANCHO = PANTALLA.ancho;
 const ALTO = PANTALLA.alto;
 
@@ -261,6 +267,8 @@ const resumirFotogramas = (datos: FotogramasEnPagina, hilo: TiempoDelHilo) => {
       guion: "",
     }),
     nodos: datos.nodos,
+    marcadores: datos.marcadores,
+    desfase: datos.desfase,
     hilo,
   };
 };
@@ -1281,8 +1289,8 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
       );
     }
     lineas.push(
-      "\n| Gesto | fps | fps por ronda | hilo ms (guion · estilo) | hilo por ronda | p95 ms | máx ms | >20 ms | >50 ms | LoAF | peor LoAF |",
-      "|---|---|---|---|---|---|---|---|---|---|---|",
+      "\n| Gesto | fps | fps por ronda | hilo ms (guion · estilo) | hilo por ronda | p95 ms | máx ms | >20 ms | >50 ms | LoAF | marcadores · nodos | desfase px media · máx · tarde | peor LoAF |",
+      "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     );
     for (const gesto of Object.keys(suyas[0]?.gestos ?? {})) {
       const g = (leer: (x: Fotogramas) => number) =>
@@ -1300,7 +1308,13 @@ const informe = (rondas: ReadonlyArray<Ronda>): string => {
         )} | ${dispersion(suyas.map((r) => r.gestos[gesto]?.fps))} | ${f(g((x) => x.hilo.tareas))} (${f(g((x) => x.hilo.guion))} · ${f(g((x) => x.hilo.estilo))}) | ${dispersion(suyas.map((r) => r.gestos[gesto]?.hilo.tareas))} | ${f(
           g((x) => x.p95),
           1,
-        )} | ${f(g((x) => x.maximo))} | ${f(g((x) => x.perdidos))} | ${f(g((x) => x.mas50))} | ${f(g((x) => x.loaf))} | ${peor === undefined || peor.duracion === 0 ? "—" : `${Math.round(peor.duracion)} ms (estilo ${Math.round(peor.estilo)}) ${peor.guion}`} |`,
+        )} | ${f(g((x) => x.maximo))} | ${f(g((x) => x.perdidos))} | ${f(g((x) => x.mas50))} | ${f(g((x) => x.loaf))} | ${f(g((x) => x.marcadores))} · ${f(g((x) => x.nodos))} | ${f(
+          g((x) => x.desfase.media),
+          1,
+        )} · ${f(
+          g((x) => x.desfase.maximo),
+          1,
+        )} · ${f(g((x) => x.desfase.tarde * 100))} % tarde | ${peor === undefined || peor.duracion === 0 ? "—" : `${Math.round(peor.duracion)} ms (estilo ${Math.round(peor.estilo)}) ${peor.guion}`} |`,
       );
     }
     lineas.push("\n| Ficha | ms |", "|---|---|");

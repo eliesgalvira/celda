@@ -38,28 +38,17 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
   const servicio = useContext(ServicioContexto);
   const [fotograma, setFotograma] = createSignal(0);
 
-  // El punto se recoloca en cada fotograma en que se mueve el mapa, como los marcadores.
+  // El punto se recoloca en cada `move`, en el fotograma en que se mueve el mapa (`seguirVista`).
   recurso(
     "referencia:movimiento",
     () => props.mapa,
     (mapa) => {
-      let pendiente = 0;
-      const alMover = () => {
-        if (pendiente === 0) {
-          pendiente = requestAnimationFrame(() => {
-            pendiente = 0;
-            setFotograma((n) => n + 1);
-          });
-        }
-      };
+      const alMover = () => setFotograma((n) => n + 1);
       mapa.on("move", alMover);
       // El mapa puede haberse movido entre el primer cálculo y ahora (al abrir con un emplazamiento
       // en la dirección salta hasta él): se recoloca una vez.
       alMover();
-      return () => {
-        mapa.off("move", alMover);
-        cancelAnimationFrame(pendiente);
-      };
+      return () => mapa.off("move", alMover);
     },
   );
 
