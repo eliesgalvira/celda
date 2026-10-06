@@ -34,13 +34,12 @@ const ROTULOS = estilo.layers.filter(
 );
 
 describe("foto aérea en el estilo", () => {
-  it("es la ortofoto PNOA del IGN por su TMS, en teselas de 256 del zoom 14 al 19", () => {
+  it("es la ortofoto PNOA del IGN por su TMS, en teselas de 256 hasta el zoom 19", () => {
     assert.deepStrictEqual(estilo.sources[FUENTE_FOTO], {
       type: "raster",
       tiles: ["https://tms-pnoa-ma.idee.es/1.0.0/pnoa-ma/{z}/{x}/{y}.jpeg"],
       scheme: "tms",
       tileSize: 256,
-      minzoom: 14,
       maxzoom: 19,
       bounds: [-18.4, 27.5, 4.5, 44],
     });

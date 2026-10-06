@@ -261,7 +261,10 @@ export interface EntradaFoto {
 export interface FotoDelMapa {
   /** Si la foto aérea está encendida. Apagada al abrir cada visita. */
   readonly encendida: () => boolean;
-  /** Si el mapa la enseña: encendida, al zoom de la foto o más cerca y con la cámara sin volar. */
+  /**
+   * Si el mapa la enseña: encendida y al zoom de la foto o más cerca. Mientras la cámara vuela no
+   * cambia: sigue como al despegar.
+   */
   readonly seVe: () => boolean;
   /** Enciende o apaga la foto. Más lejos de `ZOOM_FOTO` no la cambia: saca la pista `acercate`. */
   readonly alternar: () => void;
@@ -311,12 +314,11 @@ const BUSCANDO: EstadoEdificio = { tipo: "buscando" };
  * ficha quita el resaltado. Si no hay edificio que resaltar, la pista lo dice durante
  * `PISTA_SIN_CONTORNO_MS`, con su espera abierta también con `recurso()`.
  *
- * Mientras la cámara vuela, el mapa se ve sin la foto, como con ella apagada, y la foto vuelve al
- * llegar (#67): un vuelo de España a la calle pedía las teselas de cada zoom del camino, que solo
- * se ven de paso. Al llegar, la foto se pide sin enseñarla y sale de una vez cuando han llegado sus
- * teselas (`ponerFoto`). Con la foto se apaga todo lo que cambia con ella (`conFoto`): las vías blancas
- * sobre el fondo claro no se verían. Los gestos de la persona no son vuelos y no la apagan. Más
- * lejos de `ZOOM_FOTO` tampoco se ve, con el control encendido.
+ * La foto no cambia mientras la web mueve la cámara con una animación: si se veía al despegar,
+ * sigue durante todo el vuelo, y si no, sale al llegar. Así no parpadea al empezar y al acabar
+ * cada vuelo, a cambio de pedir la foto de los zooms del camino. Encenderla la pide sin enseñarla y
+ * sale de una vez cuando han llegado sus teselas (`ponerFoto`). Más lejos de `ZOOM_FOTO` no se ve,
+ * con el control encendido. Los gestos de la persona no son vuelos.
  */
 export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
   const [encendida, setEncendida] = createSignal(false);
@@ -333,14 +335,14 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
     }),
   );
 
-  // Un pedido de «Ver el edificio» cuyo vuelo aún no ha empezado cuenta ya como vuelo: así la foto
-  // no se pone en el punto de partida para quitarse en la misma tarea.
-  const seVe = createMemo(() => {
+  // Un pedido de «Ver el edificio» cuyo vuelo aún no ha empezado cuenta ya como vuelo: la foto que
+  // enciende sale al llegar al edificio y no en el punto de partida.
+  const seVe = createMemo((antes: boolean | undefined) => {
     const lienzo = entrada.lienzo();
+    if (lienzo === undefined) return false;
     const porVolar = pedido() !== undefined && volado() !== pedido();
-    return (
-      encendida() && entrada.deCerca() && lienzo !== undefined && enVuelo() !== lienzo && !porVolar
-    );
+    if (enVuelo() === lienzo || porVolar) return antes ?? false;
+    return encendida() && entrada.deCerca();
   });
 
   recurso(

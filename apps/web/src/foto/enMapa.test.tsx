@@ -370,84 +370,39 @@ describe("foto aérea en el mapa", () => {
 });
 
 describe("foto aérea durante los vuelos de la cámara", () => {
-  it("un vuelo la quita del mapa y al llegar vuelve, una vez por vuelo", () => {
+  it("un vuelo con la foto puesta no la quita: no parpadea al despegar ni al llegar", () => {
     const m = montar();
-    m.foto.alternar();
+    m.foto.encender();
     flush();
-    assert.deepStrictEqual(m.fotos, [false, true]);
-
     m.camara.empezar();
     flush();
-    // Mientras vuela, el mapa va sin la foto; el control sigue encendido.
-    assert.deepStrictEqual(m.fotos, [false, true, false]);
-    assert.isTrue(m.foto.encendida());
-    assert.isFalse(m.foto.seVe());
-
+    assert.isTrue(m.foto.seVe());
+    // Aunque el vuelo se aleje del zoom de la foto por el camino.
+    m.setDeCerca(false);
+    flush();
+    assert.isTrue(m.foto.seVe());
+    m.setDeCerca(true);
     m.camara.parar();
     flush();
-    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
-    assert.isTrue(m.foto.seVe());
+    assert.deepStrictEqual(m.fotos, [false, true]);
     // Un solo seguimiento de la cámara para toda la visita.
     assert.strictEqual(m.seguimientos(), 1);
     m.desmontar();
     assert.strictEqual(m.avisos(), 0);
   });
 
-  it("los gestos de la persona y los saltos no la quitan", () => {
+  it("al llegar decide con lo de ese momento: lejos del zoom de la foto, se quita", () => {
     const m = montar();
     m.foto.encender();
     flush();
-    const antes = m.fotos.length;
-    // Pellizcar o arrastrar: MapLibre da el evento del dedo.
-    m.camara.empezar(true);
+    m.camara.empezar();
+    m.setDeCerca(false);
     flush();
     assert.isTrue(m.foto.seVe());
     m.camara.parar();
-    flush();
-    // Un salto (`jumpTo`) empieza y acaba en la misma tarea.
-    m.camara.empezar();
-    m.camara.parar();
-    flush();
-    assert.isTrue(m.foto.seVe());
-    assert.strictEqual(m.fotos.length, antes);
-    m.desmontar();
-  });
-
-  it("un vuelo que interrumpe otro la deja quitada hasta que llega el segundo", () => {
-    const m = montar();
-    m.foto.encender();
-    m.camara.empezar();
-    flush();
-    // Encendida en pleno vuelo: el mapa no la pone hasta que llegue.
-    assert.deepStrictEqual(m.fotos, [false]);
-    assert.isFalse(m.foto.seVe());
-    // MapLibre para el primero (`moveend`) y empieza el segundo (`movestart`) en la misma tarea.
-    m.camara.parar();
-    m.camara.empezar();
-    flush();
-    assert.deepStrictEqual(m.fotos, [false]);
-    m.camara.parar();
-    flush();
-    assert.deepStrictEqual(m.fotos, [false, true]);
-    m.desmontar();
-  });
-
-  it("si la persona coge el mapa a mitad de vuelo, la foto vuelve y el gesto no la quita", () => {
-    const m = montar();
-    m.foto.encender();
-    flush();
-    m.camara.empezar();
     flush();
     assert.isFalse(m.foto.seVe());
-    // MapLibre para el vuelo y empieza el gesto, con el evento del dedo.
-    m.camara.parar();
-    m.camara.empezar(true);
-    flush();
-    assert.isTrue(m.foto.seVe());
-    m.camara.parar();
-    flush();
-    assert.isTrue(m.foto.seVe());
-    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
+    assert.deepStrictEqual(m.fotos, [false, true, false]);
     m.desmontar();
   });
 
@@ -461,21 +416,32 @@ describe("foto aérea durante los vuelos de la cámara", () => {
     }
     assert.isTrue(m.foto.encendida());
     assert.deepStrictEqual(m.fotos, [false]);
+    // MapLibre para un vuelo y empieza otro en la misma tarea: sigue sin tocarla.
+    m.camara.parar();
+    m.camara.empezar();
+    flush();
+    assert.deepStrictEqual(m.fotos, [false]);
     m.camara.parar();
     flush();
     assert.deepStrictEqual(m.fotos, [false, true]);
-    // Con la foto apagada, los vuelos no tocan el mapa.
-    m.foto.alternar();
-    flush();
-    m.camara.empezar();
-    flush();
-    m.camara.parar();
-    flush();
-    assert.deepStrictEqual(m.fotos, [false, true, false]);
     m.desmontar();
   });
 
-  it("«Ver el edificio» enciende la foto al llegar y resalta el edificio", async () => {
+  it("los gestos de la persona no son vuelos: la foto sigue al zoom", () => {
+    const m = montar();
+    m.foto.encender();
+    flush();
+    m.camara.empezar(true);
+    m.setDeCerca(false);
+    flush();
+    assert.isFalse(m.foto.seVe());
+    m.setDeCerca(true);
+    flush();
+    assert.isTrue(m.foto.seVe());
+    m.desmontar();
+  });
+
+  it("«Ver el edificio» con la foto apagada la enciende al llegar, no al despegar", async () => {
     const m = montar();
     m.foto.verEdificio("movistar-1", SITIO);
     flush();
@@ -485,43 +451,25 @@ describe("foto aérea durante los vuelos de la cámara", () => {
     m.vuelos[0]?.acabar(EDIFICIO);
     flush();
     assert.isTrue(m.foto.seVe());
-    assert.strictEqual(m.fotos.at(-1), true);
     await esperar(() =>
       assert.deepStrictEqual(m.foto.edificio("movistar-1"), {
         tipo: "resaltado",
         numero: "251-259",
       }),
     );
-    // Con la foto ya puesta: se quita una vez al despegar y vuelve al llegar.
+    // Con la foto ya puesta, el siguiente vuelo la deja puesta.
     m.foto.verEdificio("movistar-1", OTRO);
     flush();
-    assert.deepStrictEqual(m.fotos, [false, true, false]);
     m.vuelos[1]?.acabar(EDIFICIO);
     flush();
-    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
+    assert.deepStrictEqual(m.fotos, [false, true]);
     m.desmontar();
   });
 
-  it("«Ver el edificio» anulado en la misma tarea no deja la foto quitada", () => {
+  it("un mapa nuevo a mitad de vuelo empieza quieto, con la foto como toca", () => {
     const m = montar();
-    m.foto.encender();
-    flush();
-    m.foto.verEdificio("movistar-1", SITIO);
-    m.setSeleccionada(null);
-    flush();
-    // El vuelo ya ha salido y nadie lo espera; al pararse, la foto vuelve.
-    assert.isTrue(m.vuelos[0]?.dejado);
-    m.camara.parar();
-    flush();
-    assert.isTrue(m.foto.seVe());
-    assert.deepStrictEqual(m.fotos, [false, true, false, true]);
-    m.desmontar();
-  });
-
-  it("un mapa nuevo a mitad de vuelo empieza con la foto puesta", () => {
-    const m = montar();
-    m.foto.encender();
     m.camara.empezar();
+    m.foto.encender();
     flush();
     assert.isFalse(m.foto.seVe());
     const otro = lienzoDePrueba();
