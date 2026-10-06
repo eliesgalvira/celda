@@ -46,18 +46,18 @@ const comunidades = (lineas: LineasDeLimites | undefined) =>
     .map((f) => f.geometry.coordinates);
 
 /**
- * Un mapa de prueba. Como MapLibre, avisa una sola vez de que tiene el estilo, de que pasa de un
+ * Un mapa de prueba. Como MapLibre, avisa una sola vez de que ha pintado la silueta, de que pasa de un
  * zoom y de que se quita, y apunta lo que se le dibuja.
  */
 const mapaDePrueba = () => {
-  const conEstilo: Array<() => void> = [];
+  const trasLaSilueta: Array<() => void> = [];
   const alAcercarse: Array<{ readonly zoom: number; readonly escuchar: () => void }> = [];
   const alQuitar: Array<() => void> = [];
   const dibujos: Array<LineasDeLimites> = [];
   let zoom = 5;
-  let estilo = false;
+  let silueta = false;
   const mapa: MapaParaLimites = {
-    conEstilo: (escuchar) => (estilo ? escuchar() : conEstilo.push(escuchar)),
+    trasLaSilueta: (escuchar) => (silueta ? escuchar() : trasLaSilueta.push(escuchar)),
     alAcercarse: (desde, escuchar) =>
       zoom >= desde ? escuchar() : alAcercarse.push({ zoom: desde, escuchar }),
     alQuitarse: (escuchar) => alQuitar.push(escuchar),
@@ -66,9 +66,9 @@ const mapaDePrueba = () => {
   return {
     mapa,
     dibujos,
-    cargarEstilo: () => {
-      estilo = true;
-      for (const escuchar of conEstilo.splice(0)) escuchar();
+    pintarSilueta: () => {
+      silueta = true;
+      for (const escuchar of trasLaSilueta.splice(0)) escuchar();
     },
     acercar: (a: number) => {
       zoom = a;
@@ -93,7 +93,7 @@ const montar = () => {
 };
 
 describe("límites de comunidades y provincias en el mapa", () => {
-  it("el general se pide al arrancar, antes del mapa, y se dibuja en cuanto el estilo lo admite", async () => {
+  it("el general se pide al arrancar, antes del mapa, y se dibuja en cuanto el mapa pinta la silueta", async () => {
     const { origen, limites } = montar();
     limites.adelantar();
     await waitFor(() => assert.deepStrictEqual(origen.abiertas(), [URL_LIMITES]));
@@ -103,7 +103,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     limites.poner(prueba.mapa);
     await otraTarea();
     assert.deepStrictEqual(prueba.dibujos, []);
-    prueba.cargarEstilo();
+    prueba.pintarSilueta();
     await waitFor(() => assert.lengthOf(prueba.dibujos, 1));
     assert.deepStrictEqual(
       prueba.dibujos[0]?.features.map((f) => [f.properties.limite, f.geometry.coordinates]),
@@ -131,7 +131,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     const { origen, limites } = montar();
     const prueba = mapaDePrueba();
     limites.poner(prueba.mapa);
-    prueba.cargarEstilo();
+    prueba.pintarSilueta();
     await waitFor(() => assert.deepStrictEqual(origen.abiertas(), [URL_LIMITES]));
     origen.responder(URL_LIMITES, { estado: 200, cuerpo: GENERAL });
     await waitFor(() => assert.lengthOf(prueba.dibujos, 1));
@@ -157,7 +157,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     const { origen, limites } = montar();
     const prueba = mapaDePrueba();
     prueba.acercar(16);
-    prueba.cargarEstilo();
+    prueba.pintarSilueta();
     limites.poner(prueba.mapa);
     await waitFor(() => assert.deepStrictEqual(origen.abiertas(), [URL_LIMITES, URL_DETALLE]));
     origen.responder(URL_DETALLE, { estado: 200, cuerpo: DETALLE });
@@ -172,7 +172,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     const { origen, limites } = montar();
     const primero = mapaDePrueba();
     limites.poner(primero.mapa);
-    primero.cargarEstilo();
+    primero.pintarSilueta();
     primero.acercar(10);
     await waitFor(() => assert.lengthOf(origen.abiertas(), 2));
     origen.responder(URL_LIMITES, { estado: 200, cuerpo: GENERAL });
@@ -181,7 +181,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
 
     const segundo = mapaDePrueba();
     limites.poner(segundo.mapa);
-    segundo.cargarEstilo();
+    segundo.pintarSilueta();
     segundo.acercar(10);
     await waitFor(() => assert.strictEqual(segundo.dibujos.at(-1), primero.dibujos.at(-1)));
     assert.deepStrictEqual(origen.pedidas(), [URL_LIMITES, URL_DETALLE]);
@@ -191,7 +191,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     const { origen, limites } = montar();
     const prueba = mapaDePrueba();
     limites.poner(prueba.mapa);
-    prueba.cargarEstilo();
+    prueba.pintarSilueta();
     await waitFor(() => assert.lengthOf(origen.abiertas(), 1));
     prueba.quitar();
     origen.responder(URL_LIMITES, { estado: 200, cuerpo: GENERAL });
@@ -203,7 +203,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
     const { origen, limites } = montar();
     const primero = mapaDePrueba();
     limites.poner(primero.mapa);
-    primero.cargarEstilo();
+    primero.pintarSilueta();
     await waitFor(() => assert.lengthOf(origen.abiertas(), 1));
     origen.responder(URL_LIMITES, { estado: 404, cuerpo: "" });
     await otraTarea();
@@ -211,7 +211,7 @@ describe("límites de comunidades y provincias en el mapa", () => {
 
     const segundo = mapaDePrueba();
     limites.poner(segundo.mapa);
-    segundo.cargarEstilo();
+    segundo.pintarSilueta();
     await waitFor(() => assert.lengthOf(origen.abiertas(), 1));
     origen.responder(URL_LIMITES, { estado: 200, cuerpo: '{"comunidades":[]}' });
     await otraTarea();

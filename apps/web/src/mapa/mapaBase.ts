@@ -166,10 +166,7 @@ export const crearMapaBase = (
   // Los huecos de los marcadores piden su imagen transparente la primera vez (ADR 0024).
   crearImagenesDeHuecos(mapa);
   limitesDeComunidades.poner({
-    conEstilo: (escuchar) => {
-      if (mapa.getSource(FUENTE_LIMITES) === undefined) mapa.once("style.load", escuchar);
-      else escuchar();
-    },
+    trasLaSilueta: (escuchar) => trasLaSilueta(mapa, escuchar),
     alAcercarse: (zoom, escuchar) => {
       const mirar = () => {
         if (mapa.getZoom() < zoom) return;

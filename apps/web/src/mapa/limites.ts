@@ -40,8 +40,11 @@ export const leerLimites = Effect.fn("Mapa.leerLimites")(function* (url: string)
 
 /** Lo que hacen los límites con un mapa. En las pruebas, un mapa que apunta lo que recibe. */
 export interface MapaParaLimites {
-  /** Llama a `escuchar` en cuanto el estilo del mapa puede recibir las líneas. */
-  readonly conEstilo: (escuchar: () => void) => void;
+  /**
+   * Llama a `escuchar` cuando el mapa ya ha pintado la silueta de España: las líneas nunca salen
+   * sueltas sobre el fondo, sin la tierra ni la costa.
+   */
+  readonly trasLaSilueta: (escuchar: () => void) => void;
   /** Llama a `escuchar` una sola vez, la primera vez que el mapa llega a `zoom` o más cerca. */
   readonly alAcercarse: (zoom: number, escuchar: () => void) => void;
   /** Llama a `escuchar` cuando el mapa se quita: después ya no se le puede pedir nada. */
@@ -76,7 +79,7 @@ export interface LecturasDeLimites {
 
 /**
  * Los límites de la visita. `adelantar` pide ya el general, al cargarse el código del mapa.
- * `poner` los dibuja en cada mapa que recibe: el general en cuanto el estilo puede recibirlo y el
+ * `poner` los dibuja en cada mapa que recibe: el general en cuanto el mapa pinta la silueta y el
  * de detalle la primera vez que el mapa pasa de `ZOOM_DEL_DETALLE`. Una vez puesto el de detalle,
  * el general ya no lo pisa aunque llegue tarde. Mover el mapa no vuelve a pedir nada, y si el mapa
  * se crea otra vez, el nuevo recibe las mismas líneas. Si un fichero no llega, el mapa se queda
@@ -95,9 +98,9 @@ export const limitesDeLaVisita = (leer: LecturasDeLimites) => {
       mapa.alQuitarse(() => {
         quitado = true;
       });
-      const conEstilo = new Promise<void>((resolver) => mapa.conEstilo(resolver));
+      const conSilueta = new Promise<void>((resolver) => mapa.trasLaSilueta(resolver));
       const dibujar = (lineas: Promise<LineasDeLimites | undefined>, deDetalle: boolean) =>
-        void Promise.all([lineas, conEstilo]).then(([llegadas]) => {
+        void Promise.all([lineas, conSilueta]).then(([llegadas]) => {
           if (llegadas === undefined || quitado || conDetalle) return;
           conDetalle = deDetalle;
           mapa.dibujar(llegadas);
