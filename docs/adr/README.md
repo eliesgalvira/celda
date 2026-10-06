@@ -15,7 +15,7 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 | [0009](0009-ingesta-y-procedencia.md) | Ingesta automática por fuente, con la procedencia de cada dato (antenasmoviles.es la retira el 0019) |
 | [0010](0010-alojamiento.md) | La web en Vercel, las capas y las fichas en R2 (servidas por un Worker o una Pages Function), con copia en Vercel y aviso ante bloqueos (en parte sustituida por el 0018) |
 | [0011](0011-castellano-en-interfaz-y-codigo.md) | Castellano en la interfaz y en los nombres del dominio en el código |
-| [0012](0012-fusion-a-15-metros.md) | Fusión: observaciones a 15 m o menos, de cualquier compañía, y hasta 60 m la misma estación y 30 m la misma dirección (sustituye la regla del 0009) |
+| [0012](0012-fusion-a-15-metros.md) | Fusión: observaciones a 15 m o menos, de cualquier compañía, y hasta 60 m la misma estación y 30 m la misma dirección (sustituye la regla del 0009); desde el 07/10/2026, con claves estables |
 | [0013](0013-busqueda-de-direcciones-con-nominatim.md) | Búsqueda de direcciones en toda España con el Nominatim público, solo al pedirla y con su límite de una petición por segundo (el 0025 amplía los topónimos) |
 | [0014](0014-barrido-por-zonas-y-ritmo-en-espana.md) | Propuesta: barrido del registro oficial por zonas, Cataluña primero y luego toda España, y fichas a una cada 3 s |
 | [0015](0015-ingesta-y-publicacion-fuera-de-convex.md) | Propuesta: la ingesta y la publicación, fuera de Convex, como servicio de NixOS con su estado en SQLite |

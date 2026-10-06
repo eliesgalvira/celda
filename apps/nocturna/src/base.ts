@@ -3,6 +3,7 @@ import { compararTexto } from "@celda/dominio/banda";
 import { type EmplazamientoDeCapa, emplazamientoDeCapa } from "@celda/dominio/capa";
 import { Emplazamiento, type Estado } from "@celda/dominio/emplazamiento";
 import { fichaDe, type HechoDeFicha } from "@celda/dominio/ficha";
+import { conClavesEstables, llaveDeProcedencia, procedenciasDe } from "@celda/dominio/claveEstable";
 import { fusionar } from "@celda/dominio/fusion";
 import {
   AceptadaParaPublicar,
@@ -118,6 +119,11 @@ export interface OpcionesBase {
  * La versión 9 trae `otros_titulares`: los registros del listado de titulares que no son compañías
  * de Celda, como las licencias locales de 2,6 GHz, con lo que escribió el registro, la primera y
  * la última vez que salieron. No van a la fusión ni al mapa.
+ *
+ * La versión 10 trae, en `aportaciones_aceptadas`, las observaciones del emplazamiento de cada
+ * una cuando se importó (`registros`, una lista de pares de fuente y clave). Si su emplazamiento
+ * desaparece, como al juntarse con otro, la fusión la lleva al que tiene ahora esas
+ * observaciones. Las que ya estaban toman las de su emplazamiento de hoy.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -138,6 +144,16 @@ const masAntigua = (() => {
   const otras = ["ficha_leida_en", "vista_en", `json_extract(datos, '$.sinFichaEnRegistro')`];
   return `min(${fecha}, ${otras.map((otra) => `coalesce(${otra}, ${fecha})`).join(", ")})`;
 })();
+
+/**
+ * Las observaciones del emplazamiento de una aportación aceptada, en SQL: una lista JSON de pares
+ * de fuente y clave, sacada de su emplazamiento en la tabla de emplazamientos.
+ */
+const PROCEDENCIAS_DE_LA_ACEPTADA = `(SELECT json_group_array(json_array(json_extract(o.value, '$.fuente'),
+          json_extract(o.value, '$.clave')))
+        FROM emplazamientos e, json_each(e.datos, '$.estaciones') s,
+          json_each(s.value, '$.observaciones') o
+        WHERE e.clave = aportaciones_aceptadas.emplazamiento)`;
 
 /** Las fuentes de hoy, como lista de SQL: `('registro-oficial', …)`. */
 const FUENTES = `(${Fuente.literals.map((fuente) => `'${fuente}'`).join(", ")})`;
@@ -294,6 +310,11 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
       vista_en INTEGER NOT NULL
     )`,
   ],
+  [
+    `ALTER TABLE aportaciones_aceptadas ADD COLUMN registros TEXT`,
+    `UPDATE aportaciones_aceptadas SET registros = ${PROCEDENCIAS_DE_LA_ACEPTADA}
+      WHERE emplazamiento IS NOT NULL`,
+  ],
 ];
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
@@ -315,6 +336,13 @@ const FilaHecho = Schema.Struct({
   tipo: Schema.String,
   fecha: Schema.Finite,
   datos: Schema.String,
+});
+
+/** Una aportación aceptada con las observaciones de su emplazamiento cuando se importó. */
+const FilaHuerfana = Schema.Struct({
+  id: Schema.String,
+  emplazamiento: Schema.String,
+  registros: Schema.fromJsonString(Schema.Array(Schema.Tuple([Schema.String, Schema.String]))),
 });
 
 /** Lo que publica la ficha de un hecho del historial. */
@@ -351,17 +379,24 @@ const FilaAceptada = Schema.Struct({
   persona: Schema.String,
   aceptada_en: Schema.Finite,
   importada_en: Schema.Finite,
+  /** Su emplazamiento de hoy, que puede no ser el que dice su contenido (versión 10). */
+  emplazamiento: Schema.NullOr(Schema.String),
   datos: ContenidoEnJson,
 });
 
-/** Las correcciones de la ficha que salen de las filas aceptadas de su emplazamiento. */
+/**
+ * Las correcciones de la ficha que salen de las filas aceptadas de su emplazamiento, en el
+ * emplazamiento que tienen hoy: el de su contenido, o al que las llevó la fusión si ese
+ * desapareció.
+ */
 const correccionesDeFilas = (filas: ReadonlyArray<typeof FilaAceptada.Type>) =>
   correccionesDeFicha(
     filas.map((f) => ({
       id: f.id,
       persona: f.persona,
       aceptadaEl: f.aceptada_en,
-      contenido: f.datos,
+      contenido:
+        f.emplazamiento === null ? f.datos : { ...f.datos, emplazamiento: f.emplazamiento },
     })),
   );
 
@@ -1019,6 +1054,36 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         }, Effect.orDie),
 
         fusionar: Effect.fn("BaseNocturna.fusionar")(function* (fecha) {
+          /**
+           * Lleva cada aportación aceptada cuyo emplazamiento ya no está al que tiene ahora alguna
+           * de las observaciones del suyo. Si ninguno las tiene, se queda como estaba.
+           */
+          const llevarAceptadas = (
+            nuevos: ReadonlyArray<Emplazamiento>,
+            claves: ReadonlySet<string>,
+          ) =>
+            Effect.gen(function* () {
+              const huerfanas = (yield* decodificar(FilaHuerfana)(
+                yield* sql`SELECT id, emplazamiento, registros FROM aportaciones_aceptadas
+                    WHERE emplazamiento IS NOT NULL AND registros IS NOT NULL`,
+              )).filter((fila) => !claves.has(fila.emplazamiento));
+              if (huerfanas.length === 0) return;
+              const ahora = new Map(
+                nuevos.flatMap((e) =>
+                  procedenciasDe(e).map((p) => [llaveDeProcedencia(p), e.clave] as const),
+                ),
+              );
+              for (const { id, registros } of huerfanas) {
+                const destino = registros
+                  .map(([fuente, clave]) => ahora.get(`${fuente}\u0000${clave}`))
+                  .find((clave) => clave !== undefined);
+                if (destino !== undefined) {
+                  yield* sql`UPDATE aportaciones_aceptadas SET emplazamiento = ${destino}
+                      WHERE id = ${id}`;
+                }
+              }
+            });
+
           return yield* sql.withTransaction(
             Effect.gen(function* () {
               // Por páginas, y cada una pasa a observación antes de leer la siguiente.
@@ -1033,7 +1098,27 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 if (ultima === undefined) break;
                 desde = ultima.id;
               }
-              const nuevos = fusionar(vigentes);
+              // Cada emplazamiento conserva la clave que tenía, aunque cambien sus estaciones base:
+              // los enlaces a su ficha y lo aceptado en la moderación siguen valiendo.
+              const anterior = new Map(
+                (yield* sql<{
+                  readonly emplazamiento: string;
+                  readonly fuente: string;
+                  readonly clave: string;
+                }>`SELECT e.clave AS emplazamiento, json_extract(o.value, '$.fuente') AS fuente,
+                    json_extract(o.value, '$.clave') AS clave
+                  FROM emplazamientos e, json_each(e.datos, '$.estaciones') s,
+                    json_each(s.value, '$.observaciones') o`).map((fila) => [
+                  `${fila.fuente}\u0000${fila.clave}`,
+                  fila.emplazamiento,
+                ]),
+              );
+              const nuevos = conClavesEstables(
+                fusionar(vigentes),
+                anterior,
+                new Set(anterior.values()),
+              );
+              anterior.clear();
               vigentes.length = 0;
               // Los guardados en su JSON: casi todos salen iguales al codificar el nuevo, y solo
               // los que no se decodifican para compararlos.
@@ -1072,6 +1157,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 if (previo === undefined) cuentas.creados++;
                 else cuentas.cambiados++;
               }
+              yield* llevarAceptadas(nuevos, claves);
               return cuentas;
             }),
           );
@@ -1146,7 +1232,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         );
         const ficha = fichaDe(fila.datos, fila.version, estaciones);
         const aceptadas = yield* decodificar(FilaAceptada)(
-          yield* sql`SELECT id, persona, aceptada_en, importada_en, datos
+          yield* sql`SELECT id, persona, aceptada_en, importada_en, emplazamiento, datos
             FROM aportaciones_aceptadas WHERE emplazamiento = ${clave} AND tipo <> 'propia'`,
         );
         const correcciones = correccionesDeFilas(aceptadas).get(clave) ?? [];
@@ -1177,7 +1263,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           const corregidos = new Set(
             correccionesDeFilas(
               yield* decodificar(FilaAceptada)(
-                yield* sql`SELECT id, persona, aceptada_en, importada_en, datos
+                yield* sql`SELECT id, persona, aceptada_en, importada_en, emplazamiento, datos
                   FROM aportaciones_aceptadas
                   WHERE emplazamiento IS NOT NULL AND tipo <> 'propia'`,
               ),
@@ -1334,6 +1420,13 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                     datos: yield* codificarAportacion(aceptada.contenido),
                   })} ON CONFLICT (id) DO NOTHING RETURNING id`;
                 nuevas += filas.length;
+              }
+              // Con las observaciones de su emplazamiento de hoy, por si su clave desaparece.
+              if (aceptadas.length > 0) {
+                yield* sql`UPDATE aportaciones_aceptadas
+                    SET registros = ${sql.literal(PROCEDENCIAS_DE_LA_ACEPTADA)}
+                    WHERE registros IS NULL AND emplazamiento IS NOT NULL
+                      AND id IN ${sql.in(aceptadas.map((a) => a.id))}`;
               }
               return nuevas;
             }),

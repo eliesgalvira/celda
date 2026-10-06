@@ -73,3 +73,11 @@ Consecuencias:
 - Quedan juntos tres grupos dudosos de Madrid, como con 15 m: dos estaciones de Movistar en CL JOSE ORTEGA Y GASSET, 91 y CL FRANCISCO SILVELA, 13, Movistar en CL ALCALA, 27 con Vodafone en el 28, y AV PUERTA DE HIERRO, 1 B con PS SENDA DEL REY, 16. Separarlos pediría ir a verlos.
 - Las pruebas de la ingesta fusionan los tres listados y guardan un emplazamiento por línea en `packages/ingesta/src/registro-oficial/referencia/fusion-listado-*.txt`. Un cambio de regla se ve en el diff de esos ficheros.
 - Las observaciones de antenasmoviles.es también pasan por las dos uniones nuevas. Las direcciones que copia del registro se juntan como las del registro; las que vienen de Nominatim tienen otro formato y casi nunca darán la misma clave. La unión por código exacto con el registro oficial sigue igual.
+
+## Ampliación: claves estables (07/10/2026)
+
+La clave de menor compañía y código cambia cuando cambian las estaciones base de un emplazamiento: uno con DIGI y Movistar, como 1.925 de los de clave `digi-…`, pasaría a `movistar-…` si DIGI se fuera. Con la clave se rompen los enlaces a su ficha y lo aceptado en la moderación, que se guarda con ella.
+
+- **Cada emplazamiento conserva la clave que ya tenía.** La fusión sigue dando la clave de menor compañía y código, y la ingesta nocturna, al guardar sus emplazamientos, le pone la clave estable (`conClavesEstables`, `packages/dominio/src/claveEstable.ts`). Uno cuya clave ya existía la conserva. Los demás heredan la clave de antes con la que comparten más observaciones, si nadie la ha conservado ni heredado; si empatan, el de clave menor. Si no, se quedan con la suya. La clave ya no dice qué compañía tiene el emplazamiento, y nada la lee así.
+- **Al juntarse dos, una clave desaparece.** Se queda la del que la conservaba, y la otra no tiene dueño. Lo aceptado en la moderación guarda las observaciones de su emplazamiento cuando se importa, y si su clave desaparece la fusión lo lleva al emplazamiento que tiene ahora esas observaciones (versión 10 de la base). Un enlace a la clave que desaparece deja de encontrar la ficha, como hasta ahora.
+

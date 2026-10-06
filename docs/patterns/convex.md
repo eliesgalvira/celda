@@ -119,7 +119,9 @@ La base se abre con el módulo `node:sqlite` de Node 24 a través de `@effect/sq
 - `versiones` y `ficheros_publicados`: lo publicado, con el SHA-256 de cada fichero;
 - `otros_titulares`: los registros del listado de titulares que no son compañías de Celda, las licencias locales de 2,6 GHz en TDD (Teleast Digital, Tele Caravaca, la UTE Aire-Alvi-TV Horadada y Desarrollos Urbanos Laurentino Cordero), con lo que escribió el registro y la primera y la última vez que salieron (versión 9 del esquema). No van a la fusión ni al mapa, y sus bandas en la ficha de otra estación base se dejan fuera. `RETEVISION MOVIL SA`, la razón social de Amena, es Orange;
 - `hechos`: el historial de cada registro del ministerio (versión 8 del esquema, ADR 0027), ver [El historial de cada registro](#el-historial-de-cada-registro);
-- `aportaciones_aceptadas`: lo aceptado en la moderación que la noche ha leído del buzón, con su emplazamiento, el seudónimo de quien lo envió, cuándo se aceptó y la fecha de la ejecución que lo trajo (versión 6 del esquema, #57). Ni la identidad ni la huella de la IP salen del buzón.
+- `aportaciones_aceptadas`: lo aceptado en la moderación que la noche ha leído del buzón, con su emplazamiento, el seudónimo de quien lo envió, cuándo se aceptó y la fecha de la ejecución que lo trajo (versión 6 del esquema, #57). Ni la identidad ni la huella de la IP salen del buzón. Desde la versión 10 guarda también las observaciones de su emplazamiento cuando se importó (`registros`): si su emplazamiento desaparece al juntarse con otro, la fusión lo lleva al que tiene ahora esas observaciones.
+
+Los emplazamientos conservan su clave aunque cambien sus estaciones base (`conClavesEstables`, ADR 0012, «Claves estables»): la fusión da la de menor compañía y código, y al guardar, uno que ya existía con otra clave conserva la suya.
 
 Las páginas del registro tal como llegan van en otro fichero, el archivo de páginas ([El archivo de páginas](#el-archivo-de-páginas)).
 

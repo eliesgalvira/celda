@@ -303,4 +303,74 @@ describe("lo aceptado en la moderación, en la ingesta nocturna", () => {
         }),
       ),
   );
+
+  it.effect(
+    "lo aceptado y el enlace a la ficha siguen en su emplazamiento cuando cambian sus estaciones base o se junta con otro",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          const buzon: Buzon = yield* Ref.make<ReadonlyArray<AportacionEnCola>>([]);
+          const caido = yield* Ref.make(false);
+          const conBuzon = { buzon: buzonDePrueba(buzon, caido) };
+          const noche = (registros: typeof grabada.listado.registros) =>
+            unaNoche(
+              entorno,
+              capaGrabadaPorCajas("registro-oficial", {
+                ...grabada,
+                listado: { ...grabada.listado, registros },
+              }),
+              conBuzon,
+            );
+          yield* TestClock.setTime(NOCHE);
+          yield* noche(grabada.listado.registros);
+          // Movistar, Orange y Vodafone en un mismo emplazamiento: su clave es la de Movistar.
+          const compartido = "movistar-0802532";
+          const solo = "vodafone-079808";
+          const posicion = (clave: string) =>
+            correccion(clave, {
+              tipo: "posicion",
+              posicion: { longitud: CAMPUS_NORD.longitud + 0.001, latitud: CAMPUS_NORD.latitud },
+            });
+          const enCompartido = posicion(compartido);
+          const enSolo = posicion(solo);
+          yield* Ref.set(buzon, [
+            enBuzon(enCompartido, "identidad-a", "aceptada", NOCHE + DIA / 2),
+            enBuzon(enSolo, "identidad-b", "aceptada", NOCHE + DIA / 2 + 1),
+          ]);
+
+          // Movistar deja el emplazamiento compartido, y la estación de Vodafone que estaba sola se
+          // mueve junto a las de Telefónica de `movistar-0807565`.
+          const destino = { longitud: 2.121719, latitud: 41.385502 };
+          const despues = grabada.listado.registros
+            .filter((r) => r.clave !== "TELEFONICA MOVILES ESPAÑA, S.A.U. - 0802532")
+            .map((r) => {
+              if (r.clave !== "VODAFONE ESPAÑA, S.A.U. - 079808" || r.crudo === undefined) return r;
+              // Lo que escribe el registro también se mueve: es lo que compara la ingesta.
+              const crudo = { ...r.crudo, longitud: destino.longitud, latitud: destino.latitud };
+              return { ...r, posicion: destino, crudo };
+            });
+          // Una baja pide dos barridos.
+          for (const dia of [1, 2]) {
+            yield* TestClock.setTime(NOCHE + dia * DIA);
+            yield* noche(despues);
+          }
+          const compartida = yield* fichaPublicada(entorno, compartido);
+          assert.deepStrictEqual(
+            compartida.estaciones.map((e) => e.compania),
+            ["orange", "vodafone"],
+          );
+          assert.deepStrictEqual(
+            compartida.correcciones?.map((c) => c.clave),
+            [enCompartido.id],
+          );
+          // `vodafone-079808` se ha juntado con `movistar-0807565`, y lo suyo va con él.
+          const juntada = yield* fichaPublicada(entorno, "movistar-0807565");
+          assert.deepStrictEqual(
+            juntada.correcciones?.map((c) => c.clave),
+            [enSolo.id],
+          );
+        }),
+      ),
+  );
 });
