@@ -1,11 +1,16 @@
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
+import * as Schedule from "effect/Schedule";
+import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/unstable/http/HttpClient";
+import type * as HttpClientError from "effect/unstable/http/HttpClientError";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
 import {
@@ -26,7 +31,33 @@ export interface OpcionesCubo {
   readonly secreto: Redacted.Redacted<string>;
   /** Otro punto de entrada compatible con S3, para las pruebas. */
   readonly puntoDeEntrada?: string;
+  /** Cuánto se espera a cada petición y cuántas veces se repite. Por defecto, `PLAZOS_DE_R2`. */
+  readonly plazos?: PlazosDelCubo;
 }
+
+/** Cuánto se espera a cada petición al cubo y cuántas veces se repite la que no llega. */
+export interface PlazosDelCubo {
+  /** Lo más que dura una petición, desde que sale hasta que se lee la respuesta entera. */
+  readonly porPeticion: Duration.Input;
+  /** Las veces que se repite una petición sin respuesta a tiempo, sin conexión o con 429 o 5xx. */
+  readonly reintentos: number;
+  /** La espera antes del primer reintento. Cada uno espera el doble que el anterior. */
+  readonly pausa: Duration.Input;
+}
+
+/**
+ * Cinco minutos por petición, el mismo límite que ya pone el `fetch` de Node. undici da por perdida
+ * la petición que no recibe las cabeceras de la respuesta 300 s después de enviarla, y con el
+ * cuerpo en memoria esos 300 s cuentan también la subida. Un paquete del archivo, de 8 MiB como
+ * mucho, sube en ese tiempo con algo más de 0,2 Mbit/s, y lo publicado son ficheros pequeños. El
+ * plazo propio cubre además lo que undici no cuenta, como una respuesta que llega a gotas. Con dos
+ * reintentos, a los 2 y a los 4 s, una petición parada del todo cuesta unos quince minutos.
+ */
+export const PLAZOS_DE_R2: PlazosDelCubo = {
+  porPeticion: "5 minutes",
+  reintentos: 2,
+  pausa: "2 seconds",
+};
 
 export interface OpcionesR2 extends OpcionesCubo {
   /** URL pública desde la que la web lee los ficheros, la de Vercel (`…/capas`), sin barra final. */
@@ -77,6 +108,35 @@ export const leerListado = (xml: string): PaginaDeListado => {
 
 type Metodo = "GET" | "PUT" | "DELETE";
 
+/** Respuestas que R2 da cuando conviene volver a pedir lo mismo un poco después. */
+const esPasajero = (estado: number): boolean => estado === 429 || estado >= 500;
+
+/** Una petición que no ha llegado o que R2 ha rechazado por un momento, para reintentarla. */
+class PeticionFallida extends Schema.TaggedError<PeticionFallida>()("PeticionFallida", {
+  motivo: Schema.String,
+  /** La respuesta pasajera de R2 (429 o 5xx), si la hubo. */
+  estado: Schema.optional(Schema.Int),
+  texto: Schema.optional(Schema.String),
+}) {}
+
+/**
+ * Lo que dice un fallo de transporte, con la causa más honda. `fetch` envuelve en un «fetch failed»
+ * el fallo de la conexión, y el mensaje de Effect no la lleva.
+ */
+const motivoDelTransporte = (error: HttpClientError.HttpClientError): string => {
+  let causa: unknown = error.reason.cause;
+  for (let paso = 0; paso < 5 && Predicate.hasProperty(causa, "cause"); paso++) {
+    if (causa.cause === undefined) break;
+    causa = causa.cause;
+  }
+  const codigo =
+    Predicate.hasProperty(causa, "code") && Predicate.isString(causa.code) ? causa.code : undefined;
+  const mensaje =
+    causa instanceof Error ? causa.message.replaceAll(/\s+/gu, " ").slice(0, 200) : "";
+  const detalle = [codigo, mensaje].filter((parte) => parte !== undefined && parte !== "");
+  return detalle.length === 0 ? error.message : `${error.message}: ${detalle.join(": ")}`;
+};
+
 const SIN_CUERPO = new Uint8Array(0);
 const codificador = new TextEncoder();
 
@@ -96,9 +156,15 @@ const cuboEnR2 = (opciones: OpcionesCubo) =>
       servicio: "s3",
     };
 
+    const plazos = opciones.plazos ?? PLAZOS_DE_R2;
+    const plazo = Duration.fromInputUnsafe(plazos.porPeticion);
+
     /**
      * Una petición firmada al cubo. `clave` vacía es el propio cubo (para listarlo), y `consulta`,
-     * sus parámetros. El cuerpo va entero en la firma.
+     * sus parámetros. El cuerpo va entero en la firma, que se calcula una vez; cada intento se
+     * firma con su hora. Cada intento tiene `plazos.porPeticion` para acabar, y uno que no
+     * llega o que R2 contesta con 429 o 5xx se repite `plazos.reintentos` veces. Tras el último, un
+     * 429 o un 5xx se devuelve como cualquier otra respuesta.
      */
     const pedir = (
       metodo: Metodo,
@@ -116,34 +182,76 @@ const cuboEnR2 = (opciones: OpcionesCubo) =>
         );
         const cadena = codificarConsulta(consulta);
         const hashCuerpo = yield* sha256DeBytes(cuerpo.bytes);
-        const firmadas = {
-          host,
-          "x-amz-content-sha256": hashCuerpo,
-          "x-amz-date": fechaAmz(yield* Clock.currentTimeMillis),
-        };
-        const autorizacion = yield* firmarV4(
-          { metodo, ruta, consulta: cadena, cabeceras: firmadas, hashCuerpo },
-          credenciales,
-        );
-        const cabeceras = { ...firmadas, ...extra, authorization: autorizacion };
         const url = `${base}${ruta}${cadena === "" ? "" : `?${cadena}`}`;
-        const peticion =
-          metodo === "PUT"
-            ? HttpClientRequest.put(url).pipe(
-                HttpClientRequest.setHeaders(cabeceras),
-                HttpClientRequest.bodyUint8Array(cuerpo.bytes, cuerpo.tipo),
-              )
-            : (metodo === "GET" ? HttpClientRequest.get(url) : HttpClientRequest.delete(url)).pipe(
-                HttpClientRequest.setHeaders(cabeceras),
-              );
-        const respuesta = yield* http.execute(peticion);
-        return { estado: respuesta.status, texto: yield* respuesta.text };
+        const objeto = clave === "" ? opciones.cubo : clave;
+        const intento = Effect.gen(function* () {
+          const firmadas = {
+            host,
+            "x-amz-content-sha256": hashCuerpo,
+            "x-amz-date": fechaAmz(yield* Clock.currentTimeMillis),
+          };
+          const autorizacion = yield* firmarV4(
+            { metodo, ruta, consulta: cadena, cabeceras: firmadas, hashCuerpo },
+            credenciales,
+          );
+          const cabeceras = { ...firmadas, ...extra, authorization: autorizacion };
+          const peticion =
+            metodo === "PUT"
+              ? HttpClientRequest.put(url).pipe(
+                  HttpClientRequest.setHeaders(cabeceras),
+                  HttpClientRequest.bodyUint8Array(cuerpo.bytes, cuerpo.tipo),
+                )
+              : (metodo === "GET"
+                  ? HttpClientRequest.get(url)
+                  : HttpClientRequest.delete(url)
+                ).pipe(HttpClientRequest.setHeaders(cabeceras));
+          const respuesta = yield* http.execute(peticion);
+          return { estado: respuesta.status, texto: yield* respuesta.text };
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: plazo,
+            orElse: () =>
+              Effect.fail(
+                new PeticionFallida({
+                  motivo: `${metodo} ${objeto}: sin acabar en ${Duration.format(plazo)}`,
+                }),
+              ),
+          }),
+          Effect.catchTag("HttpClientError", (error) =>
+            Effect.fail(new PeticionFallida({ motivo: motivoDelTransporte(error) })),
+          ),
+          Effect.filterOrFail(
+            (respondida) => !esPasajero(respondida.estado),
+            (respondida) =>
+              new PeticionFallida({
+                motivo: `${metodo} ${objeto}: ${respondida.estado}`,
+                estado: respondida.estado,
+                texto: respondida.texto,
+              }),
+          ),
+        );
+        const intentos = plazos.reintentos + 1;
+        return yield* intento.pipe(
+          Effect.retry({
+            schedule: Schedule.exponential(plazos.pausa),
+            times: plazos.reintentos,
+            while: (error) => error._tag === "PeticionFallida",
+          }),
+          Effect.catchTag("PeticionFallida", (error) =>
+            error.estado !== undefined && error.texto !== undefined
+              ? Effect.succeed({ estado: error.estado, texto: error.texto })
+              : Effect.fail(
+                  new AlmacenNoDisponible({
+                    motivo:
+                      intentos === 1 ? error.motivo : `${error.motivo} (${intentos} intentos)`,
+                  }),
+                ),
+          ),
+        );
       }).pipe(
-        Effect.catchTags({
-          FirmaFallida: (error) => Effect.fail(new AlmacenNoDisponible({ motivo: error.motivo })),
-          HttpClientError: (error) =>
-            Effect.fail(new AlmacenNoDisponible({ motivo: error.message })),
-        }),
+        Effect.catchTag("FirmaFallida", (error) =>
+          Effect.fail(new AlmacenNoDisponible({ motivo: error.motivo })),
+        ),
       );
 
     const fallo = (metodo: string, clave: string, estado: number, texto: string) =>

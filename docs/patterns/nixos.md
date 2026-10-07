@@ -278,7 +278,7 @@ Una subida que falla queda en el diario («No se ha podido subir la copia de la 
 
 ### El archivo de páginas
 
-El archivo de páginas del registro (ADR 0027) es `/var/lib/celda-nocturna/archivo.sqlite`, y sus paquetes, `archivo-<fecha>.sqlite`, uno por noche, van a la carpeta `archivo` de `copias.directorio` y a `archivo/` del cubo de R2. Ninguno se borra. No hace falta ninguna opción ni credencial nueva. Para comprobarlo tras una noche:
+El archivo de páginas del registro (ADR 0027) es `/var/lib/celda-nocturna/archivo.sqlite`, y sus paquetes, `archivo-<fecha>-<número>.sqlite`, de 8 MiB como mucho, van a la carpeta `archivo` de `copias.directorio` y a `archivo/` del cubo de R2. Una noche normal saca uno, y una de la relectura de España, unos quince. Ninguno se borra. Los de antes del 07/10/2026 son un solo fichero por noche, `archivo-<fecha>.sqlite`. Uno de esos de más de 16 MiB que aún no está en R2 se parte al subirlo, y el entero se queda en `archivo/enteros/`. No hace falta ninguna opción ni credencial nueva. Para comprobarlo tras una noche:
 
 ```sh
 journalctl --unit=celda-nocturna.service | grep 'Archivo de páginas'
@@ -286,7 +286,9 @@ ls /var/lib/celda-nocturna/copias/archivo/
 sudo --user=celda-nocturna celda-nocturna releer-archivo   # sin red; dice cuántas fichas archivadas se leen
 ```
 
-Para rehacerlo, para la ingesta, junta los paquetes en una carpeta (los de la carpeta de copias o los de `archivo/` en R2, bajados con la clave de la ingesta) y lanza:
+Una subida que falla queda en el diario («No se han podido subir los paquetes del archivo a R2: …», con la causa) y la noche acaba bien. Los paquetes que llegaron antes del fallo se quedan en R2, y los demás suben la noche siguiente.
+
+Para rehacerlo, para la ingesta, junta los paquetes en una carpeta (los de la carpeta de copias o los de `archivo/` en R2, bajados con la clave de la ingesta; los de `enteros/` no hacen falta, porque sus partes llevan las mismas filas) y lanza:
 
 ```sh
 sudo --user=celda-nocturna celda-nocturna restaurar-archivo /ruta/de/los/paquetes

@@ -1,14 +1,22 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import { assert, describe, it } from "@effect/vitest";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import { TestClock } from "effect/testing";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
+// Un servidor que no contesta nunca o que corta la conexión a media petición, y que dice cuándo
+// cierra el cliente cada una. El servidor de Effect no deja hacer ni ver eso.
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import * as NodeHttp from "node:http";
 
 import { codificarConsulta, codificarRuta, firmarV4, sha256DeBytes } from "./firma.ts";
 import { almacenEnR2, archivoEnR2, copiasEnR2, leerListado } from "./r2.ts";
@@ -32,6 +40,9 @@ const OPCIONES = {
   secreto: Redacted.make("secreto"),
   puntoDeEntrada: PUNTO,
 };
+
+/** La dirección de un servidor que escucha en TCP, de la que basta el puerto. */
+const decodificarDireccion = Schema.decodeUnknownEffect(Schema.Struct({ port: Schema.Int }));
 
 const texto = (bytes: Uint8Array | undefined): string | undefined =>
   bytes === undefined ? undefined : new TextDecoder().decode(bytes);
@@ -102,6 +113,20 @@ const cuboDePrueba = Effect.gen(function* () {
   const archivo = archivoEnR2(OPCIONES).pipe(Layer.provide(http));
   return { almacen, copias, archivo, objetos, peticiones };
 });
+
+/**
+ * Adelanta el reloj de prueba de segundo en segundo hasta que la fibra termina, y deja correr entre
+ * paso y paso lo asíncrono de verdad, como las firmas de Web Crypto, para que cada espera se
+ * programe antes del paso siguiente.
+ */
+const esperarConReloj = <A, E>(fibra: Fiber.Fiber<A, E>) =>
+  Effect.gen(function* () {
+    for (let paso = 0; paso < 3600 && fibra.pollUnsafe() === undefined; paso++) {
+      yield* TestClock.withLive(Effect.sleep("1 millis"));
+      yield* TestClock.adjust("1 second");
+    }
+    return yield* Fiber.join(fibra);
+  });
 
 describe("almacén de ficheros en R2", () => {
   it.effect("firma como AWS Signature V4 (caso get-vanilla de la batería de AWS)", () =>
@@ -354,6 +379,142 @@ describe("almacén de ficheros en R2", () => {
           ["ingesta-2026-09-26T02-15-03.000Z.sqlite.gz"],
         );
       }),
+  );
+
+  it.effect(
+    "repite una petición que R2 rechaza por un momento o que no acaba a su plazo, y se rinde tras dos reintentos",
+    () =>
+      Effect.gen(function* () {
+        // Cada intento contesta lo siguiente de la lista, o nunca si es `parada`.
+        const respuestas = yield* Ref.make<ReadonlyArray<number | "parada">>([]);
+        const intentos = yield* Ref.make<ReadonlyArray<{ hora: number; fecha: string }>>([]);
+        const cliente = HttpClient.make((request) =>
+          Effect.gen(function* () {
+            const hora = yield* Clock.currentTimeMillis;
+            yield* Ref.update(intentos, (i) => [
+              ...i,
+              { hora, fecha: request.headers["x-amz-date"] ?? "" },
+            ]);
+            const [respuesta = "parada", ...resto] = yield* Ref.get(respuestas);
+            yield* Ref.set(respuestas, resto);
+            if (respuesta === "parada") return yield* Effect.never;
+            return HttpClientResponse.fromWeb(request, new Response("", { status: respuesta }));
+          }),
+        );
+        const copias = yield* Effect.service(AlmacenDeCopias).pipe(
+          Effect.provide(
+            copiasEnR2(OPCIONES).pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, cliente))),
+          ),
+        );
+        const contenido = new Uint8Array([1, 2, 3]);
+        const horas = Effect.map(Ref.get(intentos), (i) =>
+          i.map(({ hora }) => hora - Date.UTC(2026, 9, 7, 2, 15)),
+        );
+
+        // El reloj de prueba avanza de segundo en segundo, así que cada intento puede llegar un
+        // paso más tarde de lo justo.
+        const casi = (horas: ReadonlyArray<number>, esperadas: ReadonlyArray<number>) => {
+          assert.lengthOf(horas, esperadas.length);
+          for (const [i, hora] of horas.entries()) {
+            const esperada = esperadas[i] ?? 0;
+            assert.isTrue(hora >= esperada && hora <= esperada + 3000, `${horas.join(", ")} ms`);
+          }
+        };
+
+        // Con un 503, una petición parada y un 200, sube al tercer intento. El segundo va 2 s después
+        // del 503, y el tercero, 4 s después de que el segundo se pase de sus cinco minutos.
+        yield* TestClock.setTime(Date.UTC(2026, 9, 7, 2, 15));
+        yield* Ref.set(respuestas, [503, "parada", 200]);
+        yield* esperarConReloj(
+          yield* Effect.forkChild(copias.guardar("ingesta.sqlite.gz", contenido)),
+        );
+        casi(yield* horas, [0, 2000, 2000 + 300_000 + 4000]);
+        // Cada intento va firmado con su hora.
+        const fechas = (yield* Ref.get(intentos)).map(({ fecha }) => fecha);
+        assert.strictEqual(new Set(fechas).size, 3);
+        assert.match(fechas[2] ?? "", /^20261007T0220\d\dZ$/u);
+
+        // Si se para del todo, son tres intentos de cinco minutos y un fallo que lo dice.
+        yield* Ref.set(intentos, []);
+        yield* TestClock.setTime(Date.UTC(2026, 9, 7, 2, 15));
+        yield* Ref.set(respuestas, []);
+        const fallo = yield* esperarConReloj(
+          yield* Effect.forkChild(Effect.flip(copias.guardar("ingesta.sqlite.gz", contenido))),
+        );
+        assert.strictEqual(
+          fallo.motivo,
+          "PUT copias/ingesta.sqlite.gz: sin acabar en 5m (3 intentos)",
+        );
+        casi(yield* horas, [0, 302_000, 606_000]);
+
+        // Un 500 que no se arregla se devuelve tras los reintentos como cualquier otra respuesta.
+        yield* Ref.set(intentos, []);
+        yield* Ref.set(respuestas, [500, 500, 500]);
+        const rechazada = yield* esperarConReloj(
+          yield* Effect.forkChild(Effect.flip(copias.guardar("ingesta.sqlite.gz", contenido))),
+        );
+        assert.match(rechazada.motivo, /^PUT copias\/ingesta\.sqlite\.gz: 500/u);
+        assert.lengthOf(yield* Ref.get(intentos), 3);
+      }),
+    30_000,
+  );
+
+  it.live(
+    "contra un servidor que no contesta, cada intento acaba a su plazo y cierra su conexión; si la corta, dice por qué",
+    () =>
+      Effect.gen(function* () {
+        // Lo que ve el servidor, que vive fuera de Effect.
+        const visto = { recibidas: 0, cerradas: 0, corta: false };
+        const servidor = yield* Effect.acquireRelease(
+          Effect.callback<NodeHttp.Server>((resume) => {
+            const abierto = NodeHttp.createServer((peticion) => {
+              visto.recibidas++;
+              peticion.on("close", () => {
+                visto.cerradas++;
+              });
+              // Lee el cuerpo y no contesta nunca, o corta la conexión.
+              peticion.resume();
+              if (visto.corta) peticion.socket.destroy();
+            });
+            abierto.listen(0, "127.0.0.1", () => resume(Effect.succeed(abierto)));
+          }),
+          (abierto) =>
+            Effect.callback<void>((resume) => {
+              abierto.closeAllConnections();
+              abierto.close(() => resume(Effect.void));
+            }),
+        );
+        const { port: puerto } = yield* decodificarDireccion(servidor.address());
+        const copias = yield* Effect.service(AlmacenDeCopias).pipe(
+          Effect.provide(
+            copiasEnR2({
+              ...OPCIONES,
+              puntoDeEntrada: `http://127.0.0.1:${puerto}`,
+              plazos: { porPeticion: "300 millis", reintentos: 1, pausa: "10 millis" },
+            }).pipe(Layer.provide(FetchHttpClient.layer)),
+          ),
+        );
+        const contenido = new Uint8Array(256 * 1024);
+
+        const fallo = yield* Effect.flip(copias.guardar("ingesta.sqlite.gz", contenido));
+        assert.strictEqual(
+          fallo.motivo,
+          "PUT copias/ingesta.sqlite.gz: sin acabar en 300ms (2 intentos)",
+        );
+        assert.strictEqual(visto.recibidas, 2);
+        // El cliente ha cerrado las dos conexiones al pasarse del plazo.
+        yield* Effect.sleep("100 millis");
+        assert.strictEqual(visto.cerradas, 2);
+
+        visto.corta = true;
+        const cortada = yield* Effect.flip(copias.guardar("ingesta.sqlite.gz", contenido));
+        // El servidor ha cortado, y el motivo lleva la causa de undici, que Effect no da.
+        assert.match(
+          cortada.motivo,
+          /^Transport error \(PUT http:.+\): (?:ECONNRESET|UND_ERR_SOCKET): .+ \(2 intentos\)$/u,
+        );
+        assert.strictEqual(visto.recibidas, 4);
+      }).pipe(Effect.scoped),
   );
 
   it("lee las claves y el testigo de ListObjectsV2", () => {
