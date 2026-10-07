@@ -2,7 +2,9 @@ import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
 
 export const variantesEtiqueta = cva(
-  "cinta inline-flex items-center gap-1.5 py-1 pr-3.5 pl-2.5 font-mono text-xs font-semibold tracking-wider whitespace-nowrap",
+  // Un término dentro, como el estado (#18), se subraya del color del texto: el primario no se
+  // vería sobre el fondo de «Verificado».
+  "cinta inline-flex items-center gap-1.5 py-1 pr-3.5 pl-2.5 font-mono text-xs font-semibold tracking-wider whitespace-nowrap [&_[data-termino]]:decoration-current",
   {
     variants: {
       tono: {

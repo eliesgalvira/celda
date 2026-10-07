@@ -97,6 +97,10 @@ export const NOMBRE_ESTADO: Readonly<Record<Estado, string>> = {
   nuevo: "Nuevo",
 };
 
+/** La etiqueta del estado, que abre su explicación del glosario (#18). */
+export const etiquetaDeEstado = (estado: Estado): TextoMarcado =>
+  termino(estado, NOMBRE_ESTADO[estado]);
+
 /** Los códigos de una estación base: «Código 0802532» o «Códigos 086040 y 86040». */
 export const textoCodigos = (codigos: ReadonlyArray<string>): string =>
   codigos.length === 1 ? `Código ${codigos[0] ?? ""}` : `Códigos ${enumerar(codigos)}`;

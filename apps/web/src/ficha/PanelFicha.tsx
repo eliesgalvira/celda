@@ -63,8 +63,8 @@ import { FichasPublicadas } from "./servicio.ts";
 import {
   antetituloDe,
   creditoDelLugar,
+  etiquetaDeEstado,
   lugarDe,
-  NOMBRE_ESTADO,
   textoCodigos,
   textosDeOrigenes,
   textosMarca,
@@ -226,7 +226,9 @@ function ContenidoFicha(props: {
           </Show>
         }
         etiquetas={
-          <Etiqueta tono={props.ficha.estado}>{NOMBRE_ESTADO[props.ficha.estado]}</Etiqueta>
+          <Etiqueta tono={props.ficha.estado}>
+            <TextoConTerminos texto={etiquetaDeEstado(props.ficha.estado)} />
+          </Etiqueta>
         }
       />
       <ResumenFicha>

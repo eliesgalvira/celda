@@ -23,6 +23,9 @@ export const TERMINOS = [
   "registro-oficial",
   "expediente",
   "correccion",
+  "verificado",
+  "corregido",
+  "nuevo",
   "version-de-los-datos",
   "marca-de-agua",
   "modo-de-informacion",
@@ -204,6 +207,31 @@ export const GLOSARIO: Glosario = {
       "enseña las dos versiones y marca el emplazamiento como corregido.",
     tecnico: "corrección aceptada en la moderación",
     relacionados: ["registro-oficial"],
+  },
+  verificado: {
+    nombre: "Verificado",
+    explicacion:
+      "El registro oficial tiene este emplazamiento y ninguna corrección de la comunidad de " +
+      "Celda lo contradice. Es lo que declaran las compañías mientras nadie diga otra cosa.",
+    tecnico: "en el registro oficial, sin correcciones",
+    relacionados: ["registro-oficial", "correccion"],
+  },
+  corregido: {
+    nombre: "Corregido",
+    explicacion:
+      "Alguien de la comunidad de Celda ha contradicho al registro oficial en este " +
+      "emplazamiento y la revisión de Celda le ha dado la razón. La ficha enseña lo que dice " +
+      "cada uno.",
+    tecnico: "con una corrección aceptada en la moderación",
+    relacionados: ["correccion", "registro-oficial"],
+  },
+  nuevo: {
+    nombre: "Nuevo",
+    explicacion:
+      "Este emplazamiento no está en el registro oficial. Lo ha propuesto alguien de la " +
+      "comunidad de Celda, y la revisión lo ha aceptado.",
+    tecnico: "emplazamiento que solo conoce la comunidad",
+    relacionados: ["registro-oficial", "correccion"],
   },
   "version-de-los-datos": {
     nombre: "Versión de los datos",

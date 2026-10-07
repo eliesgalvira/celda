@@ -56,8 +56,10 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
     const { findByRole, getByRole } = await abrirCon(FICHA_CORREGIDA);
     const panel = await findByRole("article", { name: "CL JORDI GIRONA, 1" });
 
-    const etiqueta = within(panel).getByText("Corregido");
-    assert.strictEqual(etiqueta.getAttribute("data-tono"), "corregido");
+    // La etiqueta abre la explicación del estado en el glosario (#18).
+    const etiqueta = within(panel).getByRole("button", { name: "Corregido" });
+    assert.strictEqual(etiqueta.getAttribute("data-termino"), "corregido");
+    assert.strictEqual(etiqueta.closest("[data-tono]")?.getAttribute("data-tono"), "corregido");
 
     assert.isNotNull(getByRole("heading", { name: /Registro oficial y comunidad/u }));
     const vodafone = within(panel).getByLabelText("Qué dice cada fuente de Vodafone");
@@ -85,7 +87,9 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
   it("nuevo: la etiqueta y que el registro oficial no lo tiene", async () => {
     const { findByRole } = await abrirCon(FICHA_NUEVA);
     const panel = await findByRole("article", { name: "Carrer de Tarragona, 177" });
-    assert.strictEqual(within(panel).getByText("Nuevo").getAttribute("data-tono"), "nuevo");
+    const etiqueta = within(panel).getByRole("button", { name: "Nuevo" });
+    assert.strictEqual(etiqueta.getAttribute("data-termino"), "nuevo");
+    assert.strictEqual(etiqueta.closest("[data-tono]")?.getAttribute("data-tono"), "nuevo");
     const movistar = within(panel).getByLabelText("Qué dice cada fuente de Movistar");
     assert.isNotNull(within(movistar).getByText("No la tiene"));
     assert.isNotNull(within(movistar).getByText("La sitúa aquí"));
@@ -102,10 +106,9 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
     };
     const { findByRole, queryByRole } = await abrirCon(verificada);
     const panel = await findByRole("article", { name: "CL JORDI GIRONA, 1" });
-    assert.strictEqual(
-      within(panel).getByText("Verificado").getAttribute("data-tono"),
-      "verificado",
-    );
+    const etiqueta = within(panel).getByRole("button", { name: "Verificado" });
+    assert.strictEqual(etiqueta.getAttribute("data-termino"), "verificado");
+    assert.strictEqual(etiqueta.closest("[data-tono]")?.getAttribute("data-tono"), "verificado");
     assert.isNull(queryByRole("heading", { name: /Registro oficial y comunidad/u }));
   });
 });
