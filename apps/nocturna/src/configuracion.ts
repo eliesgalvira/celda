@@ -63,8 +63,7 @@ export const COPIAS_CONSERVADAS = 14;
  *   despliegue.
  *
  * El registro oficial es la única fuente con extractor (ADR 0019), y la comunidad llega por el
- * buzón. OpenCelliD queda apagado. Dónde se publica lo dice `almacenDesdeConfig`
- * (`@celda/publicacion`).
+ * buzón. Dónde se publica lo dice `almacenDesdeConfig` (`@celda/publicacion`).
  */
 export const configuracion: Config.Config<Configuracion> = Config.all({
   base: Config.String("CELDA_INGESTA_BASE").pipe(Config.withDefault("datos/ingesta.sqlite")),

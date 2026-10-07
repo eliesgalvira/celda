@@ -1,6 +1,6 @@
 # Investigación 07 · antenasmoviles.es y OpenCelliD
 
-> **Nota (03/10/2026).** Celda ya no lee antenasmoviles.es: el [ADR 0019](../adr/0019-fuentes-registro-y-aportaciones-propias.md) lo retira y el #55 borró el extractor y las muestras grabadas de `muestras/antenasmoviles/`, que siguen en el historial de git. Esta investigación guarda sus cifras como historia; los enlaces a esas muestras ya no llevan a nada. Lo de OpenCelliD sigue abierto (#21).
+> **Nota (03/10/2026).** Celda ya no lee antenasmoviles.es: el [ADR 0019](../adr/0019-fuentes-registro-y-aportaciones-propias.md) lo retira y el #55 borró el extractor y las muestras grabadas de `muestras/antenasmoviles/`, que siguen en el historial de git. Esta investigación guarda sus cifras como historia; los enlaces a esas muestras ya no llevan a nada. El 07/10/2026 se descartó también OpenCelliD, por lo poco que aciertan sus posiciones, lo poco que cubre y su licencia (ADR 0019, apartado «OpenCelliD, descartado»). Lo que dice aquí de OpenCelliD queda también como historia.
 
 Formato, condiciones de uso y `robots.txt` de las dos fuentes comunitarias de Celda. Issue #9, padre #1.
 

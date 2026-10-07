@@ -10,8 +10,7 @@ export interface Interruptor {
 /**
  * Interruptor de cada fuente mientras nadie lo cambie. Las correcciones de la comunidad llegan del
  * buzón de Convex, con lo aceptado en la moderación (ADR 0020): la ingesta nocturna la enciende
- * cuando tiene la conexión con el buzón. OpenCelliD no está decidido (ADR 0019) y no tiene
- * extractor.
+ * cuando tiene la conexión con el buzón.
  */
 export const INTERRUPTOR_POR_DEFECTO: Readonly<Record<Fuente, Interruptor>> = {
   "registro-oficial": { activo: true, motivo: "" },
@@ -20,7 +19,6 @@ export const INTERRUPTOR_POR_DEFECTO: Readonly<Record<Fuente, Interruptor>> = {
     motivo:
       "apagado por defecto: sin la conexión con el buzón (CELDA_CONVEX_SITE_URL y CELDA_PUBLICACION_CLAVE)",
   },
-  opencellid: { activo: false, motivo: "apagado por defecto: aún no tiene extractor" },
 };
 
 /** Lo que apunta una ejecución omitida por su interruptor. */

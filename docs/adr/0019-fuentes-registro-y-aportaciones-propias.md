@@ -1,6 +1,6 @@
 # Fuentes: el registro oficial y las aportaciones propias, sin antenasmoviles.es
 
-Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Sustituye la opción descartada del ADR 0009 («No extraer antenasmoviles.es»), la ampliación del ADR 0012 por la unión por código con la comunidad en lo que toca a antenasmoviles.es, el apartado «antenasmoviles.es por zonas» del ADR 0014 y lo que el ADR 0015 guarda y configura de antenasmoviles.es. Lo lleva a cabo el #55.
+Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Sustituye la opción descartada del ADR 0009 («No extraer antenasmoviles.es»), la ampliación del ADR 0012 por la unión por código con la comunidad en lo que toca a antenasmoviles.es, el apartado «antenasmoviles.es por zonas» del ADR 0014 y lo que el ADR 0015 guarda y configura de antenasmoviles.es. Lo lleva a cabo el #55. Ampliada el 07/10/2026: Celda descarta también OpenCelliD (apartado «OpenCelliD, descartado»).
 
 ## Contexto
 
@@ -22,7 +22,7 @@ El usuario quiere además que Celda sea la fuente de verdad, y no una copia de o
   - el crédito de la interfaz y las menciones en las guías y en el glosario.
 - **Los cuadros y las densidades salen del registro.** Los 94 cuadros de `ZONAS_DE_BARRIDO` (`packages/dominio/src/barrido.ts`) se eligieron con los marcadores de antenasmoviles.es, y las densidades de los datos de prueba de España (`apps/nocturna/src/pruebas/espana.ts`) también. Se rehacen con el listado propio de toda España del registro, 69.612 registros. Un cuadro con registros fuera de los 94 nunca aparece en ese listado, porque nadie lo pide, así que hay que pedir una vez cada cuadro que toca los límites de España y quedarse con los que traen algo.
 - **La ficha sigue enseñando las dos versiones.** La parte del panel que pone al lado lo que dice el registro y lo que dice otra fuente se queda si se puede hacer independiente de la fuente con poco trabajo, para las correcciones aceptadas. Si no, se quita y se rehace con el buzón (ADR 0020).
-- **Ya no hace falta escribir a antenasmoviles.es** (#39). El correo al ministerio sigue.
+- **Ya no hace falta escribir a antenasmoviles.es** (#39). El correo al ministerio sigue. El 08/10/2026 el usuario decidió no enviarlo tampoco (ADR 0014, «Correos antes de publicar»).
 - Los ADR, la investigación de fuentes comunitarias y la de España guardan sus cifras: son historia. Las investigaciones llevan arriba una nota que remite a este ADR.
 
 ## Consecuencias
@@ -31,9 +31,20 @@ El usuario quiere además que Celda sea la fuente de verdad, y no una copia de o
 - Se pierden las estaciones que antenasmoviles.es tenía fuera del registro (las ER5: 42 en la caja de Barcelona). Celda las tendrá que recibir como aportaciones de «falta un emplazamiento».
 - La unión por código del ADR 0012 con observaciones de otras fuentes se queda sin ninguna fuente que la use. Se deja o se quita en el ticket, según lo que pida el buzón.
 - Las muestras borradas siguen en el historial de git. Cuando Celda pase a su propio repositorio, el historial que se lleve no debe incluirlas.
-- OpenCelliD (#21) no se decide aquí. Su licencia CC BY-SA 4.0 obliga a publicar con esa misma licencia las capas que lleven sus filas, y eso choca con la CC0 de los datos de Celda (ADR 0021).
+- OpenCelliD (#21) quedó fuera de esta decisión. El usuario lo descartó el 07/10/2026 (ver «OpenCelliD, descartado»).
 
 ## Alternativas descartadas
 
 - **Seguir con el extractor apagado y decidir más adelante.** Mantiene código, pruebas, opciones de NixOS y una fuente en el glosario que nunca se va a encender, y deja la duda legal abierta.
 - **Pedir permiso a antenasmoviles.es** (#39). Aunque lo diera, Celda seguiría dependiendo de otra web para lo que quiere ser su propio dato.
+
+## OpenCelliD, descartado (07/10/2026)
+
+Para el #21 se cruzaron los datos de OpenCelliD con el registro oficial. El 07/10/2026, con el resultado, el usuario descartó OpenCelliD como fuente:
+
+- La posición que da a cada eNB se aparta unos 500 m de mediana del emplazamiento.
+- El emplazamiento de la misma compañía más cercano a esa posición solo era el suyo en la mitad de los casos, más o menos.
+- Solo tiene algo de un 20 % de los emplazamientos de Celda.
+- Su licencia, CC BY-SA 4.0, obliga a publicar con esa misma licencia lo que se derive de sus datos, y eso choca con la CC0 de los datos de Celda (ADR 0021).
+
+**Decisión.** Celda no lee ni publica nada de OpenCelliD. Se quitan el literal `opencellid` de `Fuente`, su interruptor y sus textos en la ficha. El #21 se reescribe sin sus datos: Orange numera sus estaciones base 4G con un prefijo regional y las cuatro cifras de su código en el registro, así que del ECI de una medida propia de Orange se puede deducir su emplazamiento. Esa regla describe cómo numera Orange y no usa ninguna fila de OpenCelliD. La investigación de fuentes comunitarias guarda lo que dice de OpenCelliD como historia, con una nota arriba que remite aquí.

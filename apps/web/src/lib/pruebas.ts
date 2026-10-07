@@ -47,7 +47,7 @@ export const JERGA: ReadonlyArray<{ readonly que: string; readonly patron: RegEx
   { que: "identificador con versión", patron: /[\p{L}\d-]@\d/u },
   { que: "versión suelta", patron: /\bv\d+\b/u },
   { que: "versión de capa o de fichas", patron: /\b(?:sitios|fichas)@/u },
-  { que: "clave de una fuente", patron: /\b(?:registro-oficial|opencellid)\b/u },
+  { que: "clave de una fuente", patron: /\bregistro-oficial\b/u },
   {
     que: "clave de un emplazamiento",
     patron: /\b(?:movistar|vodafone|orange|digi|yoigo)(?:-| - )[\dA-Z]/u,

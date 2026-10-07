@@ -1,6 +1,6 @@
 # Barrido del registro oficial por zonas: Cataluña primero, luego toda España, y fichas a una cada 3 s
 
-Estado: propuesta (28/09/2026), con las decisiones del usuario del mismo día. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 1). Cambia el barrido del glosario y el ritmo del ADR 0009 y de la investigación del registro. El apartado «antenasmoviles.es por zonas» y el correo a antenasmoviles.es los retira el [ADR 0019](0019-fuentes-registro-y-aportaciones-propias.md) (02/10/2026), que también rehace los cuadros con el registro.
+Estado: aceptada el 08/10/2026. Se propuso el 28/09/2026, con las decisiones del usuario del mismo día, y corre en producción desde el 01/10/2026, en el portátil de la ingesta nocturna (#42). Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 1). Cambia el barrido del glosario y el ritmo del ADR 0009 y de la investigación del registro. El apartado «antenasmoviles.es por zonas» y el correo a antenasmoviles.es los retira el [ADR 0019](0019-fuentes-registro-y-aportaciones-propias.md) (02/10/2026), que también rehace los cuadros con el registro.
 
 ## Contexto
 
@@ -23,6 +23,10 @@ Hoy un barrido es la lectura completa del listado, y una observación que falta 
 ## Correos antes de publicar
 
 El usuario decidió que los correos al ministerio (`emisionesysalud@economia.gob.es`) y a antenasmoviles.es se envían antes de publicar Celda, y que no bloquean el trabajo. Una ficha cada 3 s son unas 5.500 peticiones por noche, frente a las 250 de hoy, a un servicio que el ministerio describe como solo informativo. Si el ministerio pide menos, basta con cambiar el ritmo en la configuración.
+
+**No se envía ningún correo** (decisión del usuario del 08/10/2026). El registro es información pública que el ministerio publica para que se consulte, y Celda lo lee una página cada vez, con una pausa entre una y la siguiente. antenasmoviles.es ya no es una fuente (ADR 0019), así que tampoco hay nada que pedirle. El ritmo sigue en la configuración: si el ministerio pide algún día que se lea más despacio, basta con subirlo.
+
+En producción las fichas van a una por segundo desde el 07/10/2026 (`registroOficial.fichas.ritmo = 1`, ver «El mínimo de las fichas baja a 1 s»). El listado sigue a una petición cada 3 s.
 
 ## Consecuencias
 
@@ -87,7 +91,7 @@ El 01/10/2026 el usuario pidió poder leer las fichas a una por segundo en lugar
 - **Siempre de una en una.** El ritmo sigue siendo la pausa entre el final de una ficha y la petición de la siguiente, sobre una sola conexión que hace una petición cada vez. Con un geoportal que tarda 0,9 s, sale una ficha cada 1,9 s en lugar de cada 3,9 s: unas 11.000 por noche de 6 horas en lugar de 5.500. Las 50.000 tardan unas cinco noches en lugar de nueve: la mitad y no un tercio, porque la respuesta tarda lo mismo.
 - **Tope.** El de peticiones de las fichas son las que caben en la ventana al ritmo configurado: 7.200 a 3 s y 21.600 a 1 s.
 - **Salvaguardas.** Siguen las de antes: un 401 o un 403, o una página que no es una ficha, paran las fichas en el acto, y tres fallos seguidos también. Se añade la fuente que pide esperar: un 429, o un 503 con `Retry-After`. Si pide un minuto o menos, la conexión espera lo que pide y repite, dentro de los reintentos; si pide más, si un 429 no dice cuánto o si lo sigue pidiendo, las fichas paran hasta la noche siguiente y queda en los errores (`FuentePideEsperar`). Antes un 429 se reintentaba tres veces como un fallo pasajero. El cambio está en el cliente común, así que vale también para el listado y para antenasmoviles.es. Las pruebas comprueban cada una a 1 s.
-- **Riesgo.** El ministerio podría bloquear este ritmo. A favor solo hay lo visto hasta ahora: unas 27.000 fichas leídas a 3 s sin ningún rechazo. El usuario acepta el riesgo. Si aparece un rechazo, la noche para sola y se vuelve a 3 s cambiando la configuración.
+- **Riesgo.** El ministerio podría bloquear este ritmo (ver «Correos antes de publicar»). A favor solo hay lo visto hasta ahora: unas 27.000 fichas leídas a 3 s sin ningún rechazo. El usuario acepta el riesgo. Si aparece un rechazo, la noche para sola y se vuelve a 3 s cambiando la configuración.
 
 ## Fichas que fallan y estaciones base sin ficha en el registro (#58 y #59, 03/10/2026)
 

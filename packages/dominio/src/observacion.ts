@@ -6,10 +6,10 @@ import { Compania } from "./compania.ts";
 import { MedidaDeExposicion } from "./exposicion.ts";
 
 /**
- * Origen de las observaciones sobre emplazamientos: el registro oficial, la comunidad de Celda con
- * sus correcciones aceptadas (ADR 0019 y 0020) y OpenCelliD, que aún no se ha decidido (#21).
+ * Origen de las observaciones sobre emplazamientos: el registro oficial y la comunidad de Celda con
+ * sus correcciones aceptadas (ADR 0019 y 0020). OpenCelliD se descartó el 07/10/2026 (ADR 0019).
  */
-export const Fuente = Schema.Literals(["registro-oficial", "comunidad", "opencellid"]);
+export const Fuente = Schema.Literals(["registro-oficial", "comunidad"]);
 export type Fuente = typeof Fuente.Type;
 
 /**

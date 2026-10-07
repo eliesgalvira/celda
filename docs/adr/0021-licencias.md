@@ -31,5 +31,5 @@ Celda será abierta del todo, y el usuario pidió «la más abierta» para lo qu
 
 - Cualquiera puede copiar, cambiar y republicar lo que es de Celda sin pedir nada ni citar.
 - Una capa de Celda mezcla datos CC0 con datos del registro, así que quien la reutilice tiene que seguir citando al ministerio por su parte. La capa lo dice.
-- Una fuente con «compartir igual», como OpenCelliD con CC BY-SA 4.0 (#21), no puede entrar en las capas sin que las capas pasen a esa licencia. Si entra, va aparte.
+- Una fuente con «compartir igual», como OpenCelliD con CC BY-SA 4.0, no puede entrar en las capas sin que las capas pasen a esa licencia. Fue una de las razones para descartar OpenCelliD el 07/10/2026 (ADR 0019).
 - Una aportación enviada no se puede retirar de la licencia: CC0 es irrevocable. La persona lo lee antes de enviarla.

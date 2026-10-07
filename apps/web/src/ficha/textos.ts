@@ -140,13 +140,11 @@ export const sinBandasDe = (estacion: EstacionDeFicha): string => {
 export const NOMBRE_FUENTE: Readonly<Record<Fuente, string>> = {
   "registro-oficial": "Registro oficial",
   comunidad: "Comunidad de Celda",
-  opencellid: "OpenCelliD",
 };
 
 export const ENLACE_FUENTE: Readonly<Record<Fuente, string>> = {
   "registro-oficial": "Ver en el registro oficial",
   comunidad: "Ver la corrección",
-  opencellid: "Ver en OpenCelliD",
 };
 
 /**
