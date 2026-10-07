@@ -198,7 +198,36 @@ La sintética da 238 peticiones la primera vez y 202 después, frente a las 251 
 - Antes de este ticket la fusión leía a la vez el JSON de todas las observaciones, todas decodificadas y todos los emplazamientos decodificados: la noche de las fichas no cabía en 512 MB de montón. Ahora lee la base de 2.000 en 2.000 filas y compara los emplazamientos por su JSON.
 - Con los valores por defecto, una noche son unos 2 minutos de listado, las 6 horas de fichas, dos fusiones de unos 3 s y dos publicaciones de unos 10 s. La base con las bandas de toda España ocupa 190 MB y sus catorce copias, unos 2,6 GB.
 
-**Recuento de la primera semana.** Lo que falta de la tabla de arriba lo da la primera semana de la ingesta en el portátil (#42), con la orden `estado`: registros y peticiones de cada zona en su noche. Queda pendiente hasta entonces.
+**Recuento de la primera semana** (#50, **medido**). Sale del diario de la ingesta nocturna en el portátil (#42), del 01/10 al 06/10/2026: la línea de cada zona y la de las fichas al acabar cada ejecución. Las peticiones son las que el diario cuenta a la zona, con `robots.txt`, que la ejecución pide una vez antes de la primera caja, y con los reintentos. En las observaciones, `+` son altas, `~` cambiadas y `−` retiradas. La hora es la del final de la ejecución, en hora de Madrid.
+
+| Fin | Zona | Cuadros | Peticiones | kB | Registros | Observaciones | Fichas leídas (con cambios) | Fichas fallidas | Fichas pendientes |
+|---|---|---|---|---|---|---|---|---|---|
+| 01/10 00:30 | `cataluna`, fallida | 0 | 4 | 0 | 0 | +0 ~0 −0 | | | |
+| 01/10 10:00 | `cataluna` | 9 | 31 | 6.319 | 10.305 | +0 ~10 −0 | 9.187 (9.185) | 3 | 51.448 |
+| 01/10 23:54 | `andalucia` | 14 | 36 | 6.876 | 11.175 | +0 ~2 −0 | 19.940 (19.940) | 1 | 27.189 |
+| 02/10 06:04 | `levante` | 14 | 39 | 6.766 | 10.957 | +11 ~23 −0 | 19.994 (19.985) | 0 | 7.224 |
+| 02/10 08:30 | `norte` | 14 | 33 | 5.736 | 9.290 | +3 ~13 −0 | 7.240 (7.227) | 1 | 0 |
+| 02/10 08:42 | `ebro-y-duero` | 17 | 25 | 6.141 | 9.883 | +8 ~21 −0 | 29 (8) | 0 | 0 |
+| 02/10 08:54 | `oeste-y-canarias` | 16 | 20 | 3.445 | 5.497 | +2 ~7 −0 | 9 (2) | 0 | 0 |
+| 02/10 09:06 | `cataluna` | 9 | 31 | 6.320 | 10.308 | +3 ~18 −0 | 21 (19) | 0 | 0 |
+| 02/10 09:14 | `centro` | 10 | 32 | 7.701 | 12.544 | +16 ~38 −1 | 54 (46) | 0 | 0 |
+| 03/10 00:33 | `andalucia` | 14 | 36 | 6.881 | 11.183 | +8 ~25 −0 | 33 (32) | 1 | 0 |
+| 04/10 00:33 | `levante` | 14 | 39 | 6.771 | 10.965 | +8 ~18 −1 | 26 (21) | 0 | 0 |
+| 04/10 18:25 | `norte` | 14 | 33 | 5.736 | 9.289 | +0 ~2 −0 | 2 (2) | 0 | 0 |
+| 05/10 00:32 | `ebro-y-duero` | 18 | 28 | 6.828 | 10.999 | +0 ~20 −0 | 20 (14) | 0 | 0 |
+| 05/10 14:55 | `oeste-y-canarias` | 16 | 20 | 3.444 | 5.496 | +0 ~1 −0 | 1 (1) | 0 | 0 |
+| 06/10 00:33 | `cataluna` | 9 | 31 | 6.322 | 10.311 | +3 ~27 −0 | 30 (25) | 0 | 0 |
+| 06/10 03:11 | `centro` | 8 | 27 | 6.767 | 11.026 | +4 ~55 −1 | 59 (43) | 0 | 0 |
+| 06/10 15:54 | `andalucia` | 15 | 37 | 7.133 | 11.592 | +6 ~22 −0 | 28 (24) | 0 | 0 |
+| **Las 17 ejecuciones** | | | **502** | | | **+72 ~302 −3** | **56.673 (56.574)** | **6** | |
+
+- **El fallo del 01/10 a las 00:30.** La primera noche no llegó a pedir ninguna caja. `robots.txt` falló cuatro veces, con sus reintentos, con un `TransportError`, y la zona quedó fallida con `FuenteNoDisponible`. Media hora después llegó el #42, que completa la cadena del certificado del geoportal con el intermedio de la FNMT y hace que el diario diga por qué falla una conexión. La ejecución que acabó a las 10:00 barrió Cataluña sin ningún error.
+- **Más ejecuciones que noches.** Son 17 en seis días. Las que acaban hacia las 00:30 son noches sin cola de fichas. Las demás empezaron a otras horas o las alargó la primera pasada de las fichas, como las cinco seguidas del 02/10 por la mañana. Cada ejecución barre la zona que le toca en el turno, así que en la semana cada zona se barrió dos veces por lo menos.
+- **Los cuadros del #55.** Desde el 05/10 las zonas llevan los cuadros del apartado 7: `-5,38` pasa de `centro` a Andalucía y `-5,40` de `centro` al Ebro y el Duero. Por eso `centro` baja de 10 cuadros a 8, el Ebro y el Duero sube a 18 y Andalucía a 15. Con los cuadros nuevos, los registros de esas tres zonas quedan a menos de 20 de los que daba ese apartado.
+- **La vuelta entera.** Las siete zonas, de la ejecución de Cataluña de las 10:00 del 01/10 a la de `centro` del 02/10, hicieron 209 peticiones de listado sin `robots.txt` (216 con él) en los 94 cuadros, y trajeron 69.651 registros y 42.984 kB. Son 39 registros más que los 69.612 de la noche del 29/09/2026 (apartado 7), un 1,1 % más de los 68.911 previstos con antenasmoviles.es, y los 43 MB previstos. La segunda vuelta, del 03/10 al 06/10, hizo 207 peticiones de listado. No sirve para contar registros, porque el cuadro `-5,38` cambió de zona entre la ejecución de Andalucía y la de `centro` y no entró en ninguna de las dos.
+- **Frente a lo estimado.** Se esperaban unas 31 peticiones de listado por noche, con 34 de media la primera semana por ser la primera pasada, y unas 250 en total en la primera vuelta. La base del portátil ya tenía las observaciones y las cajas de la noche del 29/09/2026, porque Cataluña y Andalucía no dieron ni una alta en su primera ejecución (deducido). Ninguna zona hizo, por tanto, su primera pasada esta semana, y lo que toca comparar son las pasadas siguientes: 209 peticiones de listado en la vuelta, 30 por noche de media (31 con `robots.txt`), frente a las 202 de la España sintética y las 215 de la simulación con `showf`. Por zona, medidas y sintéticas: Cataluña 30 y 27, `centro` 31 y 28 (con las cajas del 29/09 se esperaban 24), Andalucía 35 y 35, levante 38 y 35, norte 32 y 32, Ebro y Duero 24 y 26, oeste y Canarias 19 y 19.
+- **Fichas.** Las 17 ejecuciones leyeron 56.673 fichas, 56.574 de ellas con cambios porque casi todas se leían por primera vez, y fallaron 6. La cola de la primera pasada, 60.635 fichas al empezar el 01/10 (9.187 leídas y 51.448 pendientes), se vació el 02/10 a las 08:30, tras cuatro ejecuciones. Las del 01 y el 02/10 leyeron unas 20.000 cada una, más de tres veces las 5.500 por noche que da el ritmo de 3 s. Desde que se vació la cola, cada ejecución lee de 1 a 59 fichas, las de las altas y los cambios de listado.
+- **Las fichas a 1 s desde el 07/10/2026.** En producción las fichas van a una por segundo desde esa noche (ADR 0014). Su ejecución (Ebro y Duero, 18 cuadros, 28 peticiones, 6.831 kB, 11.004 registros, +7 ~16 −3) leyó 25.820 fichas, todas con cambios, y dejó 41.624 pendientes. Es la relectura de toda España que trae las medidas de exposición del ministerio (#73).
 
 ### Fichas de detalle
 
@@ -651,7 +680,7 @@ Son `robots.txt` y una petición por cuadro, unos 15 s, y no toca la base. Se la
 
 ## Qué no he podido comprobar
 
-- El total de registros es una extrapolación. Cataluña y `centro` ya están medidas (22.833 registros, un 3 % más de lo previsto); el resto lo mide la primera semana de la ingesta en el portátil.
+- El total de registros ya está medido. La primera vuelta de la ingesta en el portátil contó 69.651 en las siete zonas, un 1,1 % más de lo previsto (apartado 1, «Recuento de la primera semana»).
 - La E/S de Convex es una cuenta sobre el código, no una lectura del panel. Hay que confirmarla con el uso real del despliegue de Barcelona.
 - Las fotos `desmantelada` de antenasmoviles.es siguen sin un caso real.
 - Las cifras del navegador son de un móvil simulado con la GPU de un portátil.
