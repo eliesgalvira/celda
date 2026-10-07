@@ -7,8 +7,15 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 import { type FichaLeida, ListadoCrudo, Registro } from "./extractor.ts";
-import { alDia, ObservacionGuardada, observacionDe, sinCrudo } from "./guardado.ts";
-import { registroDeCrudo } from "./registro-oficial/normalizar.ts";
+import {
+  alDia,
+  mismasBandas,
+  mismasMedidas,
+  ObservacionGuardada,
+  observacionDe,
+  sinCrudo,
+} from "./guardado.ts";
+import { bandaAlDia, registroDeCrudo } from "./registro-oficial/normalizar.ts";
 
 /**
  * El historial de cada registro (ADR 0027, fase 2): los hechos que la ingesta ve de cada registro
@@ -302,10 +309,16 @@ const sinMarca = (o: ObservacionGuardada): ObservacionGuardada => {
 };
 
 const mismaPosicion = Schema.toEquivalence(Coordenada);
-const mismasBandas = Schema.toEquivalence(Schema.Array(Banda));
-const mismasMedidas = Schema.toEquivalence(Schema.UndefinedOr(Schema.Array(MedidaDeExposicion)));
+const mismasMedidasSiLasHay = (
+  a: ReadonlyArray<MedidaDeExposicion> | undefined,
+  b: ReadonlyArray<MedidaDeExposicion> | undefined,
+): boolean => (a === undefined || b === undefined ? a === b : mismasMedidas(a, b));
 
-/** Cada campo que se publica de una observación, con cómo se comparan dos. */
+/**
+ * Cada campo que se publica de una observación, con cómo se comparan dos. Las bandas y las medidas
+ * se comparan sin mirar su orden: la fusión las ordena, y una observación guardada antes de
+ * guardarlas en orden (versión 11 de la base) las tiene en el de su página.
+ */
 const CAMPOS: ReadonlyArray<readonly [string, (a: Observacion, b: Observacion) => boolean]> = [
   ["fuente", (a, b) => a.fuente === b.fuente],
   ["clave", (a, b) => a.clave === b.clave],
@@ -319,7 +332,10 @@ const CAMPOS: ReadonlyArray<readonly [string, (a: Observacion, b: Observacion) =
   ["fecha", (a, b) => a.fecha === b.fecha],
   ["afirma", (a, b) => a.afirma === b.afirma],
   ["sinFichaEnRegistro", (a, b) => a.sinFichaEnRegistro === b.sinFichaEnRegistro],
-  ["medidasDeExposicion", (a, b) => mismasMedidas(a.medidasDeExposicion, b.medidasDeExposicion)],
+  [
+    "medidasDeExposicion",
+    (a, b) => mismasMedidasSiLasHay(a.medidasDeExposicion, b.medidasDeExposicion),
+  ],
 ];
 
 /**
@@ -339,6 +355,136 @@ export const registroPublicado = (o: ObservacionGuardada): RegistroRepetido => (
   observacion: observacionDe(alDia(o)),
   retiradaEn: o.retiradaEn,
 });
+
+// ── Hechos de ficha que solo cambian el orden de las filas ───────────────────────────────────
+
+/** Lo que dice una ficha que se enseña: sus bandas y sus medidas de exposición. */
+export type LoQueDiceLaFicha = Pick<FichaLeida, "bandas" | "medidasDeExposicion">;
+
+/** Lo que hay que corregir en el historial de un registro (`corregirElOrden`). */
+export interface CorreccionDelOrden {
+  /**
+   * Los hechos de ficha, por su posición en el historial, que dicen que cambia lo que se enseña y
+   * dicen lo mismo que había antes, en otro orden.
+   */
+  readonly sinCambio: ReadonlyArray<number>;
+  /** Los hechos de ficha con `cambia` que no se pueden comparar, con el motivo. */
+  readonly sinComparar: ReadonlyArray<{ readonly indice: number; readonly motivo: string }>;
+  /** La fecha de la observación que da el historial tal como está. */
+  readonly fechaAntes: number | undefined;
+  /** La que da con esos hechos sin `cambia`. */
+  readonly fechaDespues: number | undefined;
+}
+
+/** Lo que había antes de un hecho, o por qué no se sabe. */
+type LoQueHabia =
+  | {
+      readonly bandas: ReadonlyArray<Banda>;
+      readonly medidasDeExposicion: ReadonlyArray<MedidaDeExposicion> | undefined;
+    }
+  | { readonly motivo: string };
+
+/**
+ * La fecha de la observación que dan unos hechos: la del punto de partida, la del alta o la del
+ * último hecho que cambia lo que se enseña, como al repetirlos (`repetirHechos`).
+ */
+const fechaDeLosHechos = (
+  hechos: ReadonlyArray<HechoLeido>,
+  sinCambio: ReadonlySet<number>,
+): number | undefined => {
+  let fecha: number | undefined;
+  for (const [indice, hecho] of hechos.entries()) {
+    switch (hecho.tipo) {
+      case "conocido-antes":
+        fecha = hecho.datos.observacion.fecha;
+        break;
+      case "alta":
+        fecha = hecho.fecha;
+        break;
+      case "listado":
+      case "vuelta":
+      case "ficha":
+        if (hecho.datos.cambia && !sinCambio.has(indice)) fecha = hecho.fecha;
+        break;
+      case "sin-ficha":
+      case "retirada":
+        break;
+    }
+  }
+  return fecha;
+};
+
+/**
+ * Los hechos de ficha de un registro que dicen que cambia lo que se enseña cuando la ficha dice lo
+ * mismo que antes con las filas en otro orden. Hasta la versión 11 de la base, `trasFicha`
+ * comparaba las bandas y las medidas fila a fila, y el registro da las filas en otro orden de una
+ * petición a otra (ADR 0027).
+ *
+ * Lo de cada hecho de ficha sale de su página del archivo (`paginas`), leída hoy, o de lo leído que
+ * guarda. Si no está, el último puede tomar lo que guarda hoy la observación (`ultima`), porque
+ * después de él el registro ha escrito lo mismo. Lo de antes sale del hecho de ficha anterior, del
+ * punto de partida, con sus bandas limpias con la limpieza de hoy, o del alta, que no tiene bandas.
+ * Como en `trasFicha`, unas medidas que antes no se tenían no cuentan. Si falta lo de antes o lo
+ * del hecho, no se compara.
+ */
+export const corregirElOrden = (
+  hechos: ReadonlyArray<HechoLeido>,
+  paginas: FichasDeLasPaginas,
+  ultima: LoQueDiceLaFicha | undefined,
+): CorreccionDelOrden => {
+  const ultimaFicha = hechos.findLastIndex((h) => h.tipo === "ficha");
+  const sinCambio: Array<number> = [];
+  const sinComparar: Array<{ readonly indice: number; readonly motivo: string }> = [];
+  let antes: LoQueHabia = { motivo: "no hay nada antes" };
+  for (const [indice, hecho] of hechos.entries()) {
+    switch (hecho.tipo) {
+      case "conocido-antes":
+        antes = {
+          bandas: hecho.datos.observacion.bandas.map(bandaAlDia),
+          medidasDeExposicion: hecho.datos.observacion.medidasDeExposicion,
+        };
+        break;
+      case "alta":
+        antes = { bandas: [], medidasDeExposicion: undefined };
+        break;
+      case "ficha": {
+        const leida = leidaDeLaFicha(hecho.datos.ficha, paginas);
+        const dice: LoQueHabia = Result.isSuccess(leida)
+          ? leida.success
+          : indice === ultimaFicha && ultima !== undefined
+            ? ultima
+            : { motivo: leida.failure };
+        if (hecho.datos.cambia) {
+          if ("motivo" in antes) {
+            sinComparar.push({ indice, motivo: `no se sabe qué decía antes: ${antes.motivo}` });
+          } else if ("motivo" in dice) {
+            sinComparar.push({ indice, motivo: dice.motivo });
+          } else if (
+            mismasBandas(antes.bandas, dice.bandas) &&
+            (antes.medidasDeExposicion === undefined ||
+              (dice.medidasDeExposicion !== undefined &&
+                mismasMedidas(antes.medidasDeExposicion, dice.medidasDeExposicion)))
+          ) {
+            sinCambio.push(indice);
+          }
+        }
+        antes = dice;
+        break;
+      }
+      case "listado":
+      case "vuelta":
+      case "sin-ficha":
+      case "retirada":
+        break;
+    }
+  }
+  return {
+    sinCambio,
+    sinComparar,
+    fechaAntes: fechaDeLosHechos(hechos, new Set()),
+    fechaDespues: fechaDeLosHechos(hechos, new Set(sinCambio)),
+  };
+};
 
 // ── Lo que se publica del historial ──────────────────────────────────────────────────────────
 

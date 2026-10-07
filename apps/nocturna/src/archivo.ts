@@ -21,6 +21,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as NodeZlib from "node:zlib";
 
 import { BaseNocturna } from "./base.ts";
+import { ArchivoNoDisponible, fichasDeContenidos } from "./fichasArchivadas.ts";
 
 /**
  * El archivo de páginas del registro oficial (ADR 0027): cada respuesta del listado y de las
@@ -246,12 +247,6 @@ export interface FichaArchivada {
   readonly huella: string;
 }
 
-/** El archivo no se ha podido abrir o no responde. */
-export class ArchivoNoDisponible extends Schema.TaggedError<ArchivoNoDisponible>()(
-  "ArchivoNoDisponible",
-  { motivo: Schema.String },
-) {}
-
 /** Un paquete que no es de la versión del archivo, o que no es un paquete. */
 export class PaqueteIncompatible extends Schema.TaggedError<PaqueteIncompatible>()(
   "PaqueteIncompatible",
@@ -342,14 +337,6 @@ const mensajeDe = (causa: Cause.Cause<unknown>): string => {
   const error = Cause.squash(causa);
   return error instanceof Error ? error.message : String(error);
 };
-
-/** Un contenido del archivo, comprimido. */
-const FilaContenido = Schema.Struct({ huella: Schema.String, gzip: Schema.Uint8Array });
-
-const trozosDe = <A>(elementos: ReadonlyArray<A>, tamano: number) =>
-  Array.from({ length: Math.ceil(elementos.length / tamano) }, (_, i) =>
-    elementos.slice(i * tamano, (i + 1) * tamano),
-  );
 
 /** Un fallo de SQLite, del esquema o del disco, como archivo no disponible. */
 const noDisponible = (error: { readonly message: string }) =>
@@ -630,29 +617,14 @@ const archivoSobre = (fichero: string, tamanoDePaquete: number, sql: SqlClient.S
     });
 
     const fichasDePaginas = (huellas: ReadonlyArray<string>) =>
-      Effect.gen(function* () {
-        const fichas = new Map<string, Pick<FichaLeida, "bandas" | "medidasDeExposicion">>();
-        for (const trozo of trozosDe(huellas, PAGINA)) {
-          const filas = yield* sql`SELECT huella, gzip FROM contenidos
-              WHERE huella IN ${sql.in(trozo)}`.pipe(
-            Effect.flatMap(decodificar(FilaContenido)),
-            Effect.mapError(noDisponible),
-          );
-          for (const fila of filas) {
-            const html = yield* Effect.try({
-              try: () => decodificarLatin1(new Uint8Array(NodeZlib.gunzipSync(fila.gzip))),
-              catch: () =>
-                new ArchivoNoDisponible({ motivo: `no se puede descomprimir ${fila.huella}` }),
-            });
-            const lectura = lecturaDeFicha(html);
-            if (lectura.resultado === "leida") {
-              const { bandas, medidasDeExposicion } = lectura.ficha;
-              fichas.set(fila.huella, { bandas, medidasDeExposicion });
-            }
-          }
-        }
-        const hechas: FichasDeLasPaginas = fichas;
-        return hechas;
+      Effect.map(fichasDeContenidos(sql, huellas), (leidas) => {
+        const fichas: FichasDeLasPaginas = new Map(
+          [...leidas].map(([huella, { bandas, medidasDeExposicion }]) => [
+            huella,
+            { bandas, medidasDeExposicion },
+          ]),
+        );
+        return fichas;
       }).pipe(Effect.withSpan("Archivo.fichasDePaginas"));
 
     const recorrerFichas = <E, R>(cada: (ficha: FichaArchivada) => Effect.Effect<void, E, R>) =>

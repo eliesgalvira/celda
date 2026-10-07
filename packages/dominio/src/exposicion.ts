@@ -29,3 +29,11 @@ export const compararMedidas = (a: MedidaDeExposicion, b: MedidaDeExposicion): n
   a.acimutGrados - b.acimutGrados ||
   a.distanciaMetros - b.distanciaMetros ||
   a.microvatiosPorCm2 - b.microvatiosPorCm2;
+
+/**
+ * Las medidas en el orden de `compararMedidas`, que mira todos sus campos. Como las bandas
+ * (`bandasEnOrden`), el registro las da en otro orden de una petición a otra.
+ */
+export const medidasEnOrden = (
+  medidas: ReadonlyArray<MedidaDeExposicion>,
+): ReadonlyArray<MedidaDeExposicion> => medidas.toSorted(compararMedidas);

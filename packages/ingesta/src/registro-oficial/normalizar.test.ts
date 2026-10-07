@@ -109,6 +109,31 @@ describe("listado del registro oficial", () => {
     );
   });
 
+  it("de dos elementos con la misma clave que dicen cosas distintas se queda el mismo en cualquier orden", () => {
+    const elemento = (id: string, direccion: string, longitud: number) => ({
+      id,
+      geometry: { coordinates: [longitud, 41.4] },
+      properties: { Gis_ID: id.slice(-3), Dirección: direccion },
+    });
+    const elementos = [
+      elemento("VODAFONE ESPAÑA, S.A.U. - 123", "CL Y, 2. BARCELONA, BARCELONA", 2.1),
+      elemento("VODAFONE ESPAÑA, S.A.U. - 123", "CL X, 1. BARCELONA, BARCELONA", 2.2),
+      elemento("TELEAST DIGITAL, S.L. - 777", "CL Z, 9. BARCELONA, BARCELONA", 2.3),
+      elemento("TELEAST DIGITAL, S.L. - 777", "CL Z, 9. BARCELONA, BARCELONA", 2.0),
+    ];
+    const enUnOrden = listadoDeElementos(elementos);
+    const enOtro = listadoDeElementos(elementos.toReversed());
+    assert.deepStrictEqual(enOtro, enUnOrden);
+    assert.deepStrictEqual(
+      enUnOrden.registros.map((r) => r.direccion),
+      ["CL X, 1. BARCELONA, BARCELONA"],
+    );
+    assert.deepStrictEqual(
+      (enUnOrden.otros ?? []).map((o) => o.crudo.longitud),
+      [2],
+    );
+  });
+
   it("un titular desconocido es un aviso, no un registro", () => {
     const listado = listadoDeElementos([
       {
@@ -200,25 +225,27 @@ describe("ficha del registro oficial", () => {
     ]);
   });
 
-  it.effect("lee las bandas igual que la conversión de la investigación", () =>
+  it.effect("lee las bandas igual que la conversión de la investigación, por frecuencia", () =>
     Effect.gen(function* () {
       const { bandas } = yield* fichaGrabada("detalle-orange-CATR0228A.iso-8859-1.html");
+      // En la ficha van 2100, 900, 900, 800, 1800 y 700; el registro cambia ese orden de una
+      // petición a otra, así que salen por frecuencia y referencia.
       assert.deepStrictEqual(
         bandas.map((b) => [b.referencia, b.mhz, b.anio]),
         [
-          ["B B -2403167", 2100, 2024],
+          ["B B -2403166", 700, 2024],
+          ["B B -2403163", 800, 2024],
           ["B B -2403159", 900, 2024],
           ["B B -2403161", 900, 2024],
-          ["B B -2403163", 800, 2024],
           ["B B -2403165", 1800, 2024],
-          ["B B -2403166", 700, 2024],
+          ["B B -2403167", 2100, 2024],
         ],
       );
       assert.isTrue(bandas.every((b) => b.compania === "orange"));
     }).pipe(conMuestras),
   );
 
-  it.effect("lee las medidas de exposición en el orden de la ficha", () =>
+  it.effect("lee las medidas de exposición por acimut, distancia y valor", () =>
     Effect.gen(function* () {
       const { medidasDeExposicion } = yield* fichaGrabada(
         "detalle-orange-CATR0228A.iso-8859-1.html",
@@ -226,12 +253,12 @@ describe("ficha del registro oficial", () => {
       assert.deepStrictEqual(
         medidasDeExposicion.map((m) => [m.distanciaMetros, m.acimutGrados, m.microvatiosPorCm2]),
         [
-          [80, 175, 0.98806],
-          [75, 146, 0.59683],
           [32, 36, 0.19618],
           [89, 125, 0.5889],
           [77, 138, 0.5889],
           [51, 146, 0.42784],
+          [75, 146, 0.59683],
+          [80, 175, 0.98806],
         ],
       );
     }).pipe(conMuestras),
@@ -279,8 +306,8 @@ describe("ficha del registro oficial", () => {
     assert.deepStrictEqual(
       Result.map(leida, (l) => l.medidasDeExposicion),
       Result.succeed([
-        { distanciaMetros: 80, acimutGrados: 175, microvatiosPorCm2: 0.98806 },
         { distanciaMetros: 10.5, acimutGrados: 0, microvatiosPorCm2: 0.0001 },
+        { distanciaMetros: 80, acimutGrados: 175, microvatiosPorCm2: 0.98806 },
       ]),
     );
   });
@@ -305,11 +332,11 @@ describe("ficha del registro oficial", () => {
   it.effect("un expediente con dos rangos es una sola banda", () =>
     Effect.gen(function* () {
       const { bandas } = yield* fichaGrabada("detalle-telefonica-0800942.iso-8859-1.html");
-      assert.deepStrictEqual(bandas[0]?.rangos, [
+      const tres = bandas.find((b) => b.mhz === 2100);
+      assert.deepStrictEqual(tres?.rangos, [
         { desdeMhz: 1910, hastaMhz: 1915 },
         { desdeMhz: 2155, hastaMhz: 2170 },
       ]);
-      assert.strictEqual(bandas[0]?.mhz, 2100);
       assert.strictEqual(bandas.length, 2);
     }).pipe(conMuestras),
   );

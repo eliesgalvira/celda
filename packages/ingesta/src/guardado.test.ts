@@ -1,6 +1,18 @@
+// Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
+// @effect-diagnostics strictEffectProvide:off
+import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
+import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
 
-import { type ObservacionGuardada, trasFicha } from "./guardado.ts";
+import type { FichaLeida } from "./extractor.ts";
+import { huellaDeFicha, type ObservacionGuardada, trasFicha } from "./guardado.ts";
+import { conFilasRotadas } from "./pruebas/ficha.ts";
+import { leerMuestra } from "./pruebas/grabado.ts";
+import { bandasDeFilas, leerFicha, medidasDeFilas } from "./registro-oficial/normalizar.ts";
+import { decodificarLatin1 } from "./texto.ts";
+
+const conMuestras = Effect.provide(NodeServices.layer);
 
 const DIA = 24 * 60 * 60 * 1000;
 const ANTES = Date.UTC(2026, 8, 30);
@@ -74,4 +86,118 @@ describe("trasFicha", () => {
     assert.strictEqual(guardada.fecha, ANTES);
     assert.strictEqual(guardada.fichaLeidaEn, HOY);
   });
+});
+
+/** Las cuatro fichas que el registro dio con las filas en otro orden el 07/10/2026. */
+const DEL_7_DE_OCTUBRE = [
+  "detalle-orange-CATR0057A.iso-8859-1.html",
+  "detalle-digi-0801321.iso-8859-1.html",
+  "detalle-telefonica-0801321.iso-8859-1.html",
+  "detalle-telefonica-0802878.iso-8859-1.html",
+];
+
+const leida = (html: string): FichaLeida => {
+  const ficha = leerFicha(html);
+  if (Result.isFailure(ficha)) return assert.fail(ficha.failure);
+  return ficha.success;
+};
+
+/** Una ficha grabada en HTML, tal como llega, y con sus filas en otro orden. */
+const grabada = (nombre: string) =>
+  Effect.map(leerMuestra(nombre), (bytes) => {
+    const html = decodificarLatin1(new Uint8Array(bytes));
+    return { html, rotada: conFilasRotadas(html) };
+  });
+
+/**
+ * La observación que guardaba una noche de antes de la versión 11 de la base: las bandas y las
+ * medidas en el orden de la página, sin la huella de la ficha.
+ */
+const guardadaEnElOrdenDeLaPagina = (html: string): ObservacionGuardada => {
+  const { cruda } = leida(html);
+  if (cruda === undefined) return assert.fail("sin las filas de la ficha");
+  return {
+    ...leidaSinMedidas,
+    bandas: Result.getOrThrow(bandasDeFilas(cruda.caracteristicas)),
+    medidasDeExposicion: Result.getOrThrow(medidasDeFilas(cruda.niveles)),
+  };
+};
+
+describe("trasFicha con las filas en otro orden (ADR 0027)", () => {
+  it.effect(
+    "las fichas del 07/10/2026 se leen igual y dan la misma huella con las filas en otro orden",
+    () =>
+      Effect.gen(function* () {
+        for (const nombre of DEL_7_DE_OCTUBRE) {
+          const { html, rotada } = yield* grabada(nombre);
+          assert.notStrictEqual(rotada, html, nombre);
+          const { cruda, ...enOrden } = leida(html);
+          const { cruda: crudaRotada, ...rotadaEnOrden } = leida(rotada);
+          assert.notDeepEqual(crudaRotada, cruda, nombre);
+          assert.deepStrictEqual(rotadaEnOrden, enOrden, nombre);
+          assert.strictEqual(
+            huellaDeFicha(crudaRotada ?? assert.fail("")),
+            huellaDeFicha(cruda ?? assert.fail("")),
+            nombre,
+          );
+        }
+      }).pipe(conMuestras),
+  );
+
+  it.effect("la primera vez que guarda lo crudo, unas filas en otro orden no cambian nada", () =>
+    Effect.gen(function* () {
+      for (const nombre of DEL_7_DE_OCTUBRE) {
+        const { html, rotada } = yield* grabada(nombre);
+        const { guardada, cambiada, hecho } = trasFicha(
+          guardadaEnElOrdenDeLaPagina(html),
+          leida(rotada),
+          HOY,
+        );
+        // Guardar lo crudo por primera vez es un hecho, pero sin cambio.
+        assert.deepStrictEqual(hecho?.tipo === "ficha" && hecho.cambia, false, nombre);
+        assert.isFalse(cambiada, nombre);
+        assert.strictEqual(guardada.fecha, ANTES, nombre);
+        assert.strictEqual(guardada.fichaLeidaEn, HOY, nombre);
+      }
+    }).pipe(conMuestras),
+  );
+
+  it.effect("las noches siguientes, unas filas en otro orden no son ningún hecho", () =>
+    Effect.gen(function* () {
+      for (const nombre of DEL_7_DE_OCTUBRE) {
+        const { html, rotada } = yield* grabada(nombre);
+        const primera = trasFicha(guardadaEnElOrdenDeLaPagina(html), leida(html), ANTES + DIA);
+        const segunda = trasFicha(primera.guardada, leida(rotada), HOY);
+        assert.isUndefined(segunda.hecho, nombre);
+        assert.isFalse(segunda.cambiada, nombre);
+        assert.strictEqual(segunda.guardada.fecha, ANTES, nombre);
+        assert.deepStrictEqual(segunda.guardada.bandas, primera.guardada.bandas, nombre);
+        assert.deepStrictEqual(
+          segunda.guardada.medidasDeExposicion,
+          primera.guardada.medidasDeExposicion,
+          nombre,
+        );
+      }
+    }).pipe(conMuestras),
+  );
+
+  it.effect("un cambio de verdad con las filas en otro orden sigue cambiando la fecha", () =>
+    Effect.gen(function* () {
+      const { html, rotada } = yield* grabada("detalle-telefonica-0802878.iso-8859-1.html");
+      const otraMedida = rotada.replace("0.12629", "0.5");
+      const otraBanda = rotada.replace("3460.00 - 3600.00", "3420.00 - 3500.00");
+      assert.notStrictEqual(otraMedida, rotada);
+      assert.notStrictEqual(otraBanda, rotada);
+      // La primera vez que guarda lo crudo y las noches siguientes.
+      const primera = trasFicha(guardadaEnElOrdenDeLaPagina(html), leida(html), ANTES + DIA);
+      for (const previa of [guardadaEnElOrdenDeLaPagina(html), primera.guardada]) {
+        for (const otra of [otraMedida, otraBanda]) {
+          const { guardada, cambiada, hecho } = trasFicha(previa, leida(otra), HOY);
+          assert.deepStrictEqual(hecho?.tipo === "ficha" && hecho.cambia, true);
+          assert.isTrue(cambiada);
+          assert.strictEqual(guardada.fecha, HOY);
+        }
+      }
+    }).pipe(conMuestras),
+  );
 });

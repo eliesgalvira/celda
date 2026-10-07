@@ -185,6 +185,7 @@ export const unaNoche = (
           interruptores:
             variante.interruptores ??
             (variante.buzon === undefined ? INTERRUPTOR_POR_DEFECTO : CON_COMUNIDAD),
+          archivo: variante.archivo ?? entorno.archivo,
         }),
       ),
     );
@@ -218,7 +219,11 @@ export const comprobarHistorial = (entorno: Entorno, maximo = 5) =>
     Effect.provide(
       Layer.mergeAll(
         archivoNocturno(entorno.archivo),
-        baseNocturna({ fichero: entorno.base, interruptores: INTERRUPTOR_POR_DEFECTO }),
+        baseNocturna({
+          fichero: entorno.base,
+          interruptores: INTERRUPTOR_POR_DEFECTO,
+          archivo: entorno.archivo,
+        }),
       ),
     ),
   );

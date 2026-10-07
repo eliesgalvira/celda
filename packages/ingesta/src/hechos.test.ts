@@ -5,6 +5,7 @@ import type { FichaCruda, ListadoCrudo, Registro } from "./extractor.ts";
 import { type ObservacionGuardada, trasAusencia, trasFicha, trasListado } from "./guardado.ts";
 import { datosDeHecho, type HechoNuevo } from "./hecho.ts";
 import {
+  corregirElOrden,
   type FichasDeLasPaginas,
   type HechoLeido,
   hechosDeFicha,
@@ -12,7 +13,12 @@ import {
   registroPublicado,
   repetirHechos,
 } from "./hechos.ts";
-import { leerFicha, registroDeCrudo } from "./registro-oficial/normalizar.ts";
+import {
+  bandasDeFilas,
+  leerFicha,
+  medidasDeFilas,
+  registroDeCrudo,
+} from "./registro-oficial/normalizar.ts";
 
 const DIA = 86_400_000;
 const NOCHE = Date.UTC(2026, 9, 1, 2, 15);
@@ -321,5 +327,162 @@ describe("historial de un registro (ADR 0027)", () => {
       listado: { crudo: CRUDO },
       cambia: false,
     });
+  });
+});
+
+/** Una ficha con tres bandas y tres medidas, y la misma con las filas en otro orden. */
+const CRUDA_LARGA: FichaCruda = {
+  caracteristicas: [
+    {
+      operador: "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+      referencia: "B B -1201255",
+      bandaMhz: "1805.10 - 1825.10",
+    },
+    {
+      operador: "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+      referencia: "B B -2502763",
+      bandaMhz: "778.00 - 788.00",
+    },
+    {
+      operador: "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+      referencia: "B B -2502764",
+      bandaMhz: "3460.00 - 3600.00",
+    },
+  ],
+  niveles: [
+    { distancia: "5.0", acimut: "102.0", valor: "0.12629" },
+    { distancia: "12.0", acimut: "10.0", valor: "0.12629" },
+    { distancia: "30.0", acimut: "250.0", valor: "0.02" },
+  ],
+};
+const rotar = <A>(filas: ReadonlyArray<A>): ReadonlyArray<A> => [
+  ...filas.slice(1),
+  ...filas.slice(0, 1),
+];
+const CRUDA_ROTADA: FichaCruda = {
+  caracteristicas: rotar(CRUDA_LARGA.caracteristicas),
+  niveles: rotar(CRUDA_LARGA.niveles),
+};
+const CRUDA_CAMBIADA: FichaCruda = {
+  ...CRUDA_ROTADA,
+  niveles: [...CRUDA_ROTADA.niveles.slice(1), { distancia: "5.0", acimut: "102.0", valor: "0.5" }],
+};
+
+/** Unos hechos como los lee la base, tras el punto de partida de una observación. */
+const leidos = (
+  partida: ObservacionGuardada,
+  hechos: ReadonlyArray<readonly [number, HechoNuevo]>,
+): ReadonlyArray<HechoLeido> => [
+  Result.getOrThrow(
+    leerHecho("conocido-antes", partida.fecha, JSON.stringify({ forma: 1, observacion: partida })),
+  ),
+  ...hechos.map(([fecha, hecho]) =>
+    Result.getOrThrow(leerHecho(hecho.tipo, fecha, datosDeHecho(hecho))),
+  ),
+];
+
+/**
+ * El punto de partida que dejó una noche de antes de la versión 11 de la base: las bandas y las
+ * medidas en el orden de la página.
+ */
+const partidaEnElOrdenDeLaPagina = (): ObservacionGuardada => ({
+  ...guardadaSinCrudo(registroDe(CRUDO)),
+  bandas: Result.getOrThrow(bandasDeFilas(CRUDA_LARGA.caracteristicas)),
+  medidasDeExposicion: Result.getOrThrow(medidasDeFilas(CRUDA_LARGA.niveles)),
+  fichaLeidaEn: NOCHE,
+});
+
+const fichaConCambio = (pagina: string, cambia = true): HechoNuevo => ({
+  tipo: "ficha",
+  ficha: { pagina },
+  cambia,
+  antes: NOCHE,
+});
+
+describe("hechos de ficha que solo cambian el orden de las filas (versión 11 de la base)", () => {
+  it("trasFicha no ve ningún cambio en unas filas en otro orden, la primera vez que guarda lo crudo ni después", () => {
+    const partida = partidaEnElOrdenDeLaPagina();
+    const primera = trasFicha(partida, leidaDe(CRUDA_ROTADA), NOCHE + DIA);
+    assert.deepStrictEqual(primera.hecho?.tipo === "ficha" && primera.hecho.cambia, false);
+    assert.strictEqual(primera.guardada.fecha, NOCHE);
+    const segunda = trasFicha(primera.guardada, leidaDe(CRUDA_LARGA), NOCHE + 2 * DIA);
+    assert.isUndefined(segunda.hecho);
+    assert.strictEqual(segunda.guardada.fecha, NOCHE);
+    const cambiada = trasFicha(segunda.guardada, leidaDe(CRUDA_CAMBIADA), NOCHE + 3 * DIA);
+    assert.deepStrictEqual(cambiada.hecho?.tipo === "ficha" && cambiada.hecho.cambia, true);
+    assert.strictEqual(cambiada.guardada.fecha, NOCHE + 3 * DIA);
+  });
+
+  it("un hecho de ficha que solo cambia el orden se corrige y la observación vuelve a su fecha, y uno de verdad no", () => {
+    const partida = partidaEnElOrdenDeLaPagina();
+    const hechos = leidos(partida, [
+      [NOCHE + DIA, fichaConCambio("rotada")],
+      [NOCHE + 2 * DIA, fichaConCambio("cambiada")],
+    ]);
+    const paginas: FichasDeLasPaginas = new Map([
+      ["rotada", leidaDe(CRUDA_ROTADA)],
+      ["cambiada", leidaDe(CRUDA_CAMBIADA)],
+    ]);
+    // Con la ficha de verdad la última, la fecha es la suya.
+    assert.deepStrictEqual(corregirElOrden(hechos, paginas, undefined), {
+      sinCambio: [1],
+      sinComparar: [],
+      fechaAntes: NOCHE + 2 * DIA,
+      fechaDespues: NOCHE + 2 * DIA,
+    });
+    // Sin ella, la de antes del hecho corregido.
+    assert.deepStrictEqual(corregirElOrden(hechos.slice(0, 2), paginas, undefined), {
+      sinCambio: [1],
+      sinComparar: [],
+      fechaAntes: NOCHE + DIA,
+      fechaDespues: NOCHE,
+    });
+  });
+
+  it("corregir otra vez lo corregido no cambia nada", () => {
+    const corregido = fichaConCambio("rotada", false);
+    const hechos = leidos(partidaEnElOrdenDeLaPagina(), [[NOCHE + DIA, corregido]]);
+    const paginas: FichasDeLasPaginas = new Map([["rotada", leidaDe(CRUDA_ROTADA)]]);
+    assert.deepStrictEqual(corregirElOrden(hechos, paginas, undefined), {
+      sinCambio: [],
+      sinComparar: [],
+      fechaAntes: NOCHE,
+      fechaDespues: NOCHE,
+    });
+  });
+
+  it("sin las páginas, el último hecho de ficha se compara con lo que guarda la observación, y los demás no se comparan", () => {
+    const partida = partidaEnElOrdenDeLaPagina();
+    const { bandas, medidasDeExposicion } = leidaDe(CRUDA_ROTADA);
+    const ultima = { bandas, medidasDeExposicion };
+    assert.deepStrictEqual(
+      corregirElOrden(
+        leidos(partida, [[NOCHE + DIA, fichaConCambio("rotada")]]),
+        new Map(),
+        ultima,
+      ),
+      { sinCambio: [1], sinComparar: [], fechaAntes: NOCHE + DIA, fechaDespues: NOCHE },
+    );
+    const dos = corregirElOrden(
+      leidos(partida, [
+        [NOCHE + DIA, fichaConCambio("rotada")],
+        [NOCHE + 2 * DIA, fichaConCambio("otra")],
+      ]),
+      new Map(),
+      ultima,
+    );
+    assert.deepStrictEqual(dos.sinCambio, []);
+    assert.deepStrictEqual(
+      dos.sinComparar.map((s) => s.indice),
+      [1, 2],
+    );
+    assert.strictEqual(dos.fechaDespues, dos.fechaAntes);
+  });
+
+  it("las primeras medidas de una observación que no las tenía no cuentan, como en trasFicha", () => {
+    const { medidasDeExposicion: _sinMedidas, ...partida } = partidaEnElOrdenDeLaPagina();
+    const hechos = leidos(partida, [[NOCHE + DIA, fichaConCambio("rotada")]]);
+    const paginas: FichasDeLasPaginas = new Map([["rotada", leidaDe(CRUDA_ROTADA)]]);
+    assert.deepStrictEqual(corregirElOrden(hechos, paginas, undefined).sinCambio, [1]);
   });
 });

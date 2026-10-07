@@ -171,7 +171,11 @@ const principal = Effect.gen(function* () {
     );
     return;
   }
-  const base = baseNocturna({ fichero: c.base, interruptores: c.interruptores });
+  const base = baseNocturna({
+    fichero: c.base,
+    interruptores: c.interruptores,
+    archivo: c.archivo,
+  });
   const almacen = yield* almacenDesdeConfig;
   const vercel = yield* vercelDesdeConfig;
   const copias = yield* copiasDesdeConfig;

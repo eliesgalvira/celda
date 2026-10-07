@@ -270,7 +270,7 @@ Qué no significan:
 
 ## Muestras grabadas (`muestras/`)
 
-Todas son del 26/09/2026. Los ficheros `.iso-8859-1.*` son los bytes exactos de la respuesta, sin volver a codificar.
+Todas son del 26/09/2026 salvo las cuatro fichas del 07/10/2026. Los ficheros `.iso-8859-1.*` son los bytes exactos de la respuesta, sin volver a codificar.
 
 | Fichero | Contenido |
 |---|---|
@@ -280,6 +280,7 @@ Todas son del 26/09/2026. Los ficheros `.iso-8859-1.*` son los bytes exactos de 
 | `detalle-telefonica-0800942.iso-8859-1.html` | ficha con una banda doble (`1910.00 - 1915.00; 2155.00 - 2170.00`) |
 | `detalle-digi-0800143.iso-8859-1.html` | ficha de Digi con expedientes de 2026 |
 | `detalle-codigo-no-valido.iso-8859-1.html` | respuesta 200 de error por codificar mal `codEmplazamiento` |
+| `detalle-orange-CATR0057A.iso-8859-1.html`, `detalle-digi-0801321.iso-8859-1.html`, `detalle-telefonica-0801321.iso-8859-1.html`, `detalle-telefonica-0802878.iso-8859-1.html` | fichas del 07/10/2026 a las 21:57. A las 15:00 el registro las había dado con las mismas filas en otro orden (ADR 0027, «El orden de las filas») |
 | `fichas-campus-nord.json` | 23 fichas convertidas a JSON (UTF-8), útiles como resultado esperado del analizador |
 | `teselas-area-barcelona.json` | peticiones y recuentos de las descargas por teselas |
 | `herramientas/quad.py`, `herramientas/det.py` | scripts usados para el recuento y las fichas |

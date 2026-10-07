@@ -25,8 +25,10 @@ import {
   type ErrorDeExtractor,
   ExtractorPorCajas,
   type FichaLeida,
+  laQueSeQueda,
   type Registro,
   type RegistroDeOtroTitular,
+  seQueda,
 } from "./extractor.ts";
 import {
   type FalloDeFicha,
@@ -222,11 +224,19 @@ export const recorrerCuadro = Effect.fn("Barrido.recorrerCuadro")(function* (
     }
     cajas.push(caja);
     avisos.push(...listado.avisos);
+    // Un registro en el borde de dos cajas sale en las dos. Si dicen cosas distintas, se queda
+    // el mismo sea cual sea el orden de las cajas.
     for (const registro of listado.registros) {
-      if (!registros.has(registro.clave)) registros.set(registro.clave, registro);
+      const previo = registros.get(registro.clave);
+      if (previo === undefined || !seQueda(previo, registro)) {
+        registros.set(registro.clave, registro);
+      }
     }
     for (const otro of listado.otros ?? []) {
-      if (!otros.has(otro.crudo.id)) otros.set(otro.crudo.id, otro);
+      const previo = otros.get(otro.crudo.id);
+      if (previo === undefined || laQueSeQueda(previo.crudo, otro.crudo) !== previo.crudo) {
+        otros.set(otro.crudo.id, otro);
+      }
     }
   }
   const recorrido: CuadroRecorrido = {

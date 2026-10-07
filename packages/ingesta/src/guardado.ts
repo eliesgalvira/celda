@@ -1,5 +1,5 @@
-import { Banda } from "@celda/dominio/banda";
-import { MedidaDeExposicion } from "@celda/dominio/exposicion";
+import { Banda, bandasEnOrden, compararTexto } from "@celda/dominio/banda";
+import { MedidaDeExposicion, medidasEnOrden } from "@celda/dominio/exposicion";
 import { type Fuente, Observacion } from "@celda/dominio/observacion";
 import * as Schema from "effect/Schema";
 
@@ -41,12 +41,27 @@ export const BARRIDOS_PARA_RETIRAR = 2;
 const { crudo: _crudo, ...camposLimpios } = Registro.fields;
 const mismoRegistroLimpio = Schema.toEquivalence(Schema.Struct(camposLimpios));
 const mismoCrudo = Schema.toEquivalence(ListadoCrudo);
-const mismasBandas = Schema.toEquivalence(Schema.Array(Banda));
-const mismasMedidas = Schema.toEquivalence(Schema.Array(MedidaDeExposicion));
+const bandasIguales = Schema.toEquivalence(Schema.Array(Banda));
+const medidasIguales = Schema.toEquivalence(Schema.Array(MedidaDeExposicion));
+
+/**
+ * Si dos listas de bandas tienen las mismas, repetidas las mismas veces, en cualquier orden. El
+ * registro da las filas de una ficha en otro orden de una petición a otra (ADR 0027).
+ */
+export const mismasBandas = (a: ReadonlyArray<Banda>, b: ReadonlyArray<Banda>): boolean =>
+  a.length === b.length && bandasIguales(bandasEnOrden(a), bandasEnOrden(b));
+
+/** Si dos listas de medidas tienen las mismas, repetidas las mismas veces, en cualquier orden. */
+export const mismasMedidas = (
+  a: ReadonlyArray<MedidaDeExposicion>,
+  b: ReadonlyArray<MedidaDeExposicion>,
+): boolean => a.length === b.length && medidasIguales(medidasEnOrden(a), medidasEnOrden(b));
 
 /**
  * La huella de las tablas de una ficha tal como las escribe el registro: FNV-1a de su texto, con
- * separadores que no salen en una ficha. Solo sirve para saber si dos lecturas son la misma.
+ * separadores que no salen en una ficha. Solo sirve para saber si dos lecturas son la misma. Las
+ * filas de cada tabla van ordenadas, con las repetidas tantas veces como salgan, porque el
+ * registro las da en otro orden de una petición a otra.
  */
 export const huellaDeFicha = (cruda: FichaCruda): string =>
   huella(
@@ -54,7 +69,7 @@ export const huellaDeFicha = (cruda: FichaCruda): string =>
       cruda.caracteristicas.map((f) => [f.operador, f.referencia, f.bandaMhz].join("\u001f")),
       cruda.niveles.map((f) => [f.distancia, f.acimut, f.valor].join("\u001f")),
     ]
-      .map((filas) => filas.join("\u001e"))
+      .map((filas) => filas.toSorted(compararTexto).join("\u001e"))
       .join("\u001d"),
   );
 
@@ -242,21 +257,26 @@ export interface TrasAusencia {
  * fecha no se mueve aunque la limpieza dé otras bandas, y no hay hecho salvo si vuelve a tener
  * ficha. La primera vez que se guarda la huella de una ficha, sus bandas de antes se comparan con
  * la limpieza de hoy (`bandaAlDia`). La primera ficha de una estación base nueva tampoco mueve la
- * fecha, que es la de su alta.
+ * fecha, que es la de su alta. Ni la huella ni las bandas ni las medidas miran el orden de las
+ * filas, que el registro cambia de una petición a otra.
  */
 export const trasFicha = (
   previa: ObservacionGuardada,
   leida: FichaLeida,
   fecha: number,
 ): TrasFicha => {
-  const { bandas, medidasDeExposicion, cruda, pagina } = leida;
+  const { cruda, pagina } = leida;
+  // Se guardan en su orden, como las da `fichaDeCruda`, también si vienen de otra fuente.
+  const bandas = bandasEnOrden(leida.bandas);
+  const medidasDeExposicion = medidasEnOrden(leida.medidasDeExposicion);
   const nueva = cruda === undefined ? undefined : huellaDeFicha(cruda);
-  const primerasMedidas = previa.medidasDeExposicion === undefined;
+  const medidasDeAntes = previa.medidasDeExposicion;
+  const primerasMedidas = medidasDeAntes === undefined;
   const bandasDeAntes =
     previa.huellaDeFicha === undefined ? previa.bandas.map(bandaAlDia) : previa.bandas;
   const limpiasIguales =
     mismasBandas(bandasDeAntes, bandas) &&
-    (primerasMedidas || mismasMedidas(previa.medidasDeExposicion, medidasDeExposicion));
+    (medidasDeAntes === undefined || mismasMedidas(medidasDeAntes, medidasDeExposicion));
   const crudaIgual = igualesEnCrudo(previa.huellaDeFicha, nueva, (a, b) => a === b, limpiasIguales);
   // La primera ficha de una estación base nueva no cambia nada: es lo que ya decía el registro
   // cuando apareció en el listado, aunque se lea unas noches después.

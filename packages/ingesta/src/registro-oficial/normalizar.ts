@@ -1,25 +1,28 @@
 import {
   anioDeReferencia,
   type Banda,
+  bandasEnOrden,
   compararTexto,
   mhzDeRangos,
   type Rango,
 } from "@celda/dominio/banda";
 import type { Compania } from "@celda/dominio/compania";
-import type { MedidaDeExposicion } from "@celda/dominio/exposicion";
+import { type MedidaDeExposicion, medidasEnOrden } from "@celda/dominio/exposicion";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import type {
-  FichaCruda,
-  FichaLeida,
-  FilaDeNiveles,
-  FilaFicha,
-  Listado,
-  ListadoCrudo,
-  Registro,
-  RegistroDeOtroTitular,
+import {
+  type FichaCruda,
+  type FichaLeida,
+  type FilaDeNiveles,
+  type FilaFicha,
+  laQueSeQueda,
+  type Listado,
+  type ListadoCrudo,
+  type Registro,
+  type RegistroDeOtroTitular,
+  seQueda,
 } from "../extractor.ts";
 import { repararTexto, textoDeHtml } from "../texto.ts";
 import type { Caja } from "../zona.ts";
@@ -155,7 +158,8 @@ const decodificarElemento = Schema.decodeUnknownOption(Elemento);
 
 /**
  * Registros de los elementos de todas las cajas, sin repetir: un elemento en el borde de dos
- * cajas sale en las dos. Salen ordenados por clave.
+ * cajas sale en las dos. Si dos elementos con la misma clave dicen cosas distintas, se queda uno
+ * (`laQueSeQueda`) sea cual sea su orden. Salen ordenados por clave.
  */
 export const listadoDeElementos = (elementos: ReadonlyArray<unknown>): Listado => {
   const registros = new Map<string, Registro>();
@@ -170,9 +174,16 @@ export const listadoDeElementos = (elementos: ReadonlyArray<unknown>): Listado =
     } else if (lectura.value.tipo === "otro-titular") {
       const { titular, local, crudo } = lectura.value;
       if (!local) avisos.push(`Titular desconocido: ${crudo.id}`);
-      if (!otros.has(crudo.id)) otros.set(crudo.id, { titular, local, crudo });
-    } else if (!registros.has(lectura.value.registro.clave)) {
-      registros.set(lectura.value.registro.clave, lectura.value.registro);
+      const otro = otros.get(crudo.id);
+      if (otro === undefined || laQueSeQueda(otro.crudo, crudo) !== otro.crudo) {
+        otros.set(crudo.id, { titular, local, crudo });
+      }
+    } else {
+      const { registro } = lectura.value;
+      const previo = registros.get(registro.clave);
+      if (previo === undefined || !seQueda(previo, registro)) {
+        registros.set(registro.clave, registro);
+      }
     }
   }
   const listado: Listado = {
@@ -333,15 +344,22 @@ export const VERSION_DE_LECTURA = 3;
 /**
  * Las bandas y las medidas de exposición de las tablas de una ficha tal como las escribe el
  * registro, o por qué no se pueden leer. Es la limpieza de Celda: se puede volver a hacer con lo
- * guardado cuando cambia (ADR 0027).
+ * guardado cuando cambia (ADR 0027). Salen en su orden (`bandasEnOrden` y `medidasEnOrden`) y no
+ * en el de la página, que el registro cambia de una petición a otra.
  */
 export const fichaDeCruda = (
   cruda: FichaCruda,
 ): Result.Result<Pick<FichaLeida, "bandas" | "medidasDeExposicion">, string> =>
-  Result.all({
-    bandas: bandasDeFilas(cruda.caracteristicas),
-    medidasDeExposicion: medidasDeFilas(cruda.niveles),
-  });
+  Result.map(
+    Result.all({
+      bandas: bandasDeFilas(cruda.caracteristicas),
+      medidasDeExposicion: medidasDeFilas(cruda.niveles),
+    }),
+    ({ bandas, medidasDeExposicion }) => ({
+      bandas: bandasEnOrden(bandas),
+      medidasDeExposicion: medidasEnOrden(medidasDeExposicion),
+    }),
+  );
 
 /** Las bandas y las medidas de exposición de una ficha en HTML, o por qué no se puede leer. */
 export const leerFicha = (html: string): Result.Result<FichaLeida, string> =>

@@ -1,5 +1,5 @@
 import { Coordenada } from "@celda/dominio/area";
-import type { Banda } from "@celda/dominio/banda";
+import { type Banda, compararTexto } from "@celda/dominio/banda";
 import type { Caja } from "@celda/dominio/barrido";
 import { Compania } from "@celda/dominio/compania";
 import type { MedidaDeExposicion } from "@celda/dominio/exposicion";
@@ -64,6 +64,26 @@ export const Registro = Schema.Struct({
   crudo: Schema.optionalKey(ListadoCrudo),
 });
 export type Registro = typeof Registro.Type;
+
+/**
+ * Entre dos lecturas del listado con la misma clave, la que se queda: la primera por lo que
+ * escribió el registro. Así la que se guarda no depende del orden de los elementos, que el
+ * registro puede cambiar de una petición a otra como cambia el de las filas de una ficha.
+ */
+export const laQueSeQueda = (a: ListadoCrudo, b: ListadoCrudo): ListadoCrudo =>
+  (compararTexto(a.gisId, b.gisId) ||
+    compararTexto(a.direccion, b.direccion) ||
+    a.longitud - b.longitud ||
+    a.latitud - b.latitud) <= 0
+    ? a
+    : b;
+
+/**
+ * Si de dos registros con la misma clave se queda `a` (`laQueSeQueda`). Uno sin lo que escribió
+ * el registro, que no sale del listado, se queda si ya estaba.
+ */
+export const seQueda = (a: Registro, b: Registro): boolean =>
+  a.crudo === undefined || b.crudo === undefined || laQueSeQueda(a.crudo, b.crudo) === a.crudo;
 
 /** Lo que se lee de la ficha de una estación base. */
 export interface FichaLeida {

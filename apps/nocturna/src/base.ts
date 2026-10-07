@@ -72,11 +72,18 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import type * as SqlError from "effect/unstable/sql/SqlError";
 
+import { corregirOrdenDeFilas } from "./ordenDeFilas.ts";
+
 /** Dónde está la base y cómo están los interruptores de las fuentes. */
 export interface OpcionesBase {
   /** El fichero SQLite. Su carpeta se crea si no existe. */
   readonly fichero: string;
   readonly interruptores: Readonly<Record<Fuente, Interruptor>>;
+  /**
+   * El archivo de páginas, que la versión 11 del esquema lee para corregir el historial
+   * (`corregirOrdenDeFilas`). Sin él, la corrección compara con lo que guarda la base.
+   */
+  readonly archivo?: string;
 }
 
 /**
@@ -134,6 +141,10 @@ export interface OpcionesBase {
  * observaciones. Las que ya estaban toman las de su emplazamiento de hoy. Trae también
  * `claves_anteriores`: la clave de cada emplazamiento que desapareció al juntarse con otro, con la
  * clave de ese otro y desde cuándo, para que los enlaces a la vieja abran la ficha del que queda.
+ *
+ * La versión 11 no cambia ninguna tabla: corrige el historial que dejó comparar las filas de la
+ * ficha en el orden de la página, que el registro cambia de una petición a otra
+ * (`corregirOrdenDeFilas`, ADR 0027). Lee las páginas del archivo, si está.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -321,7 +332,12 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
     `UPDATE aportaciones_aceptadas SET registros = ${PROCEDENCIAS_DE_LA_ACEPTADA}
       WHERE emplazamiento IS NOT NULL`,
   ],
+  // La versión 11 se hace con código (`VERSION_DEL_ORDEN`).
+  [],
 ];
+
+/** La versión del esquema que corrige el historial del orden de las filas de la ficha. */
+const VERSION_DEL_ORDEN = 11;
 
 const ObservacionEnJson = Schema.fromJsonString(ObservacionGuardada);
 const codificarCrudo = Schema.encodeEffect(Schema.fromJsonString(ListadoCrudo));
@@ -631,26 +647,29 @@ export class BaseNocturna extends Context.Service<
  * Aplica las versiones del esquema que le faltan a la base. Una base al día no toma el cerrojo
  * de escritura, así que la orden `estado` se puede lanzar en mitad de una noche. Si falta algo,
  * vuelve a leer la versión dentro de la transacción: si dos procesos abren a la vez una base
- * nueva, el segundo ya la encuentra al día.
+ * nueva, el segundo ya la encuentra al día. `archivo` es el archivo de páginas, que lee la
+ * versión 11.
  */
-const migrar = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient;
-  const [antes] = yield* sql<{ readonly user_version: number }>`PRAGMA user_version`;
-  if ((antes?.user_version ?? 0) >= ESQUEMA.length) return;
-  yield* sql.withTransaction(
-    Effect.gen(function* () {
-      const [fila] = yield* sql<{ readonly user_version: number }>`PRAGMA user_version`;
-      const actual = fila?.user_version ?? 0;
-      for (const [indice, sentencias] of ESQUEMA.entries()) {
-        if (indice < actual) continue;
-        for (const sentencia of sentencias) {
-          yield* sql.unsafe(sentencia);
+const migrar = (archivo: string | undefined) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const [antes] = yield* sql<{ readonly user_version: number }>`PRAGMA user_version`;
+    if ((antes?.user_version ?? 0) >= ESQUEMA.length) return;
+    yield* sql.withTransaction(
+      Effect.gen(function* () {
+        const [fila] = yield* sql<{ readonly user_version: number }>`PRAGMA user_version`;
+        const actual = fila?.user_version ?? 0;
+        for (const [indice, sentencias] of ESQUEMA.entries()) {
+          if (indice < actual) continue;
+          for (const sentencia of sentencias) {
+            yield* sql.unsafe(sentencia);
+          }
+          if (indice + 1 === VERSION_DEL_ORDEN) yield* corregirOrdenDeFilas(sql, archivo);
+          yield* sql.unsafe(`PRAGMA user_version = ${indice + 1}`);
         }
-        yield* sql.unsafe(`PRAGMA user_version = ${indice + 1}`);
-      }
-    }),
-  );
-});
+      }),
+    );
+  }).pipe(Effect.scoped);
 
 /**
  * La base SQLite de la ingesta nocturna (ADR 0015), con el módulo `node:sqlite` de Node 24 a
@@ -663,7 +682,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       // Sin su esquema la base no sirve para nada: un fallo aquí para el programa.
-      yield* Effect.orDie(migrar);
+      yield* Effect.orDie(migrar(opciones.archivo));
 
       const observacionesDe = Effect.fn("BaseNocturna.observacionesDe")(function* (
         fuente: Fuente,

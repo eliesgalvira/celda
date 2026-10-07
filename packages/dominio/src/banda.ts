@@ -60,9 +60,35 @@ export const anioDeReferencia = (referencia: string): number | null => {
   return numero === undefined ? null : 2000 + Number(numero);
 };
 
-/** Orden estable de las bandas: por frecuencia y, dentro de ella, por referencia. */
+const compararRangos = (a: ReadonlyArray<Rango>, b: ReadonlyArray<Rango>): number => {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x === undefined || y === undefined) break;
+    const distintos = x.desdeMhz - y.desdeMhz || x.hastaMhz - y.hastaMhz;
+    if (distintos !== 0) return distintos;
+  }
+  return a.length - b.length;
+};
+
+/**
+ * Orden estable de las bandas: por frecuencia y, dentro de ella, por referencia. Dos bandas con la
+ * misma referencia van por compañía y por rangos, así que dos que salen iguales son la misma y el
+ * orden no depende del de entrada.
+ */
 export const compararBandas = (a: Banda, b: Banda): number =>
-  (a.mhz ?? 99_999) - (b.mhz ?? 99_999) || compararTexto(a.referencia, b.referencia);
+  (a.mhz ?? 99_999) - (b.mhz ?? 99_999) ||
+  compararTexto(a.referencia, b.referencia) ||
+  compararTexto(a.compania, b.compania) ||
+  compararRangos(a.rangos, b.rangos);
+
+/**
+ * Las bandas en el orden de `compararBandas`. El registro oficial da las filas de una ficha en otro
+ * orden de una petición a otra, con lo mismo en ellas (ADR 0027), así que Celda las guarda y las
+ * compara siempre en este.
+ */
+export const bandasEnOrden = (bandas: ReadonlyArray<Banda>): ReadonlyArray<Banda> =>
+  bandas.toSorted(compararBandas);
 
 /**
  * Orden de textos por código de carácter. No depende de `Intl`, que el runtime de Convex no
