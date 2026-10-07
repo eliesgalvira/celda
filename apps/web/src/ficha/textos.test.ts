@@ -89,6 +89,14 @@ describe("textos de la ficha", () => {
       lugarDe(en({ municipio: null, provincia: { codigo: "01", nombre: "Araba/Álava" } })),
       "Territorio compartido entre municipios, provincia de Álava",
     );
+    // Con el barrio de Barcelona que dice la capa, delante (#13).
+    assert.strictEqual(
+      lugarDe(
+        en({ municipio: { codigo: "08019", nombre: "Barcelona" }, provincia: barcelona }),
+        "Pedralbes",
+      ),
+      "Pedralbes, Barcelona, provincia de Barcelona",
+    );
     // Sin lugar del IGN, o lejos de todo municipio, lo que escribe la fuente.
     assert.strictEqual(lugarDe(en(undefined)), "BARCELONA");
     assert.strictEqual(lugarDe(en({ municipio: null, provincia: null })), "BARCELONA");

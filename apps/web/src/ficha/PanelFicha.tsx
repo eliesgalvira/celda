@@ -86,6 +86,11 @@ export interface PanelFichaProps {
    * del filtro, cuál: la ficha lo explica (ADR 0026). Sin él, nada.
    */
   readonly redUsada?: ReadonlyArray<RedUsada>;
+  /**
+   * El barrio de Barcelona en que cae, según la capa de su provincia, si ha llegado y lo sabe. Va
+   * delante del municipio (#13).
+   */
+  readonly barrio?: string | undefined;
   readonly alCerrar: () => void;
 }
 
@@ -150,6 +155,7 @@ export function PanelFicha(props: PanelFichaProps) {
                 clave={props.clave}
                 fechaCapa={props.fechaCapa}
                 redUsada={props.redUsada ?? []}
+                barrio={props.barrio}
               />
             )}
           </Show>
@@ -191,6 +197,7 @@ function ContenidoFicha(props: {
   readonly clave: string;
   readonly fechaCapa: number | undefined;
   readonly redUsada: ReadonlyArray<RedUsada>;
+  readonly barrio: string | undefined;
 }) {
   const marca = createMemo(() =>
     textosMarca(props.ficha, compararConCapa(props.fechaCapa, props.ficha.version)),
@@ -211,7 +218,7 @@ function ContenidoFicha(props: {
       <CabeceraFicha
         antetitulo={<TextoConTerminos texto={antetituloDe(props.ficha)} />}
         titulo={tituloDe(props.ficha)}
-        lugar={lugarDe(props.ficha)}
+        lugar={lugarDe(props.ficha, props.barrio)}
         companias={props.ficha.estaciones.map((e) => e.compania)}
         accion={
           // El edificio que resalta es el de OpenStreetMap: su número no es la dirección del

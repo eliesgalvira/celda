@@ -1155,6 +1155,23 @@ export function PantallaMapa() {
     return redesUsadas(actual).filter((r) => suyo.companias.includes(r.red));
   });
 
+  /**
+   * El barrio de Barcelona del emplazamiento seleccionado, si la capa de su provincia ha llegado
+   * y lo sabe: la ficha lo pone delante del municipio (#13).
+   */
+  const barrioDeLaSeleccionada = createMemo(() => {
+    const clave = seleccionada();
+    if (clave === null) return undefined;
+    for (const { capa } of cargadas()) {
+      const suyo = capa.emplazamientos.find((e) => e.clave === clave);
+      if (suyo === undefined) continue;
+      return suyo.barrio === null
+        ? undefined
+        : capa.barrios.find((b) => b.codigo === suyo.barrio)?.nombre;
+    }
+    return undefined;
+  });
+
   /** Solo los fallos van en el centro. Mientras carga, la silueta y `CargaDelMapa` bastan. */
   const aviso = createMemo(() => {
     const actual = estado();
@@ -1350,6 +1367,7 @@ export function PantallaMapa() {
                         provincia={provinciaSeleccionada()}
                         fechaCapa={fechaDeLaSeleccionada()}
                         redUsada={redUsadaDeLaSeleccionada()}
+                        barrio={barrioDeLaSeleccionada()}
                         alCerrar={() => navegar(ruta.mapa)}
                       />
                     )}

@@ -63,9 +63,16 @@ const CIUDADES_AUTONOMAS = new Set(["51", "52"]);
  * nombre de lugar (ADR 0025): «Sant Cugat del Vallès, provincia de Barcelona», «Elx, provincia de
  * Alacant». En un territorio compartido por varios
  * municipios, solo la provincia. Si la ficha no los trae, porque se publicó antes o porque el
- * emplazamiento cae lejos de todo municipio, el municipio tal como lo escribe la fuente.
+ * emplazamiento cae lejos de todo municipio, el municipio tal como lo escribe la fuente. Con el
+ * barrio de Barcelona en que cae, si la capa de su provincia lo sabe, el barrio va delante: «el
+ * Raval, Barcelona, provincia de Barcelona» (#13).
  */
-export const lugarDe = (ficha: Ficha): string => {
+export const lugarDe = (ficha: Ficha, barrio?: string): string => {
+  const sitio = municipioYProvinciaDe(ficha);
+  return barrio === undefined ? sitio : `${barrio}, ${sitio}`;
+};
+
+const municipioYProvinciaDe = (ficha: Ficha): string => {
   const { municipio, provincia } = ficha.lugar ?? { municipio: null, provincia: null };
   const deMunicipio =
     municipio === null ? null : nombreDeLugarDeMunicipio(municipio.codigo, municipio.nombre);

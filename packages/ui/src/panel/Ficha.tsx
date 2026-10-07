@@ -14,7 +14,12 @@ const CONTENEDOR_CABECERA =
   "flex flex-col gap-1 border-b border-linea bg-superficie-alta px-5 pr-28 pb-4 md:px-6 md:pt-5 md:pr-28";
 const ANTETITULO = "font-mono text-[11px] leading-4 tracking-[0.14em] uppercase";
 const TITULO = "font-titulo text-[1.375rem] leading-7 md:text-[1.625rem] md:leading-8";
-const LUGAR = "font-mono text-xs leading-4 text-tinta-suave";
+/**
+ * En el resumen de la hoja del móvil, el lugar va en una línea: con el barrio (#13) o un municipio
+ * largo partía en dos o tres y la fila de los logos quedaba fuera del resumen.
+ */
+const LUGAR =
+  "font-mono text-xs leading-4 text-tinta-suave max-md:group-data-[altura=resumen]/panel:truncate";
 /**
  * La fila de los logos llega por debajo de «Cerrar», que queda a la altura del título: así caben
  * los logos, «Ver el edificio» y el estado sin partirse en dos líneas.

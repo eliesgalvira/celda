@@ -6,6 +6,7 @@ import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
+import { FICHA_CORREGIDA } from "../ficha/fichasCorregidas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { type CapaDePrueba, capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { CapaNoDescargada } from "../capa/servicio.ts";
@@ -108,6 +109,42 @@ describe("capa de emplazamientos en el mapa", () => {
     assert.strictEqual(credito.getAttribute("href"), FUENTE_DE_BARRIOS.enlace);
     assert.match(credito.getAttribute("title") ?? "", /^Límites de barrio/u);
     assert.include(credito.textContent ?? "", "CC BY 4.0");
+  });
+
+  it("la ficha pone delante del municipio el barrio de Barcelona que dice la capa (#13)", async () => {
+    const [enPedralbes] = CAPA.emplazamientos;
+    if (enPedralbes === undefined) return assert.fail("sin emplazamiento");
+    const capa: CapaDePrueba = {
+      ...CAPA,
+      emplazamientos: [
+        { ...enPedralbes, clave: FICHA_CORREGIDA.clave, posicion: FICHA_CORREGIDA.posicion },
+      ],
+    };
+    const fichas = fichasDePrueba();
+    navegar(ruta.emplazamiento(FICHA_CORREGIDA.clave, "08"), { reemplazar: true });
+    const { findByRole } = render(() => (
+      <App
+        servicios={Layer.mergeAll(
+          capaDePrueba([Effect.succeed(capa)]),
+          fichas.capa,
+          simuladorDePrueba,
+          ubicacionDePrueba().capa,
+        )}
+      />
+    ));
+    flush();
+    await waitFor(() => {
+      assert.include(fichas.abiertas(), FICHA_CORREGIDA.clave);
+    });
+    fichas.responder(FICHA_CORREGIDA.clave, FICHA_CORREGIDA);
+
+    const panel = await findByRole("article", { name: "CL JORDI GIRONA, 1" });
+    await waitFor(() => {
+      assert.strictEqual(
+        panel.querySelector("header h2 + p")?.textContent,
+        `Pedralbes, ${FICHA_CORREGIDA.municipio}`,
+      );
+    });
   });
 
   it("con los logos llega a los créditos el aviso de las marcas, sin «©» ni enlace, y sin DIGI no se cita su web", async () => {
