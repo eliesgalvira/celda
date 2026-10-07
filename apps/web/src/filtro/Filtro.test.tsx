@@ -47,8 +47,8 @@ const FICHA: Ficha = {
   confianza: "media",
   conflictos: [],
   estaciones: [
-    { compania: "movistar", codigos: ["0802532"], bandas: [], origenes: [] },
-    { compania: "vodafone", codigos: ["0802532"], bandas: [], origenes: [] },
+    { compania: "movistar", codigos: ["0802532"], bandas: [], bandasSinLeer: true, origenes: [] },
+    { compania: "vodafone", codigos: ["0802532"], bandas: [], bandasSinLeer: true, origenes: [] },
   ],
   datosDel: NOCHE,
   version: NOCHE,

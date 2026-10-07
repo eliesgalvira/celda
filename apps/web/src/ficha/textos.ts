@@ -114,6 +114,9 @@ export const textoTramo = (banda: Banda): string =>
 
 export const SIN_BANDAS = "Celda aún no ha leído sus bandas en el registro oficial.";
 
+/** Lo que se dice de una estación base cuya ficha del registro Celda ha leído sin bandas (#41). */
+export const SIN_BANDAS_EN_REGISTRO = "El registro oficial no publica sus bandas.";
+
 /**
  * Lo que se dice de una estación base sin ficha en el registro: el listado del registro la
  * incluye, pero su página de detalle dice «Código de emplazamiento no válido».
@@ -125,16 +128,17 @@ export const comprobadoEl = (fecha: number): string => `comprobado el ${fechaCor
 
 /**
  * Qué decir de una estación base sin bandas: si el registro no tiene su ficha, que no la tiene y
- * desde cuándo se sabe; si no está en el registro, que no hay de dónde leerlas; si no, que Celda
- * aún no las ha leído.
+ * desde cuándo se sabe; si no está en el registro, que no hay de dónde leerlas; si Celda aún no
+ * ha leído su ficha, que no la ha leído; y si la ha leído, que el registro no las publica.
  */
 export const sinBandasDe = (estacion: EstacionDeFicha): string => {
   if (estacion.sinFichaEnRegistro !== undefined) {
     return `${SIN_FICHA_EN_REGISTRO} (${comprobadoEl(estacion.sinFichaEnRegistro)}), así que no se conocen sus bandas.`;
   }
-  return estacion.origenes.some((o) => o.fuente === "registro-oficial")
-    ? SIN_BANDAS
-    : "No está en el registro oficial, así que no se conocen sus bandas.";
+  if (!estacion.origenes.some((o) => o.fuente === "registro-oficial")) {
+    return "No está en el registro oficial, así que no se conocen sus bandas.";
+  }
+  return estacion.bandasSinLeer ? SIN_BANDAS : SIN_BANDAS_EN_REGISTRO;
 };
 
 export const NOMBRE_FUENTE: Readonly<Record<Fuente, string>> = {

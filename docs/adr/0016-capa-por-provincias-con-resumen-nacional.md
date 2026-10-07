@@ -121,6 +121,17 @@ Cuánto pesan, estimado con el listado de Barcelona del 28/09/2026 (1.294 emplaz
 
 Cada origen del registro oficial en la ficha lleva su historial (`historial`, ADR 0027), y cada parte del índice de claves lleva las claves de los emplazamientos que se juntaron con otro, con la clave de hoy y su provincia (`anteriores`, ADR 0012). Hasta el lanzamiento no hay webs de antes que mantener, así que el formato sube a 6 en lugar de añadir claves opcionales. La web solo lee el 6. El build de Vercel no monta las versiones anteriores de otro formato, y una vigente del 5 se vuelve a publicar entera en el 6.
 
+## Formato 7: bandas sin leer (#41, 08/10/2026)
+
+Una estación base sin bandas puede estar así por dos razones: Celda aún no ha leído la ficha del registro, o la ha leído y el registro no publica ninguna banda de esa compañía. Hasta el formato 6 la ficha no las distinguía, y la web decía de las dos que Celda aún no había leído sus bandas.
+
+- La observación del registro que la fusión recibe lleva `bandasSinLeer` si su ficha está en la cola: nunca leída, o pendiente otra vez porque cambió su listado (`fichaLeidaEn` nulo en la base). Una sin ficha en el registro no la lleva, porque el registro ya ha contestado.
+- La estación base de la fusión lleva `bandasSinLeer` si la lleva alguna de sus observaciones, como `sinFichaEnRegistro`. Que la marca aparezca o se vaya cambia el emplazamiento, así que su ficha sale en la versión siguiente.
+- La estación base de la ficha lleva siempre `bandasSinLeer`, `true` o `false`. No lleva la fecha de la lectura, que cambia en cada relectura y haría cambiar la ficha cada 30 días aunque no cambie nada de lo que enseña.
+- La web dice «Aún no se conocen sus bandas» si están sin leer y «El registro no publica sus bandas» si no, en la frase del resumen, en la fila del eje de frecuencias y en los datos técnicos.
+
+Una ficha del formato 6 sin la clave se leería como leída, así que el formato sube a 7 y la web solo lee el 7, como en el paso al 6. El historial no sirve para esto: solo apunta las lecturas que cambian algo, y la primera de una ficha sin bandas no cambia nada.
+
 ## Consecuencias
 
 - Abrir la web descarga el resumen (de 2 a 4 KB con gzip, según cuántas zonas lleve) y las provincias de la vista inicial, no toda España.

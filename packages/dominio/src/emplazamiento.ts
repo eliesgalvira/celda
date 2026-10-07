@@ -64,6 +64,11 @@ export const EstacionBase = Schema.Struct({
    */
   sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
   /**
+   * Si la ingesta aún no ha leído la ficha de alguna de sus observaciones del registro, así que
+   * puede que no estén todas sus bandas (#41). Falta si las ha leído todas.
+   */
+  bandasSinLeer: Schema.optionalKey(Schema.Literal(true)),
+  /**
    * Las medidas de exposición del ministerio de sus observaciones del registro, sin repetir y por
    * acimut. Falta si ninguna se ha leído desde que Celda las guarda.
    */

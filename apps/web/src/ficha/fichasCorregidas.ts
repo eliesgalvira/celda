@@ -33,6 +33,7 @@ export const FICHA_CORREGIDA: Ficha = {
       compania: "movistar",
       codigos: ["0802532"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [
         {
           fuente: "registro-oficial",
@@ -48,6 +49,7 @@ export const FICHA_CORREGIDA: Ficha = {
       compania: "vodafone",
       codigos: ["086040", "86040"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [
         {
           fuente: "registro-oficial",
@@ -86,6 +88,7 @@ export const FICHA_NUEVA: Ficha = {
       compania: "movistar",
       codigos: ["MV-BCN-82383"],
       bandas: [],
+      bandasSinLeer: false,
       origenes: [
         {
           fuente: "comunidad",
@@ -115,6 +118,7 @@ export const FICHA_COMPANIA_ANADIDA: Ficha = {
       compania: "movistar",
       codigos: ["0800542"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [
         {
           fuente: "registro-oficial",
@@ -130,6 +134,7 @@ export const FICHA_COMPANIA_ANADIDA: Ficha = {
       compania: "orange",
       codigos: ["CATR6031A"],
       bandas: [],
+      bandasSinLeer: false,
       origenes: [
         {
           fuente: "comunidad",
@@ -160,6 +165,7 @@ export const FICHA_CON_CORRECCIONES_ACEPTADAS: Ficha = {
       compania: "movistar",
       codigos: ["0802532"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [
         {
           fuente: "registro-oficial",
@@ -175,6 +181,7 @@ export const FICHA_CON_CORRECCIONES_ACEPTADAS: Ficha = {
       compania: "vodafone",
       codigos: ["086040"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [
         {
           fuente: "registro-oficial",

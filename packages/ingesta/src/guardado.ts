@@ -13,8 +13,10 @@ import { bandaAlDia, registroAlDia, registroDeCrudo } from "./registro-oficial/n
  * noches. `fecha` cambia solo cuando cambia lo que dice la fuente, así que una ejecución sin
  * cambios no escribe nada.
  */
+const { bandasSinLeer: _bandasSinLeer, ...camposDeLaObservacion } = Observacion.fields;
+
 export const ObservacionGuardada = Schema.Struct({
-  ...Observacion.fields,
+  ...camposDeLaObservacion,
   /** Cuándo se leyó la ficha por última vez. Nulo si está pendiente. */
   fichaLeidaEn: Schema.NullOr(Schema.Finite),
   /** Barridos completos seguidos en los que el listado no la trae. */
@@ -353,7 +355,10 @@ export const alDia = (o: ObservacionGuardada): ObservacionGuardada => {
   return { ...o, compania, codigo, direccion, municipio, url };
 };
 
-/** Lo que la fusión necesita de una observación guardada, con la limpieza de hoy. */
+/**
+ * Lo que la fusión necesita de una observación guardada, con la limpieza de hoy. Una del registro
+ * cuya ficha está en la cola lleva `bandasSinLeer`, salvo si el registro no tiene su ficha.
+ */
 export const observacionDe = (guardada: ObservacionGuardada): Observacion => {
   const o = alDia(guardada);
   const observacion: Observacion = {
@@ -370,7 +375,10 @@ export const observacionDe = (guardada: ObservacionGuardada): Observacion => {
     afirma: o.afirma,
   };
   const { sinFichaEnRegistro, medidasDeExposicion } = o;
+  const sinLeer =
+    o.fuente === "registro-oficial" && o.fichaLeidaEn === null && sinFichaEnRegistro === undefined;
+  const conLeidas = sinLeer ? { ...observacion, bandasSinLeer: true as const } : observacion;
   const conMarca =
-    sinFichaEnRegistro === undefined ? observacion : { ...observacion, sinFichaEnRegistro };
+    sinFichaEnRegistro === undefined ? conLeidas : { ...conLeidas, sinFichaEnRegistro };
   return medidasDeExposicion === undefined ? conMarca : { ...conMarca, medidasDeExposicion };
 };

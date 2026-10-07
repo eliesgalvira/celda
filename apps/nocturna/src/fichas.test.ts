@@ -495,6 +495,61 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
   );
 
   it.effect(
+    "la ficha publicada dice qué bandas están sin leer, y una ficha leída sin bandas deja de estarlo (#41)",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          // Una estación base con una sola observación, para que ninguna otra le dé bandas.
+          const clave = fusionar(
+            grabada.listado.registros.map((r) => ({
+              ...r,
+              fuente: "registro-oficial" as const,
+              bandas: [],
+              fecha: NOCHE,
+              afirma: "presente" as const,
+            })),
+          )
+            .flatMap((e) => e.estaciones)
+            .find((e) => e.observaciones.length === 1)?.observaciones[0]?.clave;
+          assert.isDefined(clave);
+          // El registro lista la estación base, pero su ficha no publica ninguna banda.
+          const fichas = new Map(grabada.fichas);
+          fichas.set(clave, { bandas: [], medidasDeExposicion: [] });
+          const sinBandas = { ...grabada, fichas };
+          const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
+          const deLaClave = (publicadas: ReadonlyArray<Ficha>) =>
+            publicadas
+              .flatMap((f) => f.estaciones)
+              .find((e) => e.origenes.some((o) => o.clave === clave));
+
+          // Primera noche, solo el listado: ninguna ficha leída.
+          yield* TestClock.setTime(NOCHE);
+          yield* unaNoche(
+            entorno,
+            conFichasApuntadas(sinBandas, pedidas),
+            conFichas({ maximo: 0 }),
+          );
+          const antes = yield* fichasPublicadas(entorno);
+          assert.isAbove(antes.length, 0);
+          assert.isTrue(antes.every((f) => f.estaciones.every((e) => e.bandasSinLeer)));
+
+          // Segunda noche, con las fichas: ninguna queda sin leer, y la de la clave, sin bandas.
+          yield* TestClock.setTime(NOCHE + DIA);
+          yield* unaNoche(entorno, conFichasApuntadas(sinBandas, pedidas));
+          const despues = yield* fichasPublicadas(entorno);
+          assert.isTrue(despues.every((f) => f.estaciones.every((e) => !e.bandasSinLeer)));
+          const estacion = deLaClave(despues);
+          assert.isDefined(estacion);
+          assert.isFalse(estacion.bandasSinLeer);
+          assert.deepStrictEqual(estacion.bandas, []);
+          assert.isUndefined(estacion.sinFichaEnRegistro);
+        }),
+      ),
+    30_000,
+  );
+
+  it.effect(
     "veinte fichas seguidas sin ficha en el registro paran la noche y ninguna queda marcada",
     () =>
       conEntorno((entorno) =>

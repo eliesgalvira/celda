@@ -42,6 +42,12 @@ export const Observacion = Schema.Struct({
    */
   sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
   /**
+   * Si la ingesta aún no ha leído la ficha del registro oficial de la estación base, de la que
+   * salen sus bandas, porque es nueva o porque ha cambiado su listado. Falta cuando ya la ha leído,
+   * cuando el registro no tiene su ficha (`sinFichaEnRegistro`) y en las demás fuentes (#41).
+   */
+  bandasSinLeer: Schema.optionalKey(Schema.Literal(true)),
+  /**
    * Las medidas de exposición del ministerio que publica la ficha del registro oficial, quizá
    * ninguna. Su fecha es `fecha`, como la de las bandas. Falta si la ficha no se ha leído desde que
    * Celda las guarda, y en las demás fuentes.

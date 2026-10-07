@@ -451,6 +451,23 @@ describe("fusionar", () => {
     assert.notProperty(estacion("orange"), "sinFichaEnRegistro");
   });
 
+  it("una estación base tiene las bandas sin leer si la ficha de alguna observación suya lo está", () => {
+    const [emplazamiento] = fusionar([
+      { ...observacion({ compania: "vodafone", codigo: "061723" }), bandasSinLeer: true },
+      observacion({
+        compania: "vodafone",
+        codigo: "61723",
+        bandas: [banda("vodafone", "V", 1800)],
+      }),
+      observacion({ compania: "orange", codigo: "CLMR6422A" }),
+    ]);
+    const estacion = (compania: Compania) =>
+      emplazamiento?.estaciones.find((e) => e.compania === compania);
+    assert.strictEqual(estacion("vodafone")?.bandasSinLeer, true);
+    // Orange tiene su ficha leída, aunque el registro no publique ninguna banda.
+    assert.notProperty(estacion("orange"), "bandasSinLeer");
+  });
+
   it("una estación base con bandas no está sin ficha aunque otra observación suya lo esté", () => {
     const [emplazamiento] = fusionar([
       { ...observacion({ compania: "vodafone", codigo: "061723" }), sinFichaEnRegistro: FECHA },

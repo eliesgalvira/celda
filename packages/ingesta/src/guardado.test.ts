@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 
 import type { FichaLeida } from "./extractor.ts";
-import { huellaDeFicha, type ObservacionGuardada, trasFicha } from "./guardado.ts";
+import { huellaDeFicha, observacionDe, type ObservacionGuardada, trasFicha } from "./guardado.ts";
 import { conFilasRotadas } from "./pruebas/ficha.ts";
 import { leerMuestra } from "./pruebas/grabado.ts";
 import { bandasDeFilas, leerFicha, medidasDeFilas } from "./registro-oficial/normalizar.ts";
@@ -101,6 +101,27 @@ const leida = (html: string): FichaLeida => {
   if (Result.isFailure(ficha)) return assert.fail(ficha.failure);
   return ficha.success;
 };
+
+describe("observacionDe", () => {
+  it("una del registro con la ficha en la cola lleva las bandas sin leer (#41)", () => {
+    assert.strictEqual(
+      observacionDe({ ...leidaSinMedidas, fichaLeidaEn: null }).bandasSinLeer,
+      true,
+    );
+  });
+
+  it("leída, sin ficha en el registro o de la comunidad, no", () => {
+    assert.notProperty(observacionDe(leidaSinMedidas), "bandasSinLeer");
+    assert.notProperty(
+      observacionDe({ ...leidaSinMedidas, fichaLeidaEn: null, sinFichaEnRegistro: ANTES }),
+      "bandasSinLeer",
+    );
+    assert.notProperty(
+      observacionDe({ ...leidaSinMedidas, fuente: "comunidad", fichaLeidaEn: null }),
+      "bandasSinLeer",
+    );
+  });
+});
 
 /** Una ficha grabada en HTML, tal como llega, y con sus filas en otro orden. */
 const grabada = (nombre: string) =>

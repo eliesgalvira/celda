@@ -91,6 +91,28 @@ const sinFicha = (estacion: EstacionDeFicha): boolean =>
   estacion.sinFichaEnRegistro !== undefined && bandasDe(estacion).length === 0;
 
 /**
+ * Si Celda ha leído la ficha del registro de una estación base y el registro no publica ninguna
+ * banda de ella (#41).
+ */
+const sinPublicar = (estacion: EstacionDeFicha): boolean =>
+  !estacion.bandasSinLeer &&
+  estacion.bandas.length === 0 &&
+  estacion.sinFichaEnRegistro === undefined &&
+  estacion.origenes.some((o) => o.fuente === "registro-oficial");
+
+/**
+ * Que el registro no publica las bandas de unas estaciones base. En un emplazamiento compartido
+ * dice de qué compañías, si no son todas.
+ */
+const fraseSinPublicar = (
+  sinBandas: ReadonlyArray<EstacionDeFicha>,
+  todas: number,
+): TextoMarcado =>
+  sinBandas.length === todas
+    ? marcado`El ${termino("registro-oficial", "registro")} no publica sus ${BANDAS}.`
+    : marcado`El ${termino("registro-oficial", "registro")} no publica las ${BANDAS} de ${nombres(sinBandas)}.`;
+
+/**
  * Que el registro no tiene la ficha de unas estaciones base, con la comprobación más reciente.
  * En un emplazamiento compartido dice de qué compañías, si no son todas.
  */
@@ -114,21 +136,26 @@ export const fraseDeResumen = (estaciones: ReadonlyArray<EstacionDeFicha>): Text
     estaciones.some((e) => bandasDe(e).includes(mhz)),
   );
   const sinFichas = estaciones.filter(sinFicha);
+  const sinBandas = estaciones.filter(sinPublicar);
   const deSinFicha: TextoMarcado | string =
     sinFichas.length === 0 ? "" : marcado` ${fraseSinFicha(sinFichas, estaciones.length)}`;
+  const deSinBandas: TextoMarcado | string =
+    sinBandas.length === 0 ? "" : marcado` ${fraseSinPublicar(sinBandas, estaciones.length)}`;
   if (bandas.length === 0) {
-    // Si el registro no tiene la ficha de ninguna, no se da por pendiente.
-    return sinFichas.length === estaciones.length
-      ? marcado`${quien}${deSinFicha} Sin sus ${BANDAS} no se sabe si da ${CUATRO_G} o ${CINCO_G}.`
-      : marcado`${quien} Aún no se conocen sus ${BANDAS} ni si da ${CUATRO_G} o ${CINCO_G}.${deSinFicha}`;
+    // Si el registro no tiene la ficha de ninguna o no publica sus bandas, no se da por pendiente.
+    return sinFichas.length + sinBandas.length === estaciones.length
+      ? marcado`${quien}${deSinFicha}${deSinBandas} Sin sus ${BANDAS} no se sabe si da ${CUATRO_G} o ${CINCO_G}.`
+      : marcado`${quien} Aún no se conocen sus ${BANDAS} ni si da ${CUATRO_G} o ${CINCO_G}.${deSinFicha}${deSinBandas}`;
   }
 
   const completo = estaciones.every(conocidaDelTodo);
-  const pendientes = estaciones.filter((e) => bandasDe(e).length === 0 && !sinFicha(e));
+  const pendientes = estaciones.filter(
+    (e) => bandasDe(e).length === 0 && !sinFicha(e) && !sinPublicar(e),
+  );
   const segun = completo ? marcado`Por sus ${BANDAS}` : marcado`Por las ${BANDAS} que se conocen`;
   const falta =
     pendientes.length === 0 ? "" : ` De ${nombres(pendientes)} aún no se conocen las bandas.`;
-  return marcado`${quien} ${segun}, probablemente da ${queGeneracion(estaciones)}. ${mayuscula(queAlcance(bandas, completo))}.${falta}${deSinFicha}`;
+  return marcado`${quien} ${segun}, probablemente da ${queGeneracion(estaciones)}. ${mayuscula(queAlcance(bandas, completo))}.${falta}${deSinFicha}${deSinBandas}`;
 };
 
 /** El título del eje de frecuencias, con la frecuencia y los MHz explicados. */
@@ -150,7 +177,9 @@ export const filasDelEje = (estaciones: ReadonlyArray<EstacionDeFicha>): Readonl
           ? undefined
           : sinFicha(estacion)
             ? SIN_FICHA_EN_REGISTRO
-            : "Aún no se conocen sus bandas",
+            : sinPublicar(estacion)
+              ? "El registro no publica sus bandas"
+              : "Aún no se conocen sus bandas",
     };
   });
 

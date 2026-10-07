@@ -29,6 +29,7 @@ const CAMPUS_NORD: Ficha = {
       compania: "movistar",
       codigos: ["0802532"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [
         {
           fuente: "registro-oficial",

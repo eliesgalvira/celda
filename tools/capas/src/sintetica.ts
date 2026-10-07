@@ -123,6 +123,7 @@ const fichaDe = (emplazamiento: EmplazamientoDeCapa, fecha: number): Ficha => ({
     compania,
     codigos: [emplazamiento.clave],
     bandas: [],
+    bandasSinLeer: true,
     origenes: [],
   })),
   datosDel: fecha,

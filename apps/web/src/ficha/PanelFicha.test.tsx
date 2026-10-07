@@ -63,6 +63,7 @@ const CAMPUS_NORD: Ficha = {
           anio: 2023,
         },
       ],
+      bandasSinLeer: false,
       origenes: [
         {
           fuente: "registro-oficial",
@@ -78,6 +79,7 @@ const CAMPUS_NORD: Ficha = {
       compania: "vodafone",
       codigos: ["086040", "86040"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [
         {
           fuente: "registro-oficial",
@@ -104,6 +106,7 @@ const PEDRALBES: Ficha = {
       compania: "orange",
       codigos: ["CATR0228A"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [
         {
           fuente: "registro-oficial",

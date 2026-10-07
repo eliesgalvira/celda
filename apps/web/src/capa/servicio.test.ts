@@ -370,6 +370,7 @@ describe("agrupación de una provincia con un filtro de compañías (ADR 0026)",
       compania,
       codigos: [clave],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [],
     })),
   });

@@ -350,11 +350,15 @@ export const camposDistintos = (
   ...(a.retiradaEn === b.retiradaEn ? [] : ["retiradaEn"]),
 ];
 
-/** Lo que se publica de una observación guardada, con la limpieza de hoy. */
-export const registroPublicado = (o: ObservacionGuardada): RegistroRepetido => ({
-  observacion: observacionDe(alDia(o)),
-  retiradaEn: o.retiradaEn,
-});
+/**
+ * Lo que se publica de una observación guardada, con la limpieza de hoy. Sin `bandasSinLeer`: el
+ * historial solo apunta las lecturas de la ficha que cambian algo, así que no sabe si la última
+ * está leída (#41).
+ */
+export const registroPublicado = (o: ObservacionGuardada): RegistroRepetido => {
+  const { bandasSinLeer: _sinLeer, ...observacion } = observacionDe(alDia(o));
+  return { observacion, retiradaEn: o.retiradaEn };
+};
 
 // ── Hechos de ficha que solo cambian el orden de las filas ───────────────────────────────────
 

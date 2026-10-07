@@ -115,6 +115,13 @@ export const EstacionDeFicha = Schema.Struct({
    */
   sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
   /**
+   * Si Celda aún no ha leído la ficha del registro de alguna de sus observaciones del registro, así
+   * que puede que falten bandas. Con `false` y sin bandas, Celda ha leído su ficha y el registro
+   * no lista ninguna, o el registro no tiene ficha (`sinFichaEnRegistro`). En una estación base
+   * que no está en el registro es `false`. Desde el formato 7 (#41).
+   */
+  bandasSinLeer: Schema.Boolean,
+  /**
    * Las medidas de exposición del ministerio que publica el registro oficial en las fichas de sus
    * observaciones, por acimut. El ministerio no las fecha: desde cuándo las publica es la `fecha`
    * de esos orígenes. Una lista vacía es que el registro no publica ninguna. Falta si Celda aún no
@@ -217,6 +224,7 @@ export const fichaDe = (
         compania: estacion.compania,
         codigos: estacion.codigos,
         bandas: estacion.bandas.toSorted(compararBandas),
+        bandasSinLeer: estacion.bandasSinLeer === true,
         origenes: observaciones.map(
           ({ fuente, clave, url, fecha, afirma, historial }): OrigenDeFicha => ({
             fuente,

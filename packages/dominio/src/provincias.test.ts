@@ -454,18 +454,25 @@ describe("lote de fichas de una provincia", () => {
     compania: "orange",
     codigos: ["CLMR6422A"],
     bandas: [],
+    bandasSinLeer: false,
     origenes: [],
   };
   const medida = { distanciaMetros: 80, acimutGrados: 175, microvatiosPorCm2: 0.98806 };
 
-  it("un lote lleva la marca de sin ficha y las medidas de las estaciones que las tienen", () => {
+  it("un lote lleva la marca de sin ficha, las bandas sin leer y las medidas de cada estación", () => {
     const contenido = generarLoteDeProvincia(
       "08",
       [
         {
           ...ficha(EN_PEDRALBES),
           estaciones: [
-            { compania: "movistar", codigos: ["0802532"], bandas: [], origenes: [] },
+            {
+              compania: "movistar",
+              codigos: ["0802532"],
+              bandas: [],
+              bandasSinLeer: true,
+              origenes: [],
+            },
             { ...orange, sinFichaEnRegistro: NOCHE, medidasDeExposicion: [medida] },
           ],
         },
@@ -476,12 +483,31 @@ describe("lote de fichas de una provincia", () => {
     const leido = leerLoteDeProvincia(contenido, "08");
     if (Result.isFailure(leido)) return assert.fail(leido.failure.message);
     assert.deepStrictEqual(
-      leido.success[0]?.estaciones.map((e) => [e.sinFichaEnRegistro, e.medidasDeExposicion]),
+      leido.success[0]?.estaciones.map((e) => [
+        e.sinFichaEnRegistro,
+        e.bandasSinLeer,
+        e.medidasDeExposicion,
+      ]),
       [
-        [undefined, undefined],
-        [NOCHE, [medida]],
+        [undefined, true, undefined],
+        [NOCHE, false, [medida]],
       ],
     );
+  });
+
+  it("un lote del formato 6, sin las bandas sin leer, no se lee (#41)", () => {
+    const contenido = generarLoteDeProvincia(
+      "08",
+      [{ ...ficha(EN_PEDRALBES), estaciones: [orange] }],
+      lugares,
+      FUENTE_IGN,
+    );
+    assert.include(contenido, '"bandasSinLeer":false');
+    const del6 = contenido
+      .replace(`"formato":${FORMATO_PROVINCIAS}`, '"formato":6')
+      .replaceAll(/,"bandasSinLeer":(?:true|false)/gu, "");
+    assert.notStrictEqual(del6, contenido);
+    assert.isTrue(Result.isFailure(leerLoteDeProvincia(del6, "08")));
   });
 });
 

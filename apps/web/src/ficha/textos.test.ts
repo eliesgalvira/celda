@@ -203,6 +203,7 @@ describe("textos de la ficha", () => {
       compania,
       codigos: ["086040"],
       bandas: [],
+      bandasSinLeer: true,
       origenes: [origen, desmontada],
     });
     const textos = textosDeOrigenes([estacion("movistar"), estacion("vodafone")]);

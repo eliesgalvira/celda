@@ -214,8 +214,11 @@ const estacionDe = (
     observaciones: observaciones.map(procedencia),
   };
   const sinFichaEnRegistro = sinFichaEnRegistroDe(presentes, bandas);
+  const conLeidas = presentes.some((o) => o.bandasSinLeer === true)
+    ? { ...estacion, bandasSinLeer: true as const }
+    : estacion;
   const conMarca =
-    sinFichaEnRegistro === undefined ? estacion : { ...estacion, sinFichaEnRegistro };
+    sinFichaEnRegistro === undefined ? conLeidas : { ...conLeidas, sinFichaEnRegistro };
   const medidasDeExposicion = unirMedidas(presentes);
   return medidasDeExposicion === undefined ? conMarca : { ...conMarca, medidasDeExposicion };
 };

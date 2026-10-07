@@ -105,6 +105,7 @@ const fichaDe = (emplazamiento: EmplazamientoDeCapa, i: number): Ficha => ({
     compania,
     codigos: [`08${String(i).padStart(5, "0")}`],
     bandas: [],
+    bandasSinLeer: true,
     origenes: [
       {
         fuente: "registro-oficial",

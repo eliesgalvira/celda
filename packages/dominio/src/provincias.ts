@@ -47,7 +47,8 @@ import { FuenteDePoblacion } from "./poblacion.ts";
 /**
  * El formato de la capa (ADR 0016): un resumen nacional con una fila por provincia y una capa por
  * provincia, con las fichas en lotes dentro de cada provincia. El 5 lo estrenó; el 6 trae el
- * historial de cada origen de la ficha y las claves anteriores en el índice de claves (ADR 0027).
+ * historial de cada origen de la ficha y las claves anteriores en el índice de claves (ADR 0027),
+ * y el 7, si Celda aún no ha leído las bandas de cada estación base de la ficha (#41).
  *
  * - El resumen lleva la versión en el nombre y una huella de su contenido, porque la misma versión
  *   de los datos puede publicarse otra vez con otra cobertura (otra fecha de barrido).
@@ -56,7 +57,7 @@ import { FuenteDePoblacion } from "./poblacion.ts";
  * - El manifiesto de una versión lista sus capas y sus lotes. La web no lo lee; sirve para retirar
  *   versiones viejas sin borrar lo que comparten con las que se quedan.
  */
-export const FORMATO_PROVINCIAS = 6;
+export const FORMATO_PROVINCIAS = 7;
 
 /** Caracteres de la huella SHA-256 que van en el nombre de un fichero: 64 bits. */
 export const LARGO_HUELLA = 16;
