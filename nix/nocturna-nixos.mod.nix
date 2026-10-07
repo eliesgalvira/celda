@@ -403,6 +403,12 @@
           # Espera al disco de copias si lo hay, sin depender de él.
           unitConfig.WantsMountsFor = config.services.celda-nocturna.copias.directorio;
 
+          # Una configuración nueva vale desde la noche siguiente. Activarla no corta la noche que
+          # está corriendo ni deja `nixos-rebuild switch` esperando horas a que acabe la que
+          # arrancaría otra vez. Sin reinicio, `stopIfChanged` no se usa. Cómo aplicarla ya, en
+          # docs/patterns/nixos.md.
+          restartIfChanged = false;
+
           environment = {
             CELDA_ALMACEN_ORIGEN = mkIf (
               config.services.celda-nocturna.origenPublico != null

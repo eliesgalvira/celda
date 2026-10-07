@@ -392,6 +392,10 @@
                   listados = maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log").strip()
                   assert listados == "9", listados
 
+              with subtest("activar una configuración nueva no reinicia la noche"):
+                  unidad = maquina.succeed("cat /etc/systemd/system/celda-nocturna.service")
+                  assert "X-RestartIfChanged=false" in unidad.splitlines(), unidad
+
               with subtest("la noche corre con el montón de V8 a 512 MB y la memoria del servicio limitada"):
                   assert "NODE_OPTIONS=--max-old-space-size=512" in entorno, entorno
                   alta = maquina.succeed("systemctl show celda-nocturna.service --property=MemoryHigh --value").strip()

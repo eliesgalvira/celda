@@ -209,6 +209,19 @@ Cualquier variable del programa se puede poner también a mano, sin secretos:
 systemd.services.celda-nocturna.environment.CELDA_REGISTRO_MAX_PETICIONES = "100";
 ```
 
+### Cuándo vale una configuración nueva
+
+`nixos-rebuild switch` no reinicia el servicio (`restartIfChanged = false` en el módulo). La noche que esté corriendo sigue con el paquete y la configuración con que empezó, y la nueva vale desde la noche siguiente. Así `switch` no corta una noche a medias ni se queda horas esperando a que acabe la que arrancaría otra vez. Con el servicio parado, tampoco lo arranca: lo arranca el temporizador a su hora.
+
+Para que valga ya, para la noche y arráncala otra vez, sin esperar a que acabe:
+
+```sh
+sudo systemctl stop celda-nocturna.service
+sudo systemctl start --no-block celda-nocturna.service
+```
+
+Parar una noche a medias no pierde lo leído: el barrido sigue por el primer cuadro sin guardar ([convex.md](convex.md#el-barrido-por-zonas)), y las fichas que faltan siguen en la cola. `--no-block` devuelve en cuanto la noche arranca; síguela con `journalctl --unit=celda-nocturna.service --follow`.
+
 ### El directorio de copias en otro disco
 
 Si `copias.directorio` está fuera de `/var/lib/celda-nocturna`, tmpfiles lo crea con el usuario del servicio. Las copias de fuera de casa van a R2 (abajo). El servicio espera a que se monte su disco (`WantsMountsFor=`), pero no depende de él: si el disco no está, la noche corre igual. En ese caso la copia va al directorio vacío del disco del sistema, o falla con un aviso en el diario si no se puede escribir.
