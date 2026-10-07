@@ -182,15 +182,22 @@ export const fichasDelOrigen = Layer.effect(
         ).pipe(Effect.catchTag("LoteRetirado", () => fichaDeLaVigente(pedida, provincia.version)));
       });
 
+    /**
+     * La ficha de un enlace. Uno sin provincia, o con la clave de un emplazamiento que se juntó con
+     * otro, se busca en el índice de claves, que da la clave de hoy (ADR 0027).
+     */
     const leer = Effect.fn("FichasPublicadas.leer")(function* (pedida: FichaEnlazada) {
       if (pedida.provincia !== null) {
-        return yield* leerDe({ clave: pedida.clave, provincia: pedida.provincia });
+        const leida = yield* leerDe({ clave: pedida.clave, provincia: pedida.provincia });
+        if (Option.isSome(leida)) return leida;
       }
-      const provincia = yield* capas
-        .provinciaDeClave(pedida.clave)
+      const situada = yield* capas
+        .situarClave(pedida.clave)
         .pipe(Effect.mapError(() => noLeida("no ha llegado el índice de claves")));
-      if (Option.isNone(provincia)) return Option.none<Ficha>();
-      return yield* leerDe({ clave: pedida.clave, provincia: provincia.value });
+      if (Option.isNone(situada)) return Option.none<Ficha>();
+      const { clave, provincia } = situada.value;
+      if (clave === pedida.clave && provincia === pedida.provincia) return Option.none<Ficha>();
+      return yield* leerDe({ clave, provincia });
     });
 
     const precargar = Effect.fn("FichasPublicadas.precargar")(

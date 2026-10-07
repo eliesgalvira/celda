@@ -159,10 +159,13 @@ export const capaDeProvincias = (provincias: ReadonlyArray<ProvinciaDePrueba>) =
           }
           return provinciaCargada(provincia);
         }),
-      provinciaDeClave: (clave) =>
+      situarClave: (clave) =>
         Effect.succeed(
-          Option.fromNullishOr(
-            provincias.find((p) => p.emplazamientos.some((e) => e.clave === clave))?.codigo,
+          Option.map(
+            Option.fromNullishOr(
+              provincias.find((p) => p.emplazamientos.some((e) => e.clave === clave))?.codigo,
+            ),
+            (provincia) => ({ clave, provincia }),
           ),
         ),
       agrupacion: (codigo, filtro) => {

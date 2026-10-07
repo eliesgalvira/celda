@@ -195,6 +195,68 @@ describe("fusionar", () => {
     await expect(json(emplazamientos)).toMatchFileSnapshot(referencia("codigos-vodafone"));
   });
 
+  it("el registro de Orange y el de Retevisión con el mismo código son una estación base, en el mismo punto o a 40 m", () => {
+    // `RETEVISION MOVIL SA - ANDR0133B` es de Orange, como `ORANGE ESPAGNE, S.A.U. - ANDR0133B`.
+    const orange = banda("orange", "B B -1900010", 1800);
+    for (const metros of [0, 40]) {
+      const emplazamientos = fusionar([
+        {
+          ...observacion({ compania: "orange", codigo: "ANDR0133B", bandas: [orange] }),
+          clave: "ORANGE ESPAGNE, S.A.U. - ANDR0133B",
+        },
+        {
+          ...observacion({
+            compania: "orange",
+            codigo: "ANDR0133B",
+            posicion: alEste(PIUS_XII, metros),
+            direccion: "CL TAMARGUILLO, 1. SEVILLA, SEVILLA",
+            bandas: [orange, banda("orange", "B B -1900020", 2600)],
+          }),
+          clave: "RETEVISION MOVIL SA - ANDR0133B",
+        },
+        observacion({ compania: "vodafone", codigo: "065755" }),
+      ]);
+      assert.deepStrictEqual(
+        emplazamientos.map((e) => ({
+          clave: e.clave,
+          estado: e.estado,
+          conflictos: e.conflictos,
+          estaciones: e.estaciones.map((estacion) => ({
+            compania: estacion.compania,
+            codigos: estacion.codigos,
+            bandas: estacion.bandas.map((b) => b.referencia),
+            observaciones: estacion.observaciones.map((o) => o.clave),
+          })),
+        })),
+        [
+          {
+            clave: "orange-ANDR0133B",
+            estado: "verificado",
+            conflictos: [],
+            estaciones: [
+              {
+                compania: "orange",
+                codigos: ["ANDR0133B"],
+                bandas: ["B B -1900010", "B B -1900020"],
+                observaciones: [
+                  "ORANGE ESPAGNE, S.A.U. - ANDR0133B",
+                  "RETEVISION MOVIL SA - ANDR0133B",
+                ],
+              },
+              {
+                compania: "vodafone",
+                codigos: ["065755"],
+                bandas: [],
+                observaciones: ["VODAFONE - 065755"],
+              },
+            ],
+          },
+        ],
+        `a ${metros} m`,
+      );
+    }
+  });
+
   it("verificado: el registro y la comunidad coinciden", async () => {
     const emplazamientos = fusionar([
       observacion({ compania: "movistar", codigo: "0802314" }),

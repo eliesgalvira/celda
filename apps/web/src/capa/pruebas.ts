@@ -182,11 +182,15 @@ export const resumenDePrueba = (capa: CapaDePrueba, sinCombinaciones = false): R
 /**
  * Servicio de capa de prueba: la carga número `n` del resumen devuelve el de `cargas[n]`, y a
  * partir de la última repite esa. La provincia de Barcelona sale de la última capa que ha llegado
- * o, si no ha llegado ninguna, de la última carga. Con `Effect.never` no terminan nunca.
+ * o, si no ha llegado ninguna, de la última carga. Con `Effect.never` no terminan nunca. Las
+ * claves de `anteriores` llevan a la de un emplazamiento que se juntó con otro, como el índice.
  */
 export const capaDePrueba = (
   cargas: ReadonlyArray<Effect.Effect<CapaDePrueba, FalloCapa>>,
-  opciones: { readonly sinCombinaciones?: boolean } = {},
+  opciones: {
+    readonly sinCombinaciones?: boolean;
+    readonly anteriores?: ReadonlyMap<string, string>;
+  } = {},
 ): Layer.Layer<CapaEmplazamientos> =>
   Layer.sync(CapaEmplazamientos, () => {
     let hechas = 0;
@@ -231,17 +235,19 @@ export const capaDePrueba = (
           ),
         ),
       // Todos los emplazamientos de prueba van en Barcelona.
-      provinciaDeClave: (clave) =>
+      situarClave: (clave) =>
         Effect.suspend(() =>
           Effect.map(
             Option.match(llegada, {
               onSome: Effect.succeed,
               onNone: () => carga(cargas.length - 1),
             }),
-            (capa) =>
-              capa.emplazamientos.some((e) => e.clave === clave)
-                ? Option.some(BARCELONA.codigo)
-                : Option.none<string>(),
+            (capa) => {
+              const actual = opciones.anteriores?.get(clave) ?? clave;
+              return capa.emplazamientos.some((e) => e.clave === actual)
+                ? Option.some({ clave: actual, provincia: BARCELONA.codigo })
+                : Option.none();
+            },
           ),
         ),
     });
@@ -258,7 +264,7 @@ const huellaDePrueba = (contenido: string): string => {
   return `${a.toString(16).padStart(8, "0")}${b.toString(16).padStart(8, "0")}`;
 };
 
-/** Una versión publicada en el formato 5, con todos sus ficheros, como la leería la web. */
+/** Una versión publicada en el formato 6, con todos sus ficheros, como la leería la web. */
 export interface PublicacionDePrueba {
   readonly version: string;
   readonly fecha: number;
@@ -282,6 +288,7 @@ export const publicacionDePrueba = (
   fichas: ReadonlyArray<Ficha>,
   porLote = 2,
   partesDelIndice: number | null = 4,
+  anteriores: ReadonlyArray<readonly [anterior: string, actual: string]> = [],
 ): PublicacionDePrueba => {
   const situados: ReadonlyArray<EmplazamientoSituado> = fichas
     .map((f) => {
@@ -327,7 +334,11 @@ export const publicacionDePrueba = (
   const claves =
     partesDelIndice === null
       ? undefined
-      : generarIndiceDeClaves(new Map([["08", situados]]), partesDelIndice).map((contenido) => {
+      : generarIndiceDeClaves(
+          new Map([["08", situados]]),
+          partesDelIndice,
+          new Map(anteriores),
+        ).map((contenido) => {
           const fichero = ficheroDeIndiceDeClaves(huellaDePrueba(contenido));
           ficheros.set(fichero, contenido);
           return fichero;

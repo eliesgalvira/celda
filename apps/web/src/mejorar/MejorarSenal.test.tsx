@@ -36,6 +36,7 @@ const CAMPUS_NORD: Ficha = {
           url: "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0802532",
           fecha: NOCHE,
           afirma: "presente",
+          historial: [],
         },
       ],
     },

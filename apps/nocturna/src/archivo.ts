@@ -1,5 +1,6 @@
 import { ArchivoDePaginas, type PaginaDelRegistro } from "@celda/ingesta/archivo";
 import type { FichaLeida } from "@celda/ingesta/extractor";
+import type { FichasDeLasPaginas } from "@celda/ingesta/hechos";
 import { lecturaDeFicha } from "@celda/ingesta/registro-oficial/normalizar";
 import { decodificarLatin1 } from "@celda/ingesta/texto";
 import { AlmacenDelArchivo } from "@celda/publicacion/almacen";
@@ -163,6 +164,13 @@ export class ArchivoNocturno extends Context.Service<
      * Recorre la última lectura de cada ficha archivada, de `PAGINA` en `PAGINA`, sin tener más
      * de una página de fichas en memoria.
      */
+    /**
+     * Lo que se lee hoy de las páginas de unas fichas, por su SHA-256, para repetir el historial
+     * (ADR 0027). Una que no está en el archivo, o que hoy no se lee, falta.
+     */
+    readonly fichasDePaginas: (
+      huellas: ReadonlyArray<string>,
+    ) => Effect.Effect<FichasDeLasPaginas, ArchivoNoDisponible>;
     readonly recorrerFichas: <E, R>(
       cada: (ficha: FichaArchivada) => Effect.Effect<void, E, R>,
     ) => Effect.Effect<void, ArchivoNoDisponible | E, R>;
@@ -198,6 +206,14 @@ const mensajeDe = (causa: Cause.Cause<unknown>): string => {
   const error = Cause.squash(causa);
   return error instanceof Error ? error.message : String(error);
 };
+
+/** Un contenido del archivo, comprimido. */
+const FilaContenido = Schema.Struct({ huella: Schema.String, gzip: Schema.Uint8Array });
+
+const trozosDe = <A>(elementos: ReadonlyArray<A>, tamano: number) =>
+  Array.from({ length: Math.ceil(elementos.length / tamano) }, (_, i) =>
+    elementos.slice(i * tamano, (i + 1) * tamano),
+  );
 
 /** Un fallo de SQLite, del esquema o del disco, como archivo no disponible. */
 const noDisponible = (error: { readonly message: string }) =>
@@ -410,6 +426,32 @@ const archivoSobre = (fichero: string, sql: SqlClient.SqlClient) =>
       );
     });
 
+    const fichasDePaginas = (huellas: ReadonlyArray<string>) =>
+      Effect.gen(function* () {
+        const fichas = new Map<string, Pick<FichaLeida, "bandas" | "medidasDeExposicion">>();
+        for (const trozo of trozosDe(huellas, PAGINA)) {
+          const filas = yield* sql`SELECT huella, gzip FROM contenidos
+              WHERE huella IN ${sql.in(trozo)}`.pipe(
+            Effect.flatMap(decodificar(FilaContenido)),
+            Effect.mapError(noDisponible),
+          );
+          for (const fila of filas) {
+            const html = yield* Effect.try({
+              try: () => decodificarLatin1(new Uint8Array(NodeZlib.gunzipSync(fila.gzip))),
+              catch: () =>
+                new ArchivoNoDisponible({ motivo: `no se puede descomprimir ${fila.huella}` }),
+            });
+            const lectura = lecturaDeFicha(html);
+            if (lectura.resultado === "leida") {
+              const { bandas, medidasDeExposicion } = lectura.ficha;
+              fichas.set(fila.huella, { bandas, medidasDeExposicion });
+            }
+          }
+        }
+        const hechas: FichasDeLasPaginas = fichas;
+        return hechas;
+      }).pipe(Effect.withSpan("Archivo.fichasDePaginas"));
+
     const recorrerFichas = <E, R>(cada: (ficha: FichaArchivada) => Effect.Effect<void, E, R>) =>
       Effect.gen(function* () {
         for (let desde = 0; ;) {
@@ -449,7 +491,14 @@ const archivoSobre = (fichero: string, sql: SqlClient.SqlClient) =>
 
     return {
       paginas: ArchivoDePaginas.of({ archivar }),
-      nocturno: ArchivoNocturno.of({ fichero, resumen, empaquetar, restaurar, recorrerFichas }),
+      nocturno: ArchivoNocturno.of({
+        fichero,
+        resumen,
+        empaquetar,
+        restaurar,
+        fichasDePaginas,
+        recorrerFichas,
+      }),
     };
   });
 
@@ -466,6 +515,7 @@ const sinArchivo = (fichero: string, motivo: string) => {
       resumen: fallo,
       empaquetar: () => fallo,
       restaurar: () => fallo,
+      fichasDePaginas: () => fallo,
       recorrerFichas: () => fallo,
     }),
   };

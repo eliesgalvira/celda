@@ -3,7 +3,12 @@ import { compararTexto } from "@celda/dominio/banda";
 import { type EmplazamientoDeCapa, emplazamientoDeCapa } from "@celda/dominio/capa";
 import { Emplazamiento, type Estado } from "@celda/dominio/emplazamiento";
 import { fichaDe, type HechoDeFicha } from "@celda/dominio/ficha";
-import { conClavesEstables, llaveDeProcedencia, procedenciasDe } from "@celda/dominio/claveEstable";
+import {
+  clavesQueDesaparecen,
+  conClavesEstables,
+  llaveDeProcedencia,
+  procedenciasDe,
+} from "@celda/dominio/claveEstable";
 import { fusionar } from "@celda/dominio/fusion";
 import {
   AceptadaParaPublicar,
@@ -15,7 +20,8 @@ import {
   type BarridoAbierto,
   BaseDeBarrido,
   CambioMasivo,
-  esCambioMasivo,
+  cambioMasivoEn,
+  titularDeClave,
   type EstadoDeZona,
   ZonaEnLaEjecucion,
 } from "@celda/ingesta/barrido";
@@ -29,11 +35,13 @@ import {
 import type { FichaEnCola } from "@celda/ingesta/fichas";
 import { type FichaLeida, ListadoCrudo, Registro } from "@celda/ingesta/extractor";
 import { VERSION_DE_LECTURA } from "@celda/ingesta/registro-oficial/normalizar";
-import { conAntes, datosDeHecho, type HechoNuevo, idDeHecho } from "@celda/ingesta/hecho";
+import { conAntes, conocidoDesde, datosDeHecho, type HechoNuevo } from "@celda/ingesta/hecho";
 import {
   camposDistintos,
-  hechoDeFicha,
+  type FichasDeLasPaginas,
+  hechosDeFicha,
   leerHecho,
+  paginasDe,
   registroPublicado,
   repetirHechos,
 } from "@celda/ingesta/hechos";
@@ -123,7 +131,9 @@ export interface OpcionesBase {
  * La versión 10 trae, en `aportaciones_aceptadas`, las observaciones del emplazamiento de cada
  * una cuando se importó (`registros`, una lista de pares de fuente y clave). Si su emplazamiento
  * desaparece, como al juntarse con otro, la fusión la lleva al que tiene ahora esas
- * observaciones. Las que ya estaban toman las de su emplazamiento de hoy.
+ * observaciones. Las que ya estaban toman las de su emplazamiento de hoy. Trae también
+ * `claves_anteriores`: la clave de cada emplazamiento que desapareció al juntarse con otro, con la
+ * clave de ese otro y desde cuándo, para que los enlaces a la vieja abran la ficha del que queda.
  */
 /**
  * La parte entera por abajo de una coordenada de la observación, en SQL: `CAST` redondea hacia
@@ -134,16 +144,6 @@ const sueloDe = (eje: "longitud" | "latitud") => {
   const valor = `json_extract(datos, '$.posicion.${eje}')`;
   return `(CAST(${valor} AS INTEGER) - (${valor} < CAST(${valor} AS INTEGER)))`;
 };
-
-/**
- * La fecha más antigua que la base guarda de una observación, en SQL: la de la observación, la de
- * su ficha, la del último listado que la trajo y la de su marca de sin ficha, la menor que haya.
- */
-const masAntigua = (() => {
-  const fecha = `json_extract(datos, '$.fecha')`;
-  const otras = ["ficha_leida_en", "vista_en", `json_extract(datos, '$.sinFichaEnRegistro')`];
-  return `min(${fecha}, ${otras.map((otra) => `coalesce(${otra}, ${fecha})`).join(", ")})`;
-})();
 
 /**
  * Las observaciones del emplazamiento de una aportación aceptada, en SQL: una lista JSON de pares
@@ -284,20 +284,20 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
   [
     `CREATE TABLE hechos (
       secuencia INTEGER PRIMARY KEY,
-      id TEXT NOT NULL UNIQUE,
       fuente TEXT NOT NULL,
       clave TEXT NOT NULL,
       version INTEGER NOT NULL,
       tipo TEXT NOT NULL,
       fecha INTEGER NOT NULL,
       datos TEXT NOT NULL,
-      UNIQUE (fuente, clave, version)
+      UNIQUE (fuente, clave, version),
+      UNIQUE (fuente, clave, tipo, fecha)
     )`,
     // El punto de partida: un hecho «conocido antes» por observación, con la observación entera y
-    // la fecha más antigua que la base guarda de ella. Una retirada lo lleva en su observación.
-    `INSERT INTO hechos (id, fuente, clave, version, tipo, fecha, datos)
-      SELECT 'conocido-antes:' || fuente || ':' || clave, fuente, clave, 1, 'conocido-antes',
-        ${masAntigua},
+    // su fecha, desde la que dice lo que dice. Una retirada lo lleva en su observación.
+    `INSERT INTO hechos (fuente, clave, version, tipo, fecha, datos)
+      SELECT fuente, clave, 1, 'conocido-antes',
+        json_extract(datos, '$.fecha'),
         json_object('forma', 1, 'observacion', json(datos))
       FROM observaciones ORDER BY id`,
   ],
@@ -305,12 +305,18 @@ export const ESQUEMA: ReadonlyArray<ReadonlyArray<string>> = [
     `CREATE TABLE otros_titulares (
       clave TEXT PRIMARY KEY,
       titular TEXT NOT NULL,
+      local INTEGER NOT NULL,
       crudo TEXT NOT NULL,
       visto_desde INTEGER NOT NULL,
       vista_en INTEGER NOT NULL
     )`,
   ],
   [
+    `CREATE TABLE claves_anteriores (
+      anterior TEXT PRIMARY KEY,
+      actual TEXT NOT NULL,
+      desde INTEGER NOT NULL
+    )`,
     `ALTER TABLE aportaciones_aceptadas ADD COLUMN registros TEXT`,
     `UPDATE aportaciones_aceptadas SET registros = ${PROCEDENCIAS_DE_LA_ACEPTADA}
       WHERE emplazamiento IS NOT NULL`,
@@ -329,6 +335,9 @@ const FilaObservacion = Schema.Struct({
   /** Cuándo la trajo un listado por última vez, si se ha pedido. */
   vista_en: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
 });
+/** Una observación vigente de un cuadro, con sus ausencias. */
+const FilaVigente = Schema.Struct({ clave: Schema.String, ausencias: Schema.Int });
+
 /** Un hecho del historial tal como está en la base, para repetirlo. */
 const FilaHecho = Schema.Struct({
   fuente: Fuente,
@@ -352,6 +361,7 @@ const FilaHistorial = Schema.Struct({
   antes: Schema.NullOr(Schema.Finite),
   /** `json_extract` da 1 o 0 por `true` o `false`, y nulo si el hecho no lo lleva. */
   cambia: Schema.NullOr(Schema.Int),
+  conocidoDesde: Schema.NullOr(Schema.Finite),
 });
 
 /** Una observación con su cola de fichas, para aplicarle una ficha releída del archivo. */
@@ -602,9 +612,13 @@ export class BaseNocturna extends Context.Service<
      */
     /**
      * Repite el historial de cada observación y lo compara con lo que publica la tabla (ADR 0027).
+     * Las fichas de los hechos se leen de sus páginas, con `paginas`, que las busca en el archivo.
      * Devuelve cuántas ha comprobado y las que no coinciden, como mucho `maximo`.
      */
-    readonly comprobarHistorial: (maximo: number) => Effect.Effect<ComprobacionDelHistorial>;
+    readonly comprobarHistorial: (
+      maximo: number,
+      paginas: (huellas: ReadonlyArray<string>) => Effect.Effect<FichasDeLasPaginas>,
+    ) => Effect.Effect<ComprobacionDelHistorial>;
     readonly aplicarFichaReleida: (
       clave: string,
       leida: FichaLeida,
@@ -664,6 +678,42 @@ export const baseNocturna = (opciones: OpcionesBase) =>
       });
 
       /**
+       * Si el alta de un registro es de uno que ya estaba en el registro antes de que Celda lo
+       * reconociera, desde cuándo se sabe (ADR 0027):
+       *
+       * - si ya salía en el listado como de otro titular, desde la primera vez que salió;
+       * - si ninguna noche anterior ha visto un registro de su razón social, desde esta noche: es
+       *   un titular que Celda empieza a reconocer, como `RETEVISION MOVIL` o cualquiera en la
+       *   primera noche de una base nueva, y no una estación base que acaba de aparecer.
+       *
+       * Si no, es un alta de verdad.
+       */
+      const titularesVistos = new Map<string, boolean>();
+      const conocidoDesdeDe = Effect.fn("BaseNocturna.conocidoDesde")(function* (
+        fuente: Fuente,
+        clave: string,
+        fecha: number,
+      ) {
+        const [otro] = yield* decodificar(Maximo)(
+          yield* sql`SELECT visto_desde AS v FROM otros_titulares WHERE clave = ${clave}`,
+        );
+        if (otro?.v !== undefined && otro.v !== null && otro.v < fecha) return otro.v;
+        const titular = titularDeClave(clave);
+        const llave = `${fecha}\u0000${fuente}\u0000${titular}`;
+        let visto = titularesVistos.get(llave);
+        if (visto === undefined) {
+          const prefijo = `${titular} - `;
+          const [fila] = yield* sql<{ readonly n: number }>`SELECT count(*) AS n FROM (
+              SELECT 1 FROM hechos WHERE fuente = ${fuente}
+                AND clave >= ${prefijo} AND clave < ${`${prefijo}\uffff`} AND fecha < ${fecha}
+              LIMIT 1)`;
+          visto = (fila?.n ?? 0) > 0;
+          titularesVistos.set(llave, visto);
+        }
+        return visto ? undefined : fecha;
+      });
+
+      /**
        * Añade un hecho al historial de un registro, con la fecha de la ejecución que lo ve (ADR
        * 0027). Va dentro de la transacción de quien guarda la observación. Su versión es la
        * siguiente del registro, y un hecho con el mismo `id` ya escrito no se repite.
@@ -674,11 +724,11 @@ export const baseNocturna = (opciones: OpcionesBase) =>
         fecha: number,
         hecho: HechoNuevo,
       ) {
-        yield* sql`INSERT INTO hechos (id, fuente, clave, version, tipo, fecha, datos)
-          SELECT ${idDeHecho(hecho.tipo, fecha, fuente, clave)}, ${fuente}, ${clave},
-            coalesce(max(version), 0) + 1, ${hecho.tipo}, ${fecha}, ${datosDeHecho(hecho)}
+        yield* sql`INSERT INTO hechos (fuente, clave, version, tipo, fecha, datos)
+          SELECT ${fuente}, ${clave}, coalesce(max(version), 0) + 1, ${hecho.tipo}, ${fecha},
+            ${datosDeHecho(hecho)}
           FROM hechos WHERE fuente = ${fuente} AND clave = ${clave}
-          ON CONFLICT (id) DO NOTHING`;
+          ON CONFLICT (fuente, clave, tipo, fecha) DO NOTHING`;
       });
 
       /**
@@ -860,10 +910,14 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               let creados = 0;
               let cambiados = 0;
               if (fila === undefined) return { creados, cambiados };
-              // Las vigentes del cuadro antes de guardarlo, para ver si cambia de golpe.
-              const vigentes = yield* sql<{ readonly clave: string }>`SELECT clave
-                  FROM observaciones WHERE fuente = ${fila.fuente} AND cuadro = ${cuadro}
-                    AND retirada_en IS NULL`;
+              // Las vigentes del cuadro antes de guardarlo, con sus ausencias, para ver si cambia
+              // de golpe.
+              const vigentes = yield* decodificar(FilaVigente)(
+                yield* sql`SELECT clave, json_extract(datos, '$.ausencias') AS ausencias
+                    FROM observaciones WHERE fuente = ${fila.fuente} AND cuadro = ${cuadro}
+                      AND retirada_en IS NULL`,
+              );
+              const cambiadas: Array<string> = [];
               // La última vez que se pidió este cuadro: un registro nuevo no estaba entonces.
               const [anterior] = yield* decodificar(Maximo)(
                 yield* sql`SELECT max(b.inicio) AS v FROM cuadros_barridos cb
@@ -876,7 +930,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 const previas = yield* observacionesDe(fila.fuente, claves);
                 for (const registro of lote) {
                   const previa = previas.get(registro.clave);
-                  const { guardar, cuenta, hecho } = trasListado(
+                  const { guardar, cuenta, cambia, hecho } = trasListado(
                     previa?.datos,
                     registro,
                     fila.fuente,
@@ -885,9 +939,19 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                   if (guardar !== undefined) {
                     yield* guardarObservacion(previa?.id, guardar, cuenta !== undefined);
                   }
+                  if (cambia) cambiadas.push(registro.clave);
                   if (hecho !== undefined) {
                     const antes = hecho.tipo === "alta" ? anterior?.v : previa?.vista_en;
-                    yield* apuntarHecho(fila.fuente, registro.clave, fecha, conAntes(hecho, antes));
+                    const desde =
+                      hecho.tipo === "alta"
+                        ? yield* conocidoDesdeDe(fila.fuente, registro.clave, fecha)
+                        : undefined;
+                    yield* apuntarHecho(
+                      fila.fuente,
+                      registro.clave,
+                      fecha,
+                      conocidoDesde(conAntes(hecho, antes), desde),
+                    );
                   }
                   creados += cuenta === "creada" ? 1 : 0;
                   cambiados += cuenta === "cambiada" ? 1 : 0;
@@ -895,27 +959,34 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 yield* sql`UPDATE observaciones SET vista_en = ${fecha}
                     WHERE fuente = ${fila.fuente} AND clave IN ${sql.in(claves)}`;
               }
-              for (const { titular, crudo } of recorrido.otros ?? []) {
+              for (const { titular, local, crudo } of recorrido.otros ?? []) {
                 yield* sql`INSERT INTO otros_titulares ${sql.insert({
                   clave: crudo.id,
                   titular,
+                  local: local ? 1 : 0,
                   crudo: yield* codificarCrudo(crudo),
                   visto_desde: fecha,
                   vista_en: fecha,
                 })} ON CONFLICT (clave) DO UPDATE SET crudo = excluded.crudo,
                     titular = excluded.titular, vista_en = excluded.vista_en`;
               }
-              // Un cambio masivo deshace la transacción: el cuadro se queda como estaba.
+              // Un cambio masivo deshace la transacción: el cuadro se queda como estaba. Cuentan
+              // los cambios de lo que se enseña y las vigentes que faltan por primera vez. Las
+              // altas no cuentan, porque no retiran nada, ni las que vuelven tras retirarse. Las
+              // que ya faltaban tampoco: pasaron el límite la noche que faltaron.
               const enElListado = new Set(recorrido.registros.map((r) => r.clave));
-              const faltan = vigentes.filter((v) => !enElListado.has(v.clave)).length;
-              // Las altas no cuentan: añaden estaciones y no retiran ninguna, como las de un
-              // titular que Celda empieza a reconocer.
-              const cambios = cambiados + faltan;
-              if (esCambioMasivo(cambios, vigentes.length, limite)) {
+              const faltan = vigentes
+                .filter((v) => v.ausencias === 0 && !enElListado.has(v.clave))
+                .map((v) => v.clave);
+              const masivo = cambioMasivoEn(
+                vigentes.map((v) => v.clave),
+                [...cambiadas, ...faltan],
+                limite,
+              );
+              if (masivo !== undefined) {
                 return yield* new CambioMasivo({
+                  ...masivo,
                   donde: `cuadro ${cuadro}`,
-                  cambios,
-                  vigentes: vigentes.length,
                   desconocidos: recorrido.avisos.filter((a) => a.startsWith("Titular desconocido"))
                     .length,
                 });
@@ -958,21 +1029,25 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                             AND cuadro IN ${sql.in(fila.cuadros)}
                             AND (vista_en IS NULL OR vista_en < ${fila.inicio})`,
                     );
-              const [vigentes] =
+              const vigentes =
                 fila.cuadros.length === 0
                   ? []
-                  : yield* decodificar(Cuenta)(
-                      yield* sql`SELECT count(*) AS n FROM observaciones
-                          WHERE fuente = ${fila.fuente} AND retirada_en IS NULL
-                            AND cuadro IN ${sql.in(fila.cuadros)}`,
-                    );
-              if (esCambioMasivo(ausentes.length, vigentes?.n ?? 0, limite)) {
+                  : yield* sql<{ readonly clave: string }>`SELECT clave FROM observaciones
+                      WHERE fuente = ${fila.fuente} AND retirada_en IS NULL
+                        AND cuadro IN ${sql.in(fila.cuadros)}`;
+              // Solo cuentan las que faltan por primera vez: las que ya faltaban pasaron el límite
+              // la noche que faltaron, o con el límite subido.
+              const masivo = cambioMasivoEn(
+                vigentes.map((v) => v.clave),
+                ausentes.filter((a) => a.datos.ausencias === 0).map((a) => a.datos.clave),
+                limite,
+              );
+              if (masivo !== undefined) {
                 const [zona] = yield* sql<{ readonly zona: string }>`SELECT zona FROM barridos
                     WHERE id = ${fila.id}`;
                 return yield* new CambioMasivo({
+                  ...masivo,
                   donde: `zona ${zona?.zona ?? fila.id}`,
-                  cambios: ausentes.length,
-                  vigentes: vigentes?.n ?? 0,
                   desconocidos: 0,
                 });
               }
@@ -1073,10 +1148,13 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                   procedenciasDe(e).map((p) => [llaveDeProcedencia(p), e.clave] as const),
                 ),
               );
-              for (const { id, registros } of huerfanas) {
-                const destino = registros
-                  .map(([fuente, clave]) => ahora.get(`${fuente}\u0000${clave}`))
-                  .find((clave) => clave !== undefined);
+              for (const { id, emplazamiento, registros } of huerfanas) {
+                const [alias] = yield* sql<{ readonly actual: string }>`SELECT actual
+                    FROM claves_anteriores WHERE anterior = ${emplazamiento}`;
+                const destino =
+                  registros
+                    .map(([fuente, clave]) => ahora.get(`${fuente}\u0000${clave}`))
+                    .find((clave) => clave !== undefined) ?? alias?.actual;
                 if (destino !== undefined) {
                   yield* sql`UPDATE aportaciones_aceptadas SET emplazamiento = ${destino}
                       WHERE id = ${id}`;
@@ -1113,11 +1191,8 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                   fila.emplazamiento,
                 ]),
               );
-              const nuevos = conClavesEstables(
-                fusionar(vigentes),
-                anterior,
-                new Set(anterior.values()),
-              );
+              const nuevos = conClavesEstables(fusionar(vigentes), anterior);
+              const desaparecen = clavesQueDesaparecen(nuevos, anterior);
               anterior.clear();
               vigentes.length = 0;
               // Los guardados en su JSON: casi todos salen iguales al codificar el nuevo, y solo
@@ -1157,6 +1232,20 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 if (previo === undefined) cuentas.creados++;
                 else cuentas.cambiados++;
               }
+              // Las claves que desaparecen llevan al emplazamiento que tiene sus observaciones, y las
+              // que llevaban a ellas, también. Una que vuelve a tener emplazamiento deja de llevar
+              // a otro.
+              for (const [vieja, nueva] of desaparecen) {
+                yield* sql`INSERT INTO claves_anteriores ${sql.insert({
+                  anterior: vieja,
+                  actual: nueva,
+                  desde: fecha,
+                })} ON CONFLICT (anterior) DO UPDATE SET actual = excluded.actual,
+                    desde = excluded.desde`;
+                yield* sql`UPDATE claves_anteriores SET actual = ${nueva} WHERE actual = ${vieja}`;
+              }
+              yield* sql`DELETE FROM claves_anteriores
+                  WHERE anterior IN (SELECT clave FROM emplazamientos)`;
               yield* llevarAceptadas(nuevos, claves);
               return cuentas;
             }),
@@ -1197,18 +1286,13 @@ export const baseNocturna = (opciones: OpcionesBase) =>
       ) {
         const filas = yield* decodificar(FilaHistorial)(
           yield* sql`SELECT tipo, fecha, json_extract(datos, '$.antes') AS antes,
-              json_extract(datos, '$.cambia') AS cambia
+              json_extract(datos, '$.cambia') AS cambia,
+              json_extract(datos, '$.conocidoDesde') AS conocidoDesde
             FROM hechos WHERE fuente = ${fuente} AND clave = ${clave} ORDER BY version`,
         );
-        return filas.flatMap((fila): ReadonlyArray<HechoDeFicha> => {
-          const tipo = hechoDeFicha(fila.tipo, fila.cambia === null ? null : fila.cambia === 1);
-          if (tipo === undefined) return [];
-          return [
-            fila.antes === null
-              ? { tipo, fecha: fila.fecha }
-              : { tipo, fecha: fila.fecha, antes: fila.antes },
-          ];
-        });
+        return filas.flatMap((fila): ReadonlyArray<HechoDeFicha> =>
+          hechosDeFicha({ ...fila, cambia: fila.cambia === null ? null : fila.cambia === 1 }),
+        );
       });
 
       const fichaDeClave = Effect.fn("BaseNocturna.ficha")(function* (clave: string) {
@@ -1222,9 +1306,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               Effect.gen(function* () {
                 const encontradas = [...(yield* observacionesDe(fuente, [claveFuente])).values()];
                 const historial = yield* historialDe(fuente, claveFuente);
-                return encontradas.map(({ datos }) =>
-                  historial.length === 0 ? datos : { ...datos, historial },
-                );
+                return encontradas.map(({ datos }) => ({ ...datos, historial }));
               }),
             ),
             (encontradas) => ({ estacion, observaciones: encontradas.flat() }),
@@ -1291,6 +1373,11 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           Effect.map(Effect.forEach(claves, fichaDeClave), (fichas) => fichas.flat()).pipe(
             Effect.mapError(noDisponible),
           ),
+        clavesAnteriores: Effect.map(
+          sql<{ readonly anterior: string; readonly actual: string }>`SELECT anterior, actual
+            FROM claves_anteriores`,
+          (filas) => new Map(filas.map((f) => [f.anterior, f.actual])),
+        ).pipe(Effect.mapError(noDisponible)),
         registrar: (publicada) =>
           sql
             .withTransaction(
@@ -1421,8 +1508,15 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                   })} ON CONFLICT (id) DO NOTHING RETURNING id`;
                 nuevas += filas.length;
               }
-              // Con las observaciones de su emplazamiento de hoy, por si su clave desaparece.
+              // Una aceptada con la clave de un emplazamiento que ya se juntó con otro va a ese
+              // otro, y todas, con las observaciones de su emplazamiento de hoy, por si su clave
+              // desaparece.
               if (aceptadas.length > 0) {
+                yield* sql`UPDATE aportaciones_aceptadas SET emplazamiento = (
+                      SELECT actual FROM claves_anteriores WHERE anterior = emplazamiento)
+                    WHERE id IN ${sql.in(aceptadas.map((a) => a.id))}
+                      AND emplazamiento NOT IN (SELECT clave FROM emplazamientos)
+                      AND emplazamiento IN (SELECT anterior FROM claves_anteriores)`;
                 yield* sql`UPDATE aportaciones_aceptadas
                     SET registros = ${sql.literal(PROCEDENCIAS_DE_LA_ACEPTADA)}
                     WHERE registros IS NULL AND emplazamiento IS NOT NULL
@@ -1433,7 +1527,10 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           );
         }, Effect.orDie),
 
-        comprobarHistorial: Effect.fn("BaseNocturna.comprobarHistorial")(function* (maximo) {
+        comprobarHistorial: Effect.fn("BaseNocturna.comprobarHistorial")(function* (
+          maximo,
+          paginas,
+        ) {
           let comprobadas = 0;
           let distintas = 0;
           const primeras: Array<{ readonly clave: string; readonly motivo: string }> = [];
@@ -1459,15 +1556,28 @@ export const baseNocturna = (opciones: OpcionesBase) =>
               const llave = `${fila.fuente}\u0000${fila.clave}`;
               porClave.set(llave, [...(porClave.get(llave) ?? []), fila]);
             }
+            const leidosPorClave = new Map(
+              [...porClave].map(([llave, suyas]) => [
+                llave,
+                Result.all(suyas.map((h) => leerHecho(h.tipo, h.fecha, h.datos))),
+              ]),
+            );
+            const fichas = yield* paginas([
+              ...new Set(
+                [...leidosPorClave.values()].flatMap((leidos) =>
+                  Result.isSuccess(leidos) ? paginasDe(leidos.success) : [],
+                ),
+              ),
+            ]);
             for (const { datos } of pagina) {
               comprobadas++;
-              const suyas = porClave.get(`${datos.fuente}\u0000${datos.clave}`) ?? [];
-              const leidos = Result.all(suyas.map((h) => leerHecho(h.tipo, h.fecha, h.datos)));
+              const leidos =
+                leidosPorClave.get(`${datos.fuente}\u0000${datos.clave}`) ?? Result.succeed([]);
               if (Result.isFailure(leidos)) {
                 apuntar(datos.clave, leidos.failure);
                 continue;
               }
-              const repetido = repetirHechos(datos.fuente, leidos.success);
+              const repetido = repetirHechos(datos.fuente, leidos.success, fichas);
               if (Result.isFailure(repetido)) {
                 apuntar(datos.clave, repetido.failure);
                 continue;

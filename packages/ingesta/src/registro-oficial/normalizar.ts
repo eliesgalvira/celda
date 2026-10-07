@@ -102,7 +102,12 @@ export const TOPE_LISTADO = 1000;
 
 export type Lectura =
   | { readonly tipo: "registro"; readonly registro: Registro }
-  | { readonly tipo: "otro-titular"; readonly titular: string; readonly crudo: ListadoCrudo }
+  | {
+      readonly tipo: "otro-titular";
+      readonly titular: string;
+      readonly local: boolean;
+      readonly crudo: ListadoCrudo;
+    }
   | { readonly tipo: "aviso"; readonly aviso: string };
 
 /** Lo que escribe el registro de un elemento del listado, sin limpiar (ADR 0027). */
@@ -123,9 +128,7 @@ export const registroDeCrudo = (crudo: ListadoCrudo): Lectura => {
   const titular = separador > 0 ? crudo.id.slice(0, separador) : crudo.id;
   const compania = companiaDeTitular(titular);
   if (compania === undefined) {
-    return esOtroTitular(titular)
-      ? { tipo: "otro-titular", titular, crudo }
-      : { tipo: "aviso", aviso: `Titular desconocido: ${crudo.id}` };
+    return { tipo: "otro-titular", titular, local: esOtroTitular(titular), crudo };
   }
   const direccion = repararTexto(crudo.direccion);
   const codigo = crudo.gisId.trim();
@@ -165,8 +168,9 @@ export const listadoDeElementos = (elementos: ReadonlyArray<unknown>): Listado =
     } else if (lectura.value.tipo === "aviso") {
       avisos.push(lectura.value.aviso);
     } else if (lectura.value.tipo === "otro-titular") {
-      const { titular, crudo } = lectura.value;
-      if (!otros.has(crudo.id)) otros.set(crudo.id, { titular, crudo });
+      const { titular, local, crudo } = lectura.value;
+      if (!local) avisos.push(`Titular desconocido: ${crudo.id}`);
+      if (!otros.has(crudo.id)) otros.set(crudo.id, { titular, local, crudo });
     } else if (!registros.has(lectura.value.registro.clave)) {
       registros.set(lectura.value.registro.clave, lectura.value.registro);
     }
@@ -233,6 +237,41 @@ export const bandaDeFila = (fila: FilaFicha): Result.Result<Banda, string> => {
 };
 
 /**
+ * Una banda guardada con la limpieza de hoy: la que daría su fila si se leyera ahora. Sirve para
+ * comparar la primera lectura en crudo de una ficha con lo que se guardó antes de tenerla, sin
+ * que un arreglo de la lectura parezca un cambio del registro (ADR 0027).
+ */
+export const bandaAlDia = (banda: Banda): Banda => {
+  const rangos = banda.rangos.map((r) => rangoEnMhz(r.desdeMhz, r.hastaMhz));
+  const referencia = repararTexto(banda.referencia);
+  return {
+    referencia,
+    compania: banda.compania,
+    rangos,
+    mhz: mhzDeRangos(rangos),
+    anio: anioDeReferencia(referencia),
+  };
+};
+
+/**
+ * Un registro guardado con la limpieza de hoy, para comparar el primer listado en crudo con lo
+ * que se guardó antes de tenerlo: la dirección y el municipio limpios otra vez y la compañía de su
+ * razón social, si hoy se reconoce.
+ */
+export const registroAlDia = (registro: Registro): Registro => {
+  const separador = registro.clave.lastIndexOf(" - ");
+  const titular = separador > 0 ? registro.clave.slice(0, separador) : registro.clave;
+  const direccion = repararTexto(registro.direccion);
+  return {
+    ...registro,
+    compania: companiaDeTitular(titular) ?? registro.compania,
+    codigo: registro.codigo.trim(),
+    direccion,
+    municipio: municipioDeDireccion(direccion),
+  };
+};
+
+/**
  * Las bandas de todas las filas, o el motivo de la primera que no se puede leer. Las de otros
  * titulares, que no son compañías de Celda, se dejan fuera.
  */
@@ -286,8 +325,10 @@ export const medidasDeFilas = (
  *
  * 1. Las bandas.
  * 2. Las medidas de exposición del ministerio (#73).
+ * 3. La banda de 26 GHz escrita en GHz se lee en MHz, las bandas de las licencias locales de
+ *    2,6 GHz se dejan fuera y la ficha guarda la huella de sus tablas en crudo (ADR 0027).
  */
-export const VERSION_DE_LECTURA = 2;
+export const VERSION_DE_LECTURA = 3;
 
 /**
  * Las bandas y las medidas de exposición de las tablas de una ficha tal como las escribe el

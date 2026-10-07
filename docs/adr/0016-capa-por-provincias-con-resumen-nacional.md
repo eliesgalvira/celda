@@ -115,6 +115,10 @@ La estación base de la ficha lleva las medidas de exposición del ministerio qu
 
 Cuánto pesan, estimado con el listado de Barcelona del 28/09/2026 (1.294 emplazamientos de la provincia en 11 lotes), las bandas de Campus Nord y medidas al azar con el reparto de las de Campus Nord (de 1 a 9 por ficha, unas 4,2 de media, y los valores en pasos de 0,01 V/m): los lotes pasan de 142 KB a 237 KB con gzip, unos 73 bytes más por emplazamiento. Para toda España son unos 2,6 MB más con gzip sobre unos 4 MB. Un lote de 128 pasa de unos 13 KB a unos 21 KB con gzip y deja de caber en la ventana inicial de TCP, que es por lo que `EMPLAZAMIENTOS_POR_LOTE` vale 128: abrir una ficha puede costar un viaje más. Cuando se decida cómo las enseña el panel, se puede revisar el tamaño del lote o sacar las medidas a un fichero aparte. Escribir cada medida como un trío de números en lugar de un objeto ahorraría una quinta parte de eso con gzip, y casi nada con brotli; se quedan como objetos, como las bandas.
 
+## Formato 6: historial y claves anteriores (07/10/2026)
+
+Cada origen del registro oficial en la ficha lleva su historial (`historial`, ADR 0027), y cada parte del índice de claves lleva las claves de los emplazamientos que se juntaron con otro, con la clave de hoy y su provincia (`anteriores`, ADR 0012). Hasta el lanzamiento no hay webs de antes que mantener, así que el formato sube a 6 en lugar de añadir claves opcionales. La web solo lee el 6. El build de Vercel no monta las versiones anteriores de otro formato, y una vigente del 5 se vuelve a publicar entera en el 6.
+
 ## Consecuencias
 
 - Abrir la web descarga el resumen (de 2 a 4 KB con gzip, según cuántas zonas lleve) y las provincias de la vista inicial, no toda España.

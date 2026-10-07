@@ -38,6 +38,7 @@ import { configuracion } from "./configuracion.ts";
 import { credencialesDeSystemd } from "./credenciales.ts";
 import {
   carpetaDelArchivo,
+  comprobarNoche,
   copiarBase,
   estado,
   Extractores,
@@ -208,7 +209,7 @@ const principal = Effect.gen(function* () {
   const efecto = Effect.gen(function* () {
     switch (orden) {
       case "noche":
-        yield* noche(c.noche);
+        yield* comprobarNoche(yield* noche(c.noche));
         return;
       case "estado":
         yield* estado(c.noche.proceso);
@@ -231,7 +232,20 @@ const principal = Effect.gen(function* () {
       }
       case "comprobar-historial": {
         const base = yield* BaseNocturna;
-        const comprobacion = yield* base.comprobarHistorial(20);
+        const archivo = yield* ArchivoNocturno;
+        // Sin el archivo, las fichas de los hechos no se pueden releer y salen como distintas.
+        const comprobacion = yield* base.comprobarHistorial(20, (huellas) =>
+          archivo
+            .fichasDePaginas(huellas)
+            .pipe(
+              Effect.catch((error) =>
+                Effect.as(
+                  Effect.logWarning(`El archivo de páginas no responde: ${error.motivo}`),
+                  new Map(),
+                ),
+              ),
+            ),
+        );
         yield* Console.log(
           [
             `Registros comprobados: ${comprobacion.comprobadas}, distintos: ${comprobacion.distintas}`,

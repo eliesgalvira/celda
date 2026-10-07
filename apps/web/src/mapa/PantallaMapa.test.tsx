@@ -159,10 +159,12 @@ describe("capa de emplazamientos en el mapa", () => {
   });
 });
 
-describe("enlace a una ficha sin provincia", () => {
+describe("enlace a una ficha sin provincia o con una clave de antes", () => {
   const servicios = (fichas = fichasDePrueba()) =>
     Layer.mergeAll(
-      capaDePrueba([Effect.succeed(CAPA)]),
+      capaDePrueba([Effect.succeed(CAPA)], {
+        anteriores: new Map([["orange-juntado", "movistar-0802532"]]),
+      }),
       fichas.capa,
       simuladorDePrueba,
       ubicacionDePrueba().capa,
@@ -196,5 +198,20 @@ describe("enlace a una ficha sin provincia", () => {
     fichas.responder("movistar-nadie", "no-existe");
     await findByText("Este emplazamiento no existe");
     assert.strictEqual(window.location.search, "?emplazamiento=movistar-nadie");
+  });
+
+  it("la de un emplazamiento que se juntó con otro pasa a la de ese otro cuando llega su provincia", async () => {
+    navegar("/?emplazamiento=orange-juntado&provincia=08&medir", { reemplazar: true });
+    const fichas = fichasDePrueba();
+    render(() => <App servicios={servicios(fichas)} />);
+    flush();
+    await waitFor(() => {
+      flush();
+      assert.strictEqual(
+        window.location.search,
+        "?emplazamiento=movistar-0802532&provincia=08&medir",
+      );
+    });
+    assert.include(fichas.abiertas(), "movistar-0802532");
   });
 });

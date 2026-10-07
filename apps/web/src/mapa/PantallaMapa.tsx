@@ -113,7 +113,7 @@ import {
   conMedir,
   aportacionesAbiertas,
   conAportaciones,
-  conProvincia,
+  conEmplazamiento,
   ejercicioDe,
   emplazamientoDe,
   medirAbierto,
@@ -612,13 +612,20 @@ export function PantallaMapa() {
     esperar: esperarDeVerdad,
   });
 
-  // Un enlace sin provincia: se busca en el índice de claves del resumen y, si está, la dirección
-  // pasa a llevarla y se pide su provincia. Si no está, la ficha dice que no existe.
+  // Un enlace sin provincia, o uno cuya provincia ya ha llegado sin su clave: se busca en el índice
+  // de claves del resumen. Si está, la dirección pasa a llevar su provincia y la clave de hoy, que
+  // es otra si el emplazamiento se juntó con otro, y se pide su provincia. Si no está, la ficha
+  // dice que no existe.
   recurso(
     "capa:clave",
     () => {
       const clave = seleccionada();
-      return clave !== null && provinciaSeleccionada() === null && resumen() !== undefined
+      if (clave === null || resumen() === undefined) return undefined;
+      const codigo = provinciaSeleccionada();
+      if (codigo === null) return clave;
+      const suya = provincias().get(codigo);
+      return suya?.tipo === "lista" &&
+        !suya.provincia.capa.emplazamientos.some((e) => e.clave === clave)
         ? clave
         : undefined;
     },
@@ -626,15 +633,16 @@ export function PantallaMapa() {
       const parar = new AbortController();
       void datos
         .runPromiseExit(
-          Effect.flatMap(CapaEmplazamientos, (servicio) => servicio.provinciaDeClave(clave)),
+          Effect.flatMap(CapaEmplazamientos, (servicio) => servicio.situarClave(clave)),
           { signal: parar.signal },
         )
         .then((salida) => {
           if (parar.signal.aborted || !Exit.isSuccess(salida)) return;
-          const provincia = Option.getOrUndefined(salida.value);
-          if (provincia === undefined || emplazamientoDe(ubicacion()) !== clave) return;
-          pedirProvincias([provincia]);
-          navegar(conProvincia(ubicacion(), provincia), { reemplazar: true });
+          const situado = Option.getOrUndefined(salida.value);
+          if (situado === undefined || emplazamientoDe(ubicacion()) !== clave) return;
+          if (situado.clave === clave && situado.provincia === provinciaDe(ubicacion())) return;
+          pedirProvincias([situado.provincia]);
+          navegar(conEmplazamiento(ubicacion(), situado), { reemplazar: true });
         });
       return () => parar.abort();
     },

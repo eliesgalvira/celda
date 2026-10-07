@@ -68,11 +68,12 @@ const conFichas = <A, E>(
   capa: Effect.Effect<CapaDePrueba, CapaNoDescargada>,
   origen: OrigenDePrueba,
   prueba: (fichas: FichasPublicadas["Service"]) => Effect.Effect<A, E>,
+  anteriores: ReadonlyMap<string, string> = new Map(),
 ) =>
   Effect.flatMap(FichasPublicadas, prueba).pipe(
     Effect.provide(
       fichasDelOrigen.pipe(
-        Layer.provide(capaDePrueba([capa])),
+        Layer.provide(capaDePrueba([capa], { anteriores })),
         Layer.provide(origen.capa),
         Layer.provide(
           ConfigProvider.layer(ConfigProvider.fromUnknown({ VITE_CAPAS_ORIGEN: ORIGEN })),
@@ -145,6 +146,24 @@ describe("fichas publicadas en el origen estático", () => {
         assert.deepStrictEqual(yield* Fiber.join(lecturas), [Option.some(a), Option.some(b)]);
         assert.lengthOf(origen.pedidas(), 1);
       }),
+    );
+  });
+
+  it.effect("la clave de un emplazamiento que se juntó con otro abre la ficha de ese otro", () => {
+    const origen = origenDePrueba();
+    const [a] = FICHAS;
+    const clave = a?.clave ?? "";
+    return conFichas(
+      Effect.succeed(HOY.capa),
+      origen,
+      (fichas) =>
+        Effect.gen(function* () {
+          const lectura = yield* Effect.forkChild(fichas.leer(pedida("vodafone-juntado")));
+          yield* contestar(origen, HOY.urlDe(clave), 200, HOY.cuerpoDe(clave));
+          assert.deepStrictEqual(yield* Fiber.join(lectura), Option.some(a));
+          assert.deepStrictEqual(origen.pedidas(), [HOY.urlDe(clave)]);
+        }),
+      new Map([["vodafone-juntado", clave]]),
     );
   });
 

@@ -25,6 +25,7 @@ import {
   type FuentesDeZonas,
   generarCapaDeProvincia,
   generarIndiceDeClaves,
+  PARTES_DEL_INDICE,
   generarLoteDeProvincia,
   generarManifiesto,
   generarResumen,
@@ -131,6 +132,12 @@ export class DatosPublicables extends Context.Service<
      * último barrido completo (ADR 0014): hasta dónde llegan los datos.
      */
     readonly cobertura: Effect.Effect<ReadonlyArray<ZonaBarrida>, DatosNoDisponibles>;
+    /**
+     * Las claves de emplazamientos que desaparecieron al juntarse con otro, con la clave del que
+     * los sustituye (ADR 0027). El índice de claves las publica para que sus enlaces sigan
+     * abriendo una ficha.
+     */
+    readonly clavesAnteriores: Effect.Effect<ReadonlyMap<string, string>, DatosNoDisponibles>;
     /** Apunta una versión publicada. Registrar otra vez la misma no la duplica. */
     readonly registrar: (publicada: VersionPublicada) => Effect.Effect<void, DatosNoDisponibles>;
   }
@@ -318,7 +325,7 @@ const fuentesDe = (zonas: ZonasDePublicacion): FuentesDeZonas => ({
 });
 
 /**
- * Publica la instantánea actual en el formato 5 (ADR 0016): el resumen nacional, una capa por
+ * Publica la instantánea actual en el formato 6 (ADR 0016): el resumen nacional, una capa por
  * provincia y las fichas en lotes dentro de cada provincia, y después `vigente.json` apuntando al
  * resumen.
  *
@@ -436,12 +443,15 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
       return { provincia, publicado: yield* ficheroPublicado(fichero, contenido) };
     }),
   );
-  const indice = yield* Effect.forEach(generarIndiceDeClaves(situados), (contenido) =>
-    Effect.gen(function* () {
-      const fichero = ficheroDeIndiceDeClaves(yield* huellaDe(contenido));
-      yield* guardarSiFalta(fichero, contenido);
-      return yield* ficheroPublicado(fichero, contenido);
-    }),
+  const anteriores = yield* datos.clavesAnteriores;
+  const indice = yield* Effect.forEach(
+    generarIndiceDeClaves(situados, PARTES_DEL_INDICE, anteriores),
+    (contenido) =>
+      Effect.gen(function* () {
+        const fichero = ficheroDeIndiceDeClaves(yield* huellaDe(contenido));
+        yield* guardarSiFalta(fichero, contenido);
+        return yield* ficheroPublicado(fichero, contenido);
+      }),
   );
   yield* comprobarVersion;
 
@@ -535,7 +545,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
 /**
  * Con `vigente.json` ya en la versión de los datos, rehace su resumen con la cobertura de ahora,
  * sin leer la instantánea. Si sale el mismo, no escribe nada; si no, escribe el nuevo resumen y
- * `vigente.json`. `undefined` si la vigente no tiene un resumen legible del formato 5, o si es
+ * `vigente.json`. `undefined` si la vigente no tiene un resumen legible del formato 6, o si es
  * de antes de las combinaciones de compañías (ADR 0026): entonces hay que publicarla entera. Las
  * capas y los lotes salen iguales y no se vuelven a escribir; cambian el resumen y `vigente.json`.
  */

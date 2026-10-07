@@ -23,8 +23,13 @@ import {
   releerArchivo,
   restaurarArchivo,
 } from "./archivo.ts";
-import { BaseNocturna } from "./base.ts";
-import { conBase, conEntorno, type Entorno, unaNoche } from "./pruebas/entorno.ts";
+import {
+  comprobarHistorial,
+  conBase,
+  conEntorno,
+  type Entorno,
+  unaNoche,
+} from "./pruebas/entorno.ts";
 import { fichasGrabadas, geoportal, latin1 } from "./pruebas/geoportal.ts";
 
 const NOCHE = Date.UTC(2026, 9, 7, 2, 15);
@@ -411,10 +416,7 @@ describe("archivo de páginas del registro (ADR 0027)", () => {
           assert.strictEqual(otraVez.aplicadas["al-dia"], 39);
           assert.strictEqual(otraVez.aplicadas.aplicada, 0);
           // Lo aplicado va también al historial de cada registro (ADR 0027).
-          const comprobacion = yield* conBase(
-            entorno.base,
-            Effect.flatMap(BaseNocturna, (base) => base.comprobarHistorial(5)),
-          );
+          const comprobacion = yield* comprobarHistorial(entorno);
           assert.deepStrictEqual(comprobacion.primeras, []);
         }),
       ),

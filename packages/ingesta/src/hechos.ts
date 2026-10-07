@@ -1,13 +1,14 @@
 import { Coordenada } from "@celda/dominio/area";
+import type { HechoDeFicha } from "@celda/dominio/ficha";
 import { Banda } from "@celda/dominio/banda";
 import { MedidaDeExposicion } from "@celda/dominio/exposicion";
 import { Observacion } from "@celda/dominio/observacion";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import { FichaCruda, ListadoCrudo, Registro } from "./extractor.ts";
-import { alDia, ObservacionGuardada, observacionDe, sinCrudo, sinFichaCruda } from "./guardado.ts";
-import { fichaDeCruda, registroDeCrudo } from "./registro-oficial/normalizar.ts";
+import { type FichaLeida, ListadoCrudo, Registro } from "./extractor.ts";
+import { alDia, ObservacionGuardada, observacionDe, sinCrudo } from "./guardado.ts";
+import { registroDeCrudo } from "./registro-oficial/normalizar.ts";
 
 /**
  * El historial de cada registro (ADR 0027, fase 2): los hechos que la ingesta ve de cada registro
@@ -18,14 +19,16 @@ import { fichaDeCruda, registroDeCrudo } from "./registro-oficial/normalizar.ts"
  * Tipos:
  *
  * - `conocido-antes`: el punto de partida. La observación que la base ya tenía al empezar el
- *   historial, con la fecha más antigua que guardaba de ella. Lo que dice ya estaba en el registro
- *   en esa fecha, y quizá mucho antes: no es una fecha de alta.
- * - `alta`: el listado trae un registro que la base no tenía.
+ *   historial, con su fecha: desde cuándo dice lo que dice. Ya estaba en el registro en esa fecha,
+ *   y quizá mucho antes: no es una fecha de alta.
+ * - `alta`: el listado trae un registro que la base no tenía. Con `conocidoDesde`, el registro ya
+ *   lo tenía y es Celda la que empieza a reconocer su titular.
  * - `listado`: el listado trae otra cosa de un registro, o Celda guarda por primera vez lo que
  *   escribió. `cambia` dice si cambia lo que Celda enseña.
  * - `vuelta`: el listado vuelve a traer un registro retirado.
  * - `ficha`: la ficha dice otra cosa, Celda guarda por primera vez lo que escribió o vuelve a
- *   tenerla tras no tenerla. `cambia` dice si cambian las bandas o las medidas que se enseñan.
+ *   tenerla tras no tenerla. `cambia` dice si cambian las bandas o las medidas que se enseñan. Lleva
+ *   el SHA-256 de su página, cuyos bytes están en el archivo de páginas.
  * - `sin-ficha`: la ficha dice «Código de emplazamiento no válido».
  * - `retirada`: el registro falta en dos barridos seguidos de su zona.
  *
@@ -44,7 +47,7 @@ const ListadoGuardado = Schema.Union([
   Schema.Struct({ registro: RegistroSinCrudo }),
 ]);
 const FichaGuardada = Schema.Union([
-  Schema.Struct({ cruda: FichaCruda }),
+  Schema.Struct({ pagina: Schema.String }),
   Schema.Struct({
     leida: Schema.Struct({
       bandas: Schema.Array(Banda),
@@ -59,7 +62,12 @@ const FichaGuardada = Schema.Union([
  */
 const FORMAS = {
   "conocido-antes": Schema.Struct({ forma: Forma1, observacion: ObservacionGuardada }),
-  alta: Schema.Struct({ forma: Forma1, listado: ListadoGuardado, antes: Antes }),
+  alta: Schema.Struct({
+    forma: Forma1,
+    listado: ListadoGuardado,
+    antes: Antes,
+    conocidoDesde: Schema.optionalKey(Schema.Finite),
+  }),
   listado: Schema.Struct({
     forma: Forma1,
     listado: ListadoGuardado,
@@ -76,7 +84,6 @@ const FORMAS = {
     forma: Forma1,
     ficha: FichaGuardada,
     cambia: Schema.Boolean,
-    pagina: Schema.optionalKey(Schema.String),
     antes: Antes,
   }),
   "sin-ficha": Schema.Struct({ forma: Forma1, antes: Antes }),
@@ -196,28 +203,36 @@ const registroDelListado = (
   }
 };
 
-/** Lo que dice la ficha de un hecho, con la limpieza de hoy, y sus tablas si las tiene. */
-interface FichaDelHechoLeida {
-  readonly bandas: ReadonlyArray<Banda>;
-  readonly medidasDeExposicion: ReadonlyArray<MedidaDeExposicion>;
-  readonly cruda: FichaCruda | undefined;
-}
+/** Lo que se lee hoy de la página de una ficha del archivo, por su SHA-256. */
+export type FichasDeLasPaginas = ReadonlyMap<
+  string,
+  Pick<FichaLeida, "bandas" | "medidasDeExposicion">
+>;
 
-const leidaDeLaFicha = (
-  ficha: typeof FichaGuardada.Type,
-): Result.Result<FichaDelHechoLeida, string> =>
-  "leida" in ficha
-    ? Result.succeed({ ...ficha.leida, cruda: undefined })
-    : Result.map(fichaDeCruda(ficha.cruda), (leida) => ({ ...leida, cruda: ficha.cruda }));
+const leidaDeLaFicha = (ficha: typeof FichaGuardada.Type, paginas: FichasDeLasPaginas) => {
+  if ("leida" in ficha) return Result.succeed(ficha.leida);
+  const leida = paginas.get(ficha.pagina);
+  return leida === undefined
+    ? Result.fail(`la página ${ficha.pagina} no está en el archivo o no se lee`)
+    : Result.succeed(leida);
+};
+
+/** Las páginas del archivo que hacen falta para repetir unos hechos. */
+export const paginasDe = (hechos: ReadonlyArray<HechoLeido>): ReadonlyArray<string> =>
+  hechos.flatMap((h) =>
+    h.tipo === "ficha" && "pagina" in h.datos.ficha ? [h.datos.ficha.pagina] : [],
+  );
 
 /**
- * Lo que dice de un registro su historial, repitiendo sus hechos en orden con la limpieza de hoy.
- * Tiene que coincidir con lo que publica la tabla `observaciones` (`registroPublicado`): lo
- * comprueba la orden `comprobar-historial`.
+ * Lo que dice de un registro su historial, repitiendo sus hechos en orden con la limpieza y la
+ * lectura de hoy: las fichas se vuelven a leer de sus páginas del archivo (`paginas`). Tiene que
+ * coincidir con lo que publica la tabla `observaciones` (`registroPublicado`): lo comprueba la
+ * orden `comprobar-historial`.
  */
 export const repetirHechos = (
   fuente: Observacion["fuente"],
   hechos: ReadonlyArray<HechoLeido>,
+  paginas: FichasDeLasPaginas,
 ): Result.Result<RegistroRepetido, string> => {
   let estado: ObservacionGuardada | undefined;
   for (const hecho of hechos) {
@@ -257,15 +272,14 @@ export const repetirHechos = (
       }
       case "ficha": {
         if (estado === undefined) return Result.fail("ficha sin alta");
-        const leida = leidaDeLaFicha(hecho.datos.ficha);
+        const leida = leidaDeLaFicha(hecho.datos.ficha, paginas);
         if (Result.isFailure(leida)) return Result.fail(leida.failure);
-        const { cruda, ...limpia } = leida.success;
-        const conLaFicha: ObservacionGuardada = {
-          ...sinFichaCruda(estado),
-          ...limpia,
+        estado = sinMarca({
+          ...estado,
+          bandas: leida.success.bandas,
+          medidasDeExposicion: leida.success.medidasDeExposicion,
           fecha: hecho.datos.cambia ? hecho.fecha : estado.fecha,
-        };
-        estado = sinMarca(cruda === undefined ? conLaFicha : { ...conLaFicha, fichaCruda: cruda });
+        });
         break;
       }
       case "sin-ficha":
@@ -328,28 +342,47 @@ export const registroPublicado = (o: ObservacionGuardada): RegistroRepetido => (
 
 // ── Lo que se publica del historial ──────────────────────────────────────────────────────────
 
+/** Lo que la base da de un hecho para publicarlo, sin leer lo que guarda entero. */
+export interface HechoParaLaFicha {
+  readonly tipo: string;
+  readonly fecha: number;
+  readonly antes: number | null;
+  readonly cambia: boolean | null;
+  readonly conocidoDesde: number | null;
+}
+
 /**
- * Lo que la ficha publicada cuenta de un hecho (`HechoDeFicha` de `@celda/dominio/ficha`), o
- * `undefined` si no cambia nada que se enseñe: la primera vez que Celda guarda lo que escribió el
- * registro sin que cambie.
+ * Lo que la ficha publicada cuenta de un hecho (`HechoDeFicha` de `@celda/dominio/ficha`):
+ *
+ * - nada si no cambia nada que se enseñe, como la primera vez que Celda guarda lo que escribió el
+ *   registro sin que cambie;
+ * - de un alta de un titular que Celda empieza a reconocer, que estaba en el registro antes;
+ * - de una vuelta con otro listado, la vuelta y el cambio.
  */
-export const hechoDeFicha = (tipo: string, cambia: boolean | null) => {
-  switch (tipo) {
+export const hechosDeFicha = (hecho: HechoParaLaFicha): ReadonlyArray<HechoDeFicha> => {
+  const { fecha } = hecho;
+  const conAntes = (tipo: HechoDeFicha["tipo"]): HechoDeFicha =>
+    hecho.antes === null ? { tipo, fecha } : { tipo, fecha, antes: hecho.antes };
+  switch (hecho.tipo) {
     case "conocido-antes":
-      return "en-el-registro-antes" as const;
+      return [{ tipo: "en-el-registro-antes", fecha }];
     case "alta":
-      return "alta" as const;
+      return hecho.conocidoDesde === null
+        ? [conAntes("alta")]
+        : [{ tipo: "en-el-registro-antes", fecha: hecho.conocidoDesde }];
     case "listado":
-      return cambia === true ? ("cambio-de-listado" as const) : undefined;
+      return hecho.cambia === true ? [conAntes("cambio-de-listado")] : [];
     case "ficha":
-      return cambia === true ? ("cambio-de-ficha" as const) : undefined;
+      return hecho.cambia === true ? [conAntes("cambio-de-ficha")] : [];
     case "vuelta":
-      return "vuelta" as const;
+      return hecho.cambia === true
+        ? [conAntes("vuelta"), conAntes("cambio-de-listado")]
+        : [conAntes("vuelta")];
     case "sin-ficha":
-      return "sin-ficha" as const;
+      return [conAntes("sin-ficha")];
     case "retirada":
-      return "retirada" as const;
+      return [conAntes("retirada")];
     default:
-      return undefined;
+      return [];
   }
 };

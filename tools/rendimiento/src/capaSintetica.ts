@@ -30,7 +30,7 @@ import {
 
 /**
  * Una capa publicada de prueba, sin descargar nada: 25 emplazamientos en una rejilla alrededor
- * del Campus Nord, con sus fichas y sus bandas, en el formato 5 que publica Celda (ADR 0016): un
+ * del Campus Nord, con sus fichas y sus bandas, en el formato 6 que publica Celda (ADR 0016): un
  * resumen nacional con Barcelona, su capa y sus lotes. Basta para abrir una ficha, calcular las
  * celdas y la vista de interferencia.
  */
@@ -112,6 +112,7 @@ const fichaDe = (emplazamiento: EmplazamientoDeCapa, i: number): Ficha => ({
         url: "https://geoportal.minetur.gob.es/VCTEL/",
         fecha: NOCHE,
         afirma: "presente",
+        historial: [{ tipo: "en-el-registro-antes" as const, fecha: NOCHE }],
       },
     ],
   })),

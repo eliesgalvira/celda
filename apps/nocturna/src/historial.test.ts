@@ -17,7 +17,14 @@ import { TestClock } from "effect/testing";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { BaseNocturna, ESQUEMA } from "./base.ts";
-import { conBase, conEntorno, contenidoDe, type Entorno, unaNoche } from "./pruebas/entorno.ts";
+import {
+  comprobarHistorial,
+  conBase,
+  conEntorno,
+  contenidoDe,
+  type Entorno,
+  unaNoche,
+} from "./pruebas/entorno.ts";
 import { type ElementoDelListado, fichasGrabadas, geoportal } from "./pruebas/geoportal.ts";
 
 const NOCHE = Date.UTC(2026, 9, 7, 2, 15);
@@ -31,7 +38,6 @@ const hechosDe = (fichero: string) =>
     const sql = yield* SqlClient.SqlClient;
     return yield* sql<{
       readonly secuencia: number;
-      readonly id: string;
       readonly clave: string;
       readonly version: number;
       readonly tipo: string;
@@ -39,18 +45,14 @@ const hechosDe = (fichero: string) =>
       readonly cambia: number | null;
       readonly antes: number | null;
       readonly pagina: string | null;
-    }>`SELECT secuencia, id, clave, version, tipo, fecha,
+    }>`SELECT secuencia, clave, version, tipo, fecha,
         json_extract(datos, '$.cambia') AS cambia, json_extract(datos, '$.antes') AS antes,
-        json_extract(datos, '$.pagina') AS pagina
+        json_extract(datos, '$.ficha.pagina') AS pagina
       FROM hechos ORDER BY secuencia`;
   }).pipe(Effect.provide(SqliteClient.layer({ filename: fichero })));
 
 /** Repite el historial de la base y lo compara con la tabla de observaciones. */
-const comprobar = (entorno: Entorno) =>
-  conBase(
-    entorno.base,
-    Effect.flatMap(BaseNocturna, (base) => base.comprobarHistorial(5)),
-  );
+const comprobar = (entorno: Entorno) => comprobarHistorial(entorno);
 
 /** Las fichas de la versión vigente del almacén, como las leería la web. */
 const fichasPublicadas = (entorno: Entorno) =>
@@ -90,7 +92,7 @@ const DESAPARECE = "VODAFONE ESPAÑA, S.A.U. - 054846";
 
 describe("historial de cada registro (ADR 0027)", () => {
   it.effect(
-    "una base de la versión 7 se pone al día con un hecho «conocido antes» por observación, con la fecha más antigua que guarda de ella",
+    "una base de la versión 7 se pone al día con un hecho «conocido antes» por observación, con su fecha",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -141,14 +143,26 @@ describe("historial de cada registro (ADR 0027)", () => {
           assert.deepStrictEqual(
             hechos.map((h) => [h.clave, h.version, h.tipo, h.fecha]),
             [
-              [leida?.clave, 1, "conocido-antes", NOCHE - 9 * DIA],
+              // La fecha de la observación, desde la que dice lo que dice, aunque su ficha se leyera
+              // antes: lo de antes de esa fecha pudo ser otra cosa.
+              [leida?.clave, 1, "conocido-antes", NOCHE - DIA],
               [retirada?.clave, 1, "conocido-antes", NOCHE - 5 * DIA],
               [vista?.clave, 1, "conocido-antes", NOCHE - 2 * DIA],
             ],
           );
-          assert.strictEqual(
-            hechos[0]?.id,
-            `conocido-antes:registro-oficial:${leida?.clave ?? ""}`,
+          // Un hecho repetido con la misma fecha y el mismo tipo no se escribe dos veces.
+          const repetido = yield* Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            return yield* Effect.flip(
+              sql`INSERT INTO hechos (fuente, clave, version, tipo, fecha, datos)
+                VALUES ('registro-oficial', ${leida?.clave ?? ""}, 2, 'conocido-antes',
+                  ${NOCHE - DIA}, '{}')`,
+            );
+          }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
+          assert.strictEqual(repetido._tag, "SqlError");
+          assert.lengthOf(
+            (yield* hechosDe(entorno.base)).filter((h) => h.clave === leida?.clave),
+            1,
           );
           assert.deepStrictEqual(yield* comprobar(entorno), {
             comprobadas: 3,
@@ -188,8 +202,11 @@ describe("historial de cada registro (ADR 0027)", () => {
           assert.match(leidaPrimera?.pagina ?? "", /^[0-9a-f]{64}$/u);
           const publicadas = yield* fichasPublicadas(entorno);
           const deAlta = origenPublicado(publicadas, CAMBIA_DE_FICHA);
-          assert.deepStrictEqual(deAlta?.historial, [{ tipo: "alta", fecha: NOCHE }]);
-          assert.deepStrictEqual(desdeDelOrigen(deAlta ?? { fecha: 0 }), {
+          // En una base nueva ningún titular se ha visto antes: lo que trae es lo que ya había.
+          assert.deepStrictEqual(deAlta?.historial, [
+            { tipo: "en-el-registro-antes", fecha: NOCHE },
+          ]);
+          assert.deepStrictEqual(desdeDelOrigen(deAlta ?? { fecha: 0, historial: [] }), {
             tipo: "antes-del",
             fecha: NOCHE,
           });
@@ -243,10 +260,10 @@ describe("historial de cada registro (ADR 0027)", () => {
           const publicadasDespues = yield* fichasPublicadas(entorno);
           const cambiada = origenPublicado(publicadasDespues, CAMBIA_DE_FICHA);
           assert.deepStrictEqual(cambiada?.historial, [
-            { tipo: "alta", fecha: NOCHE },
+            { tipo: "en-el-registro-antes", fecha: NOCHE },
             { tipo: "cambio-de-ficha", fecha: NOCHE + 31 * DIA, antes: NOCHE },
           ]);
-          assert.deepStrictEqual(desdeDelOrigen(cambiada ?? { fecha: 0 }), {
+          assert.deepStrictEqual(desdeDelOrigen(cambiada ?? { fecha: 0, historial: [] }), {
             tipo: "desde",
             fecha: NOCHE + 31 * DIA,
             antes: NOCHE,
@@ -304,6 +321,62 @@ describe("historial de cada registro (ADR 0027)", () => {
             NOCHE,
           );
           assert.strictEqual((yield* comprobar(entorno)).distintas, 0);
+        }),
+      ),
+  );
+
+  it.effect(
+    "el alta de un titular que Celda empieza a reconocer, o de uno que ya salía como de otro titular, estaba en el registro antes",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabadas = yield* fichasGrabadas;
+          const fichas = yield* Ref.make(grabadas.fichas);
+          const listado = yield* Ref.make(
+            (elementos: ReadonlyArray<ElementoDelListado>): ReadonlyArray<ElementoDelListado> =>
+              elementos,
+          );
+          const registro = yield* geoportal(fichas, listado);
+          yield* TestClock.setTime(NOCHE);
+          yield* unaNoche(entorno, yield* registro.extractor);
+          // Una que salía como de otro titular antes de que Celda reconociera el suyo.
+          yield* Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            yield* sql`INSERT INTO otros_titulares ${sql.insert({
+              clave: "VODAFONE ESPAÑA, S.A.U. - 999",
+              titular: "VODAFONE ESPAÑA, S.A.U.",
+              local: 0,
+              crudo: "{}",
+              visto_desde: NOCHE - 5 * DIA,
+              vista_en: NOCHE,
+            })}`;
+          }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
+          const elemento = (id: string, codigo: string): ElementoDelListado => ({
+            type: "Feature",
+            id,
+            geometry: { type: "Point", coordinates: [2.1151, 41.3871] },
+            properties: { Gis_ID: codigo, Dirección: "CL Jordi Girona, 31. BARCELONA, BARCELONA" },
+          });
+          yield* Ref.set(listado, (elementos) => [
+            ...elementos,
+            elemento("RETEVISION MOVIL SA - 300123", "300123"),
+            elemento("VODAFONE ESPAÑA, S.A.U. - 999", "999"),
+            elemento("TELEFONICA MOVILES ESPAÑA, S.A.U. - 0809999", "0809999"),
+          ]);
+          yield* TestClock.setTime(NOCHE + DIA);
+          yield* unaNoche(entorno, yield* registro.extractor);
+          const publicadas = yield* fichasPublicadas(entorno);
+          const historial = (clave: string) => origenPublicado(publicadas, clave)?.historial;
+          assert.deepStrictEqual(historial("RETEVISION MOVIL SA - 300123"), [
+            { tipo: "en-el-registro-antes", fecha: NOCHE + DIA },
+          ]);
+          assert.deepStrictEqual(historial("VODAFONE ESPAÑA, S.A.U. - 999"), [
+            { tipo: "en-el-registro-antes", fecha: NOCHE - 5 * DIA },
+          ]);
+          // Una estación base nueva de un titular de siempre es un alta, desde esta noche.
+          assert.deepStrictEqual(historial("TELEFONICA MOVILES ESPAÑA, S.A.U. - 0809999"), [
+            { tipo: "alta", fecha: NOCHE + DIA, antes: NOCHE },
+          ]);
         }),
       ),
   );

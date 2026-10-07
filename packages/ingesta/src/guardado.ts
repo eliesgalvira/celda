@@ -1,12 +1,12 @@
 import { Banda } from "@celda/dominio/banda";
 import { MedidaDeExposicion } from "@celda/dominio/exposicion";
 import { type Fuente, Observacion } from "@celda/dominio/observacion";
-import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
-import { FichaCruda, type FichaLeida, ListadoCrudo, Registro } from "./extractor.ts";
-import { conAntes, conPagina, type HechoNuevo, type ListadoDelHecho } from "./hecho.ts";
-import { fichaDeCruda, registroDeCrudo } from "./registro-oficial/normalizar.ts";
+import { type FichaCruda, type FichaLeida, ListadoCrudo, Registro } from "./extractor.ts";
+import { conAntes, type HechoNuevo, type ListadoDelHecho } from "./hecho.ts";
+import { huella } from "./huella.ts";
+import { bandaAlDia, registroAlDia, registroDeCrudo } from "./registro-oficial/normalizar.ts";
 
 /**
  * Lo último que dice una fuente de una estación base, tal como lo guarda la ingesta entre
@@ -26,8 +26,12 @@ export const ObservacionGuardada = Schema.Struct({
    * observaciones que ningún listado ha traído desde que se guarda.
    */
   crudo: Schema.optionalKey(ListadoCrudo),
-  /** Las tablas de la última ficha leída, sin limpiar (ADR 0027). */
-  fichaCruda: Schema.optionalKey(FichaCruda),
+  /**
+   * La huella de las tablas de la última ficha leída tal como las escribe el registro
+   * (`huellaDeFicha`), para saber si el registro escribe otra cosa. Los bytes están en el archivo
+   * de páginas. Falta en las fichas leídas antes de guardarla.
+   */
+  huellaDeFicha: Schema.optionalKey(Schema.String),
 });
 export type ObservacionGuardada = typeof ObservacionGuardada.Type;
 
@@ -37,9 +41,22 @@ export const BARRIDOS_PARA_RETIRAR = 2;
 const { crudo: _crudo, ...camposLimpios } = Registro.fields;
 const mismoRegistroLimpio = Schema.toEquivalence(Schema.Struct(camposLimpios));
 const mismoCrudo = Schema.toEquivalence(ListadoCrudo);
-const mismaFichaCruda = Schema.toEquivalence(FichaCruda);
 const mismasBandas = Schema.toEquivalence(Schema.Array(Banda));
 const mismasMedidas = Schema.toEquivalence(Schema.Array(MedidaDeExposicion));
+
+/**
+ * La huella de las tablas de una ficha tal como las escribe el registro: FNV-1a de su texto, con
+ * separadores que no salen en una ficha. Solo sirve para saber si dos lecturas son la misma.
+ */
+export const huellaDeFicha = (cruda: FichaCruda): string =>
+  huella(
+    [
+      cruda.caracteristicas.map((f) => [f.operador, f.referencia, f.bandaMhz].join("\u001f")),
+      cruda.niveles.map((f) => [f.distancia, f.acimut, f.valor].join("\u001f")),
+    ]
+      .map((filas) => filas.join("\u001e"))
+      .join("\u001d"),
+  );
 
 /** Los campos del listado de una observación guardada, con lo que escribió el registro si lo hay. */
 export const registroDe = (o: Registro): Registro => {
@@ -82,9 +99,30 @@ export interface TrasListado {
   readonly guardar: ObservacionGuardada | undefined;
   /** Si cuenta como creada, como cambiada o como ninguna de las dos. */
   readonly cuenta: "creada" | "cambiada" | undefined;
+  /**
+   * Si cambia lo que se enseña de ella. Una retirada que vuelve igual no cambia, aunque cuente
+   * como cambiada.
+   */
+  readonly cambia: boolean;
   /** El hecho del historial, si lo hay (ADR 0027). */
   readonly hecho: HechoNuevo | undefined;
 }
+
+/**
+ * Lo limpio de una observación guardada con la limpieza de hoy: de lo que escribió el registro,
+ * si lo tiene, y si no, de lo que guardó la limpieza de entonces, limpio otra vez.
+ */
+const limpioDeHoy = (o: Registro) => {
+  const deHoy =
+    o.crudo === undefined
+      ? registroAlDia(o)
+      : (() => {
+          const leido = registroDeCrudo(o.crudo);
+          return leido.tipo === "registro" ? leido.registro : o;
+        })();
+  const { crudo: _sinCrudo, ...limpio } = registroDe(deHoy);
+  return limpio;
+};
 
 /**
  * La observación tras verla en el listado de una ejecución con fecha `fecha`. Una nueva queda
@@ -92,7 +130,9 @@ export interface TrasListado {
  * cambiado, aunque la limpieza de Celda dé otra cosa; entonces solo se guarda lo limpio de hoy, sin
  * cambiar la fecha. Si el registro escribe otra cosa pero lo limpio es igual, se guarda lo nuevo
  * con su hecho y sin cambiar la fecha. Si lo limpio cambia, cambia la fecha y la ficha se vuelve a
- * leer en esta misma ejecución. Una retirada que vuelve cuenta como cambiada.
+ * leer en esta misma ejecución. Lo limpio se compara siempre con la limpieza de hoy, también la
+ * primera vez que se guarda lo que escribió el registro: un arreglo de la limpieza no es un
+ * cambio. Una retirada que vuelve cuenta como cambiada.
  */
 export const trasListado = (
   previa: ObservacionGuardada | undefined,
@@ -113,10 +153,11 @@ export const trasListado = (
         retiradaEn: null,
       },
       cuenta: "creada",
+      cambia: false,
       hecho: { tipo: "alta", listado: listadoDelHecho(registro) },
     };
   }
-  const limpioIgual = mismoRegistroLimpio(registroLimpio(previa), registroLimpio(registro));
+  const limpioIgual = mismoRegistroLimpio(limpioDeHoy(previa), limpioDeHoy(registro));
   const crudoIgual = igualesEnCrudo(previa.crudo, registro.crudo, mismoCrudo, limpioIgual);
   const cambia = !crudoIgual && !limpioIgual;
   const vuelve = previa.retiradaEn !== null;
@@ -124,8 +165,9 @@ export const trasListado = (
     crudoIgual && !vuelve
       ? undefined
       : { tipo: vuelve ? "vuelta" : "listado", listado: listadoDelHecho(registro), cambia };
-  if (hecho === undefined && limpioIgual && previa.ausencias === 0) {
-    return { guardar: undefined, cuenta: undefined, hecho: undefined };
+  const guardado = mismoRegistroLimpio(registroLimpio(previa), registroLimpio(registro));
+  if (hecho === undefined && guardado && previa.ausencias === 0) {
+    return { guardar: undefined, cuenta: undefined, cambia: false, hecho: undefined };
   }
   const guardada: ObservacionGuardada = {
     ...sinCrudo(previa),
@@ -139,6 +181,7 @@ export const trasListado = (
     // Con otro listado la ficha vuelve a estar pendiente, aunque el registro no la tuviera.
     guardar: cambia ? conFicha(guardada) : guardada,
     cuenta: cambia || vuelve ? "cambiada" : undefined,
+    cambia,
     hecho,
   };
 };
@@ -154,9 +197,9 @@ export const sinCrudo = (o: ObservacionGuardada): ObservacionGuardada => {
   return resto;
 };
 
-/** La observación sin las tablas de su ficha, que se sustituyen. */
-export const sinFichaCruda = (o: ObservacionGuardada): ObservacionGuardada => {
-  const { fichaCruda: _cruda, ...resto } = o;
+/** La observación sin la huella de su ficha, que se sustituye. */
+const sinHuellaDeFicha = (o: ObservacionGuardada): ObservacionGuardada => {
+  const { huellaDeFicha: _huella, ...resto } = o;
   return resto;
 };
 
@@ -197,7 +240,9 @@ export interface TrasAusencia {
  *
  * Como en el listado, se compara lo que escribió el registro (ADR 0027): si escribe lo mismo, la
  * fecha no se mueve aunque la limpieza dé otras bandas, y no hay hecho salvo si vuelve a tener
- * ficha. La primera ficha de una estación base nueva tampoco mueve la fecha, que es la de su alta.
+ * ficha. La primera vez que se guarda la huella de una ficha, sus bandas de antes se comparan con
+ * la limpieza de hoy (`bandaAlDia`). La primera ficha de una estación base nueva tampoco mueve la
+ * fecha, que es la de su alta.
  */
 export const trasFicha = (
   previa: ObservacionGuardada,
@@ -205,15 +250,18 @@ export const trasFicha = (
   fecha: number,
 ): TrasFicha => {
   const { bandas, medidasDeExposicion, cruda, pagina } = leida;
+  const nueva = cruda === undefined ? undefined : huellaDeFicha(cruda);
   const primerasMedidas = previa.medidasDeExposicion === undefined;
+  const bandasDeAntes =
+    previa.huellaDeFicha === undefined ? previa.bandas.map(bandaAlDia) : previa.bandas;
   const limpiasIguales =
-    mismasBandas(previa.bandas, bandas) &&
+    mismasBandas(bandasDeAntes, bandas) &&
     (primerasMedidas || mismasMedidas(previa.medidasDeExposicion, medidasDeExposicion));
-  const crudaIgual = igualesEnCrudo(previa.fichaCruda, cruda, mismaFichaCruda, limpiasIguales);
+  const crudaIgual = igualesEnCrudo(previa.huellaDeFicha, nueva, (a, b) => a === b, limpiasIguales);
   // La primera ficha de una estación base nueva no cambia nada: es lo que ya decía el registro
   // cuando apareció en el listado, aunque se lea unas noches después.
   const conocida =
-    previa.fichaCruda !== undefined ||
+    previa.huellaDeFicha !== undefined ||
     previa.medidasDeExposicion !== undefined ||
     previa.fichaLeidaEn !== null ||
     previa.bandas.length > 0;
@@ -222,27 +270,24 @@ export const trasFicha = (
   const hecho: HechoNuevo | undefined =
     crudaIgual && !vuelve
       ? undefined
-      : conPagina(
-          conAntes(
-            {
-              tipo: "ficha",
-              ficha: cruda === undefined ? { leida: { bandas, medidasDeExposicion } } : { cruda },
-              cambia,
-            },
-            previa.fichaLeidaEn,
-          ),
-          pagina,
+      : conAntes(
+          {
+            tipo: "ficha",
+            ficha: pagina === undefined ? { leida: { bandas, medidasDeExposicion } } : { pagina },
+            cambia,
+          },
+          previa.fichaLeidaEn,
         );
   const conLaFicha: ObservacionGuardada = {
-    ...sinFichaCruda(previa),
+    ...sinHuellaDeFicha(previa),
     bandas,
     medidasDeExposicion,
     fecha: cambia ? fecha : previa.fecha,
     fichaLeidaEn: fecha,
   };
   return {
-    guardada: conFicha(cruda === undefined ? conLaFicha : { ...conLaFicha, fichaCruda: cruda }),
-    cambiada: !limpiasIguales || primerasMedidas || vuelve,
+    guardada: conFicha(nueva === undefined ? conLaFicha : { ...conLaFicha, huellaDeFicha: nueva }),
+    cambiada: !mismasBandas(previa.bandas, bandas) || !limpiasIguales || primerasMedidas || vuelve,
     hecho,
   };
 };
@@ -274,28 +319,18 @@ export const trasAusencia = (previa: ObservacionGuardada, fecha: number): TrasAu
 };
 
 /**
- * La observación con la limpieza de hoy (ADR 0027): lo que se enseña de ella sale de lo que
- * escribió el registro, si se tiene, con la compañía, el código, la dirección, el municipio, las
- * bandas y las medidas que da hoy la lectura. Así un arreglo de la limpieza llega a todas las
- * observaciones en la siguiente fusión, sin cambiar sus fechas. Lo que hoy no se pudiera leer se
- * queda como estaba guardado.
+ * La observación con la limpieza de hoy (ADR 0027): la compañía, el código, la dirección, el
+ * municipio y el enlace salen de lo que escribió el registro en el listado, si se tiene, y si no,
+ * de lo que guardó la limpieza de entonces, limpio otra vez (`registroAlDia`). Así un
+ * arreglo de la limpieza llega a todas en la siguiente fusión, sin cambiar sus fechas. Las bandas
+ * no: la ficha guarda solo la huella de sus tablas, y un arreglo de su lectura llega al releerla,
+ * del registro o del archivo de páginas (`releer-archivo --aplicar`).
  */
 export const alDia = (o: ObservacionGuardada): ObservacionGuardada => {
-  let alDia = o;
-  if (o.crudo !== undefined) {
-    const leido = registroDeCrudo(o.crudo);
-    if (leido.tipo === "registro") {
-      const { compania, codigo, direccion, municipio, url } = leido.registro;
-      alDia = { ...alDia, compania, codigo, direccion, municipio, url };
-    }
-  }
-  if (o.fichaCruda !== undefined && o.medidasDeExposicion !== undefined) {
-    const leida = fichaDeCruda(o.fichaCruda);
-    if (Result.isSuccess(leida)) {
-      alDia = { ...alDia, ...leida.success };
-    }
-  }
-  return alDia;
+  const leido = o.crudo === undefined ? undefined : registroDeCrudo(o.crudo);
+  const deHoy = leido?.tipo === "registro" ? leido.registro : registroAlDia(o);
+  const { compania, codigo, direccion, municipio, url } = deHoy;
+  return { ...o, compania, codigo, direccion, municipio, url };
 };
 
 /** Lo que la fusión necesita de una observación guardada, con la limpieza de hoy. */

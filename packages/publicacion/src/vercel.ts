@@ -102,6 +102,21 @@ const leerManifiesto = (origen: Origen, sello: string) =>
     return { fichero, contenido, ficheros: listados.success.ficheros };
   });
 
+/**
+ * El manifiesto de una versión anterior, o `undefined` si es de otro formato: la web de este build
+ * no lee sus ficheros, así que no se monta. Pasa las noches de después de subir el formato.
+ */
+const manifiestoAnterior = (origen: Origen, sello: string) =>
+  Effect.gen(function* () {
+    const fichero = ficheroDeManifiesto(sello);
+    const contenido = yield* leerEntero(origen, fichero);
+    if (Result.isFailure(decodificarManifiesto(contenido))) {
+      yield* Effect.logInfo(`${fichero} es de otro formato: no se monta`);
+      return undefined;
+    }
+    return yield* leerManifiesto(origen, sello);
+  });
+
 /** Lo que ha montado `montarCapas`. */
 export interface CapasMontadas {
   readonly version: string;
@@ -147,7 +162,9 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
   }
   const { version, resumen: ficheroResumen } = vigente.success;
   if (ficheroResumen === undefined) {
-    return yield* new CapasIncompletas({ motivo: `${version} no es del formato 5` });
+    return yield* new CapasIncompletas({
+      motivo: `${version} no tiene resumen nacional: es del formato 4 o anterior`,
+    });
   }
 
   const resumen = yield* leerEntero(origen, ficheroResumen);
@@ -169,18 +186,20 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
     });
   }
 
-  const anteriores = (yield* origen.listar)
+  const candidatas = (yield* origen.listar)
     .flatMap((fichero) => selloDelManifiesto(fichero) ?? [])
     .filter((otro) => otro < sello)
     .toSorted()
     .toReversed()
     .slice(0, ANTERIORES_EN_VERCEL);
-  const manifiestos = [
-    suyo,
-    ...(yield* Effect.forEach(anteriores, (otro) => leerManifiesto(origen, otro), {
-      concurrency: A_LA_VEZ,
-    })),
-  ];
+  const deSuFormato = (yield* Effect.forEach(
+    candidatas,
+    (otro) =>
+      Effect.map(manifiestoAnterior(origen, otro), (m) => (m === undefined ? [] : [{ otro, m }])),
+    { concurrency: A_LA_VEZ },
+  )).flat();
+  const anteriores = deSuFormato.map(({ otro }) => otro);
+  const manifiestos = [suyo, ...deSuFormato.map(({ m }) => m)];
   const ficheros = [...new Set(manifiestos.flatMap((m) => m.ficheros))];
   // Lo privado del cubo, las copias de la base y el archivo de páginas, nunca llega a la web,
   // aunque un manifiesto lo liste por un error (ADR 0027).

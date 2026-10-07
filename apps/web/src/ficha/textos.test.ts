@@ -169,6 +169,7 @@ describe("textos de la ficha", () => {
       url: "https://geoportal.minetur.gob.es/",
       fecha: CAPA,
       afirma: "presente" as const,
+      historial: [],
     };
     const presente = textosOrigen(origen);
     assert.strictEqual(textoPlano(presente.fuente), "Registro oficial");
@@ -191,6 +192,7 @@ describe("textos de la ficha", () => {
       url: "https://geoportal.minetur.gob.es/",
       fecha: CAPA,
       afirma: "presente" as const,
+      historial: [],
     };
     const desmontada = {
       ...origen,

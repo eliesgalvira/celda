@@ -153,6 +153,7 @@ export const datosSinteticos = (n: number, fecha: number) => {
           barrido: fecha,
         })),
       ),
+      clavesAnteriores: Effect.succeed(new Map()),
       registrar: () => Effect.void,
     }),
   );

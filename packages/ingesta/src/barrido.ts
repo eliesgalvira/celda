@@ -93,15 +93,57 @@ export const esCambioMasivo = (
   limite: LimiteDeCambios,
 ): boolean => vigentes > 0 && cambios > limite.minimo && cambios > limite.fraccion * vigentes;
 
+/** La razón social de la clave de un registro del registro oficial («TITULAR - código»). */
+export const titularDeClave = (clave: string): string => {
+  const separador = clave.lastIndexOf(" - ");
+  return separador > 0 ? clave.slice(0, separador) : clave;
+};
+
 /**
- * El registro cambia de golpe mucho más de lo normal en un cuadro o en una zona: cambios o
- * estaciones que faltan. Las altas no cuentan, porque no retiran nada. Lo probable es que haya cambiado cómo escribe algo, como la razón
- * social de una compañía, y no que lo hayan hecho miles de estaciones a la vez. La noche se para
- * sin guardar ese cuadro, sin contar ausencias y sin publicar, hasta que alguien lo mire.
+ * Si unas observaciones que cambian (`cambiadas`, por clave) son un cambio masivo entre las
+ * `vigentes`: todas juntas o las de una sola razón social, contra las vigentes de esa razón social.
+ * Así salta también si cambia cómo se escribe una compañía pequeña, como DIGI, o una razón social
+ * de una grande, como `VODAFONE ESPAÑA, S.A.` frente a `S.A.U.`. Devuelve cuántas cambian de
+ * cuántas, y de qué razón social si es una sola, o `undefined` si no es masivo.
+ */
+export const cambioMasivoEn = (
+  vigentes: ReadonlyArray<string>,
+  cambiadas: ReadonlyArray<string>,
+  limite: LimiteDeCambios,
+):
+  | { readonly cambios: number; readonly vigentes: number; readonly titular?: string }
+  | undefined => {
+  if (esCambioMasivo(cambiadas.length, vigentes.length, limite)) {
+    return { cambios: cambiadas.length, vigentes: vigentes.length };
+  }
+  const contar = (claves: ReadonlyArray<string>) => {
+    const cuentas = new Map<string, number>();
+    for (const clave of claves) {
+      const titular = titularDeClave(clave);
+      cuentas.set(titular, (cuentas.get(titular) ?? 0) + 1);
+    }
+    return cuentas;
+  };
+  const deCadaTitular = contar(vigentes);
+  for (const [titular, cambios] of contar(cambiadas)) {
+    const suyas = deCadaTitular.get(titular) ?? 0;
+    if (esCambioMasivo(cambios, suyas, limite)) return { cambios, vigentes: suyas, titular };
+  }
+  return undefined;
+};
+
+/**
+ * El registro cambia de golpe mucho más de lo normal en un cuadro o en una zona, con cambios o con
+ * estaciones que faltan por primera vez. Las altas y las que vuelven no cuentan, porque no retiran
+ * nada. Lo probable es que haya cambiado cómo escribe algo, como la razón social de una compañía,
+ * porque miles de estaciones rara vez cambian a la vez. La noche se para sin guardar ese cuadro,
+ * sin contar ausencias y sin publicar, hasta que alguien lo mire.
  */
 export class CambioMasivo extends Schema.TaggedError<CambioMasivo>()("CambioMasivo", {
   /** El cuadro, o la zona si es al cerrar su barrido. */
   donde: Schema.String,
+  /** La razón social que cambia de golpe, si es una sola y no todas juntas. */
+  titular: Schema.optionalKey(Schema.String),
   cambios: Schema.Int,
   vigentes: Schema.Int,
   /** Registros del listado de titulares que Celda no reconoce, que suelen explicar el cambio. */
@@ -112,7 +154,8 @@ export class CambioMasivo extends Schema.TaggedError<CambioMasivo>()("CambioMasi
       this.desconocidos === 0
         ? ""
         : `; el listado trae ${this.desconocidos} registros de titulares desconocidos`;
-    return `${this.donde}: ${this.cambios} cambios de ${this.vigentes} observaciones vigentes, muchos más de lo normal${desconocidos}`;
+    const deQuien = this.titular === undefined ? "" : ` de ${this.titular}`;
+    return `${this.donde}: ${this.cambios} cambios de ${this.vigentes} observaciones vigentes${deQuien}, muchos más de lo normal${desconocidos}`;
   }
 }
 
@@ -631,6 +674,8 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
     if (Result.isFailure(cerrado)) {
       const motivo = describirFallo(cerrado.failure);
       errores.push(`Zona ${hecha?.zona ?? ""}: ${motivo}`);
+      // El barrido falla: la noche siguiente empieza otro, que vuelve a pedir sus cuadros.
+      yield* base.fallarBarrido(barrido, yield* Clock.currentTimeMillis, motivo);
       detenida = motivo;
       parada = motivo;
       if (hecha !== undefined) hechas[indice] = { ...hecha, estado: "fallido", error: motivo };

@@ -123,6 +123,7 @@ const FICHA: Ficha = {
           url: "https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=0802532",
           fecha: Date.UTC(2026, 8, 26, 2, 15),
           afirma: "presente",
+          historial: [],
         },
       ],
     },

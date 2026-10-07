@@ -1,6 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
 import * as Result from "effect/Result";
-import * as Schema from "effect/Schema";
 
 import type { LimitesDeBarrios } from "./barrio.ts";
 import { type EmplazamientoDeCapa, versionDeCapa } from "./capa.ts";
@@ -29,6 +28,7 @@ import {
   ficheroDeLoteDeProvincia,
   ficheroDeManifiesto,
   ficheroDeResumen,
+  FORMATO_PROVINCIAS,
   type FuentesDeZonas,
   ficheroDeIndiceDeClaves,
   generarCapaDeProvincia,
@@ -39,10 +39,10 @@ import {
   leerLoteDeProvincia,
   leerParteDelIndice,
   leerResumen,
-  LoteDeProvincia,
   type MunicipioDeCapa,
   parteDeClave,
   PARTES_DEL_INDICE,
+  situarEnLaParte,
   resumenConNombresDeLugar,
   situarEmplazamientos,
 } from "./provincias.ts";
@@ -208,38 +208,6 @@ const ficha = (e: EmplazamientoDeCapa): Ficha => ({
   datosDel: NOCHE,
   version: NOCHE,
 });
-
-/** El lote tal como lo lee la web de antes de la marca de sin ficha en el registro. */
-const { sinFichaEnRegistro: _sinFicha, ...estacionDeAntes } = EstacionDeFicha.fields;
-const LoteDeAntes = Schema.Struct({
-  ...LoteDeProvincia.fields,
-  fichas: Schema.Array(
-    Schema.Struct({ ...Ficha.fields, estaciones: Schema.Array(Schema.Struct(estacionDeAntes)) }),
-  ),
-});
-const leerLoteDeAntes = Schema.decodeUnknownResult(Schema.fromJsonString(LoteDeAntes));
-
-/** El lote tal como lo lee la web de antes de las medidas de exposición del ministerio (#73). */
-const { medidasDeExposicion: _medidas, ...estacionSinMedidas } = EstacionDeFicha.fields;
-const LoteSinMedidas = Schema.Struct({
-  ...LoteDeProvincia.fields,
-  fichas: Schema.Array(
-    Schema.Struct({ ...Ficha.fields, estaciones: Schema.Array(Schema.Struct(estacionSinMedidas)) }),
-  ),
-});
-const leerLoteSinMedidas = Schema.decodeUnknownResult(Schema.fromJsonString(LoteSinMedidas));
-
-/** Lo que la web de antes de las combinaciones de compañías lee de un resumen (ADR 0026). */
-const ResumenDeAntes = Schema.Struct({
-  version: Schema.String,
-  formato: Schema.Literal(5),
-  provincias: Schema.Struct({
-    codigo: Schema.Array(Schema.String),
-    emplazamientos: Schema.Array(Schema.Int),
-    companias: Schema.Array(Schema.Int),
-  }),
-});
-const leerResumenDeAntes = Schema.decodeUnknownResult(Schema.fromJsonString(ResumenDeAntes));
 
 const CATALUNA: ZonaBarrida = {
   nombre: "cataluna",
@@ -482,74 +450,38 @@ describe("lote de fichas de una provincia", () => {
     assert.isTrue(Result.isFailure(leerLoteDeProvincia(contenido, "17")));
   });
 
-  // La marca de sin ficha en el registro no sube el formato (ADR 0016): la web de antes la
-  // ignora y la de ahora lee los lotes de antes, que no la llevan.
   const orange: EstacionDeFicha = {
     compania: "orange",
     codigos: ["CLMR6422A"],
     bandas: [],
     origenes: [],
   };
-  const conEstaciones = (sinFicha: boolean): Ficha => ({
-    ...ficha(EN_PEDRALBES),
-    estaciones: [
-      { compania: "movistar", codigos: ["0802532"], bandas: [], origenes: [] },
-      sinFicha ? { ...orange, sinFichaEnRegistro: NOCHE } : orange,
-    ],
-  });
+  const medida = { distanciaMetros: 80, acimutGrados: 175, microvatiosPorCm2: 0.98806 };
 
-  it("la web de antes lee un lote con una estación base sin ficha en el registro", () => {
-    const contenido = generarLoteDeProvincia("08", [conEstaciones(true)], lugares, FUENTE_IGN);
-    assert.include(contenido, `"sinFichaEnRegistro":${NOCHE}`);
-    const leido = leerLoteDeAntes(contenido);
+  it("un lote lleva la marca de sin ficha y las medidas de las estaciones que las tienen", () => {
+    const contenido = generarLoteDeProvincia(
+      "08",
+      [
+        {
+          ...ficha(EN_PEDRALBES),
+          estaciones: [
+            { compania: "movistar", codigos: ["0802532"], bandas: [], origenes: [] },
+            { ...orange, sinFichaEnRegistro: NOCHE, medidasDeExposicion: [medida] },
+          ],
+        },
+      ],
+      lugares,
+      FUENTE_IGN,
+    );
+    const leido = leerLoteDeProvincia(contenido, "08");
     if (Result.isFailure(leido)) return assert.fail(leido.failure.message);
     assert.deepStrictEqual(
-      leido.success.fichas[0]?.estaciones.map((e) => [e.compania, Object.keys(e).length]),
+      leido.success[0]?.estaciones.map((e) => [e.sinFichaEnRegistro, e.medidasDeExposicion]),
       [
-        ["movistar", 4],
-        ["orange", 4],
+        [undefined, undefined],
+        [NOCHE, [medida]],
       ],
     );
-  });
-
-  it("la web de ahora lee los lotes de antes, sin la marca, y los nuevos con ella", () => {
-    const deAntes = leerLoteDeProvincia(
-      generarLoteDeProvincia("08", [conEstaciones(false)], lugares, FUENTE_IGN),
-      "08",
-    );
-    const nuevo = leerLoteDeProvincia(
-      generarLoteDeProvincia("08", [conEstaciones(true)], lugares, FUENTE_IGN),
-      "08",
-    );
-    if (Result.isFailure(deAntes) || Result.isFailure(nuevo)) return assert.fail("ilegible");
-    const marcas = (fichas: ReadonlyArray<Ficha>) =>
-      fichas[0]?.estaciones.map((e) => e.sinFichaEnRegistro);
-    assert.deepStrictEqual(marcas(deAntes.success), [undefined, undefined]);
-    assert.deepStrictEqual(marcas(nuevo.success), [undefined, NOCHE]);
-  });
-
-  // Las medidas de exposición del ministerio tampoco suben el formato (#73).
-  const medida = { distanciaMetros: 80, acimutGrados: 175, microvatiosPorCm2: 0.98806 };
-  const conMedidas: Ficha = {
-    ...ficha(EN_PEDRALBES),
-    estaciones: [{ ...orange, medidasDeExposicion: [medida] }],
-  };
-
-  it("la web de antes lee un lote con medidas de exposición, y la de ahora uno sin ellas", () => {
-    const contenido = generarLoteDeProvincia("08", [conMedidas], lugares, FUENTE_IGN);
-    assert.include(contenido, `"medidasDeExposicion":[${JSON.stringify(medida)}]`);
-    const deAntes = leerLoteSinMedidas(contenido);
-    if (Result.isFailure(deAntes)) return assert.fail(deAntes.failure.message);
-    assert.notProperty(deAntes.success.fichas[0]?.estaciones[0], "medidasDeExposicion");
-
-    const nuevo = leerLoteDeProvincia(contenido, "08");
-    const sinMedidas = leerLoteDeProvincia(
-      generarLoteDeProvincia("08", [conEstaciones(false)], lugares, FUENTE_IGN),
-      "08",
-    );
-    if (Result.isFailure(nuevo) || Result.isFailure(sinMedidas)) return assert.fail("ilegible");
-    assert.deepStrictEqual(nuevo.success[0]?.estaciones[0]?.medidasDeExposicion, [medida]);
-    assert.isUndefined(sinMedidas.success[0]?.estaciones[1]?.medidasDeExposicion);
   });
 });
 
@@ -576,7 +508,7 @@ describe("resumen nacional", () => {
       provincias,
       cuadros: CUADROS,
     });
-    assert.isTrue(contenido.startsWith(`{"version":"${VERSION}","formato":5,`));
+    assert.isTrue(contenido.startsWith(`{"version":"${VERSION}","formato":${FORMATO_PROVINCIAS},`));
     const leido = leerResumen(contenido, VERSION);
     if (Result.isFailure(leido)) return assert.fail(leido.failure.message);
     assert.strictEqual(leido.success.fecha, NOCHE);
@@ -791,19 +723,7 @@ describe("resumen nacional", () => {
     );
   });
 
-  it("la web de antes lee un resumen con combinaciones, y la de ahora uno sin ellas", () => {
-    const nuevo = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [CAJA_DE_BARCELONA],
-      provincias: conCombinaciones,
-      cuadros: CUADROS,
-    });
-    const deAntes = leerResumenDeAntes(nuevo);
-    if (Result.isFailure(deAntes)) return assert.fail(deAntes.failure.message);
-    assert.notProperty(deAntes.success.provincias, "combinaciones");
-    assert.deepStrictEqual(deAntes.success.provincias.emplazamientos, [3, 2, 1]);
-
+  it("un resumen sin combinaciones no las lleva, y si alguna provincia no las tiene no las lleva ninguna", () => {
     const sinEllas = generarResumen({
       version: VERSION,
       fuentes: FUENTES,
@@ -879,10 +799,16 @@ describe("índice de claves", () => {
     for (const e of TODOS) {
       const suya = parteDeClave(e.clave, 4);
       leidas.forEach((leida, i) => {
-        assert.strictEqual(leida?.has(e.clave), i === suya, `${e.clave} en la parte ${i}`);
+        assert.strictEqual(
+          leida?.provincias.has(e.clave),
+          i === suya,
+          `${e.clave} en la parte ${i}`,
+        );
       });
     }
-    const todas = new Map(leidas.flatMap((leida) => [...(leida ?? new Map<string, string>())]));
+    const todas = new Map(
+      leidas.flatMap((leida) => [...(leida?.provincias ?? new Map<string, string>())]),
+    );
     assert.deepStrictEqual(
       [...todas].toSorted(),
       [...situados]
@@ -896,7 +822,38 @@ describe("índice de claves", () => {
     assert.deepStrictEqual(generarIndiceDeClaves(otraVez), generarIndiceDeClaves(situados));
     const partes = generarIndiceDeClaves(situados, 64);
     assert.lengthOf(partes, 64);
-    assert.isTrue(partes.some((p) => Result.getOrUndefined(leerParteDelIndice(p))?.size === 0));
+    assert.isTrue(
+      partes.some((p) => Result.getOrUndefined(leerParteDelIndice(p))?.provincias.size === 0),
+    );
+  });
+
+  it("una clave que se juntó con otra lleva a la que la sustituye, en su provincia", () => {
+    const [primera, segunda] = TODOS;
+    if (primera === undefined || segunda === undefined) return assert.fail("sin emplazamientos");
+    const anteriores = new Map([
+      ["vodafone-viejo", primera.clave],
+      // Una que lleva a una clave que no se publica no va.
+      ["orange-viejo", "orange-que-no-esta"],
+      // Ni una que vuelve a tener emplazamiento.
+      [segunda.clave, primera.clave],
+    ]);
+    const partes = generarIndiceDeClaves(situados, 4, anteriores).map((parte) =>
+      Result.getOrThrow(leerParteDelIndice(parte)),
+    );
+    const parteDe = (clave: string) => partes[parteDeClave(clave, 4)];
+    const provincia = parteDe(primera.clave)?.provincias.get(primera.clave);
+    assert.deepStrictEqual(
+      situarEnLaParte(parteDe("vodafone-viejo") ?? partes[0]!, "vodafone-viejo"),
+      {
+        clave: primera.clave,
+        provincia,
+      },
+    );
+    assert.isUndefined(situarEnLaParte(parteDe("orange-viejo") ?? partes[0]!, "orange-viejo"));
+    assert.deepStrictEqual(situarEnLaParte(parteDe(segunda.clave) ?? partes[0]!, segunda.clave), {
+      clave: segunda.clave,
+      provincia: parteDe(segunda.clave)?.provincias.get(segunda.clave),
+    });
   });
 
   it("la parte de una clave es estable y sale de sus bytes en UTF-8", () => {
@@ -908,7 +865,9 @@ describe("índice de claves", () => {
 
   it("una parte mal formada no se da por buena, y el nombre lleva la huella", () => {
     assert.isTrue(
-      Result.isFailure(leerParteDelIndice('{"formato":5,"provincias":["08"],"claves":[]}')),
+      Result.isFailure(
+        leerParteDelIndice(`{"formato":${FORMATO_PROVINCIAS},"provincias":["08"],"claves":[]}`),
+      ),
     );
     assert.strictEqual(
       ficheroDeIndiceDeClaves("0123456789abcdef9999"),

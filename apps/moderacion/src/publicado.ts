@@ -6,9 +6,11 @@ import {
   type CapaDeProvincia,
   leerCapaDeProvincia,
   leerLoteDeProvincia,
+  type ClaveSituada,
   leerParteDelIndice,
   leerResumen,
   parteDeClave,
+  situarEnLaParte,
   type ResumenLeido,
 } from "@celda/dominio/provincias";
 import * as Cache from "effect/Cache";
@@ -98,7 +100,9 @@ export const loPublicadoDesde = (leer: LeerPublicado) =>
           if (Option.isNone(texto)) return Option.none();
           const vigente = yield* resultado(decodificarVigente(texto.value), FICHERO_VIGENTE);
           if (vigente.resumen === undefined) {
-            return yield* noDisponible(`${vigente.version} no es del formato 5`);
+            return yield* noDisponible(
+              `${vigente.version} no tiene resumen nacional: es del formato 4 o anterior`,
+            );
           }
           const contenido = yield* obligatorio(vigente.resumen);
           return Option.some(
@@ -112,14 +116,17 @@ export const loPublicadoDesde = (leer: LeerPublicado) =>
           resultado(leerCapaDeProvincia(contenido, provincia), nombre),
         );
 
-      /** La provincia de una clave, según el índice de claves. */
-      const provinciaDe = (leido: ResumenLeido, clave: string) =>
+      /**
+       * Dónde está una clave según el índice de claves: su provincia y la clave de hoy, que es otra
+       * si su emplazamiento se juntó con otro (ADR 0027).
+       */
+      const situar = (leido: ResumenLeido, clave: string) =>
         Effect.gen(function* () {
           const partes = leido.claves ?? [];
           const parte = partes[parteDeClave(clave, partes.length)];
-          if (parte === undefined) return Option.none<string>();
+          if (parte === undefined) return Option.none<ClaveSituada>();
           const indice = yield* resultado(leerParteDelIndice(yield* obligatorio(parte)), parte);
-          return Option.fromNullishOr(indice.get(clave));
+          return Option.fromNullishOr(situarEnLaParte(indice, clave));
         });
 
       const fichaEn = (capa: CapaDeProvincia, clave: string) =>
@@ -143,14 +150,15 @@ export const loPublicadoDesde = (leer: LeerPublicado) =>
           Effect.gen(function* () {
             const leido = yield* resumen;
             if (Option.isNone(leido)) return Option.none();
-            const provincia = yield* provinciaDe(leido.value, clave);
-            const nombre = Option.flatMap(provincia, (codigo) =>
+            const situada = yield* situar(leido.value, clave);
+            const nombre = Option.flatMap(situada, ({ provincia }) =>
               Option.fromNullishOr(
-                leido.value.provincias.find((p) => p.codigo === codigo)?.fichero,
+                leido.value.provincias.find((p) => p.codigo === provincia)?.fichero,
               ),
             );
-            if (Option.isNone(provincia) || Option.isNone(nombre)) return Option.none();
-            return yield* fichaEn(yield* capaDe(provincia.value, nombre.value), clave);
+            if (Option.isNone(situada) || Option.isNone(nombre)) return Option.none();
+            const { provincia, clave: deHoy } = situada.value;
+            return yield* fichaEn(yield* capaDe(provincia, nombre.value), deHoy);
           }).pipe(Effect.withSpan("LoPublicado.ficha")),
         cercanos: (punto, radio) =>
           Effect.gen(function* () {

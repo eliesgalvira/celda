@@ -83,14 +83,19 @@ export interface Listado {
   readonly avisos: ReadonlyArray<string>;
   /**
    * Registros de otros titulares, que no son compañías de Celda pero que la ingesta guarda aparte
-   * sin enseñarlos en el mapa, como las licencias locales de 2,6 GHz. Sin repetir.
+   * sin enseñarlos en el mapa: las licencias locales de 2,6 GHz y los de titulares que no
+   * reconoce, que además son un aviso. Sin repetir.
    */
   readonly otros?: ReadonlyArray<RegistroDeOtroTitular>;
 }
 
-/** Un registro del listado de otro titular, como lo escribe el registro. */
+/**
+ * Un registro del listado de otro titular, como lo escribe el registro: una licencia local
+ * (`local`) o uno que Celda no reconoce.
+ */
 export interface RegistroDeOtroTitular {
   readonly titular: string;
+  readonly local: boolean;
   readonly crudo: ListadoCrudo;
 }
 

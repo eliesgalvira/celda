@@ -159,12 +159,17 @@ export const provinciaDe = (ubicacion: Ubicacion): string | null => {
 };
 
 /**
- * La misma ubicación con la provincia del emplazamiento seleccionado; el resto de la URL no
- * cambia. Es lo que se hace con un enlace que no la dice en cuanto se sabe cuál es.
+ * La misma ubicación con la clave y la provincia del emplazamiento seleccionado; el resto de la
+ * URL no cambia. Es lo que se hace con un enlace que no dice la provincia, o con uno a un
+ * emplazamiento que se juntó con otro, en cuanto el índice de claves dice dónde está.
  */
-export const conProvincia = (ubicacion: Ubicacion, provincia: string): string => {
+export const conEmplazamiento = (
+  ubicacion: Ubicacion,
+  situado: { readonly clave: string; readonly provincia: string },
+): string => {
   const parametros = new URLSearchParams(ubicacion.search);
-  parametros.set(PROVINCIA, provincia);
+  parametros.set(EMPLAZAMIENTO, situado.clave);
+  parametros.set(PROVINCIA, situado.provincia);
   const busqueda = parametros
     .toString()
     .replace(/(^|&)(medir|ajustes|aportaciones)=(?=&|$)/gu, "$1$2");

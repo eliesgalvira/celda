@@ -57,12 +57,11 @@ export const OrigenDeFicha = Schema.Struct({
   fecha: Schema.Finite,
   afirma: Afirmacion,
   /**
-   * El historial del registro en la fuente, del hecho más viejo al más nuevo (ADR 0027). Solo lo
-   * tiene el registro oficial. Es opcional, como `sinFichaEnRegistro`: las fichas publicadas antes
-   * no lo llevan, y la web de antes ignora la clave (ADR 0016). Cómo se dice `fecha` con él:
-   * `desdeDelOrigen`.
+   * El historial del registro en la fuente, del hecho más viejo al más nuevo (ADR 0027). Desde el
+   * formato 6. Solo el registro oficial tiene hechos; de las demás fuentes va vacío. Cómo se dice
+   * `fecha` con él: `desdeDelOrigen`.
    */
-  historial: Schema.optionalKey(Schema.Array(HechoDeFicha)),
+  historial: Schema.Array(HechoDeFicha),
 });
 export type OrigenDeFicha = typeof OrigenDeFicha.Type;
 
@@ -83,14 +82,15 @@ const ESTABLECEN: ReadonlySet<HechoDeFicha["tipo"]> = new Set([
  * - `desde`: lo vio Celda por primera vez en `fecha`, y si hay `antes`, llegó entre `antes` y
  *   `fecha`. La web dice «desde el <fecha>».
  *
- * Sin historial, como en las fichas publicadas antes, es `desde` con la `fecha` del origen.
+ * Sin ningún hecho que lo diga, como en un origen de la comunidad, es `desde` con la `fecha` del
+ * origen.
  */
 export const desdeDelOrigen = (
   origen: Pick<OrigenDeFicha, "fecha" | "historial">,
 ):
   | { readonly tipo: "antes-del"; readonly fecha: number }
   | { readonly tipo: "desde"; readonly fecha: number; readonly antes?: number } => {
-  const ultimo = (origen.historial ?? []).findLast((hecho) => ESTABLECEN.has(hecho.tipo));
+  const ultimo = origen.historial.findLast((hecho) => ESTABLECEN.has(hecho.tipo));
   if (ultimo === undefined) return { tipo: "desde", fecha: origen.fecha };
   if (
     ultimo.tipo === "en-el-registro-antes" ||
@@ -111,16 +111,15 @@ export const EstacionDeFicha = Schema.Struct({
   origenes: Schema.Array(OrigenDeFicha),
   /**
    * Si el registro oficial no tiene ficha de ella («Código de emplazamiento no válido»), la fecha
-   * en que se comprobó. Es opcional, como `lugar`: las fichas publicadas antes no lo llevan, y la
-   * web de antes ignora la clave (ADR 0016).
+   * en que se comprobó. Falta si la tiene.
    */
   sinFichaEnRegistro: Schema.optionalKey(Schema.Finite),
   /**
    * Las medidas de exposición del ministerio que publica el registro oficial en las fichas de sus
    * observaciones, por acimut. El ministerio no las fecha: desde cuándo las publica es la `fecha`
    * de esos orígenes. Una lista vacía es que el registro no publica ninguna. Falta si Celda aún no
-   * ha leído sus fichas desde que las guarda, y en las fichas publicadas antes; la web de antes
-   * ignora la clave (ADR 0016).
+   * ha leído sus fichas desde que las guarda (#73): la relectura de toda España las trae en unas
+   * noches, y hasta entonces la ficha no sabe si las hay.
    */
   medidasDeExposicion: Schema.optionalKey(Schema.Array(MedidaDeExposicion)),
 });
@@ -189,7 +188,7 @@ export interface EstacionConOrigenes {
   /** Las observaciones de `estacion.observaciones` que se han encontrado, en su orden. */
   readonly observaciones: ReadonlyArray<
     Pick<Observacion, "fuente" | "clave" | "url" | "fecha" | "afirma"> & {
-      readonly historial?: ReadonlyArray<HechoDeFicha>;
+      readonly historial: ReadonlyArray<HechoDeFicha>;
     }
   >;
 }
@@ -218,10 +217,16 @@ export const fichaDe = (
         compania: estacion.compania,
         codigos: estacion.codigos,
         bandas: estacion.bandas.toSorted(compararBandas),
-        origenes: observaciones.map(({ fuente, clave, url, fecha, afirma, historial }) => {
-          const origen: OrigenDeFicha = { fuente, clave, url, fecha, afirma };
-          return historial === undefined ? origen : { ...origen, historial };
-        }),
+        origenes: observaciones.map(
+          ({ fuente, clave, url, fecha, afirma, historial }): OrigenDeFicha => ({
+            fuente,
+            clave,
+            url,
+            fecha,
+            afirma,
+            historial,
+          }),
+        ),
       };
       const { sinFichaEnRegistro, medidasDeExposicion } = estacion;
       const conMarca =

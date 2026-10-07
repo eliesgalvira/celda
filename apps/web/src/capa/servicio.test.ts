@@ -523,7 +523,7 @@ describe("agrupación de una provincia con un filtro de compañías (ADR 0026)",
   );
 });
 
-describe("provincia de una clave", () => {
+describe("dónde está una clave", () => {
   const parteDe = (publicacion: PublicacionDePrueba, clave: string) => {
     const partes = publicacion.resumen.claves ?? [];
     return partes[parteDeClave(clave, partes.length)] ?? "";
@@ -532,9 +532,10 @@ describe("provincia de una clave", () => {
   it.effect("la busca en la parte del índice que le toca, sin descargar ninguna capa", () =>
     Effect.gen(function* () {
       const { resultado, peticiones } = yield* conCapa(origenCon(HOY), (capa) =>
-        Effect.all([capa.provinciaDeClave("movistar-a"), capa.provinciaDeClave("movistar-a")]),
+        Effect.all([capa.situarClave("movistar-a"), capa.situarClave("movistar-a")]),
       );
-      assert.deepStrictEqual(resultado, [Option.some("08"), Option.some("08")]);
+      const situada = Option.some({ clave: "movistar-a", provincia: "08" });
+      assert.deepStrictEqual(resultado, [situada, situada]);
       // El resumen y una sola vez la parte: ni la capa de la provincia ni las otras partes.
       assert.deepStrictEqual(peticiones.slice(2), [parteDe(HOY, "movistar-a")]);
     }),
@@ -543,9 +544,21 @@ describe("provincia de una clave", () => {
   it.effect("una clave que ninguna provincia tiene no está", () =>
     Effect.gen(function* () {
       const { resultado } = yield* conCapa(origenCon(HOY), (capa) =>
-        capa.provinciaDeClave("vodafone-nadie"),
+        capa.situarClave("vodafone-nadie"),
       );
       assert.isTrue(Option.isNone(resultado));
+    }),
+  );
+
+  it.effect("la de un emplazamiento que se juntó con otro lleva a la de ese otro", () =>
+    Effect.gen(function* () {
+      const juntado = publicacionDePrueba(versionDeCapa(NOCHE), NOCHE, FICHAS, 2, 4, [
+        ["vodafone-juntado", "movistar-a"],
+      ]);
+      const { resultado } = yield* conCapa(origenCon(juntado), (capa) =>
+        capa.situarClave("vodafone-juntado"),
+      );
+      assert.deepStrictEqual(resultado, Option.some({ clave: "movistar-a", provincia: "08" }));
     }),
   );
 
@@ -553,9 +566,9 @@ describe("provincia de una clave", () => {
     Effect.gen(function* () {
       const antes = publicacionDePrueba(versionDeCapa(NOCHE), NOCHE, FICHAS, 2, null);
       const { resultado, peticiones } = yield* conCapa(origenCon(antes), (capa) =>
-        capa.provinciaDeClave("vodafone-nadie"),
+        capa.situarClave("vodafone-nadie"),
       );
-      assert.deepStrictEqual(resultado, Option.some("08"));
+      assert.deepStrictEqual(resultado, Option.some({ clave: "vodafone-nadie", provincia: "08" }));
       assert.lengthOf(peticiones, 2);
     }),
   );
@@ -566,8 +579,8 @@ describe("provincia de una clave", () => {
       sinParte.delete(`${ORIGEN}/${parteDe(HOY, "movistar-a")}`);
       const { resultado, peticiones } = yield* conCapa(sinParte, (capa) =>
         Effect.all([
-          Effect.exit(capa.provinciaDeClave("movistar-a")),
-          Effect.exit(capa.provinciaDeClave("movistar-a")),
+          Effect.exit(capa.situarClave("movistar-a")),
+          Effect.exit(capa.situarClave("movistar-a")),
         ]),
       );
       assert.deepStrictEqual(resultado.map(errorDe), ["CapaNoDescargada", "CapaNoDescargada"]);

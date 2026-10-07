@@ -7,7 +7,10 @@ import {
 } from "@celda/dominio/capa";
 import { claveDeFiltro, type FiltroDeCompanias, hayFiltro } from "@celda/dominio/filtro";
 import {
+  type ClaveSituada,
   leerParteDelIndice,
+  type ParteLeida,
+  situarEnLaParte,
   leerResumen,
   parteDeClave,
   resumenConNombresDeLugar,
@@ -60,7 +63,7 @@ export type FalloCapa =
   | IndiceFallido;
 
 /**
- * La capa de emplazamientos que dibuja el mapa, en el formato 5 (ADR 0016): el resumen nacional
+ * La capa de emplazamientos que dibuja el mapa, en el formato 6 (ADR 0016): el resumen nacional
  * de la versión vigente y, a demanda, la capa de cada provincia, indexada. Lo que llega se queda
  * para toda la visita: el mapa y las fichas leen de lo mismo.
  */
@@ -77,10 +80,11 @@ export class CapaEmplazamientos extends Context.Service<
     readonly provincia: (codigo: string) => Effect.Effect<ProvinciaCargada, FalloCapa>;
     /**
      * La provincia en cuya capa va un emplazamiento, por su clave, sin descargar ninguna capa:
-     * lee la parte del índice de claves que le toca. `None` si ninguna provincia lo tiene. Un
+     * lee la parte del índice de claves que le toca. Si la clave es de un emplazamiento que se
+     * juntó con otro, da la clave de ese otro (ADR 0027). `None` si ninguna provincia lo tiene. Un
      * resumen de antes del índice no sabe buscar, y da la de los enlaces viejos (Barcelona).
      */
-    readonly provinciaDeClave: (clave: string) => Effect.Effect<Option.Option<string>, FalloCapa>;
+    readonly situarClave: (clave: string) => Effect.Effect<Option.Option<ClaveSituada>, FalloCapa>;
     /**
      * Cómo se agrupa una provincia con un filtro de compañías (ADR 0026). La primera vez el Worker
      * de capas indexa aparte lo que sale con el filtro; después se guarda: volver a un filtro no
@@ -163,7 +167,9 @@ export const descargarResumen = (http: HttpClient.HttpClient, origen: string, vi
   Effect.gen(function* () {
     if (vigente.resumen === undefined) {
       // Un `vigente.json` del formato 4 o anterior: esta web ya no sabe leerlo.
-      return yield* new CapaIlegible({ motivo: `${vigente.version} no es del formato 5` });
+      return yield* new CapaIlegible({
+        motivo: `${vigente.version} no tiene resumen nacional: es del formato 4 o anterior`,
+      });
     }
     const url = `${origen}/${vigente.resumen}`;
     const contenido = yield* descargarFichero(http, origen, vigente.resumen);
@@ -274,7 +280,7 @@ export const capaDelOrigen = Layer.effect(
     };
 
     /** Cada parte del índice leída, por su fichero: una sola petición por parte y visita. */
-    const partes = new Map<string, Effect.Effect<ReadonlyMap<string, string>, FalloCapa>>();
+    const partes = new Map<string, Effect.Effect<ParteLeida, FalloCapa>>();
     const parte = (fichero: string) => {
       let carga = partes.get(fichero);
       if (carga === undefined) {
@@ -296,14 +302,14 @@ export const capaDelOrigen = Layer.effect(
       return carga;
     };
 
-    const provinciaDeClave = Effect.fn("CapaEmplazamientos.provinciaDeClave")(function* (
-      clave: string,
-    ) {
+    const situarClave = Effect.fn("CapaEmplazamientos.situarClave")(function* (clave: string) {
       const { claves } = yield* resumen;
-      if (claves === undefined) return Option.some(PROVINCIA_DE_LOS_ENLACES_VIEJOS);
+      if (claves === undefined) {
+        return Option.some<ClaveSituada>({ clave, provincia: PROVINCIA_DE_LOS_ENLACES_VIEJOS });
+      }
       const fichero = claves[parteDeClave(clave, claves.length)];
-      if (fichero === undefined) return Option.none<string>();
-      return Option.fromNullishOr((yield* parte(fichero)).get(clave));
+      if (fichero === undefined) return Option.none<ClaveSituada>();
+      return Option.fromNullishOr(situarEnLaParte(yield* parte(fichero), clave));
     });
 
     /** Las agrupaciones con filtro de cada provincia, de la más vieja a la más reciente. */
@@ -367,6 +373,6 @@ export const capaDelOrigen = Layer.effect(
       );
     });
 
-    return CapaEmplazamientos.of({ resumen, provincia, provinciaDeClave, agrupacion });
+    return CapaEmplazamientos.of({ resumen, provincia, situarClave, agrupacion });
   }),
 );

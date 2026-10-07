@@ -530,6 +530,25 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
   return hecha;
 });
 
+/**
+ * Una noche parada por un cambio masivo en el registro (ADR 0027). La orden `noche` acaba con este
+ * error, y con él con un código distinto de cero, para que systemd dé el servicio por fallido y se
+ * vea en `systemctl` y en las alertas.
+ */
+export class NocheDetenida extends Schema.TaggedError<NocheDetenida>()("NocheDetenida", {
+  motivo: Schema.String,
+}) {
+  override get message() {
+    return `La noche se ha parado sin publicar: ${this.motivo}`;
+  }
+}
+
+/** Falla con `NocheDetenida` si la noche se paró por un cambio masivo. */
+export const comprobarNoche = (hecha: Noche): Effect.Effect<void, NocheDetenida> =>
+  hecha.publicacion.tipo === "detenida"
+    ? Effect.fail(new NocheDetenida({ motivo: hecha.publicacion.motivo }))
+    : Effect.void;
+
 /** Publica a mano, sin ingerir nada, lo apunta en la base y lanza el build de Vercel si hace falta. */
 export const publicarAMano = Effect.gen(function* () {
   const { resultado } = yield* publicarYApuntar([]);

@@ -254,7 +254,11 @@ const comprobarIndice = (entorno: Entorno, leida: Leida) =>
     for (const e of leida.emplazamientos) {
       const parte = partes[parteDeClave(e.clave, partes.length)] ?? "";
       const indice = leerParteDelIndice((yield* leer(entorno, parte)) ?? "");
-      assert.strictEqual(Result.getOrUndefined(indice)?.get(e.clave), e.provincia, e.clave);
+      assert.strictEqual(
+        Result.getOrUndefined(indice)?.provincias.get(e.clave),
+        e.provincia,
+        e.clave,
+      );
     }
   });
 

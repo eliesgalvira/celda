@@ -39,13 +39,15 @@ import {
   municipioDelPunto,
   puntoDeMunicipio,
 } from "./municipio.ts";
+import { compararTexto } from "./banda.ts";
 import { type Combinaciones, combinacionesDe } from "./filtro.ts";
 import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "./nombreDeLugar.ts";
 import { FuenteDePoblacion } from "./poblacion.ts";
 
 /**
- * El formato 5 de la capa (ADR 0016): un resumen nacional con una fila por provincia y una capa
- * por provincia, con las fichas en lotes dentro de cada provincia.
+ * El formato de la capa (ADR 0016): un resumen nacional con una fila por provincia y una capa por
+ * provincia, con las fichas en lotes dentro de cada provincia. El 5 lo estrenó; el 6 trae el
+ * historial de cada origen de la ficha y las claves anteriores en el índice de claves (ADR 0027).
  *
  * - El resumen lleva la versión en el nombre y una huella de su contenido, porque la misma versión
  *   de los datos puede publicarse otra vez con otra cobertura (otra fecha de barrido).
@@ -54,7 +56,7 @@ import { FuenteDePoblacion } from "./poblacion.ts";
  * - El manifiesto de una versión lista sus capas y sus lotes. La web no lo lee; sirve para retirar
  *   versiones viejas sin borrar lo que comparten con las que se quedan.
  */
-export const FORMATO_PROVINCIAS = 5;
+export const FORMATO_PROVINCIAS = 6;
 
 /** Caracteres de la huella SHA-256 que van en el nombre de un fichero: 64 bits. */
 export const LARGO_HUELLA = 16;
@@ -559,6 +561,11 @@ const ParteDelIndice = Schema.Struct({
   provincias: Schema.Array(Schema.String),
   /** Las claves de cada provincia de `provincias`, ordenadas. */
   claves: Schema.Array(Schema.Array(Schema.String)),
+  /**
+   * Las claves de la parte que ya no tienen emplazamiento porque se juntó con otro, con la clave
+   * de ese otro y su provincia (ADR 0027). Desde el formato 6.
+   */
+  anteriores: Schema.Array(Schema.Tuple([Schema.String, Schema.String, Schema.String])),
 });
 type ParteDelIndice = typeof ParteDelIndice.Type;
 
@@ -575,42 +582,82 @@ const decodificarParte = Schema.decodeUnknownResult(ParteEnJson);
 export const generarIndiceDeClaves = (
   situados: ReadonlyMap<string, ReadonlyArray<EmplazamientoSituado>>,
   partes: number = PARTES_DEL_INDICE,
+  anteriores: ReadonlyMap<string, string> = new Map(),
 ): ReadonlyArray<string> => {
   const porParte = Array.from({ length: partes }, () => new Map<string, Array<string>>());
+  const provinciaDe = new Map<string, string>();
   for (const [provincia, suyos] of situados) {
     for (const { emplazamiento } of suyos) {
       const parte = porParte[parteDeClave(emplazamiento.clave, partes)];
       const claves = parte?.get(provincia) ?? [];
       claves.push(emplazamiento.clave);
       parte?.set(provincia, claves);
+      provinciaDe.set(emplazamiento.clave, provincia);
     }
   }
-  return porParte.map((parte) => {
+  // Una clave anterior va en su parte, con la clave que la sustituye y la provincia de esa, si se
+  // publica.
+  const alias = Array.from(
+    { length: partes },
+    () => new Array<readonly [string, string, string]>(),
+  );
+  for (const [anterior, actual] of [...anteriores].sort((a, b) => compararTexto(a[0], b[0]))) {
+    const provincia = provinciaDe.get(actual);
+    if (provincia === undefined || provinciaDe.has(anterior)) continue;
+    alias[parteDeClave(anterior, partes)]?.push([anterior, actual, provincia]);
+  }
+  return porParte.map((parte, i) => {
     const provincias = [...parte.keys()].sort();
     const columnas: ParteDelIndice = {
       formato: FORMATO_PROVINCIAS,
       provincias,
       claves: provincias.map((p) => (parte.get(p) ?? []).slice().sort()),
+      anteriores: alias[i] ?? [],
     };
     return codificarParte(columnas);
   });
 };
 
+/** Dónde está hoy una clave según una parte del índice: su provincia y la clave que la lleva. */
+export interface ClaveSituada {
+  /** La clave del emplazamiento, distinta de la pedida si esa se juntó con otro. */
+  readonly clave: string;
+  readonly provincia: string;
+}
+
+/** Una parte del índice de claves leída. */
+export interface ParteLeida {
+  /** La provincia de cada clave de la parte. */
+  readonly provincias: ReadonlyMap<string, string>;
+  /** Las claves anteriores de la parte, con dónde están hoy. */
+  readonly anteriores: ReadonlyMap<string, ClaveSituada>;
+}
+
+/** Dónde está hoy una clave, según la parte del índice en que va, o `undefined` si no está. */
+export const situarEnLaParte = (parte: ParteLeida, clave: string): ClaveSituada | undefined => {
+  const provincia = parte.provincias.get(clave);
+  return provincia === undefined ? parte.anteriores.get(clave) : { clave, provincia };
+};
+
 /** Lee una parte del índice de claves: la provincia de cada clave que tiene. */
-export const leerParteDelIndice = (
-  contenido: string,
-): Result.Result<ReadonlyMap<string, string>, CapaIlegible> =>
+export const leerParteDelIndice = (contenido: string): Result.Result<ParteLeida, CapaIlegible> =>
   decodificarParte(contenido).pipe(
     Result.mapError((error) => new CapaIlegible({ motivo: error.message })),
     Result.flatMap((parte) =>
       parte.claves.length === parte.provincias.length
-        ? Result.succeed(
-            new Map(
+        ? Result.succeed({
+            provincias: new Map(
               parte.provincias.flatMap((provincia, i) =>
                 (parte.claves[i] ?? []).map((clave) => [clave, provincia] as const),
               ),
             ),
-          )
+            anteriores: new Map(
+              parte.anteriores.map(([anterior, clave, provincia]) => [
+                anterior,
+                { clave, provincia },
+              ]),
+            ),
+          })
         : descuadrada("el índice de claves está descuadrado"),
     ),
   );

@@ -4,7 +4,14 @@ import * as Result from "effect/Result";
 import type { FichaCruda, ListadoCrudo, Registro } from "./extractor.ts";
 import { type ObservacionGuardada, trasAusencia, trasFicha, trasListado } from "./guardado.ts";
 import { datosDeHecho, type HechoNuevo } from "./hecho.ts";
-import { type HechoLeido, leerHecho, registroPublicado, repetirHechos } from "./hechos.ts";
+import {
+  type FichasDeLasPaginas,
+  type HechoLeido,
+  hechosDeFicha,
+  leerHecho,
+  registroPublicado,
+  repetirHechos,
+} from "./hechos.ts";
 import { leerFicha, registroDeCrudo } from "./registro-oficial/normalizar.ts";
 
 const DIA = 86_400_000;
@@ -52,7 +59,10 @@ const leidaDe = (cruda: FichaCruda) => {
 };
 
 /** Repite una lista de hechos como los guardaría la base, leídos con su forma. */
-const repetir = (hechos: ReadonlyArray<readonly [number, HechoNuevo]>) =>
+const repetir = (
+  hechos: ReadonlyArray<readonly [number, HechoNuevo]>,
+  paginas: FichasDeLasPaginas = new Map(),
+) =>
   repetirHechos(
     "registro-oficial",
     hechos.map(([fecha, hecho]) => {
@@ -60,7 +70,23 @@ const repetir = (hechos: ReadonlyArray<readonly [number, HechoNuevo]>) =>
       if (Result.isFailure(leido)) return assert.fail(leido.failure);
       return leido.success;
     }),
+    paginas,
   );
+
+/** Una observación guardada antes de que se guardara lo que escribe el registro. */
+const guardadaSinCrudo = (registro: Registro): ObservacionGuardada => {
+  const { crudo: _crudo, ...limpio } = registro;
+  return {
+    ...limpio,
+    fuente: "registro-oficial",
+    afirma: "presente",
+    bandas: [],
+    fecha: NOCHE,
+    fichaLeidaEn: null,
+    ausencias: 0,
+    retiradaEn: null,
+  };
+};
 
 /** Una vida de un registro: el alta, su ficha y lo que pase después, con sus hechos. */
 const alta = () => {
@@ -97,7 +123,7 @@ describe("historial de un registro (ADR 0027)", () => {
     assert.isUndefined(trasFicha(leida.guardada, leidaDe(CRUDA), NOCHE + DIA).hecho);
     assert.deepStrictEqual(
       trasListado(leida.guardada, registroDe(CRUDO), "registro-oficial", NOCHE + DIA),
-      { guardar: undefined, cuenta: undefined, hecho: undefined },
+      { guardar: undefined, cuenta: undefined, cambia: false, hecho: undefined },
     );
   });
 
@@ -190,7 +216,110 @@ describe("historial de un registro (ADR 0027)", () => {
 
   it("repetir sin alta ni punto de partida falla", () => {
     const sinAlta: HechoLeido = { tipo: "retirada", fecha: NOCHE, datos: { forma: 1 } };
-    assert.isTrue(Result.isFailure(repetirHechos("registro-oficial", [sinAlta])));
-    assert.isTrue(Result.isFailure(repetirHechos("registro-oficial", [])));
+    assert.isTrue(Result.isFailure(repetirHechos("registro-oficial", [sinAlta], new Map())));
+    assert.isTrue(Result.isFailure(repetirHechos("registro-oficial", [], new Map())));
+  });
+
+  it("la ficha de un hecho se vuelve a leer de su página del archivo, y sin ella no se repite", () => {
+    const { guardada, hechos } = alta();
+    const leida = leidaDe(CRUDA);
+    const conPagina = trasFicha(guardada, { ...leida, pagina: "a1b2" }, NOCHE);
+    assert.deepStrictEqual(conPagina.hecho, {
+      tipo: "ficha",
+      ficha: { pagina: "a1b2" },
+      cambia: false,
+    });
+    hechos.push([NOCHE, conPagina.hecho ?? assert.fail("sin hecho")]);
+    assert.deepStrictEqual(
+      Result.getOrThrow(repetir(hechos, new Map([["a1b2", leida]]))),
+      registroPublicado(conPagina.guardada),
+    );
+    assert.isTrue(Result.isFailure(repetir(hechos)));
+  });
+
+  it("la primera vez que se guarda lo crudo se compara con la limpieza de hoy, y un arreglo no es un cambio", () => {
+    // Guardada antes del historial: la dirección con la «ñ» rota y la banda de 26 GHz en «MHz».
+    const conEne = { ...CRUDO, direccion: "AV Espa±a, 18. FUENLABRADA, MADRID" };
+    const deAntes: ObservacionGuardada = {
+      ...guardadaSinCrudo(registroDe(conEne)),
+      direccion: "AV Espa±a, 18. FUENLABRADA, MADRID",
+      municipio: "FUENLABRADA",
+      bandas: [
+        {
+          referencia: "B B -2201234",
+          compania: "movistar",
+          rangos: [{ desdeMhz: 25.7, hastaMhz: 26.7 }],
+          mhz: null,
+          anio: 2022,
+        },
+      ],
+      medidasDeExposicion: [],
+      fichaLeidaEn: NOCHE,
+    };
+    const listado = trasListado(deAntes, registroDe(conEne), "registro-oficial", NOCHE + DIA);
+    assert.deepStrictEqual(listado.hecho, {
+      tipo: "listado",
+      listado: { crudo: conEne },
+      cambia: false,
+    });
+    assert.strictEqual(listado.guardar?.fecha, NOCHE);
+    assert.strictEqual(listado.guardar?.direccion, "AV España, 18. FUENLABRADA, MADRID");
+    assert.isUndefined(listado.cuenta);
+    const ficha = trasFicha(
+      listado.guardar ?? deAntes,
+      leidaDe({
+        caracteristicas: [
+          {
+            operador: "TELEFONICA MOVILES ESPAÑA, S.A.U.",
+            referencia: "B B -2201234",
+            bandaMhz: "25.70 - 26.70",
+          },
+        ],
+        niveles: [],
+      }),
+      NOCHE + DIA,
+    );
+    assert.strictEqual(ficha.hecho?.tipo, "ficha");
+    assert.isFalse(ficha.hecho?.tipo === "ficha" && ficha.hecho.cambia);
+    assert.strictEqual(ficha.guardada.fecha, NOCHE);
+    assert.deepStrictEqual(ficha.guardada.bandas[0]?.rangos, [
+      { desdeMhz: 25700, hastaMhz: 26700 },
+    ]);
+  });
+
+  it("lo que publica la ficha: una vuelta con otro listado es también un cambio, y un titular nuevo estaba antes", () => {
+    const base = { antes: NOCHE, cambia: null, conocidoDesde: null };
+    assert.deepStrictEqual(
+      hechosDeFicha({ ...base, tipo: "vuelta", fecha: NOCHE + DIA, cambia: true }),
+      [
+        { tipo: "vuelta", fecha: NOCHE + DIA, antes: NOCHE },
+        { tipo: "cambio-de-listado", fecha: NOCHE + DIA, antes: NOCHE },
+      ],
+    );
+    assert.deepStrictEqual(
+      hechosDeFicha({ ...base, tipo: "vuelta", fecha: NOCHE + DIA, cambia: false }),
+      [{ tipo: "vuelta", fecha: NOCHE + DIA, antes: NOCHE }],
+    );
+    assert.deepStrictEqual(
+      hechosDeFicha({ ...base, tipo: "alta", fecha: NOCHE + DIA, conocidoDesde: NOCHE - DIA }),
+      [{ tipo: "en-el-registro-antes", fecha: NOCHE - DIA }],
+    );
+    assert.deepStrictEqual(
+      hechosDeFicha({ ...base, tipo: "listado", fecha: NOCHE, cambia: false }),
+      [],
+    );
+  });
+
+  it("una retirada que vuelve igual no cambia lo que se enseña", () => {
+    const { guardada } = alta();
+    const retirada: ObservacionGuardada = { ...guardada, ausencias: 2, retiradaEn: NOCHE + DIA };
+    const vuelta = trasListado(retirada, registroDe(CRUDO), "registro-oficial", NOCHE + 2 * DIA);
+    assert.isFalse(vuelta.cambia);
+    assert.strictEqual(vuelta.cuenta, "cambiada");
+    assert.deepStrictEqual(vuelta.hecho, {
+      tipo: "vuelta",
+      listado: { crudo: CRUDO },
+      cambia: false,
+    });
   });
 });

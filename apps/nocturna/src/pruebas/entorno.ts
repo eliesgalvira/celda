@@ -4,7 +4,7 @@ import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Fuente } from "@celda/dominio/observacion";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
 import { zonaDeBarrido } from "@celda/dominio/barrido";
-import type { OpcionesBarrido } from "@celda/ingesta/barrido";
+import { BaseDeBarrido, type OpcionesBarrido } from "@celda/ingesta/barrido";
 import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
 import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
 import {
@@ -26,8 +26,8 @@ import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
-import { archivoNocturno } from "../archivo.ts";
-import { baseNocturna } from "../base.ts";
+import { ArchivoNocturno, archivoNocturno } from "../archivo.ts";
+import { BaseNocturna, baseNocturna } from "../base.ts";
 import type { AceptadasDelBuzon } from "../buzon.ts";
 import { COPIAS_CONSERVADAS, REINTENTO_DE_PUBLICACION } from "../configuracion.ts";
 import {
@@ -144,6 +144,8 @@ export interface Variante {
   readonly buzon?: Layer.Layer<AceptadasDelBuzon>;
   readonly reintento?: Duration.Duration;
   readonly proceso?: OpcionesBarrido;
+  /** Cambia la base del barrido de la noche, para que falle donde quiera la prueba. */
+  readonly envolverBase?: (base: BaseDeBarrido["Service"]) => BaseDeBarrido["Service"];
 }
 
 /**
@@ -186,12 +188,40 @@ export const unaNoche = (
         }),
       ),
     );
-    return yield* noche({
+    const laNoche = noche({
       ...opcionesDe(entorno),
       reintento: variante.reintento ?? REINTENTO_DE_PUBLICACION,
       proceso: variante.proceso ?? CATALUNA_CADA_NOCHE,
-    }).pipe(Effect.provide(entornoDeLaNoche));
+    });
+    const { envolverBase } = variante;
+    return yield* (
+      envolverBase === undefined
+        ? laNoche
+        : Effect.flatMap(Effect.service(BaseDeBarrido), (base) =>
+            laNoche.pipe(Effect.provideService(BaseDeBarrido, envolverBase(base))),
+          )
+    ).pipe(Effect.provide(entornoDeLaNoche));
   });
+
+/**
+ * Repite el historial de la base del entorno y lo compara con la tabla de observaciones, con las
+ * fichas de sus hechos leídas del archivo de páginas del entorno (ADR 0027).
+ */
+export const comprobarHistorial = (entorno: Entorno, maximo = 5) =>
+  Effect.gen(function* () {
+    const base = yield* BaseNocturna;
+    const archivo = yield* ArchivoNocturno;
+    return yield* base.comprobarHistorial(maximo, (huellas) =>
+      Effect.orDie(archivo.fichasDePaginas(huellas)),
+    );
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        archivoNocturno(entorno.archivo),
+        baseNocturna({ fichero: entorno.base, interruptores: INTERRUPTOR_POR_DEFECTO }),
+      ),
+    ),
+  );
 
 /** Abre una base (la del entorno o una copia) y hace algo con ella. */
 export const conBase = <A, E, R>(fichero: string, efecto: Effect.Effect<A, E, R>) =>

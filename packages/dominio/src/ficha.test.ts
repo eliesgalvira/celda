@@ -6,8 +6,11 @@ const DIA = 86_400_000;
 const NOCHE = Date.UTC(2026, 9, 1, 2, 15);
 
 describe("desde cuándo dice la fuente lo que dice (ADR 0027)", () => {
-  it("sin historial, como en las fichas de antes, es desde la fecha del origen", () => {
-    assert.deepStrictEqual(desdeDelOrigen({ fecha: NOCHE }), { tipo: "desde", fecha: NOCHE });
+  it("sin hechos, como en un origen de la comunidad, es desde la fecha del origen", () => {
+    assert.deepStrictEqual(desdeDelOrigen({ fecha: NOCHE, historial: [] }), {
+      tipo: "desde",
+      fecha: NOCHE,
+    });
   });
 
   it("lo que ya estaba al empezar el historial está en el registro antes de esa fecha", () => {
@@ -48,6 +51,21 @@ describe("desde cuándo dice la fuente lo que dice (ADR 0027)", () => {
         ],
       }),
       { tipo: "desde", fecha: NOCHE + 30 * DIA, antes: NOCHE },
+    );
+  });
+
+  it("una vuelta con otro listado dice desde la vuelta", () => {
+    assert.deepStrictEqual(
+      desdeDelOrigen({
+        fecha: NOCHE + 40 * DIA,
+        historial: [
+          { tipo: "en-el-registro-antes", fecha: NOCHE },
+          { tipo: "retirada", fecha: NOCHE + 20 * DIA, antes: NOCHE + 10 * DIA },
+          { tipo: "vuelta", fecha: NOCHE + 40 * DIA, antes: NOCHE + 10 * DIA },
+          { tipo: "cambio-de-listado", fecha: NOCHE + 40 * DIA, antes: NOCHE + 10 * DIA },
+        ],
+      }),
+      { tipo: "desde", fecha: NOCHE + 40 * DIA, antes: NOCHE + 10 * DIA },
     );
   });
 });

@@ -43,6 +43,7 @@ const estacion = (compania: Compania, bandas: ReadonlyArray<Mhz | null>): Estaci
       url: "https://geoportal.minetur.gob.es/",
       fecha: NOCHE,
       afirma: "presente",
+      historial: [],
     },
   ],
 });
