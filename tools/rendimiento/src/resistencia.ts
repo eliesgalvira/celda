@@ -192,6 +192,10 @@ const principal = async () => {
     if (await funciones.isVisible()) await funciones.click();
     await pagina.getByRole("button", { name: /^Interferencia/u }).click();
     await esperarTexto(pagina, /destaca la señal/u);
+    // La salvedad de las celdas dura 5 s o hasta el primer gesto sobre el mapa, y al irse deja de
+    // escuchar los gestos: si la página se queda quieta antes, eso caía dentro de la ventana. Una
+    // tecla que el mapa no usa es ese primer gesto, como haría quien deja el móvil.
+    await pagina.locator(".maplibregl-canvas").press("Shift");
 
     // Que acaben las transiciones, los cálculos y el pintado de lo que se ha abierto.
     const sinAsentarse = await esperarQuieta(pagina);
