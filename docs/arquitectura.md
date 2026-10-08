@@ -110,7 +110,7 @@ interface Simulacion<Params, Resultado> {
 - `packages/ui`: componentes al estilo shadcn con `cva`, como en Moli, más los tokens del tema Hexágono en variables CSS OKLCH y el estilo del mapa, también como tokens.
 - **Se aplica con lint, no por convención** (en Moli era solo convención). Una regla de oxlint prohíbe `class`/`style` a medida y los colores sueltos fuera de `packages/ui`. Si una pantalla necesita algo nuevo, se añade una variante o un componente.
 - Los componentes hexagonales del prototipo (botón, etiqueta de estado, fichas, hoja inferior) pasan a ser componentes. Como el diseño va a cambiar, cambiarán en un solo sitio.
-- Queda preparado un tema oscuro con nombres semánticos, aunque no se active en la v1.
+- Los tokens tienen nombres semánticos y un tema oscuro, que la web usa cuando el sistema está en oscuro (#75, `docs/patterns/ui.md`).
 
 ### ▸ 7. Aportaciones en el dispositivo con el formato definitivo
 
