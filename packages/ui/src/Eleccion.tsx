@@ -161,39 +161,62 @@ export interface InterruptorProps {
 /**
  * Un ajuste que se enciende y se apaga. Es una casilla nativa con el papel de interruptor: se
  * cambia con el dedo en toda la fila, con Espacio y con el lector de pantalla, que dice si está
- * encendido.
+ * encendido. Su nombre es la etiqueta, y la descripción se lee después.
+ *
+ * Se ve como una pastilla. Apagada, un contorno con el mando pequeño en tinta suave; encendida,
+ * verde azulada con el mando claro, más grande, al otro lado. El mando queda a la misma distancia
+ * del borde por arriba, por abajo y por su lado, en píxeles enteros, para que salga centrado
+ * también a 2x. La fila entera, de 44 px como mínimo, es el objetivo táctil y lleva el foco.
  */
 export function Interruptor(props: InterruptorProps) {
   const id = createUniqueId();
+  const idEtiqueta = createUniqueId();
   return (
     <label
       class={
-        "grid min-h-11 cursor-pointer grid-cols-[1fr_auto] items-start gap-x-3 gap-y-1 bg-superficie-alta px-4 py-3 " +
-        "text-base font-semibold " +
+        "group/interruptor grid min-h-11 cursor-pointer grid-cols-[1fr_auto] items-start gap-x-3 gap-y-1 " +
+        "bg-superficie-alta px-4 py-3 text-base font-semibold " +
         "shadow-[inset_0_0_0_1.5px_var(--linea)] hover:bg-fondo " +
         "has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-foco " +
         "has-disabled:cursor-default has-disabled:opacity-60"
       }
     >
-      {props.etiqueta}
+      <span id={idEtiqueta}>{props.etiqueta}</span>
       <input
         type="checkbox"
         role="switch"
         checked={props.encendido}
         aria-checked={props.encendido ? "true" : "false"}
+        aria-labelledby={idEtiqueta}
         disabled={props.disabled}
         aria-describedby={props.descripcion === undefined ? undefined : id}
         onChange={(evento) => props.alCambiar(evento.currentTarget.checked)}
-        class="peer sr-only"
+        class="sr-only"
       />
       <span
         aria-hidden="true"
         class={
-          "col-start-2 row-span-2 row-start-1 mt-0.5 flex h-7 w-12 items-center bg-linea-fuerte px-1 " +
-          "transition-colors peer-checked:bg-primario peer-checked:*:translate-x-5 motion-reduce:transition-none"
+          "relative col-start-2 row-span-2 row-start-1 mt-0.5 h-7 w-12 rounded-full bg-superficie " +
+          "shadow-[inset_0_0_0_1.5px_var(--linea-fuerte)] transition-[background-color,box-shadow] duration-150 " +
+          "group-hover/interruptor:shadow-[inset_0_0_0_1.5px_var(--tinta)] " +
+          "group-has-checked/interruptor:bg-primario group-has-checked/interruptor:shadow-none " +
+          "group-has-checked/interruptor:group-hover/interruptor:bg-primario-hover " +
+          "group-has-checked/interruptor:group-hover/interruptor:shadow-none " +
+          "motion-reduce:transition-none"
         }
       >
-        <span class="hexagono size-5 bg-superficie transition-transform motion-reduce:transition-none" />
+        <span
+          class={
+            "absolute top-1.5 left-1.5 size-4 rounded-full bg-tinta-suave " +
+            "transition-[top,left,width,height,background-color] duration-180 ease-[cubic-bezier(0.3,0.7,0.2,1)] " +
+            "group-hover/interruptor:bg-tinta " +
+            "group-has-checked/interruptor:top-0.75 group-has-checked/interruptor:left-5.75 " +
+            "group-has-checked/interruptor:size-5.5 group-has-checked/interruptor:bg-primario-fg " +
+            "group-has-checked/interruptor:shadow-[0_1px_2px_var(--sombra)] " +
+            "group-has-checked/interruptor:group-hover/interruptor:bg-primario-fg " +
+            "motion-reduce:transition-none"
+          }
+        />
       </span>
       <Show when={props.descripcion}>
         <span id={id} class="col-start-1 text-sm leading-snug font-normal text-tinta-suave">
