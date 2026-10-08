@@ -50,3 +50,70 @@ export const puntosDelTraspaso = (
   }
   return puntos;
 };
+
+/** El paso entre los puntos y los marcadores, en la vista de puntos. */
+export interface Traspaso {
+  readonly tipo: "traspaso";
+  readonly hacia: "logos" | "puntos";
+  /** La escena con los marcadores: la que llega al acercar y la que se va al alejar. */
+  readonly marcadores: Escena;
+  /** La escena que llega con el paso. */
+  readonly llega: Escena;
+  /** El zoom del mapa en el paso: el tamaño de los puntos que se mueven. */
+  readonly zoom: number;
+}
+
+/** Sin paso: los marcadores están, o no, desde el principio o desde un cambio de vista. */
+export type SinTraspaso = { readonly tipo: "con" } | { readonly tipo: "sin" };
+export const CON: SinTraspaso = { tipo: "con" };
+export const SIN: SinTraspaso = { tipo: "sin" };
+
+/** Lo que se sabe del paso entre los puntos y los marcadores tras cada escena. */
+export interface EstadoDelTraspaso {
+  readonly vista: "puntos" | "agrupada" | undefined;
+  /** Si se dibujan marcadores. */
+  readonly con: boolean;
+  /** La última escena con marcadores: de ella salen los puntos al alejar o al volver a la vista de puntos. */
+  readonly ultima: Escena | undefined;
+  /** El último paso, que sigue mientras no cambie si hay marcadores. */
+  readonly traspaso: Traspaso | undefined;
+}
+
+/**
+ * El estado del paso tras una escena nueva. Hay paso cuando, con la vista de puntos antes y
+ * ahora, los marcadores salen o se van. Si salen o se van al cambiar de vista no hay paso, y el
+ * último deja de valer: los puntos del mapa se encienden o se apagan solo según haya marcadores.
+ */
+export const siguienteTraspaso = (
+  antes: EstadoDelTraspaso | undefined,
+  ahora: {
+    readonly vista: "puntos" | "agrupada" | undefined;
+    readonly con: boolean;
+    readonly escena: Escena | undefined;
+    readonly zoom: number;
+  },
+): EstadoDelTraspaso => {
+  const { vista, con, escena, zoom } = ahora;
+  const ultima = con ? escena : antes?.ultima;
+  if (
+    vista === "puntos" &&
+    antes?.vista === "puntos" &&
+    con !== antes.con &&
+    escena !== undefined &&
+    ultima !== undefined
+  ) {
+    return {
+      vista,
+      con,
+      ultima,
+      traspaso: {
+        tipo: "traspaso",
+        hacia: con ? "logos" : "puntos",
+        marcadores: ultima,
+        llega: escena,
+        zoom,
+      },
+    };
+  }
+  return { vista, con, ultima, traspaso: con === antes?.con ? antes.traspaso : undefined };
+};

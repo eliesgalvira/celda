@@ -36,7 +36,15 @@ import {
 } from "../capa/nacional.ts";
 import type { FichaPedida } from "../ficha/servicio.ts";
 import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
-import { type PuntoDelTraspaso, puntosDelTraspaso } from "../capa/traspaso.ts";
+import {
+  CON,
+  type EstadoDelTraspaso,
+  type PuntoDelTraspaso,
+  puntosDelTraspaso,
+  SIN,
+  siguienteTraspaso,
+  type Traspaso,
+} from "../capa/traspaso.ts";
 import { ZOOM_DE_LOGOS } from "../puntos/puntos.ts";
 import { posicionesDelVuelo } from "../puntos/vuelo.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
@@ -107,22 +115,6 @@ export interface MarcadoresProps {
 
 /** El tamaño de un logo de un marcador, en píxeles: de él a un punto va la escala del paso. */
 const LOGO_PX = 34;
-
-/** El paso entre los puntos y los marcadores, en la vista de puntos (ADR 0028). */
-interface Traspaso {
-  readonly tipo: "traspaso";
-  readonly hacia: "logos" | "puntos";
-  /** La escena con los marcadores: la que llega al acercar y la que se va al alejar. */
-  readonly marcadores: Escena;
-  /** La escena que llega con el paso. */
-  readonly llega: Escena;
-  readonly zoom: number;
-}
-
-/** Sin paso: los marcadores están, o no, desde el principio. */
-type SinTraspaso = { readonly tipo: "con" } | { readonly tipo: "sin" };
-const CON: SinTraspaso = { tipo: "con" };
-const SIN: SinTraspaso = { tipo: "sin" };
 
 const SIN_ROTULOS: LecturaDeRotulos = { zoom: 0, rotulos: [] };
 
@@ -211,39 +203,14 @@ export function Marcadores(props: MarcadoresProps) {
    * Si hay marcadores, la última escena que los tenía y el último paso entre los puntos y los
    * marcadores: uno nuevo cada vez que, con la vista de puntos, salen o se van.
    */
-  const estadoDelTraspaso = createMemo<{
-    readonly vista: "puntos" | "agrupada" | undefined;
-    readonly con: boolean;
-    readonly ultima: Escena | undefined;
-    readonly traspaso: Traspaso | undefined;
-  }>((antes) => {
-    const con = props.conMarcadores !== false;
-    const actual = escena();
-    const ultima = con ? actual : antes?.ultima;
-    const marcadores = con ? actual : antes?.ultima;
-    const vistaActual = props.vista;
-    if (
-      vistaActual === "puntos" &&
-      antes?.vista === "puntos" &&
-      con !== antes.con &&
-      actual !== undefined &&
-      marcadores !== undefined
-    ) {
-      return {
-        vista: vistaActual,
-        con,
-        ultima,
-        traspaso: {
-          tipo: "traspaso",
-          hacia: con ? "logos" : "puntos",
-          marcadores,
-          llega: actual,
-          zoom: untrack(() => props.mapa.getZoom()),
-        },
-      };
-    }
-    return { vista: vistaActual, con, ultima, traspaso: antes?.traspaso };
-  });
+  const estadoDelTraspaso = createMemo<EstadoDelTraspaso | undefined>((antes) =>
+    siguienteTraspaso(antes, {
+      vista: props.vista,
+      con: props.conMarcadores !== false,
+      escena: escena(),
+      zoom: untrack(() => props.mapa.getZoom()),
+    }),
+  );
 
   // Funciones por mapa, que no leen props al llamarlas: se usan dentro de efectos.
   const proyectar = createMemo(() => {
@@ -286,7 +253,7 @@ export function Marcadores(props: MarcadoresProps) {
   }>();
   recurso(
     "marcadores:traspaso",
-    () => estadoDelTraspaso().traspaso ?? (estadoDelTraspaso().con ? CON : SIN),
+    () => estadoDelTraspaso()?.traspaso ?? (estadoDelTraspaso()?.con === false ? SIN : CON),
     (paso) => {
       const apagar = props.alApagarPuntos;
       if (paso.tipo !== "traspaso" || untrack(reducido)) {
@@ -352,7 +319,7 @@ export function Marcadores(props: MarcadoresProps) {
                 cajaConMargen(ahora.caja),
                 props.seleccionada,
               )
-            : untrack(estadoDelTraspaso).ultima;
+            : untrack(estadoDelTraspaso)?.ultima;
       const color = leerOklch(
         getComputedStyle(document.documentElement).getPropertyValue("--mapa-punto"),
       );
@@ -421,7 +388,7 @@ export function Marcadores(props: MarcadoresProps) {
       }
     | undefined
   >((antes) => {
-    const paso = estadoDelTraspaso().traspaso;
+    const paso = estadoDelTraspaso()?.traspaso;
     const { cambio } = cambioDeVista();
     const enVuelo = vuelo();
     const actual = escena();

@@ -4,7 +4,7 @@ import { assert, describe, it } from "@effect/vitest";
 
 import { crearAgrupador, type Escena, SIN_TRANSICION } from "./agrupacion.ts";
 import { siguientesPintados } from "./pintados.ts";
-import { puntosDelTraspaso } from "./traspaso.ts";
+import { type EstadoDelTraspaso, puntosDelTraspaso, siguienteTraspaso } from "./traspaso.ts";
 
 const emplazamiento = (clave: string, longitud: number, latitud: number): EmplazamientoLeido => ({
   clave,
@@ -70,5 +70,38 @@ describe("los puntos del paso entre los puntos y los logos", () => {
         (p) => p.movimiento.tipo === "quieto",
       ),
     );
+  });
+});
+
+describe("cuándo hay paso entre los puntos y los logos", () => {
+  const VACIA: Escena = { nivel: 14, elementos: new Map() };
+  const paso = (
+    antes: EstadoDelTraspaso | undefined,
+    vista: "puntos" | "agrupada",
+    con: boolean,
+    escena: Escena,
+  ) => siguienteTraspaso(antes, { vista, con, escena, zoom: 15 });
+
+  it("con la vista de puntos, al salir los logos y al irse", () => {
+    const inicio = paso(undefined, "puntos", false, VACIA);
+    assert.isUndefined(inicio.traspaso);
+    const acercar = paso(inicio, "puntos", true, ESCENA);
+    assert.deepInclude(acercar.traspaso, { hacia: "logos", marcadores: ESCENA, llega: ESCENA });
+    // Mientras siguen los logos, el paso es el mismo.
+    assert.strictEqual(paso(acercar, "puntos", true, ESCENA).traspaso, acercar.traspaso);
+    const alejar = paso(acercar, "puntos", false, VACIA);
+    assert.deepInclude(alejar.traspaso, { hacia: "puntos", marcadores: ESCENA, llega: VACIA });
+  });
+
+  it("al cambiar de vista no hay paso, y el anterior deja de valer", () => {
+    const conLogos = paso(paso(undefined, "puntos", false, VACIA), "puntos", true, ESCENA);
+    // A la agrupada con los logos a la vista: siguen los marcadores, el paso es el de antes.
+    const agrupada = paso(conLogos, "agrupada", true, ESCENA);
+    assert.strictEqual(agrupada.traspaso, conLogos.traspaso);
+    // De vuelta a los puntos de lejos: los marcadores se van sin paso, y los puntos se encienden.
+    const puntos = paso(agrupada, "puntos", false, VACIA);
+    assert.isUndefined(puntos.traspaso);
+    assert.isFalse(puntos.con);
+    assert.strictEqual(puntos.ultima, ESCENA);
   });
 });
