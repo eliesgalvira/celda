@@ -904,6 +904,8 @@ export function PantallaMapa() {
    * los apagan al salir y los vuelven a encender cuando los puntos que se mueven llegan a su sitio.
    */
   const [puntosApagados, setPuntosApagados] = createSignal(false);
+  /** Si los puntos del mapa están tapados por los que vuelan al cambiar de vista. */
+  const [puntosTapados, setPuntosTapados] = createSignal(false);
 
   crearPuntosEnMapa({
     lienzo: createMemo(() => {
@@ -911,7 +913,7 @@ export function PantallaMapa() {
       return actual === undefined ? undefined : lienzoDePuntos(actual);
     }),
     puntos: puntosListos,
-    visibles: () => vistaDibujada() === "puntos",
+    visibles: () => vistaDibujada() === "puntos" && !puntosTapados(),
     apagados: puntosApagados,
     filtro: filtro.aplicado,
     elegido: () => pendiente()?.posicion ?? posicionSeleccionada(),
@@ -1471,8 +1473,10 @@ export function PantallaMapa() {
                             lectorDeRotulos={lectorDeRotulos()}
                             conFoto={foto.seVe()}
                             conMarcadores={conMarcadores()}
-                            conPuntos={vistaDibujada() === "puntos"}
+                            vista={vistaDibujada()}
+                            puntos={puntosListos()?.puntos}
                             alApagarPuntos={setPuntosApagados}
+                            alTaparPuntos={setPuntosTapados}
                           />
                         )}
                       </Show>
@@ -1530,7 +1534,15 @@ export function PantallaMapa() {
                     icono={<IconoVistaAgrupada />}
                     activo={vistaElegida() === "agrupada"}
                     disabled={vistaElegida() === undefined}
-                    onClick={() => ajustes.cambiarVistaAgrupada(vistaElegida() !== "agrupada")}
+                    onClick={() => {
+                      const agrupada = vistaElegida() !== "agrupada";
+                      // Al volver a los puntos de lejos, vuelan desde sus hexágonos: los del mapa no
+                      // se ven hasta que llegan (ver `Marcadores`).
+                      if (!agrupada && (mapa?.getZoom() ?? ZOOM_DE_LOGOS) < ZOOM_DE_LOGOS) {
+                        setPuntosTapados(true);
+                      }
+                      ajustes.cambiarVistaAgrupada(agrupada);
+                    }}
                   />
                   <ControlDelMapa
                     etiqueta="Medir mi señal"

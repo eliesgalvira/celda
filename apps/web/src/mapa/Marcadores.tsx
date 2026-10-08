@@ -1,10 +1,18 @@
 import type { Coordenada } from "@celda/dominio/area";
-import { type FiltroDeCompanias, SIN_FILTRO } from "@celda/dominio/filtro";
+import { type FiltroDeCompanias, mascarasDeFiltro, SIN_FILTRO } from "@celda/dominio/filtro";
+import type { PuntosLeidos } from "@celda/dominio/puntos";
 import { habitantesDeRotulo, indiceDeCiudades } from "@celda/dominio/poblacionDeRotulos";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { quitarRotulosDeMunicipios } from "@celda/ui/mapa/estilo.ts";
 import { FUENTE_HUECOS, puestaDeHuecos } from "@celda/ui/mapa/huecos.ts";
-import { FUNDIDO_DE_PUNTOS_MS, opacidadDePunto, radioDePunto } from "@celda/ui/mapa/puntos.ts";
+import { leerOklch } from "@celda/ui/mapa/color.ts";
+import {
+  CAPA_DE_PUNTOS,
+  FUNDIDO_DE_PUNTOS_MS,
+  opacidadDePunto,
+  radioDePunto,
+} from "@celda/ui/mapa/puntos.ts";
+import { CAPA_DE_VUELO, capaDeVuelo } from "@celda/ui/mapa/vuelo.ts";
 import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Deslizable.tsx";
 import { CapaDeTraspaso, PuntoDeTraspaso } from "@celda/ui/puntos/Puntos.tsx";
 import { CapaDeRotulos, RotuloDeCiudad } from "@celda/ui/marcadores/RotuloDeCiudad.tsx";
@@ -29,6 +37,8 @@ import {
 import type { FichaPedida } from "../ficha/servicio.ts";
 import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { type PuntoDelTraspaso, puntosDelTraspaso } from "../capa/traspaso.ts";
+import { ZOOM_DE_LOGOS } from "../puntos/puntos.ts";
+import { posicionesDelVuelo } from "../puntos/vuelo.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
 import type { LecturaDeRotulos, LectorDeRotulos, RotuloLeido } from "./rotulosDeCiudad.ts";
 import { type Lamina, seguirVista } from "./vista.ts";
@@ -79,10 +89,15 @@ export interface MarcadoresProps {
    */
   readonly conMarcadores?: boolean;
   /**
-   * Con la vista de puntos: al cruzar el zoom de los logos, cada logo crece desde su punto y los
-   * puntos de una agrupación se deslizan a su hexágono, y al alejar al revés (ADR 0028).
+   * La vista que se dibuja (ADR 0028). Con la de puntos, al cruzar el zoom de los logos, cada logo
+   * crece desde su punto y los puntos de una agrupación se deslizan a su hexágono, y al alejar al
+   * revés. Al cambiar de una a otra de lejos, los puntos vuelan a sus hexágonos o salen de ellos.
    */
-  readonly conPuntos?: boolean;
+  readonly vista?: "puntos" | "agrupada" | undefined;
+  /** Los puntos de toda España, si han llegado: los que vuelan al cambiar de vista. */
+  readonly puntos?: PuntosLeidos | undefined;
+  /** Mientras los puntos que vuelan tapan los del mapa, que no se ven. */
+  readonly alTaparPuntos?: (tapados: boolean) => void;
   /**
    * Cuándo se apagan los puntos del mapa y cuándo vuelven: al salir los logos, y al alejar, cuando
    * los puntos que se mueven están llegando a su sitio.
@@ -169,11 +184,19 @@ export function Marcadores(props: MarcadoresProps) {
     return () => preferencia.removeEventListener("change", alCambiarPreferencia);
   });
 
+  /** El vuelo de los puntos al cambiar de vista, mientras dura: hacia dónde y si ya llegan. */
+  const [vuelo, setVuelo] = createSignal<{
+    readonly hacia: "puntos" | "agrupada";
+    readonly llegado: boolean;
+  }>();
+
   const escena = createMemo(() => {
     const ahora = vista();
     if (ahora === undefined) return undefined;
-    // Sin marcadores, una escena vacía: los que había se van con su transición.
-    if (props.conMarcadores === false) {
+    const enVuelo = vuelo();
+    // Sin marcadores, una escena vacía: los que había se van con su transición. Mientras los
+    // puntos vuelan hacia sus hexágonos, tampoco: salen cuando llegan.
+    if (props.conMarcadores === false || (enVuelo?.hacia === "agrupada" && !enVuelo.llegado)) {
       return { nivel: nivelDeZoom(ahora.zoom), elementos: new Map<string, Elemento>() };
     }
     return agrupador().escena(
@@ -189,6 +212,7 @@ export function Marcadores(props: MarcadoresProps) {
    * marcadores: uno nuevo cada vez que, con la vista de puntos, salen o se van.
    */
   const estadoDelTraspaso = createMemo<{
+    readonly vista: "puntos" | "agrupada" | undefined;
     readonly con: boolean;
     readonly ultima: Escena | undefined;
     readonly traspaso: Traspaso | undefined;
@@ -197,14 +221,16 @@ export function Marcadores(props: MarcadoresProps) {
     const actual = escena();
     const ultima = con ? actual : antes?.ultima;
     const marcadores = con ? actual : antes?.ultima;
+    const vistaActual = props.vista;
     if (
-      props.conPuntos === true &&
-      antes !== undefined &&
+      vistaActual === "puntos" &&
+      antes?.vista === "puntos" &&
       con !== antes.con &&
       actual !== undefined &&
       marcadores !== undefined
     ) {
       return {
+        vista: vistaActual,
         con,
         ultima,
         traspaso: {
@@ -216,7 +242,7 @@ export function Marcadores(props: MarcadoresProps) {
         },
       };
     }
-    return { con, ultima, traspaso: antes?.traspaso };
+    return { vista: vistaActual, con, ultima, traspaso: antes?.traspaso };
   });
 
   // Funciones por mapa, que no leen props al llamarlas: se usan dentro de efectos.
@@ -291,6 +317,128 @@ export function Marcadores(props: MarcadoresProps) {
       };
     },
   );
+
+  /** Cada cambio de vista, después de la primera que se sabe: el que hace volar los puntos. */
+  const cambioDeVista = createMemo<{
+    readonly vista: "puntos" | "agrupada" | undefined;
+    readonly cambio: { readonly hacia: "puntos" | "agrupada" } | undefined;
+  }>((antes) => {
+    const actual = props.vista;
+    return {
+      vista: actual,
+      cambio:
+        antes?.vista !== undefined && actual !== undefined && antes.vista !== actual
+          ? { hacia: actual }
+          : antes?.cambio,
+    };
+  });
+  // Al cambiar de vista de lejos, los puntos vuelan a sus hexágonos o salen de ellos, en una capa
+  // propia de MapLibre (`capaDeVuelo`). Desde el zoom de los logos las dos vistas son iguales y
+  // no vuela nada; con la preferencia de reducir movimiento, tampoco.
+  recurso(
+    "marcadores:vuelo",
+    () => cambioDeVista().cambio,
+    ({ hacia }) => {
+      const mapa = props.mapa;
+      const ahora = untrack(vista);
+      const puntos = props.puntos;
+      const zoom = mapa.getZoom();
+      const escenaAgrupada =
+        ahora === undefined
+          ? undefined
+          : hacia === "agrupada"
+            ? untrack(agrupador).escena(
+                nivelDeZoom(ahora.zoom),
+                cajaConMargen(ahora.caja),
+                props.seleccionada,
+              )
+            : untrack(estadoDelTraspaso).ultima;
+      const color = leerOklch(
+        getComputedStyle(document.documentElement).getPropertyValue("--mapa-punto"),
+      );
+      if (
+        untrack(reducido) ||
+        puntos === undefined ||
+        ahora === undefined ||
+        escenaAgrupada === undefined ||
+        color === null ||
+        nivelDeZoom(zoom) >= ZOOM_DE_LOGOS
+      ) {
+        setVuelo(undefined);
+        props.alTaparPuntos?.(false);
+        return undefined;
+      }
+      const posiciones = posicionesDelVuelo(
+        puntos,
+        escenaAgrupada,
+        (elemento) => untrack(agrupador).emplazamientosDe(elemento),
+        cajaConMargen(ahora.caja),
+        mascarasDeFiltro(untrack(filtro)),
+      );
+      const juntan = hacia === "agrupada";
+      const quitar = () => {
+        if (mapa.getLayer(CAPA_DE_VUELO) !== undefined) mapa.removeLayer(CAPA_DE_VUELO);
+      };
+      quitar();
+      setVuelo({ hacia, llegado: false });
+      if (!juntan) props.alTaparPuntos?.(true);
+      const orden = mapa.getLayersOrder();
+      mapa.addLayer(
+        capaDeVuelo({
+          desde: juntan ? posiciones.desde : posiciones.hasta,
+          hasta: juntan ? posiciones.hasta : posiciones.desde,
+          color,
+          opacidad: opacidadDePunto(zoom),
+          diametro: 2 * radioDePunto(zoom),
+          sentido: juntan ? "junta" : "separa",
+          // Al llegar, los puntos del mapa salen ya en el mismo sitio: no hace falta fundido.
+          fundidoMs: 0,
+          alLlegar: () => {
+            setVuelo({ hacia, llegado: true });
+            if (!juntan) props.alTaparPuntos?.(false);
+          },
+          alAcabar: quitar,
+        }),
+        // Justo encima de los puntos, bajo los rótulos.
+        orden[orden.indexOf(CAPA_DE_PUNTOS) + 1],
+      );
+      return quitar;
+    },
+  );
+
+  /**
+   * Con qué escena llega un paso entre los puntos y los marcadores, para que cada logo crezca desde
+   * su punto o se encoja hasta él: la del último paso al cruzar el zoom de los logos o la del último
+   * vuelo al cambiar de vista, la que haya cambiado.
+   */
+  const traspasoDeCapa = createMemo<
+    | {
+        readonly paso: Traspaso | undefined;
+        readonly cambio: ReturnType<typeof cambioDeVista>["cambio"];
+        readonly vuelo: ReturnType<typeof vuelo>;
+        readonly escena: Escena;
+        readonly escala: number;
+      }
+    | undefined
+  >((antes) => {
+    const paso = estadoDelTraspaso().traspaso;
+    const { cambio } = cambioDeVista();
+    const enVuelo = vuelo();
+    const actual = escena();
+    const escala = () => (2 * radioDePunto(untrack(() => props.mapa.getZoom()))) / LOGO_PX;
+    const de = { paso, cambio, vuelo: enVuelo };
+    if (paso !== undefined && paso !== antes?.paso) {
+      return { ...de, escena: paso.llega, escala: escala() };
+    }
+    // Al volver a los puntos, los marcadores se van a la vez que cambia la vista; al pasar a la
+    // agrupada, salen cuando los puntos llegan a sus hexágonos.
+    const vuelven = cambio?.hacia === "puntos" && cambio !== antes?.cambio;
+    const llegan = enVuelo?.hacia === "agrupada" && enVuelo.llegado && enVuelo !== antes?.vuelo;
+    if ((vuelven || llegan) && actual !== undefined) {
+      return { ...de, escena: actual, escala: escala() };
+    }
+    return antes === undefined ? undefined : { ...antes, ...de };
+  });
 
   // Precarga las fichas de los sueltos que se ven. La escena cambia también al seleccionar uno;
   // si los que se ven son los mismos, no se vuelve a pedir nada. Solo al mover el mapa o al
@@ -529,14 +677,7 @@ export function Marcadores(props: MarcadoresProps) {
         seleccionada={props.seleccionada}
         alSeleccionar={(clave) => props.alSeleccionar(clave, provinciaDe(clave))}
         alAbrir={abrir}
-        traspaso={
-          estadoDelTraspaso().traspaso === undefined
-            ? undefined
-            : {
-                escena: estadoDelTraspaso().traspaso?.llega ?? SIN_ESCENA,
-                escala: (2 * radioDePunto(estadoDelTraspaso().traspaso?.zoom ?? 15)) / LOGO_PX,
-              }
-        }
+        traspaso={traspasoDeCapa()}
       />
       <CapaDeRotulos contenedor={props.mapa.getCanvasContainer()} salto={lamina().salto}>
         <For each={rotulosEncima()} keyed={(rotulo) => rotulo.clave}>
@@ -580,9 +721,6 @@ function RotuloEnPantalla(props: {
     />
   );
 }
-
-/** Una escena que no es ninguna: no coincide con ninguna que dibuje la capa. */
-const SIN_ESCENA: Escena = { nivel: -1, elementos: new Map() };
 
 /**
  * Un punto que se mueve entre su sitio y su marcador en el paso entre los puntos y los logos: va

@@ -27,6 +27,8 @@ export const FUENTE_PUNTOS = "puntos";
 export const FUENTE_PUNTO_ELEGIDO = "punto-elegido";
 
 const CAPA_PUNTOS = "puntos";
+/** La capa de los puntos propios: encima de ella vuela lo que cambia de vista (`vuelo.ts`). */
+export const CAPA_DE_PUNTOS = CAPA_PUNTOS;
 const CAPA_PUNTOS_RED_USADA = "puntos-red-usada";
 const CAPA_ELEGIDO = "punto-elegido";
 const CAPA_ELEGIDO_ANILLO = "punto-elegido-anillo";
