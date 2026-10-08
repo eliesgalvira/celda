@@ -4,13 +4,20 @@ import { habitantesDeRotulo, indiceDeCiudades } from "@celda/dominio/poblacionDe
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { quitarRotulosDeMunicipios } from "@celda/ui/mapa/estilo.ts";
 import { FUENTE_HUECOS, puestaDeHuecos } from "@celda/ui/mapa/huecos.ts";
-import type { Salto } from "@celda/ui/marcadores/Deslizable.tsx";
+import { FUNDIDO_DE_PUNTOS_MS, opacidadDePunto, radioDePunto } from "@celda/ui/mapa/puntos.ts";
+import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Deslizable.tsx";
+import { CapaDeTraspaso, PuntoDeTraspaso } from "@celda/ui/puntos/Puntos.tsx";
 import { CapaDeRotulos, RotuloDeCiudad } from "@celda/ui/marcadores/RotuloDeCiudad.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
-import { createEffect, createMemo, createSignal, For, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
-import { type Elemento, type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
+import {
+  type Elemento,
+  type ElementoAbrible,
+  type Escena,
+  nivelDeZoom,
+} from "../capa/agrupacion.ts";
 import { huecosDe, resolverChoques, type RotuloEnElMapa, tamanoDeNivel } from "../capa/choques.ts";
 import { cajaConMargen, logosDe, type Vista } from "../capa/marcadores.ts";
 import {
@@ -21,6 +28,7 @@ import {
 } from "../capa/nacional.ts";
 import type { FichaPedida } from "../ficha/servicio.ts";
 import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
+import { type PuntoDelTraspaso, puntosDelTraspaso } from "../capa/traspaso.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
 import type { LecturaDeRotulos, LectorDeRotulos, RotuloLeido } from "./rotulosDeCiudad.ts";
 import { type Lamina, seguirVista } from "./vista.ts";
@@ -70,7 +78,36 @@ export interface MarcadoresProps {
    * emplazamientos y aquí solo van los rótulos de ciudad. Sin él, siempre.
    */
   readonly conMarcadores?: boolean;
+  /**
+   * Con la vista de puntos: al cruzar el zoom de los logos, cada logo crece desde su punto y los
+   * puntos de una agrupación se deslizan a su hexágono, y al alejar al revés (ADR 0028).
+   */
+  readonly conPuntos?: boolean;
+  /**
+   * Cuándo se apagan los puntos del mapa y cuándo vuelven: al salir los logos, y al alejar, cuando
+   * los puntos que se mueven están llegando a su sitio.
+   */
+  readonly alApagarPuntos?: (apagados: boolean) => void;
 }
+
+/** El tamaño de un logo de un marcador, en píxeles: de él a un punto va la escala del paso. */
+const LOGO_PX = 34;
+
+/** El paso entre los puntos y los marcadores, en la vista de puntos (ADR 0028). */
+interface Traspaso {
+  readonly tipo: "traspaso";
+  readonly hacia: "logos" | "puntos";
+  /** La escena con los marcadores: la que llega al acercar y la que se va al alejar. */
+  readonly marcadores: Escena;
+  /** La escena que llega con el paso. */
+  readonly llega: Escena;
+  readonly zoom: number;
+}
+
+/** Sin paso: los marcadores están, o no, desde el principio. */
+type SinTraspaso = { readonly tipo: "con" } | { readonly tipo: "sin" };
+const CON: SinTraspaso = { tipo: "con" };
+const SIN: SinTraspaso = { tipo: "sin" };
 
 const SIN_ROTULOS: LecturaDeRotulos = { zoom: 0, rotulos: [] };
 
@@ -147,6 +184,41 @@ export function Marcadores(props: MarcadoresProps) {
     );
   });
 
+  /**
+   * Si hay marcadores, la última escena que los tenía y el último paso entre los puntos y los
+   * marcadores: uno nuevo cada vez que, con la vista de puntos, salen o se van.
+   */
+  const estadoDelTraspaso = createMemo<{
+    readonly con: boolean;
+    readonly ultima: Escena | undefined;
+    readonly traspaso: Traspaso | undefined;
+  }>((antes) => {
+    const con = props.conMarcadores !== false;
+    const actual = escena();
+    const ultima = con ? actual : antes?.ultima;
+    const marcadores = con ? actual : antes?.ultima;
+    if (
+      props.conPuntos === true &&
+      antes !== undefined &&
+      con !== antes.con &&
+      actual !== undefined &&
+      marcadores !== undefined
+    ) {
+      return {
+        con,
+        ultima,
+        traspaso: {
+          tipo: "traspaso",
+          hacia: con ? "logos" : "puntos",
+          marcadores,
+          llega: actual,
+          zoom: untrack(() => props.mapa.getZoom()),
+        },
+      };
+    }
+    return { con, ultima, traspaso: antes?.traspaso };
+  });
+
   // Funciones por mapa, que no leen props al llamarlas: se usan dentro de efectos.
   const proyectar = createMemo(() => {
     const mapa = props.mapa;
@@ -179,6 +251,46 @@ export function Marcadores(props: MarcadoresProps) {
       return enPantalla({ x: punto.x + salto.x, y: punto.y + salto.y });
     };
   });
+
+  /** Los puntos que se mueven en el paso entre los puntos y los logos, mientras se mueven. */
+  const [moviendose, setMoviendose] = createSignal<{
+    readonly hacia: "logos" | "puntos";
+    readonly zoom: number;
+    readonly puntos: ReadonlyArray<PuntoDelTraspaso>;
+  }>();
+  recurso(
+    "marcadores:traspaso",
+    () => estadoDelTraspaso().traspaso ?? (estadoDelTraspaso().con ? CON : SIN),
+    (paso) => {
+      const apagar = props.alApagarPuntos;
+      if (paso.tipo !== "traspaso" || untrack(reducido)) {
+        apagar?.(paso.tipo === "traspaso" ? paso.hacia === "logos" : paso.tipo === "con");
+        setMoviendose(undefined);
+        return undefined;
+      }
+      const enPantalla = untrack(proyectar);
+      const seVeAhora = untrack(seVe);
+      const puntos = puntosDelTraspaso(
+        paso.marcadores,
+        (elemento) => untrack(agrupador).emplazamientosDe(elemento),
+        (posicion) => seVeAhora(enPantalla(posicion)),
+      );
+      setMoviendose({ hacia: paso.hacia, zoom: paso.zoom, puntos });
+      const relojes: Array<number> = [];
+      if (paso.hacia === "logos") {
+        apagar?.(true);
+      } else {
+        // Los puntos del mapa vuelven con su fundido cuando los que se mueven llegan a su sitio.
+        relojes.push(
+          window.setTimeout(() => apagar?.(false), DURACION_MOVIMIENTO_MS - FUNDIDO_DE_PUNTOS_MS),
+        );
+      }
+      relojes.push(window.setTimeout(() => setMoviendose(undefined), DURACION_MOVIMIENTO_MS));
+      return () => {
+        for (const reloj of relojes) window.clearTimeout(reloj);
+      };
+    },
+  );
 
   // Precarga las fichas de los sueltos que se ven. La escena cambia también al seleccionar uno;
   // si los que se ven son los mismos, no se vuelve a pedir nada. Solo al mover el mapa o al
@@ -384,6 +496,22 @@ export function Marcadores(props: MarcadoresProps) {
 
   return (
     <>
+      <Show when={moviendose()}>
+        {(paso) => (
+          <CapaDeTraspaso contenedor={props.mapa.getCanvasContainer()} salto={lamina().salto}>
+            <For each={paso().puntos} keyed={(punto) => punto.clave}>
+              {(punto) => (
+                <PuntoQueSeMueve
+                  punto={punto()}
+                  hacia={paso().hacia}
+                  zoom={paso().zoom}
+                  proyectar={untrack(proyectarEnLamina)}
+                />
+              )}
+            </For>
+          </CapaDeTraspaso>
+        )}
+      </Show>
       <CapaAgrupada
         contenedor={props.mapa.getCanvasContainer()}
         logos={logos()}
@@ -401,6 +529,14 @@ export function Marcadores(props: MarcadoresProps) {
         seleccionada={props.seleccionada}
         alSeleccionar={(clave) => props.alSeleccionar(clave, provinciaDe(clave))}
         alAbrir={abrir}
+        traspaso={
+          estadoDelTraspaso().traspaso === undefined
+            ? undefined
+            : {
+                escena: estadoDelTraspaso().traspaso?.llega ?? SIN_ESCENA,
+                escala: (2 * radioDePunto(estadoDelTraspaso().traspaso?.zoom ?? 15)) / LOGO_PX,
+              }
+        }
       />
       <CapaDeRotulos contenedor={props.mapa.getCanvasContainer()} salto={lamina().salto}>
         <For each={rotulosEncima()} keyed={(rotulo) => rotulo.clave}>
@@ -441,6 +577,33 @@ function RotuloEnPantalla(props: {
       tamano={props.rotulo.tamano}
       importancia={props.rotulo.importancia}
       conFoto={props.conFoto}
+    />
+  );
+}
+
+/** Una escena que no es ninguna: no coincide con ninguna que dibuje la capa. */
+const SIN_ESCENA: Escena = { nivel: -1, elementos: new Map() };
+
+/**
+ * Un punto que se mueve entre su sitio y su marcador en el paso entre los puntos y los logos: va
+ * hacia él al acercar y sale de él al alejar.
+ */
+function PuntoQueSeMueve(props: {
+  readonly punto: PuntoDelTraspaso;
+  readonly hacia: "logos" | "puntos";
+  readonly zoom: number;
+  readonly proyectar: (posicion: Coordenada) => Salto;
+}) {
+  const sitio = props.proyectar(props.punto.posicion);
+  const marcador = props.proyectar(props.punto.marcador);
+  return (
+    <PuntoDeTraspaso
+      x={sitio.x}
+      y={sitio.y}
+      desplazamiento={{ x: marcador.x - sitio.x, y: marcador.y - sitio.y }}
+      sentido={props.hacia === "logos" ? "va" : "viene"}
+      diametro={2 * radioDePunto(props.zoom)}
+      opacidad={opacidadDePunto(props.zoom)}
     />
   );
 }

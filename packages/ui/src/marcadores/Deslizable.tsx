@@ -17,11 +17,14 @@ export const trasladoDeLamina = (salto: Salto): string =>
  * - `entra`: sale de `desde` (la agrupación en que estaba) o, sin él, crece en su sitio.
  * - `sale`: se desliza hacia `hacia` (la agrupación que lo recoge) o, sin él, se apaga en su sitio.
  * - `quieto`: aparece sin transición, como al abrir el mapa.
+ *
+ * `escala` es lo pequeño que empieza o acaba: en el paso de la vista de puntos a los logos, el
+ * tamaño de un punto (ADR 0028). Sin ella, el de siempre.
  */
 export type Movimiento =
   | { readonly tipo: "quieto" }
-  | { readonly tipo: "entra"; readonly desde: Salto | undefined }
-  | { readonly tipo: "sale"; readonly hacia: Salto | undefined };
+  | { readonly tipo: "entra"; readonly desde: Salto | undefined; readonly escala?: number }
+  | { readonly tipo: "sale"; readonly hacia: Salto | undefined; readonly escala?: number };
 
 /** Lo que dura la transición más larga. Después, lo que sale ya no se ve y se puede quitar. */
 export const DURACION_MOVIMIENTO_MS = 600;
@@ -54,13 +57,13 @@ const estiloDe = (movimiento: Movimiento): JSX.CSSProperties | undefined => {
       return {
         "--desde-x": `${(movimiento.desde?.x ?? 0).toFixed(1)}px`,
         "--desde-y": `${(movimiento.desde?.y ?? 0).toFixed(1)}px`,
-        "--desde-escala": String(escala(movimiento.desde)),
+        "--desde-escala": String(movimiento.escala ?? escala(movimiento.desde)),
       };
     }
     case "sale": {
       const { x = 0, y = 0 } = movimiento.hacia ?? {};
       return {
-        transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${escala(movimiento.hacia)})`,
+        transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${movimiento.escala ?? escala(movimiento.hacia)})`,
         opacity: "0",
       };
     }

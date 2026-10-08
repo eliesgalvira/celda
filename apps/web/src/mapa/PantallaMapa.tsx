@@ -899,6 +899,12 @@ export function PantallaMapa() {
     },
   );
 
+  /**
+   * Si los puntos del mapa están apagados porque se ven los logos. Lo dicen los marcadores, que
+   * los apagan al salir y los vuelven a encender cuando los puntos que se mueven llegan a su sitio.
+   */
+  const [puntosApagados, setPuntosApagados] = createSignal(false);
+
   crearPuntosEnMapa({
     lienzo: createMemo(() => {
       const actual = mapaCreado();
@@ -906,7 +912,7 @@ export function PantallaMapa() {
     }),
     puntos: puntosListos,
     visibles: () => vistaDibujada() === "puntos",
-    apagados: conMarcadores,
+    apagados: puntosApagados,
     filtro: filtro.aplicado,
     elegido: () => pendiente()?.posicion ?? posicionSeleccionada(),
   });
@@ -1465,6 +1471,8 @@ export function PantallaMapa() {
                             lectorDeRotulos={lectorDeRotulos()}
                             conFoto={foto.seVe()}
                             conMarcadores={conMarcadores()}
+                            conPuntos={vistaDibujada() === "puntos"}
+                            alApagarPuntos={setPuntosApagados}
                           />
                         )}
                       </Show>

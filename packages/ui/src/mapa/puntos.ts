@@ -68,6 +68,24 @@ const OPACIDAD: Curva = [
   [14.5, 0.9],
 ];
 
+/** El valor de una curva a un zoom, en línea recta entre sus paradas, como `interpolate`. */
+const enCurva = (curva: Curva, zoom: number): number => {
+  const primera = curva[0] ?? [0, 0];
+  if (zoom <= primera[0]) return primera[1];
+  for (let i = 1; i < curva.length; i++) {
+    const [z0, v0] = curva[i - 1] ?? primera;
+    const [z1, v1] = curva[i] ?? primera;
+    if (zoom <= z1) return v0 + ((v1 - v0) * (zoom - z0)) / (z1 - z0);
+  }
+  return curva.at(-1)?.[1] ?? primera[1];
+};
+
+/** El radio de un punto a un zoom, en píxeles CSS: el mismo que dibuja MapLibre. */
+export const radioDePunto = (zoom: number): number => enCurva(RADIO, zoom);
+
+/** La opacidad de un punto a un zoom: la misma que dibuja MapLibre. */
+export const opacidadDePunto = (zoom: number): number => enCurva(OPACIDAD, zoom);
+
 /** Lo que pesa la red usada frente a lo propio: sale más clara, como sus logos (ADR 0026). */
 const PESO_RED_USADA = 0.4;
 

@@ -1,7 +1,9 @@
 import type { Compania } from "@celda/dominio/compania";
 import type { JSX } from "@solidjs/web";
+import { Portal } from "@solidjs/web";
 import { Show } from "solid-js";
 
+import { type Salto, trasladoDeLamina } from "../marcadores/Deslizable.tsx";
 import { LogoCompanias } from "../marcadores/LogoCompanias.tsx";
 
 /**
@@ -91,5 +93,75 @@ export function FilaDeEmplazamiento(props: {
         </span>
       </button>
     </li>
+  );
+}
+
+/**
+ * La lámina de los puntos que se mueven en el paso entre la vista de puntos y los logos (ADR
+ * 0028): dentro del contenedor del mapa, bajo los marcadores, que se montan después. No recoge
+ * gestos y el lector de pantalla no la lee: los puntos del mapa tampoco se leen. Se desplaza con
+ * la de los marcadores.
+ */
+export function CapaDeTraspaso(props: {
+  readonly contenedor: HTMLElement;
+  readonly salto: Salto;
+  readonly children: JSX.Element;
+}) {
+  return (
+    <Portal mount={props.contenedor}>
+      <div
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 will-change-transform"
+        style={{ transform: trasladoDeLamina(props.salto) }}
+      >
+        {props.children}
+      </div>
+    </Portal>
+  );
+}
+
+/**
+ * Un punto del paso entre los puntos y los logos, igual que los que dibuja el mapa: del mismo
+ * color, tamaño y opacidad. Con `va`, sale de su sitio hacia `desplazamiento` (el hexágono que lo
+ * recoge, o su propio logo) y se apaga; con `viene`, sale de ahí y se queda en su sitio. Usa la
+ * curva de los logos (`deslizar`). Con la preferencia de reducir movimiento no se monta.
+ */
+export function PuntoDeTraspaso(props: {
+  /** Dónde está su emplazamiento en la lámina. */
+  readonly x: number;
+  readonly y: number;
+  readonly desplazamiento: Salto;
+  readonly sentido: "va" | "viene";
+  readonly diametro: number;
+  readonly opacidad: number;
+}) {
+  const quieto = { x: 0, y: 0, opacidad: props.opacidad };
+  const movido = { ...props.desplazamiento, opacidad: 0 };
+  const desde = props.sentido === "va" ? quieto : movido;
+  const hasta = props.sentido === "va" ? movido : quieto;
+  return (
+    <span
+      class="absolute top-0 left-0 block"
+      style={{
+        width: `${props.diametro}px`,
+        height: `${props.diametro}px`,
+        transform: `translate(${(props.x - props.diametro / 2).toFixed(1)}px, ${(props.y - props.diametro / 2).toFixed(1)}px)`,
+      }}
+    >
+      <span
+        class="deslizar block size-full rounded-full [opacity:var(--hasta-opacidad)] [transform:translate(var(--hasta-x),var(--hasta-y))] motion-reduce:transition-none starting:[opacity:var(--desde-opacidad)] starting:[transform:translate(var(--desde-x),var(--desde-y))]"
+        style={{
+          // Lo de llegada va en variables y no en `transform` y `opacity`: un estilo en línea
+          // ganaría también a `@starting-style`, y el punto no se movería.
+          background: "var(--mapa-punto)",
+          "--desde-x": `${desde.x.toFixed(1)}px`,
+          "--desde-y": `${desde.y.toFixed(1)}px`,
+          "--desde-opacidad": String(desde.opacidad),
+          "--hasta-x": `${hasta.x.toFixed(1)}px`,
+          "--hasta-y": `${hasta.y.toFixed(1)}px`,
+          "--hasta-opacidad": String(hasta.opacidad),
+        }}
+      />
+    </span>
   );
 }

@@ -30,6 +30,12 @@ export interface CambioDeEscena {
   readonly ahora: number;
   /** La preferencia de reducir movimiento. */
   readonly reducido: boolean;
+  /**
+   * En la vista de puntos, si el cambio es el paso entre los puntos y los logos (ADR 0028): lo
+   * pequeño que es un punto al lado de un logo. Cada logo crece desde su punto, o se encoge hasta
+   * él, también si la escena no cambia de nivel.
+   */
+  readonly escalaDeTraspaso?: number | undefined;
 }
 
 const QUIETO: Movimiento = { tipo: "quieto" };
@@ -57,7 +63,14 @@ const hayQueAnimar = (cambio: CambioDeEscena): boolean =>
   !cambio.reducido &&
   cambio.anterior !== undefined &&
   (cambio.anterior.nivel !== cambio.nueva.nivel ||
+    cambio.escalaDeTraspaso !== undefined ||
     cambio.transicion.destino.size + cambio.transicion.origen.size > 0);
+
+/** Lo pequeño que empieza o acaba un logo sin origen ni destino: su punto, en un traspaso. */
+const escalaDe = (elemento: Elemento, cambio: CambioDeEscena): { escala?: number } =>
+  elemento.tipo === "emplazamiento" && cambio.escalaDeTraspaso !== undefined
+    ? { escala: cambio.escalaDeTraspaso }
+    : {};
 
 /** Qué pasa con lo que estaba pintado y no está en la escena nueva: se va o se quita ya. */
 const loQueSeVa = (pintado: Pintado, cambio: CambioDeEscena): Pintado | undefined => {
@@ -72,11 +85,10 @@ const loQueSeVa = (pintado: Pintado, cambio: CambioDeEscena): Pintado | undefine
   }
   return {
     elemento: pintado.elemento,
-    movimiento: {
-      tipo: "sale",
-      hacia:
-        destino === undefined ? undefined : salto(cambio.proyectar, posicion, destino.posicion),
-    },
+    movimiento:
+      destino === undefined
+        ? { tipo: "sale", hacia: undefined, ...escalaDe(pintado.elemento, cambio) }
+        : { tipo: "sale", hacia: salto(cambio.proyectar, posicion, destino.posicion) },
     quitarEn: cambio.ahora + DURACION_MOVIMIENTO_MS,
   };
 };
@@ -87,13 +99,9 @@ const comoLlega = (elemento: Elemento, cambio: CambioDeEscena): Movimiento => {
   if (!hayQueAnimar(cambio) || !cruzaLaPantalla(cambio, elemento.posicion, origen?.posicion)) {
     return QUIETO;
   }
-  return {
-    tipo: "entra",
-    desde:
-      origen === undefined
-        ? undefined
-        : salto(cambio.proyectar, elemento.posicion, origen.posicion),
-  };
+  return origen === undefined
+    ? { tipo: "entra", desde: undefined, ...escalaDe(elemento, cambio) }
+    : { tipo: "entra", desde: salto(cambio.proyectar, elemento.posicion, origen.posicion) };
 };
 
 /**

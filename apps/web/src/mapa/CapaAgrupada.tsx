@@ -70,6 +70,12 @@ export interface CapaAgrupadaProps {
   readonly alSeleccionar: (clave: string) => void;
   /** Se ha pulsado una agrupación o una zona: hay que acercar el mapa a ella. */
   readonly alAbrir: (elemento: ElementoAbrible) => void;
+  /**
+   * En la vista de puntos, la escena que llega con el paso entre los puntos y los logos, y lo
+   * pequeño que es un punto al lado de un logo: con ella cada logo crece desde su punto o se
+   * encoge hasta él (ADR 0028).
+   */
+  readonly traspaso?: { readonly escena: Escena; readonly escala: number } | undefined;
 }
 
 /**
@@ -92,8 +98,9 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
       transicion: props.transicion,
       proyectar: props.proyectar,
       seVe: props.seVe,
+      traspaso: props.traspaso,
     }),
-    ({ escena, reducido, transicion, proyectar, seVe }) => {
+    ({ escena, reducido, transicion, proyectar, seVe, traspaso }) => {
       const antes = anterior;
       anterior = escena;
       if (escena === undefined) {
@@ -111,6 +118,7 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
           seVe,
           ahora,
           reducido,
+          escalaDeTraspaso: traspaso?.escena === escena ? traspaso.escala : undefined,
         }),
       );
       quitarHasta = ahora + DURACION_MOVIMIENTO_MS;
