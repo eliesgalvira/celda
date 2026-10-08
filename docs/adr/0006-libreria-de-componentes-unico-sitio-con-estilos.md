@@ -8,4 +8,4 @@ En Moli esto era una convención. En Celda lo comprueba una regla de oxlint que 
 
 ## Consecuencias
 
-Los tokens tienen nombres semánticos para que un tema oscuro sea posible. Desde el #75, la web sigue el tema del sistema con los mismos tokens y otros valores; cómo se elige y cómo cambia el mapa está en `docs/patterns/ui.md`, «Tema claro y oscuro».
+Los tokens tienen nombres semánticos para que un tema oscuro sea posible. Desde el #75, la web sigue el tema del sistema con los mismos tokens y otros valores, y desde el #76 se puede fijar el claro o el oscuro en Ajustes; cómo se elige y cómo cambia el mapa está en `docs/patterns/ui.md`, «Tema claro y oscuro».
