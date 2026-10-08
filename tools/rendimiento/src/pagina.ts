@@ -122,9 +122,13 @@ export const instalar = (): void => {
         });
       }
     }
+    // Los primeros datos: un marcador o, con la vista de puntos, que no hay ninguno de lejos, la
+    // fecha de los datos, que sale cuando han llegado el resumen y los puntos (ADR 0028).
     if (
       marcadores === undefined &&
-      document.querySelector('section[aria-label="Emplazamientos"] button') !== null
+      (document.querySelector('section[aria-label="Emplazamientos"] button') !== null ||
+        (document.querySelector('section[aria-label="Emplazamientos"]') !== null &&
+          document.querySelector('output[data-tono="fecha"]') !== null))
     ) {
       marcadores = -1;
       void pintado().then((t) => {

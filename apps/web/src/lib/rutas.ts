@@ -142,6 +142,27 @@ export const conAportaciones = (ubicacion: Ubicacion, abiertas: boolean): string
   return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
 };
 
+/**
+ * El parámetro de la URL que abre la lista de los emplazamientos que se ven, en la vista de puntos
+ * (ADR 0028). No lleva valor.
+ */
+const LISTA = "lista";
+
+/** Si la ubicación tiene abierta la lista de los emplazamientos que se ven. */
+export const listaAbierta = (ubicacion: Ubicacion): boolean => ubicacion.search.has(LISTA);
+
+/** La misma ubicación con la lista abierta o cerrada; el resto de la URL no cambia. */
+export const conLista = (ubicacion: Ubicacion, abierta: boolean): string => {
+  const parametros = new URLSearchParams(ubicacion.search);
+  if (abierta) {
+    parametros.set(LISTA, "");
+  } else {
+    parametros.delete(LISTA);
+  }
+  const busqueda = parametros.toString().replace(/(^|&)lista=(?=&|$)/u, "$1lista");
+  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
+};
+
 /** La clave del emplazamiento seleccionado en una ubicación, o `null` si no hay ninguno. */
 export const emplazamientoDe = (ubicacion: Ubicacion): string | null => {
   const clave = ubicacion.search.get(EMPLAZAMIENTO)?.trim() ?? "";
@@ -172,7 +193,7 @@ export const conEmplazamiento = (
   parametros.set(PROVINCIA, situado.provincia);
   const busqueda = parametros
     .toString()
-    .replace(/(^|&)(medir|ajustes|aportaciones)=(?=&|$)/gu, "$1$2");
+    .replace(/(^|&)(medir|ajustes|aportaciones|lista)=(?=&|$)/gu, "$1$2");
   return `${ubicacion.pathname}?${busqueda}`;
 };
 

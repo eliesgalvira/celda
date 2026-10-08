@@ -1,3 +1,4 @@
+import { FUENTE_PUNTO_ELEGIDO } from "./puntos.ts";
 import { assert, describe, it } from "@effect/vitest";
 import * as Predicate from "effect/Predicate";
 import type { StyleSpecification } from "maplibre-gl";
@@ -171,7 +172,15 @@ describe("estiloMapa", () => {
   });
 
   it("rotula los lugares por importancia: la capa más importante, la última, se coloca antes", () => {
-    const ids = estiloDePrueba().layers.map((capa) => capa.id);
+    // Encima de todo va el emplazamiento elegido de la vista de puntos, que no es un rótulo.
+    const capas = estiloDePrueba().layers;
+    const ids = capas.flatMap((capa) =>
+      "source" in capa && capa.source === FUENTE_PUNTO_ELEGIDO ? [] : [capa.id],
+    );
+    assert.deepStrictEqual(
+      capas.slice(-2).map((capa) => ("source" in capa ? capa.source : undefined)),
+      [FUENTE_PUNTO_ELEGIDO, FUENTE_PUNTO_ELEGIDO],
+    );
     // Entre los pueblos y las ciudades, los huecos de los marcadores de Celda (ADR 0024).
     assert.deepStrictEqual(ids.slice(-CAPAS_DE_LUGARES.length - 1), [
       "lugares-aldeas",

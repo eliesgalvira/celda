@@ -106,31 +106,51 @@ export const nombraUnSitio = (vista: Vista | undefined): vista is Vista =>
   (Math.floor(vista.zoom) >= NIVEL_DE_PROVINCIAS ||
     vista.caja.noreste.longitud - vista.caja.suroeste.longitud <= ANCHO_DE_UNA_PROVINCIA);
 
+/** El sitio que se mira: España, una provincia o un municipio, con su nombre de lugar. */
+export type SitioDeLaVista =
+  | { readonly tipo: "espana"; readonly nombre: string }
+  | { readonly tipo: "provincia"; readonly nombre: string; readonly codigo: string }
+  | { readonly tipo: "municipio"; readonly nombre: string; readonly codigo: string };
+
+const ESPANA_ENTERA: SitioDeLaVista = { tipo: "espana", nombre: ESPANA.nombre };
+
 /**
- * Lo que dice la cabecera de lo que se ve, o `undefined` mientras no se sepa:
+ * El sitio que se mira, o `undefined` mientras no se sepa:
  *
- * - de lejos, «España», como el resumen nacional (`nombraUnSitio`);
+ * - de lejos, España, como el resumen nacional (`nombraUnSitio`);
  * - hasta el nivel de municipios, la provincia del centro;
  * - desde él, el municipio del centro o, en un territorio compartido, su provincia.
  *
- * Con el centro fuera de las provincias (en el mar o al otro lado de la frontera) dice «España».
- * Los nombres son los de lugar, en una sola forma: «Elx», «San Sebastián» (ADR 0025).
+ * Con el centro fuera de las provincias (en el mar o al otro lado de la frontera), España. Los
+ * nombres son los de lugar, en una sola forma: «Elx», «San Sebastián» (ADR 0025).
  */
-export const lugarDeLaVista = (
+export const sitioDeLaVista = (
   vista: Vista | undefined,
   zonas: ZonasDelMapa,
-): string | undefined => {
-  if (!nombraUnSitio(vista)) return ESPANA.nombre;
+): SitioDeLaVista | undefined => {
+  if (!nombraUnSitio(vista)) return ESPANA_ENTERA;
   const asignacion = dondeCae(centroDe(vista), zonas);
   if (asignacion === undefined) return undefined;
   const { municipio, provincia } = asignacion;
   if (Math.floor(vista.zoom) >= NIVEL_DE_MUNICIPIOS && municipio !== undefined) {
-    return nombreDeLugarDeMunicipio(municipio.codigo, municipio.nombre);
+    return {
+      tipo: "municipio",
+      nombre: nombreDeLugarDeMunicipio(municipio.codigo, municipio.nombre),
+      codigo: municipio.codigo,
+    };
   }
   return provincia === undefined
-    ? ESPANA.nombre
-    : nombreDeLugarDeProvincia(provincia.codigo, provincia.nombre);
+    ? ESPANA_ENTERA
+    : {
+        tipo: "provincia",
+        nombre: nombreDeLugarDeProvincia(provincia.codigo, provincia.nombre),
+        codigo: provincia.codigo,
+      };
 };
+
+/** Lo que dice la cabecera de lo que se ve, o `undefined` mientras no se sepa (`sitioDeLaVista`). */
+export const lugarDeLaVista = (vista: Vista | undefined, zonas: ZonasDelMapa): string | undefined =>
+  sitioDeLaVista(vista, zonas)?.nombre;
 
 /** Cómo se descargan las provincias y sus contornos. En las pruebas, con respuestas de prueba. */
 export interface CargasDeZonas {
@@ -144,6 +164,8 @@ export interface LugaresDelMapa {
    * que no parpadea ni se queda en blanco; al abrir, «España».
    */
   readonly nombre: () => string;
+  /** El sitio de `nombre`, con su código: con él la cabecera cuenta sus emplazamientos. */
+  readonly sitio: () => SitioDeLaVista;
   /** Dónde cae un punto, o `undefined` si aún no se sabe. */
   readonly dondeCae: (punto: Coordenada) => Asignacion | undefined;
   /** Las provincias con su caja, cuando han llegado. */
@@ -227,16 +249,19 @@ export const crearLugares = (entrada: {
     { iguales: mismasListas },
   );
 
-  const [nombre, setNombre] = createSignal(ESPANA.nombre);
+  const [sitio, setSitio] = createSignal<SitioDeLaVista>(ESPANA_ENTERA, {
+    equals: (a, b) => a.tipo === b.tipo && a.nombre === b.nombre,
+  });
   createEffect(
-    () => lugarDeLaVista(entrada.vista(), zonas()),
+    () => sitioDeLaVista(entrada.vista(), zonas()),
     (sabido) => {
-      if (sabido !== undefined) setNombre(sabido);
+      if (sabido !== undefined) setSitio(sabido);
     },
   );
 
   return {
-    nombre,
+    nombre: () => sitio().nombre,
+    sitio,
     dondeCae: (punto) => dondeCae(punto, zonas()),
     provincias: () => {
       const provincias = zonas().provincias;

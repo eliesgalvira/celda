@@ -27,10 +27,11 @@ import {
   generarLoteDeProvincia,
   generarResumen,
 } from "../../../packages/dominio/src/provincias.ts";
+import { ficheroDePuntos, generarPuntos } from "../../../packages/dominio/src/puntos.ts";
 
 /**
  * Una capa publicada de prueba, sin descargar nada: 25 emplazamientos en una rejilla alrededor
- * del Campus Nord, con sus fichas y sus bandas, en el formato 6 que publica Celda (ADR 0016): un
+ * del Campus Nord, con sus fichas y sus bandas, en el formato que publica Celda (ADR 0016): un
  * resumen nacional con Barcelona, su capa y sus lotes. Basta para abrir una ficha, calcular las
  * celdas y la vista de interferencia.
  */
@@ -179,6 +180,9 @@ export const escribirCapaSintetica = async (base: string): Promise<CapaSintetica
   });
   const ficheroCapa = ficheroDeCapaDeProvincia("08", huella(contenidoCapa));
   await guardar(ficheroCapa, contenidoCapa);
+  const puntos = generarPuntos(new Map([["08", situados]]));
+  const ficheroPuntos = ficheroDePuntos(huella(puntos));
+  await guardar(ficheroPuntos, puntos);
   const resumen = generarResumen({
     version,
     fuentes: { barrios: LIMITES.fuente, municipios: FUENTE_IGN, padron: FUENTE_INE },
@@ -210,6 +214,7 @@ export const escribirCapaSintetica = async (base: string): Promise<CapaSintetica
       },
     ],
     cuadros: new Map(),
+    puntos: ficheroPuntos,
   });
   const ficheroResumen = ficheroDeResumen(version, huella(resumen));
   await guardar(ficheroResumen, resumen);

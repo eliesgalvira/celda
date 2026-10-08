@@ -26,6 +26,7 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  *                     [--repeticiones 3] [--trazas <carpeta>] [--json <fichero>]
  *                     [--escenario barcelona|espana|borde|vuelos] [--ruta /?emplazamiento=<clave>]
  *                     [--pantalla movil|escritorio] [--grupos saltos,vuelos,alejar,…] [--foto]
+ *                     [--vista puntos|agrupada]
  *
  * El escenario `barcelona` va a Barcelona entera y hace allí los gestos de siempre. El de `espana`, el
  * de varias provincias (ADR 0016): aleja hasta ver toda España con el resumen, toca el hexágono
@@ -46,6 +47,9 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  * Con `--foto`, cada página enciende la foto aérea con su control al abrir, y la medida cuenta lo
  * pedido al PNOA en la primera visita y cuántas de esas teselas se pidieron con la cámara de la
  * medida en movimiento (#67).
+ *
+ * Con `--vista agrupada`, la primera página de cada ronda abre en la vista de puntos y pasa a la
+ * agrupada desde «Funciones»; las siguientes de la ronda ya abren en ella (ADR 0028).
  */
 
 /**
@@ -78,6 +82,9 @@ const { values: opciones } = NodeUtil.parseArgs({
     foto: { type: "boolean", default: false },
     // La densidad de píxeles de la pantalla, en lugar de la de cada pantalla (2,6 y 1).
     dpr: { type: "string" },
+    // La vista del mapa (ADR 0028): `puntos`, la de la web al abrir, o `agrupada`, que se elige en
+    // «Funciones» al abrir la primera página y el dispositivo recuerda para las siguientes.
+    vista: { type: "string", default: "puntos" },
   },
 });
 
@@ -810,6 +817,17 @@ const abrirYEsperar = async (pagina: Page, origen: string): Promise<void> => {
     { timeout: 60_000, polling: 200 },
   );
   await esperar(3000);
+  if (opciones.vista === "agrupada") {
+    const agrupada = pagina.getByRole("button", { name: "Vista agrupada", exact: true });
+    const menu = pagina.getByRole("button", { name: "Funciones", exact: true });
+    if (!(await agrupada.isVisible())) await tocar(menu);
+    if ((await agrupada.getAttribute("aria-pressed")) !== "true") {
+      await tocar(agrupada);
+      await esperar(3000);
+    } else if (await agrupada.isVisible()) {
+      await pagina.keyboard.press("Escape");
+    }
+  }
   if (opciones.foto === true) {
     await pulsar(pagina, "Foto aérea", 1);
     await esperar(3000);

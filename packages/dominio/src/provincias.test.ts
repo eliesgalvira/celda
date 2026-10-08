@@ -223,6 +223,8 @@ const CAJA_DE_BARCELONA: ZonaBarrida = {
 };
 /** Los cuadros con datos que toca cada provincia de los límites de prueba. */
 const CUADROS = cuadrosDeProvincias(INDICE);
+/** Los puntos de toda España de la versión: el resumen solo dice su fichero. */
+const PUNTOS = "puntos/0123456789abcdef.json";
 
 describe("situar los emplazamientos por provincias", () => {
   it("cada uno va a la provincia de su municipio, y las provincias y sus listas van ordenadas", () => {
@@ -533,6 +535,7 @@ describe("resumen nacional", () => {
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     assert.isTrue(contenido.startsWith(`{"version":"${VERSION}","formato":${FORMATO_PROVINCIAS},`));
     const leido = leerResumen(contenido, VERSION);
@@ -567,6 +570,7 @@ describe("resumen nacional", () => {
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
     assert.deepStrictEqual(
@@ -587,6 +591,7 @@ describe("resumen nacional", () => {
           cobertura: [CAJA_DE_BARCELONA, CATALUNA],
           provincias,
           cuadros: CUADROS,
+          puntos: PUNTOS,
         }),
         VERSION,
       ),
@@ -612,6 +617,7 @@ describe("resumen nacional", () => {
       cobertura: [CAJA_DE_BARCELONA],
       provincias: conBilingue,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
     if (leido === undefined) return assert.fail("no se lee");
@@ -636,6 +642,7 @@ describe("resumen nacional", () => {
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     const leido = Result.getOrUndefined(leerResumen(antes, VERSION));
     if (leido === undefined) return assert.fail("no se lee");
@@ -645,6 +652,7 @@ describe("resumen nacional", () => {
       cobertura: [CATALUNA],
       provincias: leido.provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     assert.strictEqual(
       rehecho,
@@ -654,6 +662,7 @@ describe("resumen nacional", () => {
         cobertura: [CATALUNA],
         provincias,
         cuadros: CUADROS,
+        puntos: PUNTOS,
       }),
     );
   });
@@ -666,6 +675,7 @@ describe("resumen nacional", () => {
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
       claves,
     });
     const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
@@ -677,6 +687,7 @@ describe("resumen nacional", () => {
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     assert.notInclude(sinIndice, '"claves"');
     assert.isUndefined(Result.getOrUndefined(leerResumen(sinIndice, VERSION))?.claves);
@@ -696,6 +707,7 @@ describe("resumen nacional", () => {
       cobertura: [CAJA_DE_BARCELONA],
       provincias: conCombinaciones,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     // Barcelona: Movistar y Orange (5), Vodafone (2) y Orange (4), uno de cada.
     assert.include(contenido, '"combinaciones":[[2,1,4,1,5,1],[1,1,8,1],[2,1]]');
@@ -736,6 +748,7 @@ describe("resumen nacional", () => {
       cobertura: [CATALUNA],
       provincias: leido.provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     assert.strictEqual(
       rehecho,
@@ -745,6 +758,7 @@ describe("resumen nacional", () => {
         cobertura: [CATALUNA],
         provincias: conCombinaciones,
         cuadros: CUADROS,
+        puntos: PUNTOS,
       }),
     );
   });
@@ -756,6 +770,7 @@ describe("resumen nacional", () => {
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     assert.notInclude(sinEllas, '"combinaciones"');
     const leido = Result.getOrUndefined(leerResumen(sinEllas, VERSION));
@@ -770,6 +785,7 @@ describe("resumen nacional", () => {
       cobertura: [],
       provincias: [...conCombinaciones.slice(0, 2), ...provincias.slice(2)],
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     assert.notInclude(aMedias, '"combinaciones"');
   });
@@ -781,6 +797,7 @@ describe("resumen nacional", () => {
       cobertura: [],
       provincias: conCombinaciones,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     }).replace('"combinaciones":[[2,1,4,1,5,1]', '"combinaciones":[[2,1,4,1,5,9]');
     const leido = leerResumen(contenido, VERSION);
     if (Result.isFailure(leido)) return assert.fail(leido.failure.message);
@@ -801,6 +818,7 @@ describe("resumen nacional", () => {
       cobertura: [],
       provincias,
       cuadros: CUADROS,
+      puntos: PUNTOS,
     });
     const leido = leerResumen(contenido, versionDeCapa(NOCHE + 1000));
     assert.isTrue(Result.isFailure(leido));

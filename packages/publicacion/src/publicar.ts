@@ -34,6 +34,7 @@ import {
   selloDeVersion,
   situarEmplazamientos,
 } from "@celda/dominio/provincias";
+import { ficheroDePuntos, generarPuntos } from "@celda/dominio/puntos";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -325,9 +326,9 @@ const fuentesDe = (zonas: ZonasDePublicacion): FuentesDeZonas => ({
 });
 
 /**
- * Publica la instantánea actual en el formato 6 (ADR 0016): el resumen nacional, una capa por
- * provincia y las fichas en lotes dentro de cada provincia, y después `vigente.json` apuntando al
- * resumen.
+ * Publica la instantánea actual en el formato 8 (ADR 0016 y 0028): el resumen nacional, una capa
+ * por provincia, las fichas en lotes dentro de cada provincia y los puntos de toda España, y
+ * después `vigente.json` apuntando al resumen.
  *
  * 1. Lee la versión de los datos y la cobertura. Si `vigente.json` ya apunta a esa versión, rehace
  *    su resumen con la cobertura de ahora sin leer la instantánea: si sale el mismo fichero, no
@@ -340,7 +341,8 @@ const fuentesDe = (zonas: ZonasDePublicacion): FuentesDeZonas => ({
  * 4. Guarda la capa de cada provincia, que dice el lote de cada emplazamiento, también con su
  *    huella en el nombre. Una provincia sin cambios da los mismos ficheros, que ya están: no se
  *    vuelven a escribir. Guarda también las partes del índice de claves, que dicen la provincia de
- *    cada emplazamiento para abrir un enlace que no la lleva.
+ *    cada emplazamiento para abrir un enlace que no la lleva, y los puntos de toda España, que
+ *    dibujan la vista de puntos (ADR 0028).
  * 5. Vuelve a comprobar la versión, guarda el manifiesto y el resumen, y registra la versión.
  * 6. Cambia `vigente.json`, salvo que otra publicación haya dejado ya una versión posterior.
  * 7. Retira las versiones que sobran (`retirarVersionesViejas`), también si estaba al día.
@@ -453,6 +455,10 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
         return yield* ficheroPublicado(fichero, contenido);
       }),
   );
+  const contenidoPuntos = generarPuntos(situados);
+  const ficheroPuntos = ficheroDePuntos(yield* huellaDe(contenidoPuntos));
+  yield* guardarSiFalta(ficheroPuntos, contenidoPuntos);
+  const puntos = yield* ficheroPublicado(ficheroPuntos, contenidoPuntos);
   yield* comprobarVersion;
 
   const ficheroDe = new Map(capas.map((c) => [c.provincia, c.publicado.fichero]));
@@ -473,6 +479,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
     ...capas.map((c) => c.publicado),
     ...lotes.map((l) => l.publicado),
     ...indice,
+    puntos,
   ];
   const manifiesto = generarManifiesto(
     version,
@@ -487,6 +494,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
       cobertura,
       provincias,
       claves: indice.map((parte) => parte.fichero),
+      puntos: puntos.fichero,
     },
     zonas,
   );
@@ -545,7 +553,7 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
 /**
  * Con `vigente.json` ya en la versión de los datos, rehace su resumen con la cobertura de ahora,
  * sin leer la instantánea. Si sale el mismo, no escribe nada; si no, escribe el nuevo resumen y
- * `vigente.json`. `undefined` si la vigente no tiene un resumen legible del formato 6, o si es
+ * `vigente.json`. `undefined` si la vigente no tiene un resumen legible del formato 8, o si es
  * de antes de las combinaciones de compañías (ADR 0026): entonces hay que publicarla entera. Las
  * capas y los lotes salen iguales y no se vuelven a escribir; cambian el resumen y `vigente.json`.
  */
@@ -568,6 +576,7 @@ const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
       cobertura,
       provincias: leido.success.provincias,
       claves: leido.success.claves,
+      puntos: leido.success.puntos,
     },
     zonas,
   );

@@ -26,6 +26,11 @@ export const Ajustes = Schema.Struct({
    * no: los ajustes de antes se leen igual, sin cambiar de esquema.
    */
   salvedadDeCeldasVista: Schema.optionalKey(Schema.Boolean),
+  /**
+   * Si el mapa va en la vista agrupada, con los hexágonos de provincias, zonas y agrupaciones, y
+   * no en la de puntos (ADR 0028). Sin la clave, la de puntos.
+   */
+  vistaAgrupada: Schema.optionalKey(Schema.Boolean),
 });
 export type Ajustes = typeof Ajustes.Type;
 

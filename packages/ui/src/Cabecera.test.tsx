@@ -29,4 +29,18 @@ describe("Cabecera", () => {
     assert.strictEqual(despues, antes);
     assert.strictEqual(despues.className, clases);
   });
+
+  it("la cuenta va en su propia línea, que está aunque no se sepa: nada se mueve al llegar", () => {
+    const [cuenta, setCuenta] = createSignal<string>();
+    const { container } = render(() => <Cabecera lugar="Barcelona" cuenta={cuenta()} />);
+    flush();
+    const linea = container.querySelector("[data-cuenta]");
+    assert.isNotNull(linea);
+    assert.strictEqual(linea?.textContent, "\u00a0");
+    assert.match(linea?.className ?? "", /\btruncate\b/u);
+    setCuenta("2.905 emplazamientos");
+    flush();
+    assert.strictEqual(container.querySelector("[data-cuenta]"), linea);
+    assert.strictEqual(linea?.textContent, "2.905 emplazamientos");
+  });
 });

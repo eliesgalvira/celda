@@ -5,7 +5,7 @@ import { render } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 
 import { provinciasDeLaVista } from "../capa/nacional.ts";
-import { FUENTES_DE_PRUEBA } from "../capa/pruebas.ts";
+import { FICHERO_DE_PUNTOS_DE_PRUEBA, FUENTES_DE_PRUEBA } from "../capa/pruebas.ts";
 import {
   type AlAbrir,
   crearVistaInicial,
@@ -45,6 +45,7 @@ const resumenCon = (provincias: ReadonlyArray<ProvinciaDelResumen>): ResumenLeid
   fuentes: FUENTES_DE_PRUEBA,
   cobertura: [],
   provincias,
+  puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
 });
 
 // Cataluña cubierta y Huesca a medias.

@@ -10,7 +10,7 @@ import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
 import { createEffect, createMemo, createSignal, For, untrack } from "solid-js";
 
-import { type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
+import { type Elemento, type ElementoAbrible, nivelDeZoom } from "../capa/agrupacion.ts";
 import { huecosDe, resolverChoques, type RotuloEnElMapa, tamanoDeNivel } from "../capa/choques.ts";
 import { cajaConMargen, logosDe, type Vista } from "../capa/marcadores.ts";
 import {
@@ -64,6 +64,12 @@ export interface MarcadoresProps {
   readonly lectorDeRotulos?: LectorDeRotulos | undefined;
   /** Con la foto aérea encendida: los rótulos copiados van en blanco con halo oscuro. */
   readonly conFoto?: boolean;
+  /**
+   * Si se dibujan los marcadores. Con la vista de puntos, solo desde el zoom de los logos y con
+   * las provincias que se ven ya agrupadas (ADR 0028); mientras, los puntos dibujan los
+   * emplazamientos y aquí solo van los rótulos de ciudad. Sin él, siempre.
+   */
+  readonly conMarcadores?: boolean;
 }
 
 const SIN_ROTULOS: LecturaDeRotulos = { zoom: 0, rotulos: [] };
@@ -128,14 +134,17 @@ export function Marcadores(props: MarcadoresProps) {
 
   const escena = createMemo(() => {
     const ahora = vista();
-    return ahora === undefined
-      ? undefined
-      : agrupador().escena(
-          nivelDeZoom(ahora.zoom),
-          cajaConMargen(ahora.caja),
-          // El seleccionado se ve siempre, aunque al alejar quede dentro de una agrupación.
-          props.seleccionada,
-        );
+    if (ahora === undefined) return undefined;
+    // Sin marcadores, una escena vacía: los que había se van con su transición.
+    if (props.conMarcadores === false) {
+      return { nivel: nivelDeZoom(ahora.zoom), elementos: new Map<string, Elemento>() };
+    }
+    return agrupador().escena(
+      nivelDeZoom(ahora.zoom),
+      cajaConMargen(ahora.caja),
+      // El seleccionado se ve siempre, aunque al alejar quede dentro de una agrupación.
+      props.seleccionada,
+    );
   });
 
   // Funciones por mapa, que no leen props al llamarlas: se usan dentro de efectos.

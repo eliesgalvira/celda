@@ -28,6 +28,7 @@ import {
   type ProvinciaDelResumen,
   type ResumenLeido,
 } from "@celda/dominio/provincias";
+import { ficheroDePuntos, generarPuntos } from "@celda/dominio/puntos";
 import { cajaDe } from "@celda/dominio/area";
 import { combinacionesDe } from "@celda/dominio/filtro";
 import * as Effect from "effect/Effect";
@@ -37,7 +38,40 @@ import * as Result from "effect/Result";
 
 import { crearAgrupador } from "./agrupacion.ts";
 import { agrupacionEnHilo, type ProvinciaCargada, prefijoDeProvincia } from "./nacional.ts";
+import { leerPuntosDelMapa, type PuntosDelMapa } from "./puntos.ts";
 import { CapaEmplazamientos, type FalloCapa } from "./servicio.ts";
+
+/** El fichero de los puntos en los resúmenes de prueba. */
+export const FICHERO_DE_PUNTOS_DE_PRUEBA = ficheroDePuntos("prueba");
+
+/**
+ * Los puntos de toda España de unas provincias de prueba, como los publica la publicación y los
+ * deja el Worker de capas.
+ */
+export const puntosDePrueba = (
+  provincias: ReadonlyArray<{
+    readonly codigo: string;
+    readonly emplazamientos: ReadonlyArray<EmplazamientoLeido>;
+  }>,
+): PuntosDelMapa => {
+  const leidos = leerPuntosDelMapa(
+    generarPuntos(
+      new Map(
+        provincias.map((p) => [
+          p.codigo,
+          p.emplazamientos.map((emplazamiento): EmplazamientoSituado => ({
+            emplazamiento,
+            provincia: p.codigo,
+            municipio: emplazamiento.municipio ?? null,
+            lugar: { municipio: null, provincia: null },
+          })),
+        ]),
+      ),
+    ),
+  );
+  if (Result.isFailure(leidos)) throw new Error(leidos.failure.motivo);
+  return leidos.success;
+};
 
 /** La fuente de los límites de barrio, como la publica Open Data BCN. */
 export const FUENTE_DE_BARRIOS: FuenteDeBarrios = {
@@ -176,6 +210,7 @@ export const resumenDePrueba = (capa: CapaDePrueba, sinCombinaciones = false): R
         ? barcelona
         : { ...barcelona, combinaciones: combinacionesDe(capa.emplazamientos) },
     ],
+    puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
   };
 };
 
@@ -234,6 +269,16 @@ export const capaDePrueba = (
               ),
           ),
         ),
+      puntos: Effect.suspend(() =>
+        Effect.map(
+          Option.match(llegada, {
+            onSome: Effect.succeed,
+            onNone: () => carga(cargas.length - 1),
+          }),
+          (capa) =>
+            puntosDePrueba([{ codigo: BARCELONA.codigo, emplazamientos: capa.emplazamientos }]),
+        ),
+      ),
       // Todos los emplazamientos de prueba van en Barcelona.
       situarClave: (clave) =>
         Effect.suspend(() =>
@@ -343,6 +388,9 @@ export const publicacionDePrueba = (
           ficheros.set(fichero, contenido);
           return fichero;
         });
+  const contenidoPuntos = generarPuntos(new Map([["08", situados]]));
+  const ficheroPuntos = ficheroDePuntos(huellaDePrueba(contenidoPuntos));
+  ficheros.set(ficheroPuntos, contenidoPuntos);
   const contenidoResumen = generarResumen({
     version,
     fuentes: FUENTES_DE_PRUEBA,
@@ -359,6 +407,7 @@ export const publicacionDePrueba = (
     ],
     cuadros: new Map(),
     claves,
+    puntos: ficheroPuntos,
   });
   const ficheroResumen = ficheroDeResumen(version, huellaDePrueba(contenidoResumen));
   ficheros.set(ficheroResumen, contenidoResumen);

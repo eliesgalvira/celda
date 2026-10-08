@@ -510,6 +510,7 @@ describe("agrupación de una provincia con un filtro de compañías (ADR 0026)",
             indexar: enHilo.indexar,
             indexarFiltro: (provincia) =>
               Effect.fail(new IndiceFallido({ provincia, motivo: "se ha caído" })),
+            leerPuntos: enHilo.leerPuntos,
           });
         }),
       ).pipe(Layer.provide(indexadorEnHilo));
@@ -586,6 +587,41 @@ describe("dónde está una clave", () => {
       );
       assert.deepStrictEqual(resultado.map(errorDe), ["CapaNoDescargada", "CapaNoDescargada"]);
       assert.lengthOf(peticiones, 4);
+    }),
+  );
+});
+
+describe("los puntos de toda España (ADR 0028)", () => {
+  it.effect("se leen en el Worker una vez por visita, con su GeoJSON, sin pedir provincias", () =>
+    Effect.gen(function* () {
+      const worker = workerDePrueba();
+      const { resultado, peticiones } = yield* conCapa(
+        origenCon(HOY),
+        (capa) => Effect.zip(capa.puntos, capa.puntos),
+        indexadorEnWorker(worker.crear),
+      );
+      const [puntos, otra] = resultado;
+      assert.strictEqual(otra, puntos);
+      assert.strictEqual(puntos.puntos.cuantos, FICHAS.length);
+      assert.deepStrictEqual(puntos.puntos.provincias, ["08"]);
+      const texto = new TextDecoder().decode(puntos.geojson);
+      assert.match(texto, /^\{"type":"FeatureCollection","features":\[/u);
+      assert.include(texto, '"id":2,');
+      assert.notInclude(texto, '"id":3,');
+      assert.strictEqual(worker.recibidas(), 1);
+      assert.deepStrictEqual(
+        peticiones.filter((p) => !p.startsWith("resumen@")),
+        ["vigente.json", HOY.resumen.puntos],
+      );
+    }),
+  );
+
+  it.effect("si el origen no los tiene, no llegan", () =>
+    Effect.gen(function* () {
+      const sinPuntos = origenCon(HOY);
+      sinPuntos.delete(`${ORIGEN}/${HOY.resumen.puntos}`);
+      const { resultado } = yield* conCapa(sinPuntos, (capa) => Effect.exit(capa.puntos));
+      assert.strictEqual(errorDe(resultado), "CapaNoDescargada");
     }),
   );
 });

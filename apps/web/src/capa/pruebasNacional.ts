@@ -14,7 +14,7 @@ import {
   type ProvinciaCargada,
   prefijoDeProvincia,
 } from "./nacional.ts";
-import { cajaDeBarcelona, FUENTES_DE_PRUEBA } from "./pruebas.ts";
+import { cajaDeBarcelona, FICHERO_DE_PUNTOS_DE_PRUEBA, FUENTES_DE_PRUEBA } from "./pruebas.ts";
 
 /** El mundo entero, como caja de una escena. */
 export const MUNDO: Rectangulo = {
@@ -91,6 +91,7 @@ export const RESUMEN: ResumenLeido = {
     fila("17", "Girona", { longitud: 2.7, latitud: 41.95 }),
     fila("25", "Lleida", { longitud: 1, latitud: 42 }),
   ],
+  puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
 };
 
 /** Una provincia cargada, con su agrupador hecho en el hilo. */

@@ -1,3 +1,4 @@
+import { leerPuntos } from "@celda/dominio/puntos";
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import type { LimitesDeBarrios } from "@celda/dominio/barrio";
@@ -248,6 +249,15 @@ const lugarEsperado = (e: EmplazamientoLeido) =>
       };
 
 /** El índice de claves dice la provincia de cada emplazamiento, en la parte que le toca. */
+/** Los puntos de toda España son los de todos los emplazamientos publicados, en su provincia. */
+const comprobarPuntos = (entorno: Entorno, leida: Leida) =>
+  Effect.gen(function* () {
+    const puntos = leerPuntos((yield* leer(entorno, leida.resumen.puntos)) ?? "");
+    if (Result.isFailure(puntos)) return assert.fail(puntos.failure.motivo);
+    assert.strictEqual(puntos.success.cuantos, leida.emplazamientos.length);
+    assert.deepStrictEqual(puntos.success.provincias, [...leida.capas.keys()].toSorted());
+  });
+
 const comprobarIndice = (entorno: Entorno, leida: Leida) =>
   Effect.gen(function* () {
     const partes = leida.resumen.claves ?? [];
@@ -326,14 +336,17 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
           assert.strictEqual(publicada.tipo, "publicada");
           assert.isAbove(publicada.lotes, 2);
 
-          // Los lotes, las capas y el índice de claves, luego el manifiesto y el resumen, y al
-          // final vigente.json: la web no ve la versión hasta tenerlo todo. Las partes del índice
-          // que salen iguales (vacías) son un mismo fichero.
+          // Los lotes, las capas, el índice de claves y los puntos de toda España (ADR 0028),
+          // luego el manifiesto y el resumen, y al final vigente.json: la web no ve la versión
+          // hasta tenerlo todo. Las partes del índice que salen iguales (vacías) son un mismo
+          // fichero.
           const escritos = yield* entorno.escritos;
           const leida = yield* leerVigente(entorno);
           const partes = leida.resumen.claves ?? [];
           assert.lengthOf(partes, PARTES_DEL_INDICE);
-          assert.strictEqual(escritos.length, publicada.lotes + 2 + new Set(partes).size + 3);
+          assert.strictEqual(escritos.length, publicada.lotes + 2 + new Set(partes).size + 1 + 3);
+          assert.strictEqual(escritos.at(-4), leida.resumen.puntos);
+          assert.match(leida.resumen.puntos, /^puntos\/[0-9a-f]{16}\.json$/u);
           assert.strictEqual(escritos.at(-3), ficheroDeManifiesto(version));
           assert.strictEqual(escritos.at(-2), leida.vigente.resumen);
           assert.strictEqual(escritos.at(-1), FICHERO_VIGENTE);
@@ -399,19 +412,16 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
 
           yield* comprobarFichas(entorno, leida);
 
-          // El manifiesto lista las capas y los lotes, que no llevan la versión en el nombre.
+          // El manifiesto lista las capas, los lotes, el índice y los puntos, que no llevan la
+          // versión en el nombre.
           const manifiesto = decodificarManifiesto(
             (yield* leer(entorno, ficheroDeManifiesto(version))) ?? "",
           );
           assert.deepStrictEqual(
             Result.getOrUndefined(manifiesto)?.ficheros,
-            escritos
-              .filter(
-                (f) =>
-                  f.startsWith("provincias/") || f.startsWith("fichas/") || f.startsWith("claves/"),
-              )
-              .toSorted(),
+            escritos.filter((f) => /^(?:provincias|fichas|claves|puntos)\//u.test(f)).toSorted(),
           );
+          yield* comprobarPuntos(entorno, leida);
 
           yield* comprobarIndice(entorno, leida);
 

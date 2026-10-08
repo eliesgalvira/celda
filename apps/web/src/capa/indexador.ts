@@ -19,6 +19,7 @@ import {
   rehidratarIndice,
   serializarIndice,
 } from "./indice.ts";
+import { leerPuntosDelMapa, type PuntosDelMapa, transferiblesDePuntos } from "./puntos.ts";
 import type { EtiquetaDeMunicipio } from "./zonas.ts";
 
 /** La capa de una provincia no se ha podido leer o indexar. */
@@ -26,6 +27,9 @@ export class IndiceFallido extends Schema.TaggedError<IndiceFallido>()("IndiceFa
   provincia: Schema.String,
   motivo: Schema.String,
 }) {}
+
+/** Lo que dice un fallo al leer los puntos en lugar de la provincia: son de toda España. */
+const PUNTOS = "puntos";
 
 /** Una capa de provincia leída, con sus índices listos para agrupar. */
 export interface ProvinciaIndexada {
@@ -54,7 +58,8 @@ export interface IndicesDeFiltro {
 /**
  * Lee la capa de una provincia e indexa sus emplazamientos (ADR 0016). En el navegador lo hace un
  * Worker: analizar el JSON y agrupar con supercluster no bloquean el mapa, y aquí solo se
- * rehidratan los índices.
+ * rehidratan los índices. El mismo Worker lee los puntos de toda España de la vista de puntos
+ * (ADR 0028).
  */
 export class IndexadorDeProvincias extends Context.Service<
   IndexadorDeProvincias,
@@ -77,6 +82,8 @@ export class IndexadorDeProvincias extends Context.Service<
       propios: ParteDeCapa,
       redUsada: ParteDeCapa | undefined,
     ) => Effect.Effect<IndicesDeFiltro, IndiceFallido>;
+    /** Lee los puntos de toda España y escribe su GeoJSON (`leerPuntosDelMapa`). */
+    readonly leerPuntos: (texto: string) => Effect.Effect<PuntosDelMapa, IndiceFallido>;
   }
 >()("@celda/web/capa/indexador/IndexadorDeProvincias") {}
 
@@ -111,7 +118,8 @@ export type SolicitudDeIndice =
       readonly provincia: string;
       readonly propios: ParteEnColumnas;
       readonly redUsada: ParteEnColumnas | undefined;
-    };
+    }
+  | { readonly tipo: "puntos"; readonly numero: number; readonly texto: string };
 
 /** Los índices de una capa o de una parte, serializados (`IndicesDeCapa`). */
 export interface IndicesSerializados {
@@ -134,6 +142,7 @@ export type RespuestaDeIndice =
       readonly propios: IndicesSerializados;
       readonly redUsada: IndicesSerializados | undefined;
     }
+  | { readonly numero: number; readonly tipo: "puntos"; readonly puntos: PuntosDelMapa }
   | { readonly numero: number; readonly tipo: "fallo"; readonly motivo: string };
 
 /** Algo que viaja al Worker o viene de él, con los búferes que se transfieren sin copiarse. */
@@ -228,6 +237,18 @@ const municipiosDeZona = (capa: CapaDeProvincia, cubierta: boolean) =>
  * búferes de `transferibles` se transfieren con la respuesta.
  */
 export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar => {
+  if (solicitud.tipo === "puntos") {
+    const leidos = leerPuntosDelMapa(solicitud.texto);
+    return Result.isFailure(leidos)
+      ? {
+          respuesta: { numero: solicitud.numero, tipo: "fallo", motivo: leidos.failure.motivo },
+          transferibles: [],
+        }
+      : {
+          respuesta: { numero: solicitud.numero, tipo: "puntos", puntos: leidos.success },
+          transferibles: transferiblesDePuntos(leidos.success),
+        };
+  }
   if (solicitud.tipo === "filtro") {
     const propios = indexarParte(solicitud.propios);
     const redUsada =
@@ -338,6 +359,13 @@ export const indexadorEnHilo = Layer.succeed(
         propios: indexarEnHilo(propios),
         redUsada: redUsada === undefined ? undefined : indexarEnHilo(redUsada),
       })),
+    leerPuntos: (texto) =>
+      Effect.suspend(() => {
+        const leidos = leerPuntosDelMapa(texto);
+        return Result.isFailure(leidos)
+          ? Effect.fail(new IndiceFallido({ provincia: PUNTOS, motivo: leidos.failure.motivo }))
+          : Effect.succeed(leidos.success);
+      }),
   }),
 );
 
@@ -494,6 +522,14 @@ export const indexadorEnWorker = (
           );
         });
 
+      const leerPuntos = (texto: string) =>
+        pedir(
+          PUNTOS,
+          (este) => ({ tipo: "puntos", numero: este, texto }),
+          [],
+          (respuesta) => (respuesta.tipo === "puntos" ? respuesta.puntos : undefined),
+        );
+
       return IndexadorDeProvincias.of({
         indexar: (provincia, texto, cubierta) =>
           indexar(provincia, texto, cubierta).pipe(
@@ -503,6 +539,8 @@ export const indexadorEnWorker = (
           indexarFiltro(provincia, propios, redUsada).pipe(
             Effect.withSpan("IndexadorDeProvincias.indexarFiltro"),
           ),
+        leerPuntos: (texto) =>
+          leerPuntos(texto).pipe(Effect.withSpan("IndexadorDeProvincias.leerPuntos")),
       });
     }),
   );

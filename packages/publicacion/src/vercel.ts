@@ -53,7 +53,8 @@ const bytesDe = (texto: string): number => new TextEncoder().encode(texto).lengt
 
 /**
  * La huella del nombre de un fichero nombrado por su contenido: `provincias/08/<huella>.json`,
- * `fichas/08/<huella>.json`, `claves/<huella>.json` o `resumen@<fecha>.<huella>.json`.
+ * `fichas/08/<huella>.json`, `claves/<huella>.json`, `puntos/<huella>.json` o
+ * `resumen@<fecha>.<huella>.json`.
  */
 const huellaDelNombre = (fichero: string): string | undefined =>
   new RegExp(`[/.]([0-9a-f]{${LARGO_HUELLA}})\\.json$`, "u").exec(fichero)?.[1];
@@ -135,7 +136,7 @@ export interface CapasMontadas {
  * 1. Lee `vigente.json` una vez. Todo lo demás es de esa versión, aunque mientras tanto se publique
  *    otra.
  * 2. Lee el resumen y el manifiesto de la vigente, y comprueba que el resumen es de esa versión y
- *    que la capa de cada provincia está en el manifiesto.
+ *    que la capa de cada provincia y los puntos de toda España están en el manifiesto.
  * 3. Lista el origen y lee los manifiestos de las versiones anteriores a la vigente, las más
  *    recientes. Una posterior a la vigente es otra publicación a medias y no se toca.
  * 4. Lee y guarda cada fichero de esos manifiestos, una vez aunque lo compartan varias versiones.
@@ -177,9 +178,10 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
   const sello = selloDeVersion(version);
   const suyo = yield* leerManifiesto(origen, sello);
   const enManifiesto = new Set(suyo.ficheros);
-  const sinListar = leido.success.provincias.flatMap((p) =>
-    p.fichero === undefined || enManifiesto.has(p.fichero) ? [] : [p.fichero],
-  );
+  const sinListar = [
+    ...leido.success.provincias.flatMap((p) => (p.fichero === undefined ? [] : [p.fichero])),
+    leido.success.puntos,
+  ].filter((fichero) => !enManifiesto.has(fichero));
   if (sinListar.length > 0) {
     return yield* new CapasIncompletas({
       motivo: `el manifiesto no lista ${sinListar.join(", ")}`,

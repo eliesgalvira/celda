@@ -14,7 +14,12 @@ import * as Option from "effect/Option";
 
 import { crearAgrupador } from "../capa/agrupacion.ts";
 import { agrupacionEnHilo, type ProvinciaCargada, prefijoDeProvincia } from "../capa/nacional.ts";
-import { cajaDeBarcelona, FUENTES_DE_PRUEBA } from "../capa/pruebas.ts";
+import {
+  cajaDeBarcelona,
+  FICHERO_DE_PUNTOS_DE_PRUEBA,
+  FUENTES_DE_PRUEBA,
+  puntosDePrueba,
+} from "../capa/pruebas.ts";
 import { CapaEmplazamientos, CapaNoDescargada } from "../capa/servicio.ts";
 
 /**
@@ -109,6 +114,7 @@ export const resumenDeProvincias = (
     fichero:
       p.emplazamientos.length === 0 ? undefined : ficheroDeCapaDeProvincia(p.codigo, "prueba"),
   })),
+  puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
 });
 
 /** Una provincia de prueba ya leída e indexada, como la deja el servicio de capa. */
@@ -180,6 +186,7 @@ export const capaDeProvincias = (provincias: ReadonlyArray<ProvinciaDePrueba>) =
               ),
             );
       },
+      puntos: Effect.sync(() => puntosDePrueba(provincias)),
     }),
   );
   return {

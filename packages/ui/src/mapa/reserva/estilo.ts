@@ -1,6 +1,12 @@
 import type { LayerSpecification, StyleSpecification } from "maplibre-gl";
 
-import { capasDeCelda, estadoDelEstilo, FUENTE_MAPA_BASE, fuentesDeCelda } from "../estilo.ts";
+import {
+  capasDeCelda,
+  capasDeCeldaEncima,
+  estadoDelEstilo,
+  FUENTE_MAPA_BASE,
+  fuentesDeCelda,
+} from "../estilo.ts";
 import { capaFoto, capaNumeroDelEdificio } from "../foto.ts";
 import type { ContornoDeEspana } from "../rotulos.ts";
 import { capasSilueta, fuentesSilueta } from "../silueta.ts";
@@ -60,6 +66,7 @@ export const estiloDeReserva = (
     ...capasViasDeReserva(FUENTE_RESERVA, color),
     ...capasDeCelda(color),
     ...capasRotulosDeReserva(FUENTE_RESERVA, color, [capaNumeroDelEdificio(color)]),
+    ...capasDeCeldaEncima(color),
   ],
 });
 

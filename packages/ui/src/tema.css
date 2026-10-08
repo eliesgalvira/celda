@@ -155,6 +155,8 @@
   --mapa-pdi-otro: oklch(56% 0.01 248);
   /* Las líneas de las celdas: el verde azulado del primario */
   --mapa-celda: oklch(52% 0.077 203.3);
+  /* Cada emplazamiento en la vista de puntos: el verde azulado del primario (mapa/puntos.ts). */
+  --mapa-punto: oklch(52% 0.077 203.3);
   /*
    * Vista de interferencia: de la señal limpia (verde azulado) a donde domina la interferencia
    * (naranja oscuro), en seis tramos de la señal frente a interferencia (mapa/interferencia.ts).

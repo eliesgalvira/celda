@@ -48,7 +48,8 @@ import { FuenteDePoblacion } from "./poblacion.ts";
  * El formato de la capa (ADR 0016): un resumen nacional con una fila por provincia y una capa por
  * provincia, con las fichas en lotes dentro de cada provincia. El 5 lo estrenó; el 6 trae el
  * historial de cada origen de la ficha y las claves anteriores en el índice de claves (ADR 0027),
- * y el 7, si Celda aún no ha leído las bandas de cada estación base de la ficha (#41).
+ * el 7, si Celda aún no ha leído las bandas de cada estación base de la ficha (#41), y el 8, los
+ * puntos de toda España de la vista de puntos (`puntos.ts`, ADR 0028).
  *
  * - El resumen lleva la versión en el nombre y una huella de su contenido, porque la misma versión
  *   de los datos puede publicarse otra vez con otra cobertura (otra fecha de barrido).
@@ -57,7 +58,7 @@ import { FuenteDePoblacion } from "./poblacion.ts";
  * - El manifiesto de una versión lista sus capas y sus lotes. La web no lo lee; sirve para retirar
  *   versiones viejas sin borrar lo que comparten con las que se quedan.
  */
-export const FORMATO_PROVINCIAS = 7;
+export const FORMATO_PROVINCIAS = 8;
 
 /** Caracteres de la huella SHA-256 que van en el nombre de un fichero: 64 bits. */
 export const LARGO_HUELLA = 16;
@@ -709,6 +710,8 @@ const ColumnasDelResumen = Schema.Struct({
    * del índice no lo llevan.
    */
   claves: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Los puntos de toda España de la versión (`ficheroDePuntos`). Desde el formato 8. */
+  puntos: Schema.String,
 });
 type ColumnasDelResumen = typeof ColumnasDelResumen.Type;
 
@@ -813,6 +816,8 @@ export const generarResumen = (resumen: {
   readonly cuadros: ReadonlyMap<string, ReadonlySet<Cuadro>>;
   /** Las partes del índice de claves (`generarIndiceDeClaves`), ya nombradas. */
   readonly claves?: ReadonlyArray<string> | undefined;
+  /** Los puntos de toda España (`generarPuntos`), ya nombrados. */
+  readonly puntos: string;
 }): string => {
   const provincias = resumen.provincias.slice().sort(porCodigo);
   const estados = provincias.map((p) =>
@@ -835,6 +840,7 @@ export const generarResumen = (resumen: {
       barrido: estados.map((e) => e.barrido),
       fichero: provincias.map((p) => p.fichero ?? null),
     },
+    puntos: resumen.puntos,
   };
   // Un resumen de antes de las combinaciones, rehecho con otra cobertura, sigue sin ellas.
   const combinaciones = provincias.map((p) => p.combinaciones);
@@ -863,6 +869,8 @@ export interface ResumenLeido {
   readonly provincias: ReadonlyArray<ProvinciaDelResumen>;
   /** Las partes del índice de claves, o nada en un resumen de antes del índice. */
   readonly claves?: ReadonlyArray<string> | undefined;
+  /** Los puntos de toda España (`ficheroDePuntos`). */
+  readonly puntos: string;
 }
 
 /**
@@ -932,6 +940,7 @@ export const leerResumen = (
         cobertura: c.cobertura,
         provincias,
         claves: c.claves,
+        puntos: c.puntos,
       });
     }),
   );

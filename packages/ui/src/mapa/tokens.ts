@@ -48,6 +48,7 @@ export const TOKENS_MAPA = [
   "mapa-pdi-otro",
   // Lo que pinta Celda encima.
   "mapa-celda",
+  "mapa-punto",
   "mapa-sinr-1",
   "mapa-sinr-2",
   "mapa-sinr-3",

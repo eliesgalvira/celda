@@ -19,6 +19,7 @@ import { IconoOndas } from "@celda/ui/interferencia/PanelInterferencia.tsx";
 import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
 import { IconoAjustes, IconoEjercicio } from "@celda/ui/ejercicio/Ejercicio.tsx";
 import { IconoFotoAerea } from "@celda/ui/foto/FotoAerea.tsx";
+import { IconoListaDeEmplazamientos, IconoVistaAgrupada } from "@celda/ui/puntos/Puntos.tsx";
 import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
 import { ZOOM_FOTO } from "@celda/ui/mapa/foto.ts";
 import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
@@ -47,12 +48,30 @@ import {
   textoDatosDelMapa,
 } from "../capa/estado.ts";
 import type { Vista } from "../capa/marcadores.ts";
+import { nivelDeZoom } from "../capa/agrupacion.ts";
 import {
   type EstadoProvincia,
   NIVEL_DE_PROVINCIAS,
   provinciasDeLaVista,
 } from "../capa/nacional.ts";
+import type { PuntosDelMapa } from "../capa/puntos.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
+import { DialogoLista } from "../puntos/DialogoLista.tsx";
+import { crearPuntosEnMapa, lienzoDePuntos } from "../puntos/enMapa.ts";
+import {
+  emplazamientoDelPunto,
+  NIVEL_DE_PROVINCIAS_CON_PUNTOS,
+  posicionDePunto,
+  provinciaDePunto,
+  queHacerAlTocar,
+  ZOOM_DE_LOGOS,
+} from "../puntos/puntos.ts";
+import {
+  DETALLE_LISTA,
+  DETALLE_VISTA_AGRUPADA,
+  LISTA_DE_EMPLAZAMIENTOS,
+  VISTA_AGRUPADA,
+} from "../puntos/textos.ts";
 import {
   cargadasDe,
   enumerar,
@@ -114,8 +133,10 @@ import {
   aportacionesAbiertas,
   conAportaciones,
   conEmplazamiento,
+  conLista,
   ejercicioDe,
   emplazamientoDe,
+  listaAbierta,
   medirAbierto,
   navegar,
   provinciaDe,
@@ -146,6 +167,7 @@ import {
   type MotivoFallo,
 } from "./estado.ts";
 import type { LectorDeRotulos } from "./rotulosDeCiudad.ts";
+import { cuentaDelSitio, textoDeCuenta } from "./cuenta.ts";
 import { type CargasDeZonas, crearLugares } from "./lugar.ts";
 import { Marcadores } from "./Marcadores.tsx";
 import {
@@ -245,6 +267,42 @@ export function PantallaMapa() {
   const yaPedidas = new Set<string>();
 
   const fallar = (motivo: MotivoFallo) => setEstado({ tipo: "fallo", motivo });
+
+  /**
+   * La vista que ha elegido la persona (ADR 0028): la de puntos o la agrupada, guardada en el
+   * dispositivo. `undefined` mientras se leen los ajustes: hasta saberla no se pide ni se dibuja
+   * nada que dependa de ella.
+   */
+  const vistaElegida = createMemo(() =>
+    ajustes.leidos()
+      ? ajustes.ajustes().vistaAgrupada === true
+        ? "agrupada"
+        : "puntos"
+      : undefined,
+  );
+  /** Los puntos de toda España: se piden la primera vez que hace falta la vista de puntos. */
+  const [puntos, setPuntos] = createSignal<
+    | { readonly tipo: "cargando" }
+    | { readonly tipo: "lista"; readonly puntos: PuntosDelMapa }
+    | { readonly tipo: "fallo" }
+  >();
+  /** Para volver a pedirlos con «Reintentar»: cada intento es otra clave. */
+  const [intentoDePuntos, setIntentoDePuntos] = createSignal(0);
+  /**
+   * La vista que dibuja el mapa: la elegida o, si los puntos no han llegado, la agrupada, que no
+   * los necesita. Mientras llegan, la de puntos sin puntos: la marca de agua dice que carga.
+   */
+  const vistaDibujada = createMemo(() =>
+    vistaElegida() === "puntos" && puntos()?.tipo === "fallo" ? "agrupada" : vistaElegida(),
+  );
+  /** Los puntos, si han llegado. */
+  const puntosListos = createMemo(() => {
+    const actual = puntos();
+    return actual?.tipo === "lista" ? actual.puntos : undefined;
+  });
+  /** Desde qué nivel se piden las provincias de lo que se ve: con puntos, solo cerca de los logos. */
+  const nivelDePedir = () =>
+    untrack(vistaDibujada) === "agrupada" ? NIVEL_DE_PROVINCIAS : NIVEL_DE_PROVINCIAS_CON_PUNTOS;
 
   /** Lo que se ve, como vista de la capa: el centro dice el lugar de la cabecera. */
   const vistaDelEncuadre = createMemo((): Vista | undefined => {
@@ -422,7 +480,9 @@ export function PantallaMapa() {
             ),
           };
     const vista = ultimaVista ?? inicial;
-    if (vista !== undefined) pedirProvincias(provinciasDeLaVista(resumenLeido, vista));
+    if (vista !== undefined) {
+      pedirProvincias(provinciasDeLaVista(resumenLeido, vista, nivelDePedir()));
+    }
   };
 
   /** El mapa ha decidido qué dibuja: se piden las provincias que se ven. */
@@ -502,25 +562,34 @@ export function PantallaMapa() {
 
   /** Quien espera el siguiente punto que se toque en el mapa: el ejercicio al elegir su zona. */
   let esperandoPunto: ((punto: Coordenada) => void) | undefined;
+  /** Lo que hace un toque en el mapa que no es de nadie más: tocar los puntos (más abajo). */
+  let alTocarElMapa: ((pixel: { readonly x: number; readonly y: number }) => void) | undefined;
 
   // En escritorio, mientras se elige un punto, un clic en el mapa lo marca (historia 26). Si el
-  // ejercicio espera un punto para elegir su zona, el clic es suyo, también en el móvil.
+  // ejercicio espera un punto para elegir su zona, el clic es suyo, también en el móvil. Si no,
+  // es de los puntos.
   recurso(
     "mapa:clic",
     () => mapaListo(),
     (actual) => {
       const alClic = (evento: {
         readonly lngLat: { readonly lng: number; readonly lat: number };
+        readonly point: { readonly x: number; readonly y: number };
       }) => {
         if (esperandoPunto !== undefined) {
           esperandoPunto({ longitud: evento.lngLat.lng, latitud: evento.lngLat.lat });
           return;
         }
-        if (!eligiendo() || !escritorio()) return;
-        puntoDeReferencia.elegir(
-          { longitud: evento.lngLat.lng, latitud: evento.lngLat.lat },
-          "mapa",
-        );
+        if (eligiendo()) {
+          if (escritorio()) {
+            puntoDeReferencia.elegir(
+              { longitud: evento.lngLat.lng, latitud: evento.lngLat.lat },
+              "mapa",
+            );
+          }
+          return;
+        }
+        alTocarElMapa?.(evento.point);
       };
       actual.on("click", alClic);
       return () => {
@@ -743,6 +812,132 @@ export function PantallaMapa() {
     },
     { equals: mismaCoordenada },
   );
+
+  // ── La vista de puntos (ADR 0028) ─────────────────────────────────────────────────────────────
+
+  // Los puntos se piden una vez, con la vista de puntos y el resumen, que dice su fichero. Lo que
+  // está en marcha se termina aunque se cambie de vista: vale para la siguiente vez.
+  let puntosPedidos: number | undefined;
+  recurso(
+    "capa:puntos",
+    () => (vistaElegida() === "puntos" && resumen() !== undefined ? intentoDePuntos() : undefined),
+    (intento) => {
+      if (puntosPedidos === intento) return undefined;
+      puntosPedidos = intento;
+      setPuntos({ tipo: "cargando" });
+      void datos
+        .runPromiseExit(Effect.flatMap(CapaEmplazamientos, (servicio) => servicio.puntos))
+        .then((salida) => {
+          setPuntos(
+            Exit.isSuccess(salida) ? { tipo: "lista", puntos: salida.value } : { tipo: "fallo" },
+          );
+        });
+      return undefined;
+    },
+  );
+
+  // Al cambiar de vista, se piden las provincias que esa vista dibuja en lo que se ve.
+  createEffect(vistaDibujada, () => pedirLoQueSeVe());
+
+  /**
+   * Si se dibujan los marcadores: siempre con la vista agrupada y, con la de puntos, desde el zoom
+   * de los logos y con todas las provincias que se ven ya agrupadas (con el filtro, si lo hay). Los
+   * puntos se apagan a la vez, con su fundido, y los logos entran con el suyo: nunca hay unos
+   * encima de los otros, ni un hueco sin ninguno.
+   */
+  const conMarcadores = createMemo(() => {
+    const vista = vistaDibujada();
+    if (vista === "agrupada") return true;
+    if (vista === undefined || puntosListos() === undefined) return false;
+    const actual = vistaDelMapa();
+    const leido = resumen();
+    if (actual === undefined || leido === undefined) return false;
+    if (nivelDeZoom(actual.zoom) < ZOOM_DE_LOGOS) return false;
+    const conFiltro = hayFiltro(filtro.aplicado());
+    const agrupaciones = filtro.agrupaciones();
+    return provinciasDeLaVista(leido, actual, ZOOM_DE_LOGOS).every((codigo) =>
+      conFiltro ? agrupaciones.has(codigo) : provincias().get(codigo)?.tipo === "lista",
+    );
+  });
+
+  /**
+   * El emplazamiento que se acaba de tocar o elegir en la lista, mientras llega la capa de su
+   * provincia: de ella sale su clave, que abre su ficha. El anillo ya lo marca.
+   */
+  const [pendiente, setPendiente] = createSignal<{
+    readonly provincia: string;
+    readonly posicion: Coordenada;
+  }>();
+  /** Abre la ficha de un punto: pide su provincia y, cuando llega, la abre. */
+  const abrirPunto = (indice: number) => {
+    const actuales = puntosListos();
+    if (actuales === undefined) return;
+    const provincia = provinciaDePunto(actuales.puntos, indice);
+    setPendiente({ provincia, posicion: posicionDePunto(actuales.puntos, indice) });
+    if (untrack(provincias).get(provincia)?.tipo === "fallo") reintentarProvincias([provincia]);
+    else pedirProvincias([provincia]);
+  };
+  createEffect(
+    () => {
+      const actual = pendiente();
+      if (actual === undefined) return undefined;
+      const estado = provincias().get(actual.provincia);
+      if (estado === undefined || estado.tipo === "cargando") return undefined;
+      return {
+        provincia: actual.provincia,
+        clave:
+          estado.tipo === "lista"
+            ? emplazamientoDelPunto(estado.provincia.capa.emplazamientos, actual.posicion)?.clave
+            : undefined,
+      };
+    },
+    (resuelto) => {
+      if (resuelto === undefined) return;
+      setPendiente(undefined);
+      // Si su provincia no llega, la marca de agua lo dice con un reintento.
+      if (resuelto.clave !== undefined) seleccionar(resuelto.clave, resuelto.provincia);
+    },
+  );
+
+  crearPuntosEnMapa({
+    lienzo: createMemo(() => {
+      const actual = mapaCreado();
+      return actual === undefined ? undefined : lienzoDePuntos(actual);
+    }),
+    puntos: puntosListos,
+    visibles: () => vistaDibujada() === "puntos",
+    apagados: conMarcadores,
+    filtro: filtro.aplicado,
+    elegido: () => pendiente()?.posicion ?? posicionSeleccionada(),
+  });
+
+  // Un toque en el mapa, con la vista de puntos y los puntos a la vista: acerca o abre una ficha.
+  alTocarElMapa = (pixel) => {
+    if (mapa === undefined || vistaDibujada() !== "puntos" || conMarcadores()) return;
+    const actuales = puntosListos();
+    if (actuales === undefined) return;
+    const zoom = mapa.getZoom();
+    const decision = queHacerAlTocar(zoom, lienzoDePuntos(mapa).tocados(pixel));
+    if (decision.tipo === "acercar") {
+      vistaInicial.yaColocado();
+      mapa.easeTo({ center: mapa.unproject([pixel.x, pixel.y]), zoom: decision.zoom });
+    } else if (decision.tipo === "abrir") {
+      abrirPunto(decision.indice);
+    }
+  };
+
+  /** Cuántos emplazamientos tiene el sitio que se mira, para la cabecera. */
+  const cuenta = createMemo(() => {
+    const leido = resumen();
+    if (leido === undefined) return undefined;
+    const suya = cuentaDelSitio(lugares.sitio(), {
+      resumen: leido,
+      puntos: puntosListos()?.puntos,
+      provincias: provincias(),
+      filtro: filtro.aplicado(),
+    });
+    return suya === undefined ? undefined : textoDeCuenta(suya);
+  });
 
   /**
    * Lo que miran las celdas: lo que se ve al zoom de las celdas y el emplazamiento seleccionado,
@@ -1115,8 +1310,9 @@ export function PantallaMapa() {
   };
 
   // Si la página se abre con un emplazamiento en la URL, el mapa empieza en él. Solo al cargar:
-  // después, abrir o cerrar la ficha no mueve el mapa (historia 22).
-  let enfocadoAlCargar = false;
+  // después, abrir o cerrar la ficha no mueve el mapa (historia 22). Sin emplazamiento al abrir no
+  // hay nada que enfocar: la primera ficha que se abre después tampoco salta a pie de calle.
+  let enfocadoAlCargar = emplazamientoDe(ubicacion()) === null;
   createEffect(
     () => {
       const clave = seleccionada();
@@ -1210,13 +1406,15 @@ export function PantallaMapa() {
               lienzo={(elemento) => {
                 contenedor = elemento;
               }}
-              cabecera={<Cabecera lugar={lugares.nombre()} />}
+              cabecera={<Cabecera lugar={lugares.nombre()} cuenta={cuenta()} />}
               datos={
                 <EstadoDeLaCapa
                   estado={capa()}
                   vista={estadoVista()}
                   emplazamientos={resumen()?.provincias.reduce((n, p) => n + p.emplazamientos, 0)}
                   donde={donde()}
+                  puntos={vistaElegida() === "puntos" ? puntos()?.tipo : undefined}
+                  reintentarPuntos={() => setIntentoDePuntos((n) => n + 1)}
                   reintentar={cargarCapa}
                   reintentarProvincias={reintentarProvincias}
                 />
@@ -1266,6 +1464,7 @@ export function PantallaMapa() {
                             alCambiarVista={alCambiarVista}
                             lectorDeRotulos={lectorDeRotulos()}
                             conFoto={foto.seVe()}
+                            conMarcadores={conMarcadores()}
                           />
                         )}
                       </Show>
@@ -1306,6 +1505,24 @@ export function PantallaMapa() {
                     activo={vistaActiva()}
                     disabled={!listo() || emplazamientos().length === 0}
                     onClick={cambiarVista}
+                  />
+                  <Show when={vistaDibujada() === "puntos"}>
+                    <ControlDelMapa
+                      etiqueta={LISTA_DE_EMPLAZAMIENTOS}
+                      detalle={DETALLE_LISTA}
+                      icono={<IconoListaDeEmplazamientos />}
+                      aria-haspopup="dialog"
+                      disabled={puntosListos() === undefined}
+                      onClick={() => navegar(conLista(ubicacion(), true))}
+                    />
+                  </Show>
+                  <ControlDelMapa
+                    etiqueta={VISTA_AGRUPADA}
+                    detalle={DETALLE_VISTA_AGRUPADA}
+                    icono={<IconoVistaAgrupada />}
+                    activo={vistaElegida() === "agrupada"}
+                    disabled={vistaElegida() === undefined}
+                    onClick={() => ajustes.cambiarVistaAgrupada(vistaElegida() !== "agrupada")}
                   />
                   <ControlDelMapa
                     etiqueta="Medir mi señal"
@@ -1429,6 +1646,20 @@ export function PantallaMapa() {
                 }}
               />
             </Show>
+            <Show when={listaAbierta(ubicacion()) ? puntosListos() : undefined}>
+              {(actuales) => (
+                <DialogoLista
+                  puntos={actuales().puntos}
+                  caja={vistaDelEncuadre()?.caja}
+                  filtro={filtro.aplicado()}
+                  alElegir={(indice) => {
+                    navegar(conLista(ubicacion(), false), { reemplazar: true });
+                    abrirPunto(indice);
+                  }}
+                  alCerrar={() => navegar(conLista(ubicacion(), false), { reemplazar: true })}
+                />
+              )}
+            </Show>
             <Show when={ajustesAbiertos(ubicacion())}>
               <DialogoAjustes
                 alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
@@ -1454,13 +1685,16 @@ export function EstadoDeLaCapa(props: {
   readonly emplazamientos: number | undefined;
   /** Dónde los tiene (`dondeHayDatos`). */
   readonly donde: ReadonlyArray<string>;
+  /** Cómo van los puntos de la vista de puntos, si se han pedido (ADR 0028). */
+  readonly puntos?: "cargando" | "lista" | "fallo" | undefined;
+  readonly reintentarPuntos?: () => void;
   readonly reintentar: () => void;
   readonly reintentarProvincias: (codigos: ReadonlyArray<string>) => void;
 }) {
   // Todo sale de un solo memo que se lee en cada rama sin pasar por el valor de `Match`: al cambiar
   // de rama, la vieja puede volver a leer antes de desmontarse, y con el valor de `Match` eso es
   // una lectura caducada.
-  const marca = createMemo(() => marcaDeLaCapa(props.estado, props.vista));
+  const marca = createMemo(() => marcaDeLaCapa(props.estado, props.vista, props.puntos));
   const fallidas = () => {
     const actual = marca();
     return actual.tipo === "fallo-provincias" ? actual.provincias : [];
@@ -1473,6 +1707,19 @@ export function EstadoDeLaCapa(props: {
     <Switch>
       <Match when={marca().tipo === "cargando"}>
         <DatosDelMapa tono="espera" texto="Cargando los emplazamientos…" />
+      </Match>
+      <Match when={marca().tipo === "fallo-puntos"}>
+        <Aviso
+          tono="fallo"
+          titulo="No han llegado los puntos"
+          acciones={
+            <Boton variante="secundario" onClick={() => props.reintentarPuntos?.()}>
+              Reintentar
+            </Boton>
+          }
+        >
+          Puede que falle la conexión. Mientras, el mapa va agrupado.
+        </Aviso>
       </Match>
       <Match when={marca().tipo === "fallo"}>
         <Aviso
@@ -1527,6 +1774,7 @@ export function EstadoDeLaCapa(props: {
 /** Lo que dice la marca de agua del mapa, de la capa y de lo que se ve. */
 type MarcaDeLaCapa =
   | { readonly tipo: "cargando" }
+  | { readonly tipo: "fallo-puntos" }
   | { readonly tipo: "fallo"; readonly motivo: keyof typeof EXPLICACION_FALLO_CAPA }
   | {
       readonly tipo: "fallo-provincias";
@@ -1541,8 +1789,15 @@ type MarcaDeLaCapa =
       readonly barrido: number | null;
     };
 
-const marcaDeLaCapa = (estado: EstadoCapa, vista: EstadoDeLaVista | undefined): MarcaDeLaCapa => {
+const marcaDeLaCapa = (
+  estado: EstadoCapa,
+  vista: EstadoDeLaVista | undefined,
+  puntos: "cargando" | "lista" | "fallo" | undefined,
+): MarcaDeLaCapa => {
   if (estado.tipo !== "lista") return estado;
+  // Con la vista de puntos, el mapa no enseña nada hasta que llegan.
+  if (puntos === "cargando") return { tipo: "cargando" };
+  if (puntos === "fallo") return { tipo: "fallo-puntos" };
   const { resumen } = estado;
   if (vista?.tipo === "fallo") return { tipo: "fallo-provincias", provincias: vista.provincias };
   if (vista?.tipo === "cargando") {

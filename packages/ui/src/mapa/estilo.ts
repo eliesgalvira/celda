@@ -16,6 +16,7 @@ import {
 import { FUENTE_HUECOS, fuenteHuecos } from "./huecos.ts";
 import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
 import { capasLimites, FUENTE_LIMITES } from "./limites.ts";
+import { capasPuntoElegido, capasPuntos, fuentesPuntos } from "./puntos.ts";
 import {
   capasRotulos,
   type ContornoDeEspana,
@@ -72,8 +73,8 @@ export const estadoDelEstilo = (): NonNullable<StyleSpecification["state"]> => (
 /**
  * Las fuentes de lo que pinta Celda sobre el mapa base: la foto aérea, el edificio resaltado, las
  * celdas, el sector que da servicio, la vista de interferencia, la zona del ejercicio, los límites
- * de comunidades y provincias y los huecos de los marcadores (ADR 0024), vacías hasta que la web
- * las llena.
+ * de comunidades y provincias, los huecos de los marcadores (ADR 0024) y los puntos de la vista de
+ * puntos (ADR 0028), vacías hasta que la web las llena.
  */
 export const fuentesDeCelda = (): StyleSpecification["sources"] => ({
   [FUENTE_FOTO]: fuenteFoto(),
@@ -91,11 +92,13 @@ export const fuentesDeCelda = (): StyleSpecification["sources"] => ({
   [FUENTE_ZONA]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   [FUENTE_LIMITES]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   [FUENTE_HUECOS]: fuenteHuecos(),
+  ...fuentesPuntos(),
 });
 
 /**
  * Las capas de Celda que van entre las vías y los rótulos del mapa base: la vista de interferencia,
- * el sector que da servicio, las celdas, la zona del ejercicio y el edificio resaltado.
+ * el sector que da servicio, las celdas, la zona del ejercicio, el edificio resaltado y, encima,
+ * los puntos de la vista de puntos.
  */
 export const capasDeCelda = (color: ColorDeToken): ReadonlyArray<LayerSpecification> => [
   ...capasInterferencia([
@@ -111,7 +114,12 @@ export const capasDeCelda = (color: ColorDeToken): ReadonlyArray<LayerSpecificat
   ...capasServicioEncima(color("mapa-celda"), color("mapa-referencia")),
   ...capasZona(color("mapa-referencia")),
   ...capasEdificio(color),
+  ...capasPuntos(color("mapa-punto"), color("mapa-foto-linea")),
 ];
+
+/** Las capas de Celda que van encima de todo, también de los rótulos: el emplazamiento elegido. */
+export const capasDeCeldaEncima = (color: ColorDeToken): ReadonlyArray<LayerSpecification> =>
+  capasPuntoElegido(color("mapa-punto"), color("mapa-halo"));
 
 /**
  * El estilo del mapa base de OpenFreeMap (esquema OpenMapTiles) con la paleta A del tema (ADR
@@ -157,6 +165,7 @@ export const estiloMapa = (
     ...capasRotulos(FUENTE_MAPA_BASE, color, espana, comunitatValenciana, [
       capaNumeroDelEdificio(color),
     ]),
+    ...capasDeCeldaEncima(color),
   ],
 });
 

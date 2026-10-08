@@ -28,6 +28,7 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { IndexadorDeProvincias, type IndiceFallido } from "./indexador.ts";
+import type { PuntosDelMapa } from "./puntos.ts";
 import {
   type AgrupacionConFiltro,
   agrupacionConFiltro,
@@ -63,9 +64,10 @@ export type FalloCapa =
   | IndiceFallido;
 
 /**
- * La capa de emplazamientos que dibuja el mapa, en el formato 6 (ADR 0016): el resumen nacional
- * de la versión vigente y, a demanda, la capa de cada provincia, indexada. Lo que llega se queda
- * para toda la visita: el mapa y las fichas leen de lo mismo.
+ * La capa de emplazamientos que dibuja el mapa, en el formato 8 (ADR 0016): el resumen nacional
+ * de la versión vigente y, a demanda, los puntos de toda España (ADR 0028) y la capa de cada
+ * provincia, indexada. Lo que llega se queda para toda la visita: el mapa y las fichas leen de lo
+ * mismo.
  */
 export class CapaEmplazamientos extends Context.Service<
   CapaEmplazamientos,
@@ -95,6 +97,11 @@ export class CapaEmplazamientos extends Context.Service<
       codigo: string,
       filtro: FiltroDeCompanias,
     ) => Effect.Effect<AgrupacionConFiltro, FalloCapa>;
+    /**
+     * Los puntos de toda España de la versión del resumen, leídos en el Worker de capas, para la
+     * vista de puntos (ADR 0028). Se piden una vez por visita, y solo con esa vista.
+     */
+    readonly puntos: Effect.Effect<PuntosDelMapa, FalloCapa>;
   }
 >()("@celda/web/capa/servicio/CapaEmplazamientos") {}
 
@@ -373,6 +380,23 @@ export const capaDelOrigen = Layer.effect(
       );
     });
 
-    return CapaEmplazamientos.of({ resumen, provincia, situarClave, agrupacion });
+    const puntos = guardado(
+      yield* Semaphore.make(1),
+      Effect.gen(function* () {
+        const { puntos: fichero } = yield* resumen;
+        const texto = yield* descargarFichero(http, origen, fichero);
+        if (Option.isNone(texto)) {
+          return yield* new CapaNoDescargada({
+            url: `${origen}/${fichero}`,
+            motivo: "el origen no los tiene",
+          });
+        }
+        const leidos = yield* indexador.leerPuntos(texto.value);
+        yield* dejarPintar;
+        return leidos;
+      }),
+    ).pipe(Effect.withSpan("CapaEmplazamientos.puntos"));
+
+    return CapaEmplazamientos.of({ resumen, provincia, situarClave, agrupacion, puntos });
   }),
 );

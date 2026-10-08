@@ -217,10 +217,15 @@ export const agrupadorDeProvincia = (
 
 /**
  * Las provincias con capa que hay que pedir para ver `vista`: las que tienen emplazamientos en la
- * caja de la vista con su margen. Por debajo del nivel de provincias, ninguna.
+ * caja de la vista con su margen. Por debajo del nivel `desde`, ninguna: con la vista agrupada es
+ * el de provincias, y con la de puntos, el anterior al de los logos (ADR 0028).
  */
-export const provinciasDeLaVista = (resumen: ResumenLeido, vista: Vista): ReadonlyArray<string> => {
-  if (Math.floor(vista.zoom) < NIVEL_DE_PROVINCIAS) return [];
+export const provinciasDeLaVista = (
+  resumen: ResumenLeido,
+  vista: Vista,
+  desde: number = NIVEL_DE_PROVINCIAS,
+): ReadonlyArray<string> => {
+  if (Math.floor(vista.zoom) < desde) return [];
   const caja = cajaConMargen(vista.caja);
   return resumen.provincias.flatMap((p) =>
     p.fichero !== undefined && p.caja !== undefined && seCortan(p.caja, caja) ? [p.codigo] : [],

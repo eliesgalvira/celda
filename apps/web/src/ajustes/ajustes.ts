@@ -24,6 +24,8 @@ export interface ControlAjustes {
   readonly leidos: () => boolean;
   /** Apunta en el dispositivo que ya se ha visto la salvedad de las celdas. */
   readonly marcarSalvedadDeCeldasVista: () => void;
+  /** Pasa a la vista agrupada, o vuelve a la de puntos, y lo guarda en el dispositivo (ADR 0028). */
+  readonly cambiarVistaAgrupada: (agrupada: boolean) => void;
 }
 
 export const AjustesContexto = createContext<ControlAjustes>();
@@ -79,6 +81,10 @@ export const crearAjustes = (
     marcarSalvedadDeCeldasVista: () => {
       if (ajustes().salvedadDeCeldasVista === true) return;
       cambiar({ ...ajustes(), salvedadDeCeldasVista: true });
+    },
+    cambiarVistaAgrupada: (agrupada) => {
+      if ((ajustes().vistaAgrupada === true) === agrupada) return;
+      cambiar({ ...ajustes(), vistaAgrupada: agrupada });
     },
   };
 };
