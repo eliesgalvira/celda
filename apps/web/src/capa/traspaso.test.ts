@@ -80,7 +80,7 @@ describe("cuándo hay paso entre los puntos y los logos", () => {
     vista: "puntos" | "agrupada",
     con: boolean,
     escena: Escena,
-  ) => siguienteTraspaso(antes, { vista, con, escena, zoom: 15 });
+  ) => siguienteTraspaso(antes, { vista, con, escena });
 
   it("con la vista de puntos, al salir los logos y al irse", () => {
     const inicio = paso(undefined, "puntos", false, VACIA);

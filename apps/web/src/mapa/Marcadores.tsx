@@ -3,7 +3,7 @@ import { type FiltroDeCompanias, mascarasDeFiltro, SIN_FILTRO } from "@celda/dom
 import type { PuntosLeidos } from "@celda/dominio/puntos";
 import { habitantesDeRotulo, indiceDeCiudades } from "@celda/dominio/poblacionDeRotulos";
 import type { ResumenLeido } from "@celda/dominio/provincias";
-import { quitarRotulosDeMunicipios } from "@celda/ui/mapa/estilo.ts";
+import { type MapaConRotulos, quitarRotulosDeMunicipios } from "@celda/ui/mapa/estilo.ts";
 import { FUENTE_HUECOS, puestaDeHuecos } from "@celda/ui/mapa/huecos.ts";
 import { leerOklch } from "@celda/ui/mapa/color.ts";
 import {
@@ -17,7 +17,12 @@ import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Desliza
 import { CapaDeTraspaso, PuntoDeTraspaso } from "@celda/ui/puntos/Puntos.tsx";
 import { CapaDeRotulos, RotuloDeCiudad } from "@celda/ui/marcadores/RotuloDeCiudad.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
-import type { GeoJSONSource, Map as MapaMapLibre } from "maplibre-gl";
+import type {
+  CustomLayerInterface,
+  GeoJSONSource,
+  LngLatLike,
+  Map as MapaMapLibre,
+} from "maplibre-gl";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 
 import {
@@ -48,8 +53,14 @@ import {
 import { ZOOM_DE_LOGOS } from "../puntos/puntos.ts";
 import { posicionesDelVuelo } from "../puntos/vuelo.ts";
 import { CapaAgrupada } from "./CapaAgrupada.tsx";
-import type { LecturaDeRotulos, LectorDeRotulos, RotuloLeido } from "./rotulosDeCiudad.ts";
-import { type Lamina, seguirVista } from "./vista.ts";
+import type {
+  LecturaDeRotulos,
+  LectorDeRotulos,
+  MapaConRotulosColocados,
+  RotuloLeido,
+  ZoomsDeCapa,
+} from "./rotulosDeCiudad.ts";
+import { type Lamina, type MapaQueSeMueve, seguirVista } from "./vista.ts";
 
 const REDUCIR_MOVIMIENTO = "(prefers-reduced-motion: reduce)";
 
@@ -59,8 +70,33 @@ const MEDIO_MARCADOR = 30;
 /** Hasta dónde acerca pulsar una provincia para verla entera: más cerca se ven sus calles. */
 const ZOOM_MAXIMO_DE_PROVINCIA = 12;
 
+/**
+ * Lo que los marcadores usan del mapa de MapLibre: seguirlo, proyectar, sus contenedores, la capa
+ * del vuelo al cambiar de vista, los huecos y los rótulos del mapa base, y acercar al abrir un
+ * hexágono. `Map` lo cumple; las pruebas, con un doble.
+ */
+export interface MapaDeMarcadores extends MapaQueSeMueve, MapaConRotulos, MapaConRotulosColocados {
+  readonly on: (evento: "move" | "moveend" | "idle", oyente: () => void) => void;
+  readonly off: (evento: "move" | "moveend" | "idle", oyente: () => void) => void;
+  readonly getContainer: () => HTMLElement;
+  readonly getCanvasContainer: () => HTMLElement;
+  readonly getCanvas: () => HTMLElement;
+  readonly getLayer: (id: string) => ZoomsDeCapa | undefined;
+  readonly getLayersOrder: () => Array<string>;
+  readonly addLayer: (capa: CustomLayerInterface, antes?: string) => void;
+  readonly removeLayer: (id: string) => void;
+  readonly getSource: MapaMapLibre["getSource"];
+  readonly isMoving: () => boolean;
+  readonly getMaxZoom: () => number;
+  readonly easeTo: (opciones: { readonly center: LngLatLike; readonly zoom: number }) => void;
+  readonly cameraForBounds: (
+    caja: [[number, number], [number, number]],
+    opciones: { readonly padding: number; readonly maxZoom: number },
+  ) => { readonly center?: LngLatLike | undefined; readonly zoom?: number | undefined } | undefined;
+}
+
 export interface MarcadoresProps {
-  readonly mapa: MapaMapLibre;
+  readonly mapa: MapaDeMarcadores;
   /** El resumen nacional: un hexágono por provincia, y qué provincias tienen capa. */
   readonly resumen: ResumenLeido;
   /** Cómo va cada provincia pedida. Las listas se agrupan aquí y se dibujan las de la vista. */
@@ -208,7 +244,6 @@ export function Marcadores(props: MarcadoresProps) {
       vista: props.vista,
       con: props.conMarcadores !== false,
       escena: escena(),
-      zoom: untrack(() => props.mapa.getZoom()),
     }),
   );
 
@@ -248,7 +283,6 @@ export function Marcadores(props: MarcadoresProps) {
   /** Los puntos que se mueven en el paso entre los puntos y los logos, mientras se mueven. */
   const [moviendose, setMoviendose] = createSignal<{
     readonly hacia: "logos" | "puntos";
-    readonly zoom: number;
     readonly puntos: ReadonlyArray<PuntoDelTraspaso>;
   }>();
   recurso(
@@ -268,7 +302,7 @@ export function Marcadores(props: MarcadoresProps) {
         (elemento) => untrack(agrupador).emplazamientosDe(elemento),
         (posicion) => seVeAhora(enPantalla(posicion)),
       );
-      setMoviendose({ hacia: paso.hacia, zoom: paso.zoom, puntos });
+      setMoviendose({ hacia: paso.hacia, puntos });
       const relojes: Array<number> = [];
       if (paso.hacia === "logos") {
         apagar?.(true);
@@ -619,8 +653,8 @@ export function Marcadores(props: MarcadoresProps) {
                 <PuntoQueSeMueve
                   punto={punto()}
                   hacia={paso().hacia}
-                  zoom={paso().zoom}
-                  proyectar={untrack(proyectarEnLamina)}
+                  zoom={zoomColocado()}
+                  proyectar={proyectarEnLamina()}
                 />
               )}
             </For>
@@ -691,21 +725,30 @@ function RotuloEnPantalla(props: {
 
 /**
  * Un punto que se mueve entre su sitio y su marcador en el paso entre los puntos y los logos: va
- * hacia él al acercar y sale de él al alejar.
+ * hacia él al acercar y sale de él al alejar. Se vuelve a colocar al cambiar el zoom, como los
+ * marcadores, aunque el gesto siga a mitad de paso: colocado solo al empezar, se quedaba donde
+ * caía su emplazamiento a ese zoom y se separaba de él mientras el mapa seguía alejándose (#74).
  */
 function PuntoQueSeMueve(props: {
   readonly punto: PuntoDelTraspaso;
   readonly hacia: "logos" | "puntos";
+  /** El zoom al que se colocan: la proyección cambia con él aunque no lo lea. */
   readonly zoom: number;
   readonly proyectar: (posicion: Coordenada) => Salto;
 }) {
-  const sitio = props.proyectar(props.punto.posicion);
-  const marcador = props.proyectar(props.punto.marcador);
+  const sitio = createMemo(() => {
+    void props.zoom;
+    return props.proyectar(props.punto.posicion);
+  });
+  const marcador = createMemo(() => {
+    void props.zoom;
+    return props.proyectar(props.punto.marcador);
+  });
   return (
     <PuntoDeTraspaso
-      x={sitio.x}
-      y={sitio.y}
-      desplazamiento={{ x: marcador.x - sitio.x, y: marcador.y - sitio.y }}
+      x={sitio().x}
+      y={sitio().y}
+      marcador={{ x: marcador().x - sitio().x, y: marcador().y - sitio().y }}
       sentido={props.hacia === "logos" ? "va" : "viene"}
       diametro={2 * radioDePunto(props.zoom)}
       opacidad={opacidadDePunto(props.zoom)}

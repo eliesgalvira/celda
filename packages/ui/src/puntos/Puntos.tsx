@@ -121,45 +121,51 @@ export function CapaDeTraspaso(props: {
 }
 
 /**
+ * Hacia dónde anima cada sentido: `va` sale de su sitio y avanza hasta su marcador apagándose, y
+ * `viene` hace lo contrario. El principio va en `@starting-style` y el final en la clase: un estilo
+ * en línea ganaría también a `@starting-style`, y el punto no se movería. Si el sentido cambia a
+ * mitad, la transición da la vuelta desde donde esté.
+ */
+const SENTIDOS = {
+  va: "[--traspaso-avance:1] [--traspaso-luz:0] starting:[--traspaso-avance:0] starting:[--traspaso-luz:1]",
+  viene:
+    "[--traspaso-avance:0] [--traspaso-luz:1] starting:[--traspaso-avance:1] starting:[--traspaso-luz:0]",
+} as const;
+
+/**
  * Un punto del paso entre los puntos y los logos, igual que los que dibuja el mapa: del mismo
- * color, tamaño y opacidad. Con `va`, sale de su sitio hacia `desplazamiento` (el hexágono que lo
- * recoge, o su propio logo) y se apaga; con `viene`, sale de ahí y se queda en su sitio. Usa la
- * curva de los logos (`deslizar`). Con la preferencia de reducir movimiento no se monta.
+ * color, tamaño y opacidad. Con `va`, sale de su sitio hacia `marcador` (el hexágono que lo recoge,
+ * o su propio logo) y se apaga; con `viene`, sale de ahí y se queda en su sitio. Usa la curva de
+ * los logos. Quien lo usa le pasa su sitio y su marcador cada vez que cambia el zoom: lo que se
+ * anima es solo cuánto ha avanzado (la utilidad `traspaso`), así que va siempre entre los dos
+ * aunque el zoom cambie a mitad. Con la preferencia de reducir movimiento no se monta.
  */
 export function PuntoDeTraspaso(props: {
   /** Dónde está su emplazamiento en la lámina. */
   readonly x: number;
   readonly y: number;
-  readonly desplazamiento: Salto;
+  /** Dónde está su marcador respecto a su emplazamiento. */
+  readonly marcador: Salto;
   readonly sentido: "va" | "viene";
   readonly diametro: number;
   readonly opacidad: number;
 }) {
-  const quieto = { x: 0, y: 0, opacidad: props.opacidad };
-  const movido = { ...props.desplazamiento, opacidad: 0 };
-  const desde = props.sentido === "va" ? quieto : movido;
-  const hasta = props.sentido === "va" ? movido : quieto;
   return (
     <span
       class="absolute top-0 left-0 block"
       style={{
-        width: `${props.diametro}px`,
-        height: `${props.diametro}px`,
+        width: `${props.diametro.toFixed(2)}px`,
+        height: `${props.diametro.toFixed(2)}px`,
         transform: `translate(${(props.x - props.diametro / 2).toFixed(1)}px, ${(props.y - props.diametro / 2).toFixed(1)}px)`,
       }}
     >
       <span
-        class="deslizar block size-full rounded-full [opacity:var(--hasta-opacidad)] [transform:translate(var(--hasta-x),var(--hasta-y))] motion-reduce:transition-none starting:[opacity:var(--desde-opacidad)] starting:[transform:translate(var(--desde-x),var(--desde-y))]"
+        class={`traspaso block size-full rounded-full motion-reduce:transition-none ${SENTIDOS[props.sentido]}`}
         style={{
-          // Lo de llegada va en variables y no en `transform` y `opacity`: un estilo en línea
-          // ganaría también a `@starting-style`, y el punto no se movería.
           background: "var(--mapa-punto)",
-          "--desde-x": `${desde.x.toFixed(1)}px`,
-          "--desde-y": `${desde.y.toFixed(1)}px`,
-          "--desde-opacidad": String(desde.opacidad),
-          "--hasta-x": `${hasta.x.toFixed(1)}px`,
-          "--hasta-y": `${hasta.y.toFixed(1)}px`,
-          "--hasta-opacidad": String(hasta.opacidad),
+          "--traspaso-x": `${props.marcador.x.toFixed(1)}px`,
+          "--traspaso-y": `${props.marcador.y.toFixed(1)}px`,
+          "--traspaso-opacidad": props.opacidad.toFixed(3),
         }}
       />
     </span>

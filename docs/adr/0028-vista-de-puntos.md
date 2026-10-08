@@ -72,7 +72,7 @@ Los puntos no son botones. «Funciones» tiene «Lista de emplazamientos», que 
 
 Al cruzar el zoom 15 los logos salen solo cuando todas las provincias que se ven están agrupadas, y los puntos se apagan a la vez: nunca hay puntos y logos encima, ni un hueco sin ninguno, ni hexágonos de provincia «cargando» sobre los puntos. El usuario pidió además que el paso fuera natural:
 
-- **Al acercar**, cada logo crece desde el tamaño de su punto y los puntos de una agrupación se deslizan a su hexágono, que brota allí. **Al alejar**, al revés: los logos se encogen hasta su punto y los puntos salen del hexágono. Son puntos del DOM, solo los que se ven, en una lámina bajo los marcadores, con la curva de los logos (`deslizar`) y su máquina de transiciones (`@starting-style`, el desplazamiento de la lámina). Los puntos del mapa se apagan al salir los logos y vuelven cuando los del DOM están llegando.
+- **Al acercar**, cada logo crece desde el tamaño de su punto y los puntos de una agrupación se deslizan a su hexágono, que brota allí. **Al alejar**, al revés: los logos se encogen hasta su punto y los puntos salen del hexágono. Son puntos del DOM, solo los que se ven, en una lámina bajo los marcadores, con la curva de los logos (`deslizar`) y su máquina de transiciones (`@starting-style`, el desplazamiento de la lámina). Como los marcadores, se vuelven a colocar cada vez que cambia el zoom, aunque el gesto siga a mitad de paso, y lo que se anima es solo cuánto han avanzado hacia su marcador: van siempre entre su emplazamiento y su marcador, y acaban en su emplazamiento. Los puntos del mapa se apagan al salir los logos y vuelven cuando los del DOM están llegando.
 
 ### El cambio de vista
 

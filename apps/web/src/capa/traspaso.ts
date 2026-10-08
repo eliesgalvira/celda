@@ -59,8 +59,6 @@ export interface Traspaso {
   readonly marcadores: Escena;
   /** La escena que llega con el paso. */
   readonly llega: Escena;
-  /** El zoom del mapa en el paso: el tamaño de los puntos que se mueven. */
-  readonly zoom: number;
 }
 
 /** Sin paso: los marcadores están, o no, desde el principio o desde un cambio de vista. */
@@ -90,10 +88,9 @@ export const siguienteTraspaso = (
     readonly vista: "puntos" | "agrupada" | undefined;
     readonly con: boolean;
     readonly escena: Escena | undefined;
-    readonly zoom: number;
   },
 ): EstadoDelTraspaso => {
-  const { vista, con, escena, zoom } = ahora;
+  const { vista, con, escena } = ahora;
   const ultima = con ? escena : antes?.ultima;
   if (
     vista === "puntos" &&
@@ -111,7 +108,6 @@ export const siguienteTraspaso = (
         hacia: con ? "logos" : "puntos",
         marcadores: ultima,
         llega: escena,
-        zoom,
       },
     };
   }

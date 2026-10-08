@@ -470,6 +470,37 @@
     opacity 0.45s ease;
 }
 
+/*
+ * Un punto del paso entre la vista de puntos y los logos (puntos/Puntos.tsx, ADR 0028). Lo que se
+ * anima es cuánto ha avanzado hacia su marcador, de 0 a 1, y cuánto se ve, con las curvas de
+ * `deslizar`. Hacia dónde va (`--traspaso-x` y `--traspaso-y`) y su opacidad se recalculan cada
+ * vez que cambia el zoom y no se animan: el punto queda siempre entre su emplazamiento y su
+ * marcador según la cámara de ese momento, y al acabar, en su emplazamiento. Con `transform`
+ * animado iba hacia donde estaba el marcador al empezar, aunque el zoom siguiera cambiando (#74).
+ */
+@property --traspaso-avance {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --traspaso-luz {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@utility traspaso {
+  transform: translate(
+    calc(var(--traspaso-x) * var(--traspaso-avance)),
+    calc(var(--traspaso-y) * var(--traspaso-avance))
+  );
+  opacity: calc(var(--traspaso-opacidad) * var(--traspaso-luz));
+  transition:
+    --traspaso-avance 0.6s cubic-bezier(0.3, 0.7, 0.2, 1),
+    --traspaso-luz 0.45s ease;
+}
+
 @layer base {
   html,
   body {
