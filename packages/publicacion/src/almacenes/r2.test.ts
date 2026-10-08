@@ -114,20 +114,6 @@ const cuboDePrueba = Effect.gen(function* () {
   return { almacen, copias, archivo, objetos, peticiones };
 });
 
-/**
- * Adelanta el reloj de prueba de segundo en segundo hasta que la fibra termina, y deja correr entre
- * paso y paso lo asíncrono de verdad, como las firmas de Web Crypto, para que cada espera se
- * programe antes del paso siguiente.
- */
-const esperarConReloj = <A, E>(fibra: Fiber.Fiber<A, E>) =>
-  Effect.gen(function* () {
-    for (let paso = 0; paso < 3600 && fibra.pollUnsafe() === undefined; paso++) {
-      yield* TestClock.withLive(Effect.sleep("1 millis"));
-      yield* TestClock.adjust("1 second");
-    }
-    return yield* Fiber.join(fibra);
-  });
-
 describe("almacén de ficheros en R2", () => {
   it.effect("firma como AWS Signature V4 (caso get-vanilla de la batería de AWS)", () =>
     Effect.gen(function* () {
@@ -411,48 +397,73 @@ describe("almacén de ficheros en R2", () => {
           i.map(({ hora }) => hora - Date.UTC(2026, 9, 7, 2, 15)),
         );
 
-        // El reloj de prueba avanza de segundo en segundo, así que cada intento puede llegar un
-        // paso más tarde de lo justo.
-        const casi = (horas: ReadonlyArray<number>, esperadas: ReadonlyArray<number>) => {
-          assert.lengthOf(horas, esperadas.length);
-          for (const [i, hora] of horas.entries()) {
-            const esperada = esperadas[i] ?? 0;
-            assert.isTrue(hora >= esperada && hora <= esperada + 3000, `${horas.join(", ")} ms`);
-          }
-        };
+        // El reloj de prueba solo se mueve aquí, a mano. Cada intento firma con Web Crypto, que es
+        // asíncrona de verdad, así que tras mover el reloj se espera en tiempo real a que llegue el
+        // intento. Con el reloj quieto mientras tanto, las horas salen exactas aunque la máquina
+        // vaya cargada.
+        const hasta = (cuantos: number) =>
+          Effect.gen(function* () {
+            for (let vuelta = 0; vuelta < 2000; vuelta++) {
+              if ((yield* Ref.get(intentos)).length >= cuantos) break;
+              yield* TestClock.withLive(Effect.sleep("5 millis"));
+            }
+            assert.lengthOf(yield* Ref.get(intentos), cuantos);
+          });
+        // Mueve el reloj hasta un milisegundo antes de lo esperado y comprueba que aún no hay otro
+        // intento; después, el milisegundo que falta y el intento siguiente.
+        const tras = (milisegundos: number, cuantos: number) =>
+          Effect.gen(function* () {
+            yield* TestClock.adjust(milisegundos - 1);
+            yield* TestClock.withLive(Effect.sleep("30 millis"));
+            assert.lengthOf(yield* Ref.get(intentos), cuantos - 1);
+            yield* TestClock.adjust(1);
+            yield* hasta(cuantos);
+          });
+        const PLAZO = 300_000;
 
         // Con un 503, una petición parada y un 200, sube al tercer intento. El segundo va 2 s después
         // del 503, y el tercero, 4 s después de que el segundo se pase de sus cinco minutos.
         yield* TestClock.setTime(Date.UTC(2026, 9, 7, 2, 15));
         yield* Ref.set(respuestas, [503, "parada", 200]);
-        yield* esperarConReloj(
-          yield* Effect.forkChild(copias.guardar("ingesta.sqlite.gz", contenido)),
-        );
-        casi(yield* horas, [0, 2000, 2000 + 300_000 + 4000]);
+        const subida = yield* Effect.forkChild(copias.guardar("ingesta.sqlite.gz", contenido));
+        yield* hasta(1);
+        yield* tras(2000, 2);
+        yield* tras(PLAZO + 4000, 3);
+        yield* Fiber.join(subida);
+        assert.deepStrictEqual(yield* horas, [0, 2000, 2000 + PLAZO + 4000]);
         // Cada intento va firmado con su hora.
         const fechas = (yield* Ref.get(intentos)).map(({ fecha }) => fecha);
-        assert.strictEqual(new Set(fechas).size, 3);
-        assert.match(fechas[2] ?? "", /^20261007T0220\d\dZ$/u);
+        assert.deepStrictEqual(fechas, ["20261007T021500Z", "20261007T021502Z", "20261007T022006Z"]);
 
         // Si se para del todo, son tres intentos de cinco minutos y un fallo que lo dice.
         yield* Ref.set(intentos, []);
         yield* TestClock.setTime(Date.UTC(2026, 9, 7, 2, 15));
         yield* Ref.set(respuestas, []);
-        const fallo = yield* esperarConReloj(
-          yield* Effect.forkChild(Effect.flip(copias.guardar("ingesta.sqlite.gz", contenido))),
+        const parada = yield* Effect.forkChild(
+          Effect.flip(copias.guardar("ingesta.sqlite.gz", contenido)),
         );
+        yield* hasta(1);
+        yield* tras(PLAZO + 2000, 2);
+        yield* tras(PLAZO + 4000, 3);
+        yield* TestClock.adjust(PLAZO);
+        const fallo = yield* Fiber.join(parada);
         assert.strictEqual(
           fallo.motivo,
           "PUT copias/ingesta.sqlite.gz: sin acabar en 5m (3 intentos)",
         );
-        casi(yield* horas, [0, 302_000, 606_000]);
+        assert.deepStrictEqual(yield* horas, [0, PLAZO + 2000, 2 * PLAZO + 6000]);
 
         // Un 500 que no se arregla se devuelve tras los reintentos como cualquier otra respuesta.
         yield* Ref.set(intentos, []);
+        yield* TestClock.setTime(Date.UTC(2026, 9, 7, 2, 15));
         yield* Ref.set(respuestas, [500, 500, 500]);
-        const rechazada = yield* esperarConReloj(
-          yield* Effect.forkChild(Effect.flip(copias.guardar("ingesta.sqlite.gz", contenido))),
+        const rechazo = yield* Effect.forkChild(
+          Effect.flip(copias.guardar("ingesta.sqlite.gz", contenido)),
         );
+        yield* hasta(1);
+        yield* tras(2000, 2);
+        yield* tras(4000, 3);
+        const rechazada = yield* Fiber.join(rechazo);
         assert.match(rechazada.motivo, /^PUT copias\/ingesta\.sqlite\.gz: 500/u);
         assert.lengthOf(yield* Ref.get(intentos), 3);
       }),
