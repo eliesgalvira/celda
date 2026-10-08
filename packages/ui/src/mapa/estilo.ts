@@ -119,7 +119,7 @@ export const capasDeCelda = (color: ColorDeToken): ReadonlyArray<LayerSpecificat
 
 /** Las capas de Celda que van encima de todo, también de los rótulos: el emplazamiento elegido. */
 export const capasDeCeldaEncima = (color: ColorDeToken): ReadonlyArray<LayerSpecification> =>
-  capasPuntoElegido(color("mapa-punto"), color("mapa-halo"));
+  capasPuntoElegido(color("mapa-punto"), color("mapa-foto-linea"));
 
 /**
  * El estilo del mapa base de OpenFreeMap (esquema OpenMapTiles) con la paleta A del tema (ADR

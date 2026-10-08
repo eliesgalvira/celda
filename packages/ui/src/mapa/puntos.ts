@@ -179,7 +179,8 @@ export const capasPuntos = (color: string, claro: string): ReadonlyArray<LayerSp
 
 /**
  * Las capas del emplazamiento elegido, un punto mayor con un anillo, encima de todo, también de
- * los rótulos: es lo que dice qué ficha está abierta. `halo` es `--mapa-halo`.
+ * los rótulos: es lo que dice qué ficha está abierta. `halo` es su borde claro, `--mapa-foto-linea`,
+ * que se lee sobre el mapa claro, el oscuro y la foto aérea.
  */
 export const capasPuntoElegido = (
   color: string,
