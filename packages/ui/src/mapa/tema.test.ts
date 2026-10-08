@@ -84,6 +84,25 @@ describe("pasarDeTema", () => {
     }
   });
 
+  it("cambia el color de los puntos de la vista de puntos y del elegido, también escondidos y apagados", () => {
+    for (const estilo of Object.values(ESTILOS)) {
+      const mapa = mapaDePrueba(estilo(CLARO));
+      // Apagados mientras salen los logos, como los deja `apagarPuntos`.
+      mapa.pintura.get("puntos")?.set("circle-opacity", 0);
+      pasarDeTema(mapa, estilo(CLARO), estilo(OSCURO));
+      const punto = OSCURO("mapa-punto");
+      assert.notStrictEqual(punto, CLARO("mapa-punto"));
+      assert.strictEqual(mapa.pintura.get("puntos")?.get("circle-color"), punto);
+      assert.strictEqual(mapa.pintura.get("puntos-red-usada")?.get("circle-color"), punto);
+      assert.strictEqual(mapa.pintura.get("punto-elegido")?.get("circle-color"), punto);
+      assert.strictEqual(
+        mapa.pintura.get("punto-elegido-anillo")?.get("circle-stroke-color"),
+        punto,
+      );
+      assert.strictEqual(mapa.pintura.get("puntos")?.get("circle-opacity"), 0);
+    }
+  });
+
   it("con el mismo tema no cambia nada", () => {
     const mapa = mapaDePrueba(ESTILOS.principal(OSCURO));
     pasarDeTema(mapa, ESTILOS.principal(OSCURO), ESTILOS.principal(OSCURO));
