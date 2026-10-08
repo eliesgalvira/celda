@@ -433,7 +433,11 @@ describe("almacén de ficheros en R2", () => {
         assert.deepStrictEqual(yield* horas, [0, 2000, 2000 + PLAZO + 4000]);
         // Cada intento va firmado con su hora.
         const fechas = (yield* Ref.get(intentos)).map(({ fecha }) => fecha);
-        assert.deepStrictEqual(fechas, ["20261007T021500Z", "20261007T021502Z", "20261007T022006Z"]);
+        assert.deepStrictEqual(fechas, [
+          "20261007T021500Z",
+          "20261007T021502Z",
+          "20261007T022006Z",
+        ]);
 
         // Si se para del todo, son tres intentos de cinco minutos y un fallo que lo dice.
         yield* Ref.set(intentos, []);
