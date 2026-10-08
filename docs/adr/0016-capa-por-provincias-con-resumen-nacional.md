@@ -132,6 +132,10 @@ Una estación base sin bandas puede estar así por dos razones: Celda aún no ha
 
 Una ficha del formato 6 sin la clave se leería como leída, así que el formato sube a 7 y la web solo lee el 7, como en el paso al 6. El historial no sirve para esto: solo apunta las lecturas que cambian algo, y la primera de una ficha sin bandas no cambia nada.
 
+## Formato 8: los puntos de toda España (#74, 08/10/2026)
+
+Cada versión lleva `puntos/<huella>.json`, con la posición al metro, las compañías y el municipio de cada emplazamiento de España, sin claves, que el resumen nombra (`puntos`) y el manifiesto lista. Es lo que dibuja la vista de puntos, la de por defecto, por debajo del zoom 15 ([ADR 0028](0028-vista-de-puntos.md)). Pesa 176 KB con gzip con los 35.689 emplazamientos del 07/10/2026. El resumen lo lleva siempre, así que el formato sube a 8 y la web solo lee el 8, como en el paso al 6 y al 7.
+
 ## Consecuencias
 
 - Abrir la web descarga el resumen (de 2 a 4 KB con gzip, según cuántas zonas lleve) y las provincias de la vista inicial, no toda España.

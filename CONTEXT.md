@@ -43,8 +43,20 @@ Sector de un emplazamiento que da servicio a un punto de referencia: el que más
 _Evitar_: celda servidora, sector servidor, mi antena
 
 **Agrupación**:
-Hexágono con un número que recoge los emplazamientos cercanos cuando se aleja el mapa.
+Hexágono con un número que recoge los emplazamientos cercanos cuando se aleja el mapa: en la vista agrupada y, en las dos vistas, desde el zoom de los logos, donde varios quedan muy juntos.
 _Evitar_: cluster, grupo, hexágono
+
+**Vista de puntos**:
+Cómo dibuja el mapa los emplazamientos si nadie elige otra cosa: cada uno es un punto pequeño del verde azulado de Celda, sin agrupar, hasta el zoom de los logos, el 15. Desde ahí, logos y agrupaciones, como en la vista agrupada. Sin número en el mapa: cuántos hay lo dice la cabecera, del sitio que se mira (ADR 0028).
+_Evitar_: mapa de calor, nube de puntos, densidad
+
+**Vista agrupada**:
+La otra forma de dibujarlos, que se elige en «Funciones»: provincias, zonas y agrupaciones con su número hasta la calle. El dispositivo la recuerda.
+_Evitar_: vista de hexágonos, clusters
+
+**Paso a los logos**:
+En la vista de puntos, el cruce del zoom de los logos: cada logo crece desde su punto y los puntos de una agrupación se deslizan hasta su hexágono, y al alejar al revés.
+_Evitar_: traspaso (en la interfaz), transición, handover
 
 **Barrio**:
 Uno de los 73 barrios de Barcelona, con los límites que publica el Ayuntamiento. En el nivel de barrios del mapa, cada uno recoge sus emplazamientos con su número. Los municipios de alrededor no tienen barrios.
@@ -67,7 +79,7 @@ Terreno que el IGN no asigna a ningún municipio porque lo comparten varios, com
 _Evitar_: mancomunidad, comunidad (son solo parte del nombre de algunos)
 
 **Zona**:
-Barrio, municipio o provincia: lo que el mapa recoge en un hexágono con su número de emplazamientos y su nombre. Provincias de lejos, municipios a media distancia y barrios dentro del municipio de Barcelona. En el mapa, un municipio es zona solo si tiene 4 emplazamientos o más y cabe en la pantalla, y de lejos, además, solo si es grande; si no, sus emplazamientos van en agrupaciones o sueltos. El ejercicio de emplazamientos se hace sobre un barrio de Barcelona o un municipio.
+Barrio, municipio o provincia: lo que el mapa recoge en un hexágono con su número de emplazamientos y su nombre, en la vista agrupada. Provincias de lejos, municipios a media distancia y barrios dentro del municipio de Barcelona. En el mapa, un municipio es zona solo si tiene 4 emplazamientos o más y cabe en la pantalla, y de lejos, además, solo si es grande; si no, sus emplazamientos van en agrupaciones o sueltos. El ejercicio de emplazamientos se hace sobre un barrio de Barcelona o un municipio.
 _Evitar_: área, región, zona de barrido (esa es la de la ingesta)
 
 **Ausencia**:
@@ -155,7 +167,7 @@ _Evitar_: celda (esa es la de un emplazamiento), tesela, casilla
 ### Mapa publicado
 
 **Capa**:
-Copia fija de todos los emplazamientos, publicada de una vez para dibujar el mapa. Desde el formato 5 es un resumen nacional y una capa por provincia, que la web pide según lo que se ve.
+Copia fija de todos los emplazamientos, publicada de una vez para dibujar el mapa. Desde el formato 5 es un resumen nacional y una capa por provincia, que la web pide según lo que se ve, y desde el 8 lleva además los puntos de toda España.
 _Evitar_: tiles, teselas, mapa
 
 **Resumen nacional**:
@@ -165,6 +177,10 @@ _Evitar_: índice (ese es el de claves), overview, mapa general
 **Índice de claves**:
 Parte de la capa que dice en qué provincia va cada emplazamiento, repartida en 16 ficheros por su clave. El resumen nacional lista esos ficheros. Sirve para abrir el enlace a una ficha que no dice su provincia sin descargar ninguna capa.
 _Evitar_: diccionario, tabla de búsqueda, índice a secas
+
+**Puntos de toda España**:
+Parte de la capa con la posición al metro, las compañías y el municipio de cada emplazamiento, sin sus claves, en un solo fichero. Es lo que dibuja la vista de puntos, y lo que cuenta los emplazamientos de un municipio en la cabecera. Desde el formato 8 (ADR 0028).
+_Evitar_: GeoJSON, nube, puntos a secas en el código (son los de la vista de puntos)
 
 **Provincia cubierta**:
 Provincia de la que se han barrido todos los cuadros con datos que la tocan: su número es el de toda la provincia. Si solo se ha barrido una parte, sus emplazamientos de esa parte están todos, pero su número es el de esa parte y la interfaz lo dice. Sin nada barrido, no tiene número.
@@ -357,7 +373,7 @@ Modo discreto que relaciona lo que se ve con ejercicios de clase de comunicacion
 _Evitar_: modo asignatura, modo práctica
 
 **Ajustes**:
-Lo que la persona elige una vez y el dispositivo recuerda, sin cuenta: el modo estudiante y el filtro de compañías. No es una aportación: nunca se compartiría.
+Lo que la persona elige una vez y el dispositivo recuerda, sin cuenta: el modo estudiante, el filtro de compañías y la vista agrupada. No es una aportación: nunca se compartiría.
 _Evitar_: preferencias, configuración
 
 **Ejercicio de emplazamientos**:
@@ -400,6 +416,7 @@ _Evitar_: clientes, carga
 - Una **corrección** se enseña junto a la **observación** del **registro oficial** que contradice, con cuántas personas la sostienen.
 - Una **simulación** nunca es una **observación** ni una **medida**.
 - Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.
+- En la **vista de puntos** cada **emplazamiento** es un punto hasta el zoom de los logos; en la **vista agrupada**, va en una **zona** o una **agrupación** hasta que se separa. Desde el zoom de los logos las dos vistas son iguales.
 - El hexágono de una **provincia** va en su **centro visual**. Los **rótulos** de ciudad van por encima de los hexágonos de **zona**; si se pisan, se dibuja el del sitio con más habitantes y el otro sale al acercar.
 - El **ejercicio de emplazamientos** se hace sobre una **zona**: un barrio de Barcelona o un municipio. Cada **emplazamiento** de la zona en que emite una **compañía** cuenta como una **estación base** suya.
 - Al abrir, el mapa encuadra la **provincia** del **punto elegido** que guarda el dispositivo o, sin él, la península entera. La **ubicación GPS** no cuenta: nunca se pide al abrir.

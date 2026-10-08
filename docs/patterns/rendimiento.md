@@ -40,7 +40,8 @@ pnpm run medir -- --capas <carpeta> --web <antes>,<después> --escenario vuelos 
 - `--trazas` graba una traza de CDP de cada gesto en una ronda aparte, que no cuenta en las medianas, y resume el tiempo propio por hilo y por tipo de trabajo. `--perfil` guarda el perfil de CPU de V8 de cada gesto, con el nombre del gesto, así que va con una sola `--web`; para leerlo, construye la web sin minificar (`npx vp build --minify false`).
 - `--solo-carga` se salta los gestos, `--cascada` imprime las peticiones de la carga con su inicio y su fin, y `--json` guarda las rondas enteras.
 - `--escenario espana` cambia los gestos por el recorrido de varias provincias (ADR 0016): alejar con el botón hasta ver toda España con el resumen, tocar el hexágono de Barcelona, acercar con el botón hasta el nivel de municipios y arrastrar y pellizcar allí, acercar hasta la calle tocando cada vez la agrupación o la zona mayor, alejar hasta el nivel de provincias y cruzar de una a otra con seis arrastres largos. Al final mide la memoria de la página y sus Workers (`measureUserAgentSpecificMemory`, con el sitio aislado por COOP y COEP) y el montón del hilo principal, y cuenta lo pedido de las capas en toda la visita.
-- `--escenario vuelos` (#67) mueve la cámara de MapLibre en lugar de tocar la interfaz, así que no depende de qué marcadores hay ni de dónde caen: es la medida de referencia de la fluidez del mapa con toda España, en el móvil y en el escritorio. Hace cinco grupos de gestos, cada uno en una página nueva de la misma visita, con un mapa sin teselas en memoria: saltos de vista en vista (València z8, Barcelona z12, el Eixample z17 y z18, y España z5,5, cada uno con 2,5 s para que lleguen sus teselas), los cinco vuelos de 2,5 s del #61 (España → Cataluña z8 → Barcelona z12 → Eixample z17 → Barcelona z11 → España), alejarse del Eixample z17 a España en 4 s y acercar y alejar del 9,5 al 14,5, un nivel cada 1,5 s, sobre Zaragoza y sobre Barcelona (#66). Antes, una primera página hace todo el recorrido sin medir, para que las teselas ya estén en la caché HTTP y la red no meta ruido. `--grupos saltos,vuelos,alejar,niveles-zaragoza,niveles-barcelona` elige cuáles.
+- `--escenario vuelos` (#67) mueve la cámara de MapLibre en lugar de tocar la interfaz, así que no depende de qué marcadores hay ni de dónde caen: es la medida de referencia de la fluidez del mapa con toda España, en el móvil y en el escritorio. Hace cinco grupos de gestos, cada uno en una página nueva de la misma visita, con un mapa sin teselas en memoria: saltos de vista en vista (València z8, Barcelona z12, el Eixample z17 y z18, y España z5,5, cada uno con 2,5 s para que lleguen sus teselas), los cinco vuelos de 2,5 s del #61 (España → Cataluña z8 → Barcelona z12 → Eixample z17 → Barcelona z11 → España), alejarse del Eixample z17 a España en 4 s y acercar y alejar del 9,5 al 14,5, un nivel cada 1,5 s, sobre Zaragoza y sobre Barcelona (#66). Antes, una primera página hace todo el recorrido sin medir, para que las teselas ya estén en la caché HTTP y la red no meta ruido. Desde el #74 hay un sexto grupo, `arrastres`: arrastrar con un dedo, ida y vuelta, en España z5,5, Cataluña z8, Barcelona z12 y el centro de Madrid z14. `--grupos saltos,vuelos,alejar,niveles-zaragoza,niveles-barcelona,arrastres` elige cuáles.
+- `--vista agrupada` mide con la vista agrupada (ADR 0028): la primera página de cada ronda abre en la de puntos y pasa a la agrupada desde «Funciones», y las siguientes de la ronda ya abren en ella. Sin la opción, la de puntos, la de la web al abrir. Con la vista de puntos, «primeros marcadores» es el momento en que sale la fecha de los datos, que llega con el resumen y los puntos: de lejos no hay ningún marcador.
 - La web no expone el mapa. La medida lo encuentra por CDP: busca en el montón de V8 la clase cuyo prototipo tiene `flyTo` y `getCanvasContainer` y deja el ejemplar de la página en `window.__celdaMapa`. Las órdenes a la cámara no devuelven nada: `jumpTo` devuelve el mapa, y Playwright lo serializaba entero, hasta 2 s de JavaScript en el hilo principal que no eran de Celda.
 - `--foto` enciende la foto aérea con su control al abrir cada página, como una persona, y cuenta lo pedido al PNOA en la primera página, la de la caché vacía: bytes, peticiones y cuántas empezaron en pleno vuelo o acercamiento de la medida. Con `--escenario vuelos --grupos vuelos` es la sesión con vuelos del #67.
 - `--pantalla escritorio` mide en una pantalla de 1400 × 900 con ratón, en lugar del móvil.
@@ -400,6 +401,45 @@ Al cambiar el zoom, cada marcador se mueve ahora en todos los fotogramas, y ante
 - **Esconder los marcadores en los vuelos de la web**, como hacía la foto: ganaba de 3 a 8 fps en los vuelos, pero los marcadores desaparecen y reaparecen en cada vuelo. El usuario no lo quiere: prefiere ver la animación.
 
 `tools/rendimiento` mide además, por gesto, cuántos marcadores hay y cuánto se separan del lienzo (columna «desfase»), así que un regreso al retraso se ve en la tabla.
+
+## Vista de puntos (#74)
+
+Medido el 08/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repeticiones 3`, una vez con `--vista puntos` y otra con `--vista agrupada`, en el móvil (390 × 844, DPR 2,6, Chromium con GPU, «Fast 4G»), con la publicación del 07/10/2026 (35.689 emplazamientos) pasada al formato 8 y la misma build. La máquina tenía otro proceso ocupando un núcleo entero durante toda la medida. Fps, el más largo de los fotogramas en ms y cuántos pasan de 20 ms, medianas de tres rondas; entre paréntesis, el hilo principal en ms.
+
+| Gesto | Vista agrupada | Vista de puntos |
+|---|---|---|
+| Salto a València z8 | 58,3 · 67 · 4 | 58,5 · 50 · 4 |
+| Salto a Barcelona z12 | 53,9 · 183 · 9 | 59,1 · 33 · 3 |
+| Salto al Eixample z17 | 55,9 · 100 · 7 | 55,3 · 100 · 7 |
+| Salto al Eixample z18 | 59,1 · 33 · 3 | 58,5 · 33 · 5 |
+| Salto a España z5,5 | 59,1 · 67 · 1 | 60,0 · 17 · 0 |
+| Vuelo a Cataluña z8 | 56,8 · 67 · 8 (2203) | 58,8 · 50 · 2 (1741) |
+| Vuelo a Barcelona z12 | 53,5 · 167 · 10 (2255) | 60,0 · 17 · 0 (1772) |
+| Vuelo al Eixample z17 | 45,0 · 100 · 41 (3179) | 51,8 · 100 · 16 (2333) |
+| Vuelo a Barcelona z11 | 48,5 · 83 · 28 (2506) | 54,1 · 67 · 15 (1884) |
+| Vuelo a España z5,5 | 48,2 · 117 · 19 (2170) | 60,0 · 17 · 0 (1279) |
+| Alejar del Eixample a España | 42,8 · 133 · 37 (3578) | 52,0 · 67 · 32 (3060) |
+| Zaragoza, del 9,5 al 14,5 y vuelta | 55,4 · 100 · 49 (7721) | 59,6 · 33 · 7 (4512) |
+| Barcelona, del 9,5 al 14,5 y vuelta | 53,7 · 117 · 70 (8705) | 59,4 · 50 · 7 (4459) |
+| Arrastrar en España z5,5 | 59,7 · 33 · 2 | 59,8 · 33 · 1 |
+| Arrastrar en Cataluña z8 | 60,0 · 17 · 0 | 60,0 · 17 · 0 |
+| Arrastrar en Barcelona z12 | 59,6 · 50 · 1 | 60,0 · 17 · 0 |
+| Arrastrar en Madrid z14 | 59,7 · 33 · 2 | 60,0 · 17 · 0 |
+
+- **Fluidez.** Los vuelos y el alejamiento ganan de 2 a 12 fps y el hilo principal gasta de un 14 a un 41 % menos; los niveles, de 4 a 6 fps con casi la mitad de hilo. Lo que se ahorra es el estilo y la maquetación de los marcadores que aparecen y se van, y agrupar: los puntos los dibuja MapLibre y no cambian al cambiar de nivel. Desde el zoom 15 las dos vistas son la misma (el Eixample a z17 y z18 sale igual). Los arrastres iban ya a 60 fps con las dos.
+- **Bytes.** Con la vista de puntos, abrir pide 181 KB de capas en 3 peticiones: `vigente.json`, el resumen y los puntos de toda España (176 KB con gzip). Tras todo el recorrido, 311 KB en 6 peticiones, con las provincias que se piden desde el nivel 14. Con la agrupada, 411 KB en 27 peticiones (la primera página de la medida abre en la de puntos, así que su carga cuenta también los puntos).
+- **Carga.** El resumen llega a los 1,4 s y la fecha de los datos, con los puntos, a los 2,35 s, igual que el primer hexágono de la agrupada. Los puntos se leen y se pasan a GeoJSON en el Worker de capas, y MapLibre los lee de una URL `blob:` en su worker: el hilo principal no los copia.
+- **El cambio de vista** (`ui/mapa/vuelo.ts`, un vuelo de 550 ms en una capa propia de MapLibre), medido aparte con un guion que pulsa «Funciones» y «Vista agrupada» y mide los fotogramas del segundo y medio siguiente, con la CPU a ×4 en el móvil y cinco rondas; con la preferencia de reducir movimiento, el cambio directo:
+
+| | Con el vuelo | Directo |
+|---|---|---|
+| España z5,5, a la agrupada | 50,7 fps · 6 de más de 20 ms · 133 ms el más largo | 54,0 · 4 · 100 |
+| España z5,5, a los puntos | 56,7 · 1 · 100 | 58,7 · 1 · 50 |
+| Cataluña z8,3, a la agrupada | 55,3 · 5 · 67 | 56,7 · 3 · 50 |
+| Cataluña z8,3, a los puntos | 60,0 · 0 · 17 | 60,0 · 0 · 17 |
+
+  El vuelo cuesta un fotograma largo al empezar: escribir los dos búferes de los 35.689 puntos y subirlos a la GPU, y la primera vez compilar el programa, que después se guarda para el mapa. Durante el vuelo solo cambia un número por fotograma. Con la escritura directa en los búferes, sin un objeto ni una cadena por punto, el más largo bajó de 150 a 100 ms al separar.
+- **El paso a los logos** mueve en el DOM solo los puntos que se ven: unos 160 a z15 en el centro de Madrid a 1400 px, 600 ms y después se quitan.
 
 ## Qué entró
 
