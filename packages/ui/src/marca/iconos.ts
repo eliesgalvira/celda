@@ -14,7 +14,7 @@ import * as NodeZlib from "node:zlib";
 import type { Plugin } from "vite";
 
 import { leerOklch } from "../mapa/color.ts";
-import { leerTokens } from "../tokens.ts";
+import { leerTokens, type Tema } from "../tokens.ts";
 import {
   CAJA_MARCA,
   CARPETA_ICONOS,
@@ -188,6 +188,20 @@ const manifiesto = (colores: ColoresIcono): string => {
   )}\n`;
 };
 
+/**
+ * El color de la barra del navegador y de la web instalada en cada tema: la superficie de la
+ * interfaz. Va en una etiqueta `theme-color` por tema, que pasa por delante del `theme_color` del
+ * manifiesto, que solo puede tener uno.
+ */
+export const coloresDeLaBarra = (css: string): Readonly<Record<Tema, string>> => {
+  const superficie = (tema: Tema): string => {
+    const leido = leerOklch(leerTokens(css, tema).get("superficie") ?? "");
+    if (leido === null) throw new Error(`Falta el token --superficie del tema ${tema} en tema.css`);
+    return comoHex(leido);
+  };
+  return { claro: superficie("claro"), oscuro: superficie("oscuro") };
+};
+
 /** Todos los ficheros de iconos, por ruta sin la barra inicial. */
 export const ficherosDeIconos = (css: string): ReadonlyMap<string, string | Uint8Array> => {
   const colores = coloresDeIconos(css);
@@ -214,8 +228,8 @@ const tipoDe = (ruta: string): string =>
 
 /** El plugin de Vite que sirve, escribe y enlaza los iconos. */
 export const iconosDeCelda = (): Plugin => {
-  const leer = () =>
-    ficherosDeIconos(NodeFS.readFileSync(new URL("../tema.css", import.meta.url), "utf8"));
+  const leerTema = () => NodeFS.readFileSync(new URL("../tema.css", import.meta.url), "utf8");
+  const leer = () => ficherosDeIconos(leerTema());
   const carpeta = CARPETA_ICONOS;
   return {
     name: "celda-iconos",
@@ -237,7 +251,17 @@ export const iconosDeCelda = (): Plugin => {
       }
     },
     transformIndexHtml() {
+      const barra = coloresDeLaBarra(leerTema());
       return [
+        ...(["claro", "oscuro"] as const).map((tema) => ({
+          tag: "meta",
+          attrs: {
+            name: "theme-color",
+            content: barra[tema],
+            media: `(prefers-color-scheme: ${tema === "claro" ? "light" : "dark"})`,
+          },
+          injectTo: "head" as const,
+        })),
         {
           tag: "link",
           attrs: { rel: "icon", href: `${carpeta}/${ICONOS.svg}`, type: "image/svg+xml" },

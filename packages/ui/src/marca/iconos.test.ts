@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import tema from "../tema.css?raw";
-import { ficherosDeIconos, pixelesDeIcono, coloresDeIconos } from "./iconos.ts";
+import { coloresDeLaBarra, ficherosDeIconos, pixelesDeIcono, coloresDeIconos } from "./iconos.ts";
 
 const ficheros = ficherosDeIconos(tema);
 
@@ -47,5 +47,12 @@ describe("iconos de la marca", () => {
     const favicon = pixelesDeIcono("favicon", 32, colores);
     assert.strictEqual(alfa(favicon, 32, 0, 0), 0, "esquina del favicon");
     assert.strictEqual(alfa(favicon, 32, 16, 10), 255, "figura del favicon");
+  });
+
+  it("la barra del navegador lleva la superficie de cada tema", () => {
+    const barra = coloresDeLaBarra(tema);
+    assert.match(barra.claro, /^#[\da-f]{6}$/u);
+    assert.match(barra.oscuro, /^#[\da-f]{6}$/u);
+    assert.notStrictEqual(barra.claro, barra.oscuro);
   });
 });
