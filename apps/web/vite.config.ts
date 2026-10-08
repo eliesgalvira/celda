@@ -1,12 +1,14 @@
 import "vite-plus/test/config";
 import { iconosDeCelda } from "@celda/ui/marca/iconos.ts";
+import { temaAntesDePintar } from "@celda/ui/temaElegido.ts";
 import solid from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
 
 export default defineConfig(({ mode }) => ({
-  // El favicon, los iconos y el manifiesto salen de la marca y los tokens de @celda/ui.
-  plugins: [tailwindcss(), solid(), iconosDeCelda()],
+  // El favicon, los iconos y el manifiesto salen de la marca y los tokens de @celda/ui. El guion
+  // del tema elegido va detrás, porque ajusta las etiquetas `theme-color` que pone `iconosDeCelda`.
+  plugins: [tailwindcss(), solid(), iconosDeCelda(), temaAntesDePintar()],
   server: { port: 8840, strictPort: true },
   preview: { port: 8841, strictPort: true },
   build: {

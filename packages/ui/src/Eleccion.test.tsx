@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 
-import { Interruptor } from "./Eleccion.tsx";
+import { Corredera, Interruptor } from "./Eleccion.tsx";
 
 const montarInterruptor = (inicial: boolean, disabled = false) => {
   const [encendido, setEncendido] = createSignal(inicial);
@@ -74,5 +74,62 @@ describe("Interruptor", () => {
     fireEvent.click(interruptor);
     flush();
     assert.deepStrictEqual(cambios, []);
+  });
+});
+
+type Tema = "sistema" | "claro" | "oscuro";
+
+const montarCorredera = (inicial: Tema) => {
+  const [valor, setValor] = createSignal<Tema>(inicial);
+  const pantalla = render(() => (
+    <Corredera
+      leyenda="Tema"
+      opciones={[
+        { valor: "sistema", etiqueta: "Sistema" },
+        { valor: "claro", etiqueta: "Claro" },
+        { valor: "oscuro", etiqueta: "Oscuro" },
+      ]}
+      valor={valor()}
+      alCambiar={setValor}
+    />
+  ));
+  flush();
+  return { ...pantalla, valor };
+};
+
+describe("Corredera", () => {
+  it("son botones de radio agrupados por su pregunta, con la opción elegida marcada", () => {
+    const { getByRole } = montarCorredera("sistema");
+    const grupo = getByRole("group", { name: "Tema" });
+    const opciones = Array.from(grupo.querySelectorAll<HTMLInputElement>("input"));
+    assert.deepStrictEqual(
+      opciones.map((opcion) => [opcion.type, opcion.value, opcion.checked]),
+      [
+        ["radio", "sistema", true],
+        ["radio", "claro", false],
+        ["radio", "oscuro", false],
+      ],
+    );
+    assert.strictEqual(new Set(opciones.map((opcion) => opcion.name)).size, 1);
+  });
+
+  it("al elegir otra opción, la corredera se desliza hasta ella", () => {
+    const { getByRole, container, valor } = montarCorredera("sistema");
+    const corredera = container.querySelector<HTMLElement>("[data-parte='corredera']");
+    assert.strictEqual(corredera?.style.transform, "translateX(0%)");
+
+    fireEvent.click(getByRole("radio", { name: "Oscuro" }));
+    flush();
+    assert.strictEqual(valor(), "oscuro");
+    const oscuro = getByRole("radio", { name: "Oscuro" });
+    assert.isTrue(oscuro instanceof HTMLInputElement && oscuro.checked);
+    assert.strictEqual(corredera?.style.transform, "translateX(200%)");
+    assert.include(corredera?.getAttribute("class") ?? "", "motion-reduce:transition-none");
+  });
+
+  it("cada opción ocupa los 44 px de alto de la pastilla", () => {
+    const { getByRole } = montarCorredera("claro");
+    const etiqueta = getByRole("radio", { name: "Claro" }).closest("label");
+    assert.isTrue(etiqueta?.classList.contains("h-11"));
   });
 });

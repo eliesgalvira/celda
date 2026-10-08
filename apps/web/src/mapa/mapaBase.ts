@@ -87,7 +87,7 @@ export const trasLaSilueta = (mapa: MapaMapLibre, escuchar: () => void): void =>
   mapa.once("load", una);
 };
 
-/** El mapa base y cómo repintarlo con los colores del tema del sistema. */
+/** El mapa base y cómo repintarlo con los colores del tema activo. */
 export interface MapaBase {
   readonly mapa: MapaMapLibre;
   /**
@@ -116,8 +116,8 @@ const TEXTOS_MAPLIBRE = {
  * llega todo el callejero de la vista, la silueta de España con los límites lo tapa
  * (`@celda/ui/mapa/silueta.ts`), y entonces se funde.
  *
- * Si el sistema cambia de tema, la pantalla llama a `repintar` y el mapa toma los colores del
- * nuevo con el callejero que tenga en ese momento.
+ * Si cambia el tema, del sistema o elegido en Ajustes, la pantalla llama a `repintar` y el mapa
+ * toma los colores del nuevo con el callejero que tenga en ese momento.
  */
 export const crearMapaBase = (
   contenedor: HTMLElement,

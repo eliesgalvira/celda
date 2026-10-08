@@ -27,6 +27,7 @@ import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
+import { CONSULTA_DEL_OSCURO } from "@celda/ui/temaElegido.ts";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
 import * as Effect from "effect/Effect";
@@ -86,6 +87,7 @@ import { crearPistaDeCeldas } from "../celdas/pista.ts";
 import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { AjustesContexto, crearAjustes } from "../ajustes/ajustes.ts";
 import { DialogoAjustes } from "../ajustes/DialogoAjustes.tsx";
+import { almacenDelNavegador, crearTema, repintarConElTema } from "../ajustes/tema.ts";
 import { DialogoAportaciones } from "../buzon/DialogoAportaciones.tsx";
 import { usarDatos } from "../datos.tsx";
 import { PanelEjercicio } from "../ejercicio/PanelEjercicio.tsx";
@@ -192,9 +194,6 @@ const CARGAS_DE_ZONAS: CargasDeZonas = {
 /** El ancho a partir del cual el panel va a la izquierda y el punto se elige con un clic. */
 const ESCRITORIO = "(min-width: 48rem)";
 
-/** El tema del sistema: el CSS lo sigue solo, y el mapa se repinta cuando cambia. */
-const TEMA_OSCURO = "(prefers-color-scheme: dark)";
-
 /**
  * Hasta dónde, alrededor de lo que se ve al zoom de las celdas, se cargan las provincias vecinas
  * antes de calcular. Una celda de ciudad no pasa de unos cientos de metros; si una del campo llega
@@ -213,6 +212,7 @@ export function PantallaMapa() {
   const datos = usarDatos();
   const puntoDeReferencia = crearUbicacion(datos);
   const ajustes = crearAjustes(datos);
+  const tema = crearTema(document, almacenDelNavegador());
   const eligiendo = createMemo(() => puntoDeReferencia.ubicacion().estado.tipo === "eligiendo");
   const [escritorio, setEscritorio] = createSignal(window.matchMedia(ESCRITORIO).matches);
   const [estado, setEstado] = createSignal<EstadoMapa>({ tipo: "cargando" });
@@ -540,18 +540,12 @@ export function PantallaMapa() {
       pidiendose.clear();
     };
   });
-  // Con la silueta ya pintada, el estilo está cargado y se le pueden cambiar los colores. Al
-  // abrirse repinta por si el tema cambió mientras se creaba el mapa: si no, no cambia nada.
-  recurso(
-    "mapa:tema",
-    () => mapaCreado(),
-    () => {
-      const preferencia = window.matchMedia(TEMA_OSCURO);
-      const repintar = () => repintarMapa?.();
-      preferencia.addEventListener("change", repintar);
-      repintar();
-      return () => preferencia.removeEventListener("change", repintar);
-    },
+  // Con la silueta ya pintada, el estilo está cargado y se le pueden cambiar los colores.
+  repintarConElTema(
+    mapaCreado,
+    tema.eleccion,
+    () => repintarMapa?.(),
+    () => window.matchMedia(CONSULTA_DEL_OSCURO),
   );
   recursoFijo("pantalla:escritorio", () => {
     const pantalla = window.matchMedia(ESCRITORIO);
@@ -1682,6 +1676,7 @@ export function PantallaMapa() {
             </Show>
             <Show when={ajustesAbiertos(ubicacion())}>
               <DialogoAjustes
+                tema={tema}
                 alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
               />
             </Show>

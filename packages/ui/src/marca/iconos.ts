@@ -14,6 +14,7 @@ import * as NodeZlib from "node:zlib";
 import type { Plugin } from "vite";
 
 import { leerOklch } from "../mapa/color.ts";
+import { consultaDeLaBarra } from "../temaElegido.ts";
 import { leerTokens, type Tema } from "../tokens.ts";
 import {
   CAJA_MARCA,
@@ -250,44 +251,52 @@ export const iconosDeCelda = (): Plugin => {
         this.emitFile({ type: "asset", fileName: ruta, source: contenido });
       }
     },
-    transformIndexHtml() {
-      const barra = coloresDeLaBarra(leerTema());
-      return [
-        ...(["claro", "oscuro"] as const).map((tema) => ({
-          tag: "meta",
-          attrs: {
-            name: "theme-color",
-            content: barra[tema],
-            media: `(prefers-color-scheme: ${tema === "claro" ? "light" : "dark"})`,
+    // Antes de que Vite enlace la hoja de estilos, para que el guion del tema, que va detrás y
+    // ajusta las etiquetas `theme-color`, corra antes de que llegue la hoja (`temaElegido.ts`).
+    transformIndexHtml: {
+      order: "pre",
+      handler() {
+        const barra = coloresDeLaBarra(leerTema());
+        return [
+          ...(["claro", "oscuro"] as const).map((tema) => ({
+            tag: "meta",
+            // `data-tema` dice de qué tema es: con uno elegido en Ajustes, su `media` cambia
+            // (`temaElegido.ts`).
+            attrs: {
+              name: "theme-color",
+              content: barra[tema],
+              media: consultaDeLaBarra(tema, "sistema"),
+              "data-tema": tema,
+            },
+            injectTo: "head" as const,
+          })),
+          {
+            tag: "link",
+            attrs: { rel: "icon", href: `${carpeta}/${ICONOS.svg}`, type: "image/svg+xml" },
+            injectTo: "head",
           },
-          injectTo: "head" as const,
-        })),
-        {
-          tag: "link",
-          attrs: { rel: "icon", href: `${carpeta}/${ICONOS.svg}`, type: "image/svg+xml" },
-          injectTo: "head",
-        },
-        {
-          tag: "link",
-          attrs: {
-            rel: "icon",
-            href: `${carpeta}/${ICONOS.png32}`,
-            sizes: "32x32",
-            type: "image/png",
+          {
+            tag: "link",
+            attrs: {
+              rel: "icon",
+              href: `${carpeta}/${ICONOS.png32}`,
+              sizes: "32x32",
+              type: "image/png",
+            },
+            injectTo: "head",
           },
-          injectTo: "head",
-        },
-        {
-          tag: "link",
-          attrs: { rel: "apple-touch-icon", href: `${carpeta}/${ICONOS.toque}` },
-          injectTo: "head",
-        },
-        {
-          tag: "link",
-          attrs: { rel: "manifest", href: `${carpeta}/${ICONOS.manifiesto}` },
-          injectTo: "head",
-        },
-      ];
+          {
+            tag: "link",
+            attrs: { rel: "apple-touch-icon", href: `${carpeta}/${ICONOS.toque}` },
+            injectTo: "head",
+          },
+          {
+            tag: "link",
+            attrs: { rel: "manifest", href: `${carpeta}/${ICONOS.manifiesto}` },
+            injectTo: "head",
+          },
+        ];
+      },
     },
   };
 };

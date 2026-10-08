@@ -2,15 +2,32 @@
  * Tema Hexágono. Único sitio con colores, fuentes y formas de Celda (ADR 0006).
  *
  * Los tokens tienen nombres semánticos y valores OKLCH. `:root` es el tema
- * claro, y dentro de `prefers-color-scheme: dark` van los valores del oscuro:
- * Celda sigue el tema del sistema, sin botón propio. Como esta hoja va enlazada
- * en el `<head>`, la primera pintura ya sale con el tema que toca.
+ * claro, y dentro de la variante `oscuro` van los valores del oscuro. Por defecto
+ * Celda sigue el tema del sistema; en Ajustes se puede fijar uno, y entonces la
+ * raíz lleva `data-tema="claro"` u `data-tema="oscuro"` (`temaElegido.ts`).
+ * Como esta hoja va enlazada en el `<head>` y el atributo se pone antes, la
+ * primera pintura ya sale con el tema que toca.
  * El estilo del mapa (mapa/estilo.ts) lee los tokens `--mapa-*` de aquí, y la web
- * los vuelve a leer cuando el sistema cambia de tema.
+ * los vuelve a leer cuando cambia el tema.
  */
 @import "tailwindcss" source("./");
 /* En una capa, para que las utilidades de Tailwind ganen a las reglas de MapLibre. */
 @import "maplibre-gl/dist/maplibre-gl.css" layer(base);
+
+/*
+ * El tema oscuro: con el sistema en oscuro, salvo que se haya elegido el claro, y siempre que se
+ * haya elegido el oscuro. Los valores se escriben una vez y salen en las dos reglas.
+ */
+@custom-variant oscuro {
+  @media (prefers-color-scheme: dark) {
+    &:not([data-tema="claro"]) {
+      @slot;
+    }
+  }
+  &[data-tema="oscuro"] {
+    @slot;
+  }
+}
 
 :root {
   color-scheme: light;
@@ -197,8 +214,8 @@
   --hexagono: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+:root {
+  @variant oscuro {
     color-scheme: dark;
 
     --fondo: oklch(23% 0.006 100);

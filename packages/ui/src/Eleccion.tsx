@@ -227,6 +227,148 @@ export function Interruptor(props: InterruptorProps) {
   );
 }
 
+export interface OpcionDeCorredera<Valor extends string> extends OpcionDeEleccion<Valor> {
+  /** Un icono de 16 px con `currentColor`, delante de la etiqueta. */
+  readonly icono?: JSX.Element;
+}
+
+export interface CorrederaProps<Valor extends string> {
+  /** Pregunta visible que agrupa las opciones. */
+  readonly leyenda: string;
+  readonly opciones: ReadonlyArray<OpcionDeCorredera<Valor>>;
+  readonly valor: Valor;
+  readonly alCambiar: (valor: Valor) => void;
+}
+
+/**
+ * Pocas opciones excluyentes en una pastilla, con una corredera verde azulada que se desliza a la
+ * elegida. Como `Segmentado`, son botones de radio de verdad. Cada opción ocupa los 44 px de alto
+ * de la pastilla, aunque el fondo que se ve al pasar por encima y el foco son más bajos.
+ */
+export function Corredera<Valor extends string>(props: CorrederaProps<Valor>) {
+  const nombre = createUniqueId();
+  const elegida = () => props.opciones.findIndex((opcion) => opcion.valor === props.valor);
+  return (
+    <fieldset class="flex min-w-0 flex-col gap-1.5">
+      <legend class="mb-1.5 font-mono text-xs font-semibold tracking-wider text-tinta-suave">
+        {props.leyenda}
+      </legend>
+      <div
+        class={
+          "relative grid auto-cols-fr grid-flow-col rounded-full bg-fondo px-1 " +
+          "shadow-[inset_0_0_0_1.5px_var(--linea-fuerte)]"
+        }
+      >
+        <Show when={elegida() >= 0}>
+          <span
+            aria-hidden="true"
+            data-parte="corredera"
+            class={
+              "absolute inset-y-1 left-1 rounded-full bg-primario shadow-[0_1px_2px_var(--sombra)] " +
+              "transition-transform duration-200 ease-[cubic-bezier(0.3,0.7,0.2,1)] motion-reduce:transition-none"
+            }
+            style={{
+              width: `calc((100% - 0.5rem) / ${props.opciones.length})`,
+              transform: `translateX(${elegida() * 100}%)`,
+            }}
+          />
+        </Show>
+        <For each={props.opciones}>
+          {(opcion) => (
+            <label class="group/opcion relative flex h-11 cursor-pointer items-center">
+              <input
+                type="radio"
+                name={nombre}
+                value={opcion.valor}
+                checked={props.valor === opcion.valor}
+                onChange={() => props.alCambiar(opcion.valor)}
+                class="sr-only"
+              />
+              <span
+                class={
+                  "flex h-9 w-full items-center justify-center gap-1.75 rounded-full px-2 " +
+                  "text-sm font-semibold text-tinta-suave transition-colors duration-150 " +
+                  "group-hover/opcion:bg-linea group-hover/opcion:text-tinta " +
+                  "group-has-checked/opcion:bg-transparent group-has-checked/opcion:text-primario-fg " +
+                  "group-has-checked/opcion:group-hover/opcion:bg-transparent " +
+                  "group-has-checked/opcion:group-hover/opcion:text-primario-fg " +
+                  "group-has-focus-visible/opcion:outline-3 group-has-focus-visible/opcion:outline-offset-3 " +
+                  "group-has-focus-visible/opcion:outline-foco motion-reduce:transition-none"
+                }
+              >
+                {opcion.icono}
+                {opcion.etiqueta}
+              </span>
+            </label>
+          )}
+        </For>
+      </div>
+    </fieldset>
+  );
+}
+
+/** Un monitor: el tema del sistema. */
+export function IconoTemaSistema() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="shrink-0"
+    >
+      <rect x="1.5" y="2.5" width="13" height="8.5" rx="1" />
+      <path d="M5.5 14h5M8 11v3" />
+    </svg>
+  );
+}
+
+/** Un sol: el tema claro. */
+export function IconoTemaClaro() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="shrink-0"
+    >
+      <circle cx="8" cy="8" r="3" />
+      <path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M3.2 12.8l1.1-1.1M11.7 4.3l1.1-1.1" />
+    </svg>
+  );
+}
+
+/** Una luna: el tema oscuro. */
+export function IconoTemaOscuro() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="shrink-0"
+    >
+      <path d="M13.5 9.8A5.8 5.8 0 0 1 6.2 2.5a5.8 5.8 0 1 0 7.3 7.3z" />
+    </svg>
+  );
+}
+
 export interface CampoNumeroProps {
   /** Etiqueta visible encima del campo. */
   readonly etiqueta: string;
