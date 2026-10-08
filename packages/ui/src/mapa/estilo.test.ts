@@ -4,7 +4,7 @@ import type { StyleSpecification } from "maplibre-gl";
 
 import { COMUNITAT_DE_PRUEBA, CONTORNO_DE_PRUEBA } from "../pruebas/contorno.ts";
 import { tokensDelTema } from "../pruebas/tema.ts";
-import { leerOklch } from "./color.ts";
+import { comoRgb, leerOklch } from "./color.ts";
 import {
   estiloMapa,
   FUENTE_MAPA_BASE,
@@ -13,6 +13,7 @@ import {
   TOKENS_MAPA,
 } from "./estilo.ts";
 import { nombreDelRotulo } from "./nombres.ts";
+import { estiloDeReserva } from "./reserva/estilo.ts";
 import {
   CAPA_HUECOS,
   crearImagenesDeHuecos,
@@ -113,6 +114,39 @@ describe("estiloMapa", () => {
         const valor = tokens.get(token);
         assert.isDefined(valor, `falta --${token} en el tema ${tema}`);
         assert.isNotNull(leerOklch(valor ?? ""), `--${token} no es OKLCH en el tema ${tema}`);
+      }
+    }
+  });
+
+  it("en los dos temas, nada de lo que dibuja el mapa sale del mismo color que el fondo", () => {
+    // Una vía, un edificio o el agua del color del fondo dejarían el mapa en blanco o en negro.
+    // Los halos sí llevan el color del fondo, y la silueta de España mientras carga, el del suelo.
+    const marcados = (estilo: StyleSpecification) =>
+      coloresDelEstilo(estilo).filter(({ propiedad }) => !propiedad.endsWith("halo-color"));
+    const conMarca = (token: string) => `${MARCA}${token}`;
+    const usados = new Set(
+      [
+        ...marcados(estiloMapa(conMarca, CONTORNO_DE_PRUEBA, COMUNITAT_DE_PRUEBA)),
+        ...marcados(estiloDeReserva(conMarca, CONTORNO_DE_PRUEBA)),
+      ].flatMap(({ valor }) =>
+        Predicate.isString(valor) && valor !== conMarca("mapa-fondo")
+          ? [valor.slice(MARCA.length)]
+          : [],
+      ),
+    );
+    assert.isAbove(usados.size, 30);
+    for (const tema of ["claro", "oscuro"] as const) {
+      const tokens = tokensDelTema(tema);
+      const rgb = (token: string) => {
+        const color = leerOklch(tokens.get(token) ?? "");
+        return color === null ? "" : comoRgb(color);
+      };
+      for (const token of usados) {
+        assert.notStrictEqual(
+          rgb(token),
+          rgb("mapa-fondo"),
+          `--${token} es del color del fondo en el tema ${tema}`,
+        );
       }
     }
   });
