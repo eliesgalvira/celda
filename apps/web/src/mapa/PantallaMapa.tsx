@@ -170,6 +170,9 @@ const CARGAS_DE_ZONAS: CargasDeZonas = {
 /** El ancho a partir del cual el panel va a la izquierda y el punto se elige con un clic. */
 const ESCRITORIO = "(min-width: 48rem)";
 
+/** El tema del sistema: el CSS lo sigue solo, y el mapa se repinta cuando cambia. */
+const TEMA_OSCURO = "(prefers-color-scheme: dark)";
+
 /**
  * Hasta dónde, alrededor de lo que se ve al zoom de las celdas, se cargan las provincias vecinas
  * antes de calcular. Una celda de ciudad no pasa de unos cientos de metros; si una del campo llega
@@ -226,6 +229,8 @@ export function PantallaMapa() {
   const [eleccion, setEleccion] = createSignal<EleccionVista>();
   let contenedor: HTMLDivElement | undefined;
   let mapa: MapaMapLibre | undefined;
+  /** Repinta el mapa con los colores del tema activo (`crearMapaBase`). */
+  let repintarMapa: (() => void) | undefined;
   // Cada arranque tiene su número; un arranque viejo o una pantalla ya cerrada
   // no crean mapa cuando MapLibre termina de descargarse.
   let intento = 0;
@@ -291,7 +296,7 @@ export function PantallaMapa() {
     if (contenedor === undefined) return;
     try {
       const inicial = vistaInicial.alCrear() ?? ESPANA.encuadre;
-      const nuevo = modulo.crearMapaBase(
+      const { mapa: nuevo, repintar } = modulo.crearMapaBase(
         contenedor,
         { ...ESPANA, encuadre: inicial },
         {
@@ -326,6 +331,7 @@ export function PantallaMapa() {
       nuevo.on("moveend", mirarEncuadre);
       nuevo.once("load", mirarEncuadre);
       mapa = nuevo;
+      repintarMapa = repintar;
       setLectorDeRotulos(() => modulo.LECTOR_DE_ROTULOS);
       // Los marcadores esperan a que se vea la silueta de España.
       modulo.trasLaSilueta(nuevo, () => {
@@ -474,6 +480,19 @@ export function PantallaMapa() {
       pidiendose.clear();
     };
   });
+  // Con la silueta ya pintada, el estilo está cargado y se le pueden cambiar los colores. Al
+  // abrirse repinta por si el tema cambió mientras se creaba el mapa: si no, no cambia nada.
+  recurso(
+    "mapa:tema",
+    () => mapaCreado(),
+    () => {
+      const preferencia = window.matchMedia(TEMA_OSCURO);
+      const repintar = () => repintarMapa?.();
+      preferencia.addEventListener("change", repintar);
+      repintar();
+      return () => preferencia.removeEventListener("change", repintar);
+    },
+  );
   recursoFijo("pantalla:escritorio", () => {
     const pantalla = window.matchMedia(ESCRITORIO);
     const medir = () => setEscritorio(pantalla.matches);

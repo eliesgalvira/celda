@@ -43,6 +43,9 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   ["ejemplo-fg", "ejemplo"],
   ["qr-tinta", "qr-fondo"],
   ["aviso-tinta", "aviso-fondo"],
+  // Un aviso sin su fondo: el antetítulo de la vista de interferencia y la fecha de los datos que fallan.
+  ["aviso-tinta", "superficie"],
+  ["aviso-tinta", "superficie-alta"],
   ["referencia-fg", "referencia"],
   ["primario-texto", "superficie"],
   ["primario-texto", "superficie-alta"],
@@ -62,11 +65,13 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   ["mapa-pdi-salud", "mapa-halo"],
   ["mapa-pdi-parque", "mapa-halo"],
   ["mapa-pdi-otro", "mapa-halo"],
-  // El número de una autopista, con su amarillo de halo, también sobre la foto aérea.
+  // El número de una autopista, con su amarillo de halo. Sobre la foto aérea va en tinta oscura.
   ["mapa-rotulo-carretera", "mapa-autopista"],
-  ["mapa-rotulo-carretera", "mapa-foto-autopista"],
+  ["mapa-foto-tinta", "mapa-foto-autopista"],
   // El número de portal del edificio resaltado, sobre su halo blanco.
   ["mapa-foto-tinta", "mapa-foto-rotulo"],
+  // Los rótulos sobre la foto aérea, con su halo oscuro.
+  ["mapa-foto-rotulo", "mapa-foto-halo"],
   // Las etiquetas y los iconos de los controles claros.
   ["control-tinta", "control"],
   ["control-tinta", "control-hover"],
@@ -96,8 +101,15 @@ const FONDOS_DEL_MAPA = [
 const PARES_NO_TEXTO: ReadonlyArray<readonly [pieza: string, fondo: string]> = [
   // El borde de un control claro frente a cualquier fondo del mapa.
   ...FONDOS_DEL_MAPA.map((fondo) => ["control-borde", fondo] as const),
-  // El relleno de un control claro frente a una agrupación, que es oscura.
+  // El relleno de un control frente a una agrupación: claro y oscura en el tema claro, al revés en
+  // el oscuro.
   ["control", "superficie-invertida"],
+  // Los datos frente a cualquier fondo del mapa: el hexágono de las agrupaciones y las zonas, el
+  // anillo del seleccionado, las celdas y el punto de referencia con su línea. En el tema oscuro,
+  // las autopistas claras se comían las celdas y la línea naranja.
+  ...["superficie-invertida", "primario", "mapa-celda", "referencia", "mapa-referencia"].flatMap(
+    (pieza) => FONDOS_DEL_MAPA.map((fondo) => [pieza, fondo] as const),
+  ),
   // El favicon: lo recortado y el borde frente a la figura oscura.
   ["icono-figura", "icono-fondo"],
   ["icono-acento", "icono-fondo"],
@@ -115,7 +127,23 @@ describe("contraste del tema", () => {
   }
 });
 
-describe("contraste de los controles frente al mapa y las agrupaciones", () => {
+describe("los dos temas", () => {
+  it("el oscuro tiene cada color del claro salvo los de las compañías, que no cambian", () => {
+    const claro = tokensDelTema("claro");
+    const oscuro = tokensDelTema("oscuro");
+    const colores = [...claro].filter(([, valor]) => leerOklch(valor) !== null);
+    assert.isAbove(colores.length, 50);
+    for (const [token] of colores) {
+      if (token.startsWith("compania-")) continue;
+      assert.isTrue(oscuro.has(token), `falta --${token} en el tema oscuro`);
+    }
+    for (const token of oscuro.keys()) {
+      assert.isTrue(claro.has(token), `--${token} solo está en el tema oscuro`);
+    }
+  });
+});
+
+describe("contraste de los controles y los datos frente al mapa", () => {
   for (const tema of ["claro", "oscuro"] as const) {
     it(`cumple WCAG AA para componentes (3:1) en el tema ${tema}`, () => {
       const tokens = tokensDelTema(tema);

@@ -2,8 +2,11 @@
  * Tema Hexágono. Único sitio con colores, fuentes y formas de Celda (ADR 0006).
  *
  * Los tokens tienen nombres semánticos y valores OKLCH. `:root` es el tema
- * claro; `[data-tema="oscuro"]` deja preparado el oscuro, que la v1 no activa.
- * El estilo del mapa (mapa/estilo.ts) lee los tokens `--mapa-*` de aquí.
+ * claro, y dentro de `prefers-color-scheme: dark` van los valores del oscuro:
+ * Celda sigue el tema del sistema, sin botón propio. Como esta hoja va enlazada
+ * en el `<head>`, la primera pintura ya sale con el tema que toca.
+ * El estilo del mapa (mapa/estilo.ts) lee los tokens `--mapa-*` de aquí, y la web
+ * los vuelve a leer cuando el sistema cambia de tema.
  */
 @import "tailwindcss" source("./");
 /* En una capa, para que las utilidades de Tailwind ganen a las reglas de MapLibre. */
@@ -140,7 +143,10 @@
   --mapa-rotulo-barrio: oklch(56% 0.01 243);
   --mapa-rotulo-calle: oklch(49.8% 0.009 253.9);
   --mapa-rotulo-agua: oklch(55.5% 0.116 254);
-  /* El número de una autopista o una autovía, sobre su amarillo. */
+  /*
+   * El número de una autopista o una autovía, sobre su amarillo: oscuro en el tema claro y claro en
+   * el oscuro, donde el amarillo va apagado.
+   */
   --mapa-rotulo-carretera: oklch(35.6% 0.067 89.6);
   /* Los pocos puntos de interés: transporte, salud, parques y el resto. */
   --mapa-pdi-transporte: oklch(53.2% 0.181 258.3);
@@ -166,7 +172,8 @@
   /*
    * Sobre la foto aérea (ADR 0022), como el modo híbrido de Google: vías y límites claros, las
    * autopistas en amarillo y los rótulos en blanco con halo oscuro. El número del edificio
-   * resaltado, en tinta sobre blanco. Iguales en los dos temas: la foto es la misma.
+   * resaltado, en tinta sobre blanco, y el de una carretera, en tinta sobre su amarillo. Iguales en
+   * los dos temas: la foto es la misma.
    */
   --mapa-foto-linea: oklch(100% 0 0);
   --mapa-foto-autopista: oklch(88.4% 0.124 88.3);
@@ -188,115 +195,121 @@
   --hexagono: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
 }
 
-[data-tema="oscuro"] {
-  color-scheme: dark;
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
 
-  --fondo: oklch(23% 0.006 100);
-  --superficie: oklch(27% 0.007 100);
-  --superficie-alta: oklch(31% 0.008 100);
-  --superficie-invertida: oklch(91% 0.01 87.5);
+    --fondo: oklch(23% 0.006 100);
+    --superficie: oklch(27% 0.007 100);
+    --superficie-alta: oklch(31% 0.008 100);
+    --superficie-invertida: oklch(91% 0.01 87.5);
 
-  --tinta: oklch(93% 0.008 87.5);
-  --tinta-suave: oklch(76% 0.01 100);
-  --tinta-invertida: oklch(25% 0.006 100);
-  --tinta-invertida-suave: oklch(40% 0.011 100);
-  --linea: oklch(93% 0.008 87.5 / 0.16);
-  --linea-fuerte: oklch(93% 0.008 87.5 / 0.55);
+    --tinta: oklch(93% 0.008 87.5);
+    --tinta-suave: oklch(76% 0.01 100);
+    --tinta-invertida: oklch(25% 0.006 100);
+    --tinta-invertida-suave: oklch(40% 0.011 100);
+    --linea: oklch(93% 0.008 87.5 / 0.16);
+    --linea-fuerte: oklch(93% 0.008 87.5 / 0.55);
 
-  --primario: oklch(72% 0.085 203.3);
-  --primario-hover: oklch(78% 0.08 203.3);
-  --primario-activo: oklch(83% 0.07 203.3);
-  --primario-fg: oklch(22% 0.02 203.3);
-  --primario-texto: oklch(80% 0.08 203.3);
-  --foco: oklch(78% 0.08 203.3);
+    --primario: oklch(72% 0.085 203.3);
+    --primario-hover: oklch(78% 0.08 203.3);
+    --primario-activo: oklch(83% 0.07 203.3);
+    --primario-fg: oklch(22% 0.02 203.3);
+    --primario-texto: oklch(80% 0.08 203.3);
+    --foco: oklch(78% 0.08 203.3);
 
-  --verificado: oklch(72% 0.085 203.3);
-  --verificado-fg: oklch(22% 0.02 203.3);
-  --corregido: oklch(74% 0.14 55);
-  --corregido-fg: oklch(22% 0.03 55);
-  --nuevo: oklch(74% 0.09 291.8);
-  --nuevo-fg: oklch(22% 0.03 291.8);
+    --verificado: oklch(72% 0.085 203.3);
+    --verificado-fg: oklch(22% 0.02 203.3);
+    --corregido: oklch(74% 0.14 55);
+    --corregido-fg: oklch(22% 0.03 55);
+    --nuevo: oklch(74% 0.09 291.8);
+    --nuevo-fg: oklch(22% 0.03 291.8);
 
-  --ejemplo: oklch(80% 0.12 85);
-  --ejemplo-fg: oklch(22% 0.03 85);
+    --ejemplo: oklch(80% 0.12 85);
+    --ejemplo-fg: oklch(22% 0.03 85);
 
-  --aviso: oklch(74% 0.14 55);
-  --aviso-fondo: oklch(29% 0.04 55);
-  --aviso-tinta: oklch(88% 0.06 70);
+    --aviso: oklch(74% 0.14 55);
+    --aviso-fondo: oklch(29% 0.04 55);
+    --aviso-tinta: oklch(88% 0.06 70);
 
-  --referencia: oklch(74% 0.14 55);
-  --referencia-fg: oklch(22% 0.03 55);
+    --referencia: oklch(74% 0.14 55);
+    --referencia-fg: oklch(22% 0.03 55);
 
-  --sombra: oklch(0% 0 0 / 0.5);
-  --velo: oklch(0% 0 0 / 0.6);
+    --sombra: oklch(0% 0 0 / 0.5);
+    --velo: oklch(0% 0 0 / 0.6);
 
-  --qr-fondo: oklch(99% 0 0);
-  --qr-tinta: oklch(20% 0 0);
+    --qr-fondo: oklch(99% 0 0);
+    --qr-tinta: oklch(20% 0 0);
 
-  --icono-fondo: oklch(29.9% 0.005 121.8);
-  --icono-figura: oklch(94.1% 0.009 84.6);
-  --icono-acento: oklch(72% 0.085 203.3);
+    --icono-fondo: oklch(29.9% 0.005 121.8);
+    --icono-figura: oklch(94.1% 0.009 84.6);
+    --icono-acento: oklch(72% 0.085 203.3);
 
-  --control: oklch(31% 0.008 100);
-  --control-hover: oklch(36% 0.008 100);
-  --control-tinta: oklch(93% 0.008 87.5);
-  --control-borde: oklch(93% 0.008 87.5);
+    --control: oklch(31% 0.008 100);
+    --control-hover: oklch(36% 0.008 100);
+    --control-tinta: oklch(93% 0.008 87.5);
+    --control-borde: oklch(93% 0.008 87.5);
 
-  --eje-lejos: oklch(70% 0.09 78);
+    --eje-lejos: oklch(70% 0.09 78);
 
-  --mapa-fondo: oklch(23% 0.006 100);
-  --mapa-urbano: oklch(26% 0.006 100);
-  --mapa-hospital: oklch(28% 0.03 15);
-  --mapa-educacion: oklch(27% 0.015 85);
-  --mapa-cementerio: oklch(27% 0.025 135);
-  --mapa-bosque: oklch(28% 0.035 135);
-  --mapa-hierba: oklch(26% 0.025 135);
-  --mapa-parque: oklch(31% 0.05 135);
-  --mapa-arena: oklch(28% 0.025 90);
-  --mapa-agua: oklch(30% 0.05 245);
-  --mapa-edificio: oklch(29% 0.008 90);
-  --mapa-edificio-borde: oklch(33% 0.008 90);
-  --mapa-tren: oklch(48% 0.01 90);
-  --mapa-camino: oklch(38% 0.01 90);
-  --mapa-calle: oklch(37% 0.008 90);
-  --mapa-calle-borde: oklch(20% 0.005 100);
-  --mapa-secundaria-borde: oklch(19% 0.005 100);
-  --mapa-principal-borde: oklch(18% 0.005 100);
-  --mapa-autovia: oklch(50% 0.07 85);
-  --mapa-autovia-borde: oklch(32% 0.05 80);
-  --mapa-autopista: oklch(60% 0.1 85);
-  --mapa-autopista-borde: oklch(38% 0.07 75);
-  --mapa-limite-pais: oklch(64% 0 0);
-  --mapa-limite-comunidad: oklch(54% 0 0);
-  --mapa-limite-provincia: oklch(46% 0 0);
-  --mapa-limite-municipio: oklch(39% 0 0);
-  --mapa-halo: oklch(23% 0.006 100);
-  --mapa-rotulo-capital: oklch(96% 0.005 90);
-  --mapa-rotulo-ciudad: oklch(91% 0.006 90);
-  --mapa-rotulo-pueblo: oklch(86% 0.008 90);
-  --mapa-rotulo-aldea: oklch(78% 0.01 90);
-  --mapa-rotulo-barrio: oklch(76% 0.01 90);
-  --mapa-rotulo-calle: oklch(80% 0.01 90);
-  --mapa-rotulo-agua: oklch(76% 0.08 245);
-  --mapa-rotulo-carretera: oklch(15% 0.03 85);
-  --mapa-pdi-transporte: oklch(76% 0.11 255);
-  --mapa-pdi-salud: oklch(74% 0.13 25);
-  --mapa-pdi-parque: oklch(76% 0.12 145);
-  --mapa-pdi-otro: oklch(76% 0.01 248);
-  --mapa-celda: oklch(72% 0.085 203.3);
-  --mapa-sinr-1: oklch(52% 0.14 40);
-  --mapa-sinr-2: oklch(66% 0.16 55);
-  --mapa-sinr-3: oklch(78% 0.09 75);
-  --mapa-sinr-4: oklch(80% 0.03 170);
-  --mapa-sinr-5: oklch(67% 0.07 200);
-  --mapa-sinr-6: oklch(58% 0.09 205);
-  --mapa-referencia: oklch(74% 0.14 55);
-  --mapa-silueta-fuera: oklch(28% 0.02 245);
-  --mapa-foto-linea: oklch(100% 0 0);
-  --mapa-foto-autopista: oklch(88.4% 0.124 88.3);
-  --mapa-foto-rotulo: oklch(100% 0 0);
-  --mapa-foto-halo: oklch(0% 0 0 / 0.78);
-  --mapa-foto-tinta: oklch(24.3% 0.006 264.5);
+    --mapa-fondo: oklch(23% 0.006 100);
+    --mapa-urbano: oklch(26% 0.006 100);
+    --mapa-hospital: oklch(28% 0.03 15);
+    --mapa-educacion: oklch(27% 0.015 85);
+    --mapa-cementerio: oklch(27% 0.025 135);
+    --mapa-bosque: oklch(28% 0.035 135);
+    --mapa-hierba: oklch(26% 0.025 135);
+    --mapa-parque: oklch(31% 0.05 135);
+    --mapa-arena: oklch(28% 0.025 90);
+    --mapa-agua: oklch(30% 0.05 245);
+    --mapa-edificio: oklch(29% 0.008 90);
+    --mapa-edificio-borde: oklch(33% 0.008 90);
+    --mapa-tren: oklch(48% 0.01 90);
+    --mapa-camino: oklch(38% 0.01 90);
+    --mapa-calle: oklch(37% 0.008 90);
+    --mapa-calle-borde: oklch(20% 0.005 100);
+    --mapa-secundaria-borde: oklch(19% 0.005 100);
+    --mapa-principal-borde: oklch(18% 0.005 100);
+    /*
+     * Autovías y autopistas en un amarillo apagado: más claras, las celdas, la línea hasta el punto
+     * de referencia y el anillo del seleccionado se perdían al cruzarlas (mapa/color.test.ts).
+     */
+    --mapa-autovia: oklch(40% 0.06 85);
+    --mapa-autovia-borde: oklch(29% 0.04 80);
+    --mapa-autopista: oklch(45% 0.085 82);
+    --mapa-autopista-borde: oklch(32% 0.06 75);
+    --mapa-limite-pais: oklch(64% 0 0);
+    --mapa-limite-comunidad: oklch(54% 0 0);
+    --mapa-limite-provincia: oklch(46% 0 0);
+    --mapa-limite-municipio: oklch(39% 0 0);
+    --mapa-halo: oklch(23% 0.006 100);
+    --mapa-rotulo-capital: oklch(96% 0.005 90);
+    --mapa-rotulo-ciudad: oklch(91% 0.006 90);
+    --mapa-rotulo-pueblo: oklch(86% 0.008 90);
+    --mapa-rotulo-aldea: oklch(78% 0.01 90);
+    --mapa-rotulo-barrio: oklch(76% 0.01 90);
+    --mapa-rotulo-calle: oklch(80% 0.01 90);
+    --mapa-rotulo-agua: oklch(76% 0.08 245);
+    --mapa-rotulo-carretera: oklch(94% 0.03 90);
+    --mapa-pdi-transporte: oklch(76% 0.11 255);
+    --mapa-pdi-salud: oklch(74% 0.13 25);
+    --mapa-pdi-parque: oklch(76% 0.12 145);
+    --mapa-pdi-otro: oklch(76% 0.01 248);
+    --mapa-celda: oklch(72% 0.085 203.3);
+    --mapa-sinr-1: oklch(52% 0.14 40);
+    --mapa-sinr-2: oklch(66% 0.16 55);
+    --mapa-sinr-3: oklch(78% 0.09 75);
+    --mapa-sinr-4: oklch(80% 0.03 170);
+    --mapa-sinr-5: oklch(67% 0.07 200);
+    --mapa-sinr-6: oklch(58% 0.09 205);
+    --mapa-referencia: oklch(74% 0.14 55);
+    --mapa-silueta-fuera: oklch(28% 0.02 245);
+    --mapa-foto-linea: oklch(100% 0 0);
+    --mapa-foto-autopista: oklch(88.4% 0.124 88.3);
+    --mapa-foto-rotulo: oklch(100% 0 0);
+    --mapa-foto-halo: oklch(0% 0 0 / 0.78);
+    --mapa-foto-tinta: oklch(24.3% 0.006 264.5);
+  }
 }
 
 /* Sin la paleta de Tailwind: solo existen los colores del tema. */

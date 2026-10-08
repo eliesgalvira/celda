@@ -365,7 +365,8 @@ const capasDeNombres = (
       "text-padding": 20,
     },
     paint: {
-      "text-color": color("mapa-rotulo-carretera"),
+      // Sobre la foto, el amarillo es el mismo en los dos temas y el número va en tinta oscura.
+      "text-color": conFoto(color("mapa-rotulo-carretera"), color("mapa-foto-tinta")),
       "text-halo-color": conFoto(color("mapa-autopista"), color("mapa-foto-autopista")),
       "text-halo-width": 2.6,
     },

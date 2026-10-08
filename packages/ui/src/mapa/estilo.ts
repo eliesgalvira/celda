@@ -30,7 +30,7 @@ import {
 } from "./servicio.ts";
 import { capasSilueta, fuentesSilueta } from "./silueta.ts";
 import { capasSuelo } from "./suelo.ts";
-import type { ColorDeToken } from "./tokens.ts";
+import { type ColorDeToken, TOKENS_MAPA } from "./tokens.ts";
 import { capasVias } from "./vias.ts";
 import { capasZona, FUENTE_ZONA } from "./zona.ts";
 
@@ -161,16 +161,21 @@ export const estiloMapa = (
 });
 
 /**
- * Lee los tokens del mapa de los estilos calculados de `elemento`, de modo que
- * el mapa sigue al tema activo. Falla si tema.css no está cargado.
+ * Los colores del mapa en el tema activo, leídos de una vez de los estilos calculados de
+ * `elemento`. Se quedan como estaban aunque el sistema cambie de tema: así la web puede comparar
+ * los de antes con los nuevos (`pasarDeTema` en `tema.ts`). Falla si tema.css no está cargado.
  */
-export const coloresDelTema =
-  (elemento: Element): ColorDeToken =>
-  (token) => {
-    const valor = getComputedStyle(elemento).getPropertyValue(`--${token}`).trim();
-    if (valor === "") {
-      throw new Error(`Falta el token --${token}: ¿se ha cargado @celda/ui/tema.css?`);
-    }
-    const rgb = leerOklch(valor);
-    return rgb === null ? valor : comoRgb(rgb);
-  };
+export const coloresDelTema = (elemento: Element): ColorDeToken => {
+  const estilos = getComputedStyle(elemento);
+  const colores = new Map(
+    TOKENS_MAPA.map((token) => {
+      const valor = estilos.getPropertyValue(`--${token}`).trim();
+      if (valor === "") {
+        throw new Error(`Falta el token --${token}: ¿se ha cargado @celda/ui/tema.css?`);
+      }
+      const rgb = leerOklch(valor);
+      return [token, rgb === null ? valor : comoRgb(rgb)] as const;
+    }),
+  );
+  return (token) => colores.get(token) ?? "";
+};

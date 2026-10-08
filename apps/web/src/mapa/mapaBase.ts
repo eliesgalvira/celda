@@ -1,15 +1,17 @@
 import { alRectangulo, type Area } from "@celda/dominio/area";
 import { CONTORNO_DE_LA_COMUNITAT_VALENCIANA } from "@celda/dominio/comunitatValenciana";
 import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
-import { coloresDelTema, estiloMapa } from "@celda/ui/mapa/estilo.ts";
+import { type ColorDeToken, coloresDelTema, estiloMapa } from "@celda/ui/mapa/estilo.ts";
 import { crearImagenesDeHuecos } from "@celda/ui/mapa/huecos.ts";
 import { FUENTE_LIMITES } from "@celda/ui/mapa/limites.ts";
 import { conLoDeCelda, estiloDeReserva } from "@celda/ui/mapa/reserva/estilo.ts";
 import { FUENTE_SILUETA, levantarSilueta } from "@celda/ui/mapa/silueta.ts";
+import { pasarDeTema } from "@celda/ui/mapa/tema.ts";
 import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import {
   type GeoJSONSource,
+  type StyleSpecification,
   LngLat,
   Map as MapaMapLibre,
   prewarm,
@@ -85,6 +87,17 @@ export const trasLaSilueta = (mapa: MapaMapLibre, escuchar: () => void): void =>
   mapa.once("load", una);
 };
 
+/** El mapa base y cómo repintarlo con los colores del tema del sistema. */
+export interface MapaBase {
+  readonly mapa: MapaMapLibre;
+  /**
+   * Vuelve a leer los colores del tema y cambia los que el mapa tiene distintos, sin `setStyle`
+   * ni perder la vista, la foto aérea, la ficha o lo que la web ha puesto en las fuentes
+   * (`pasarDeTema`). Se llama con el estilo ya cargado.
+   */
+  readonly repintar: () => void;
+}
+
 const TEXTOS_MAPLIBRE = {
   "Map.Title": "Mapa. Muévete con las flechas y acerca o aleja con + y −.",
 };
@@ -102,6 +115,9 @@ const TEXTOS_MAPLIBRE = {
  * (`vigilarCallejero`). La web no le pide que vuelva: eso es en la siguiente visita. Hasta que
  * llega todo el callejero de la vista, la silueta de España con los límites lo tapa
  * (`@celda/ui/mapa/silueta.ts`), y entonces se funde.
+ *
+ * Si el sistema cambia de tema, la pantalla llama a `repintar` y el mapa toma los colores del
+ * nuevo con el callejero que tenga en ese momento.
  */
 export const crearMapaBase = (
   contenedor: HTMLElement,
@@ -109,15 +125,18 @@ export const crearMapaBase = (
   avisos: Omit<Avisos, "completo">,
   relleno: Relleno,
   desde: Callejero,
-): MapaMapLibre => {
+): MapaBase => {
   const { encuadre, limites } = area;
-  const colores = coloresDelTema(document.documentElement);
+  /** Los colores con que está pintado el mapa, y con qué callejero. */
+  let colores = coloresDelTema(document.documentElement);
+  let callejero = desde;
+  const estiloCon = (color: ColorDeToken): StyleSpecification =>
+    callejero === "reserva"
+      ? estiloDeReserva(color, CONTORNO_DE_ESPANA)
+      : estiloMapa(color, CONTORNO_DE_ESPANA, CONTORNO_DE_LA_COMUNITAT_VALENCIANA);
   const mapa = new MapaMapLibre({
     container: contenedor,
-    style:
-      desde === "reserva"
-        ? estiloDeReserva(colores, CONTORNO_DE_ESPANA)
-        : estiloMapa(colores, CONTORNO_DE_ESPANA, CONTORNO_DE_LA_COMUNITAT_VALENCIANA),
+    style: estiloCon(colores),
     bounds: [
       [encuadre.suroeste.longitud, encuadre.suroeste.latitud],
       [encuadre.noreste.longitud, encuadre.noreste.latitud],
@@ -154,12 +173,14 @@ export const crearMapaBase = (
       desde,
       // El mapa compara el estilo que tiene con el de reserva y solo cambia el callejero. La fuente
       // de los límites se queda con sus líneas, si ya habían llegado.
-      ponerReserva: () =>
-        mapa.setStyle(estiloDeReserva(colores, CONTORNO_DE_ESPANA), {
+      ponerReserva: () => {
+        callejero = "reserva";
+        mapa.setStyle(estiloCon(colores), {
           diff: true,
           transformStyle: (anterior, reserva) =>
             anterior === undefined ? reserva : conLoDeCelda(anterior, reserva),
-        }),
+        });
+      },
       esperar: esperarDeVerdad,
     },
   );
@@ -183,5 +204,10 @@ export const crearMapaBase = (
       mapa.getSource<GeoJSONSource>(FUENTE_LIMITES)?.setData(lineas);
     },
   });
-  return mapa;
+  const repintar = () => {
+    const nuevos = coloresDelTema(document.documentElement);
+    pasarDeTema(mapa, estiloCon(colores), estiloCon(nuevos));
+    colores = nuevos;
+  };
+  return { mapa, repintar };
 };
