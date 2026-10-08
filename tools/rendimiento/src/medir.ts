@@ -837,7 +837,7 @@ const abrirYEsperar = async (pagina: Page, origen: string): Promise<void> => {
 /** Un grupo de gestos del escenario `vuelos`, que empieza en la vista inicial de la web. */
 interface GrupoEnVuelo {
   readonly nombre: string;
-  readonly hacer: (pagina: Page, medir: Medir) => Promise<void>;
+  readonly hacer: (pagina: Page, medir: Medir, cdp: CDPSession) => Promise<void>;
 }
 
 /** Los niveles del #66: del 9,5 al 14,5 y vuelta, uno cada 1,5 s. */
@@ -917,6 +917,24 @@ const GRUPOS_EN_VUELO: ReadonlyArray<GrupoEnVuelo> = [
   },
   niveles(lugar("zaragoza", [-0.8891, 41.6488], 9.5)),
   niveles(lugar("barcelona", BARCELONA, 9.5)),
+  {
+    // Arrastrar con un dedo, ida y vuelta, en las vistas en que la de puntos y la agrupada se
+    // distinguen más: toda España, Cataluña, Barcelona entera y el centro de Madrid a z14 (ADR 0028).
+    nombre: "arrastres",
+    hacer: async (pagina, medir, cdp) => {
+      for (const destino of [
+        ESPANA,
+        lugar("cataluna-8", [1.7, 41.75], 8),
+        lugar("barcelona-12", BARCELONA, 12),
+        lugar("madrid-14", [-3.7038, 40.4168], 14),
+      ]) {
+        await saltar(pagina, destino);
+        await esperarQuieto(pagina);
+        await esperar(2500);
+        await medir(`arrastre-${destino.nombre}`, () => arrastrar(cdp));
+      }
+    },
+  },
 ];
 
 interface Ronda {
@@ -1126,9 +1144,13 @@ const ronda = async (
       (grupo) => elegidos === undefined || elegidos.includes(grupo.nombre),
     );
     for (const grupo of grupos) {
-      await grupo.hacer(pagina, async (_nombre, accion) => {
-        await accion();
-      });
+      await grupo.hacer(
+        pagina,
+        async (_nombre, accion) => {
+          await accion();
+        },
+        cdp,
+      );
     }
     for (const grupo of grupos) {
       const otra = await contexto.newPage();
@@ -1136,7 +1158,7 @@ const ronda = async (
       await frenar(cdpOtra, cpu);
       await abrirYEsperar(otra, origen);
       await atraparMapa(cdpOtra);
-      await grupo.hacer(otra, medirEn(otra, cdpOtra));
+      await grupo.hacer(otra, medirEn(otra, cdpOtra), cdpOtra);
       if (grupo.nombre === "saltos") marcadores.espana = await contarMarcadores(otra);
       await otra.close();
     }
