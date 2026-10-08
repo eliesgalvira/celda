@@ -12,6 +12,7 @@ import {
   type Page,
 } from "playwright-core";
 
+import { atraparMapa } from "./mapa.ts";
 import { type Centro, type FotogramasEnPagina, instalar } from "./pagina.ts";
 import { servirSitio } from "./sitio.ts";
 import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
@@ -627,57 +628,6 @@ const cerrarFicha = async (pagina: Page) => {
   await pagina.goBack();
   await pagina.waitForSelector("article[aria-label]", { state: "detached" });
   await esperar(800);
-};
-
-/**
- * Encuentra el mapa de MapLibre de la página y lo deja en `window.__celdaMapa`, para mover la
- * cámara (`CamaraEnPagina`). La web no lo expone, así que se busca en el montón de V8 por CDP: la
- * clase cuyo prototipo tiene `flyTo` y `getCanvasContainer`, y el ejemplar de esa clase que está
- * en la página. Va antes de medir: recorrer el montón cuesta.
- */
-const atraparMapa = async (cdp: CDPSession): Promise<boolean> => {
-  const grupo = "celda-mapa";
-  const funciones = await cdp.send("Runtime.evaluate", {
-    expression: "Function.prototype",
-    objectGroup: grupo,
-  });
-  const todas = await cdp.send("Runtime.queryObjects", {
-    prototypeObjectId: funciones.result.objectId ?? "",
-    objectGroup: grupo,
-  });
-  const prototipo = await cdp.send("Runtime.callFunctionOn", {
-    objectId: todas.objects.objectId ?? "",
-    functionDeclaration: `function () {
-      const clase = this.find((f) => {
-        try {
-          return typeof f.prototype?.flyTo === "function" &&
-            typeof f.prototype?.getCanvasContainer === "function";
-        } catch {
-          return false;
-        }
-      });
-      return clase?.prototype;
-    }`,
-    objectGroup: grupo,
-  });
-  let encontrado = false;
-  if (prototipo.result.objectId !== undefined) {
-    const mapas = await cdp.send("Runtime.queryObjects", {
-      prototypeObjectId: prototipo.result.objectId,
-      objectGroup: grupo,
-    });
-    const puesto = await cdp.send("Runtime.callFunctionOn", {
-      objectId: mapas.objects.objectId ?? "",
-      functionDeclaration: `function () {
-        window.__celdaMapa = this.find((mapa) => mapa.getContainer().isConnected);
-        return window.__celdaMapa !== undefined;
-      }`,
-      returnByValue: true,
-    });
-    encontrado = puesto.result.value === true;
-  }
-  await cdp.send("Runtime.releaseObjectGroup", { objectGroup: grupo });
-  return encontrado;
 };
 
 /**

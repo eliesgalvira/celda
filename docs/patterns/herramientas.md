@@ -27,7 +27,7 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 
 ## Medida
 
-`tools/rendimiento` también tiene la prueba de resistencia (`pnpm run resistencia`), que sí corre en la CI, en su propio trabajo y con el Chromium de `nix develop .#resistencia`. Ver [efectos.md](efectos.md).
+`tools/rendimiento` también tiene la prueba de resistencia (`pnpm run resistencia`) y la de los puntos del paso a los logos (`pnpm run deriva`), que sí corren en la CI, en su propio trabajo y con el Chromium de `nix develop .#resistencia`. Ver [efectos.md](efectos.md) y [rendimiento.md](rendimiento.md).
 
 `tools/rendimiento` mide la carga y la fluidez con Chromium sin interfaz y `playwright-core`, que no descarga navegadores: usa el Chromium del sistema (`--chromium` o `CELDA_CHROMIUM`). Cómo se usa y qué salió: [rendimiento.md](rendimiento.md). No tiene pruebas ni corre en la CI, porque necesita GPU y conexión con OpenFreeMap. Sus ficheros llevan `@effect-diagnostics` apagados para `node:*` y `setTimeout`: el script no usa Effect.
 

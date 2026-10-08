@@ -5,10 +5,11 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 
-import { chromium, devices, type Page, type Route } from "playwright-core";
+import { chromium, devices, type Page } from "playwright-core";
 
 import { escribirCapaSintetica } from "./capaSintetica.ts";
 import { CONTADAS, type Contada, instalarContador } from "./contador.ts";
+import { mapaBaseFalso } from "./mapa.ts";
 import { servirSitio } from "./sitio.ts";
 
 /**
@@ -65,25 +66,6 @@ const UMBRALES: Readonly<Record<Contada, { readonly maximo: number; readonly mot
     maximo: 0,
     motivo: "sin nada animándose no se pide ningún fotograma",
   },
-};
-
-/** Un TileJSON y teselas vacías en lugar de OpenFreeMap. */
-const mapaBaseFalso = async (ruta: Route) => {
-  const url = new URL(ruta.request().url());
-  if (url.pathname === "/planet") {
-    await ruta.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        tilejson: "3.0.0",
-        tiles: ["https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf"],
-        minzoom: 0,
-        maxzoom: 14,
-        vector_layers: [],
-      }),
-    });
-    return;
-  }
-  await ruta.fulfill({ contentType: "application/x-protobuf", body: Buffer.alloc(0) });
 };
 
 const cuentas = (pagina: Page) => pagina.evaluate(() => window.__resistencia.cuentas());

@@ -402,6 +402,26 @@ Al cambiar el zoom, cada marcador se mueve ahora en todos los fotogramas, y ante
 
 `tools/rendimiento` mide además, por gesto, cuántos marcadores hay y cuánto se separan del lienzo (columna «desfase»), así que un regreso al retraso se ve en la tabla.
 
+## Los puntos del paso, en su sitio (09/10/2026, #74)
+
+Al alejar desde los logos, los puntos se separaban de su sitio. Los puntos del DOM del paso a los logos se colocaban una vez, al cruzar el 15, en los píxeles de ese zoom, y no se volvían a colocar: su lámina se desplaza con el mapa a un mismo zoom, pero al cambiar el zoom vuelve a cero y cada marcador se recoloca, y ellos no. Mientras el gesto seguía alejando, se quedaban donde caía su emplazamiento al zoom del cruce. Además, el mapa vuelve a pintar sus puntos a los 350 ms, así que durante un cuarto de segundo, con el mapa ya quieto, se veían dos puntos por emplazamiento: el del mapa en su sitio y el del DOM lejos.
+
+Medido con Chromium sin interfaz sobre El Prat de Llobregat con la publicación del 07/10/2026, de z15,5 a z13, comparando en cada fotograma el centro de cada punto del DOM con `map.project` de su emplazamiento:
+
+| Gesto | Antes | Ahora |
+|---|---|---|
+| Rueda, escritorio | hasta 166 px | 0,4 px |
+| Rueda, CPU ×4 | hasta 115 px | 0,4 px |
+| Botón Alejar tres veces | hasta 364 px | 0,3 px |
+| Botón Alejar, CPU ×4 | hasta 181 px | 0,3 px |
+| Pellizco en el móvil | hasta 77 px | 0,4 px |
+| Pellizco en el móvil, CPU ×4 | hasta 88 px | 0,4 px |
+| Alejar, acercar a mitad y alejar, CPU ×4 | hasta 344 px, 241 px de media con el mapa quieto | 0,4 px |
+
+Ahora cada punto del DOM se vuelve a colocar al cambiar el zoom, como los marcadores, y lo que anima el CSS es cuánto ha avanzado hacia su marcador (ver [ui.md](ui.md)). Recolocarlos es el mismo trabajo que hacen los marcadores en cada fotograma con un zoom nuevo, solo durante los 600 ms del paso. Con SwiftShader y los 10 puntos de El Prat no se nota en los intervalos entre fotogramas; no está medido con GPU ni en el centro de Madrid, donde a zoom 15 se ven unos 500. Los vuelos del cambio de vista no tenían el problema, porque su capa de MapLibre multiplica las posiciones de Mercator por la matriz de cada fotograma.
+
+`pnpm run deriva` repite la medida con la capa sintética, sin GPU ni conexión, con la CPU sin frenar y a ×4, y falla si algún punto se separa más de 1 px o si no se ve ninguno. Con la web de antes daba de 242 a 259 px.
+
 ## Vista de puntos (#74)
 
 Medido el 08/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repeticiones 3`, una vez con `--vista puntos` y otra con `--vista agrupada`, en el móvil (390 × 844, DPR 2,6, Chromium con GPU, «Fast 4G»), con la publicación del 07/10/2026 (35.689 emplazamientos) pasada al formato 8 y la misma build. La máquina tenía otro proceso ocupando un núcleo entero durante toda la medida. Fps, el más largo de los fotogramas en ms y cuántos pasan de 20 ms, medianas de tres rondas; entre paréntesis, el hilo principal en ms.
@@ -471,6 +491,7 @@ Medido el 08/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 - `tools/rendimiento/src/resistencia.ts`, en la CI: con la web quieta 30 s no se abre nada ni se pide ningún fotograma. Ver [efectos.md](efectos.md).
 - `apps/web/src/capa/agrupacion.test.ts`: el índice construido en un Worker y rehidratado da las mismas escenas, con lo mismo dentro de cada elemento, y las mismas transiciones entre cualquier par de niveles que el construido en el hilo.
 - `apps/web/src/capa/nacional.test.ts`: de lejos, solo el resumen; desde el zoom 8, las provincias que corta la vista; en el borde entre dos provincias ningún emplazamiento está dos veces y cada número cuadra, y cada provincia sale de su hexágono al acercar o al llegar.
+- `tools/rendimiento/src/deriva.ts` (`pnpm run deriva`), en la CI, y `apps/web/src/mapa/Marcadores.test.tsx`: en el paso entre la vista de puntos y los logos, cada punto del DOM que se mueve está a menos de 1 px de su emplazamiento en cada fotograma, aunque el zoom siga cambiando a mitad del paso o cambie de sentido. Ver «Los puntos del paso, en su sitio».
 - `apps/web/src/mapa/vista.test.ts`: arrastrar o acercar varios niveles no vuelve a agrupar hasta que el mapa se asienta; al alejar, agrupa por el camino solo si cambia de nivel y la vista se ha salido de lo dibujado; se recoloca como mucho una vez por fotograma.
 - `apps/web/src/ficha/servicio.test.ts`: la precarga pide como mucho `LOTES_PRECARGADOS` lotes, los que más claves tienen; abrir después una ficha de ese lote no pide nada, y un fallo al precargar no falla y no se guarda.
 - `packages/ui/src/mapa/estilo.test.ts`: lo que se pide por adelantado (`RECURSOS_INICIALES_MAPA_BASE`) es el TileJSON del estilo y los glifos de los rótulos que se ven de lejos. Si alguien cambia la letra o la fuente del callejero, la precarga no se queda pidiendo lo que ya no se usa.

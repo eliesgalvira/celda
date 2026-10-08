@@ -5,7 +5,8 @@
   "scripts": {
     "medir": "node src/medir.ts",
     "typecheck": "tsc --noEmit",
-    "resistencia": "node src/resistencia.ts"
+    "resistencia": "node src/resistencia.ts",
+    "deriva": "node src/deriva.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",

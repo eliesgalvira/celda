@@ -62,7 +62,12 @@ export type Centro = readonly [number, number];
 export interface CamaraEnPagina {
   readonly jumpTo: (opciones: { center?: Centro; zoom?: number }) => void;
   readonly flyTo: (opciones: { center: Centro; zoom: number; duration: number }) => void;
-  readonly easeTo: (opciones: { center?: Centro; zoom: number; duration: number }) => void;
+  readonly easeTo: (opciones: {
+    center?: Centro;
+    zoom: number;
+    duration: number;
+    easing?: (t: number) => number;
+  }) => void;
   readonly project: (lugar: Centro) => { readonly x: number; readonly y: number };
   readonly getZoom: () => number;
   readonly once: (evento: "idle", oyente: () => void) => void;

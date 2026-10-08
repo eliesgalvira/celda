@@ -92,6 +92,8 @@ export interface CapaSintetica {
   readonly centro: typeof CENTRO;
   /** El primer renglón de la dirección de su ficha, que es el título del panel. */
   readonly titulo: string;
+  /** Dónde está cada emplazamiento. */
+  readonly posiciones: ReadonlyArray<typeof CENTRO>;
 }
 
 const fichaDe = (emplazamiento: EmplazamientoDeCapa, i: number): Ficha => ({
@@ -233,5 +235,6 @@ export const escribirCapaSintetica = async (base: string): Promise<CapaSintetica
     central: central.clave,
     centro: CENTRO,
     titulo: "CL DE PRUEBA, 13",
+    posiciones: emplazamientos.map((emplazamiento) => emplazamiento.posicion),
   };
 };
