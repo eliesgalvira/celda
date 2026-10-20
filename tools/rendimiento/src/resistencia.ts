@@ -9,7 +9,7 @@ import { chromium, devices, type Page } from "playwright-core";
 
 import { escribirCapaSintetica } from "./capaSintetica.ts";
 import { CONTADAS, type Contada, instalarContador } from "./contador.ts";
-import { mapaBaseFalso } from "./mapa.ts";
+import { esperarVistaInicial, mapaBaseFalso } from "./mapa.ts";
 import { servirSitio } from "./sitio.ts";
 
 /**
@@ -134,6 +134,10 @@ const principal = async () => {
       geolocation: { ...posicion, accuracy: 20 },
     });
     await contexto.route("https://tiles.openfreemap.org/**", mapaBaseFalso);
+    // El mapa base de reserva del IGN, por si el de OpenFreeMap falla: tampoco se pide fuera.
+    await contexto.route(/\.idee\.es\//u, (ruta) =>
+      ruta.fulfill({ contentType: "application/x-protobuf", body: Buffer.alloc(0) }),
+    );
     await contexto.addInitScript(instalarContador);
     const pagina = await contexto.newPage();
     pagina.on("console", (mensaje) => {
@@ -144,11 +148,10 @@ const principal = async () => {
     // PREPARAR: lo que haría una persona antes de dejar el móvil quieto
     await pagina.goto(`${sitio.origen}/?emplazamiento=${encodeURIComponent(capa.central)}`);
     await pagina.getByRole("heading", { name: capa.titulo }).waitFor({ timeout: 20_000 });
-    await pagina.waitForFunction(
-      () => !(document.body.textContent ?? "").includes("Cargando el mapa base"),
-      undefined,
-      { timeout: 20_000 },
-    );
+    // Con el mapa base puesto, el de OpenFreeMap o el de reserva, y el resumen. Hasta el #81 lo
+    // esperaba sin querer el clic en «Interferencia», que no se activaba antes; el aviso que se
+    // esperaba aquí ya no existía, y el paso al mapa de reserva caía a veces en la ventana quieta.
+    await esperarVistaInicial(pagina, 20_000);
 
     const referencia = pagina.getByRole("region", { name: "Punto de referencia" });
     await referencia.getByRole("button", { name: "Usar mi ubicación" }).click();
