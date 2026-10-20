@@ -30,7 +30,7 @@ const montar = (creditos: ReadonlyArray<Credito> = [OPENSTREETMAP]) => {
       lienzo={() => {}}
       cabecera={<header>Celda</header>}
       zoom={<ControlDelMapa etiqueta="Acercar" icono="+" />}
-      controles={<ControlDelMapa etiqueta="Interferencia" icono="≈" />}
+      controles={<ControlDelMapa etiqueta="Vista agrupada" icono="⬡" />}
       botonUbicacion={<ControlDelMapa etiqueta="Ubicación" icono="⌖" />}
       controlesSecundarios={<ControlDelMapa etiqueta="Ajustes" icono="≡" />}
       atribucion={<Atribucion creditos={creditos} />}
@@ -127,11 +127,11 @@ describe("DisposicionMapa", () => {
   it("a la vista, Ubicación y Funciones; el resto, dentro de Funciones", () => {
     const { getByRole, queryByRole } = montar();
     assert.isDefined(getByRole("button", { name: "Ubicación" }));
-    assert.isNull(queryByRole("button", { name: "Interferencia" }));
+    assert.isNull(queryByRole("button", { name: "Vista agrupada" }));
     assert.isNull(queryByRole("button", { name: "Ajustes" }));
     fireEvent.click(getByRole("button", { name: "Funciones" }));
     flush();
-    assert.isDefined(getByRole("button", { name: "Interferencia" }));
+    assert.isDefined(getByRole("button", { name: "Vista agrupada" }));
     assert.isDefined(getByRole("button", { name: "Ajustes" }));
   });
 });

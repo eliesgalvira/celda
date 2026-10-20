@@ -49,12 +49,6 @@ export const TOKENS_MAPA = [
   // Lo que pinta Celda encima.
   "mapa-celda",
   "mapa-punto",
-  "mapa-sinr-1",
-  "mapa-sinr-2",
-  "mapa-sinr-3",
-  "mapa-sinr-4",
-  "mapa-sinr-5",
-  "mapa-sinr-6",
   "mapa-referencia",
   // Lo que rodea la silueta de España mientras carga el mapa base.
   "mapa-silueta-fuera",

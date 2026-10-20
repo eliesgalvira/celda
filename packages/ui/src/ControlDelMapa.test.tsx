@@ -8,10 +8,10 @@ describe("ControlDelMapa", () => {
   it("se nombra por su etiqueta visible y refleja si está activo", () => {
     const [activo, setActivo] = createSignal(false);
     const { getByRole } = render(() => (
-      <ControlDelMapa etiqueta="Interferencia" icono="≈" activo={activo()} />
+      <ControlDelMapa etiqueta="Vista agrupada" icono="⬡" activo={activo()} />
     ));
 
-    const boton = getByRole("button", { name: "Interferencia" });
+    const boton = getByRole("button", { name: "Vista agrupada" });
     assert.strictEqual(boton.getAttribute("aria-pressed"), "false");
 
     setActivo(true);

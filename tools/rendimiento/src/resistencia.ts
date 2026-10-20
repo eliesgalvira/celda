@@ -15,8 +15,8 @@ import { servirSitio } from "./sitio.ts";
 /**
  * Prueba de resistencia: abre Celda en Chromium sin interfaz, como un Android con el permiso de
  * ubicación dado, abre un emplazamiento, enciende el GPS y la brújula, filtra por Digi (sus celdas
- * cuentan también las de Movistar, la red que usa), abre la vista de interferencia con las celdas
- * calculadas, espera a que la página quede quieta y la deja así. Mientras tanto el GPS da una
+ * cuentan también las de Movistar, la red que usa), espera a que la página quede quieta con las
+ * celdas calculadas y la deja así. Mientras tanto el GPS da una
  * lectura por segundo en el mismo sitio y la brújula diez por segundo. Cuenta las llamadas a las
  * API que abren algo y falla si alguna crece más de lo que justifican esas lecturas, o si la página
  * no llega a quedarse quieta. Ver docs/patterns/efectos.md.
@@ -170,10 +170,6 @@ const principal = async () => {
     await pagina.keyboard.press("Escape");
     await esperarTexto(pagina, /Solo Digi/u);
 
-    const funciones = pagina.getByRole("button", { name: "Funciones" });
-    if (await funciones.isVisible()) await funciones.click();
-    await pagina.getByRole("button", { name: /^Interferencia/u }).click();
-    await esperarTexto(pagina, /destaca la señal/u);
     // La salvedad de las celdas dura 5 s o hasta el primer gesto sobre el mapa, y al irse deja de
     // escuchar los gestos: si la página se queda quieta antes, eso caía dentro de la ventana. Una
     // tecla que el mapa no usa es ese primer gesto, como haría quien deja el móvil.

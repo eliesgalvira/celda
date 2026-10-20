@@ -37,8 +37,8 @@ import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
  *
  * El de `borde` (#45) abre la web con `--ruta`, el enlace a la ficha de un emplazamiento junto al
  * borde de dos provincias, sin su provincia: la web la busca en el índice de claves y abre el
- * mapa a zoom 16 sobre él. Cierra la ficha y cruza el borde arrastrando con las celdas, abre la
- * vista de interferencia y lo cruza otra vez, y aleja y acerca.
+ * mapa a zoom 16 sobre él. Cierra la ficha, cruza el borde arrastrando con las celdas y aleja y
+ * acerca.
  *
  * El de `vuelos` (#67) mueve la cámara de MapLibre como los recorridos del #61 y el #66: saltos de
  * vista en vista, cinco vuelos de España a la calle y vuelta, alejarse del Eixample hasta España y
@@ -1045,8 +1045,8 @@ const ronda = async (
     memoria = await medirMemoria(pagina, cdp);
   };
   /**
-   * Junto al borde de dos provincias, con la vista abierta en un emplazamiento: celdas e
-   * interferencia necesitan las dos. Cada arrastre cruza el borde de ida o de vuelta.
+   * Junto al borde de dos provincias, con la vista abierta en un emplazamiento: las celdas
+   * necesitan las dos. Cada arrastre cruza el borde de ida o de vuelta.
    */
   const recorridoPorElBorde = async () => {
     await esperar(1500);
@@ -1068,11 +1068,6 @@ const ronda = async (
       }
     };
     await medir("cruzar-con-celdas", cruzar);
-    await medir("abrir-interferencia", async () => {
-      await pulsar(pagina, "Interferencia", 1);
-      await esperar(1500);
-    });
-    await medir("cruzar-con-interferencia", cruzar);
     await medir("alejar-y-acercar", async () => {
       await pulsar(pagina, "Alejar", 2);
       await pulsar(pagina, "Acercar", 2);

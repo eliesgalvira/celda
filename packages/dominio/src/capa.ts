@@ -18,8 +18,8 @@ export const BandasDeCapa = Schema.Struct({
 export type BandasDeCapa = typeof BandasDeCapa.Type;
 
 /**
- * Lo que la capa guarda de cada emplazamiento: lo justo para dibujar su marcador y la vista de
- * interferencia. El resto va en su ficha, que se publica con la capa.
+ * Lo que la capa guarda de cada emplazamiento: lo justo para dibujar su marcador y contar sus
+ * bandas en el ejercicio de emplazamientos. El resto va en su ficha, que se publica con la capa.
  */
 export const EmplazamientoDeCapa = Schema.Struct({
   clave: Schema.String,

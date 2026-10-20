@@ -14,14 +14,14 @@ describe("aspectos de los controles", () => {
       const { getByRole, unmount } = render(() => (
         <AspectoDeControl value={aspecto}>
           <ControlDelMapa
-            etiqueta="Interferencia"
-            detalle="Simula dónde se pisan las señales."
+            etiqueta="Vista agrupada"
+            detalle="Junta los emplazamientos en hexágonos con su número."
             icono="≈"
           />
         </AspectoDeControl>
       ));
       flush();
-      assert.isDefined(getByRole("button", { name: "Interferencia" }), aspecto);
+      assert.isDefined(getByRole("button", { name: "Vista agrupada" }), aspecto);
       unmount();
     }
   });

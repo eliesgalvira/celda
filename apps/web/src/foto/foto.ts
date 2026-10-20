@@ -31,13 +31,11 @@ export interface SituacionDeLaFoto {
   readonly seleccionado: boolean;
   /** Si el mapa está a pie de calle (`aPieDeCalle`). */
   readonly aPieDeCalle: boolean;
-  /** Si está abierta la vista de interferencia, que tiene prioridad. */
-  readonly vistaActiva: boolean;
 }
 
 /**
  * Si la pista pregunta cuál es el edificio y ofrece la foto: con un emplazamiento seleccionado, a
- * pie de calle y con la foto apagada. Con la vista de interferencia no, como las demás pistas.
+ * pie de calle y con la foto apagada.
  */
 export const pideVerFoto = (situacion: SituacionDeLaFoto): boolean =>
-  !situacion.vistaActiva && !situacion.encendida && situacion.seleccionado && situacion.aPieDeCalle;
+  !situacion.encendida && situacion.seleccionado && situacion.aPieDeCalle;

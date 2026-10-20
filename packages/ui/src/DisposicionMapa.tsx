@@ -43,7 +43,7 @@ export interface DisposicionMapaProps {
    * «Funciones», porque el mapa se amplía con dos dedos.
    */
   readonly zoom?: JSX.Element;
-  /** Los controles de las funciones del mapa, como la interferencia o medir la señal. */
+  /** Los controles de las funciones del mapa, como la vista agrupada o medir la señal. */
   readonly controles: JSX.Element;
   /** El botón de ubicación con su menú (`MenuUbicacion`), siempre a la vista. */
   readonly botonUbicacion?: JSX.Element;
@@ -59,12 +59,6 @@ export interface DisposicionMapaProps {
    * controles y los créditos suben por encima del resumen de la hoja.
    */
   readonly panelAbierto?: boolean;
-  /**
-   * El panel de una vista del mapa, como la de interferencia (`PanelInterferencia`). En escritorio
-   * va abajo a la derecha, junto a los controles; en el móvil, sobre los créditos, con los
-   * controles encima. En el móvil cede el sitio a la hoja de la ficha y a la de elegir un punto.
-   */
-  readonly vista?: JSX.Element;
   /** El panel abierto es el ancho, el del ejercicio: en escritorio los créditos se apartan más. */
   readonly panelAncho?: boolean;
 }
@@ -115,15 +109,9 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
       // vuelven abajo.
       data-hoja={props.panelAbierto === true && props.eligiendo !== true ? "" : undefined}
       data-eligiendo={props.eligiendo === true ? "" : undefined}
-      // En el móvil, los créditos abiertos tapan la pista y el pie de la vista: la pista se esconde
-      // mientras tanto y los créditos van por encima, con fondo opaco.
+      // En el móvil, los créditos abiertos tapan la pista: la pista se esconde mientras tanto y los
+      // créditos van por encima, con fondo opaco.
       data-creditos={plegada() ? undefined : ""}
-      // En el móvil la vista solo se ve sin hoja: entonces los controles suben por encima de ella.
-      data-vista={
-        props.vista !== undefined && props.panelAbierto !== true && props.eligiendo !== true
-          ? ""
-          : undefined
-      }
       class="group/mapa fixed inset-0 overflow-hidden bg-mapa-fondo font-texto text-tinta"
     >
       <main
@@ -176,21 +164,11 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
       </Show>
 
       {/* 11.75rem es el alto del resumen de la hoja (`ALTO_RESUMEN`, 188 px). */}
-      <Show when={props.vista}>
-        {/*
-          En el móvil, 22.5rem de alto sobre el botón de los créditos, con las pastillas encima. En
-          escritorio, a la izquierda de las pastillas, que ocupan unos 10rem.
-        */}
-        <div class="absolute inset-x-2 bottom-[3.25rem] z-10 h-[22.5rem] max-md:group-data-eligiendo/mapa:hidden max-md:group-data-hoja/mapa:hidden md:inset-x-auto md:right-48 md:bottom-16 md:h-auto md:max-h-[calc(100%-6rem)] md:w-[22rem]">
-          {props.vista}
-        </div>
-      </Show>
-
       {/*
         Abajo a la derecha, solo dos pastillas claras: «Ubicación», que se usa también con la ficha
         abierta, y «Funciones», que despliega el resto con una línea que explica cada uno.
       */}
-      <div class="absolute right-1.5 bottom-[max(0.25rem,env(safe-area-inset-bottom))] z-10 flex flex-col items-end gap-1 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.25rem)] max-md:group-data-vista/mapa:bottom-[calc(22.5rem+3.5rem)] max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-14">
+      <div class="absolute right-1.5 bottom-[max(0.25rem,env(safe-area-inset-bottom))] z-10 flex flex-col items-end gap-1 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.25rem)] max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-14">
         <div class="mr-3 mb-1 flex flex-col gap-1 max-md:hidden">
           <AspectoDeControl value="zoom">{props.zoom}</AspectoDeControl>
         </div>

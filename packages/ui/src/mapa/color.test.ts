@@ -43,7 +43,7 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   ["ejemplo-fg", "ejemplo"],
   ["qr-tinta", "qr-fondo"],
   ["aviso-tinta", "aviso-fondo"],
-  // Un aviso sin su fondo: el antetítulo de la vista de interferencia y la fecha de los datos que fallan.
+  // Un aviso sin su fondo, como la fecha de los datos que fallan.
   ["aviso-tinta", "superficie"],
   ["aviso-tinta", "superficie-alta"],
   ["referencia-fg", "referencia"],

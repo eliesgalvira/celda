@@ -6,7 +6,6 @@ const A_PIE_DE_CALLE: SituacionDeLaFoto = {
   encendida: false,
   seleccionado: true,
   aPieDeCalle: true,
-  vistaActiva: false,
 };
 
 describe("pista «Ver foto»", () => {
@@ -18,10 +17,9 @@ describe("pista «Ver foto»", () => {
     assert.isTrue(pideVerFoto(A_PIE_DE_CALLE));
   });
 
-  it("no sale más lejos, sin emplazamiento, con la foto ya encendida ni con la vista de interferencia", () => {
+  it("no sale más lejos, sin emplazamiento ni con la foto ya encendida", () => {
     assert.isFalse(pideVerFoto({ ...A_PIE_DE_CALLE, aPieDeCalle: false }));
     assert.isFalse(pideVerFoto({ ...A_PIE_DE_CALLE, seleccionado: false }));
     assert.isFalse(pideVerFoto({ ...A_PIE_DE_CALLE, encendida: true }));
-    assert.isFalse(pideVerFoto({ ...A_PIE_DE_CALLE, vistaActiva: true }));
   });
 });

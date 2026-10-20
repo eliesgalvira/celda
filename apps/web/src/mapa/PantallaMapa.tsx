@@ -15,7 +15,6 @@ import { ControlDelMapa } from "@celda/ui/ControlDelMapa.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { CargaDelMapa, DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
-import { IconoOndas } from "@celda/ui/interferencia/PanelInterferencia.tsx";
 import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
 import { IconoAjustes, IconoEjercicio } from "@celda/ui/ejercicio/Ejercicio.tsx";
 import { IconoFotoAerea } from "@celda/ui/foto/FotoAerea.tsx";
@@ -112,20 +111,6 @@ import { aPieDeCalle, CREDITO_FOTO_AEREA, pideVerFoto } from "../foto/foto.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
 import { type FichaPedida, FichasPublicadas } from "../ficha/servicio.ts";
 import {
-  crearInterferencia,
-  lienzoDelMapa as lienzoDeInterferencia,
-} from "../interferencia/enMapa.ts";
-import {
-  bandaInicial,
-  companiasDeLaCapa,
-  type EleccionVista,
-  type Encuadre,
-  OCUPACION,
-  provinciasParaSinr,
-  ZOOM_INTERFERENCIA,
-} from "../interferencia/interferencia.ts";
-import { VistaInterferencia } from "../interferencia/VistaInterferencia.tsx";
-import {
   ajustesAbiertos,
   conAjustes,
   conEjercicio,
@@ -181,8 +166,12 @@ import {
 
 type ModuloMapaBase = typeof import("./mapaBase.ts");
 
-/** Solo para los tipos: el panel de la vista no se monta sin elección. */
-const ELECCION_VACIA: EleccionVista = { compania: "movistar", mhz: 1800, ocupacion: 0.5 };
+/** Lo que se ve del mapa: sus esquinas y su zoom. */
+interface Encuadre {
+  readonly suroeste: Coordenada;
+  readonly noreste: Coordenada;
+  readonly zoom: number;
+}
 
 /** De dónde salen las provincias y sus contornos para saber dónde cae un punto. */
 const CARGAS_DE_ZONAS: CargasDeZonas = {
@@ -245,9 +234,6 @@ export function PantallaMapa() {
   const [cercaDeLaFoto, setCercaDeLaFoto] = createSignal(false);
   /** Lo que se ve del mapa, puesto cada vez que se para. */
   const [encuadre, setEncuadre] = createSignal<Encuadre>();
-  /** La vista de interferencia (historia 38) y lo que se ha elegido en ella. */
-  const [vistaActiva, setVistaActiva] = createSignal(false);
-  const [eleccion, setEleccion] = createSignal<EleccionVista>();
   let contenedor: HTMLDivElement | undefined;
   let mapa: MapaMapLibre | undefined;
   /** Repinta el mapa con los colores del tema activo (`crearMapaBase`). */
@@ -658,7 +644,7 @@ export function PantallaMapa() {
     const deLosLogos = [
       ...(conLogos() ? [CREDITO_DE_MARCAS] : []),
       ...(conDigi() ? [CREDITO_DEL_LOGO_DE_DIGI] : []),
-      ...(cerca() && !vistaActiva() ? [CREDITO_DE_LAS_CELDAS] : []),
+      ...(cerca() ? [CREDITO_DE_LAS_CELDAS] : []),
     ];
     return fuentes === undefined
       ? [...delCallejero, ...deLosLogos]
@@ -1118,110 +1104,16 @@ export function PantallaMapa() {
     },
   );
 
-  /** Las provincias con estaciones que mira la vista de interferencia, por código. */
-  const provinciasDeInterferencia = createMemo(
-    () => {
-      const actual = resumen();
-      return actual === undefined || !vistaActiva()
-        ? []
-        : provinciasParaSinr(actual.provincias, encuadre(), posicionDeReferencia());
-    },
-    { equals: mismasListas },
-  );
-  const cargadasDeInterferencia = createMemo(
-    () => cargadasDe(provincias(), provinciasDeInterferencia()),
-    { equals: mismasListas },
-  );
-  const interferencia = crearInterferencia(datos, {
-    lienzo: createMemo(() => {
-      const actual = mapaListo();
-      return actual === undefined ? undefined : lienzoDeInterferencia(actual);
-    }),
-    activa: vistaActiva,
-    emplazamientos: createMemo(() =>
-      cargadasDeInterferencia().flatMap((p) => p.capa.emplazamientos),
-    ),
-    eleccion,
-    encuadre,
-    referencia: posicionDeReferencia,
-    vecinas: () => {
-      const actual = resumen();
-      return actual === undefined
-        ? VECINAS_LISTAS
-        : estadoDeLasVecinas(actual, provincias(), provinciasDeInterferencia());
-    },
-  });
-
-  // Las provincias vecinas que necesitan las celdas y la vista se piden como las que se ven: una
-  // vez por visita. Una que falla se reintenta con su botón.
+  // Las provincias vecinas que necesitan las celdas se piden como las que se ven: una vez por
+  // visita. Una que falla se reintenta con su botón.
   recurso(
     "capa:vecinas",
-    () => [...new Set([...provinciasDeCeldas(), ...provinciasDeInterferencia()])].sort(),
+    provinciasDeCeldas,
     (codigos) => {
       pedirProvincias(codigos);
       return undefined;
     },
     { iguales: mismasListas },
-  );
-
-  /**
-   * Abre o cierra la vista. Al abrirla por primera vez elige la compañía del emplazamiento
-   * seleccionado, o la primera de la capa, y la banda con más estaciones confirmadas.
-   */
-  const cambiarVista = () => {
-    if (vistaActiva()) {
-      setVistaActiva(false);
-      return;
-    }
-    if (eleccion() === undefined) {
-      const todos = emplazamientos();
-      const clave = seleccionada();
-      const compania =
-        todos.find((e) => e.clave === clave)?.companias[0] ?? companiasDeLaCapa(todos)[0];
-      if (compania !== undefined) {
-        setEleccion({
-          compania,
-          mhz: bandaInicial(todos, compania),
-          ocupacion: OCUPACION.inicial,
-        });
-      }
-    }
-    setVistaActiva(true);
-  };
-
-  /**
-   * El panel de la vista. Es un memo que solo cambia al abrirla o cerrarla: la elección llega al
-   * panel como prop, y moverla no vuelve a montarlo (el deslizador no pierde el dedo).
-   */
-  const conVista = createMemo(() => vistaActiva() && eleccion() !== undefined);
-  const vista = createMemo(() =>
-    conVista() ? (
-      <VistaInterferencia
-        emplazamientos={emplazamientos()}
-        eleccion={eleccion() ?? ELECCION_VACIA}
-        alCambiar={(nueva) => {
-          const anterior = eleccion();
-          // Otra compañía abre en su banda con más estaciones confirmadas.
-          setEleccion(
-            anterior !== undefined && nueva.compania !== anterior.compania
-              ? { ...nueva, mhz: bandaInicial(emplazamientos(), nueva.compania) }
-              : nueva,
-          );
-        }}
-        calculo={interferencia.calculo()}
-        reintentar={() => {
-          const { estado, faltan } = interferencia.calculo();
-          if (estado === "sin-vecinas") {
-            reintentarProvincias((faltan ?? []).map((p) => p.codigo));
-          } else {
-            interferencia.reintentar();
-          }
-        }}
-        referencia={puntoDeReferencia.referencia()?.tipo}
-        cerca={(encuadre()?.zoom ?? 0) >= ZOOM_INTERFERENCIA}
-        alCerrar={() => setVistaActiva(false)}
-      />
-    ) : undefined,
   );
 
   // La línea del emplazamiento seleccionado al punto de referencia sigue al punto mientras se mueve.
@@ -1240,12 +1132,9 @@ export function PantallaMapa() {
       encendida: foto.encendida(),
       seleccionado: seleccionada() !== null,
       aPieDeCalle: calle(),
-      vistaActiva: vistaActiva(),
     }),
   );
   const pista = createMemo(() => {
-    // Con la vista de interferencia, su panel dice qué es cada cosa y las celdas no se ven.
-    if (vistaActiva()) return undefined;
     // Si «Ver el edificio» no encuentra nada que resaltar, la pista lo dice un rato, porque sorprende.
     if (foto.sinContorno()) return <Pista texto={PISTA_SIN_CONTORNO} />;
     if (foto.acercate()) return <Pista texto={PISTA_ACERCATE} />;
@@ -1489,14 +1378,6 @@ export function PantallaMapa() {
             }
             controles={
               <>
-                <ControlDelMapa
-                  etiqueta="Interferencia"
-                  detalle="Simula dónde se pisan las señales de una compañía."
-                  icono={<IconoOndas />}
-                  activo={vistaActiva()}
-                  disabled={!listo() || emplazamientos().length === 0}
-                  onClick={cambiarVista}
-                />
                 <Show when={vistaDibujada() === "puntos"}>
                   <ControlDelMapa
                     etiqueta={LISTA_DE_EMPLAZAMIENTOS}
@@ -1592,7 +1473,6 @@ export function PantallaMapa() {
             aviso={aviso()}
             panelAbierto={panelAbierto()}
             panelAncho={seleccionada() === null && ejercicio() !== null}
-            vista={vista()}
             panel={
               <Switch>
                 <Match when={seleccionada()}>
