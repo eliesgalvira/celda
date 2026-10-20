@@ -11,7 +11,6 @@
     "ingesta": "vp build && node dist/nocturna.js",
     "medir-espana": "node src/medida/espana.ts",
     "capas": "vp build && node dist/nocturna.js capas",
-    "despliegue": "vp build && node dist/nocturna.js despliegue",
     "test": "vp test run",
     "typecheck": "tsc --noEmit"
   },

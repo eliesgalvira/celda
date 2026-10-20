@@ -15,6 +15,7 @@ import {
   type ComprobacionDelDespliegue,
   comprobarDespliegue,
   FICHERO_DEL_DESPLIEGUE,
+  huellaDeLaWeb,
   Produccion,
   type R2DelDespliegue,
 } from "@celda/publicacion/despliegue";
@@ -30,12 +31,15 @@ import * as Ref from "effect/Ref";
 import { TestClock } from "effect/testing";
 
 import { montarCapasEn } from "./capas.ts";
-import { argumentosDelDespliegue, ordenDespliegue } from "./despliegue.ts";
+import { argumentosDelDespliegue, ordenDespliegue, ordenHuellaWeb } from "./despliegue.ts";
 import { conEntorno, contenidoDe, type Entorno, unaNoche } from "./pruebas/entorno.ts";
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
 const COMMIT = "0631fc3eb2352cd994c79009743808d78e0e9eeb";
+
+/** El commit del push número `n` a `celda/v1` en una prueba. */
+const commitNumero = (n: number): string => `${String(n).padStart(4, "0")}${COMMIT.slice(4)}`;
 
 const registroOficial = (grabada: FuenteGrabada) =>
   capaGrabadaPorCajas("registro-oficial", grabada);
@@ -70,9 +74,14 @@ const CONSTRUIDO = {
 } satisfies Readonly<Record<string, string>>;
 
 /**
- * Un Vercel de mentira y su producción. Cada despliegue copia la web construida, escribe en su
- * raíz el `despliegue.json` que le pasa el flujo y monta las capas con la orden `capas` desde el
- * almacén del entorno, que hace de cubo de R2. Si el build acaba bien, pasa a servirse.
+ * El flujo de despliegue, con un Vercel de mentira y su producción.
+ *
+ * - Cada push es un commit nuevo de la web de prueba. El flujo construye la web y calcula su huella
+ *   la primera vez que mira un commit, y la guarda con el commit en la clave, como en la caché de
+ *   GitHub. Las demás ejecuciones del mismo commit la leen de ahí.
+ * - Cada despliegue copia la web construida, escribe en su raíz el `despliegue.json` que le pasa
+ *   el flujo y monta las capas con la orden `capas` desde el almacén del entorno, que hace de cubo
+ *   de R2. Si el build acaba bien, pasa a servirse; si falla, se sigue sirviendo el anterior.
  */
 const vercelDePrueba = (entorno: Entorno) =>
   Effect.gen(function* () {
@@ -82,10 +91,18 @@ const vercelDePrueba = (entorno: Entorno) =>
     const web = path.join(raiz, "web");
     const servido = yield* Ref.make(Option.none<string>());
     const caida = yield* Ref.make(false);
+    const buildFalla = yield* Ref.make(false);
     const despliegues = yield* Ref.make(0);
+    const construcciones = yield* Ref.make(0);
+    const empujados = yield* Ref.make(0);
+    const commit = Effect.map(Ref.get(empujados), commitNumero);
+    const memoria = new Map<string, string>();
 
-    /** Cambia, añade o quita (`undefined`) ficheros de la web de prueba. */
-    const cambiarWeb = (cambios: Readonly<Record<string, string | undefined>>) =>
+    /**
+     * Un push a `celda/v1`: un commit nuevo que cambia, añade o quita (`undefined`) ficheros de la
+     * web de prueba.
+     */
+    const empujar = (cambios: Readonly<Record<string, string | undefined>>) =>
       Effect.gen(function* () {
         for (const [ruta, contenido] of Object.entries(cambios)) {
           const fichero = path.join(web, ruta);
@@ -96,12 +113,25 @@ const vercelDePrueba = (entorno: Entorno) =>
           yield* fs.makeDirectory(path.dirname(fichero), { recursive: true });
           yield* fs.writeFileString(fichero, contenido);
         }
+        yield* Ref.update(empujados, (n) => n + 1);
       });
-    yield* cambiarWeb(CONSTRUIDO);
+    yield* empujar(CONSTRUIDO);
+
+    /** La huella de la web del commit de ahora: la guardada o, si no hay, la de construirla. */
+    const huellaDelCommit = Effect.gen(function* () {
+      const deAhora = yield* commit;
+      const guardada = memoria.get(deAhora);
+      if (guardada !== undefined) return guardada;
+      yield* Ref.update(construcciones, (n) => n + 1);
+      const huella = yield* huellaDeLaWeb(web);
+      memoria.set(deAhora, huella);
+      return huella;
+    });
 
     const desplegar = (comprobacion: ComprobacionDelDespliegue) =>
       Effect.gen(function* () {
         const numero = yield* Ref.updateAndGet(despliegues, (n) => n + 1);
+        if (yield* Ref.get(buildFalla)) return;
         const destino = path.join(raiz, "vercel", String(numero));
         yield* fs.copy(path.join(web, "dist"), destino);
         yield* fs.writeFileString(
@@ -141,22 +171,31 @@ const vercelDePrueba = (entorno: Entorno) =>
     const comprobar = (
       opciones: { readonly aMano?: boolean; readonly r2?: R2DelDespliegue } = {},
     ) =>
-      comprobarDespliegue({
-        carpeta: web,
-        commit: COMMIT,
-        aMano: opciones.aMano ?? false,
-        r2: opciones.r2 ?? { tipo: "cubo", origen: r2 },
-      }).pipe(Effect.provide(produccion));
+      Effect.gen(function* () {
+        const huella = yield* huellaDelCommit;
+        return yield* comprobarDespliegue({
+          huella,
+          commit: yield* commit,
+          aMano: opciones.aMano ?? false,
+          r2: opciones.r2 ?? { tipo: "cubo", origen: r2 },
+        }).pipe(Effect.provide(produccion));
+      });
 
     return {
       web,
-      cambiarWeb,
+      empujar,
       desplegar,
       comprobar,
       produccion,
       caida,
+      buildFalla,
+      /** La caché de GitHub pierde lo guardado. */
+      olvidar: Effect.sync(() => memoria.clear()),
       servido: Ref.get(servido),
       despliegues: Ref.get(despliegues),
+      /** Veces que el flujo ha construido la web para calcular su huella. */
+      construcciones: Ref.get(construcciones),
+      commit,
     };
   });
 
@@ -213,7 +252,7 @@ describe("cuándo se despliega", () => {
               "No se despliega porque producción ya sirve esta web y estos datos.",
             );
             assert.strictEqual(sinCambios.web.tipo, "igual");
-            assert.include(sinCambios.web.detalle, COMMIT.slice(0, 7));
+            assert.include(sinCambios.web.detalle, (yield* vercel.commit).slice(0, 7));
             assert.deepStrictEqual(sinCambios.datos, {
               tipo: "igual",
               detalle: `Producción sirve sitios@${sello}, la versión vigente de R2.`,
@@ -279,7 +318,7 @@ describe("cuándo se despliega", () => {
           const vercel = yield* vercelDePrueba(entorno);
           yield* unaEjecucion(vercel);
 
-          yield* vercel.cambiarWeb({ "src/entrada.tsx": "// Solo un comentario." });
+          yield* vercel.empujar({ "src/entrada.tsx": "// Solo un comentario." });
           assert.isFalse((yield* unaEjecucion(vercel)).desplegar);
 
           for (const cambio of [
@@ -290,7 +329,7 @@ describe("cuándo se despliega", () => {
             },
             { "vercel.json": '{"buildCommand":"./scripts/vercel.sh","headers":[]}' },
           ]) {
-            yield* vercel.cambiarWeb(cambio);
+            yield* vercel.empujar(cambio);
             const cambiada = yield* unaEjecucion(vercel);
             assert.isTrue(cambiada.desplegar);
             assert.strictEqual(cambiada.motivo, "Se despliega porque ha cambiado la web.");
@@ -299,6 +338,74 @@ describe("cuándo se despliega", () => {
             assert.isFalse((yield* unaEjecucion(vercel)).desplegar);
           }
           assert.strictEqual(yield* vercel.despliegues, 4);
+        }),
+      ),
+    60_000,
+  );
+
+  it.effect(
+    "la ejecución de cada día no construye la web si nadie ha empujado, y tras un push la construye una vez",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          yield* TestClock.setTime(NOCHE);
+          yield* noche(entorno, grabada);
+          const vercel = yield* vercelDePrueba(entorno);
+          yield* unaEjecucion(vercel);
+          assert.strictEqual(yield* vercel.construcciones, 1);
+
+          // Cada día, sin pushes: la huella sale de la caché. Una versión nueva en R2 se despliega
+          // igual, con esa huella.
+          for (let dia = 0; dia < 3; dia++) assert.isFalse((yield* unaEjecucion(vercel)).desplegar);
+          yield* noche(entorno, sinUna(grabada));
+          assert.isTrue((yield* unaEjecucion(vercel)).desplegar);
+          assert.isFalse((yield* unaEjecucion(vercel)).desplegar);
+          assert.strictEqual(yield* vercel.construcciones, 1);
+
+          // Un push que no cambia lo construido: se construye una vez y no se despliega.
+          yield* vercel.empujar({ "src/entrada.tsx": "// Solo un comentario." });
+          for (let dia = 0; dia < 3; dia++) assert.isFalse((yield* unaEjecucion(vercel)).desplegar);
+          assert.strictEqual(yield* vercel.construcciones, 2);
+
+          // Si la caché lo pierde, se vuelve a construir y se decide lo mismo.
+          yield* vercel.olvidar;
+          assert.isFalse((yield* unaEjecucion(vercel)).desplegar);
+          assert.strictEqual(yield* vercel.construcciones, 3);
+          assert.strictEqual(yield* vercel.despliegues, 2);
+        }),
+      ),
+    60_000,
+  );
+
+  it.effect(
+    "si un despliegue falla, la siguiente ejecución ve que producción va atrás y vuelve a desplegar",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          yield* TestClock.setTime(NOCHE);
+          yield* noche(entorno, grabada);
+          const vercel = yield* vercelDePrueba(entorno);
+          yield* unaEjecucion(vercel);
+
+          // Un push que cambia la web y una versión nueva, con un build de Vercel que falla.
+          yield* vercel.empujar({ "dist/index.html": "<!doctype html><title>Celda</title>" });
+          yield* noche(entorno, sinUna(grabada));
+          yield* Ref.set(vercel.buildFalla, true);
+          const fallida = yield* unaEjecucion(vercel);
+          assert.strictEqual(
+            fallida.motivo,
+            "Se despliega porque ha cambiado la web y han cambiado los datos.",
+          );
+
+          // La huella del commit ya está en la caché, pero producción sigue con lo de antes.
+          yield* Ref.set(vercel.buildFalla, false);
+          const otraVez = yield* unaEjecucion(vercel);
+          assert.strictEqual(otraVez.motivo, fallida.motivo);
+          assert.isFalse((yield* unaEjecucion(vercel)).desplegar);
+          assert.strictEqual(yield* vercel.construcciones, 2);
+          assert.strictEqual(yield* vercel.despliegues, 3);
         }),
       ),
     60_000,
@@ -421,71 +528,68 @@ describe("cuándo se despliega", () => {
   );
 });
 
-describe("la orden despliegue", () => {
-  it.effect("deja en --salida, tras lo que ya tenía, lo que lee el flujo de GitHub", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        yield* TestClock.setTime(NOCHE);
-        yield* noche(entorno, yield* muestraCampusNord);
-        const vercel = yield* vercelDePrueba(entorno);
-        yield* unaEjecucion(vercel);
+describe("las órdenes huella-web y despliegue", () => {
+  it.effect(
+    "huella-web escribe la huella en su fichero, y despliegue deja en --salida, tras lo que ya tenía, lo que lee el flujo",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          yield* TestClock.setTime(NOCHE);
+          yield* noche(entorno, yield* muestraCampusNord);
+          const vercel = yield* vercelDePrueba(entorno);
+          yield* unaEjecucion(vercel);
 
-        const salida = path.join(path.dirname(entorno.almacen), "salida");
-        yield* fs.writeFileString(salida, "commit=0631fc3\n");
-        const argumentos = yield* argumentosDelDespliegue([
-          vercel.web,
-          "--salida",
-          salida,
-          "--commit",
-          COMMIT,
-        ]);
-        const comprobacion = yield* ordenDespliegue(argumentos, {
-          tipo: "cubo",
-          origen: yield* almacenEn(entorno.almacen),
-        }).pipe(Effect.provide(vercel.produccion));
-        assert.deepStrictEqual((yield* fs.readFileString(salida)).split("\n"), [
-          "commit=0631fc3",
-          "desplegar=no",
-          `despliegue=${codificarDespliegue({ web: comprobacion.despliegue.web, commit: COMMIT })}`,
-          "motivo=No se despliega porque producción ya sirve esta web y estos datos.",
-          "",
-        ]);
-        const servido = yield* vercel.servido;
-        assert.strictEqual(
-          yield* fs.readFileString(
-            path.join(
-              Option.getOrElse(servido, () => ""),
-              FICHERO_DEL_DESPLIEGUE,
-            ),
-          ),
-          `${codificarDespliegue(comprobacion.despliegue)}\n`,
-        );
-        assert.isTrue(
-          yield* fs.exists(
-            path.join(
-              Option.getOrElse(servido, () => ""),
-              "capas",
-              FICHERO_VIGENTE,
-            ),
-          ),
-        );
-      }),
-    ),
+          const fichero = path.join(path.dirname(entorno.almacen), "huella-web");
+          const huella = yield* ordenHuellaWeb(vercel.web, fichero);
+          assert.strictEqual(yield* fs.readFileString(fichero), `${huella}\n`);
+
+          const salida = path.join(path.dirname(entorno.almacen), "salida");
+          yield* fs.writeFileString(salida, "commit=0631fc3\n");
+          const commit = yield* vercel.commit;
+          const argumentos = yield* argumentosDelDespliegue([
+            "--salida",
+            salida,
+            "--huella",
+            (yield* fs.readFileString(fichero)).trim(),
+            "--commit",
+            commit,
+          ]);
+          const comprobacion = yield* ordenDespliegue(argumentos, {
+            tipo: "cubo",
+            origen: yield* almacenEn(entorno.almacen),
+          }).pipe(Effect.provide(vercel.produccion));
+          assert.deepStrictEqual((yield* fs.readFileString(salida)).split("\n"), [
+            "commit=0631fc3",
+            "desplegar=no",
+            `despliegue=${codificarDespliegue({ web: huella, commit })}`,
+            "motivo=No se despliega porque producción ya sirve esta web y estos datos.",
+            "",
+          ]);
+          const servido = Option.getOrElse(yield* vercel.servido, () => "");
+          assert.strictEqual(
+            yield* fs.readFileString(path.join(servido, FICHERO_DEL_DESPLIEGUE)),
+            `${codificarDespliegue(comprobacion.despliegue)}\n`,
+          );
+          assert.isTrue(yield* fs.exists(path.join(servido, "capas", FICHERO_VIGENTE)));
+        }),
+      ),
   );
 
-  it.effect("lee sus argumentos en cualquier orden, y sin la carpeta o el commit dice el uso", () =>
+  it.effect("despliegue lee sus argumentos en cualquier orden, y si falta algo dice el uso", () =>
     Effect.gen(function* () {
+      const huella = "c".repeat(64);
       assert.deepStrictEqual(
-        yield* argumentosDelDespliegue(["--a-mano", "--commit", "abc", "apps/web"]),
-        { carpeta: "apps/web", commit: "abc", aMano: true, salida: Option.none() },
+        yield* argumentosDelDespliegue(["--a-mano", "--commit", "abc", "--huella", huella]),
+        { huella, commit: "abc", aMano: true, salida: Option.none() },
       );
       for (const mal of [
-        ["apps/web"],
         ["--commit", "abc"],
-        ["apps/web", "--commit"],
-        ["apps/web", "otra", "--commit", "abc"],
+        ["--huella", huella],
+        ["--huella", huella, "--commit"],
+        ["--huella", "corta", "--commit", "abc"],
+        ["apps/web", "--huella", huella, "--commit", "abc"],
       ]) {
         const fallo = yield* Effect.flip(argumentosDelDespliegue(mal));
         assert.include(fallo.message, "Uso: despliegue");

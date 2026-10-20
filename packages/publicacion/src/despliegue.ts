@@ -22,8 +22,11 @@ import { leerDeVercel, planearCapas, type VercelNoDisponible } from "./vercel.ts
  * - **Los datos.** Producción no sirve el `vigente.json` de R2 y los manifiestos de la vigente y de
  *   las anteriores que montaría un build nuevo (`planearCapas`).
  *
- * Una señal que no se puede saber cuenta como un cambio. Lo lanza el flujo de despliegue de
- * GitHub con la orden `despliegue` de la ingesta nocturna.
+ * Una señal que no se puede saber cuenta como un cambio. La huella es función pura del commit, así
+ * que el flujo de despliegue de GitHub la calcula una vez por commit (orden `huella-web`) y la
+ * guarda en su caché, y cada ejecución compara la que ya sabe con la de producción (orden
+ * `despliegue`). Lo guardado nunca dice qué está desplegado, porque eso se lee siempre de
+ * producción.
  */
 
 /** El fichero de la raíz del sitio que dice de qué web es el despliegue. Lo escribe `vercel.sh`. */
@@ -91,9 +94,15 @@ export const huellaDeLaWeb = Effect.fn("Despliegue.huellaDeLaWeb")(function* (ca
   return yield* Effect.orDie(sha256(lineas.toSorted().join("\n")));
 });
 
+/** Una huella de la web, como la da `huellaDeLaWeb`: 64 cifras hexadecimales. */
+const FORMA_DE_HUELLA = /^[0-9a-f]{64}$/u;
+
+/** Si `texto` tiene la forma de una huella de la web. */
+export const esHuella = (texto: string): boolean => FORMA_DE_HUELLA.test(texto);
+
 /** Lo que dice `/despliegue.json`, la huella de la web y el commit de `celda/v1` del que salió. */
 export const Despliegue = Schema.Struct({
-  web: Schema.String.pipe(Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/u))),
+  web: Schema.String.pipe(Schema.check(Schema.isPattern(FORMA_DE_HUELLA))),
   commit: Schema.String,
 });
 export type Despliegue = typeof Despliegue.Type;
@@ -299,24 +308,24 @@ export interface ComprobacionDelDespliegue extends Decision {
 }
 
 /**
- * Mira las dos señales del despliegue de la web de `carpeta` (`apps/web`, ya construida), del
- * commit `commit`, y decide si se despliega.
+ * Mira las dos señales del despliegue del commit `commit`, cuya web tiene la huella `huella`
+ * (`huellaDeLaWeb`), y decide si se despliega. No construye nada.
  */
 export const comprobarDespliegue = Effect.fn("Despliegue.comprobar")(function* (opciones: {
-  readonly carpeta: string;
+  readonly huella: string;
   readonly commit: string;
   readonly aMano: boolean;
   readonly r2: R2DelDespliegue;
 }) {
-  const huella = yield* huellaDeLaWeb(opciones.carpeta);
-  const [web, datos] = yield* Effect.all([senalDeLaWeb(huella), senalDeLosDatos(opciones.r2)], {
-    concurrency: 2,
-  });
+  const [web, datos] = yield* Effect.all(
+    [senalDeLaWeb(opciones.huella), senalDeLosDatos(opciones.r2)],
+    { concurrency: 2 },
+  );
   const comprobacion: ComprobacionDelDespliegue = {
     ...decidir({ aMano: opciones.aMano, web, datos }),
     web,
     datos,
-    despliegue: { web: huella, commit: opciones.commit },
+    despliegue: { web: opciones.huella, commit: opciones.commit },
   };
   return comprobacion;
 });
