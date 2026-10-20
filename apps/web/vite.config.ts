@@ -5,10 +5,25 @@ import solid from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite-plus";
 
+import { VARIABLES_DE_LA_WEB } from "./src/variables.ts";
+import { soloLasVariablesDeLaWeb } from "./src/variablesDelBuild.ts";
+
 export default defineConfig(({ mode }) => ({
   // El favicon, los iconos y el manifiesto salen de la marca y los tokens de @celda/ui. El guion
   // del tema elegido va detrás, porque ajusta las etiquetas `theme-color` que pone `iconosDeCelda`.
-  plugins: [tailwindcss(), solid(), iconosDeCelda(), temaAntesDePintar()],
+  // El build falla si lleva una variable de entorno que la web no lee (#83).
+  plugins: [
+    tailwindcss(),
+    solid(),
+    iconosDeCelda(),
+    temaAntesDePintar(),
+    soloLasVariablesDeLaWeb(),
+  ],
+  // `import.meta.env` solo tiene las variables de la lista, aunque el entorno tenga más (#83).
+  // El `ConfigProvider` por defecto de Effect lee `import.meta.env` como objeto, así que con
+  // `VITE_` Vite escribiría en el JavaScript todas las `VITE_*` del build, también las
+  // `VITE_VERCEL_*`. Cada nombre de la lista vale como prefijo de sí mismo.
+  envPrefix: [...VARIABLES_DE_LA_WEB],
   server: { port: 8840, strictPort: true },
   preview: { port: 8841, strictPort: true },
   build: {

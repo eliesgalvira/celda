@@ -16,6 +16,8 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
+import type { VariableDeLaWeb } from "../variables.ts";
+
 /** Una dirección encontrada: cómo se llama, dónde queda y su posición. */
 export interface Direccion {
   /** Lo que se busca: «Carrer de Provença, 450» o «Basílica de la Sagrada Familia». */
@@ -254,7 +256,7 @@ export const buscadorNominatim: Layer.Layer<BuscadorDeDirecciones, never, HttpCl
     BuscadorDeDirecciones,
     Effect.gen(function* () {
       const http = yield* HttpClient.HttpClient;
-      const url = yield* Config.String("VITE_BUSCADOR_URL").pipe(
+      const url = yield* Config.String("VITE_BUSCADOR_URL" satisfies VariableDeLaWeb).pipe(
         Config.withDefault("https://nominatim.openstreetmap.org"),
         Effect.orDie,
       );

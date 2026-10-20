@@ -27,6 +27,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
+import type { VariableDeLaWeb } from "../variables.ts";
 import { IndexadorDeProvincias, type IndiceFallido } from "./indexador.ts";
 import type { PuntosDelMapa } from "./puntos.ts";
 import {
@@ -124,7 +125,9 @@ export const AGRUPACIONES_GUARDADAS = 4;
  * estático local de `tools/capas`; el build de Vercel la quita. Siempre como URL absoluta y sin
  * barra final.
  */
-export const origenDeCapas: Config.Config<string> = Config.String("VITE_CAPAS_ORIGEN").pipe(
+export const origenDeCapas: Config.Config<string> = Config.String(
+  "VITE_CAPAS_ORIGEN" satisfies VariableDeLaWeb,
+).pipe(
   Config.withDefault("/capas"),
   Config.map((origen) => new URL(origen, globalThis.location.href).href.replace(/\/$/u, "")),
 );
