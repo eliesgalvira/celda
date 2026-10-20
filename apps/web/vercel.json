@@ -4,7 +4,12 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "./scripts/vercel.sh",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/((?!capas/|assets/|iconos/).*)", "destination": "/index.html" }],
+  "rewrites": [
+    {
+      "source": "/((?!capas/|assets/|iconos/|despliegue\\.json).*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

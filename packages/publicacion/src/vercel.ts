@@ -100,7 +100,13 @@ const leerManifiesto = (origen: Origen, sello: string) =>
     if (Result.isFailure(listados) || selloDeVersion(listados.success.version) !== sello) {
       return yield* new CapasIncompletas({ motivo: `${fichero} no es de ${sello}` });
     }
-    return { fichero, contenido, ficheros: listados.success.ficheros };
+    const manifiesto: ManifiestoMontado = {
+      sello,
+      fichero,
+      contenido,
+      ficheros: listados.success.ficheros,
+    };
+    return manifiesto;
   });
 
 /**
@@ -118,37 +124,48 @@ const manifiestoAnterior = (origen: Origen, sello: string) =>
     return yield* leerManifiesto(origen, sello);
   });
 
-/** Lo que ha montado `montarCapas`. */
-export interface CapasMontadas {
-  readonly version: string;
-  /** Las versiones anteriores montadas, de la más reciente a la más vieja. */
-  readonly anteriores: ReadonlyArray<string>;
-  /** Ficheros copiados, contando los manifiestos, el resumen y `vigente.json`. */
-  readonly ficheros: number;
-  /** Suma de sus tamaños sin comprimir. */
-  readonly bytes: number;
+/** El manifiesto de una versión que monta el build, tal como está en el origen. */
+export interface ManifiestoMontado {
+  readonly sello: string;
+  /** `ficheros@<sello>.json`. */
+  readonly fichero: string;
+  readonly contenido: string;
+  /** Las capas y los lotes que lista. */
+  readonly ficheros: ReadonlyArray<string>;
 }
 
 /**
- * Copia de `origen`, el cubo de R2, al almacén del contexto, la carpeta `dist/capas` del build, la
- * versión vigente y las `ANTERIORES_EN_VERCEL` anteriores:
+ * Lo que montaría el build con el origen de ahora, antes de copiar nada: `vigente.json` y el resumen
+ * de la vigente, y los manifiestos de la vigente y de las anteriores que se montan. Los ficheros
+ * que listan los manifiestos se nombran por su contenido, así que con esto se sabe todo lo que
+ * llevarían las capas del despliegue.
+ */
+export interface PlanDeCapas {
+  readonly version: string;
+  /** `vigente.json` tal como está en el origen. */
+  readonly vigente: string;
+  readonly resumen: { readonly fichero: string; readonly contenido: string };
+  /** El de la vigente y después los de las anteriores, de la más reciente a la más vieja. */
+  readonly manifiestos: ReadonlyArray<ManifiestoMontado>;
+  /** Cada fichero que listan los manifiestos, una vez aunque lo compartan varias versiones. */
+  readonly ficheros: ReadonlyArray<string>;
+}
+
+/**
+ * Los pasos 1 a 3 de `montarCapas`, que no copian nada:
  *
  * 1. Lee `vigente.json` una vez. Todo lo demás es de esa versión, aunque mientras tanto se publique
  *    otra.
  * 2. Lee el resumen y el manifiesto de la vigente, y comprueba que el resumen es de esa versión y
  *    que la capa de cada provincia y los puntos de toda España están en el manifiesto.
- * 3. Lista el origen y lee los manifiestos de las versiones anteriores a la vigente, las más
- *    recientes. Una posterior a la vigente es otra publicación a medias y no se toca.
- * 4. Lee y guarda cada fichero de esos manifiestos, una vez aunque lo compartan varias versiones.
- *    Si falta alguno o su contenido no coincide con la huella de su nombre, falla sin escribir
- *    `vigente.json`.
- * 5. Guarda los manifiestos y el resumen y, al final, `vigente.json`.
+ * 3. Lista el origen y lee los manifiestos de las `ANTERIORES_EN_VERCEL` versiones anteriores a la
+ *    vigente, las más recientes. Una posterior a la vigente es otra publicación a medias y no se
+ *    toca. Una del formato 4 no se monta: la web ya no la lee.
  *
- * Así lo montado nunca anuncia algo que no tiene. Una versión del formato 4 no se monta: la web ya
- * no la lee.
+ * La usa también el flujo de despliegue para saber si producción sirve lo que montaría un build
+ * nuevo (`senalDeLosDatos` en `despliegue.ts`).
  */
-export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Origen) {
-  const destino = yield* AlmacenDeFicheros;
+export const planearCapas = Effect.fn("Vercel.planearCapas")(function* (origen: Origen) {
   const contenidoVigente = yield* origen
     .leer(FICHERO_VIGENTE)
     .pipe(Effect.retry({ schedule: Schedule.exponential("1 second"), times: REINTENTOS }));
@@ -194,14 +211,12 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
     .toSorted()
     .toReversed()
     .slice(0, ANTERIORES_EN_VERCEL);
-  const deSuFormato = (yield* Effect.forEach(
+  const anteriores = (yield* Effect.forEach(
     candidatas,
-    (otro) =>
-      Effect.map(manifiestoAnterior(origen, otro), (m) => (m === undefined ? [] : [{ otro, m }])),
+    (otro) => Effect.map(manifiestoAnterior(origen, otro), (m) => (m === undefined ? [] : [m])),
     { concurrency: A_LA_VEZ },
   )).flat();
-  const anteriores = deSuFormato.map(({ otro }) => otro);
-  const manifiestos = [suyo, ...deSuFormato.map(({ m }) => m)];
+  const manifiestos = [suyo, ...anteriores];
   const ficheros = [...new Set(manifiestos.flatMap((m) => m.ficheros))];
   // Lo privado del cubo, las copias de la base y el archivo de páginas, nunca llega a la web,
   // aunque un manifiesto lo liste por un error (ADR 0027).
@@ -212,8 +227,45 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
     });
   }
 
-  const bytes = yield* Effect.forEach(
+  const plan: PlanDeCapas = {
+    version,
+    vigente: contenidoVigente.value,
+    resumen: { fichero: ficheroResumen, contenido: resumen },
+    manifiestos,
     ficheros,
+  };
+  return plan;
+});
+
+/** Lo que ha montado `montarCapas`. */
+export interface CapasMontadas {
+  readonly version: string;
+  /** Las versiones anteriores montadas, de la más reciente a la más vieja. */
+  readonly anteriores: ReadonlyArray<string>;
+  /** Ficheros copiados, contando los manifiestos, el resumen y `vigente.json`. */
+  readonly ficheros: number;
+  /** Suma de sus tamaños sin comprimir. */
+  readonly bytes: number;
+}
+
+/**
+ * Copia de `origen`, el cubo de R2, al almacén del contexto, la carpeta `dist/capas` del build, la
+ * versión vigente y las `ANTERIORES_EN_VERCEL` anteriores. Los pasos 1 a 3 son los de
+ * `planearCapas`, y después:
+ *
+ * 4. Lee y guarda cada fichero de esos manifiestos, una vez aunque lo compartan varias versiones.
+ *    Si falta alguno o su contenido no coincide con la huella de su nombre, falla sin escribir
+ *    `vigente.json`.
+ * 5. Guarda los manifiestos y el resumen y, al final, `vigente.json`.
+ *
+ * Así lo montado nunca anuncia algo que no tiene.
+ */
+export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Origen) {
+  const destino = yield* AlmacenDeFicheros;
+  const plan = yield* planearCapas(origen);
+
+  const bytes = yield* Effect.forEach(
+    plan.ficheros,
     (fichero) =>
       Effect.gen(function* () {
         const contenido = yield* leerEntero(origen, fichero);
@@ -222,17 +274,21 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
       }),
     { concurrency: A_LA_VEZ },
   );
-  for (const manifiesto of manifiestos) {
+  for (const manifiesto of plan.manifiestos) {
     yield* destino.guardar(manifiesto.fichero, manifiesto.contenido);
   }
-  yield* destino.guardar(ficheroResumen, resumen);
-  yield* destino.cambiarVigente(contenidoVigente.value);
+  yield* destino.guardar(plan.resumen.fichero, plan.resumen.contenido);
+  yield* destino.cambiarVigente(plan.vigente);
 
   const montadas: CapasMontadas = {
-    version,
-    anteriores: anteriores.map((otro) => `sitios@${otro}`),
-    ficheros: ficheros.length + manifiestos.length + 2,
-    bytes: [...manifiestos.map((m) => m.contenido), resumen, contenidoVigente.value].reduce(
+    version: plan.version,
+    anteriores: plan.manifiestos.slice(1).map((m) => `sitios@${m.sello}`),
+    ficheros: plan.ficheros.length + plan.manifiestos.length + 2,
+    bytes: [
+      ...plan.manifiestos.map((m) => m.contenido),
+      plan.resumen.contenido,
+      plan.vigente,
+    ].reduce(
       (suma, texto) => suma + bytesDe(texto),
       bytes.reduce((suma, n) => suma + n, 0),
     ),
@@ -346,6 +402,29 @@ export interface OpcionesVercel {
 /** Lo que se espera a Vercel antes de darlo por caído. */
 const ESPERA = Duration.seconds(30);
 
+/**
+ * Lee un fichero que sirve Vercel por su URL pública, sin caché, porque tiene que ser lo que sirve
+ * ahora. Un 404 es que no lo tiene. Otro estado, un fallo de la red o 30 s sin respuesta son que
+ * Vercel no contesta.
+ */
+export const leerDeVercel = (http: HttpClient.HttpClient, url: string) =>
+  Effect.gen(function* () {
+    const respuesta = yield* http.execute(
+      HttpClientRequest.get(url).pipe(HttpClientRequest.setHeader("cache-control", "no-cache")),
+    );
+    if (respuesta.status === 404) return Option.none<string>();
+    if (respuesta.status !== 200) {
+      return yield* new VercelNoDisponible({ motivo: `GET ${url}: ${respuesta.status}` });
+    }
+    return Option.some(yield* respuesta.text);
+  }).pipe(
+    Effect.timeout(ESPERA),
+    Effect.catchTags({
+      HttpClientError: (error) => Effect.fail(new VercelNoDisponible({ motivo: error.message })),
+      TimeoutError: () => Effect.fail(new VercelNoDisponible({ motivo: "Vercel no contesta" })),
+    }),
+  );
+
 /** La web en Vercel: se lee por su URL pública y se despliega con el deploy hook. */
 export const sitioEnVercel = (opciones: OpcionesVercel) =>
   Layer.effect(
@@ -356,28 +435,8 @@ export const sitioEnVercel = (opciones: OpcionesVercel) =>
 
       const vigente = Option.match(opciones.origen, {
         onNone: () => Effect.succeed(Option.none<string>()),
-        onSome: (origen) =>
-          Effect.gen(function* () {
-            const url = `${origen.replace(/\/$/u, "")}/${FICHERO_VIGENTE}`;
-            // Sin caché: tiene que ser lo que sirve Vercel ahora.
-            const respuesta = yield* http.execute(
-              HttpClientRequest.get(url).pipe(
-                HttpClientRequest.setHeader("cache-control", "no-cache"),
-              ),
-            );
-            if (respuesta.status === 404) return Option.none<string>();
-            if (respuesta.status !== 200) {
-              return yield* noDisponible(`GET ${url}: ${respuesta.status}`);
-            }
-            return Option.some(yield* respuesta.text);
-          }),
-      }).pipe(
-        Effect.timeout(ESPERA),
-        Effect.catchTags({
-          HttpClientError: (error) => Effect.fail(noDisponible(error.message)),
-          TimeoutError: () => Effect.fail(noDisponible("Vercel no contesta")),
-        }),
-      );
+        onSome: (origen) => leerDeVercel(http, `${origen.replace(/\/$/u, "")}/${FICHERO_VIGENTE}`),
+      });
 
       // La URL del hook es el secreto: no va en los mensajes.
       const desplegar = Effect.gen(function* () {

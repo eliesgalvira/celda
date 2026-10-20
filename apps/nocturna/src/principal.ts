@@ -9,8 +9,10 @@ import {
   almacenDesdeConfig,
   archivoDesdeConfig,
   copiasDesdeConfig,
+  despliegueDesdeConfig,
   vercelDesdeConfig,
 } from "@celda/publicacion/configuracion";
+import { produccionEn } from "@celda/publicacion/despliegue";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
@@ -36,6 +38,7 @@ import { montarCapasEn } from "./capas.ts";
 import { clienteHttpDelRegistro } from "./conexionDelRegistro.ts";
 import { configuracion } from "./configuracion.ts";
 import { credencialesDeSystemd } from "./credenciales.ts";
+import { argumentosDelDespliegue, ordenDespliegue } from "./despliegue.ts";
 import {
   carpetaDelArchivo,
   comprobarNoche,
@@ -68,10 +71,14 @@ import { cuadrosDeBorde, pasadaDeBorde } from "./cuadros.ts";
  * - `comprobar-historial`: repite el historial de cada registro y comprueba que da lo que publica
  *   la tabla de observaciones (ADR 0027). Acaba con error si alguno no coincide.
  *
- * Y dos que no abren la base:
+ * Y tres que no abren la base:
  *
  * - `capas <carpeta>`, que monta en una carpeta la versión vigente del almacén de la configuración
  *   y las dos anteriores. La lanza el build de Vercel (ADR 0018).
+ * - `despliegue <carpeta de la web> --commit <commit> [--a-mano] [--salida <fichero>]`, que dice
+ *   si hay que desplegar en Vercel la web ya construida, porque su huella no es la que sirve
+ *   producción o porque producción no sirve lo que un build nuevo montaría desde R2. La lanza el
+ *   flujo de despliegue de GitHub (`despliegue.ts`, #78).
  * - `cuadros-de-borde <fichero>`, que pide una vez al registro oficial, con el ritmo, el
  *   `User-Agent` y el tope del extractor, cada cuadro que toca alguna provincia y no está en ninguna
  *   zona de barrido, y escribe en `<fichero>` lo que trae cada uno (`pasadaDeBorde`). Con ese
@@ -85,7 +92,7 @@ class OrdenDesconocida extends Schema.TaggedError<OrdenDesconocida>()("OrdenDesc
   orden: Schema.String,
 }) {
   override get message() {
-    return `Orden desconocida «${this.orden}». Usa «noche», «estado», «publicar», «copia», «releer-archivo», «restaurar-archivo», «comprobar-historial», «capas» o «cuadros-de-borde».`;
+    return `Orden desconocida «${this.orden}». Usa «noche», «estado», «publicar», «copia», «releer-archivo», «restaurar-archivo», «comprobar-historial», «capas», «despliegue» o «cuadros-de-borde».`;
   }
 }
 
@@ -144,6 +151,26 @@ const principal = Effect.gen(function* () {
     yield* montarCapasEn(origen, destino).pipe(
       // @effect-diagnostics-next-line strictEffectProvide:off
       Effect.provide(almacenEnCarpeta({ carpeta: destino, origen: "/capas" })),
+    );
+    return;
+  }
+  if (orden === "despliegue") {
+    const leidos = yield* argumentosDelDespliegue(argumentos);
+    const { sitio, almacen, faltan } = yield* despliegueDesdeConfig;
+    // Como la orden `capas`, monta aquí el almacén del que se lee, una vez.
+    const r2 = Option.isSome(almacen)
+      ? {
+          tipo: "cubo" as const,
+          // @effect-diagnostics-next-line strictEffectProvide:off
+          origen: yield* Effect.service(AlmacenDeFicheros).pipe(Effect.provide(almacen.value)),
+        }
+      : { tipo: "sin-clave" as const, faltan };
+    yield* ordenDespliegue(
+      { ...leidos, carpeta: (yield* Path.Path).resolve(leidos.carpeta) },
+      r2,
+    ).pipe(
+      // @effect-diagnostics-next-line strictEffectProvide:off
+      Effect.provide(produccionEn(sitio).pipe(Layer.provide(FetchHttpClient.layer))),
     );
     return;
   }

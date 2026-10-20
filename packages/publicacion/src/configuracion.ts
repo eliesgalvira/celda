@@ -99,3 +99,34 @@ export const vercelDesdeConfig = Effect.map(
       sitioEnVercel({ hook: valor, origen }).pipe(Layer.provide(FetchHttpClient.layer)),
     ),
 );
+
+/** Las cuatro variables de la clave de R2. */
+const VARIABLES_DE_R2 = [
+  "CELDA_R2_CUENTA",
+  "CELDA_R2_CUBO",
+  "CELDA_R2_ID_CLAVE",
+  "CELDA_R2_SECRETO",
+] as const;
+
+/**
+ * Lo que necesita la orden `despliegue` (`despliegue.ts`):
+ *
+ * - `CELDA_SITIO`: la URL de producción, `https://celda.elies.site`.
+ * - El almacén del que montaría las capas un build nuevo: `CELDA_ALMACEN_CARPETA`, para probar en
+ *   local, o el cubo de R2, con la clave de solo lectura del build de Vercel. Una variable de R2
+ *   vacía cuenta como que falta, porque así le llega a GitHub Actions un secreto que no está
+ *   puesto. Sin carpeta, `faltan` dice qué variables de R2 faltan.
+ */
+export const despliegueDesdeConfig = Effect.gen(function* () {
+  const sitio = yield* Config.String("CELDA_SITIO");
+  const carpeta = yield* Config.option(Config.String("CELDA_ALMACEN_CARPETA"));
+  const valores = yield* Config.all(
+    VARIABLES_DE_R2.map((variable) => Config.String(variable).pipe(Config.withDefault(""))),
+  );
+  const faltan = Option.isSome(carpeta)
+    ? []
+    : VARIABLES_DE_R2.filter((_, i) => (valores[i] ?? "") === "");
+  const almacen =
+    faltan.length === 0 ? yield* almacenDesdeConfig : Option.none<Layer.Layer<AlmacenDeFicheros>>();
+  return { sitio, almacen, faltan };
+});
