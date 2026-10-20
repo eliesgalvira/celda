@@ -30,7 +30,6 @@ describe("GLOSARIO", () => {
       "MHz",
       "4G",
       "5G",
-      "Celda",
       "Azimut",
       "Cobertura",
       "Compañía",

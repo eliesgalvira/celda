@@ -1,6 +1,6 @@
 # Celda
 
-Celda es una web pública que enseña en un mapa las antenas de telefonía móvil de España, de qué compañía son y cómo llega su señal. Tiene las de las zonas que la ingesta ya ha barrido, y de las demás dice que aún no las tiene. Barcelona solo es especial donde tiene datos propios: sus barrios y su padrón por barrio. Este glosario fija las palabras que usan la interfaz, el código y las conversaciones sobre el proyecto. Lo que la interfaz explica al tocar un término subrayado está en `packages/dominio/src/glosario.ts`, con palabras más llanas, y no puede contradecir a este glosario.
+Celda es una web pública que enseña en un mapa las antenas de telefonía móvil de España y de qué compañía son. Tiene las de las zonas que la ingesta ya ha barrido, y de las demás dice que aún no las tiene. Barcelona solo es especial donde tiene datos propios: sus barrios y su padrón por barrio. Este glosario fija las palabras que usan la interfaz, el código y las conversaciones sobre el proyecto. Lo que la interfaz explica al tocar un término subrayado está en `packages/dominio/src/glosario.ts`, con palabras más llanas, y no puede contradecir a este glosario.
 
 ## Lenguaje
 
@@ -19,28 +19,20 @@ Conjunto de equipos de una compañía en un emplazamiento.
 _Evitar_: antena, EB, eNB, gNB, nodo
 
 **Sector**:
-Porción de unos 120° alrededor de una estación base hacia la que emite una de sus antenas. Se orienta con un azimut, que ninguna fuente publica: es una estimación con ±15° de margen o, si no hay ninguna, una orientación supuesta (0°, 120° y 240°) que la interfaz dice como tal.
+Porción de unos 120° alrededor de una estación base hacia la que emite una de sus antenas. Apunta hacia un azimut que ninguna fuente publica, así que Celda no dibuja sectores ni dice cuál da servicio a un punto (ADR 0005, retirado el 20/10/2026).
 _Evitar_: cara, celda
 
 **Banda**:
 Frecuencia en MHz en la que emite una estación base. Las bajas llegan más lejos y las altas dan más velocidad.
 _Evitar_: canal, portadora, EARFCN
 
-**Celda**:
-Zona del mapa en la que un emplazamiento es el más cercano de todos, sea cual sea su compañía; con un filtro de compañías, el más cercano de los que salen con él, también los de la red usada. Es una simulación (celdas de Voronoi), no la zona a la que da servicio en la realidad.
-_Evitar_: zona de cobertura, cobertura, hexágono
-
 **Filtro de compañías**:
-Las compañías que la persona elige ver en el mapa, con los chips de «Compañías». Sin filtro se ven todas. Con él, los emplazamientos, las agrupaciones y las zonas son solo los de las compañías del filtro, y las celdas son las de estos y las de la red usada; un compartido sale si alguna de las suyas está. El dispositivo lo recuerda, como los ajustes (ADR 0026).
+Las compañías que la persona elige ver en el mapa, con los chips de «Compañías». Sin filtro se ven todas. Con él, los emplazamientos, las agrupaciones y las zonas son solo los de las compañías del filtro; un compartido sale si alguna de las suyas está. El dispositivo lo recuerda, como los ajustes (ADR 0026).
 _Evitar_: operador, filtro de operadoras, capa de compañía
 
 **Red usada**:
-La red de otra compañía a la que se conectan los clientes de una del filtro donde esta no tiene la suya: la de Movistar para DIGI y la de Orange para Yoigo. Con DIGI en el filtro y Movistar no, los emplazamientos de Movistar salen aparte, más claros, sin contar en las zonas ni en las agrupaciones. Tienen celda, también más clara.
+La red de otra compañía a la que se conectan los clientes de una del filtro donde esta no tiene la suya: la de Movistar para DIGI y la de Orange para Yoigo. Con DIGI en el filtro y Movistar no, los emplazamientos de Movistar salen aparte, más claros, sin contar en las zonas ni en las agrupaciones.
 _Evitar_: itinerancia, roaming (en la interfaz), red prestada, cobertura
-
-**Sector que da servicio**:
-Sector de un emplazamiento que da servicio a un punto de referencia: el que más señal manda en su dirección según el diagrama de sector. Es una simulación sobre la orientación de los sectores, que hoy es siempre supuesta, y no mira si otro emplazamiento queda más cerca.
-_Evitar_: celda servidora, sector servidor, mi antena
 
 **Agrupación**:
 Hexágono con un número que recoge los emplazamientos cercanos cuando se aleja el mapa: en la vista agrupada y, en las dos vistas, desde el zoom de los logos, donde varios quedan muy juntos.
@@ -162,7 +154,7 @@ _Evitar_: zona a secas (esa es la del mapa y el ejercicio), región, grupo, prov
 
 **Cuadro**:
 Cuadrado de 1° de longitud por 1° de latitud de la rejilla fija con que se recorre el listado del registro oficial. Se escribe con la esquina suroeste en grados enteros: `2,41` es el de Barcelona. Como el listado corta en 1000 registros sin avisar, un cuadro se pide por cajas que se dividen en cuatro al llegar al tope, y guarda las de la última vez.
-_Evitar_: celda (esa es la de un emplazamiento), tesela, casilla
+_Evitar_: celda, tesela, casilla
 
 ### Mapa publicado
 
@@ -229,7 +221,7 @@ _Evitar_: timestamp, sello, fecha de actualización
 ### Ubicación
 
 **Punto de referencia**:
-Punto desde el que se calculan el sector que da servicio, la distancia y el rumbo hasta la antena. Es una ubicación GPS o un punto elegido.
+Punto desde el que se calculan la distancia y el rumbo hasta cada emplazamiento. Es una ubicación GPS o un punto elegido.
 _Evitar_: tu ubicación, posición, usuario
 
 **Ubicación GPS**:
@@ -249,13 +241,13 @@ Explicación de para qué se usa la ubicación, que se calcula en el dispositivo
 _Evitar_: modal de permiso, preaviso
 
 **Rumbo**:
-Hacia dónde queda el emplazamiento visto desde el punto de referencia, en grados desde el norte. Sale de las dos posiciones, así que es de fiar aunque la orientación de los sectores sea supuesta.
+Hacia dónde queda el emplazamiento visto desde el punto de referencia, en grados desde el norte. Sale de las dos posiciones y no depende de hacia dónde apunten los sectores.
 _Evitar_: azimut (ese es el de un sector), dirección, orientación
 
 ### Mejorar la señal
 
 **Consejo**:
-Lo que Celda dice que se puede hacer para recibir mejor: hacia qué ventana poner un router 4G/5G, a qué rumbo apuntar una antena exterior y que girar el móvil en la mano apenas cambia nada. Sin punto de referencia es general; con punto, depende del rumbo, la distancia y el sector que da servicio.
+Lo que Celda dice que se puede hacer para recibir mejor: hacia qué ventana poner un router 4G/5G, a qué rumbo apuntar una antena exterior y que girar el móvil en la mano apenas cambia nada. Sin punto de referencia es general; con punto, depende del rumbo y la distancia.
 _Evitar_: recomendación, truco, optimización
 
 **Router 4G/5G**:
@@ -285,7 +277,7 @@ Medida que trae Celda para enseñar cómo funciona. No cuenta como de nadie y no
 _Evitar_: demo, medida falsa, medida simulada
 
 **Potencia de la señal**:
-Cuánta señal llega al móvil desde el sector que le da servicio, en dBm. En los textos, su nombre técnico (RSRP) va al final.
+Cuánta señal llega al móvil desde el sector al que está conectado, en dBm. En los textos, su nombre técnico (RSRP) va al final.
 _Evitar_: cobertura, intensidad, RSRP a secas
 
 **Calidad de la señal**:
@@ -340,32 +332,6 @@ _Evitar_: decisión, recomendación, voto
 Lo que impide a una identidad del dispositivo o a una huella de la IP enviar nada más, con su motivo. Lo que tenía pendiente sale marcado en la moderación. El de una huella dura lo que ella, 24 horas.
 _Evitar_: bloqueo, ban
 
-### Simulaciones
-
-**Simulación**:
-Cálculo con un modelo que da algo con aspecto de dato. Siempre se muestra marcado como modelo o simulación, con palabras llanas y sin su identificador ni su versión.
-_Evitar_: medida, predicción, estimación
-
-**Diagrama de radiación**:
-Forma típica en que un sector reparte la señal según la dirección. Es una simulación.
-_Evitar_: patrón de antena, lóbulo
-
-**Vista de interferencia**:
-Simulación de dónde se estorban las estaciones base de una misma compañía en una misma banda.
-_Evitar_: mapa de SINR, mapa de calor
-
-**Interferencia**:
-Señal de otros sectores de la misma compañía en la misma banda que llega a un punto y estorba a la del sector que le da servicio.
-_Evitar_: ruido, solapamiento
-
-**Ocupación**:
-Parte de la capacidad de la red que se supone en uso en la vista de interferencia. Al subirla empeoran los bordes entre celdas.
-_Evitar_: carga, tráfico
-
-**Señal frente a interferencia**:
-Cuánto destaca, en dB, la señal del sector que da servicio sobre la interferencia y el ruido en un punto de la vista de interferencia. Es una simulación. En los textos, su nombre técnico (SINR) va al final.
-_Evitar_: calidad de la señal (esa es la medida, RSRQ), SNR, SINR a secas
-
 ### Ejercicios
 
 **Modo estudiante**:
@@ -403,18 +369,16 @@ _Evitar_: clientes, carga
 - Una **estación base** emite en una o varias **bandas** y reparte su señal en **sectores**, normalmente tres.
 - Un **emplazamiento** de Barcelona cae en un solo **barrio**; uno de otro municipio, en ninguno.
 - Un **emplazamiento** cae en un **municipio** y en su **provincia**, o solo en una **provincia** si está en un **territorio compartido**.
-- Cada **emplazamiento** tiene una **celda**. Con un **punto de referencia**, la celda se divide en sectores y uno de ellos es el **sector que da servicio**.
-- Con un **filtro de compañías**, un **emplazamiento** es suyo si alguna de sus **compañías** está en el filtro, de la **red usada** si no tiene ninguna pero sí la red que usa una de ellas, y si no, no sale. Los suyos y los de la **red usada** tienen **celda**; solo los suyos cuentan en las **zonas** y las **agrupaciones**.
+- Con un **filtro de compañías**, un **emplazamiento** es suyo si alguna de sus **compañías** está en el filtro, de la **red usada** si no tiene ninguna pero sí la red que usa una de ellas, y si no, no sale. Solo los suyos cuentan en las **zonas** y las **agrupaciones**.
 - Una **fuente** produce **observaciones** en cada **ejecución de ingesta**. Una **corrección** es una observación.
 - La **fusión** convierte observaciones en **emplazamientos**, con su **confianza**, sus **conflictos** y su **estado**.
 - Una **zona de barrido** tiene uno o varios **cuadros**, y cada cuadro es de una sola zona. Un **barrido** recorre los cuadros de una zona y solo cuenta ausencias a las **observaciones** que caen en ellos.
 - Una **capa** sale de una instantánea de emplazamientos y tiene una **versión de capa**. La **publicación** escribe con ella la **ficha** de cada uno de sus emplazamientos. La ficha lleva además la fecha en que cambió su emplazamiento, y la **marca de agua** de cada vista deja ver si es más reciente que el mapa.
-- Una **medida propia** queda unida al emplazamiento y al sector que daban servicio donde se tomó.
+- Una **medida propia** queda unida al emplazamiento que le daba servicio donde se tomó.
 - Las **aportaciones** viven en el dispositivo hasta que la persona comparte una. Una **corrección propuesta** compartida pasa a ser **corrección** solo si la **moderación** la acepta. La **captura** y el **punto elegido** nunca se comparten.
 - Una **medida propia** compartida solo se publica dentro de un agregado, nunca suelta.
 - Una **aportación compartida** llega al **buzón** con la **identidad del dispositivo** y la **huella de la IP**. Una **corroboración** pasa por la **moderación** como una **corrección propuesta**, y cada identidad cuenta una vez por **corrección**.
 - Una **corrección** se enseña junto a la **observación** del **registro oficial** que contradice, con cuántas personas la sostienen.
-- Una **simulación** nunca es una **observación** ni una **medida**.
 - Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.
 - En la **vista de puntos** cada **emplazamiento** es un punto hasta el zoom de los logos; en la **vista agrupada**, va en una **zona** o una **agrupación** hasta que se separa. Desde el zoom de los logos las dos vistas son iguales.
 - El hexágono de una **provincia** va en su **centro visual**. Los **rótulos** de ciudad van por encima de los hexágonos de **zona**; si se pisan, se dibuja el del sitio con más habitantes y el otro sale al acercar.
@@ -424,11 +388,9 @@ _Evitar_: clientes, carga
 
 ## Ambigüedades señaladas
 
-- En telecomunicaciones, «celda» suele ser lo que aquí es un sector con su banda, y así la usaba el documento de UX v0 (`celda-ux.html`). Celda la usa como la zona de un emplazamiento. El «identificador de celda» de los datos técnicos conserva el sentido técnico, y la historia de usuario «ver la medida unida a la celda que me da servicio» se lee como unida al sector que da servicio.
-- La celda se calcula entre todos los emplazamientos, no por compañía (decidido el 26/09/2026). Desde el 04/10/2026, con un filtro de compañías, entre los que salen con el filtro, también los de la red usada (ADR 0026): son las celdas de una compañía, con la red que usa, o de las que se comparan, nunca cinco teselados a la vez. Junto a los emplazamientos de DIGI son una aproximación, porque el móvil prefiere su propia red donde la tiene. El mapa dibuja un marcador por emplazamiento, y con celdas por compañía saldrían cinco teselados superpuestos que se cruzan, justo las capas que se descartaron en los prototipos. Un móvil se conecta a las estaciones base de su compañía, así que la celda no es la zona a la que da servicio: esa pregunta, por compañía y banda, la contesta la vista de interferencia.
-- En un emplazamiento compartido cada compañía puede orientar sus sectores de otra forma. Falta decidir de qué estación base salen los tres sectores en que se divide la celda.
+- En telecomunicaciones, «celda» suele ser un sector con su banda, y así la usaba el documento de UX v0 (`celda-ux.html`). En Celda es solo el nombre de la web. Hasta el 20/10/2026 nombraba también la zona de un emplazamiento, una simulación que se retiró con el ADR 0005. El «identificador de celda» de los datos técnicos conserva el sentido técnico, y la historia de usuario «ver la medida unida a la celda que me da servicio» se lee como unida al emplazamiento que le daba servicio.
 - El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. Queda por decidir si los textos de primer uso lo aceptan como palabra de entrada.
-- Los ADR 0014 y 0015 y la investigación 08 llaman «celdas de 1°» a los cuadros y «grupos» a las zonas de barrido. Se escribieron antes de fijar estas palabras; «celda» ya era la de un emplazamiento.
+- Los ADR 0014 y 0015 y la investigación 08 llaman «celdas de 1°» a los cuadros y «grupos» a las zonas de barrido. Se escribieron antes de fijar estas palabras.
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.
 - La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer. En la interfaz, ficha es solo la del panel, con una excepción: «el registro no tiene ficha para este emplazamiento», que se dice de una estación base sin ficha en el registro.
 - Falta decidir si una marca que usa la red de otra empresa aparece como compañía. DIGI y Yoigo sí lo son, y la red que usan sale aparte con el filtro (ADR 0026).

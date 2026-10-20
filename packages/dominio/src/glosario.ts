@@ -10,9 +10,7 @@ export const TERMINOS = [
   "estacion-base",
   "compania",
   "sector",
-  "sector-que-da-servicio",
   "azimut",
-  "celda",
   "cobertura",
   "banda",
   "mhz",
@@ -30,12 +28,8 @@ export const TERMINOS = [
   "marca-de-agua",
   "modo-de-informacion",
   "identificador-de-celda",
-  "modelo",
   "punto-de-referencia",
   "precision",
-  "interferencia",
-  "ocupacion",
-  "sinr",
   "decibelio",
   "radio-de-cobertura",
   "penetracion",
@@ -69,7 +63,7 @@ export const GLOSARIO: Glosario = {
       "El sitio donde hay antenas de telefonía, como una azotea, una torre o una farola. " +
       "Varias compañías pueden compartirlo, cada una con sus propios equipos.",
     tecnico: "emplazamiento (en inglés, site)",
-    relacionados: ["estacion-base", "compania", "celda"],
+    relacionados: ["estacion-base", "compania"],
   },
   "estacion-base": {
     nombre: "Estación base",
@@ -93,34 +87,15 @@ export const GLOSARIO: Glosario = {
       "Una estación base no emite igual hacia todos lados. Reparte la señal en porciones, " +
       "casi siempre tres de unos 120 grados cada una, y cada porción tiene sus propias antenas.",
     tecnico: "sector",
-    relacionados: ["azimut", "estacion-base", "celda"],
-  },
-  "sector-que-da-servicio": {
-    nombre: "Sector que da servicio",
-    explicacion:
-      "El sector que más señal manda hacia un punto, porque su haz apunta hacia allí. Celda lo " +
-      "calcula con un modelo a partir de la dirección, así que depende de hacia dónde se supone " +
-      "que apunta cada sector.",
-    tecnico: "celda servidora (serving cell)",
-    relacionados: ["sector", "azimut", "decibelio"],
+    relacionados: ["azimut", "estacion-base"],
   },
   azimut: {
     nombre: "Azimut",
     explicacion:
       "Hacia dónde apunta un sector, en grados, como en una brújula: 0 es el norte, 90 el " +
-      "este, 180 el sur y 270 el oeste. Casi nunca se publica, así que suele ser una " +
-      "estimación con unos 15 grados de margen.",
+      "este, 180 el sur y 270 el oeste. Casi nunca se publica.",
     tecnico: "azimut",
     relacionados: ["sector"],
-  },
-  celda: {
-    nombre: "Celda",
-    explicacion:
-      "La zona del mapa en la que un emplazamiento es el más cercano, y por eso suele ser el " +
-      "que da servicio. En los libros de telecomunicaciones la palabra «celda» se usa para " +
-      "otra cosa, un sector en una banda.",
-    tecnico: "celda de Voronoi",
-    relacionados: ["emplazamiento", "sector", "cobertura"],
   },
   cobertura: {
     nombre: "Cobertura",
@@ -129,7 +104,7 @@ export const GLOSARIO: Glosario = {
       "Depende de la banda, de la distancia y de los edificios que haya en medio, así que no " +
       "tiene bordes nítidos.",
     tecnico: "área de cobertura",
-    relacionados: ["celda", "banda"],
+    relacionados: ["banda"],
   },
   banda: {
     nombre: "Banda",
@@ -263,15 +238,7 @@ export const GLOSARIO: Glosario = {
       "El número con que la red distingue cada sector en cada banda. El móvil lo enseña en " +
       "el modo de información, pero el registro oficial no lo publica.",
     tecnico: "Cell ID (ECI en 4G, NCI en 5G)",
-    relacionados: ["sector", "modo-de-informacion", "celda"],
-  },
-  modelo: {
-    nombre: "Simulación",
-    explicacion:
-      "Un cálculo que imita cómo se suele comportar la señal. Celda lo marca como simulación " +
-      "para distinguirlo de una medida.",
-    tecnico: "modelo",
-    relacionados: ["sector", "azimut"],
+    relacionados: ["sector", "modo-de-informacion"],
   },
   "punto-de-referencia": {
     nombre: "Punto de referencia",
@@ -290,39 +257,13 @@ export const GLOSARIO: Glosario = {
     tecnico: "precisión horizontal del GPS",
     relacionados: ["punto-de-referencia"],
   },
-  interferencia: {
-    nombre: "Interferencia",
-    explicacion:
-      "La señal de otras antenas que llega a tu móvil y dificulta recibir la que le da " +
-      "servicio. Solo interfieren las de la misma compañía en la misma banda.",
-    tecnico: "interferencia cocanal (reutilización 1)",
-    relacionados: ["sinr", "ocupacion", "banda"],
-  },
-  ocupacion: {
-    nombre: "Ocupación de la red",
-    explicacion:
-      "Qué parte de la capacidad de la red se está usando. Con mucha gente conectada, las " +
-      "antenas vecinas emiten más e interfieren más entre sí, sobre todo en los bordes entre " +
-      "celdas.",
-    tecnico: "carga de la celda",
-    relacionados: ["interferencia", "sinr"],
-  },
-  sinr: {
-    nombre: "Señal frente a interferencia",
-    explicacion:
-      "Cuánto destaca la señal que da servicio sobre la interferencia y el ruido, en dB. " +
-      "Por encima de 20 dB la señal llega limpia, y por debajo de 0 dB la interferencia es " +
-      "más fuerte que la señal.",
-    tecnico: "SINR (relación señal a interferencia más ruido)",
-    relacionados: ["interferencia", "ocupacion", "modelo"],
-  },
   decibelio: {
     nombre: "Decibelio",
     explicacion:
       "La unidad con que se compara la señal. Perder 3 dB es quedarse con la mitad y perder " +
       "10 dB, con la décima parte. Por eso unos pocos dB ya se notan.",
     tecnico: "decibelio (dB)",
-    relacionados: ["sector-que-da-servicio"],
+    relacionados: [],
   },
   "radio-de-cobertura": {
     nombre: "Radio de cobertura",
