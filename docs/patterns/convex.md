@@ -341,9 +341,32 @@ pnpm --filter @celda/nocturna run capas <carpeta vacía>
 
 Lee del almacén de la configuración, el cubo de R2 por la API S3 (en Vercel, con una clave de solo lectura) o `CELDA_ALMACEN_CARPETA`. Monta la versión vigente y los ficheros de las dos anteriores, según sus manifiestos (`ANTERIORES_EN_VERCEL` en `packages/publicacion/src/vercel.ts`), para que una pestaña abierta con un `vigente.json` viejo siga encontrando sus provincias y sus lotes. Comprueba la huella de cada fichero nombrado por su contenido, reintenta tres veces un fallo del almacén y escribe `vigente.json` el último; si falta algo, falla sin escribirlo, y Vercel sigue sirviendo el despliegue anterior. Una versión posterior a la vigente, que puede ser otra publicación a medias, no se monta.
 
-Tras publicar, la noche y `pnpm run ingesta publicar` comparan el `vigente.json` del almacén con el que sirve Vercel en `CELDA_ALMACEN_ORIGEN` (`https://celda.elies.site/capas`) y, si no coinciden o Vercel no contesta, llaman al deploy hook (`CELDA_VERCEL_DEPLOY_HOOK`). Sin el hook no lanzan ningún build. El diario lo dice en los dos casos.
+Tras publicar, la noche y `pnpm run ingesta publicar` comparan el `vigente.json` del almacén con el que sirve Vercel en `CELDA_ALMACEN_ORIGEN` (`https://celda.elies.site/capas`) y, si no coinciden o Vercel no contesta, llaman al deploy hook (`CELDA_VERCEL_DEPLOY_HOOK`). Sin el hook no lanzan ningún build. El diario lo dice en los dos casos. En producción no hay hook, y despliega el flujo de GitHub de abajo.
 
 Las pruebas están en `apps/nocturna/src/vercel.test.ts`, con un Vercel de mentira que construye cada despliegue con la misma orden: que monta la vigente y las dos anteriores y nada de la cuarta, que una pestaña con cualquiera de los resúmenes que ha servido encuentra sus provincias, sus lotes y su índice de claves, que falta un fichero de la vigente o de una anterior y el build falla sin `vigente.json`, y que `vigente.json` es lo último que escribe. Qué pone quien administra las cuentas de R2 y Vercel: [nixos.md](nixos.md#las-cuentas-de-r2-y-vercel).
+
+### Cuándo se despliega
+
+Despliega un flujo de GitHub Actions, `.github/workflows/celda-despliegue.yml`, con la CLI de Vercel (ADR 0018, «Cómo quedó el despliegue»). Cada despliegue lleva la web, unos 6 MB en 72 ficheros, y las capas, que son lo que pesa, con unos 104 MB y 375 ficheros de la versión vigente (medido el 20/10/2026) y lo que cambió en las dos anteriores. Por eso solo se despliega con una de dos señales de cambio:
+
+- **La web.** La huella de lo que construye `pnpm run build` en `apps/web/dist`, junto con `vercel.json` y `scripts/vercel.sh`, no es la que sirve producción en `/despliegue.json`. No cuentan `dist/capas` ni `dist/despliegue.json`. Un cambio en la documentación, la ingesta, Nix, una prueba o un comentario no despliega si no cambia lo construido.
+- **Los datos.** Producción no sirve, byte a byte, el `vigente.json` de R2 y los manifiestos de la vigente y de las anteriores que montaría un build nuevo. Una versión nueva o un barrido nuevo con los mismos datos, que trae otro resumen nacional, cambian la señal.
+
+Una señal que no se puede saber, porque producción no tiene `/despliegue.json`, R2 o Vercel no contestan o faltan las variables de R2, cuenta como un cambio. El flujo mira las dos señales cada día a las 08:00 UTC, así que una versión nueva se despliega sola como mucho un día después, y también tras la integración continua en verde de un push a `celda/v1`. «Run workflow» despliega siempre, para lo que no ve ninguna señal, como un cambio en las variables del proyecto de Vercel.
+
+Las mira la orden `despliegue`, que no despliega nada. El flujo la lanza con la web ya construida, y con `--salida "$GITHUB_OUTPUT"` le deja `desplegar` (`si` o `no`), `despliegue`, que es el JSON de `/despliegue.json`, y `motivo`. Si despliega, se lo pasa al build de Vercel en `CELDA_DESPLIEGUE`, y `vercel.sh` lo escribe en `dist/despliegue.json`. Para probarla en local contra producción, con una carpeta que haga de R2:
+
+```sh
+pnpm run build
+CELDA_SITIO=https://celda.elies.site CELDA_ALMACEN_CARPETA=<carpeta publicada> \
+  pnpm --filter @celda/nocturna run despliegue "$PWD/apps/web" --commit "$(git rev-parse HEAD)"
+```
+
+Escribe una frase por cada señal y otra con la decisión. Con `--a-mano` decide desplegar aunque no cambie nada. En el flujo, R2 se lee con los secretos `CELDA_R2_CUENTA`, `CELDA_R2_CUBO`, `CELDA_R2_ID_CLAVE` y `CELDA_R2_SECRETO`, los de la clave de solo lectura del build de Vercel; un secreto que no está llega vacío y cuenta como que falta.
+
+Desde el 20/10/2026, Vercel guarda los despliegues 1 día en todos los estados, para todo el equipo, y Hobby guarda siempre los 3 últimos de producción. Lo puso el usuario en el panel de Vercel. Con la ingesta mensual, los despliegues guardados quedan en unos pocos cientos de MB de los 10 GB de Hobby.
+
+`packages/publicacion/src/despliegue.test.ts` prueba qué cuenta como web. Cada fichero de `dist`, uno nuevo, uno que ya no está, `vercel.json` y `vercel.sh` cambian la huella, y las capas montadas, `despliegue.json`, el código y las pruebas de la web, `package.json`, `sitio.sh`, la documentación, la ingesta y Nix no la cambian si no cambia lo construido. Prueba también la señal de la web, la decisión con cada combinación de señales y lo que la orden deja al flujo. `apps/nocturna/src/despliegue.test.ts` publica noches de verdad con la muestra del Campus Nord y despliega en un Vercel de mentira. Comprueba que sin cambios no despliega y dice por qué, que un barrido nuevo y una versión nueva se despliegan una vez cada uno, que un cambio en lo construido despliega y uno en el código que no lo cambia no despliega, que despliega si producción no tiene una versión anterior que el build montaría, que sin la clave de R2, con R2 caído o roto y con producción caída despliega y dice por qué, y que a mano despliega siempre.
 
 ### Vista previa
 

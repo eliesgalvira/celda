@@ -134,7 +134,7 @@ CELDA_PUBLICACION_CLAVE=la-misma-que-en-el-despliegue
 
 La clave es la clave de publicación, la variable `CELDA_PUBLICACION_CLAVE` del despliegue ([convex.md](convex.md#antes-del-primer-despliegue-del-buzón)). Solo abre la acción HTTP que da lo aceptado para publicar, sin identidades ni huellas de IP. **Nunca pongas aquí una clave de despliegue de Convex**: lo puede todo (desplegar código, leer todas las aportaciones y las huellas, vetar), y esta máquina no la necesita. La clave de despliegue se queda en el portátil de quien modera. Con la de publicación, cada noche lee lo aceptado en la moderación desde la última vez y lo publica en las fichas ([convex.md](convex.md#moderar)). El diario dice «Buzón de Convex: N aceptadas leídas, M nuevas» o, si Convex no contesta, que no está disponible y que la noche publica lo demás. Sin el fichero, la comunidad queda apagada.
 
-Con el hook y `origenPublico`, la noche compara tras publicar el `vigente.json` de R2, leído por la API S3, con el que sirve Vercel en `origenPublico` y, si no coinciden, llama al hook. El build de Vercel monta entonces las capas desde R2 (ADR 0018). El diario lo dice en los dos casos: «Vercel no sirve sitios@…: build lanzado» o «Vercel ya sirve sitios@…: no hace falta otro build». Sin `origenPublico`, llama al hook en cada noche.
+Con el hook y `origenPublico`, la noche compara tras publicar el `vigente.json` de R2, leído por la API S3, con el que sirve Vercel en `origenPublico` y, si no coinciden, llama al hook. El build de Vercel monta entonces las capas desde R2 (ADR 0018). El diario lo dice en los dos casos: «Vercel no sirve sitios@…: build lanzado» o «Vercel ya sirve sitios@…: no hace falta otro build». Sin `origenPublico`, llama al hook en cada noche. En producción no hay hook ni `credenciales.vercel`. Despliega un flujo de GitHub, que mira por su cuenta si R2 tiene una versión que Vercel no sirve (abajo, «Las cuentas de R2 y Vercel»).
 
 ### Opciones
 
@@ -250,7 +250,29 @@ Desde el ADR 0018, R2 es un almacén privado y la web, las capas y las fichas se
    | `CELDA_R2_SECRETO` | el Secret Access Key de la clave de solo lectura |
 
    Borra `VITE_CAPAS_ORIGEN` y `VITE_CAPAS_RESERVA` si están: la web ya no las lee y `vercel.sh` construye sin ellas. Sin las cuatro de R2, el build falla y Vercel sigue sirviendo el despliegue anterior.
-2. El deploy hook solo existe con el proyecto conectado a Git (Settings → Git → Connect Git Repository, rama de producción). Conectado, crea un hook de la rama de producción (Settings → Git → Deploy Hooks) y guárdalo en la máquina de la ingesta como `credenciales.vercel`. La otra opción del ADR 0018, desplegar con la CLI desde la noche, no está hecha.
+2. El proyecto no está conectado a Git ni tiene deploy hook. Despliega el flujo de GitHub Actions de abajo, con la CLI de Vercel (ADR 0018, «Cómo quedó el despliegue»). Si un día se conecta, el hook de la rama de producción (Settings → Git → Deploy Hooks) se guarda en la máquina de la ingesta como `credenciales.vercel`.
+3. Desde el 20/10/2026, la retención de los despliegues es de 1 día para todos los estados, puesta en el panel de Vercel para todo el equipo. Hobby guarda siempre los 3 últimos despliegues de producción.
+
+**En GitHub**, en los secretos del repositorio del flujo de despliegue (`.github/workflows/celda-despliegue.yml`):
+
+| Secreto | Valor |
+|---|---|
+| `VERCEL_TOKEN` | un token de Vercel con el alcance del equipo del proyecto |
+| `CELDA_R2_CUENTA` | el identificador de la cuenta de Cloudflare, como en Vercel |
+| `CELDA_R2_CUBO` | el nombre del cubo, como en Vercel |
+| `CELDA_R2_ID_CLAVE` | el Access Key ID de la clave de solo lectura, la misma de Vercel |
+| `CELDA_R2_SECRETO` | el Secret Access Key de esa clave |
+
+Con las cuatro de R2, el flujo lee qué versión tiene R2 y solo despliega si producción no la sirve o si la web ha cambiado. Sin ellas, despliega en cada ejecución y su registro dice cuáles faltan. Se ponen desde una copia del repositorio, y `gh` pide cada valor sin escribirlo en pantalla:
+
+```sh
+gh secret set CELDA_R2_CUENTA
+gh secret set CELDA_R2_CUBO
+gh secret set CELDA_R2_ID_CLAVE
+gh secret set CELDA_R2_SECRETO
+```
+
+Vercel no enseña las variables marcadas como «Sensitive». Si no se guardaron los valores de la clave al crearla, crea otra clave de solo lectura en Cloudflare y ponla en Vercel y en GitHub. El flujo nunca escribe en R2.
 
 **En la máquina de la ingesta:** `origenPublico = "https://celda.elies.site/capas";`, sin `origenDeReserva`, que ya no existe y da un error que lo explica.
 
