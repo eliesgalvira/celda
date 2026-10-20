@@ -16,6 +16,7 @@ import {
 import { FUENTE_HUECOS, fuenteHuecos } from "./huecos.ts";
 import { capasInterferencia, FUENTE_INTERFERENCIA } from "./interferencia.ts";
 import { capasLimites, FUENTE_LIMITES } from "./limites.ts";
+import { capasLineaAlPunto, FUENTE_LINEA_AL_PUNTO } from "./lineaAlPunto.ts";
 import { capasPuntoElegido, capasPuntos, fuentesPuntos } from "./puntos.ts";
 import {
   capasRotulos,
@@ -23,12 +24,6 @@ import {
   LETRAS_DE_LEJOS,
   MUNICIPIOS_DE_CELDA,
 } from "./rotulos.ts";
-import {
-  capasServicioDebajo,
-  capasServicioEncima,
-  FUENTE_SERVICIO,
-  FUENTE_SERVICIO_LINEA,
-} from "./servicio.ts";
 import { capasSilueta, fuentesSilueta } from "./silueta.ts";
 import { capasSuelo } from "./suelo.ts";
 import { type ColorDeToken, TOKENS_MAPA } from "./tokens.ts";
@@ -72,7 +67,7 @@ export const estadoDelEstilo = (): NonNullable<StyleSpecification["state"]> => (
 
 /**
  * Las fuentes de lo que pinta Celda sobre el mapa base: la foto aérea, el edificio resaltado, las
- * celdas, el sector que da servicio, la vista de interferencia, la zona del ejercicio, los límites
+ * celdas, la línea hasta el punto de referencia, la vista de interferencia, la zona del ejercicio, los límites
  * de comunidades y provincias, los huecos de los marcadores (ADR 0024) y los puntos de la vista de
  * puntos (ADR 0028), vacías hasta que la web las llena.
  */
@@ -80,8 +75,7 @@ export const fuentesDeCelda = (): StyleSpecification["sources"] => ({
   [FUENTE_FOTO]: fuenteFoto(),
   [FUENTE_EDIFICIO]: fuenteEdificio(),
   [FUENTE_CELDAS]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-  [FUENTE_SERVICIO]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-  [FUENTE_SERVICIO_LINEA]: {
+  [FUENTE_LINEA_AL_PUNTO]: {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
   },
@@ -97,8 +91,8 @@ export const fuentesDeCelda = (): StyleSpecification["sources"] => ({
 
 /**
  * Las capas de Celda que van entre las vías y los rótulos del mapa base: la vista de interferencia,
- * el sector que da servicio, las celdas, la zona del ejercicio, el edificio resaltado y, encima,
- * los puntos de la vista de puntos.
+ * las celdas, la línea hasta el punto de referencia, la zona del ejercicio, el edificio resaltado
+ * y, encima, los puntos de la vista de puntos.
  */
 export const capasDeCelda = (color: ColorDeToken): ReadonlyArray<LayerSpecification> => [
   ...capasInterferencia([
@@ -109,9 +103,8 @@ export const capasDeCelda = (color: ColorDeToken): ReadonlyArray<LayerSpecificat
     color("mapa-sinr-5"),
     color("mapa-sinr-6"),
   ]),
-  ...capasServicioDebajo(color("mapa-celda")),
   ...capasCeldas(color("mapa-celda"), color("mapa-foto-linea")),
-  ...capasServicioEncima(color("mapa-celda"), color("mapa-referencia")),
+  ...capasLineaAlPunto(color("mapa-referencia")),
   ...capasZona(color("mapa-referencia")),
   ...capasEdificio(color),
   ...capasPuntos(color("mapa-punto"), color("mapa-foto-linea")),

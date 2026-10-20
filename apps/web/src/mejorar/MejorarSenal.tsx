@@ -19,8 +19,6 @@ import * as Stream from "effect/Stream";
 import { createMemo, createSignal, For, Match, Show, Switch, useContext } from "solid-js";
 
 import { type ServiciosDeDatos, usarDatos } from "../datos.tsx";
-import { ServicioContexto } from "../servicio/enMapa.ts";
-import { lecturaDe } from "../servicio/servicio.ts";
 import { UbicacionContexto } from "../ubicacion/controlador.ts";
 import { posicionDe } from "../ubicacion/estado.ts";
 import { puedePedirUbicacion } from "../ubicacion/Ubicacion.tsx";
@@ -124,26 +122,18 @@ const crearBrujula = (
  * 4G/5G y a qué rumbo apuntar una antena exterior, con la brújula del móvil o, en un ordenador,
  * con la barra que simula el giro.
  */
-export function MejorarSenal(props: {
-  readonly clave: string;
-  readonly emplazamiento: Coordenada;
-}) {
+export function MejorarSenal(props: { readonly emplazamiento: Coordenada }) {
   const control = useContext(UbicacionContexto);
-  const servicio = useContext(ServicioContexto);
   const brujula = crearBrujula(usarDatos());
 
   const textos = createMemo(() => {
     const referencia = control.referencia();
     if (referencia === undefined) return consejos(undefined);
     const desde = posicionDe(referencia);
-    const calculado = servicio.calculado();
     return consejos({
       tipo: referencia.tipo,
       distancia: distanciaMetros(desde, props.emplazamiento),
       rumbo: rumboGrados(desde, props.emplazamiento),
-      servicio:
-        calculado?.pedido.clave === props.clave ? lecturaDe(calculado.resultado) : undefined,
-      orientacion: servicio.orientacion,
     });
   });
 

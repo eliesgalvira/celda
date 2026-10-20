@@ -1,6 +1,5 @@
 import {
   CapaDeReferencia,
-  EtiquetaReferencia,
   PuntoElegido,
   UbicacionGps,
 } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
@@ -8,15 +7,9 @@ import { recurso } from "@celda/ui/recurso.ts";
 import type { Map as MapaMapLibre } from "maplibre-gl";
 import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js";
 
-import { ServicioContexto } from "../servicio/enMapa.ts";
-import { lecturaDe } from "../servicio/servicio.ts";
-import { textosServicio } from "../servicio/textos.ts";
 import { UbicacionContexto } from "./controlador.ts";
 import { posicionDe } from "./estado.ts";
 import { textoPrecision } from "./textos.ts";
-
-/** Lo que ocupa a un lado del punto la etiqueta con la distancia y el sector, en píxeles. */
-const SITIO_ETIQUETA = 200;
 
 /** Metros de un grado de latitud: basta para dibujar el círculo de precisión. */
 const METROS_POR_GRADO = 111_320;
@@ -25,17 +18,11 @@ export interface ReferenciaEnMapaProps {
   readonly mapa: MapaMapLibre;
   /** En escritorio el punto elegido se arrastra; en el móvil el dedo mueve el mapa. */
   readonly escritorio: boolean;
-  /**
-   * Si junto al punto va la distancia y el sector que da servicio. La vista de interferencia la
-   * quita, igual que quita el degradado y la línea.
-   */
-  readonly conEtiqueta: boolean;
 }
 
 /** El punto de referencia sobre el mapa: la ubicación GPS con su precisión o el punto elegido. */
 export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
   const control = useContext(UbicacionContexto);
-  const servicio = useContext(ServicioContexto);
   const [fotograma, setFotograma] = createSignal(0);
 
   // El punto se recoloca en cada `move`, en el fotograma en que se mueve el mapa (`seguirVista`).
@@ -70,40 +57,6 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
     };
   });
 
-  /**
-   * La distancia y el sector que da servicio junto al punto, con un emplazamiento seleccionado.
-   * Va al lado contrario del emplazamiento, para no tapar la línea que los une.
-   */
-  const etiqueta = createMemo(() => {
-    const referencia = control.referencia();
-    const calculado = servicio.calculado();
-    if (!props.conEtiqueta || referencia === undefined || calculado === undefined) {
-      return undefined;
-    }
-    const lectura = lecturaDe(calculado.resultado);
-    if (lectura === undefined) return undefined;
-    const texto = textosServicio(lectura, referencia.tipo, servicio.orientacion).enMapa;
-    // Hacia dónde queda el emplazamiento visto desde el punto, en la pantalla.
-    const radianes = (lectura.rumbo * Math.PI) / 180;
-    return { texto, alEste: Math.sin(radianes) < 0, alNorte: Math.cos(radianes) < 0 };
-  });
-
-  /**
-   * A qué lado del punto va la etiqueta: al contrario del emplazamiento, para no tapar la línea
-   * que los une. Si a ese lado no cabe (los controles ocupan el borde derecho), va arriba o abajo,
-   * también lejos del emplazamiento.
-   */
-  const ladoEtiqueta = (
-    x: number,
-    hacia: { readonly alEste: boolean; readonly alNorte: boolean },
-  ): "izquierda" | "derecha" | "arriba" | "abajo" => {
-    const ancho = props.mapa.getContainer().clientWidth;
-    const lado = hacia.alEste ? "izquierda" : "derecha";
-    const cabe = lado === "derecha" ? x < ancho - SITIO_ETIQUETA : x > SITIO_ETIQUETA;
-    if (cabe) return lado;
-    return hacia.alNorte ? "abajo" : "arriba";
-  };
-
   return (
     <Show when={enPantalla()}>
       {(actual) => (
@@ -135,16 +88,6 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
               />
             </Match>
           </Switch>
-          <Show when={etiqueta()}>
-            {(texto) => (
-              <EtiquetaReferencia
-                x={actual().x}
-                y={actual().y}
-                texto={texto().texto}
-                lado={ladoEtiqueta(actual().x, texto())}
-              />
-            )}
-          </Show>
         </CapaDeReferencia>
       )}
     </Show>

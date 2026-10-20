@@ -1,7 +1,7 @@
 import type { ExpressionSpecification, LayerSpecification } from "maplibre-gl";
 
 import { ocultarCeldasSalvoContorno } from "./celdas.ts";
-import { CAPAS_SERVICIO } from "./servicio.ts";
+import { FUENTE_LINEA_AL_PUNTO } from "./lineaAlPunto.ts";
 
 /**
  * Cómo se dibuja la vista de interferencia, como en el prototipo v8: una trama de hexágonos
@@ -68,13 +68,11 @@ export interface MapaConInterferencia {
 
 /**
  * Enseña u oculta la trama. Con ella a la vista, las celdas se ocultan y la del emplazamiento
- * seleccionado queda como contorno discontinuo, sin el degradado del sector que da servicio ni la
- * línea hasta el punto, como en el prototipo v8.
+ * seleccionado queda como contorno discontinuo, sin la línea hasta el punto, como en el prototipo
+ * v8.
  */
 export const mostrarInterferencia = (mapa: MapaConInterferencia, activa: boolean): void => {
   mapa.setLayoutProperty(CAPA_INTERFERENCIA, "visibility", activa ? "visible" : "none");
   ocultarCeldasSalvoContorno(mapa, activa);
-  for (const capa of CAPAS_SERVICIO) {
-    mapa.setLayoutProperty(capa, "visibility", activa ? "none" : "visible");
-  }
+  mapa.setLayoutProperty(FUENTE_LINEA_AL_PUNTO, "visibility", activa ? "none" : "visible");
 };

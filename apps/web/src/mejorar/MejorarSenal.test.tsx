@@ -150,11 +150,10 @@ describe("mejorar la señal: consejos", () => {
       seccion().getByText(/^Desde el punto/u).textContent ?? "",
       /queda hacia el noreste/u,
     );
-    assert.match(
-      seccion()
-        .getByText(/de los sectores es supuesta/u)
-        .closest("p")?.textContent ?? "",
-      /Toma el rumbo como punto de partida/u,
+    assert.isNotNull(
+      seccion().getByText(
+        "Toma el rumbo como punto de partida y ajusta mirando la señal del router.",
+      ),
     );
   });
 });

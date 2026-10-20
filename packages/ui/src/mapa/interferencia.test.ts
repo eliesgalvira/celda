@@ -84,11 +84,8 @@ describe("capa de la vista de interferencia", () => {
       "celda-seleccionada": "none",
       "celda-seleccionada-casco": "none",
       "celda-seleccionada-contorno": "visible",
-      // El degradado del sector que da servicio, sus límites y la línea al punto se apartan.
-      "servicio-sectores": "none",
-      "servicio-degradado": "none",
-      "servicio-cortes": "none",
-      "servicio-linea": "none",
+      // La línea al punto se aparta.
+      "linea-al-punto": "none",
     });
 
     mostrarInterferencia(mapa, false);
@@ -101,10 +98,7 @@ describe("capa de la vista de interferencia", () => {
       "celda-seleccionada": "visible",
       "celda-seleccionada-casco": "visible",
       "celda-seleccionada-contorno": "none",
-      "servicio-sectores": "visible",
-      "servicio-degradado": "visible",
-      "servicio-cortes": "visible",
-      "servicio-linea": "visible",
+      "linea-al-punto": "visible",
     });
   });
 });

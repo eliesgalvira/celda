@@ -12,7 +12,6 @@ import {
 import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { MenuUbicacion, OpcionUbicacion } from "@celda/ui/ubicacion/MenuUbicacion.tsx";
-import { LecturaServicio } from "@celda/ui/ubicacion/LecturaServicio.tsx";
 import { AccionesPasoPrevio, ListaPasoPrevio } from "@celda/ui/ubicacion/PasoPrevio.tsx";
 import {
   ConReferencia,
@@ -27,9 +26,6 @@ import * as Option from "effect/Option";
 import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid-js";
 
 import { usarDatos } from "../datos.tsx";
-import { ServicioContexto } from "../servicio/enMapa.ts";
-import { lecturaDe } from "../servicio/servicio.ts";
-import { notaServicio, textosServicio } from "../servicio/textos.ts";
 import {
   BuscadorDeDirecciones,
   type BusquedaFallida,
@@ -418,15 +414,10 @@ export function EleccionConBuscador(props: EleccionConBuscadorProps) {
 
 /**
  * El punto de referencia en la ficha de un emplazamiento. Sin punto, explica qué se ganaría y
- * cómo darlo; con punto, desde dónde se mira, qué sector le da servicio y a qué distancia y rumbo
- * queda el emplazamiento.
+ * cómo darlo; con punto, desde dónde se mira y a qué distancia y rumbo queda el emplazamiento.
  */
-export function ReferenciaEnFicha(props: {
-  readonly clave: string;
-  readonly emplazamiento: Coordenada;
-}) {
+export function ReferenciaEnFicha(props: { readonly emplazamiento: Coordenada }) {
   const control = useContext(UbicacionContexto);
-  const servicio = useContext(ServicioContexto);
   const estado = () => control.ubicacion().estado;
   const sinPunto = createMemo(() => {
     const actual = asentado(estado());
@@ -501,11 +492,6 @@ export function ReferenciaEnFicha(props: {
                 tipo={referencia().tipo}
                 desde={<TextoConTerminos texto={textos().desde} />}
                 relacion={textos().relacion}
-                servicio={
-                  servicio.pedido()?.clave === props.clave ? (
-                    <ServicioEnFicha clave={props.clave} tipo={referencia().tipo} />
-                  ) : undefined
-                }
                 margen={(() => {
                   const margen = textos().margen;
                   return margen === undefined ? undefined : <TextoConTerminos texto={margen} />;
@@ -526,36 +512,5 @@ export function ReferenciaEnFicha(props: {
         </Match>
       </Switch>
     </SeccionReferencia>
-  );
-}
-
-/**
- * El sector que da servicio al punto de referencia (historia 30): tres casillas, la frase que lo
- * explica y la marca de modelo. Mientras llega el primer cálculo, su sitio queda reservado; al
- * arrastrar el punto se ve el anterior hasta que llega el nuevo.
- */
-function ServicioEnFicha(props: { readonly clave: string; readonly tipo: "gps" | "elegido" }) {
-  const servicio = useContext(ServicioContexto);
-  const textos = createMemo(() => {
-    const calculado = servicio.calculado();
-    if (calculado?.pedido.clave !== props.clave) return undefined;
-    const lectura = lecturaDe(calculado.resultado);
-    return lectura === undefined
-      ? undefined
-      : textosServicio(lectura, props.tipo, servicio.orientacion);
-  });
-  const veredicto = createMemo(() => {
-    const actual = textos();
-    if (actual !== undefined) return <TextoConTerminos texto={actual.veredicto} />;
-    return servicio.fallo()
-      ? "No se ha podido calcular. Mueve el punto o recarga la página."
-      : undefined;
-  });
-  return (
-    <LecturaServicio
-      datos={textos()?.datos}
-      veredicto={veredicto()}
-      nota={<TextoConTerminos texto={textos()?.nota ?? notaServicio(servicio.orientacion)} />}
-    />
   );
 }

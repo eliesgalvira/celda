@@ -22,6 +22,7 @@ import { IconoFotoAerea } from "@celda/ui/foto/FotoAerea.tsx";
 import { IconoListaDeEmplazamientos, IconoVistaAgrupada } from "@celda/ui/puntos/Puntos.tsx";
 import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
 import { ZOOM_FOTO } from "@celda/ui/mapa/foto.ts";
+import { FUENTE_LINEA_AL_PUNTO } from "@celda/ui/mapa/lineaAlPunto.ts";
 import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
 import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
@@ -108,7 +109,6 @@ import {
   PISTA_SIN_CONTORNO,
 } from "../foto/enMapa.ts";
 import { aPieDeCalle, CREDITO_FOTO_AEREA, pideVerFoto } from "../foto/foto.ts";
-import { orientacionDe } from "../ficha/diagrama.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
 import { type FichaPedida, FichasPublicadas } from "../ficha/servicio.ts";
 import {
@@ -125,8 +125,6 @@ import {
   ZOOM_INTERFERENCIA,
 } from "../interferencia/interferencia.ts";
 import { VistaInterferencia } from "../interferencia/VistaInterferencia.tsx";
-import { crearServicio, lienzoDeServicio, ServicioContexto } from "../servicio/enMapa.ts";
-import { celdaDe } from "../servicio/servicio.ts";
 import {
   ajustesAbiertos,
   conAjustes,
@@ -150,6 +148,7 @@ import { detectarDispositivo } from "../medir/dispositivo.ts";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
 import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
 import { posicionDe } from "../ubicacion/estado.ts";
+import { lineaAlPunto } from "../ubicacion/lineaAlPunto.ts";
 import { ReferenciaEnMapa } from "../ubicacion/ReferenciaEnMapa.tsx";
 import {
   AvisosDeUbicacion,
@@ -1225,23 +1224,16 @@ export function PantallaMapa() {
     ) : undefined,
   );
 
-  // Ninguna fuente publica hacia dónde apuntan los sectores: la orientación es la supuesta.
-  const servicio = crearServicio(datos, {
-    lienzo: createMemo(() => {
-      const actual = mapaListo();
-      return actual === undefined ? undefined : lienzoDeServicio(actual);
+  // La línea del emplazamiento seleccionado al punto de referencia sigue al punto mientras se mueve.
+  createEffect(
+    () => ({
+      actual: mapaListo(),
+      linea: lineaAlPunto(posicionSeleccionada(), posicionDeReferencia()),
     }),
-    emplazamiento: createMemo(() => {
-      const clave = seleccionada();
-      const emplazamiento = emplazamientos().find((e) => e.clave === clave);
-      return emplazamiento === undefined
-        ? undefined
-        : { clave: emplazamiento.clave, posicion: emplazamiento.posicion };
-    }),
-    punto: posicionDeReferencia,
-    celda: (clave) => celdaDe(celdas.calculadas(), clave),
-    orientacion: orientacionDe([]),
-  });
+    ({ actual, linea }) => {
+      actual?.getSource<GeoJSONSource>(FUENTE_LINEA_AL_PUNTO)?.setData(linea);
+    },
+  );
   /** Con un emplazamiento seleccionado a pie de calle, la pista ofrece la foto aérea. */
   const conPistaDeFoto = createMemo(() =>
     pideVerFoto({
@@ -1400,288 +1392,280 @@ export function PantallaMapa() {
   return (
     <AjustesContexto value={ajustes}>
       <UbicacionContexto value={puntoDeReferencia}>
-        <ServicioContexto value={servicio}>
-          <FotoContexto value={foto}>
-            <DisposicionMapa
-              nombre={`Mapa de ${ESPANA.nombre}`}
-              ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
-              lienzo={(elemento) => {
-                contenedor = elemento;
-              }}
-              cabecera={<Cabecera lugar={lugares.nombre()} cuenta={cuenta()} />}
-              datos={
-                <EstadoDeLaCapa
-                  estado={capa()}
-                  vista={estadoVista()}
-                  emplazamientos={resumen()?.provincias.reduce((n, p) => n + p.emplazamientos, 0)}
-                  donde={donde()}
-                  puntos={vistaElegida() === "puntos" ? puntos()?.tipo : undefined}
-                  reintentarPuntos={() => setIntentoDePuntos((n) => n + 1)}
-                  reintentar={cargarCapa}
-                  reintentarProvincias={reintentarProvincias}
-                />
-              }
-              carga={
-                estado().tipo === "cargando" ? (
-                  <CargaDelMapa texto="Cargando el mapa…" />
-                ) : undefined
-              }
-              filtro={
-                <AvisoDelFiltro
-                  filtro={filtro.aplicado()}
-                  deLejosSinFiltrar={deLejosSinFiltrar()}
-                  alQuitar={() => filtro.elegir([])}
-                />
-              }
-              ubicacion={
-                <>
-                  <AvisosDeUbicacion panelAbierto={panelAbierto()} cobertura={resumen()} />
-                  <Show when={eligiendo()}>
-                    <EleccionConBuscador
-                      alUsarCentro={usarCentro}
-                      alIrA={irA}
-                      encuadre={encuadre()}
-                    />
-                  </Show>
-                </>
-              }
-              eligiendo={eligiendo()}
-              pinCentral={<PinCentral />}
-              dialogo={<PasoPrevio />}
-              marcadores={
-                <Show when={mapaCreado()}>
-                  {(actual) => (
-                    <>
-                      <Show when={resumen()}>
-                        {(leido) => (
-                          <Marcadores
-                            mapa={actual()}
-                            resumen={leido()}
-                            provincias={provincias()}
-                            filtro={filtro.aplicado()}
-                            agrupaciones={filtro.agrupaciones()}
-                            seleccionada={seleccionada()}
-                            alSeleccionar={seleccionar}
-                            alVer={precargarFichas}
-                            alCambiarVista={alCambiarVista}
-                            lectorDeRotulos={lectorDeRotulos()}
-                            conFoto={foto.seVe()}
-                            conMarcadores={conMarcadores()}
-                            vista={vistaDibujada()}
-                            puntos={puntosListos()?.puntos}
-                            alApagarPuntos={setPuntosApagados}
-                            alTaparPuntos={setPuntosTapados}
-                          />
-                        )}
-                      </Show>
-                      <ReferenciaEnMapa
-                        mapa={actual()}
-                        escritorio={escritorio()}
-                        conEtiqueta={!vistaActiva()}
-                      />
-                    </>
-                  )}
+        <FotoContexto value={foto}>
+          <DisposicionMapa
+            nombre={`Mapa de ${ESPANA.nombre}`}
+            ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
+            lienzo={(elemento) => {
+              contenedor = elemento;
+            }}
+            cabecera={<Cabecera lugar={lugares.nombre()} cuenta={cuenta()} />}
+            datos={
+              <EstadoDeLaCapa
+                estado={capa()}
+                vista={estadoVista()}
+                emplazamientos={resumen()?.provincias.reduce((n, p) => n + p.emplazamientos, 0)}
+                donde={donde()}
+                puntos={vistaElegida() === "puntos" ? puntos()?.tipo : undefined}
+                reintentarPuntos={() => setIntentoDePuntos((n) => n + 1)}
+                reintentar={cargarCapa}
+                reintentarProvincias={reintentarProvincias}
+              />
+            }
+            carga={
+              estado().tipo === "cargando" ? <CargaDelMapa texto="Cargando el mapa…" /> : undefined
+            }
+            filtro={
+              <AvisoDelFiltro
+                filtro={filtro.aplicado()}
+                deLejosSinFiltrar={deLejosSinFiltrar()}
+                alQuitar={() => filtro.elegir([])}
+              />
+            }
+            ubicacion={
+              <>
+                <AvisosDeUbicacion panelAbierto={panelAbierto()} cobertura={resumen()} />
+                <Show when={eligiendo()}>
+                  <EleccionConBuscador
+                    alUsarCentro={usarCentro}
+                    alIrA={irA}
+                    encuadre={encuadre()}
+                  />
                 </Show>
-              }
-              pista={pista()}
-              zoom={
-                <>
-                  {/* Como los controles de MapLibre, llevan el evento de la pulsación: son un
+              </>
+            }
+            eligiendo={eligiendo()}
+            pinCentral={<PinCentral />}
+            dialogo={<PasoPrevio />}
+            marcadores={
+              <Show when={mapaCreado()}>
+                {(actual) => (
+                  <>
+                    <Show when={resumen()}>
+                      {(leido) => (
+                        <Marcadores
+                          mapa={actual()}
+                          resumen={leido()}
+                          provincias={provincias()}
+                          filtro={filtro.aplicado()}
+                          agrupaciones={filtro.agrupaciones()}
+                          seleccionada={seleccionada()}
+                          alSeleccionar={seleccionar}
+                          alVer={precargarFichas}
+                          alCambiarVista={alCambiarVista}
+                          lectorDeRotulos={lectorDeRotulos()}
+                          conFoto={foto.seVe()}
+                          conMarcadores={conMarcadores()}
+                          vista={vistaDibujada()}
+                          puntos={puntosListos()?.puntos}
+                          alApagarPuntos={setPuntosApagados}
+                          alTaparPuntos={setPuntosTapados}
+                        />
+                      )}
+                    </Show>
+                    <ReferenciaEnMapa mapa={actual()} escritorio={escritorio()} />
+                  </>
+                )}
+              </Show>
+            }
+            pista={pista()}
+            zoom={
+              <>
+                {/* Como los controles de MapLibre, llevan el evento de la pulsación: son un
                   gesto de la persona, no un vuelo, y no apagan la foto aérea (#67). */}
-                  <ControlDelMapa
-                    etiqueta="Acercar"
-                    icono="+"
-                    disabled={!listo()}
-                    onClick={(evento) => mapa?.zoomIn(undefined, { originalEvent: evento })}
-                  />
-                  <ControlDelMapa
-                    etiqueta="Alejar"
-                    icono="−"
-                    disabled={!listo()}
-                    onClick={(evento) => mapa?.zoomOut(undefined, { originalEvent: evento })}
-                  />
-                </>
-              }
-              controles={
-                <>
-                  <ControlDelMapa
-                    etiqueta="Interferencia"
-                    detalle="Simula dónde se pisan las señales de una compañía."
-                    icono={<IconoOndas />}
-                    activo={vistaActiva()}
-                    disabled={!listo() || emplazamientos().length === 0}
-                    onClick={cambiarVista}
-                  />
-                  <Show when={vistaDibujada() === "puntos"}>
-                    <ControlDelMapa
-                      etiqueta={LISTA_DE_EMPLAZAMIENTOS}
-                      detalle={DETALLE_LISTA}
-                      icono={<IconoListaDeEmplazamientos />}
-                      aria-haspopup="dialog"
-                      disabled={puntosListos() === undefined}
-                      onClick={() => navegar(conLista(ubicacion(), true))}
-                    />
-                  </Show>
-                  <ControlDelMapa
-                    etiqueta={VISTA_AGRUPADA}
-                    detalle={DETALLE_VISTA_AGRUPADA}
-                    icono={<IconoVistaAgrupada />}
-                    activo={vistaElegida() === "agrupada"}
-                    disabled={vistaElegida() === undefined}
-                    onClick={() => {
-                      const agrupada = vistaElegida() !== "agrupada";
-                      // Al volver a los puntos de lejos, vuelan desde sus hexágonos: los del mapa no
-                      // se ven hasta que llegan (ver `Marcadores`).
-                      if (!agrupada && (mapa?.getZoom() ?? ZOOM_DE_LOGOS) < ZOOM_DE_LOGOS) {
-                        setPuntosTapados(true);
-                      }
-                      ajustes.cambiarVistaAgrupada(agrupada);
-                    }}
-                  />
-                  <ControlDelMapa
-                    etiqueta="Medir mi señal"
-                    detalle="Cómo verla en el móvil."
-                    icono={<IconoSenal />}
-                    aria-haspopup="dialog"
-                    onClick={() => navegar(conMedir(ubicacion(), true))}
-                  />
-                </>
-              }
-              botonUbicacion={
-                <>
-                  <ControlDeCompanias
-                    filtro={filtro.elegido()}
-                    disabled={resumen() === undefined}
-                    alElegir={filtro.elegir}
-                  />
-                  <ControlDelMapa
-                    etiqueta="Foto aérea"
-                    icono={<IconoFotoAerea />}
-                    activo={foto.encendida()}
-                    disabled={!listo()}
-                    aria-disabled={cercaDeLaFoto() ? undefined : "true"}
-                    onClick={() => foto.alternar()}
-                  />
-                  <MenuDeUbicacion
-                    puedeCentrar={listo()}
-                    alCentrar={() => {
-                      const referencia = puntoDeReferencia.referencia();
-                      if (referencia !== undefined) irA(posicionDe(referencia));
-                    }}
-                  />
-                </>
-              }
-              controlesSecundarios={
-                <>
-                  <Show when={ajustes.ajustes().modoEstudiante}>
-                    <ControlDelMapa
-                      etiqueta="Ejercicio"
-                      detalle="Los datos de un municipio o un barrio, paso a paso."
-                      icono={<IconoEjercicio />}
-                      activo={ejercicio() !== null}
-                      onClick={() =>
-                        navegar(conEjercicio(ubicacion(), ejercicio() === null ? "" : null))
-                      }
-                    />
-                  </Show>
-                  <ControlDelMapa
-                    etiqueta="Tus aportaciones"
-                    detalle="Para enviar tus medidas y correcciones."
-                    icono={<IconoAportaciones />}
-                    aria-haspopup="dialog"
-                    onClick={() => navegar(conAportaciones(ubicacion(), true))}
-                  />
-                  <ControlDelMapa
-                    etiqueta="Ajustes"
-                    icono={<IconoAjustes />}
-                    aria-haspopup="dialog"
-                    onClick={() => navegar(conAjustes(ubicacion(), true))}
-                  />
-                </>
-              }
-              atribucion={
-                <Atribucion
-                  creditos={foto.encendida() ? [...creditos(), CREDITO_FOTO_AEREA] : creditos()}
+                <ControlDelMapa
+                  etiqueta="Acercar"
+                  icono="+"
+                  disabled={!listo()}
+                  onClick={(evento) => mapa?.zoomIn(undefined, { originalEvent: evento })}
                 />
-              }
-              aviso={aviso()}
-              panelAbierto={panelAbierto()}
-              panelAncho={seleccionada() === null && ejercicio() !== null}
-              vista={vista()}
-              panel={
-                <Switch>
-                  <Match when={seleccionada()}>
-                    {(clave) => (
-                      <PanelFicha
-                        clave={clave()}
-                        provincia={provinciaSeleccionada()}
-                        fechaCapa={fechaDeLaSeleccionada()}
-                        redUsada={redUsadaDeLaSeleccionada()}
-                        barrio={barrioDeLaSeleccionada()}
-                        alCerrar={() => navegar(ruta.mapa)}
-                      />
-                    )}
-                  </Match>
-                  <Match when={ejercicio() !== null}>
-                    <PanelEjercicio
-                      zona={ejercicio() ?? ""}
-                      resumen={resumen()}
-                      provincias={provincias()}
-                      emplazamientos={emplazamientos()}
-                      alElegirZona={(codigo) =>
-                        navegar(conEjercicio(ubicacion(), codigo), { reemplazar: true })
-                      }
-                      alPedirProvincias={pedirProvincias}
-                      alReintentarProvincias={reintentarProvincias}
-                      alEsperarPunto={(alTocar) => {
-                        esperandoPunto = alTocar;
-                      }}
-                      alDibujar={(dibujo, encuadre) => setZona({ zona: dibujo, encuadre })}
-                      alCerrar={() => navegar(conEjercicio(ubicacion(), null))}
-                    />
-                  </Match>
-                </Switch>
-              }
-            />
-            <Show when={midiendo()}>
-              <DialogoMedir
-                navegador={{ ...leerNavegador(), modelo: modelo() }}
-                direccionMovil={new URL(ruta.medir, window.location.origin).href}
-                alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
-              />
-            </Show>
-            <Show when={aportacionesAbiertas(ubicacion())}>
-              <DialogoAportaciones
-                dispositivo={detectarDispositivo({ ...leerNavegador(), modelo: modelo() }).tipo}
-                alCerrar={() => navegar(conAportaciones(ubicacion(), false), { reemplazar: true })}
-                alElegirPunto={() => {
-                  navegar(conAportaciones(ubicacion(), false), { reemplazar: true });
-                  puntoDeReferencia.elegirEnMapa();
-                }}
-              />
-            </Show>
-            <Show when={listaAbierta(ubicacion()) ? puntosListos() : undefined}>
-              {(actuales) => (
-                <DialogoLista
-                  puntos={actuales().puntos}
-                  caja={vistaDelEncuadre()?.caja}
-                  filtro={filtro.aplicado()}
-                  alElegir={(indice) => {
-                    navegar(conLista(ubicacion(), false), { reemplazar: true });
-                    abrirPunto(indice);
+                <ControlDelMapa
+                  etiqueta="Alejar"
+                  icono="−"
+                  disabled={!listo()}
+                  onClick={(evento) => mapa?.zoomOut(undefined, { originalEvent: evento })}
+                />
+              </>
+            }
+            controles={
+              <>
+                <ControlDelMapa
+                  etiqueta="Interferencia"
+                  detalle="Simula dónde se pisan las señales de una compañía."
+                  icono={<IconoOndas />}
+                  activo={vistaActiva()}
+                  disabled={!listo() || emplazamientos().length === 0}
+                  onClick={cambiarVista}
+                />
+                <Show when={vistaDibujada() === "puntos"}>
+                  <ControlDelMapa
+                    etiqueta={LISTA_DE_EMPLAZAMIENTOS}
+                    detalle={DETALLE_LISTA}
+                    icono={<IconoListaDeEmplazamientos />}
+                    aria-haspopup="dialog"
+                    disabled={puntosListos() === undefined}
+                    onClick={() => navegar(conLista(ubicacion(), true))}
+                  />
+                </Show>
+                <ControlDelMapa
+                  etiqueta={VISTA_AGRUPADA}
+                  detalle={DETALLE_VISTA_AGRUPADA}
+                  icono={<IconoVistaAgrupada />}
+                  activo={vistaElegida() === "agrupada"}
+                  disabled={vistaElegida() === undefined}
+                  onClick={() => {
+                    const agrupada = vistaElegida() !== "agrupada";
+                    // Al volver a los puntos de lejos, vuelan desde sus hexágonos: los del mapa no
+                    // se ven hasta que llegan (ver `Marcadores`).
+                    if (!agrupada && (mapa?.getZoom() ?? ZOOM_DE_LOGOS) < ZOOM_DE_LOGOS) {
+                      setPuntosTapados(true);
+                    }
+                    ajustes.cambiarVistaAgrupada(agrupada);
                   }}
-                  alCerrar={() => navegar(conLista(ubicacion(), false), { reemplazar: true })}
                 />
-              )}
-            </Show>
-            <Show when={ajustesAbiertos(ubicacion())}>
-              <DialogoAjustes
-                tema={tema}
-                alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
+                <ControlDelMapa
+                  etiqueta="Medir mi señal"
+                  detalle="Cómo verla en el móvil."
+                  icono={<IconoSenal />}
+                  aria-haspopup="dialog"
+                  onClick={() => navegar(conMedir(ubicacion(), true))}
+                />
+              </>
+            }
+            botonUbicacion={
+              <>
+                <ControlDeCompanias
+                  filtro={filtro.elegido()}
+                  disabled={resumen() === undefined}
+                  alElegir={filtro.elegir}
+                />
+                <ControlDelMapa
+                  etiqueta="Foto aérea"
+                  icono={<IconoFotoAerea />}
+                  activo={foto.encendida()}
+                  disabled={!listo()}
+                  aria-disabled={cercaDeLaFoto() ? undefined : "true"}
+                  onClick={() => foto.alternar()}
+                />
+                <MenuDeUbicacion
+                  puedeCentrar={listo()}
+                  alCentrar={() => {
+                    const referencia = puntoDeReferencia.referencia();
+                    if (referencia !== undefined) irA(posicionDe(referencia));
+                  }}
+                />
+              </>
+            }
+            controlesSecundarios={
+              <>
+                <Show when={ajustes.ajustes().modoEstudiante}>
+                  <ControlDelMapa
+                    etiqueta="Ejercicio"
+                    detalle="Los datos de un municipio o un barrio, paso a paso."
+                    icono={<IconoEjercicio />}
+                    activo={ejercicio() !== null}
+                    onClick={() =>
+                      navegar(conEjercicio(ubicacion(), ejercicio() === null ? "" : null))
+                    }
+                  />
+                </Show>
+                <ControlDelMapa
+                  etiqueta="Tus aportaciones"
+                  detalle="Para enviar tus medidas y correcciones."
+                  icono={<IconoAportaciones />}
+                  aria-haspopup="dialog"
+                  onClick={() => navegar(conAportaciones(ubicacion(), true))}
+                />
+                <ControlDelMapa
+                  etiqueta="Ajustes"
+                  icono={<IconoAjustes />}
+                  aria-haspopup="dialog"
+                  onClick={() => navegar(conAjustes(ubicacion(), true))}
+                />
+              </>
+            }
+            atribucion={
+              <Atribucion
+                creditos={foto.encendida() ? [...creditos(), CREDITO_FOTO_AEREA] : creditos()}
               />
-            </Show>
-          </FotoContexto>
-        </ServicioContexto>
+            }
+            aviso={aviso()}
+            panelAbierto={panelAbierto()}
+            panelAncho={seleccionada() === null && ejercicio() !== null}
+            vista={vista()}
+            panel={
+              <Switch>
+                <Match when={seleccionada()}>
+                  {(clave) => (
+                    <PanelFicha
+                      clave={clave()}
+                      provincia={provinciaSeleccionada()}
+                      fechaCapa={fechaDeLaSeleccionada()}
+                      redUsada={redUsadaDeLaSeleccionada()}
+                      barrio={barrioDeLaSeleccionada()}
+                      alCerrar={() => navegar(ruta.mapa)}
+                    />
+                  )}
+                </Match>
+                <Match when={ejercicio() !== null}>
+                  <PanelEjercicio
+                    zona={ejercicio() ?? ""}
+                    resumen={resumen()}
+                    provincias={provincias()}
+                    emplazamientos={emplazamientos()}
+                    alElegirZona={(codigo) =>
+                      navegar(conEjercicio(ubicacion(), codigo), { reemplazar: true })
+                    }
+                    alPedirProvincias={pedirProvincias}
+                    alReintentarProvincias={reintentarProvincias}
+                    alEsperarPunto={(alTocar) => {
+                      esperandoPunto = alTocar;
+                    }}
+                    alDibujar={(dibujo, encuadre) => setZona({ zona: dibujo, encuadre })}
+                    alCerrar={() => navegar(conEjercicio(ubicacion(), null))}
+                  />
+                </Match>
+              </Switch>
+            }
+          />
+          <Show when={midiendo()}>
+            <DialogoMedir
+              navegador={{ ...leerNavegador(), modelo: modelo() }}
+              direccionMovil={new URL(ruta.medir, window.location.origin).href}
+              alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+            />
+          </Show>
+          <Show when={aportacionesAbiertas(ubicacion())}>
+            <DialogoAportaciones
+              dispositivo={detectarDispositivo({ ...leerNavegador(), modelo: modelo() }).tipo}
+              alCerrar={() => navegar(conAportaciones(ubicacion(), false), { reemplazar: true })}
+              alElegirPunto={() => {
+                navegar(conAportaciones(ubicacion(), false), { reemplazar: true });
+                puntoDeReferencia.elegirEnMapa();
+              }}
+            />
+          </Show>
+          <Show when={listaAbierta(ubicacion()) ? puntosListos() : undefined}>
+            {(actuales) => (
+              <DialogoLista
+                puntos={actuales().puntos}
+                caja={vistaDelEncuadre()?.caja}
+                filtro={filtro.aplicado()}
+                alElegir={(indice) => {
+                  navegar(conLista(ubicacion(), false), { reemplazar: true });
+                  abrirPunto(indice);
+                }}
+                alCerrar={() => navegar(conLista(ubicacion(), false), { reemplazar: true })}
+              />
+            )}
+          </Show>
+          <Show when={ajustesAbiertos(ubicacion())}>
+            <DialogoAjustes
+              tema={tema}
+              alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
+            />
+          </Show>
+        </FotoContexto>
       </UbicacionContexto>
     </AjustesContexto>
   );

@@ -6,8 +6,7 @@ import {
   lugarDelPunto,
 } from "@celda/dominio/municipio";
 import { generarLoteDeProvincia } from "@celda/dominio/provincias";
-import { simuladorDePrueba, workerDePrueba } from "@celda/sim/pruebas";
-import { type Simulador, simuladorEnWorker } from "@celda/sim/simulador";
+import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -160,10 +159,9 @@ const urlDelLote = (clave: string) =>
 
 /**
  * La app con la capa de prueba y las fichas del servicio real, sobre un origen estático que no
- * contesta hasta que la prueba lo pide, abierta en `clave`. Las simulaciones se calculan en el
- * mismo hilo, salvo que la prueba traiga su simulador.
+ * contesta hasta que la prueba lo pide, abierta en `clave`.
  */
-const abrir = (clave: string, simulador: Layer.Layer<Simulador> = simuladorDePrueba) => {
+const abrir = (clave: string) => {
   const origen = origenDePrueba();
   navegar(ruta.emplazamiento(clave, "08"), { reemplazar: true });
   // Sin esperar, la app leería la dirección de la prueba anterior y pediría su ficha.
@@ -178,7 +176,7 @@ const abrir = (clave: string, simulador: Layer.Layer<Simulador> = simuladorDePru
             ConfigProvider.layer(ConfigProvider.fromUnknown({ VITE_CAPAS_ORIGEN: ORIGEN })),
           ),
         ),
-        simulador,
+        simuladorDePrueba,
         ubicacionDePrueba().capa,
       )}
     />
@@ -460,28 +458,9 @@ describe("panel del emplazamiento", () => {
     );
   });
 
-  it("dibuja cómo emite: un diagrama de modelo, sin su identificador interno, y la orientación supuesta", async () => {
-    const { findByRole, getByText, origen } = abrir(CAMPUS_NORD.clave);
-    await responder(origen, CAMPUS_NORD);
-    const diagrama = await findByRole("img", { name: "Diagrama de radiación de los sectores" });
-    await waitFor(() => {
-      assert.lengthOf(diagrama.querySelectorAll("path"), 3);
-    });
-    assert.include(diagrama.querySelector("desc")?.textContent, "orientación supuesta");
-    assert.isNotNull(getByText("Simulación"));
-    assert.notInclude(diagrama.closest("figure")?.textContent, "diagrama-sector");
-    assert.isNotNull(getByText("Sector 2 · 120°"));
-    // «orientación» va subrayada: el párrafo se busca entero.
-    const nota = Array.from(diagrama.closest("figure")?.querySelectorAll("p") ?? []).find((p) =>
-      (p.textContent ?? "").startsWith("La orientación es supuesta, porque nadie publica"),
-    );
-    assert.isDefined(nota);
-    assert.deepStrictEqual(terminosSubrayados(nota ?? diagrama), ["azimut", "sector"]);
-  });
-
   // Ni la ficha ni el mapa de detrás enseñan detalles de implementación (docs/patterns/ui.md):
   // ni versiones de modelos o de capas, ni claves internas, ni en el texto ni en lo que oye un
-  // lector de pantalla. Se mira con los datos técnicos abiertos y el diagrama ya dibujado.
+  // lector de pantalla. Se mira con los datos técnicos abiertos.
   for (const [caso, ficha] of [
     ["compartido, con una observación de la comunidad", FICHA_CORREGIDA],
     ["con correcciones aceptadas", FICHA_CON_CORRECCIONES_ACEPTADAS],
@@ -500,49 +479,12 @@ describe("panel del emplazamiento", () => {
     it(`un emplazamiento ${caso} no enseña detalles de implementación`, async () => {
       const { findByRole, getByRole, origen } = abrir(CAMPUS_NORD.clave);
       await responder(origen, ficha);
-      const diagrama = await findByRole("img", { name: "Diagrama de radiación de los sectores" });
-      await waitFor(() => {
-        assert.lengthOf(diagrama.querySelectorAll("path"), 3);
-      });
+      await findByRole("heading", { name: TITULO_CAMPUS_NORD });
       fireEvent.click(getByRole("button", { name: "Datos técnicos" }));
       flush();
       assert.deepStrictEqual(jergaEn(document.body), []);
     });
   }
-
-  it("al cambiar de emplazamiento a medio calcular, cancela el diagrama anterior", async () => {
-    const worker = workerDePrueba();
-    const { findByRole, getByText, origen } = abrir(
-      CAMPUS_NORD.clave,
-      simuladorEnWorker(worker.crear),
-    );
-    await responder(origen, CAMPUS_NORD);
-    await findByRole("heading", { name: TITULO_CAMPUS_NORD });
-    await waitFor(() => {
-      assert.lengthOf(worker.pendientes(), 1);
-    });
-    // El marco ya ocupa su sitio mientras el Worker calcula.
-    const antes = getByText("Calculando el modelo…").closest("svg");
-    assert.lengthOf(antes?.querySelectorAll("path") ?? [], 0);
-
-    // Se cancela en cuanto cambia, sin esperar a la ficha nueva.
-    navegar(ruta.emplazamiento(PEDRALBES.clave, "08"));
-    flush();
-    await waitFor(() => {
-      assert.strictEqual(worker.terminados(), 1);
-    });
-    await responder(origen, PEDRALBES);
-    await findByRole("heading", { name: TITULO_PEDRALBES });
-    await waitFor(() => {
-      assert.lengthOf(worker.pendientes(), 1);
-    });
-    worker.contestar();
-    const diagrama = await findByRole("img", { name: "Diagrama de radiación de los sectores" });
-    await waitFor(() => {
-      assert.lengthOf(diagrama.querySelectorAll("path"), 3);
-    });
-    assert.strictEqual(worker.creados(), 2);
-  });
 
   it("los términos técnicos salen subrayados una vez por bloque, y todos están en el glosario", async () => {
     const { findByRole, getByRole, origen } = abrir(CAMPUS_NORD.clave);

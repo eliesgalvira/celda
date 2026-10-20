@@ -10,7 +10,7 @@ import { flush } from "solid-js";
 import { App } from "../App.tsx";
 import { type CapaDePrueba, capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
-import { terminosSubrayados, textoEntero } from "../lib/pruebas.ts";
+import { terminosSubrayados } from "../lib/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
 import { BusquedaFallida, type Direccion } from "./buscador.ts";
 import type { LecturaGps } from "./estado.ts";
@@ -101,15 +101,6 @@ const PLAZAS_MAYORES: ReadonlyArray<Direccion> = [
   },
 ];
 
-/** Las casillas del sector que da servicio: «valor · qué es». */
-const casillas = (region: ReturnType<typeof within>): ReadonlyArray<string> =>
-  region
-    .queryAllByRole("definition")
-    .map(
-      (valor: HTMLElement) =>
-        `${valor.textContent ?? ""} · ${valor.previousElementSibling?.textContent ?? ""}`,
-    );
-
 /** La app con la ficha de Campus Nord abierta y ya leída, y la ubicación en manos de la prueba. */
 const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
   const fichas = fichasDePrueba();
@@ -156,7 +147,7 @@ describe("punto de referencia: pedir la ubicación", () => {
   });
 
   it("antes del aviso del navegador explica para qué se usa; solo al continuar se pide", async () => {
-    const { panel, pulsar, findByRole, queryByRole, getByRole, gps, almacen } = await abrir();
+    const { panel, pulsar, findByRole, queryByRole, gps, almacen } = await abrir();
     fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
     flush();
 
@@ -178,37 +169,13 @@ describe("punto de referencia: pedir la ubicación", () => {
     await waitFor(() => {
       assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /tu ubicación \(±25 m\)/u);
     });
-    // Qué sector le da servicio, cuánto se pierde respecto a su eje y la distancia y el rumbo.
+    // A qué distancia y hacia dónde queda el emplazamiento.
     await waitFor(() => {
-      assert.deepStrictEqual(casillas(panel()), [
-        "Sector 3 · te da servicio",
-        "−0,9 dB · respecto al eje",
-        "340 m · hacia el noreste",
-      ]);
+      assert.match(
+        panel().getByText(/^El emplazamiento está/u).textContent ?? "",
+        /^El emplazamiento está a 340 m de ti, hacia el noreste \(\d+°\)\.$/u,
+      );
     });
-    assert.isNotNull(
-      panel().getByText(
-        textoEntero("Estás casi de frente al sector 3 (240°), donde su haz manda más señal."),
-      ),
-    );
-    // El diagrama de radiación rellena ese sector y marca hacia dónde quedas.
-    const diagrama = getByRole("img", { name: "Diagrama de radiación de los sectores" });
-    const lobulos = [...diagrama.querySelectorAll("path[data-destacado]")];
-    assert.deepStrictEqual(
-      lobulos.map((lobulo) => lobulo.getAttribute("data-destacado")),
-      ["no", "no", "si"],
-    );
-    assert.strictEqual(diagrama.querySelector("[data-rumbo]")?.textContent, "TÚ");
-    // Es un modelo, sin su identificador interno, sobre una orientación supuesta.
-    assert.isNotEmpty(panel().getAllByText("Simulación"));
-    assert.isNull(panel().queryByText(/sector-servicio/u));
-    assert.isNotNull(
-      panel().getByText(
-        textoEntero(
-          "La orientación es supuesta, así que el sector que da servicio puede ser otro.",
-        ),
-      ),
-    );
     // «Tu ubicación» y su precisión abren su explicación.
     const desde = panel().getByText(/^Desde:/u);
     assert.deepStrictEqual(terminosSubrayados(desde), ["punto-de-referencia", "precision"]);
@@ -422,19 +389,9 @@ describe("punto de referencia: punto elegido", () => {
     await waitFor(() => {
       assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /el punto elegido/u);
     });
-    await waitFor(() => {
-      assert.deepStrictEqual(casillas(panel()), [
-        "Sector 3 · da servicio",
-        "−0,9 dB · respecto al eje",
-        "340 m · hacia el noreste",
-      ]);
-    });
-    assert.isNotNull(
-      panel().getByText(
-        textoEntero(
-          "El punto está casi de frente al sector 3 (240°), donde su haz manda más señal.",
-        ),
-      ),
+    assert.match(
+      panel().getByText(/^El emplazamiento está/u).textContent ?? "",
+      /^El emplazamiento está a 340 m del punto, hacia el noreste \(\d+°\)\.$/u,
     );
     const region = getByRole("region", { name: "Punto de referencia" });
     assert.notMatch(region.textContent ?? "", /\b(ti|tu|tú)\b/iu);

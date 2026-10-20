@@ -1,34 +1,13 @@
 import { terminosDe, textoPlano } from "@celda/dominio/glosario";
 import { assert, describe, it } from "@effect/vitest";
 
-import { orientacionDe } from "../ficha/diagrama.ts";
-import type { LecturaServicio } from "../servicio/servicio.ts";
 import { type Consejos, consejos, type PuntoParaConsejos } from "./consejos.ts";
-
-const SUPUESTA = orientacionDe([]);
-
-/** Lo que dice el sector que da servicio de un punto a 340 m. */
-const servicio = (
-  sector: number | undefined,
-  desviacion: number,
-  extra: Partial<LecturaServicio> = {},
-): LecturaServicio => ({
-  sector,
-  gananciaDb: -Math.min(12 * (desviacion / 65) ** 2, 30),
-  desviacion,
-  distancia: 340,
-  rumbo: 228,
-  enCelda: true,
-  ...extra,
-});
 
 /** Un punto a 340 m del emplazamiento, que queda al noreste (48°). */
 const punto = (extra: Partial<PuntoParaConsejos> = {}): PuntoParaConsejos => ({
   tipo: "gps",
   distancia: 340,
   rumbo: 48.3,
-  servicio: servicio(2, -18),
-  orientacion: SUPUESTA,
   ...extra,
 });
 
@@ -90,22 +69,6 @@ describe("consejos para mejorar la señal", () => {
     }
   });
 
-  it("de frente a un sector y entre dos lo dice; algo fuera del eje no añade nada", () => {
-    assert.strictEqual(
-      consejo(consejos(punto()), "sector"),
-      "Estás casi de frente al sector 3, así que una antena apuntada al emplazamiento queda también de cara a su haz.",
-    );
-    assert.match(
-      consejo(consejos(punto({ servicio: servicio(1, 55) })), "sector") ?? "",
-      /^Estás entre dos sectores, donde llega menos señal\. Aun así, conviene apuntar al emplazamiento/u,
-    );
-    assert.isUndefined(consejo(consejos(punto({ servicio: servicio(0, 30) })), "sector"));
-    // Mientras el modelo calcula, los consejos que no dependen de él ya están.
-    const calculando = consejos(punto({ servicio: undefined }));
-    assert.isUndefined(consejo(calculando, "sector"));
-    assert.isDefined(consejo(calculando, "antena"));
-  });
-
   it("cerca y lejos cambian el consejo de la distancia", () => {
     assert.strictEqual(
       consejo(consejos(punto({ distancia: 150 })), "distancia"),
@@ -119,33 +82,16 @@ describe("consejos para mejorar la señal", () => {
   });
 
   it("al pie del emplazamiento no hay rumbo al que apuntar", () => {
-    const resultado = conPunto(
-      consejos(punto({ distancia: 8, servicio: servicio(undefined, 0, { distancia: 8 }) })),
-    );
+    const resultado = conPunto(consejos(punto({ distancia: 8 })));
     assert.isUndefined(resultado.objetivo);
     assert.strictEqual(textoPlano(resultado.hacia), "Estás al pie del emplazamiento, a 10 m.");
     assert.match(consejo(resultado, "router") ?? "", /^Desde tan cerca no hace falta orientar/u);
-    // Sin el modelo, la distancia basta para saberlo.
-    assert.isUndefined(conPunto(consejos(punto({ distancia: 8, servicio: undefined }))).objetivo);
-  });
-
-  it("fuera de la celda avisa de que hay otro emplazamiento más cerca", () => {
-    assert.strictEqual(
-      consejo(
-        consejos(punto({ servicio: servicio(2, -18, { enCelda: false }) })),
-        "otro-emplazamiento",
-      ),
-      "Hay otro emplazamiento más cerca de ti. Mira también su ficha antes de orientar nada, porque la señal puede llegar de allí.",
-    );
-    assert.isUndefined(consejo(consejos(punto()), "otro-emplazamiento"));
+    // A 15 m ya hay hacia dónde apuntar: es el radio de la fusión.
+    assert.strictEqual(conPunto(consejos(punto({ distancia: 15 }))).objetivo, 48);
   });
 
   it("con un punto elegido habla del punto, nunca de ti", () => {
-    for (const extra of [
-      {},
-      { servicio: servicio(1, 55, { enCelda: false }) },
-      { distancia: 8, servicio: servicio(undefined, 0) },
-    ]) {
+    for (const extra of [{}, { distancia: 1240 }, { distancia: 8 }]) {
       const todo = textos(consejos(punto({ tipo: "elegido", ...extra }))).join(" ");
       assert.notMatch(todo, /\b(ti|te|tu|tú|estás|pierdes)\b/iu, todo);
       assert.match(todo, /\bpunto\b/u);
@@ -156,21 +102,17 @@ describe("consejos para mejorar la señal", () => {
     );
   });
 
-  it("dice que la orientación de los sectores es supuesta y no promete precisión", () => {
-    const nota = textoPlano(conPunto(consejos(punto())).nota);
-    assert.match(nota, /^La orientación de los sectores es supuesta\./u);
-    assert.match(nota, /Toma el rumbo como punto de partida/u);
-    const estimada = textoPlano(
-      conPunto(consejos(punto({ orientacion: orientacionDe([30, 150, 270]) }))).nota,
-    );
-    assert.match(estimada, /orientación de los sectores tiene ±15° de margen/u);
+  it("dice que el rumbo es un punto de partida, también al pie del emplazamiento", () => {
+    for (const distancia of [340, 8]) {
+      assert.strictEqual(
+        textoPlano(conPunto(consejos(punto({ distancia }))).nota),
+        "Toma el rumbo como punto de partida y ajusta mirando la señal del router.",
+      );
+    }
   });
 
   it("subraya cada término una vez en toda la sección, en orden de lectura", () => {
-    for (const resultado of [
-      consejos(undefined),
-      consejos(punto({ distancia: 1240, servicio: servicio(1, 55, { enCelda: false }) })),
-    ]) {
+    for (const resultado of [consejos(undefined), consejos(punto({ distancia: 1240 }))]) {
       const todos = [
         ...(resultado.tipo === "con-punto" ? [resultado.hacia] : []),
         ...resultado.consejos.map((c) => c.texto),

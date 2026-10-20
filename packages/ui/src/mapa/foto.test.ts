@@ -99,20 +99,6 @@ describe("foto aérea en el estilo", () => {
     assert.strictEqual(portales?.minzoom, 15);
   });
 
-  it("el degradado de la celda seleccionada baja al 35 % a pie de calle solo sobre la foto", () => {
-    const apagada = pintura("servicio-degradado", "fill-opacity", false);
-    const encendida = pintura("servicio-degradado", "fill-opacity", true);
-    assert.deepStrictEqual<unknown>(Array.isArray(apagada) ? apagada.at(-1) : undefined, [
-      "get",
-      "opacidad",
-    ]);
-    assert.deepStrictEqual<unknown>(Array.isArray(encendida) ? encendida.at(-1) : undefined, [
-      "*",
-      0.35,
-      ["get", "opacidad"],
-    ]);
-  });
-
   it("el edificio resaltado tiene su fuente vacía y va encima de las celdas y bajo los rótulos", () => {
     assert.deepStrictEqual(estilo.sources[FUENTE_EDIFICIO], {
       type: "geojson",
