@@ -80,6 +80,9 @@ describe("capa de emplazamientos en el mapa", () => {
 
     const fecha = await findByText(textoEntero("Datos del mapa: 26 sept 2026"));
     assert.strictEqual(fecha.closest("output")?.getAttribute("data-tono"), "fecha");
+    // Sin WebGL el mapa no llega a crearse y la vista inicial nunca se pone: la región no se
+    // queda ocupada esperándola (#81).
+    assert.strictEqual(getByRole("main").getAttribute("aria-busy"), "false");
     await waitFor(() => {
       assert.isNull(queryByText(/No se han podido cargar los emplazamientos/u));
     });

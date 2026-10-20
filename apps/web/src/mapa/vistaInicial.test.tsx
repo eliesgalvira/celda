@@ -347,6 +347,37 @@ describe("crearVistaInicial", () => {
     assert.lengthOf(encuadres, 0);
   });
 
+  it("dice si aún puede mover el mapa, hasta ponerlo o hasta que otro lo mueva (#81)", () => {
+    const puesta = mapaDePrueba();
+    const conVista = montar();
+    assert.isTrue(conVista.vista()?.pendiente());
+    conVista.ponerMapa(puesta.mapa);
+    assert.isTrue(conVista.vista()?.pendiente());
+    conVista.abrir(SIN_PUNTO);
+    assert.isFalse(conVista.vista()?.pendiente());
+
+    const conGesto = mapaDePrueba();
+    const movida = montar();
+    movida.ponerMapa(conGesto.mapa);
+    conGesto.gesto();
+    flush();
+    assert.isFalse(movida.vista()?.pendiente());
+
+    const llevada = montar();
+    llevada.vista()?.yaColocado();
+    flush();
+    assert.isFalse(llevada.vista()?.pendiente());
+
+    const nacida = montar();
+    nacida.abrir(SIN_PUNTO);
+    assert.isTrue(nacida.vista()?.pendiente());
+    nacida.vista()?.alCrear();
+    flush();
+    assert.isFalse(nacida.vista()?.pendiente());
+
+    assert.isFalse(montar(false).vista()?.pendiente());
+  });
+
   it("con un emplazamiento en la dirección no hace nada", () => {
     const { mapa, encuadres } = mapaDePrueba();
     const { abrir, ponerMapa, vista } = montar(false);

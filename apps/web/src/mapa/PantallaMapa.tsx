@@ -1042,7 +1042,13 @@ export function PantallaMapa() {
         <FotoContexto value={foto}>
           <DisposicionMapa
             nombre={`Mapa de ${ESPANA.nombre}`}
-            ocupado={estado().tipo === "cargando" || capa().tipo === "cargando"}
+            // Ocupado también mientras la vista inicial pueda mover el mapa: quien lo use desde
+            // fuera, como `tools/rendimiento`, espera a eso antes de mover la cámara (#81).
+            ocupado={
+              estado().tipo === "cargando" ||
+              capa().tipo === "cargando" ||
+              (estado().tipo === "listo" && vistaInicial.pendiente())
+            }
             lienzo={(elemento) => {
               contenedor = elemento;
             }}

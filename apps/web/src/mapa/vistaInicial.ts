@@ -3,7 +3,7 @@ import { rectanguloDeCaja } from "@celda/dominio/cobertura";
 import type { Asignacion } from "@celda/dominio/municipio";
 import type { ProvinciaConCaja } from "@celda/dominio/zonaDelEjercicio";
 import { recurso } from "@celda/ui/recurso.ts";
-import { createEffect, createMemo, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 
 /**
  * Qué se ve al abrir el mapa, sin preguntar nada a nadie:
@@ -189,6 +189,12 @@ export interface VistaInicial {
   readonly alCrear: () => Rectangulo | undefined;
   /** El mapa ya se ha llevado a otro sitio: la vista inicial ya no lo mueve. */
   readonly yaColocado: () => void;
+  /**
+   * Si la vista inicial aún puede mover el mapa por su cuenta: hasta que lo pone, el mapa nace en
+   * ella, una persona lo mueve o la web lo lleva a otro sitio. Mientras, la región del mapa sigue
+   * ocupada (#81).
+   */
+  readonly pendiente: () => boolean;
 }
 
 /**
@@ -204,7 +210,13 @@ export const crearVistaInicial = (entrada: {
   /** Lo que tapa la interfaz al encuadrar `caja`. */
   readonly relleno: (caja: Rectangulo) => Relleno;
 }): VistaInicial => {
+  // `colocado` vale en el acto; `puesta` es lo mismo para quien lo lee en Solid, tras el `flush`.
   let colocado = !entrada.activa;
+  const [puesta, setPuesta] = createSignal(colocado);
+  const colocar = () => {
+    colocado = true;
+    setPuesta(true);
+  };
   const encuadre = createMemo(() =>
     entrada.activa ? encuadreInicial(entrada.alAbrir()) : undefined,
   );
@@ -215,7 +227,7 @@ export const crearVistaInicial = (entrada: {
     () => (entrada.activa ? entrada.mapa() : undefined),
     (mapa) => {
       const alEmpezar = (movimiento: Movimiento) => {
-        if (movimiento.originalEvent !== undefined) colocado = true;
+        if (movimiento.originalEvent !== undefined) colocar();
       };
       mapa.on("movestart", alEmpezar);
       return () => {
@@ -228,7 +240,7 @@ export const crearVistaInicial = (entrada: {
     () => ({ mapa: entrada.mapa(), caja: encuadre() }),
     ({ mapa, caja }) => {
       if (colocado || mapa === undefined || caja === undefined) return;
-      colocado = true;
+      colocar();
       mapa.fitBounds(
         [
           [caja.suroeste.longitud, caja.suroeste.latitud],
@@ -248,11 +260,10 @@ export const crearVistaInicial = (entrada: {
     alCrear: () => {
       const caja = untrack(encuadre);
       if (colocado || caja === undefined) return undefined;
-      colocado = true;
+      colocar();
       return caja;
     },
-    yaColocado: () => {
-      colocado = true;
-    },
+    yaColocado: colocar,
+    pendiente: () => !puesta(),
   };
 };
