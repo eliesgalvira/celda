@@ -1,7 +1,6 @@
 import type { PuntoElegido } from "@celda/dominio/aportacion";
 import { rumboGrados } from "@celda/dominio/area";
 import type { Ficha } from "@celda/dominio/ficha";
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -84,12 +83,7 @@ const abrir = async (opciones: OpcionesDeUbicacion = {}) => {
   navegar(ruta.emplazamiento(CAMPUS_NORD.clave, "08"), { reemplazar: true });
   const pantalla = render(() => (
     <App
-      servicios={Layer.mergeAll(
-        capaDePrueba([Effect.succeed(CAPA)]),
-        fichas.capa,
-        simuladorDePrueba,
-        ubicacion.capa,
-      )}
+      servicios={Layer.mergeAll(capaDePrueba([Effect.succeed(CAPA)]), fichas.capa, ubicacion.capa)}
     />
   ));
   flush();

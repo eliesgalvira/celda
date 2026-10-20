@@ -1,4 +1,3 @@
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { render } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -22,7 +21,6 @@ describe("App", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([Effect.never]),
           fichasDePrueba().capa,
-          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />
@@ -47,7 +45,6 @@ describe("App", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([Effect.never]),
           fichasDePrueba().capa,
-          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />

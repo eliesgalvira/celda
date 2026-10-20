@@ -1,6 +1,5 @@
 import type { MedidaPropia } from "@celda/dominio/medida";
 import type { Ficha } from "@celda/dominio/ficha";
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -53,12 +52,7 @@ const servicios = (opciones: OpcionesDeUbicacion, fichas = fichasDePrueba()) => 
   return {
     dispositivo,
     fichas,
-    capa: Layer.mergeAll(
-      capaDePrueba([Effect.succeed(CAPA)]),
-      fichas.capa,
-      simuladorDePrueba,
-      dispositivo.capa,
-    ),
+    capa: Layer.mergeAll(capaDePrueba([Effect.succeed(CAPA)]), fichas.capa, dispositivo.capa),
   };
 };
 

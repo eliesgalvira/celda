@@ -16,7 +16,6 @@ import { criptoDelNavegador } from "./lib/cripto.ts";
 import { brujulaDelNavegador } from "./mejorar/brujula.ts";
 import { detectarDispositivo } from "./medir/dispositivo.ts";
 import { leerNavegador } from "./medir/navegador.ts";
-import { simuladorDelNavegador } from "./simulacion/navegador.ts";
 import { almacenEnIndexedDb } from "./ubicacion/almacen.ts";
 import { buscadorNominatim } from "./ubicacion/buscador.ts";
 import { geolocalizacionDelNavegador } from "./ubicacion/geolocalizacion.ts";
@@ -32,7 +31,6 @@ const servicios = Layer.mergeAll(
     fichasDelOrigen.pipe(Layer.provideMerge(capaDelOrigen), Layer.provide(indexadorDelNavegador)),
     buscadorNominatim,
   ).pipe(Layer.provide(FetchHttpClient.layer)),
-  simuladorDelNavegador,
   geolocalizacionDelNavegador(navigator, dispositivo),
   brujulaDelNavegador(window, dispositivo),
   almacen,

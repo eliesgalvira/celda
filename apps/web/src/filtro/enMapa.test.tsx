@@ -1,6 +1,5 @@
 import type { Compania } from "@celda/dominio/compania";
 import { claveDeFiltro, type FiltroDeCompanias, SIN_FILTRO } from "@celda/dominio/filtro";
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { render, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -103,12 +102,7 @@ const montar = async (guardado: ReadonlyArray<Compania> = SIN_FILTRO) => {
   let mandos: Mandos | undefined;
   const { unmount } = render(() => (
     <ProveedorDeDatos
-      servicios={Layer.mergeAll(
-        capa,
-        fichasDePrueba().capa,
-        simuladorDePrueba,
-        ubicacionDePrueba().capa,
-      )}
+      servicios={Layer.mergeAll(capa, fichasDePrueba().capa, ubicacionDePrueba().capa)}
     >
       <Prueba
         guardado={guardado}

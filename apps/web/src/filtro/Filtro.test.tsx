@@ -1,6 +1,5 @@
 import { ESQUEMA_AJUSTES } from "@celda/dominio/ajustes";
 import type { Ficha } from "@celda/dominio/ficha";
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -70,7 +69,6 @@ const montar = (
       servicios={Layer.mergeAll(
         capaDePrueba([Effect.succeed(CAPA)], { sinCombinaciones: opciones.datosDeAntes === true }),
         fichas.capa,
-        simuladorDePrueba,
         ubicacion.capa,
       )}
     />

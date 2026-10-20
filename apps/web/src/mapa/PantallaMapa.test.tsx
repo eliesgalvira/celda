@@ -1,4 +1,3 @@
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -44,7 +43,6 @@ describe("capa de emplazamientos en el mapa", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([Effect.never]),
           fichasDePrueba().capa,
-          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />
@@ -65,7 +63,6 @@ describe("capa de emplazamientos en el mapa", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([NO_LLEGA, Effect.succeed(CAPA)]),
           fichasDePrueba().capa,
-          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />
@@ -98,7 +95,6 @@ describe("capa de emplazamientos en el mapa", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([Effect.succeed(CAPA)]),
           fichasDePrueba().capa,
-          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />
@@ -127,7 +123,6 @@ describe("capa de emplazamientos en el mapa", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([Effect.succeed(capa)]),
           fichas.capa,
-          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />
@@ -154,7 +149,6 @@ describe("capa de emplazamientos en el mapa", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([Effect.succeed(CAPA)]),
           fichasDePrueba().capa,
-          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />
@@ -182,7 +176,6 @@ describe("capa de emplazamientos en el mapa", () => {
         servicios={Layer.mergeAll(
           capaDePrueba([Effect.succeed(conDigi)]),
           fichasDePrueba().capa,
-          simuladorDePrueba,
           ubicacionDePrueba().capa,
         )}
       />
@@ -203,7 +196,6 @@ describe("enlace a una ficha sin provincia o con una clave de antes", () => {
         anteriores: new Map([["orange-juntado", "movistar-0802532"]]),
       }),
       fichas.capa,
-      simuladorDePrueba,
       ubicacionDePrueba().capa,
     );
 

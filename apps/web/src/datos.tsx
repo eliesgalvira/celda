@@ -1,4 +1,3 @@
-import type { Simulador } from "@celda/sim/simulador";
 import { recursoFijo } from "@celda/ui/recurso.ts";
 import type { JSX } from "@solidjs/web";
 import type * as Crypto from "effect/Crypto";
@@ -17,14 +16,13 @@ import type { BuscadorDeDirecciones } from "./ubicacion/buscador.ts";
 import type { Geolocalizacion } from "./ubicacion/geolocalizacion.ts";
 
 /**
- * Los servicios de la interfaz: los datos del mapa, el simulador, el GPS, la brújula, lo guardado
- * en el dispositivo, el buscador y el envío de aportaciones al buzón. En las pruebas se sustituyen por capas de prueba, y el simulador, por
- * el que calcula en el mismo hilo.
+ * Los servicios de la interfaz: los datos del mapa, el GPS, la brújula, lo guardado en el
+ * dispositivo, el buscador y el envío de aportaciones al buzón. En las pruebas se sustituyen por
+ * capas de prueba.
  */
 export type ServiciosDeDatos =
   | CapaEmplazamientos
   | FichasPublicadas
-  | Simulador
   | Geolocalizacion
   | Brujula
   | AlmacenLocal

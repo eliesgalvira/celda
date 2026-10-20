@@ -1,4 +1,3 @@
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { CLAVE_DEL_TEMA } from "@celda/ui/temaElegido.ts";
 import { afterEach, assert, beforeEach, describe, it } from "@effect/vitest";
 import { fireEvent, render } from "@solidjs/testing-library";
@@ -20,7 +19,6 @@ const montar = () => {
       servicios={Layer.mergeAll(
         capaDePrueba([Effect.never]),
         fichasDePrueba().capa,
-        simuladorDePrueba,
         ubicacionDePrueba().capa,
       )}
     />

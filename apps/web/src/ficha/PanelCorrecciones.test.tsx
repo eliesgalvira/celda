@@ -1,5 +1,4 @@
 import type { Ficha } from "@celda/dominio/ficha";
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { render, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -38,7 +37,6 @@ const abrirCon = async (ficha: Ficha) => {
       servicios={Layer.mergeAll(
         capaDePrueba([Effect.succeed(CAPA)]),
         fichas.capa,
-        simuladorDePrueba,
         ubicacionDePrueba().capa,
       )}
     />

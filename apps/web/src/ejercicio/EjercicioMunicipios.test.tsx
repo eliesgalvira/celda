@@ -1,6 +1,5 @@
 import type { Coordenada } from "@celda/dominio/area";
 import { ESQUEMA_AJUSTES } from "@celda/dominio/ajustes";
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import * as Layer from "effect/Layer";
@@ -79,7 +78,7 @@ const servicios = (capa: Layer.Layer<CapaEmplazamientos>) => {
   const ubicacionPrueba = ubicacionDePrueba({
     ajustes: { esquema: ESQUEMA_AJUSTES, modoEstudiante: true },
   });
-  return Layer.mergeAll(capa, fichasDePrueba().capa, simuladorDePrueba, ubicacionPrueba.capa);
+  return Layer.mergeAll(capa, fichasDePrueba().capa, ubicacionPrueba.capa);
 };
 
 /** Monta la web con el modo estudiante encendido y la capa de varias provincias. */

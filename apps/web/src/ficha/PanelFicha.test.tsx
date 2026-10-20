@@ -6,7 +6,6 @@ import {
   lugarDelPunto,
 } from "@celda/dominio/municipio";
 import { generarLoteDeProvincia } from "@celda/dominio/provincias";
-import { simuladorDePrueba } from "@celda/sim/pruebas";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -176,7 +175,6 @@ const abrir = (clave: string) => {
             ConfigProvider.layer(ConfigProvider.fromUnknown({ VITE_CAPAS_ORIGEN: ORIGEN })),
           ),
         ),
-        simuladorDePrueba,
         ubicacionDePrueba().capa,
       )}
     />

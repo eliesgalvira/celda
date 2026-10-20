@@ -37,12 +37,6 @@ export interface OpcionesRecurso<K> {
 /** Aperturas por segundo de un recurso a partir de las cuales el vigilante avisa. */
 export const MAXIMO_POR_SEGUNDO = 10;
 
-/**
- * El tope de un recurso que se reabre con cada evento de un gesto (arrastrar el punto, mover un
- * deslizador): uno por fotograma en una pantalla de 120 Hz.
- */
-export const SIGUE_UN_GESTO = 120;
-
 const cerrada = <K>(clave: K | Cerrado): clave is Cerrado =>
   clave === false || clave === null || clave === undefined;
 
