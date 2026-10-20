@@ -470,6 +470,51 @@ Medido con `gzip -9` contra `celda/v1` (0631fc3) construida igual.
 - **Peso.** La primera pantalla baja 19,0 KB con `gzip -9` (242.853 → 223.890 bytes): salen las celdas, el sector que da servicio, el diagrama de radiación, la vista de interferencia y el simulador que les pasaba los cálculos al Worker. La hoja de estilos baja 0,6 KB (24.216 → 23.634). El Worker de la simulación ya no existe; pesaba 26.398 bytes con `gzip -9` y se pedía con el primer cálculo, al abrir una ficha o al cruzar el zoom 15. El trozo del mapa (305.600 bytes) y el Worker de capas (38.114) quedan igual. Todo el JavaScript, sin los trozos de las zonas del ejercicio, pasa de 864.789 a 819.430 bytes.
 - **Peticiones.** Abrir una ficha ya no arranca un Worker, y a zoom 15 o más el mapa ya no pide las provincias vecinas de lo que se ve, solo las que se ven.
 
+## Las pruebas del navegador, sin red (20/10/2026, #85)
+
+`pnpm run resistencia` y `pnpm run deriva` dicen que no necesitan conexión. Para comprobarlo, cada una corrió con `celda/v1` (1935684) en un espacio de red de Linux con solo 127.0.0.1 (`unshare -rn`), y Chromium escribió su registro de red (`--log-net-log`) sin resolver ningún nombre fuera de 127.0.0.1. El registro ve todo lo que llega a la pila de red de Chromium, lo pida la página, uno de sus Workers o el propio navegador. Lo que contesta Playwright no llega a ella.
+
+| Peticiones que llegaron a la pila de red en una pasada | `resistencia` | `deriva` |
+|---|---|---|
+| Al sitio local | 20 | 18 |
+| De la página o de sus Workers, fuera del sitio | 0 | 0 |
+| Del propio Chromium, a Google | 6 | 6 |
+
+Las de Chromium fueron las mismas en las dos pruebas: una a `clients2.google.com/time/1/current`, una a `update.googleapis.com/service/update2/json`, dos a `android.clients.google.com/checkin` y dos a `www.google.com/async/folae`. Playwright no las ve, y en la CI llegaban a Google.
+
+Playwright contestaba todo lo que la página pedía fuera del sitio, también lo que pide el Worker de MapLibre. Una sonda que repetía el arranque de `deriva` encontró las cuatro teselas de la vista inicial en las entradas de `performance` del propio Worker y en el registro de la ruta del contexto, contestadas con un 200. La sospecha del #85, que las teselas del Worker se saltaban el enrutado y llegaban a `tiles.openfreemap.org`, no se cumplía.
+
+Las teselas falsas de OpenFreeMap no contaban como cargadas porque la web no llegaba a pedirlas. El TileJSON falso declaraba `vector_layers: []`. Al leerlo, MapLibre lanzaba un error sin fuente, `Source layer "landuse" does not exist on source "openmaptiles" as specified by style layer "usos"`. `vigilarCallejero` cuenta los errores sin fuente contra el mapa base principal, porque así llegan los fallos de sus glifos. La web pasaba a la reserva en cuanto llegaba el TileJSON. Desde el #60 (04/10/2026) las dos pruebas iban siempre con la reserva, y `resistencia` pidió sus teselas al IGN de verdad en cada pasada hasta 1935684, que también las contesta en local.
+
+Ahora `tools/rendimiento/src/red.ts` lleva la red de las dos pruebas:
+
+- El TileJSON falso declara las 16 capas del esquema de OpenMapTiles, como el de OpenFreeMap, y las teselas vacías cuentan como cargadas. Si una capa del estilo leyera una capa que OpenFreeMap no tiene, la web de verdad pasaría a la reserva y las pruebas fallarían.
+- Una sola ruta del contexto contesta lo que la página y sus Workers piden fuera del sitio, que es el TileJSON, las teselas y los glifos de OpenFreeMap y las teselas y los glifos del IGN. Corta lo demás, y la pasada falla con su URL.
+- La pasada falla también si la web no usa el mapa base que le toca. Con el principal, falla si no pide ninguna tesela a OpenFreeMap o si pide alguna al IGN.
+- Chromium arranca con `--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1`, una regla como la que pone Playwright con un proxy SOCKS. No resuelve ningún nombre salvo 127.0.0.1, así que nada llega a la red aunque se salte el enrutado. Chromium sigue intentando sus peticiones a Google, de cinco a ocho por prueba, y todas acaban en `ERR_NAME_NOT_RESOLVED` sin preguntar a ningún DNS.
+- `resistencia` hace dos pasadas, cada una en un contexto nuevo, una con el mapa base principal y otra con OpenFreeMap cortando la conexión, que prueba a propósito el paso a la reserva. Ahora tarda 72 s, y antes tardaba 37. `deriva` va solo con el principal y tarda lo mismo, 34 s.
+
+Para ver que las comprobaciones fallan cuando deben, `deriva` corrió dos veces con un cambio de prueba, que se deshizo después. Con un `fetch` a `https://example.org/desde-la-pagina` en la página y otro a `https://example.org/desde-un-worker` desde un Worker, terminó con código 1 y las dos URL, y ninguna llegó al registro de red. Con el TileJSON de antes terminó con código 1 y «La web pidió 0 teselas a OpenFreeMap y 31 al IGN, así que no se quedó con el mapa base principal.».
+
+Cinco pasadas seguidas de cada prueba antes y después, en el mismo espacio sin red y con el Chromium de `nix develop .#resistencia` (153.0.8010.52). Las veinte terminaron con código 0, y en las diez de después el registro de red no tiene ninguna petición de la página ni de sus Workers fuera de 127.0.0.1.
+
+| `resistencia` | Antes, con la reserva sin querer | Principal | Reserva |
+|---|---|---|---|
+| Lo que crece en la ventana quieta, salvo `setTimeout` | 0 | 0 | 0 |
+| `setTimeout` en la ventana quieta, con tope 660 | 331–332 | 331–332 | 331–332 |
+| Al empezar: `addEventListener`, `postMessage` y fotogramas | 371–387, 337–355 y 76–92 | 342–379, 320–373 y 76–89 | 386–390, 346 y 89–100 |
+| Teselas contestadas de OpenFreeMap y del IGN | 0 y sin contar | 8 y 0 | 0 y 13 |
+
+Las cuentas al empezar cambian unas veinte de una pasada a otra en los tres casos, y la prueba no las limita.
+
+| `deriva`, medidas por gesto con la CPU a ×1 y a ×4 | Antes | Después |
+|---|---|---|
+| Alejar del 15,5 al 13 de un tirón | 725–775 y 475–525 | 675–700 y 425–500 |
+| Alejar, acercar a mitad del paso y alejar otra vez | 1400–1425 y 1000–1025 | 1275–1325 y 950–975 |
+| Acercar del 14,3 al 15,8 | 225–240 y 210–255 | 195–225 y 195–225 |
+
+Antes y después salen los mismos puntos por gesto (25, 25 y 15), la misma media (0,04 px) y el mismo máximo (0,07 px al alejar y 0,05 al acercar), y después se contestan 31 teselas de OpenFreeMap y ninguna del IGN. Hay de un 5 a un 10 % menos de medidas porque con el mapa base principal cada gesto pinta algún fotograma menos en SwiftShader. Con el TileJSON de antes, la misma prueba volvió a dar 800, 1450 y 240 con la CPU a ×1. Cada gesto sigue midiendo cientos de veces el paso entero, y con la web de antes del #74 la prueba daba de 242 a 259 px.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.
@@ -497,7 +542,8 @@ Medido con `gzip -9` contra `celda/v1` (0631fc3) construida igual.
 
 ## Garantías con prueba
 
-- `tools/rendimiento/src/resistencia.ts`, en la CI: con la web quieta 30 s no se abre nada ni se pide ningún fotograma. Ver [efectos.md](efectos.md).
+- `tools/rendimiento/src/resistencia.ts`, en la CI: con la web quieta 30 s no se abre nada ni se pide ningún fotograma, con el mapa base principal y con el de reserva. Ver [efectos.md](efectos.md).
+- `tools/rendimiento/src/red.ts`, en `resistencia` y en `deriva`: nada sale a la red, y la pasada falla con la URL si la página o uno de sus Workers piden algo que la prueba no contesta, o si la web no usa el mapa base de la pasada. Ver «Las pruebas del navegador, sin red».
 - `apps/web/src/capa/agrupacion.test.ts`: el índice construido en un Worker y rehidratado da las mismas escenas, con lo mismo dentro de cada elemento, y las mismas transiciones entre cualquier par de niveles que el construido en el hilo.
 - `apps/web/src/capa/nacional.test.ts`: de lejos, solo el resumen; desde el zoom 8, las provincias que corta la vista; en el borde entre dos provincias ningún emplazamiento está dos veces y cada número cuadra, y cada provincia sale de su hexágono al acercar o al llegar.
 - `tools/rendimiento/src/deriva.ts` (`pnpm run deriva`), en la CI, y `apps/web/src/mapa/Marcadores.test.tsx`: en el paso entre la vista de puntos y los logos, cada punto del DOM que se mueve está a menos de 1 px de su emplazamiento en cada fotograma, aunque el zoom siga cambiando a mitad del paso o cambie de sentido. Ver «Los puntos del paso, en su sitio». `deriva.ts` comprueba además que la región del mapa sigue ocupada hasta que la web pone su vista inicial, con la lectura de IndexedDB retrasada.
