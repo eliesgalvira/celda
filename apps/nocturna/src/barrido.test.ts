@@ -6,7 +6,6 @@ import {
   type ZonaDeBarrido,
   ZONAS_DE_BARRIDO,
 } from "@celda/dominio/barrido";
-import type { OpcionesZonas } from "@celda/ingesta/barrido";
 import { ExtractorPorCajas, RespuestaInesperada } from "@celda/ingesta/extractor";
 import { ObservacionGuardada } from "@celda/ingesta/guardado";
 import {
@@ -33,6 +32,7 @@ import {
   CATALUNA_CADA_NOCHE,
   conBase,
   conEntorno,
+  EN_RONDAS,
   type Entorno,
   tablasDe,
   unaNoche,
@@ -40,21 +40,12 @@ import {
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
+/** Lo que va del primer sábado de un mes al del siguiente, como mucho. */
+const MES = 35 * DIA;
 
 /** Dos zonas de un cuadro cada una: el de Barcelona y el de al lado, hacia el oeste. */
 const A: ZonaDeBarrido = { nombre: "a", titulo: "A", comunidades: ["09"], cuadros: ["2,41"] };
 const B: ZonaDeBarrido = { nombre: "b", titulo: "B", comunidades: ["09"], cuadros: ["1,41"] };
-
-const cadaNoche = (...zonas: ReadonlyArray<ZonaDeBarrido>): OpcionesZonas => ({
-  cadaNoche: zonas,
-  enTurno: [],
-  porNoche: 1,
-});
-const porTurnos = (...zonas: ReadonlyArray<ZonaDeBarrido>): OpcionesZonas => ({
-  cadaNoche: [],
-  enTurno: zonas,
-  porNoche: 1,
-});
 
 /** La muestra de Campus Nord con la mitad de sus registros movidos 1° al oeste, a la zona B. */
 const repartida = (grabada: FuenteGrabada): FuenteGrabada => ({
@@ -130,8 +121,19 @@ const conFallos = (
 
 const registro = (grabada: FuenteGrabada) => capaGrabadaPorCajas("registro-oficial", grabada);
 
-const noche = (entorno: Entorno, extractor: Layer.Layer<ExtractorPorCajas>, zonas: OpcionesZonas) =>
-  unaNoche(entorno, extractor, { proceso: { ...CATALUNA_CADA_NOCHE, zonas } });
+/** Una ejecución que es una ronda nueva y barre `zonas`. */
+const noche = (
+  entorno: Entorno,
+  extractor: Layer.Layer<ExtractorPorCajas>,
+  zonas: ReadonlyArray<ZonaDeBarrido>,
+) => unaNoche(entorno, extractor, { proceso: { ...CATALUNA_CADA_NOCHE, zonas } });
+
+/** Una ejecución con las rondas de producción, que barre `zonas`. */
+const enRonda = (
+  entorno: Entorno,
+  extractor: Layer.Layer<ExtractorPorCajas>,
+  zonas: ReadonlyArray<ZonaDeBarrido>,
+) => unaNoche(entorno, extractor, { proceso: { ...EN_RONDAS, zonas } });
 
 interface Observada {
   readonly clave: string;
@@ -238,7 +240,7 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
         // Con un tope de 8, los 40 registros de Campus Nord obligan a dividir su cuadro.
         const fuente = conFallos(grabada, { pedidas, tope: 8 });
         yield* TestClock.setTime(NOCHE);
-        yield* noche(entorno, fuente, cadaNoche(A));
+        yield* noche(entorno, fuente, [A]);
         const primera = yield* Ref.getAndSet(pedidas, []);
         const guardadas = yield* Effect.gen(function* () {
           const sql = yield* SqlClient.SqlClient;
@@ -250,7 +252,7 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
         assert.isAbove(guardadas.length, 1);
 
         yield* TestClock.adjust(DIA);
-        yield* noche(entorno, fuente, cadaNoche(A));
+        yield* noche(entorno, fuente, [A]);
         assert.deepStrictEqual(yield* Ref.get(pedidas), guardadas);
         const ultima = yield* ultimaEjecucion(entorno);
         assert.strictEqual(ultima.zonas?.[0]?.peticiones, guardadas.length);
@@ -268,16 +270,12 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
           const enA = claveEn(grabada, "2,41");
           const enB = claveEn(grabada, "1,41");
           yield* TestClock.setTime(NOCHE);
-          yield* noche(entorno, registro(grabada), cadaNoche(A, B));
+          yield* noche(entorno, registro(grabada), [A, B]);
 
-          // Segunda noche: la zona A falla y a B le falta una estación. A tampoco trae la suya.
+          // Segunda ronda: la zona A falla y a B le falta una estación. A tampoco trae la suya.
           const sinLasDos = sin(sin(grabada, enA), enB);
           yield* TestClock.adjust(DIA);
-          const segunda = yield* noche(
-            entorno,
-            conFallos(sinLasDos, { fallaEn: "2,41" }),
-            cadaNoche(A, B),
-          );
+          const segunda = yield* noche(entorno, conFallos(sinLasDos, { fallaEn: "2,41" }), [A, B]);
           assert.deepStrictEqual(
             segunda.ejecuciones[0]?.zonas.map((z) => [z.zona, z.estado]),
             [
@@ -294,47 +292,123 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
           // Tercera: las dos bien y sin las dos estaciones. B lleva dos barridos seguidos sin la
           // suya y la retira; A, uno.
           yield* TestClock.adjust(DIA);
-          yield* noche(entorno, registro(sinLasDos), cadaNoche(A, B));
+          yield* noche(entorno, registro(sinLasDos), [A, B]);
           assert.isTrue((yield* observada(entorno, enB)).retirada);
           const deA = yield* observada(entorno, enA);
           assert.isFalse(deA.retirada);
           assert.strictEqual(deA.ausencias, 1);
 
           yield* TestClock.adjust(DIA);
-          yield* noche(entorno, registro(sinLasDos), cadaNoche(A, B));
+          yield* noche(entorno, registro(sinLasDos), [A, B]);
           assert.isTrue((yield* observada(entorno, enA)).retirada);
         }),
       ),
   );
 
-  it.effect("con las zonas por turnos, retirar espera al segundo barrido de su zona", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const grabada = repartida(yield* muestraCampusNord);
-        const enA = claveEn(grabada, "2,41");
-        yield* TestClock.setTime(NOCHE);
-        yield* noche(entorno, registro(grabada), cadaNoche(A, B));
+  it.effect(
+    "en cada ronda, el domingo solo barre la zona que el sábado no completó, y una estación que falta se retira en la segunda ronda sin ella",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = repartida(yield* muestraCampusNord);
+          const enA = claveEn(grabada, "2,41");
+          const pedidas = yield* Ref.make<ReadonlyArray<Caja>>([]);
+          const cuadrosPedidos = Effect.map(Ref.getAndSet(pedidas, []), (cajas) => [
+            ...new Set(cajas.map((caja) => `${Math.floor(caja[0])},${Math.floor(caja[1])}`)),
+          ]);
+          yield* TestClock.setTime(NOCHE);
+          yield* enRonda(entorno, conFallos(grabada, { pedidas }), [A, B]);
+          assert.deepStrictEqual(yield* cuadrosPedidos, ["2,41", "1,41"]);
 
-        const sinEnA = sin(grabada, enA);
-        const turnos: Array<string> = [];
-        for (let n = 0; n < 3; n++) {
+          // El sábado del mes siguiente falta la de A, y A falla: no le cuenta ninguna ausencia.
+          const sinEnA = sin(grabada, enA);
+          yield* TestClock.adjust(MES);
+          const sabado = yield* enRonda(entorno, conFallos(sinEnA, { fallaEn: "2,41", pedidas }), [
+            A,
+            B,
+          ]);
+          assert.deepStrictEqual(yield* cuadrosPedidos, ["2,41", "1,41"]);
+          assert.deepStrictEqual(sabado.ejecuciones[0]?.porLeer?.zonas, ["a"]);
+          assert.strictEqual((yield* observada(entorno, enA)).ausencias, 0);
+
+          // El domingo solo barre A, que ahora sí acaba: la primera ausencia.
           yield* TestClock.adjust(DIA);
-          const hecha = yield* noche(entorno, registro(sinEnA), porTurnos(A, B));
-          turnos.push(...(hecha.ejecuciones[0]?.zonas.map((z) => z.zona) ?? []));
-          const deA = yield* observada(entorno, enA);
-          // Tras A (una ausencia), tras B (sigue igual) y tras A otra vez (retirada).
+          const domingo = yield* enRonda(entorno, conFallos(sinEnA, { pedidas }), [A, B]);
+          assert.deepStrictEqual(yield* cuadrosPedidos, ["2,41"]);
           assert.deepStrictEqual(
-            [deA.ausencias, deA.retirada],
-            [
-              [1, false],
-              [1, false],
-              [2, true],
-            ][n],
+            domingo.ejecuciones[0]?.zonas.map((z) => [z.zona, z.estado]),
+            [["a", "completado"]],
           );
-        }
-        assert.deepStrictEqual(turnos, ["a", "b", "a"]);
-      }),
-    ),
+          assert.deepStrictEqual(domingo.ejecuciones[0]?.porLeer?.zonas, []);
+          const trasElDomingo = yield* observada(entorno, enA);
+          assert.deepStrictEqual([trasElDomingo.ausencias, trasElDomingo.retirada], [1, false]);
+
+          // Otra ejecución el mismo fin de semana no barre nada.
+          yield* TestClock.adjust(3_600_000);
+          yield* enRonda(entorno, conFallos(sinEnA, { pedidas }), [A, B]);
+          assert.deepStrictEqual(yield* cuadrosPedidos, []);
+
+          // El mes siguiente, la segunda ronda sin ella la retira: dos meses desde que faltó.
+          yield* TestClock.adjust(MES);
+          yield* enRonda(entorno, conFallos(sinEnA, { pedidas }), [A, B]);
+          assert.deepStrictEqual(yield* cuadrosPedidos, ["2,41", "1,41"]);
+          const retirada = yield* observada(entorno, enA);
+          assert.deepStrictEqual([retirada.ausencias, retirada.retirada], [2, true]);
+        }),
+      ),
+  );
+
+  it.effect(
+    "un barrido que se quedó a medias en una ronda anterior no se retoma: la ronda nueva lo empieza de cero",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          yield* TestClock.setTime(NOCHE);
+          // Se va la luz al pedir el quinto cuadro de Cataluña, con cuatro ya guardados.
+          const cortada = Layer.effect(
+            ExtractorPorCajas,
+            Effect.gen(function* () {
+              const vez = yield* Ref.make(0);
+              const real = yield* ExtractorPorCajas;
+              return ExtractorPorCajas.of({
+                ...real,
+                caja: (caja) =>
+                  Effect.flatMap(
+                    Ref.updateAndGet(vez, (n) => n + 1),
+                    (n) => (n === 5 ? Effect.die("se ha ido la luz") : real.caja(caja)),
+                  ),
+              });
+            }),
+          ).pipe(Layer.provide(capaGrabadaPorCajas("registro-oficial", grabada)));
+          assert.isTrue(
+            Exit.isFailure(yield* Effect.exit(unaNoche(entorno, cortada, { proceso: EN_RONDAS }))),
+          );
+
+          // Nadie lo retoma ese fin de semana. Un mes después se piden los nueve cuadros.
+          const pedidas = yield* Ref.make<ReadonlyArray<Caja>>([]);
+          yield* TestClock.adjust(MES);
+          const hecha = yield* unaNoche(entorno, conFallos(grabada, { pedidas }), {
+            proceso: EN_RONDAS,
+          });
+          assert.lengthOf(yield* Ref.get(pedidas), 9);
+          assert.strictEqual(hecha.ejecuciones[0]?.zonas[0]?.cuadros, 9);
+          const barridos = yield* Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            return yield* sql<{
+              readonly estado: string;
+              readonly error: string | null;
+            }>`SELECT estado, error FROM barridos ORDER BY id`;
+          }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
+          assert.deepStrictEqual(
+            barridos.map((b) => [b.estado, b.error]),
+            [
+              ["fallido", "a medias en una ronda anterior"],
+              ["completado", null],
+            ],
+          );
+        }),
+      ),
   );
 
   it.effect("una estación que se mueve a un cuadro de otra zona no se retira", () =>
@@ -343,24 +417,25 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
         const grabada = repartida(yield* muestraCampusNord);
         const enA = claveEn(grabada, "2,41");
         yield* TestClock.setTime(NOCHE);
-        yield* noche(entorno, registro(grabada), cadaNoche(A, B));
+        yield* noche(entorno, registro(grabada), [A, B]);
 
-        // Pasa del cuadro 2,41 (zona A) al 1,41 (zona B). Las zonas se turnan, así que la
-        // primera noche A no la ve y B aún no la ha visto en su sitio nuevo.
+        // Pasa del cuadro 2,41 (zona A) al 1,41 (zona B). Las zonas se barren en ejecuciones
+        // distintas, como cuando una falla el sábado y la acaba el domingo, así que la primera
+        // A no la ve y B aún no la ha visto en su sitio nuevo.
         const movidaAB = movida(grabada, enA, 1.9);
         for (let n = 0; n < 5; n++) {
           yield* TestClock.adjust(DIA);
-          yield* noche(entorno, registro(movidaAB), porTurnos(A, B));
-          assert.isFalse((yield* observada(entorno, enA)).retirada, `noche ${n + 1}`);
+          yield* noche(entorno, registro(movidaAB), n % 2 === 0 ? [A] : [B]);
+          assert.isFalse((yield* observada(entorno, enA)).retirada, `ejecución ${n + 1}`);
         }
         const ahora = yield* observada(entorno, enA);
         assert.strictEqual(ahora.cuadro, "1,41");
         assert.strictEqual(ahora.ausencias, 0);
 
-        // Y si vuelve con las dos zonas la misma noche, tampoco.
+        // Y si vuelve con las dos zonas en la misma ejecución, tampoco.
         for (let n = 0; n < 2; n++) {
           yield* TestClock.adjust(DIA);
-          yield* noche(entorno, registro(grabada), cadaNoche(A, B));
+          yield* noche(entorno, registro(grabada), [A, B]);
         }
         const vuelta = yield* observada(entorno, enA);
         assert.deepStrictEqual(
@@ -376,11 +451,11 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
       Effect.gen(function* () {
         const grabada = yield* muestraCampusNord;
         yield* TestClock.setTime(NOCHE);
-        yield* noche(entorno, registro(grabada), cadaNoche(A));
+        yield* noche(entorno, registro(grabada), [A]);
         const vacia: FuenteGrabada = { ...grabada, listado: { registros: [], avisos: [] } };
         for (let n = 0; n < 3; n++) {
           yield* TestClock.adjust(DIA);
-          const hecha = yield* noche(entorno, registro(vacia), cadaNoche(A));
+          const hecha = yield* noche(entorno, registro(vacia), [A]);
           assert.strictEqual(hecha.ejecuciones[0]?.estado, "fallida");
         }
         const ultima = yield* ultimaEjecucion(entorno);
@@ -396,64 +471,74 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
     ),
   );
 
-  it.effect("un barrido cortado a mitad se retoma sin repetir los cuadros guardados", () =>
-    Effect.gen(function* () {
-      const grabada = yield* muestraCampusNord.pipe(Effect.provide(NodeServices.layer));
-      yield* TestClock.setTime(NOCHE);
-      // Se va la luz al pedir el quinto cuadro de Cataluña (3,41), con 2,41 ya guardado.
-      const cortada = Layer.effect(
-        ExtractorPorCajas,
-        Effect.gen(function* () {
-          const pedidas = yield* Ref.make(0);
-          const real = yield* ExtractorPorCajas;
-          return ExtractorPorCajas.of({
-            ...real,
-            caja: (caja) =>
-              Effect.flatMap(
-                Ref.updateAndGet(pedidas, (n) => n + 1),
-                (n) => (n === 5 ? Effect.die("se ha ido la luz") : real.caja(caja)),
+  it.effect(
+    "un barrido cortado a mitad se retoma en la misma ronda sin repetir los cuadros guardados",
+    () =>
+      Effect.gen(function* () {
+        const grabada = yield* muestraCampusNord.pipe(Effect.provide(NodeServices.layer));
+        yield* TestClock.setTime(NOCHE);
+        // Se va la luz al pedir el quinto cuadro de Cataluña (3,41), con 2,41 ya guardado.
+        const cortada = Layer.effect(
+          ExtractorPorCajas,
+          Effect.gen(function* () {
+            const pedidas = yield* Ref.make(0);
+            const real = yield* ExtractorPorCajas;
+            return ExtractorPorCajas.of({
+              ...real,
+              caja: (caja) =>
+                Effect.flatMap(
+                  Ref.updateAndGet(pedidas, (n) => n + 1),
+                  (n) => (n === 5 ? Effect.die("se ha ido la luz") : real.caja(caja)),
+                ),
+            });
+          }),
+        ).pipe(Layer.provide(capaGrabadaPorCajas("registro-oficial", grabada)));
+        const pedidas = yield* Ref.make<ReadonlyArray<Caja>>([]);
+
+        const retomada = yield* conEntorno((entorno) =>
+          Effect.gen(function* () {
+            assert.isTrue(
+              Exit.isFailure(
+                yield* Effect.exit(unaNoche(entorno, cortada, { proceso: EN_RONDAS })),
               ),
-          });
-        }),
-      ).pipe(Layer.provide(capaGrabadaPorCajas("registro-oficial", grabada)));
-      const pedidas = yield* Ref.make<ReadonlyArray<Caja>>([]);
+            );
+            const aMedias = yield* conBase(
+              entorno.base,
+              Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+            );
+            const registro = aMedias.fuentes.find((f) => f.fuente === "registro-oficial");
+            assert.deepStrictEqual(registro?.zonas, [
+              { zona: "cataluna", completado: null, aMedias: true },
+            ]);
+            assert.strictEqual(registro?.vigentes, 40);
 
-      const retomada = yield* conEntorno((entorno) =>
-        Effect.gen(function* () {
-          assert.isTrue(Exit.isFailure(yield* Effect.exit(unaNoche(entorno, cortada))));
-          const aMedias = yield* conBase(
-            entorno.base,
-            Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
-          );
-          const registro = aMedias.fuentes.find((f) => f.fuente === "registro-oficial");
-          assert.deepStrictEqual(registro?.zonas, [
-            { zona: "cataluna", completado: null, aMedias: true },
-          ]);
-          assert.strictEqual(registro?.vigentes, 40);
+            // La retoma la ejecución siguiente de la ronda. Va a la misma hora, para comparar sus
+            // tablas con las de una ejecución entera.
+            yield* unaNoche(entorno, conFallos(grabada, { pedidas }), { proceso: EN_RONDAS });
+            return {
+              tablas: yield* tablasDe(entorno.base),
+              ultima: yield* ultimaEjecucion(entorno),
+            };
+          }),
+        );
+        // Solo pide los cinco cuadros que faltaban.
+        assert.deepStrictEqual(
+          (yield* Ref.get(pedidas)).map((caja) => `${caja[0]},${caja[1]}`),
+          ["3,41", "0,42", "1,42", "2,42", "3,42"],
+        );
+        assert.strictEqual(retomada.ultima.zonas?.[0]?.cuadros, 5);
+        assert.strictEqual(retomada.ultima.zonas?.[0]?.estado, "completado");
 
-          yield* unaNoche(entorno, conFallos(grabada, { pedidas }));
-          return {
-            tablas: yield* tablasDe(entorno.base),
-            ultima: yield* ultimaEjecucion(entorno),
-          };
-        }),
-      );
-      // Solo pide los cinco cuadros que faltaban.
-      assert.deepStrictEqual(
-        (yield* Ref.get(pedidas)).map((caja) => `${caja[0]},${caja[1]}`),
-        ["3,41", "0,42", "1,42", "2,42", "3,42"],
-      );
-      assert.strictEqual(retomada.ultima.zonas?.[0]?.cuadros, 5);
-      assert.strictEqual(retomada.ultima.zonas?.[0]?.estado, "completado");
-
-      const completa = yield* conEntorno((entorno) =>
-        Effect.andThen(
-          unaNoche(entorno, capaGrabadaPorCajas("registro-oficial", grabada)),
-          tablasDe(entorno.base),
-        ),
-      );
-      assert.deepStrictEqual(retomada.tablas, completa);
-    }),
+        const completa = yield* conEntorno((entorno) =>
+          Effect.andThen(
+            unaNoche(entorno, capaGrabadaPorCajas("registro-oficial", grabada), {
+              proceso: EN_RONDAS,
+            }),
+            tablasDe(entorno.base),
+          ),
+        );
+        assert.deepStrictEqual(retomada.tablas, completa);
+      }),
   );
 
   it.effect("un cuadro en el tope tras las divisiones máximas hace fallar su zona", () =>
@@ -468,7 +553,7 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
           listado: { registros: [uno, { ...dos, posicion: uno.posicion }], avisos: [] },
         };
         yield* TestClock.setTime(NOCHE);
-        const hecha = yield* noche(entorno, conFallos(juntas, { tope: 2 }), cadaNoche(A));
+        const hecha = yield* noche(entorno, conFallos(juntas, { tope: 2 }), [A]);
         assert.strictEqual(hecha.ejecuciones[0]?.estado, "fallida");
         const ultima = yield* ultimaEjecucion(entorno);
         assert.include(ultima.zonas?.[0]?.error ?? "", "CuadroSinDividir");
@@ -490,7 +575,7 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
             "../../../nix/nocturna-nixos.mod.nix",
           ),
         );
-        // La lista da el enumerado de las opciones y el orden de las que se turnan por defecto.
+        // La lista da el enumerado de las opciones y el orden de las de cada ronda por defecto.
         const enumerado = /zonasDeBarrido = \[([^\]]*)\]/u.exec(modulo)?.[1] ?? "";
         assert.include(modulo, "zonaDeBarrido = enum zonasDeBarrido;");
         assert.include(modulo, "default = zonasDeBarrido;");
@@ -547,14 +632,10 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
           assert.strictEqual(antes.get(enMadrid.clave)?.cuadro, "-4,40");
           assert.strictEqual(antes.get(quitada.clave)?.cuadro, "2,41");
 
-          // La primera noche por zonas cuenta una ausencia a la del cuadro de la zona que el
+          // La primera ejecución por zonas cuenta una ausencia a la del cuadro de la zona que el
           // listado ya no trae, y ninguna a la de Madrid, que no es de la zona.
           yield* TestClock.setTime(NOCHE);
-          yield* noche(
-            entorno,
-            registro(sin(sin(grabada, enMadrid.clave), quitada.clave)),
-            cadaNoche(A),
-          );
+          yield* noche(entorno, registro(sin(sin(grabada, enMadrid.clave), quitada.clave)), [A]);
           const despues = yield* observadas(entorno);
           assert.strictEqual(despues.get(quitada.clave)?.ausencias, 1);
           assert.strictEqual(despues.get(enMadrid.clave)?.ausencias, 0);

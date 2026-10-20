@@ -1,5 +1,5 @@
 import type { Fuente } from "@celda/dominio/observacion";
-import { limiteDeCambiosDesdeConfig, opcionesZonasDesdeConfig } from "@celda/ingesta/barrido";
+import { limiteDeCambiosDesdeConfig, RECIENTE, zonasDesdeConfig } from "@celda/ingesta/barrido";
 import type { OpcionesCliente } from "@celda/ingesta/cliente";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
 import { opcionesClienteDeFichas, opcionesFichasDesdeConfig } from "@celda/ingesta/fichas";
@@ -9,11 +9,12 @@ import * as Duration from "effect/Duration";
 import * as Option from "effect/Option";
 
 import { type ConexionDePublicacion, conexionDePublicacionDesdeConfig } from "./buzon.ts";
+import { calendarioDesdeConfig } from "./calendario.ts";
 import type { OpcionesNoche } from "./programa.ts";
 
-/** Todo lo que la ingesta nocturna lee de fuera, con los valores de hoy por defecto. */
+/** Todo lo que la ingesta lee de fuera, con los valores de producción por defecto. */
 export interface Configuracion {
-  /** El fichero SQLite con el estado entre noches. */
+  /** El fichero SQLite con el estado entre ejecuciones. */
   readonly base: string;
   /** El fichero SQLite del archivo de páginas del registro (ADR 0027). */
   readonly archivo: string;
@@ -26,7 +27,7 @@ export interface Configuracion {
   readonly buzon: Option.Option<ConexionDePublicacion>;
 }
 
-/** Cada cuánto se reintenta una publicación fallida la misma noche. */
+/** Cuánto se espera para repetir una publicación fallida en la misma ejecución. */
 export const REINTENTO_DE_PUBLICACION = Duration.hours(1);
 
 /** Copias de seguridad de la base que se conservan. */
@@ -43,12 +44,13 @@ export const COPIAS_CONSERVADAS = 14;
  * - `CELDA_PUBLICAR_REINTENTO_MINUTOS`: espera antes de repetir una publicación fallida (60).
  * - `CELDA_REGISTRO_ACTIVO` y `CELDA_REGISTRO_MOTIVO`: el interruptor del registro oficial
  *   (encendido) y el motivo que se apunta si está apagado.
- * - Las zonas de barrido del registro oficial: `CELDA_REGISTRO_ZONAS` (`cataluna`),
- *   `CELDA_REGISTRO_ZONAS_EN_TURNO` (ninguna) y `CELDA_REGISTRO_ZONAS_POR_NOCHE` (1)
- *   (`opcionesZonasDesdeConfig`).
- * - Las de las fichas del registro oficial: `CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS` (3),
- *   `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS` (360), `CELDA_REGISTRO_FICHAS_RELECTURA_DIAS` (30),
- *   `CELDA_REGISTRO_FICHAS_PRIORIDAD` (`08`) y `CELDA_INGESTA_MAX_FICHAS` (sin tope)
+ * - `CELDA_INGESTA_HORA` (`00:30`) y `CELDA_INGESTA_ZONA_HORARIA` (`Europe/Madrid`): a qué hora
+ *   lanza el temporizador cada ejecución, el primer sábado de cada mes y el domingo siguiente
+ *   (`calendarioDesdeConfig`, ADR 0029). Solo sirven para decir cuándo es la próxima.
+ * - Las zonas de barrido de cada ronda del registro oficial: `CELDA_REGISTRO_ZONAS` (las siete)
+ *   (`zonasDesdeConfig`).
+ * - Las de las fichas del registro oficial: `CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS` (1),
+ *   `CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS` (1320) y `CELDA_INGESTA_MAX_FICHAS` (sin tope)
  *   (`opcionesFichasDesdeConfig`).
  * - `CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO` (20) y `CELDA_REGISTRO_CAMBIO_MASIVO_MINIMO` (50):
  *   cuánto puede cambiar el registro en un cuadro o en una zona antes de parar la noche sin
@@ -72,8 +74,9 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
   conservar: Config.Int("CELDA_INGESTA_COPIAS_CONSERVADAS").pipe(
     Config.withDefault(COPIAS_CONSERVADAS),
   ),
+  calendario: calendarioDesdeConfig,
   fichas: opcionesFichasDesdeConfig,
-  zonas: opcionesZonasDesdeConfig,
+  zonas: zonasDesdeConfig,
   cambioMasivo: limiteDeCambiosDesdeConfig,
   reintentoMinutos: Config.Int("CELDA_PUBLICAR_REINTENTO_MINUTOS").pipe(
     Config.withDefault(Duration.toMinutes(REINTENTO_DE_PUBLICACION)),
@@ -91,9 +94,15 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
     base: c.base,
     archivo: c.archivo,
     noche: {
-      proceso: { zonas: c.zonas, fichas: c.fichas, cambioMasivo: c.cambioMasivo },
+      proceso: {
+        zonas: c.zonas,
+        fichas: c.fichas,
+        reciente: RECIENTE,
+        cambioMasivo: c.cambioMasivo,
+      },
       reintento: Duration.minutes(Math.max(c.reintentoMinutos, 0)),
       copias: { carpeta: c.carpetaDeCopias, conservar: Math.max(c.conservar, 1) },
+      calendario: c.calendario,
     },
     registroOficial: c.registroOficial,
     fichasDelRegistro: opcionesClienteDeFichas(c.registroOficial, c.fichas),

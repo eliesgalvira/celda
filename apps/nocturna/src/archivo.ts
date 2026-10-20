@@ -714,7 +714,7 @@ export const archivoNocturno = (fichero: string, tamanoDePaquete = TAMANO_DE_PAQ
         : yield* Effect.as(
             Effect.logError(
               `No se ha podido abrir el archivo de páginas ${fichero}: ${mensajeDe(abierto.cause)}. ` +
-                "La noche sigue sin archivar",
+                "La ejecución sigue sin archivar",
             ),
             sinArchivo(fichero, tamanoDePaquete, `no se ha podido abrir ${fichero}`),
           );
@@ -916,7 +916,7 @@ export const copiarArchivo = Effect.fn("Archivo.copiar")(function* (carpeta: str
   if (enR2.tipo === "fallido") {
     yield* Effect.logWarning(
       `No se han podido subir los paquetes del archivo a R2: ${enR2.motivo}. ` +
-        "Los que faltan se suben la noche siguiente",
+        "Los que faltan se suben en la ejecución siguiente",
     );
   }
   const hecha: CopiaDelArchivo = { paquetes, enR2 };
@@ -1025,6 +1025,6 @@ export const describirRelectura = (r: Relectura, aplicar: boolean): string =>
       ? `En la base: ${r.aplicadas.aplicada} aplicadas, ${r.aplicadas["al-dia"]} ya al día, ` +
         `${r.aplicadas.posterior} con la observación cambiada después, ` +
         `${r.aplicadas["sin-observacion"]} sin observación vigente. ` +
-        "La noche siguiente las fusiona y las publica"
+        "La ejecución siguiente las fusiona y las publica"
       : "Sin --aplicar no se cambia nada en la base",
   ].join("\n");

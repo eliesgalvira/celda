@@ -34,7 +34,7 @@
       # de solo lectura del build. Vercel construye un despliegue con la orden `capas`, con esa
       # clave, en cada llamada al deploy hook y, si acaba bien, lo sirve en `celda.prueba/capas`;
       # si falla, sigue sirviendo el anterior. El buzón de Convex contesta a su acción HTTP de lo
-      # aceptado, solo con la clave de publicación de la credencial de la noche, con una página sin
+      # aceptado, solo con la clave de publicación de la credencial de la ingesta, con una página sin
       # nada aceptado.
       fuentesDePrueba =
         pkgs.writers.writePython3Bin "fuentes-de-prueba" { flakeIgnore = singleton "E501"; }
@@ -53,12 +53,14 @@
             LISTADO, FICHA, CERTIFICADO, CLAVE, CARPETA, CELDA = sys.argv[1:7]
             CUBOS = os.path.join(CARPETA, "r2")
             PETICIONES = os.path.join(CARPETA, "peticiones.log")
+            # Con este fichero, el geoportal da las fichas que dice y luego un 429 a cada una.
+            FICHAS_QUE_QUEDAN = os.path.join(CARPETA, "fichas-que-quedan")
             # Con este fichero, R2 contesta 503 a la clave del build: el build de Vercel no llega.
             R2_CAIDO = os.path.join(CARPETA, "r2-caido-para-el-build")
             # Las variables de R2 del proyecto de Vercel, con la clave de solo lectura. Las escribe
             # la prueba.
             CLAVE_DEL_BUILD = "/run/secretos/vercel-r2.env"
-            # La conexión de la noche con el buzón. La escribe la prueba.
+            # La conexión de la ingesta con el buzón. La escribe la prueba.
             CONEXION_CON_CONVEX = "/run/secretos/celda-convex.env"
             VERCEL = os.path.join(CARPETA, "vercel")
             DESPLIEGUES = os.path.join(CARPETA, "despliegues.log")
@@ -103,6 +105,19 @@
             def leer(ruta):
                 with open(ruta, "rb") as fichero:
                     return fichero.read()
+
+
+            def queda_otra_ficha():
+                """Si el geoportal da otra ficha, o pide que se espere."""
+                if not os.path.exists(FICHAS_QUE_QUEDAN):
+                    return True
+                with open(FICHAS_QUE_QUEDAN) as fichero:
+                    quedan = int(fichero.read().strip() or "0")
+                if quedan <= 0:
+                    return False
+                with open(FICHAS_QUE_QUEDAN, "w") as fichero:
+                    fichero.write(str(quedan - 1))
+                return True
 
 
             def listado(consulta):
@@ -151,6 +166,8 @@
                             consulta = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
                             return self.responder(200, listado(consulta), "application/json")
                         if ruta == "/VCTEL/detalleEstacion.do":
+                            if not queda_otra_ficha():
+                                return self.responder(429)
                             return self.responder(200, leer(FICHA), "text/html")
                         return self.responder(404)
                     if host == "celda.prueba":
@@ -226,7 +243,8 @@
       checks.celda-nocturna = config.packages.celda-nocturna;
 
       # El módulo de NixOS en una máquina virtual: dispara el temporizador contra las fuentes de
-      # prueba y comprueba la base, la copia, lo publicado y las credenciales.
+      # prueba y comprueba el calendario de las ejecuciones, la base, la copia, lo publicado y las
+      # credenciales.
       checks.celda-nocturna-nixos =
         mkIf pkgs.stdenv.hostPlatform.isLinux
         <| pkgs.testers.runNixOSTest {
@@ -237,16 +255,16 @@
 
             services.celda-nocturna = {
               enable = true;
-              horario = "*-*-* 04:00:00";
               credenciales.r2 = "/run/secretos/celda-r2.env";
               credenciales.vercel = "/run/secretos/celda-vercel.env";
               credenciales.convex = "/run/secretos/celda-convex.env";
               copias.directorio = "/srv/copias/celda";
               origenPublico = "https://celda.prueba/capas";
-              # Una ficha cada 4 s durante los 2 primeros minutos de la noche: el listado se lleva
-              # medio, y no caben las 40. Las zonas y la prioridad de las fichas son las de por
-              # defecto, las de toda España: la primera noche barre Cataluña.
-              registroOficial.fichas.ritmo = 4;
+              # Solo Cataluña, donde cae la muestra del Campus Nord: 9 peticiones de listado en vez
+              # de las unas 100 de las siete zonas. La hora, la zona horaria y el ritmo de las fichas
+              # son los de por defecto, los de producción. En 2 minutos de ventana caben el listado
+              # y las 40 fichas, a una por segundo.
+              registroOficial.zonas = singleton "cataluna";
               registroOficial.fichas.ventana = 2;
             };
 
@@ -326,19 +344,86 @@
                   clave_de_publicacion_convex = maquina.succeed("sed --quiet 's/^CELDA_PUBLICACION_CLAVE=//p' /run/secretos/celda-convex.env").strip()
                   assert len(clave_de_publicacion_convex) > 32, clave_de_publicacion_convex
 
-              with subtest("el temporizador recupera las noches perdidas y dispara la noche a su hora"):
-                  assert maquina.succeed("systemctl show celda-nocturna.timer --property=Persistent --value").strip() == "yes"
-                  siguiente = maquina.succeed(
+              DIA = 86400
+
+              def proximo_disparo():
+                  """Cuándo se dispara el temporizador, en segundos desde 1970."""
+                  return int(maquina.succeed(
                       "systemctl show celda-nocturna.timer --property=NextElapseUSecRealtime --value --timestamp=unix"
+                  ).strip().lstrip("@"))
+
+              def en_madrid(instante):
+                  """El día de la semana (6 es sábado, 7 domingo), el del mes y la hora en Madrid."""
+                  dia, fecha, hora = maquina.succeed(f"TZ=Europe/Madrid date --date=@{instante} '+%u %-d %H:%M'").split()
+                  return int(dia), int(fecha), hora
+
+              def es_primer_sabado(instante):
+                  dia, fecha, hora = en_madrid(instante)
+                  return dia == 6 and fecha <= 7 and hora == "00:30"
+
+              def es_domingo_siguiente(instante):
+                  dia, fecha, hora = en_madrid(instante)
+                  return dia == 7 and 2 <= fecha <= 8 and hora == "00:30"
+
+              def acabadas():
+                  return maquina.succeed(
+                      "systemctl show celda-nocturna.service --property=ExecMainExitTimestampMonotonic --value"
                   ).strip()
-                  maquina.succeed(f"date --set={siguiente}")
+
+              def disparar(instante):
+                  """Lleva el reloj a la hora del disparo y espera a que acabe la ejecución que lanza."""
+                  antes = acabadas()
+                  maquina.succeed(f"date --set=@{instante}")
+                  # Mientras corre, la hora de salida vale 0.
                   maquina.wait_until_succeeds(
                       "systemctl show celda-nocturna.service --property=ExecMainExitTimestampMonotonic --value"
-                      " | grep --invert-match --line-regexp 0",
+                      f" | grep --invert-match --line-regexp --regexp=0 --regexp={antes}",
                       timeout=300,
                   )
-                  print(maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager"))
                   assert maquina.succeed("systemctl show celda-nocturna.service --property=Result --value").strip() == "success"
+
+              def del_geoportal():
+                  return [
+                      linea.split()
+                      # Antes de la primera petición, el fichero aún no existe.
+                      for linea in maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log 2>/dev/null || true").splitlines()
+                      if " geoportal.minetur.gob.es " in linea
+                  ]
+
+              def el_diario():
+                  return maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
+
+              with subtest("el temporizador lanza el primer sábado de cada mes y el domingo siguiente, a las 00:30 de Madrid, sin recuperar las perdidas"):
+                  assert maquina.succeed("systemctl show celda-nocturna.timer --property=Persistent --value").strip() == "no"
+                  calendario = maquina.succeed("systemctl show celda-nocturna.timer --property=TimersCalendar --value")
+                  print(calendario)
+                  assert "Sat *-*-01..07 00:30:00 Europe/Madrid" in calendario, calendario
+                  assert "Sun *-*-02..08 00:30:00 Europe/Madrid" in calendario, calendario
+                  siguiente = proximo_disparo()
+                  assert es_primer_sabado(siguiente) or es_domingo_siguiente(siguiente), en_madrid(siguiente)
+
+              with subtest("un disparo tardío entre semana, como tras una suspensión o un salto del reloj, no lanza la ejecución"):
+                  # El reloj salta dos días y una hora por encima del próximo disparo: el temporizador
+                  # se dispara tarde, un lunes o un martes, y la condición del servicio lo deja pasar.
+                  maquina.succeed(f"date --set=@{proximo_disparo() + 2 * DIA + 3600}")
+                  maquina.wait_until_succeeds(
+                      "journalctl --unit=celda-nocturna.service --no-pager"
+                      " | grep --fixed-strings 'quizá tras una suspensión o un salto del reloj'",
+                      timeout=60,
+                  )
+                  print(el_diario())
+                  assert acabadas() == "0", acabadas()
+                  assert del_geoportal() == []
+                  # Y el siguiente es el primer sábado del mes que viene.
+                  assert es_primer_sabado(proximo_disparo()), en_madrid(proximo_disparo())
+
+              with subtest("el primer sábado del mes la ejecución barre la zona y lee todas las fichas, y el siguiente disparo es el del domingo"):
+                  sabado = proximo_disparo()
+                  disparar(sabado)
+                  print(el_diario())
+                  assert proximo_disparo() - sabado == DIA
+                  assert es_domingo_siguiente(proximo_disparo()), en_madrid(proximo_disparo())
+                  assert "La ronda está entera, así que la ejecución del domingo" in el_diario()
 
               with subtest("la base, la copia y lo publicado están donde dicen las opciones"):
                   maquina.succeed("test \"$(stat --format=%U /var/lib/celda-nocturna/ingesta.sqlite)\" = celda-nocturna")
@@ -358,7 +443,7 @@
                   )
                   assert "Copia de la base en R2: " in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
 
-              with subtest("la noche lee lo aceptado del buzón con la clave de publicación de su credencial"):
+              with subtest("la ejecución lee lo aceptado del buzón con la clave de publicación de su credencial"):
                   diario = maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
                   assert "Buzón de Convex: 0 aceptadas leídas, 0 nuevas" in diario, diario
                   maquina.succeed(
@@ -366,37 +451,41 @@
                       " /var/lib/fuentes-de-prueba/peticiones.log"
                   )
 
-              with subtest("la orden de estado se lanza como el usuario del servicio"):
+              with subtest("la orden de estado se lanza como el usuario del servicio y dice cuándo es la próxima ejecución"):
                   estado = maquina.succeed("runuser --user=celda-nocturna -- celda-nocturna estado")
                   print(estado)
                   assert "completada" in estado
                   assert "Última versión publicada: ninguna" not in estado
+                  assert "Próxima ejecución: el domingo " in estado, estado
+                  assert "a las 00:30 (Europe/Madrid). Retoma la ronda" in estado, estado
+                  assert "Ahora no queda nada, así que no pedirá nada." in estado, estado
 
-              with subtest("por defecto las siete zonas se turnan: la primera noche barre Cataluña, cuadro a cuadro"):
+              with subtest("la ronda barre Cataluña cuadro a cuadro, con la hora y la zona horaria de producción"):
                   entorno = maquina.succeed("systemctl show celda-nocturna.service --property=Environment")
                   for variable in (
-                      "CELDA_REGISTRO_ZONAS=ninguna",
-                      "CELDA_REGISTRO_ZONAS_EN_TURNO=cataluna,centro,andalucia,levante,norte,ebro-y-duero,oeste-y-canarias",
-                      "CELDA_REGISTRO_ZONAS_POR_NOCHE=1",
+                      "CELDA_REGISTRO_ZONAS=cataluna",
                       "CELDA_REGISTRO_MAX_PETICIONES=400",
+                      "CELDA_INGESTA_HORA=00:30",
+                      "CELDA_INGESTA_ZONA_HORARIA=Europe/Madrid",
                   ):
                       assert variable in entorno, entorno
+                  for retirada in ("ZONAS_EN_TURNO", "ZONAS_POR_NOCHE", "FICHAS_PRIORIDAD", "FICHAS_RELECTURA"):
+                      assert f"CELDA_REGISTRO_{retirada}" not in entorno, entorno
                   assert "- cataluna: completado, 9 cuadros" in estado, estado
-                  assert "- centro: completado" not in estado, estado
                   assert "40 registros" in estado, estado
-                  # Por zona: cuándo se barrió y cuántas fichas le faltan, y cuál va la noche siguiente.
+                  # Por zona: cuándo se barrió y cuántas fichas le faltan, y cuáles barre la siguiente.
                   assert "- cataluna: último barrido completado" in estado, estado
-                  assert "- centro: ningún barrido completado; fichas por leer: ninguna" in estado, estado
-                  assert "La próxima noche barre: centro" in estado, estado
+                  assert "; fichas por leer: ninguna" in estado, estado
+                  assert "La próxima ejecución barre: ninguna zona" in estado, estado
                   # Los 9 cuadros de Cataluña, una petición cada uno: ninguno llega al tope.
                   listados = maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log").strip()
                   assert listados == "9", listados
 
-              with subtest("activar una configuración nueva no reinicia la noche"):
+              with subtest("activar una configuración nueva no reinicia la ejecución"):
                   unidad = maquina.succeed("cat /etc/systemd/system/celda-nocturna.service")
                   assert "X-RestartIfChanged=false" in unidad.splitlines(), unidad
 
-              with subtest("la noche corre con el montón de V8 a 512 MB y la memoria del servicio limitada"):
+              with subtest("la ejecución corre con el montón de V8 a 512 MB y la memoria del servicio limitada"):
                   assert "NODE_OPTIONS=--max-old-space-size=512" in entorno, entorno
                   alta = maquina.succeed("systemctl show celda-nocturna.service --property=MemoryHigh --value").strip()
                   maxima = maquina.succeed("systemctl show celda-nocturna.service --property=MemoryMax --value").strip()
@@ -410,34 +499,29 @@
                       ).strip())
                   assert limite(1024) - limite(512) == 512 * 1024 * 1024, (limite(512), limite(1024))
 
-              with subtest("las fichas van a su ritmo y paran al cerrar la ventana, dejando el resto en la cola"):
+              with subtest("las fichas van a una por segundo, de una en una, caben las 40 en la ventana y se publica a mitad y al acabar"):
                   entorno = maquina.succeed("systemctl show celda-nocturna.service --property=Environment")
                   for variable in (
-                      "CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS=4",
+                      "CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS=1",
                       "CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS=2",
-                      "CELDA_REGISTRO_FICHAS_PRIORIDAD=08,17,25,43",
-                      "CELDA_REGISTRO_FICHAS_RELECTURA_DIAS=30",
                   ):
                       assert variable in entorno, entorno
                   assert "CELDA_INGESTA_MAX_FICHAS" not in entorno, entorno
-                  # 2 minutos de ventana, la hora de espera antes de repetir la publicación y una hora más.
+                  # 2 minutos de ventana, la hora de espera antes de repetir la publicación y un cuarto de hora.
                   tiempo = maquina.succeed("systemctl show celda-nocturna.service --property=TimeoutStartUSec --value").strip()
-                  assert tiempo == "2h 2min", tiempo
+                  assert tiempo == "1h 17min", tiempo
 
-                  lineas = maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
-                  geoportal = [linea.split() for linea in lineas if " geoportal.minetur.gob.es " in linea]
+                  geoportal = del_geoportal()
                   inicio = float(geoportal[0][0])
                   fichas = [float(campos[0]) for campos in geoportal if "/VCTEL/detalleEstacion.do" in campos[3]]
                   huecos = [b - a for a, b in zip(fichas, fichas[1:])]
                   print(f"{len(fichas)} fichas, huecos de {min(huecos):.2f} a {max(huecos):.2f} s")
-                  assert 5 <= len(fichas) < 40, len(fichas)
-                  assert min(huecos) >= 3.9, huecos
+                  assert len(fichas) == 40, len(fichas)
+                  assert min(huecos) >= 0.99, huecos
                   assert fichas[-1] - inicio < 120, fichas[-1] - inicio
-                  assert f"fichas {len(fichas)} leídas" in estado, estado
-                  assert f"- provincia 08 (Barcelona): {40 - len(fichas)} sin leer, 0 por releer" in estado, estado
-                  assert f"; fichas por leer: {40 - len(fichas)} sin leer, 0 por releer" in estado, estado
-                  assert "ventana cerrada" in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
-                  # Se publica a mitad de la ventana y otra vez al cerrarla.
+                  assert "fichas 40 leídas" in estado, estado
+                  assert "ventana cerrada" not in el_diario()
+                  # Se publica a mitad de la ventana y otra vez al acabar.
                   capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^ficheros@'").strip()
                   assert capas == "2", capas
 
@@ -464,12 +548,12 @@
               servida = "/var/lib/fuentes-de-prueba/vercel/actual"
               r2 = "/var/lib/fuentes-de-prueba/r2/celda"
 
-              with subtest("tras publicar, la noche lanza el build una vez y Vercel monta de R2 la vigente y la anterior"):
+              with subtest("tras publicar, la ejecución lanza el build una vez y Vercel monta de R2 la vigente y la anterior"):
                   assert "Vercel no sirve sitios@" in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
                   assert llamadas_al_hook() == [hook.removeprefix("https://api.vercel.com")], llamadas_al_hook()
                   maquina.wait_until_succeeds("grep --line-regexp '1 servido' /var/lib/fuentes-de-prueba/despliegues.log", timeout=60)
                   maquina.succeed(f"cmp {servida}/vigente.json {r2}/vigente.json")
-                  # R2 tiene las dos versiones de la noche, y Vercel las dos: la vigente y su anterior.
+                  # R2 tiene las dos versiones de la ejecución, y Vercel las dos: la vigente y su anterior.
                   assert maquina.succeed(f"ls {servida} | grep --count '^ficheros@'").strip() == "2"
                   listados = maquina.succeed(
                       f"cat {servida}/ficheros@*.json | grep --only-matching '\"[a-z]*/[0-9a-f/]*\\.json\"' | sort --unique | wc --lines"
@@ -586,6 +670,74 @@
                   despues = int(maquina.succeed("grep --count infoantenasGeoJSON.do /var/lib/fuentes-de-prueba/peticiones.log"))
                   assert despues - listados == 4, (listados, despues)
                   assert maquina.succeed(f"sha256sum {base}") == antes
+
+              with subtest("el domingo, tras un sábado que lo leyó todo, la ejecución no pide nada al registro"):
+                  antes = len(del_geoportal())
+                  domingo = proximo_disparo()
+                  assert es_domingo_siguiente(domingo), en_madrid(domingo)
+                  disparar(domingo)
+                  print(el_diario())
+                  assert len(del_geoportal()) == antes, del_geoportal()[antes:]
+                  assert "No hay nada que pedir al registro" in el_diario()
+                  estado = maquina.succeed("runuser --user=celda-nocturna -- celda-nocturna estado")
+                  print(estado)
+                  assert "Próxima ejecución: el sábado " in estado, estado
+                  assert "Empieza otra ronda, en la que barre su zona y lee todas las fichas" in estado, estado
+                  assert "La próxima ejecución barre: cataluna" in estado, estado
+                  assert es_primer_sabado(proximo_disparo()), en_madrid(proximo_disparo())
+
+              with subtest("entre semana el temporizador no lanza nada"):
+                  siguiente = proximo_disparo()
+                  antes = acabadas()
+                  # El miércoles después del domingo.
+                  maquina.succeed(f"date --set=@{domingo + 3 * DIA}")
+                  maquina.sleep(5)
+                  assert proximo_disparo() == siguiente
+                  assert acabadas() == antes
+                  assert maquina.succeed("systemctl is-active celda-nocturna.service || true").strip() == "inactive"
+
+              with subtest("si la fuente para la ejecución del sábado, la del domingo lo intenta una vez más, sin repetir ninguna ficha, y si vuelve a parar, lo que falta espera al mes siguiente"):
+                  def fichas_desde(antes):
+                      return [campos[3] for campos in del_geoportal()[antes:] if "/VCTEL/detalleEstacion.do" in campos[3]]
+
+                  def listados_desde(antes):
+                      return [campos[3] for campos in del_geoportal()[antes:] if "infoantenasGeoJSON.do" in campos[3]]
+
+                  # El sábado del mes siguiente el geoportal da diez fichas y luego un 429.
+                  maquina.succeed("echo 10 > /var/lib/fuentes-de-prueba/fichas-que-quedan")
+                  antes = len(del_geoportal())
+                  sabado = proximo_disparo()
+                  assert es_primer_sabado(sabado), en_madrid(sabado)
+                  disparar(sabado)
+                  print(el_diario())
+                  # Una ronda nueva: vuelve a barrer Cataluña y empieza a releer las fichas.
+                  assert len(listados_desde(antes)) == 9, listados_desde(antes)
+                  del_sabado = fichas_desde(antes)
+                  assert len(del_sabado) == 11, del_sabado
+                  assert "paradas: FuentePideEsperar: HTTP 429" in el_diario()
+                  assert "Lo que queda de la ronda, 30 fichas, lo lee la ejecución del domingo" in el_diario()
+                  estado = maquina.succeed("runuser --user=celda-nocturna -- celda-nocturna estado")
+                  print(estado)
+                  assert "Ahora quedan 30 fichas." in estado, estado
+                  assert "Fichas paradas: FuentePideEsperar: HTTP 429" in estado, estado
+
+                  # El domingo no barre y retoma las fichas por la que paró, y otra vez diez y un 429.
+                  maquina.succeed("echo 10 > /var/lib/fuentes-de-prueba/fichas-que-quedan")
+                  antes = len(del_geoportal())
+                  disparar(proximo_disparo())
+                  print(el_diario())
+                  assert listados_desde(antes) == []
+                  del_domingo = fichas_desde(antes)
+                  assert len(del_domingo) == 11, del_domingo
+                  assert del_domingo[0] == del_sabado[-1]
+                  # Las veinte que se han leído en la ronda son distintas.
+                  assert len(set(del_sabado[:10] + del_domingo[:10])) == 20
+                  assert (
+                      "Lo que queda de la ronda, 20 fichas, se queda sin leer este mes, porque no hay otra ejecución hasta la del sábado"
+                      in el_diario()
+                  )
+                  assert es_primer_sabado(proximo_disparo()), en_madrid(proximo_disparo())
+                  maquina.succeed("rm /var/lib/fuentes-de-prueba/fichas-que-quedan")
 
               with subtest("el servicio corre endurecido"):
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))

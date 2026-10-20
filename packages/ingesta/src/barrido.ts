@@ -37,7 +37,6 @@ import {
   OPCIONES_FICHAS,
   type OpcionesFichas,
   ordenarFichas,
-  Provincias,
   PublicacionAMitad,
 } from "./fichas.ts";
 
@@ -72,7 +71,7 @@ export class CuadroVacio extends Schema.TaggedError<CuadroVacio>()("CuadroVacio"
 }
 
 /**
- * Cuánto puede cambiar el registro en una noche antes de que la ingesta se pare (ADR 0027, fase
+ * Cuánto puede cambiar el registro en una ejecución antes de que la ingesta se pare (ADR 0027, fase
  * 3): una parte de las observaciones vigentes, y como mínimo un número de ellas.
  */
 export interface LimiteDeCambios {
@@ -138,7 +137,7 @@ export const cambioMasivoEn = (
  * El registro cambia de golpe mucho más de lo normal en un cuadro o en una zona, con cambios o con
  * estaciones que faltan por primera vez. Las altas y las que vuelven no cuentan, porque no retiran
  * nada. Lo probable es que haya cambiado cómo escribe algo, como la razón social de una compañía,
- * porque miles de estaciones rara vez cambian a la vez. La noche se para sin guardar ese cuadro,
+ * porque miles de estaciones rara vez cambian a la vez. La ejecución se para sin guardar ese cuadro,
  * sin contar ausencias y sin publicar, hasta que alguien lo mire.
  */
 export class CambioMasivo extends Schema.TaggedError<CambioMasivo>()("CambioMasivo", {
@@ -169,7 +168,7 @@ const describirFallo = (fallo: FalloDeZona): string =>
     : describirError(fallo);
 
 /**
- * Fallos tras los que no tiene sentido pedir nada más a la fuente esta noche: el tope de
+ * Fallos tras los que no tiene sentido pedir nada más a la fuente en esta ejecución: el tope de
  * peticiones, `robots.txt`, una fuente que no responde ni tras los reintentos, una que pide
  * esperar o una que bloquea a Celda.
  */
@@ -304,7 +303,7 @@ export interface Cierre {
 }
 
 /**
- * Donde guarda su estado el barrido por zonas entre noches: las observaciones de cada fuente, los
+ * Donde guarda su estado el barrido por zonas entre ejecuciones: las observaciones de cada fuente, los
  * emplazamientos fusionados, el registro de ejecuciones, los barridos de cada zona, los cuadros
  * hechos de cada uno y las cajas de cada cuadro. La implementa la base SQLite de la ingesta
  * nocturna (ADR 0015). Cada operación es idempotente, así que una ejecución cortada se repite sin
@@ -321,13 +320,16 @@ export class BaseDeBarrido extends Context.Service<
     readonly estadoDeZonas: (fuente: Fuente) => Effect.Effect<ReadonlyMap<string, EstadoDeZona>>;
     /**
      * Abre un barrido de `zona` para la ejecución. Si la zona tiene uno a medias de la misma
-     * fuente, lo retoma; si no, empieza uno con fecha `fecha`.
+     * fuente que empezó desde `desde`, en esta ronda, lo retoma. Uno a medias de antes lo da por
+     * fallido, sin contar ausencias, porque sus cuadros guardados son de otra ronda. Si no retoma
+     * ninguno, empieza uno con fecha `fecha`.
      */
     readonly abrirBarrido: (
       ejecucion: string,
       fuente: Fuente,
       zona: ZonaDeBarrido,
       fecha: number,
+      desde: number,
     ) => Effect.Effect<BarridoAbierto>;
     /** Observaciones vigentes de la fuente en el cuadro. */
     readonly vigentesEn: (fuente: Fuente, cuadro: Cuadro) => Effect.Effect<number>;
@@ -400,49 +402,30 @@ export class BaseDeBarrido extends Context.Service<
   }
 >()("@celda/ingesta/barrido/BaseDeBarrido") {}
 
-/** Qué zonas de barrido se barren cada noche. */
-export interface OpcionesZonas {
-  /** Las que se barren todas las noches. */
-  readonly cadaNoche: ReadonlyArray<ZonaDeBarrido>;
-  /** Las que se turnan: cada noche, `porNoche` de ellas, las que llevan más tiempo sin barrer. */
-  readonly enTurno: ReadonlyArray<ZonaDeBarrido>;
-  readonly porNoche: number;
-}
+/**
+ * Lo que se ha leído hace menos de esto no se vuelve a pedir: ni el listado de una zona con un
+ * barrido completado ni una ficha (ADR 0029). Es más que el día que separa la ejecución del primer
+ * sábado de cada mes de la del domingo siguiente, así que la del domingo solo lee lo que la del
+ * sábado dejó sin leer, y mucho menos que el mes hasta la siguiente, que lo lee todo otra vez.
+ * Las ejecuciones que caen dentro de ese día y medio son una ronda.
+ */
+export const RECIENTE = Duration.hours(36);
 
 /**
- * Por defecto, toda España en siete noches (ADR 0014, #50): las siete zonas se turnan, una por
- * noche, empezando por Cataluña. Cada noche son unas 31 peticiones de listado.
+ * Las zonas que barre una ejecución, en el orden de la configuración: las que no tienen un
+ * barrido completado desde `desde`. Una que tiene uno a medias de esta ronda va con las demás, y
+ * su barrido se retoma por el primer cuadro sin guardar. Una zona repetida va una vez.
  */
-export const OPCIONES_ZONAS: OpcionesZonas = {
-  cadaNoche: [],
-  enTurno: ZONAS_DE_BARRIDO,
-  porNoche: 1,
-};
-
-/**
- * Las zonas de una noche: las de cada noche y, de las que se turnan, primero la que quedó a
- * medias, luego las que nunca se han completado y luego las que llevan más tiempo sin
- * completarse, en el orden de la configuración si empatan.
- */
-export const zonasDeLaNoche = (
-  opciones: OpcionesZonas,
+export const zonasPorBarrer = (
+  zonas: ReadonlyArray<ZonaDeBarrido>,
   estado: ReadonlyMap<string, EstadoDeZona>,
-): ReadonlyArray<ZonaDeBarrido> => {
-  const fijas = new Set(opciones.cadaNoche.map((zona) => zona.nombre));
-  const turno = opciones.enTurno
-    .filter((zona) => !fijas.has(zona.nombre))
-    .map((zona, orden) => ({ zona, orden, estado: estado.get(zona.nombre) }))
-    .sort(
-      (a, b) =>
-        Number(b.estado?.aMedias ?? false) - Number(a.estado?.aMedias ?? false) ||
-        (a.estado?.completado ?? -Infinity) - (b.estado?.completado ?? -Infinity) ||
-        a.orden - b.orden,
-    );
-  return [
-    ...opciones.cadaNoche,
-    ...turno.slice(0, Math.max(opciones.porNoche, 0)).map(({ zona }) => zona),
-  ];
-};
+  desde: number,
+): ReadonlyArray<ZonaDeBarrido> =>
+  zonas.filter(
+    (zona, i) =>
+      zonas.findIndex((otra) => otra.nombre === zona.nombre) === i &&
+      (estado.get(zona.nombre)?.completado ?? -Infinity) < desde,
+  );
 
 /** Lo que se escribe para no poner ninguna zona: una variable vacía cuenta como no puesta. */
 const NINGUNA = "ninguna";
@@ -464,38 +447,30 @@ const ListaDeZonas = Schema.String.check(
   }),
 );
 
-const zonasDeLista = (variable: string, porDefecto: string) =>
-  Config.schema(ListaDeZonas, variable).pipe(
-    Config.withDefault(porDefecto),
-    Config.map((lista) => nombres(lista).flatMap((nombre) => zonaDeBarrido(nombre) ?? [])),
-  );
-
 /**
- * Las zonas desde variables de entorno, por su nombre y separadas por comas, o `ninguna`:
- *
- * - `CELDA_REGISTRO_ZONAS`: las de cada noche (ninguna).
- * - `CELDA_REGISTRO_ZONAS_EN_TURNO`: las que se turnan (las siete de `ZONAS_DE_BARRIDO`).
- * - `CELDA_REGISTRO_ZONAS_POR_NOCHE`: cuántas de las que se turnan se barren cada noche (1). Con
- *   7, toda España cada noche.
- *
- * Un nombre que no está en `ZONAS_DE_BARRIDO` es un error de configuración.
+ * Las zonas de cada ejecución desde `CELDA_REGISTRO_ZONAS`, por su nombre y separadas por comas,
+ * o `ninguna`. Por defecto, las siete de `ZONAS_DE_BARRIDO`: toda España en cada ejecución. Un
+ * nombre que no está en `ZONAS_DE_BARRIDO` es un error de configuración.
  */
-export const opcionesZonasDesdeConfig: Config.Config<OpcionesZonas> = Config.all({
-  cadaNoche: zonasDeLista("CELDA_REGISTRO_ZONAS", NINGUNA),
-  enTurno: zonasDeLista(
-    "CELDA_REGISTRO_ZONAS_EN_TURNO",
-    OPCIONES_ZONAS.enTurno.map((zona) => zona.nombre).join(","),
-  ),
-  porNoche: Config.Int("CELDA_REGISTRO_ZONAS_POR_NOCHE").pipe(
-    Config.withDefault(OPCIONES_ZONAS.porNoche),
-  ),
-});
+export const zonasDesdeConfig: Config.Config<ReadonlyArray<ZonaDeBarrido>> = Config.schema(
+  ListaDeZonas,
+  "CELDA_REGISTRO_ZONAS",
+).pipe(
+  Config.withDefault(ZONAS_DE_BARRIDO.map((zona) => zona.nombre).join(",")),
+  Config.map((lista) => nombres(lista).flatMap((nombre) => zonaDeBarrido(nombre) ?? [])),
+);
 
 /** Lo que hace una ejecución del barrido por zonas, aparte del extractor. */
 export interface OpcionesBarrido {
-  readonly zonas: OpcionesZonas;
+  /** Las zonas de barrido de cada ronda, en su orden. */
+  readonly zonas: ReadonlyArray<ZonaDeBarrido>;
   readonly fichas: OpcionesFichas;
-  /** Cuánto puede cambiar el registro antes de parar la noche; `LIMITE_DE_CAMBIOS` sin él. */
+  /**
+   * Lo leído hace menos de esto no se vuelve a pedir (`RECIENTE`). Con cero, cada ejecución es
+   * una ronda nueva: barre todas sus zonas y lee todas las fichas.
+   */
+  readonly reciente: Duration.Duration;
+  /** Cuánto puede cambiar el registro antes de parar la ejecución; `LIMITE_DE_CAMBIOS` sin él. */
   readonly cambioMasivo?: LimiteDeCambios;
 }
 
@@ -520,15 +495,29 @@ export const limiteDeCambiosDesdeConfig: Config.Config<LimiteDeCambios> = Config
   })),
 );
 
-/** Por defecto: una zona por noche y las fichas a una cada 3 s durante 6 horas. */
-export const OPCIONES_BARRIDO: OpcionesBarrido = { zonas: OPCIONES_ZONAS, fichas: OPCIONES_FICHAS };
+/** Por defecto: las siete zonas y las fichas a una por segundo durante 22 horas (ADR 0029). */
+export const OPCIONES_BARRIDO: OpcionesBarrido = {
+  zonas: ZONAS_DE_BARRIDO,
+  fichas: OPCIONES_FICHAS,
+  reciente: RECIENTE,
+};
+
+/** Lo que queda por leer de la ronda al acabar una ejecución. */
+export interface PorLeer {
+  /** Las zonas sin un barrido completado en la ronda. */
+  readonly zonas: ReadonlyArray<string>;
+  /** Las fichas sin leer en la ronda, sin contar las que esperan tras un fallo. */
+  readonly fichas: number;
+}
 
 /** Cómo ha acabado una ejecución del barrido por zonas. */
 export interface Barrida {
   readonly ejecucion: string;
   readonly estado: "omitida" | "fallida" | "completada";
   readonly zonas: ReadonlyArray<ZonaEnLaEjecucion>;
-  /** Si la noche se ha parado por un cambio masivo, por qué. Entonces no se publica nada. */
+  /** Lo que queda de la ronda, salvo en una ejecución omitida. */
+  readonly porLeer?: PorLeer;
+  /** Si la ejecución se ha parado por un cambio masivo, por qué. Entonces no se publica nada. */
   readonly detenida?: string;
 }
 
@@ -562,18 +551,20 @@ interface ZonaRecorrida {
 }
 
 /**
- * Abre el barrido de una zona, o retoma el que quedó a medias, y recorre sus cuadros que faltan.
- * Cada cuadro se guarda en su propia transacción. Para en el primer cuadro que falla.
+ * Abre el barrido de una zona, o retoma el que quedó a medias en esta ronda, y recorre sus
+ * cuadros que faltan. Cada cuadro se guarda en su propia transacción. Para en el primer cuadro que
+ * falla.
  */
 const barrerZona = Effect.fn("Barrido.zona")(function* (
   ejecucion: string,
   zona: ZonaDeBarrido,
   fecha: number,
+  desde: number,
   limite: LimiteDeCambios,
 ) {
   const extractor = yield* ExtractorPorCajas;
   const base = yield* BaseDeBarrido;
-  const abierto = yield* base.abrirBarrido(ejecucion, extractor.fuente, zona, fecha);
+  const abierto = yield* base.abrirBarrido(ejecucion, extractor.fuente, zona, fecha, desde);
   const peticionesAntes = yield* extractor.peticiones;
   const vistos = new Set<string>();
   const avisos: Array<string> = [];
@@ -635,14 +626,15 @@ const pendiente = (zona: ZonaDeBarrido, motivo: string): ZonaEnLaEjecucion => ({
 
 /**
  * Barre las zonas en orden. Los barridos que acaban bien se cierran al final, cuando ya se han
- * visto todas las zonas: una estación que se ha movido a un cuadro de otra zona barrida esa
- * noche ya está vista allí. Devuelve lo que ha hecho cada zona, las claves vistas, los errores y
- * el motivo por el que la fuente dejó de responder, si lo hizo.
+ * visto todas las zonas: una estación que se ha movido a un cuadro de otra zona barrida en la
+ * misma ejecución ya está vista allí. Devuelve lo que ha hecho cada zona, las claves vistas, los
+ * errores y el motivo por el que la fuente dejó de responder, si lo hizo.
  */
 const barrerZonas = Effect.fn("Barrido.zonas")(function* (
   ejecucion: string,
   zonas: ReadonlyArray<ZonaDeBarrido>,
   fecha: number,
+  desde: number,
   limite: LimiteDeCambios,
 ) {
   const base = yield* BaseDeBarrido;
@@ -657,7 +649,7 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
       hechas.push(pendiente(zona, parada));
       continue;
     }
-    const recorrida = yield* barrerZona(ejecucion, zona, fecha, limite);
+    const recorrida = yield* barrerZona(ejecucion, zona, fecha, desde, limite);
     hechas.push(recorrida.hecha);
     errores.push(...recorrida.avisos);
     for (const clave of recorrida.vistos) vistos.add(clave);
@@ -675,7 +667,7 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
     }
   }
   // Con un cambio masivo no se cierra ningún barrido: no se cuenta ninguna ausencia ni se retira
-  // nada. Los que acabaron bien siguen en curso y se cierran la noche que se retome.
+  // nada. Los que acabaron bien siguen en curso y se cierran en la ejecución que los retome.
   for (const { indice, barrido } of detenida === undefined ? porCerrar : []) {
     const cerrado = yield* Effect.result(
       base.cerrarBarrido(barrido, fecha, yield* Clock.currentTimeMillis, limite),
@@ -684,7 +676,7 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
     if (Result.isFailure(cerrado)) {
       const motivo = describirFallo(cerrado.failure);
       errores.push(`Zona ${hecha?.zona ?? ""}: ${motivo}`);
-      // El barrido falla: la noche siguiente empieza otro, que vuelve a pedir sus cuadros.
+      // El barrido falla: la ejecución siguiente empieza otro, que vuelve a pedir sus cuadros.
       yield* base.fallarBarrido(barrido, yield* Clock.currentTimeMillis, motivo);
       detenida = motivo;
       parada = motivo;
@@ -699,39 +691,45 @@ const barrerZonas = Effect.fn("Barrido.zonas")(function* (
   return { hechas, vistos: vistos.size, errores, parada, detenida };
 });
 
+/** Cuántas fichas quedan por leer en una cola, sin las que esperan tras un fallo. */
+const porLeerEn = (cola: ReadonlyArray<FichaEnCola>, ahora: number): number =>
+  ordenarFichas(cola, ahora).length;
+
 /**
- * Una ejecución de la fuente del `ExtractorPorCajas` que barre por zonas (ADR 0014), sobre la
- * `BaseDeBarrido`:
+ * Una ejecución de la fuente del `ExtractorPorCajas` que barre por zonas (ADR 0014 y 0029), sobre
+ * la `BaseDeBarrido`. Lee lo que no se ha leído en la ronda, lo de hace menos de `reciente`:
  *
  * 1. Abre la ejecución. Si el interruptor está apagado queda omitida y no pide nada.
- * 2. Elige las zonas de la noche (`zonasDeLaNoche`).
- * 3. En cada zona abre su barrido, o retoma el que quedó a medias, y recorre sus cuadros uno a
- *    uno (`recorrerCuadro`). Cada cuadro se guarda en su propia transacción con sus registros,
- *    sus cajas y la marca de hecho, así que un corte no repite los cuadros ya guardados. Si un
- *    cuadro falla, o vuelve vacío cuando tenía estaciones, el barrido de la zona falla y no
- *    cuenta ausencias; las demás zonas siguen. El tope de peticiones, `robots.txt`, una fuente
- *    caída o una que bloquea a Celda paran todas las zonas que quedan y las fichas.
- *    Un cuadro que cambia de golpe más de lo normal no se guarda (`CambioMasivo`, ADR 0027).
+ * 2. Elige las zonas sin un barrido completado en la ronda (`zonasPorBarrer`): en la ejecución
+ *    del primer sábado de cada mes, todas; en la del domingo, las que el sábado no acabó.
+ * 3. En cada zona abre su barrido, o retoma el que quedó a medias en la ronda, y recorre sus
+ *    cuadros uno a uno (`recorrerCuadro`). Cada cuadro se guarda en su propia transacción con sus
+ *    registros, sus cajas y la marca de hecho, así que un corte no repite los cuadros ya
+ *    guardados. Si un cuadro falla, o vuelve vacío cuando tenía estaciones, el barrido de la zona
+ *    falla y no cuenta ausencias; las demás zonas siguen. El tope de peticiones, `robots.txt`, una
+ *    fuente caída o una que bloquea a Celda paran todas las zonas que quedan y las fichas. Un
+ *    cuadro que cambia de golpe más de lo normal no se guarda (`CambioMasivo`, ADR 0027).
  * 4. Cierra los barridos que han acabado bien (`barrerZonas`). Con un cambio masivo, en un cuadro
  *    o en las ausencias de una zona, no cierra ninguno, no lee fichas ni fusiona, y la ejecución
- *    queda fallida y `detenida`: la noche no publica.
- * 5. Lee las fichas de la cola en su orden (`ordenarFichas`, con las provincias de `Provincias`)
- *    hasta cerrar la ventana (`leerFichasEnLaVentana`). A mitad de la ventana fusiona y lanza
- *    `PublicacionAMitad`.
+ *    queda fallida y `detenida`: no se publica.
+ * 5. Lee las fichas sin leer en la ronda, en su orden (`ordenarFichas`), hasta cerrar la ventana
+ *    (`leerFichasEnLaVentana`). A mitad de la ventana fusiona y lanza `PublicacionAMitad`.
  * 6. Fusiona y apunta los cambios, los errores y lo que ha hecho cada zona: peticiones, bytes,
- *    registros y cambios.
+ *    registros y cambios. Devuelve lo que queda de la ronda (`porLeer`).
  *
- * La primera fusión lleva la fecha de inicio, como todos los datos de la ejecución; la de cierre,
- * si hubo otra a mitad, la hora a la que se hace, para que la versión de los datos avance.
- * Queda completada si alguna zona se ha barrido, y fallida si ninguna.
+ * Si no queda nada de la ronda, no pide nada a la fuente, ni siquiera `robots.txt`. La primera
+ * fusión lleva la fecha de inicio, como todos los datos de la ejecución; la de cierre, si hubo
+ * otra a mitad, la hora a la que se hace, para que la versión de los datos avance. Queda
+ * completada si alguna zona se ha barrido o no había ninguna por barrer, y fallida si no.
  */
 export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones: OpcionesBarrido) {
   const extractor = yield* ExtractorPorCajas;
   const base = yield* BaseDeBarrido;
-  const provincias = yield* Provincias;
   const aMitad = yield* PublicacionAMitad;
   const { fuente } = extractor;
   const inicio = yield* Clock.currentTimeMillis;
+  // Lo leído desde aquí es de esta ronda y no se vuelve a pedir.
+  const desde = inicio - Duration.toMillis(opciones.reciente);
 
   const arranque = yield* base.iniciar(fuente, inicio);
   const { ejecucion } = arranque;
@@ -740,12 +738,13 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
     return omitida;
   }
 
-  const zonas = zonasDeLaNoche(opciones.zonas, yield* base.estadoDeZonas(fuente));
+  const zonas = zonasPorBarrer(opciones.zonas, yield* base.estadoDeZonas(fuente), desde);
   const limite = opciones.cambioMasivo ?? LIMITE_DE_CAMBIOS;
   const { hechas, vistos, errores, parada, detenida } = yield* barrerZonas(
     ejecucion,
     zonas,
     inicio,
+    desde,
     limite,
   );
 
@@ -763,18 +762,20 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
   const fichas = { leidas: 0, cambiadas: 0 };
   if (parada === undefined) {
     const cola = ordenarFichas(
-      yield* base.colaDeFichas(fuente, inicio - Duration.toMillis(opciones.fichas.relectura)),
-      {
-        provincias: opciones.fichas.prioridad,
-        zonas: [...opciones.zonas.cadaNoche, ...opciones.zonas.enTurno],
-        provinciaDe: provincias.provinciaDe,
-      },
+      yield* base.colaDeFichas(fuente, desde),
       yield* Clock.currentTimeMillis,
     );
+    if (zonas.length === 0 && cola.length === 0) {
+      yield* Effect.logInfo(
+        "No hay nada que pedir al registro, porque todas las zonas tienen un barrido completado " +
+          "en esta ronda y no queda ninguna ficha por leer en ella",
+      );
+    }
     const leidas = yield* leerFichasEnLaVentana({
       cola,
       opciones: opciones.fichas,
       inicio,
+      espera: opciones.reciente,
       ficha: extractor.ficha,
       aplicar: (clave, leida) => base.aplicarFicha(fuente, clave, inicio, leida),
       fallar: (clave, fallo) => base.fallarFicha(fuente, clave, fallo),
@@ -784,16 +785,16 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
     fichas.cambiadas = leidas.cambiadas;
     errores.push(...leidas.errores);
   } else {
-    errores.push("Fichas pendientes para la próxima ejecución");
+    errores.push("Fichas pendientes para la ejecución siguiente");
   }
 
   if (detenida === undefined) {
     yield* fusionar;
   } else {
-    errores.push(`Noche parada sin fusionar ni publicar: ${detenida}`);
+    errores.push(`Ejecución parada sin fusionar ni publicar: ${detenida}`);
     yield* Effect.logError(
-      `Cambio masivo en el registro: ${detenida}. La noche se para sin contar ausencias, sin ` +
-        "fusionar y sin publicar. Si el cambio es de verdad, sube el límite una noche " +
+      `Cambio masivo en el registro: ${detenida}. La ejecución se para sin contar ausencias, ` +
+        "sin fusionar y sin publicar. Si el cambio es de verdad, sube el límite en una ejecución " +
         "(CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO)",
     );
   }
@@ -821,6 +822,17 @@ export const ejecutarBarrido = Effect.fn("Ingesta.barrido")(function* (opciones:
   } else {
     yield* base.fallar(ejecucion, cierre);
   }
-  const hecha: Barrida = { ejecucion, estado: barrida ? "completada" : "fallida", zonas: hechas };
+  const porLeer: PorLeer = {
+    zonas: zonasPorBarrer(opciones.zonas, yield* base.estadoDeZonas(fuente), desde).map(
+      (zona) => zona.nombre,
+    ),
+    fichas: porLeerEn(yield* base.colaDeFichas(fuente, desde), yield* Clock.currentTimeMillis),
+  };
+  const hecha: Barrida = {
+    ejecucion,
+    estado: barrida ? "completada" : "fallida",
+    zonas: hechas,
+    porLeer,
+  };
   return detenida === undefined ? hecha : { ...hecha, detenida };
 });

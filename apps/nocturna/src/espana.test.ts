@@ -1,10 +1,11 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import { decodificarVigente, FICHERO_VIGENTE } from "@celda/dominio/capa";
-import { ZONAS_DE_BARRIDO } from "@celda/dominio/barrido";
+import { zonaDeBarrido, ZONAS_DE_BARRIDO } from "@celda/dominio/barrido";
 import { leerResumen, type ProvinciaDelResumen } from "@celda/dominio/provincias";
 import { OPCIONES_BARRIDO, type OpcionesBarrido } from "@celda/ingesta/barrido";
-import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
+import { ExtractorPorCajas, FuenteNoDisponible } from "@celda/ingesta/extractor";
+import { OPCIONES_FICHAS } from "@celda/ingesta/fichas";
 import {
   capaGrabadaPorCajas,
   type FuenteGrabada,
@@ -14,16 +15,19 @@ import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { assert, describe, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
 import { TestClock } from "effect/testing";
 
+import { CALENDARIO } from "./calendario.ts";
 import { configuracion } from "./configuracion.ts";
 import { describirResumen } from "./estado.ts";
-import { estado, type EjecucionDeLaNoche, provinciasDe } from "./programa.ts";
+import { estado, type EjecucionDeLaNoche } from "./programa.ts";
 import { conBase, conEntorno, contenidoDe, type Entorno, unaNoche } from "./pruebas/entorno.ts";
 import { espanaSintetica } from "./pruebas/espana.ts";
 
-const NOCHE = Date.UTC(2026, 9, 5, 2, 15);
+/** El primer sábado de octubre de 2026, el día 3, a las 00:30 de Madrid. */
+const NOCHE = Date.UTC(2026, 9, 2, 22, 30);
 const DIA = 86_400_000;
 
 /** Las zonas de barrido en el orden de la configuración por defecto. */
@@ -38,7 +42,24 @@ const SIN_FICHAS: OpcionesBarrido = {
 const registroOficial = (grabada: FuenteGrabada) =>
   capaGrabadaPorCajas("registro-oficial", grabada);
 
-/** Lo que el registro oficial hizo en una noche. */
+/** La fuente grabada, con el geoportal caído en los cuadros de una zona. */
+const caidoEn = (grabada: FuenteGrabada, nombre: string) => {
+  const cuadros = new Set(zonaDeBarrido(nombre)?.cuadros);
+  return Layer.effect(
+    ExtractorPorCajas,
+    Effect.map(ExtractorPorCajas, (real) =>
+      ExtractorPorCajas.of({
+        ...real,
+        caja: (caja) =>
+          cuadros.has(`${Math.floor(caja[0])},${Math.floor(caja[1])}`)
+            ? Effect.fail(new FuenteNoDisponible({ url: "bbox", motivo: "HTTP 503" }))
+            : real.caja(caja),
+      }),
+    ),
+  ).pipe(Layer.provide(registroOficial(grabada)));
+};
+
+/** Lo que el registro oficial hizo en una ejecución. */
 const delRegistro = (ejecuciones: ReadonlyArray<EjecucionDeLaNoche>) => {
   const registro = ejecuciones.find((e) => e.fuente === "registro-oficial");
   assert.isDefined(registro);
@@ -65,44 +86,37 @@ const cubiertas = (provincias: ReadonlyMap<string, ProvinciaDelResumen>) =>
 /** El texto de la orden `estado` y lo que cuenta, a la hora del reloj. */
 const estadoDe = (entorno: Entorno, opciones: OpcionesBarrido = OPCIONES_BARRIDO) =>
   Effect.gen(function* () {
-    const provincias = provinciasDe((yield* zonasDePublicacion).municipios);
-    const hecho = yield* conBase(
-      entorno.base,
-      estado(opciones).pipe(Effect.provideService(Provincias, provincias)),
-    );
-    const texto = describirResumen(
-      entorno.base,
-      hecho.resumen,
-      hecho.cola,
-      provincias.nombreDe,
-      hecho.turno,
-    );
-    return { ...hecho, texto };
+    const hecho = yield* conBase(entorno.base, estado(opciones, CALENDARIO));
+    return { ...hecho, texto: describirResumen(entorno.base, hecho.resumen, hecho.turno) };
   });
 
-describe("toda España en la ingesta nocturna (#50)", () => {
+describe("toda España en la ingesta (#50 y ADR 0029)", () => {
   it.effect(
-    "por defecto barre una zona cada noche, y cada provincia queda cubierta cuando se ha barrido entera",
+    "el sábado barre las siete zonas; si la fuente cae a medias, el domingo barre las que faltan, y cada provincia queda cubierta cuando se ha barrido entera",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
           const zonas = yield* zonasDePublicacion;
           // Una décima parte de los registros: aquí solo importa qué se ha barrido.
           const espana = yield* espanaSintetica(zonas, { escala: 0.1 });
-          const barridas: Array<ReadonlyArray<string>> = [];
-          const noche = (n: number) =>
-            Effect.gen(function* () {
-              yield* TestClock.setTime(NOCHE + n * DIA);
-              const hecha = yield* unaNoche(entorno, registroOficial(espana), {
-                proceso: SIN_FICHAS,
-                porLote: 128,
-              });
-              const registro = delRegistro(hecha.ejecuciones);
-              assert.strictEqual(registro.estado, "completada");
-              barridas.push(registro.zonas.map((z) => z.zona));
-            });
 
-          yield* noche(0);
+          // El sábado el geoportal cae al llegar a Andalucía: las zonas que quedan, pendientes.
+          yield* TestClock.setTime(NOCHE);
+          const sabado = delRegistro(
+            (yield* unaNoche(entorno, caidoEn(espana, "andalucia"), {
+              proceso: SIN_FICHAS,
+              porLote: 128,
+            })).ejecuciones,
+          );
+          assert.strictEqual(sabado.estado, "completada");
+          assert.deepStrictEqual(
+            sabado.zonas.map((z) => [z.zona, z.estado]),
+            ZONAS.map((zona, i) => [
+              zona,
+              i < 2 ? "completado" : i === 2 ? "fallido" : "pendiente",
+            ]),
+          );
+          assert.deepStrictEqual(sabado.porLeer?.zonas, ZONAS.slice(2));
           const primera = yield* resumenPublicado(entorno);
           assert.deepStrictEqual(cubiertas(primera), ["08", "17", "25", "43"]);
           // Huesca tiene barrido el cuadro que comparte con Lleida: sus emplazamientos de ahí
@@ -111,12 +125,12 @@ describe("toda España en la ingesta nocturna (#50)", () => {
           assert.isFalse(huesca?.cubierta);
           assert.isAbove(huesca?.emplazamientos ?? 0, 0);
           assert.strictEqual(huesca?.barrido, NOCHE);
-          // Madrid no tiene nada barrido: sin número, sin capa y sin barrido.
-          const madrid = primera.get("28");
-          assert.isFalse(madrid?.cubierta);
-          assert.strictEqual(madrid?.emplazamientos, 0);
-          assert.isUndefined(madrid?.fichero);
-          assert.isNull(madrid?.barrido);
+          // Sevilla no tiene nada barrido: sin número, sin capa y sin barrido.
+          const sevilla = primera.get("41");
+          assert.isFalse(sevilla?.cubierta);
+          assert.strictEqual(sevilla?.emplazamientos, 0);
+          assert.isUndefined(sevilla?.fichero);
+          assert.isNull(sevilla?.barrido);
 
           const antes = yield* estadoDe(entorno);
           assert.include(antes.texto, "Zonas de barrido, en el orden de la configuración:");
@@ -126,47 +140,60 @@ describe("toda España en la ingesta nocturna (#50)", () => {
           );
           assert.include(
             antes.texto,
-            "- centro: ningún barrido completado; fichas por leer: ninguna",
+            "- andalucia: ningún barrido completado; fichas por leer: ninguna",
           );
-          assert.include(antes.texto, "La próxima noche barre: centro");
-
-          yield* noche(1);
-          const segunda = yield* resumenPublicado(entorno);
+          assert.include(antes.texto, `La próxima ejecución barre: ${ZONAS.slice(2).join(", ")}`);
+          assert.include(
+            antes.texto,
+            "Próxima ejecución: el domingo 4/10/2026 a las 00:30 (Europe/Madrid). Retoma la " +
+              "ronda y solo pide al registro lo que quede de ella. Ahora quedan 5 zonas " +
+              `(${ZONAS.slice(2).join(", ")}) y `,
+          );
           // Madrid llega al cuadro de Somosierra, que es de la zona del Ebro y el Duero.
-          assert.isFalse(segunda.get("28")?.cubierta);
-          assert.isAbove(segunda.get("28")?.emplazamientos ?? 0, 0);
-          assert.includeMembers(cubiertas(segunda), ["08", "17", "25", "43"]);
+          assert.isFalse(primera.get("28")?.cubierta);
+          assert.isAbove(primera.get("28")?.emplazamientos ?? 0, 0);
 
-          for (let n = 2; n < 7; n++) yield* noche(n);
-          // Una zona cada noche, en el orden de la configuración.
-          assert.deepStrictEqual(
-            barridas,
-            ZONAS.map((zona) => [zona]),
+          // El domingo solo barre las cinco que faltan, y ya está toda España.
+          yield* TestClock.setTime(NOCHE + DIA);
+          const domingo = delRegistro(
+            (yield* unaNoche(entorno, registroOficial(espana), {
+              proceso: SIN_FICHAS,
+              porLote: 128,
+            })).ejecuciones,
           );
+          assert.deepStrictEqual(
+            domingo.zonas.map((z) => [z.zona, z.estado]),
+            ZONAS.slice(2).map((zona) => [zona, "completado"]),
+          );
+          assert.deepStrictEqual(domingo.porLeer?.zonas, []);
           const todas = yield* resumenPublicado(entorno);
           assert.strictEqual(todas.size, 52);
           assert.deepStrictEqual(cubiertas(todas), [...todas.keys()]);
           // Cada provincia con el último barrido de las zonas que la tocan.
           assert.strictEqual(todas.get("08")?.barrido, NOCHE);
-          assert.strictEqual(todas.get("28")?.barrido, NOCHE + 5 * DIA);
-          assert.strictEqual(todas.get("38")?.barrido, NOCHE + 6 * DIA);
+          assert.strictEqual(todas.get("28")?.barrido, NOCHE + DIA);
+          assert.strictEqual(todas.get("38")?.barrido, NOCHE + DIA);
 
+          // La próxima, el primer sábado de noviembre, empieza otra ronda con las siete.
           const despues = yield* estadoDe(entorno);
-          assert.include(despues.texto, "La próxima noche barre: cataluna");
+          assert.include(despues.texto, `La próxima ejecución barre: ${ZONAS.join(", ")}`);
+          assert.include(
+            despues.texto,
+            "Próxima ejecución: el sábado 7/11/2026 a las 00:30 (Europe/Madrid). Empieza otra " +
+              "ronda, en la que barre sus 7 zonas y lee todas las fichas",
+          );
         }),
       ),
     120_000,
   );
 
   it.effect(
-    "toda España cabe en una noche cambiando solo la configuración, y sus fichas van por prioridad",
+    "toda España cabe en una ejecución con la configuración por defecto, y sus fichas van en un solo orden",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
           const c = yield* configuracion.parse(
-            ConfigProvider.fromEnv({
-              env: { CELDA_REGISTRO_ZONAS_POR_NOCHE: "7", CELDA_INGESTA_MAX_FICHAS: "0" },
-            }),
+            ConfigProvider.fromEnv({ env: { CELDA_INGESTA_MAX_FICHAS: "0" } }),
           );
           const espana = yield* espanaSintetica(yield* zonasDePublicacion);
           yield* TestClock.setTime(NOCHE);
@@ -180,16 +207,16 @@ describe("toda España en la ingesta nocturna (#50)", () => {
             registro.zonas.map((z) => [z.zona, z.estado]),
             ZONAS.map((zona) => [zona, "completado"]),
           );
-          // La primera pasada de cada zona es la de su noche con la configuración por defecto:
-          // unas 35 peticiones de media, y unas 29 las siguientes, con las cajas guardadas. La
-          // primera noche real, el 29/09/2026, levante necesitó 46.
+          // La primera pasada de cada zona: unas 35 peticiones de media, y unas 29 las
+          // siguientes, con las cajas guardadas. La primera pasada real de levante, el
+          // 29/09/2026, necesitó 46.
           for (const zona of registro.zonas) {
             assert.isAtLeast(zona.peticiones, 15, zona.zona);
             assert.isAtMost(zona.peticiones, 50, zona.zona);
             assert.strictEqual(zona.registros, espana.porZona.get(zona.zona), zona.zona);
           }
           const peticiones = registro.zonas.reduce((suma, z) => suma + z.peticiones, 0);
-          // 247 en la primera noche real de toda España; la España sintética da 242.
+          // 247 en la primera pasada real de toda España; la España sintética da 242.
           assert.isAtLeast(peticiones, 200);
           assert.isAtMost(peticiones, 280);
           // Con `robots.txt` y margen para reintentos, dentro del tope por defecto.
@@ -205,35 +232,31 @@ describe("toda España en la ingesta nocturna (#50)", () => {
           const suma = [...provincias.values()].reduce((a, p) => a + p.emplazamientos, 0);
           assert.strictEqual(suma, hecha.publicacion.emplazamientos);
 
-          // Las fichas: Barcelona, el resto de Cataluña y luego cada zona en su orden.
+          // Las fichas: todas sin leer, en una sola cola, y cada zona con las de sus cuadros.
           const { cola, turno } = yield* estadoDe(entorno, c.noche.proceso);
-          assert.deepStrictEqual(
-            cola.map(({ grupo }) =>
-              grupo.tipo === "provincia"
-                ? grupo.provincia
-                : grupo.tipo === "zona"
-                  ? grupo.zona
-                  : "fuera",
-            ),
-            ["08", "17", "25", "43", ...ZONAS],
-          );
-          assert.strictEqual(
-            cola.reduce((suma, g) => suma + g.nuevas, 0),
-            espana.listado.registros.length,
-          );
-          // La zona de Cataluña cuenta también las de sus provincias con prioridad.
-          assert.strictEqual(
-            turno.zonas.find((z) => z.zona === "cataluna")?.fichas.nuevas,
-            espana.porZona.get("cataluna"),
-          );
-          assert.deepStrictEqual(turno.proxima, ZONAS);
+          assert.deepStrictEqual(cola, {
+            nuevas: espana.listado.registros.length,
+            porReleer: 0,
+            enEspera: 0,
+          });
+          assert.strictEqual(turno.porLeer, espana.listado.registros.length);
+          for (const zona of ZONAS) {
+            assert.strictEqual(
+              turno.zonas.find((z) => z.zona === zona)?.fichas.nuevas,
+              espana.porZona.get(zona),
+              zona,
+            );
+          }
+          // La del domingo no barre nada: las siete zonas tienen su barrido de la ronda.
+          assert.strictEqual(turno.proxima.dia, "domingo");
+          assert.deepStrictEqual(turno.proxima.zonas, []);
         }),
       ),
     120_000,
   );
 
   it.effect(
-    "con los listados grabados de Barcelona y Madrid, cada noche barre su zona y cada ciudad va a su provincia",
+    "con los listados grabados de Barcelona y Madrid, una ejecución barre las dos zonas y cada ciudad va a su provincia",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -243,21 +266,23 @@ describe("toda España en la ingesta nocturna (#50)", () => {
             listado: { registros: [...barcelona.registros, ...madrid.registros], avisos: [] },
             fichas: new Map(),
           };
-          const noche = (n: number) =>
-            Effect.andThen(
-              TestClock.setTime(NOCHE + n * DIA),
-              unaNoche(entorno, registroOficial(grabada), { proceso: SIN_FICHAS, porLote: 128 }),
-            );
-
-          const primera = delRegistro((yield* noche(0)).ejecuciones);
-          assert.deepStrictEqual(
-            primera.zonas.map((z) => [z.zona, z.registros]),
-            [["cataluna", barcelona.registros.length]],
+          yield* TestClock.setTime(NOCHE);
+          const hecha = delRegistro(
+            (yield* unaNoche(entorno, registroOficial(grabada), {
+              proceso: SIN_FICHAS,
+              porLote: 128,
+            })).ejecuciones,
           );
-          const segunda = delRegistro((yield* noche(1)).ejecuciones);
           assert.deepStrictEqual(
-            segunda.zonas.map((z) => [z.zona, z.registros]),
-            [["centro", madrid.registros.length]],
+            hecha.zonas.map((z) => [z.zona, z.registros]),
+            ZONAS.map((zona) => [
+              zona,
+              zona === "cataluna"
+                ? barcelona.registros.length
+                : zona === "centro"
+                  ? madrid.registros.length
+                  : 0,
+            ]),
           );
 
           // Los emplazamientos de la revisión de la fusión (investigación 08, ticket 49).
@@ -266,7 +291,7 @@ describe("toda España en la ingesta nocturna (#50)", () => {
           // 1331 antes de reparar «Casta±eda», que ahora se junta con «CASTAÑEDA».
           assert.strictEqual(provincias.get("28")?.emplazamientos, 1330);
           assert.isTrue(provincias.get("08")?.cubierta);
-          assert.isFalse(provincias.get("28")?.cubierta);
+          assert.isTrue(provincias.get("28")?.cubierta);
         }),
       ),
     60_000,

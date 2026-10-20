@@ -4,9 +4,9 @@ import { FICHERO_VIGENTE } from "@celda/dominio/capa";
 import type { Fuente } from "@celda/dominio/observacion";
 import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
 import { zonaDeBarrido } from "@celda/dominio/barrido";
-import { BaseDeBarrido, type OpcionesBarrido } from "@celda/ingesta/barrido";
+import { BaseDeBarrido, OPCIONES_BARRIDO, type OpcionesBarrido } from "@celda/ingesta/barrido";
 import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
-import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
+import { OPCIONES_FICHAS } from "@celda/ingesta/fichas";
 import {
   type AlmacenDeCopias,
   AlmacenDeFicheros,
@@ -29,15 +29,9 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { ArchivoNocturno, archivoNocturno } from "../archivo.ts";
 import { BaseNocturna, baseNocturna } from "../base.ts";
 import type { AceptadasDelBuzon } from "../buzon.ts";
+import { CALENDARIO } from "../calendario.ts";
 import { COPIAS_CONSERVADAS, REINTENTO_DE_PUBLICACION } from "../configuracion.ts";
-import {
-  Extractores,
-  noche,
-  type OpcionesNoche,
-  provinciasDe,
-  publicadorEn,
-  sinAlmacen,
-} from "../programa.ts";
+import { Extractores, noche, type OpcionesNoche, publicadorEn, sinAlmacen } from "../programa.ts";
 
 /** Los interruptores por defecto con la comunidad encendida, como con el buzón configurado. */
 export const CON_COMUNIDAD: Readonly<Record<Fuente, Interruptor>> = {
@@ -101,24 +95,33 @@ export const conEntorno = <A, E, R>(prueba: (entorno: Entorno) => Effect.Effect<
     });
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
+/** La zona de barrido de Cataluña, en la que cae la muestra del Campus Nord. */
+export const CATALUNA = [zonaDeBarrido("cataluna")].flatMap((z) => z ?? []);
+
 /**
- * La muestra del Campus Nord cae en Cataluña: las pruebas con ella la barren cada noche, sin
- * turnos, y las fichas van con sus valores por defecto.
+ * La muestra del Campus Nord cae en Cataluña: las pruebas con ella solo barren esa zona, y las
+ * fichas van con sus valores por defecto. Cada ejecución de estas pruebas es una ronda nueva,
+ * como la del primer sábado de cada mes: barre Cataluña y lee todas las fichas. Las que prueban
+ * la ronda, con la del domingo que la retoma, usan `EN_RONDAS`.
  */
 export const CATALUNA_CADA_NOCHE: OpcionesBarrido = {
-  zonas: {
-    cadaNoche: [zonaDeBarrido("cataluna")].flatMap((z) => z ?? []),
-    enTurno: [],
-    porNoche: 1,
-  },
+  zonas: CATALUNA,
   fichas: OPCIONES_FICHAS,
+  reciente: Duration.zero,
 };
 
-/** Las opciones de la noche por defecto, con las carpetas del entorno. */
+/**
+ * Como `CATALUNA_CADA_NOCHE`, con las rondas de producción (`RECIENTE`): una ejecución que llega
+ * menos de un día y medio después de otra solo lee lo que esa dejó sin leer.
+ */
+export const EN_RONDAS: OpcionesBarrido = { ...OPCIONES_BARRIDO, zonas: CATALUNA };
+
+/** Las opciones de la orden `noche` por defecto, con las carpetas del entorno. */
 export const opcionesDe = (entorno: Entorno): OpcionesNoche => ({
   proceso: CATALUNA_CADA_NOCHE,
   reintento: REINTENTO_DE_PUBLICACION,
   copias: { carpeta: entorno.copias, conservar: COPIAS_CONSERVADAS },
+  calendario: CALENDARIO,
 });
 
 /** Lo que cambia de una noche a otra en una prueba. */
@@ -174,7 +177,7 @@ export const unaNoche = (
           comunidad: Option.fromUndefinedOr(variante.buzon),
         }),
       ),
-      Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
+
       variante.copiasEnR2 ?? Layer.empty,
       variante.archivoEnR2 ?? Layer.empty,
       archivoNocturno(variante.archivo ?? entorno.archivo),

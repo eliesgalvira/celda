@@ -161,7 +161,7 @@ export class FuenteBloqueada extends Schema.TaggedError<FuenteBloqueada>()("Fuen
 /**
  * La fuente pide que se espere: un 429, o un 503 con `Retry-After`. Si pide poco, el cliente
  * espera lo que pide y repite; si pide más, no lo dice o sigue pidiéndolo tras los reintentos,
- * no se insiste: se deja de pedir hasta la noche siguiente.
+ * no se insiste: se deja de pedir hasta la ejecución siguiente.
  */
 export class FuentePideEsperar extends Schema.TaggedError<FuentePideEsperar>()(
   "FuentePideEsperar",

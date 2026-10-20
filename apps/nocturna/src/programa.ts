@@ -1,4 +1,3 @@
-import { type IndiceDeMunicipios, municipioDelPunto } from "@celda/dominio/municipio";
 import type { Fuente } from "@celda/dominio/observacion";
 import type { PaginaParaPublicar } from "@celda/dominio/moderacion";
 import { SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
@@ -6,16 +5,12 @@ import {
   BaseDeBarrido,
   ejecutarBarrido,
   type OpcionesBarrido,
+  type PorLeer,
   type ZonaEnLaEjecucion,
-  zonasDeLaNoche,
+  zonasPorBarrer,
 } from "@celda/ingesta/barrido";
 import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
-import {
-  pendientesPorZona,
-  Provincias,
-  PublicacionAMitad,
-  resumirCola,
-} from "@celda/ingesta/fichas";
+import { pendientesPorZona, PublicacionAMitad, resumirCola } from "@celda/ingesta/fichas";
 import { AlmacenDeCopias, type AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import {
   DatosPublicables,
@@ -42,11 +37,17 @@ import * as Stream from "effect/Stream";
 import { type CopiaDelArchivo, copiarArchivo } from "./archivo.ts";
 import { BaseNocturna } from "./base.ts";
 import { AceptadasDelBuzon } from "./buzon.ts";
-import { describirResumen, type Turno } from "./estado.ts";
+import {
+  type Calendario,
+  describirProgramada,
+  type EjecucionProgramada,
+  proximaEjecucion,
+} from "./calendario.ts";
+import { describirResumen, loQueQueda, type Turno } from "./estado.ts";
 
 /**
- * Los extractores de la noche, uno por fuente que ya tiene extractor. Cada ejecución construye el
- * suyo desde su capa, así que su tope de peticiones cuenta desde el principio de la ejecución.
+ * Los extractores de la ejecución, uno por fuente que ya tiene extractor. Cada ejecución construye
+ * el suyo desde su capa, así que su tope de peticiones cuenta desde el principio de la ejecución.
  */
 export class Extractores extends Context.Service<
   Extractores,
@@ -139,31 +140,35 @@ export interface OpcionesCopias {
   readonly conservar: number;
 }
 
-/** Lo que hace la noche, aparte de los extractores. */
+/** Lo que hace la orden `noche`, aparte de los extractores. */
 export interface OpcionesNoche {
   readonly proceso: OpcionesBarrido;
   /** Si publicar falla por algo pasajero, cuánto se espera para repetirlo una vez. */
   readonly reintento: Duration.Duration;
   readonly copias: OpcionesCopias;
+  /** Cuándo lanza el temporizador cada ejecución, para decir en el diario quién sigue. */
+  readonly calendario: Calendario;
 }
 
-/** Una ejecución de la noche, de una fuente. */
+/** Una ejecución de la orden `noche`, de una fuente. */
 export interface EjecucionDeLaNoche {
   readonly fuente: Fuente;
   readonly ejecucion: string;
   readonly estado: "omitida" | "fallida" | "completada";
   readonly zonas: ReadonlyArray<ZonaEnLaEjecucion>;
-  /** Si la ejecución ha parado la noche por un cambio masivo en la fuente, por qué. */
+  /** Lo que queda de la ronda, en el registro oficial. */
+  readonly porLeer?: PorLeer;
+  /** Si la ejecución se ha parado por un cambio masivo en la fuente, por qué. */
   readonly detenida?: string;
 }
 
-/** Una noche parada por un cambio masivo en una fuente: no publica ni lanza el build. */
+/** Una ejecución parada por un cambio masivo en una fuente: no publica ni lanza el build. */
 export interface PublicacionDetenida {
   readonly tipo: "detenida";
   readonly motivo: string;
 }
 
-/** Lo que ha hecho una noche. */
+/** Lo que ha hecho la orden `noche`. */
 export interface Noche {
   readonly ejecuciones: ReadonlyArray<EjecucionDeLaNoche>;
   readonly publicacion: ResultadoPublicacion | PublicacionDetenida;
@@ -211,7 +216,7 @@ export const copiarBase = Effect.fn("Nocturna.copiarBase")(function* (opciones: 
   return destino;
 });
 
-/** Lo que ha pasado con la copia de la base en R2. Nunca es un fallo de la noche. */
+/** Lo que ha pasado con la copia de la base en R2. Nunca es un fallo de la ejecución. */
 export type CopiaEnR2 =
   /** No hay cubo de R2 configurado, o no hay copia local que subir. */
   | { readonly tipo: "sin-subir" }
@@ -245,8 +250,8 @@ const comprimir = (ruta: string) =>
 /**
  * Sube a R2 la copia de la base que acaba de hacer `copiarBase`, comprimida
  * (`ingesta-<fecha>.sqlite.gz`), y borra allí las más viejas hasta dejar `conservar`, como en el
- * disco (ADR 0018). Sin cubo de R2 no hace nada. Si algo falla, lo apunta en el diario y la noche
- * sigue.
+ * disco (ADR 0018). Sin cubo de R2 no hace nada. Si algo falla, lo apunta en el diario y la
+ * ejecución sigue.
  */
 export const subirCopia = Effect.fn("Nocturna.subirCopia")(function* (
   ruta: string,
@@ -290,7 +295,7 @@ export const subirCopia = Effect.fn("Nocturna.subirCopia")(function* (
   return subida;
 });
 
-/** Publica una vez y lo apunta en la base, con las ejecuciones de su noche. */
+/** Publica una vez y lo apunta en la base, con las ejecuciones que la piden. */
 const publicarYApuntar = Effect.fn("Nocturna.publicar")(function* (
   ejecuciones: ReadonlyArray<string>,
 ) {
@@ -348,7 +353,7 @@ const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<
  * página, como una ejecución de la comunidad (ADR 0020). Sigue desde la última aceptada que tiene
  * la base, y una que ya tenía no se guarda dos veces, así que leer dos veces lo mismo no duplica
  * nada. Si el buzón no contesta, la ejecución queda fallida con lo que haya guardado, lo dice el
- * diario y la noche sigue: lo que falte llega la noche siguiente.
+ * diario y la orden sigue: lo que falte llega en la ejecución siguiente.
  */
 export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function* (
   buzon: Layer.Layer<AceptadasDelBuzon>,
@@ -378,7 +383,7 @@ export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function*
       if (pagina.ultima === null) return;
       despuesDe = pagina.ultima;
     }
-    // La conexión con el buzón se monta solo para la recogida: si falla, la noche publica lo demás.
+    // La conexión con el buzón se monta solo para la recogida: si falla, se publica lo demás.
     // @effect-diagnostics-next-line strictEffectProvide:off
   }).pipe(Effect.provide(buzon));
   const fallo = yield* recogida.pipe(
@@ -398,7 +403,7 @@ export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function*
   if (Option.isSome(fallo)) {
     yield* base.fallar(arranque.ejecucion, { ...cierre, errores: [fallo.value] });
     yield* Effect.logWarning(
-      `${fallo.value}. La noche publica lo demás; lo aceptado que falta llega la próxima noche` +
+      `${fallo.value}. Se publica lo demás; lo aceptado que falta llega en la ejecución siguiente` +
         ` (${cuentas.nuevas} aceptadas nuevas guardadas antes del fallo)`,
     );
   } else {
@@ -420,43 +425,78 @@ export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function*
   return hecha;
 });
 
-/** Las provincias de los límites del IGN, para ordenar la cola de fichas y nombrarlas. */
-export const provinciasDe = (municipios: IndiceDeMunicipios) =>
-  Provincias.of({
-    provinciaDe: (posicion) => municipioDelPunto(posicion, municipios).provincia?.codigo,
-    nombreDe: (codigo) => municipios.provincias.get(codigo)?.nombre,
-  });
-
 const describirZona = (z: ZonaEnLaEjecucion): string =>
   `Zona ${z.zona}: ${z.estado}, ${z.cuadros} cuadros, ${z.peticiones} peticiones, ` +
   `${Math.round(z.bytes / 1000)} kB, ${z.registros} registros, observaciones ` +
   `+${z.observaciones.creados} ~${z.observaciones.cambiados} -${z.observaciones.retirados}` +
   (z.error === undefined ? "" : ` (${z.error})`);
 
+/** Una línea del diario, y si va como aviso. */
+export interface LineaDelDiario {
+  readonly aviso: boolean;
+  readonly texto: string;
+}
+
 /**
- * La noche entera:
+ * Lo que dice el diario al acabar una ejecución del registro: lo que queda de la ronda y qué
+ * ejecución del calendario lo lee. La del domingo retoma la ronda; la del primer sábado del mes
+ * siguiente empieza otra y lo vuelve a leer todo, así que lo que quede para ella se ha quedado
+ * sin leer este mes.
+ */
+export const describirLoQueQueda = (
+  porLeer: PorLeer,
+  proxima: EjecucionProgramada,
+  calendario: Calendario,
+): LineaDelDiario => {
+  const cuando = describirProgramada(calendario, proxima);
+  const queda = loQueQueda(porLeer.zonas, porLeer.fichas);
+  if (queda === undefined) {
+    return {
+      aviso: false,
+      texto:
+        proxima.dia === "domingo"
+          ? `La ronda está entera, así que la ejecución del ${cuando} no pedirá nada al registro`
+          : `La ronda está entera. La próxima ejecución es la del ${cuando}, que empieza otra`,
+    };
+  }
+  return proxima.dia === "domingo"
+    ? {
+        aviso: false,
+        texto: `Lo que queda de la ronda, ${queda}, lo lee la ejecución del ${cuando}`,
+      }
+    : {
+        aviso: true,
+        texto:
+          `Lo que queda de la ronda, ${queda}, se queda sin leer este mes, porque no hay otra ` +
+          `ejecución hasta la del ${cuando}, que empieza otra ronda`,
+      };
+};
+
+/**
+ * Una ejecución de la ingesta, la que lanza la orden `noche`:
  *
  * 0. Con la conexión con el buzón de Convex, lee lo aceptado en la moderación desde la última vez
  *    (`recogerAceptadas`), para que la publicación lo lleve a las fichas. Si Convex no contesta,
- *    lo dice el diario y la noche sigue.
+ *    lo dice el diario y la ejecución sigue.
  * 1. Una ejecución de ingesta por fuente con extractor, con su interruptor. El registro oficial
- *    barre sus zonas de barrido, lee las fichas de la cola hasta cerrar su ventana, publicando a
- *    mitad, y fusiona (`ejecutarBarrido`).
- * 2. Publica la capa y las fichas. Sin cambios no escribe nada, y si la noche anterior no pudo
+ *    barre las zonas de barrido y lee las fichas que faltan en la ronda hasta cerrar su ventana,
+ *    publicando a mitad, y fusiona (`ejecutarBarrido`). El diario dice lo que queda de la ronda y
+ *    qué ejecución lo lee (`describirLoQueQueda`).
+ * 2. Publica la capa y las fichas. Sin cambios no escribe nada, y si la ejecución anterior no pudo
  *    publicar, lo hace ahora. Si falla por algo pasajero, lo apunta, espera `reintento` y lo
- *    intenta otra vez; si vuelve a fallar, queda para la noche siguiente. Los datos ya están en
- *    la base.
+ *    intenta otra vez; si vuelve a fallar, queda para la ejecución siguiente. Los datos ya están
+ *    en la base.
  * 3. Si Vercel no sirve la versión vigente del almacén, lanza su build con el deploy hook, y el
  *    build monta las capas desde R2 (ADR 0018). Se hace también si la publicación ha fallado:
  *    Vercel sigue a lo que haya en el almacén.
  * 4. Copia la base a la carpeta de copias y deja las `conservar` últimas. Con un cubo de R2,
  *    sube también la copia comprimida y deja allí otras tantas.
- * 5. Saca del archivo de páginas un paquete con lo nuevo de la noche, en la carpeta `archivo` de
- *    la de copias, y sube a R2 los paquetes que aún no están allí (ADR 0027). Si falla, la noche
- *    acaba bien y lo que falta va con el paquete siguiente.
+ * 5. Saca del archivo de páginas un paquete con lo nuevo de la ejecución, en la carpeta `archivo`
+ *    de la de copias, y sube a R2 los paquetes que aún no están allí (ADR 0027). Si falla, la
+ *    ejecución acaba bien y lo que falta va con el paquete siguiente.
  *
- * Una noche cortada a mitad deja su ejecución en curso; la siguiente la da por interrumpida y la
- * rehace, porque cada paso es idempotente. Un barrido de zona cortado se retoma por el primer
+ * Una ejecución cortada a mitad se queda en curso; la siguiente la da por interrumpida y rehace lo
+ * que faltaba, porque cada paso es idempotente. Un barrido de zona cortado se retoma por el primer
  * cuadro que no llegó a guardarse.
  */
 export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNoche) {
@@ -465,7 +505,7 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
     ? [yield* recogerAceptadas(extractores.comunidad.value)]
     : [];
   // A mitad de la ventana de fichas se publica lo que haya, sin esperar ni repetir si falla: al
-  // final de la noche se vuelve a publicar.
+  // final de la ejecución se vuelve a publicar.
   const contexto = yield* Effect.context<Publicador | BaseNocturna>();
   const aMitad = PublicacionAMitad.of({
     publicar: publicarYApuntar([]).pipe(Effect.asVoid, Effect.provideContext(contexto)),
@@ -484,10 +524,18 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
       yield* Effect.logInfo(describirZona(zona));
     }
   }
+  if (registro.porLeer !== undefined && registro.detenida === undefined) {
+    const queda = describirLoQueQueda(
+      registro.porLeer,
+      proximaEjecucion(opciones.calendario, yield* Clock.currentTimeMillis),
+      opciones.calendario,
+    );
+    yield* queda.aviso ? Effect.logWarning(queda.texto) : Effect.logInfo(queda.texto);
+  }
   const completadas = ejecuciones.filter((e) => e.estado === "completada").map((e) => e.ejecucion);
 
-  // Un cambio masivo en el registro para la noche antes de publicar (ADR 0027): lo publicado y lo
-  // que sirve Vercel se quedan como estaban hasta que alguien lo mire.
+  // Un cambio masivo en el registro para la ejecución antes de publicar (ADR 0027): lo publicado
+  // y lo que sirve Vercel se quedan como estaban hasta que alguien lo mire.
   const detenida = ejecuciones.find((e) => e.detenida !== undefined)?.detenida;
   let publicacion: ResultadoPublicacion | PublicacionDetenida;
   let vercel: ResultadoVercel;
@@ -503,7 +551,7 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
     publicacion = intento.resultado;
     vercel = yield* ponerAlDiaYApuntarVercel;
   } else {
-    yield* Effect.logError(`La noche no publica: ${detenida}`);
+    yield* Effect.logError(`La ejecución no publica: ${detenida}`);
     publicacion = { tipo: "detenida", motivo: detenida };
     vercel = { tipo: "sin-hook" };
   }
@@ -531,19 +579,19 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
 });
 
 /**
- * Una noche parada por un cambio masivo en el registro (ADR 0027). La orden `noche` acaba con este
- * error, y con él con un código distinto de cero, para que systemd dé el servicio por fallido y se
- * vea en `systemctl` y en las alertas.
+ * Una ejecución parada por un cambio masivo en el registro (ADR 0027). La orden `noche` acaba con
+ * este error, y con él con un código distinto de cero, para que systemd dé el servicio por fallido
+ * y se vea en `systemctl` y en las alertas.
  */
 export class NocheDetenida extends Schema.TaggedError<NocheDetenida>()("NocheDetenida", {
   motivo: Schema.String,
 }) {
   override get message() {
-    return `La noche se ha parado sin publicar: ${this.motivo}`;
+    return `La ejecución se ha parado sin publicar: ${this.motivo}`;
   }
 }
 
-/** Falla con `NocheDetenida` si la noche se paró por un cambio masivo. */
+/** Falla con `NocheDetenida` si la ejecución se paró por un cambio masivo. */
 export const comprobarNoche = (hecha: Noche): Effect.Effect<void, NocheDetenida> =>
   hecha.publicacion.tipo === "detenida"
     ? Effect.fail(new NocheDetenida({ motivo: hecha.publicacion.motivo }))
@@ -557,31 +605,40 @@ export const publicarAMano = Effect.gen(function* () {
 });
 
 /**
- * Escribe el estado de la base: cada fuente; las zonas de barrido de la configuración, cuándo se
- * barrió cada una, cuántas fichas le quedan y cuáles barre la noche siguiente; las fichas que
- * quedan en cada parte de la cola, lo publicado y el último intento de publicar.
+ * Escribe el estado de la base: cada fuente y, del registro oficial, cuántas fichas le quedan a
+ * la ronda, también durante una ejecución; sus zonas de barrido, cuándo se barrió cada una y
+ * cuántas fichas le quedan; y la próxima ejecución del calendario, con lo que barrerá. Después, lo
+ * publicado y el último intento de publicar.
  */
-export const estado = Effect.fn("Nocturna.estado")(function* (opciones: OpcionesBarrido) {
+export const estado = Effect.fn("Nocturna.estado")(function* (
+  opciones: OpcionesBarrido,
+  calendario: Calendario,
+) {
   const base = yield* BaseNocturna;
   const barrido = yield* BaseDeBarrido;
-  const provincias = yield* Provincias;
   const ahora = yield* Clock.currentTimeMillis;
-  const leidasAntesDe = ahora - Duration.toMillis(opciones.fichas.relectura);
-  const resumen = yield* base.resumen(leidasAntesDe);
-  const pendientes = yield* barrido.colaDeFichas("registro-oficial", leidasAntesDe);
-  const zonas = [...opciones.zonas.cadaNoche, ...opciones.zonas.enTurno];
-  const cola = resumirCola(
-    pendientes,
-    { provincias: opciones.fichas.prioridad, zonas, provinciaDe: provincias.provinciaDe },
-    ahora,
-  );
-  const porZona = pendientesPorZona(pendientes, zonas, ahora);
+  // Lo leído desde aquí es de la ronda de ahora.
+  const desde = ahora - Duration.toMillis(opciones.reciente);
+  const resumen = yield* base.resumen(desde);
+  const pendientes = yield* barrido.colaDeFichas("registro-oficial", desde);
+  const cola = resumirCola(pendientes, ahora);
+  const porZona = pendientesPorZona(pendientes, opciones.zonas, ahora);
+  const proxima = proximaEjecucion(calendario, ahora);
+  const estadoDeZonas = yield* barrido.estadoDeZonas("registro-oficial");
   const turno: Turno = {
     zonas: [...porZona].map(([zona, fichas]) => ({ zona, fichas })),
-    proxima: zonasDeLaNoche(opciones.zonas, yield* barrido.estadoDeZonas("registro-oficial")).map(
-      (zona) => zona.nombre,
-    ),
+    porLeer: cola.nuevas + cola.porReleer,
+    proxima: {
+      cuando: describirProgramada(calendario, proxima),
+      dia: proxima.dia,
+      configuradas: opciones.zonas.length,
+      zonas: zonasPorBarrer(
+        opciones.zonas,
+        estadoDeZonas,
+        proxima.instante - Duration.toMillis(opciones.reciente),
+      ).map((zona) => zona.nombre),
+    },
   };
-  yield* Console.log(describirResumen(base.fichero, resumen, cola, provincias.nombreDe, turno));
+  yield* Console.log(describirResumen(base.fichero, resumen, turno));
   return { resumen, cola, turno };
 });

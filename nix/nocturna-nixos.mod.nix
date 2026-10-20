@@ -1,7 +1,9 @@
 { self, ... }:
 {
-  # El servicio de NixOS de la ingesta nocturna (ADR 0015). Genérico: la máquina, el horario, las
-  # rutas y las credenciales los pone la configuración de quien lo usa (docs/patterns/nixos.md).
+  # El servicio de NixOS de la ingesta (ADR 0015 y 0029): una ejecución el primer sábado de cada
+  # mes y otra el domingo siguiente, que solo lee lo que la del sábado dejó pendiente. Genérico: la
+  # máquina, las rutas y las credenciales los pone la configuración de quien lo usa
+  # (docs/patterns/nixos.md).
   flake.nixosModules.celda-nocturna =
     {
       config,
@@ -15,7 +17,7 @@
       inherit (lib.meta) getExe;
       inherit (lib.modules) mkIf mkRemovedOptionModule mkRenamedOptionModule;
       inherit (lib.options) literalExpression mkEnableOption mkOption;
-      inherit (lib.strings) concatStringsSep hasPrefix;
+      inherit (lib.strings) concatStringsSep hasPrefix splitString toIntBase10;
       inherit (lib.trivial) boolToString;
       inherit (lib.types)
         bool
@@ -45,6 +47,42 @@
 
       # Una lista como la lee el programa: separada por comas, o `ninguna`.
       listaDelPrograma = zonas: if zonas == [ ] then "ninguna" else concatStringsSep "," zonas;
+
+      cfg = config.services.celda-nocturna;
+
+      # La hora de cada ejecución, en minutos desde la medianoche.
+      minutoDelDia =
+        let
+          partes = map toIntBase10 (splitString ":" cfg.hora);
+        in
+        builtins.elemAt partes 0 * 60 + builtins.elemAt partes 1;
+
+      # Minutos que puede llegar tarde un disparo del temporizador y que la ejecución corra.
+      holgura = 15;
+
+      # Solo deja correr un disparo del temporizador el primer sábado de cada mes o el domingo
+      # siguiente, y a su hora (`ExecCondition=`). Con `Persistent=` apagado, un disparo tardío solo
+      # llega tras una suspensión o un salto del reloj, y uno entre semana iría contra el ADR 0029.
+      # Una ejecución lanzada a mano corre cualquier día.
+      aSuHora = pkgs.writeShellApplication {
+        name = "celda-nocturna-a-su-hora";
+        runtimeInputs = singleton pkgs.coreutils;
+        runtimeEnv.TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+        text = /* bash */ ''
+          if [ -z "''${TRIGGER_UNIT:-}" ]; then
+            exit 0
+          fi
+          read -r dia fecha horas minutos < <(TZ=${cfg.zonaHoraria} date '+%u %-d %-H %-M')
+          ahora=$((horas * 60 + minutos))
+          if { { [ "$dia" = 6 ] && [ "$fecha" -le 7 ]; } || { [ "$dia" = 7 ] && [ "$fecha" -ge 2 ] && [ "$fecha" -le 8 ]; }; } \
+            && [ "$ahora" -ge ${toString minutoDelDia} ] && [ "$ahora" -lt ${toString (minutoDelDia + holgura)} ]; then
+            exit 0
+          fi
+          printf 'El temporizador se ha disparado el día %s a las %02d:%02d (%s), quizá tras una suspensión o un salto del reloj. La ingesta solo corre el primer sábado de cada mes y el domingo siguiente a las %s, así que espera al disparo siguiente.\n' \
+            "$fecha" "$horas" "$minutos" ${cfg.zonaHoraria} ${cfg.hora}
+          exit 1
+        '';
+      };
     in
     {
       imports = [
@@ -57,10 +95,35 @@
           [ "services" "celda-nocturna" "origenDeReserva" ]
           "Las capas se sirven solo desde Vercel (ADR 0018): pon su URL, https://celda.elies.site/capas, en services.celda-nocturna.origenPublico."
         )
+        # Una ejecución al mes, el primer fin de semana (ADR 0029).
+        (mkRemovedOptionModule
+          [ "services" "celda-nocturna" "horario" ]
+          "La ingesta corre el primer sábado de cada mes y el domingo siguiente (ADR 0029). Quita horario: la hora va en services.celda-nocturna.hora (00:30 por defecto) y su zona horaria en services.celda-nocturna.zonaHoraria (Europe/Madrid por defecto)."
+        )
+        (mkRemovedOptionModule
+          [ "services" "celda-nocturna" "recuperarNochesPerdidas" ]
+          "Una ejecución perdida ya no se recupera al encender la máquina, para no correr entre semana (ADR 0029): si la máquina está apagada el sábado, la ejecución la hace el domingo, y si tampoco, espera al mes siguiente."
+        )
+        (mkRemovedOptionModule
+          [ "services" "celda-nocturna" "registroOficial" "fichas" "relectura" ]
+          "Cada ejecución lee las fichas que no se han leído en el último día y medio (ADR 0029): la del primer sábado del mes, todas, y la del domingo, las que dejó la del sábado."
+        )
+        (mkRemovedOptionModule
+          [ "services" "celda-nocturna" "registroOficial" "fichas" "prioridad" ]
+          "Las fichas van en el mismo orden en toda España, sin provincias por delante (ADR 0029): primero las nuevas y las de listado cambiado, y luego de la leída hace más tiempo a la más reciente."
+        )
+        (mkRemovedOptionModule
+          [ "services" "celda-nocturna" "registroOficial" "zonasEnTurno" ]
+          "Cada ejecución barre todas las zonas de services.celda-nocturna.registroOficial.zonas, las siete por defecto (ADR 0029). Las zonas ya no se turnan."
+        )
+        (mkRemovedOptionModule
+          [ "services" "celda-nocturna" "registroOficial" "zonasPorNoche" ]
+          "Cada ejecución barre todas las zonas de services.celda-nocturna.registroOficial.zonas, las siete por defecto (ADR 0029). Las zonas ya no se turnan."
+        )
       ];
 
       options.services.celda-nocturna = {
-        enable = mkEnableOption "la ingesta nocturna de Celda: el registro oficial, la publicación y la copia de la base, una vez por noche";
+        enable = mkEnableOption "la ingesta de Celda: el registro oficial, la publicación y la copia de la base, el primer sábado de cada mes y, si queda algo pendiente, el domingo siguiente";
 
         package = mkOption {
           type = package;
@@ -69,30 +132,38 @@
           description = "El paquete de la ingesta.";
         };
 
-        horario = mkOption {
-          type = str;
-          default = "*-*-* 02:15:00 UTC";
-          example = "*-*-* 04:30:00 Europe/Madrid";
-          description = "Cuándo empieza la noche, en el formato de `OnCalendar=` de systemd (systemd.time(7)).";
+        hora = mkOption {
+          type = strMatching "([01][0-9]|2[0-3]):[0-5][0-9]";
+          default = "00:30";
+          example = "01:00";
+          description = ''
+            A qué hora empieza cada ejecución, `HH:MM`, en `zonaHoraria`. El temporizador lanza una
+            el primer sábado de cada mes y otra el domingo siguiente, que solo pide al registro lo
+            que la del sábado dejó pendiente (ADR 0029). Una ejecución tiene que acabar el mismo
+            día: la hora, `tiempoMaximo` y 15 minutos de margen no pueden pasar de la medianoche.
+          '';
         };
 
-        recuperarNochesPerdidas = mkOption {
-          type = bool;
-          default = true;
-          description = "Si la máquina estaba apagada a la hora de la noche, la lanza al encenderse (`Persistent=` del temporizador).";
+        zonaHoraria = mkOption {
+          type = str;
+          default = "Europe/Madrid";
+          example = "Atlantic/Canary";
+          description = "Zona horaria de `hora` y de los días de cada ejecución, de la base de datos de la IANA.";
         };
 
         tiempoMaximo = mkOption {
-          type = str;
-          default = "${
-            toString (
-              config.services.celda-nocturna.registroOficial.fichas.ventana
-              + config.services.celda-nocturna.reintentoDePublicacion
-              + 60
-            )
-          }min";
-          defaultText = literalExpression ''"''${toString (registroOficial.fichas.ventana + reintentoDePublicacion + 60)}min"'';
-          description = "Lo más que puede durar una noche (`TimeoutStartSec=`). Por defecto cubre la ventana de fichas, la espera antes de repetir una publicación fallida y una hora más; con los valores por defecto, 8 horas.";
+          type = ints.positive;
+          default =
+            config.services.celda-nocturna.registroOficial.fichas.ventana
+            + config.services.celda-nocturna.reintentoDePublicacion
+            + 15;
+          defaultText = literalExpression "registroOficial.fichas.ventana + reintentoDePublicacion + 15";
+          description = ''
+            Minutos que puede durar una ejecución (`TimeoutStartSec=`). Por defecto cubre la ventana
+            de fichas, la espera antes de repetir una publicación fallida y un cuarto de hora para
+            publicar, copiar la base y subir el archivo de páginas: 23 h 15 min con los valores por
+            defecto, así que la ejecución de las 00:30 acaba antes de las 23:45.
+          '';
         };
 
         directorioDeEstado = mkOption {
@@ -106,7 +177,7 @@
           default = "/var/lib/${config.services.celda-nocturna.directorioDeEstado}/copias";
           defaultText = literalExpression ''"/var/lib/''${config.services.celda-nocturna.directorioDeEstado}/copias"'';
           example = "/srv/copias/celda";
-          description = "Dónde se guardan las copias de la base y, en su carpeta `archivo`, los paquetes del archivo de páginas (ADR 0027). Puede estar en otro disco: el servicio espera a que se monte, pero la noche corre aunque no se monte.";
+          description = "Dónde se guardan las copias de la base y, en su carpeta `archivo`, los paquetes del archivo de páginas (ADR 0027). Puede estar en otro disco: el servicio espera a que se monte, pero la ejecución corre aunque no se monte.";
         };
 
         copias.conservar = mkOption {
@@ -123,10 +194,10 @@
             Fichero con las credenciales del cubo privado de R2, fuera del almacén de Nix y legible
             solo por root. Va en formato `.env`, con `CELDA_R2_CUENTA`, `CELDA_R2_CUBO`,
             `CELDA_R2_ID_CLAVE` y `CELDA_R2_SECRETO`, de una clave que puede escribir en el cubo.
-            systemd lo pasa al servicio como credencial (`LoadCredential=`). La noche publica ahí,
-            sube a `copias/` la copia comprimida de la base (ADR 0018) y a `archivo/` los paquetes
-            del archivo de páginas que aún no están (ADR 0027). Sin él, la noche ingiere pero no
-            publica, y la copia y los paquetes se quedan en `copias.directorio`.
+            systemd lo pasa al servicio como credencial (`LoadCredential=`). Cada ejecución publica
+            ahí, sube a `copias/` la copia comprimida de la base (ADR 0018) y a `archivo/` los
+            paquetes del archivo de páginas que aún no están (ADR 0027). Sin él, la ejecución
+            ingiere pero no publica, y la copia y los paquetes se quedan en `copias.directorio`.
           '';
         };
 
@@ -137,8 +208,8 @@
           description = ''
             Fichero con el deploy hook del proyecto de Vercel (`CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/…`),
             fuera del almacén de Nix y legible solo por root. Se pasa como la credencial de R2. Tras
-            publicar, si Vercel no sirve en `origenPublico` la versión vigente de R2, la noche llama
-            al hook y el build de Vercel monta las capas desde R2 (ADR 0018). Sin él, la noche no
+            publicar, si Vercel no sirve en `origenPublico` la versión vigente de R2, la ejecución
+            llama al hook y el build de Vercel monta las capas desde R2 (ADR 0018). Sin él, no se
             lanza ningún build.
           '';
         };
@@ -153,10 +224,10 @@
             HTTP del despliegue, `https://<nombre>.convex.site`) y `CELDA_PUBLICACION_CLAVE` (la
             misma que la variable de entorno del despliegue). Esa clave solo abre la acción que da lo
             aceptado, sin identidades ni huellas de IP. Nunca pongas aquí una clave de despliegue de
-            Convex: lo puede todo. Se pasa como la credencial de R2. Cada noche lee de ahí lo
+            Convex: lo puede todo. Se pasa como la credencial de R2. Cada ejecución lee de ahí lo
             aceptado en la moderación desde la última vez y lo publica en las fichas. Si Convex no
-            contesta, la noche publica lo demás y lo dice en el diario. Sin él, la comunidad queda
-            apagada y no se publica ninguna corrección.
+            contesta, publica lo demás y lo dice en el diario. Sin él, la comunidad queda apagada y
+            no se publica ninguna corrección.
           '';
         };
 
@@ -166,16 +237,16 @@
           example = "https://celda.example.org/capas";
           description = ''
             URL pública de las capas, las de la web en Vercel (`CELDA_ALMACEN_ORIGEN`). Se apunta en la
-            base con cada versión. Tras publicar, la noche lee ahí `vigente.json` y solo llama al
-            deploy hook si no coincide con el de R2. Sin ella, cada noche con `credenciales.vercel`
-            lanza el build.
+            base con cada versión. Tras publicar, la ejecución lee ahí `vigente.json` y solo llama al
+            deploy hook si no coincide con el de R2. Sin ella, cada ejecución con
+            `credenciales.vercel` lanza el build.
           '';
         };
 
         reintentoDePublicacion = mkOption {
           type = ints.unsigned;
           default = 60;
-          description = "Minutos de espera antes de repetir una publicación fallida la misma noche.";
+          description = "Minutos de espera antes de repetir una publicación fallida en la misma ejecución.";
         };
 
         memoria.monton = mkOption {
@@ -183,9 +254,9 @@
           default = 512;
           description = ''
             Megabytes del montón de V8 (`--max-old-space-size`). Sin límite, V8 deja crecer el
-            montón con la basura de la publicación y la noche llega a 2 GB de RSS con toda España.
-            Con 512, la noche más pesada medida (69.770 registros) acaba con unos 760 MB de RSS
-            (investigación 08). Si una noche acaba sin memoria, súbelo.
+            montón con la basura de la publicación y la ejecución llega a 2 GB de RSS con toda
+            España. Con 512, una ronda entera, las siete zonas y todas las fichas, cabe con margen
+            (ADR 0029). Si una ejecución acaba sin memoria, súbelo.
           '';
         };
 
@@ -206,7 +277,7 @@
         registroOficial.enable = mkOption {
           type = bool;
           default = true;
-          description = "Interruptor del registro oficial. Apagado, la noche apunta su ejecución como omitida y no le pide nada.";
+          description = "Interruptor del registro oficial. Apagado, su ejecución queda omitida y no le pide nada.";
         };
 
         registroOficial.motivo = mkOption {
@@ -224,51 +295,28 @@
         registroOficial.maxPeticiones = mkOption {
           type = ints.positive;
           default = 400;
-          description = "Tope de peticiones del listado por noche, `robots.txt` y reintentos incluidos. Con el valor por defecto cabe toda España en una noche: unas 250 peticiones la primera vez y unas 215 después. Las fichas tienen el suyo: las que caben en su ventana.";
+          description = "Tope de peticiones del listado por ejecución, `robots.txt` y reintentos incluidos. Con el valor por defecto cabe toda España en una: unas 250 peticiones la primera vez y unas 215 después. Las fichas tienen el suyo: las que caben en su ventana.";
         };
 
         registroOficial.fichas.ritmo = mkOption {
           type = ints.between 1 3600;
-          default = 3;
-          example = 1;
-          description = "Segundos entre el final de una ficha y la petición de la siguiente (ADR 0014). Nunca menos de 1, y siempre de una en una. Si el ministerio pide menos peticiones, se sube aquí.";
+          default = 1;
+          example = 3;
+          description = "Segundos entre el final de una ficha y la petición de la siguiente (ADR 0014 y 0029). Nunca menos de 1, y siempre de una en una. A 1 s, con el geoportal contestando en unos 0,1 s, sale una cada 1,1 s, y las de toda España caben en una ejecución. Si el ministerio pide menos peticiones, se sube aquí, y lo que no quepa lo lee la ejecución del domingo o la del mes siguiente.";
         };
 
         registroOficial.fichas.ventana = mkOption {
           type = ints.positive;
-          default = 360;
+          default = 1320;
           example = 120;
-          description = "Minutos durante los que se leen fichas, desde que empieza la noche. Al cerrarse, las que quedan esperan a la noche siguiente. A una cada 3 s, 6 horas son unas 5.500 fichas.";
-        };
-
-        registroOficial.fichas.relectura = mkOption {
-          type = ints.positive;
-          default = 30;
-          description = "Días tras los que se vuelve a leer una ficha ya leída.";
-        };
-
-        registroOficial.fichas.prioridad = mkOption {
-          type = listOf <| strMatching "[0-9]{2}";
-          default = [
-            "08"
-            "17"
-            "25"
-            "43"
-          ];
-          example = singleton "08";
-          description = ''
-            Provincias, por su código INE de dos cifras, cuyas fichas se leen antes que las de
-            ninguna zona de barrido, en este orden. Después van las de cada zona de barrido, en el
-            orden de `zonas` y `zonasEnTurno`, y al final las demás. Por defecto, Barcelona (08) y
-            luego Girona, Lleida y Tarragona.
-          '';
+          description = "Minutos durante los que se leen fichas, desde que empieza la ejecución. Al cerrarse, las que quedan las lee la ejecución del domingo, o la del mes siguiente si ya era la del domingo. Con 22 horas a una cada 1,1 s caben unas 72.000, más que las unas 69.700 de España.";
         };
 
         registroOficial.fichas.maximo = mkOption {
           type = nullOr ints.unsigned;
           default = null;
           example = 250;
-          description = "Tope de fichas por noche. Sin él, se leen hasta cerrar la ventana; con 0 solo se lee el listado.";
+          description = "Tope de fichas por ejecución. Sin él, se leen hasta cerrar la ventana; con 0 solo se lee el listado.";
         };
 
         registroOficial.cambioMasivo.porCiento = mkOption {
@@ -277,16 +325,16 @@
           example = 100;
           description = ''
             Parte de las observaciones vigentes de un cuadro o de una zona, en tanto por ciento,
-            que puede cambiar en una noche (altas, cambios y estaciones que faltan) antes de que la
-            noche se pare sin guardar ese cuadro, sin contar ausencias y sin publicar (ADR 0027).
-            Si el cambio es de verdad, se sube a 100 una noche y se vuelve a bajar.
+            que puede cambiar en una ejecución (altas, cambios y estaciones que faltan) antes de que
+            la ejecución se pare sin guardar ese cuadro, sin contar ausencias y sin publicar (ADR
+            0027). Si el cambio es de verdad, se sube a 100 en una ejecución y se vuelve a bajar.
           '';
         };
 
         registroOficial.cambioMasivo.minimo = mkOption {
           type = ints.unsigned;
           default = 50;
-          description = "Por debajo de cuántos cambios en un cuadro o en una zona nunca se para la noche, sea cual sea la parte.";
+          description = "Por debajo de cuántos cambios en un cuadro o en una zona nunca se para la ejecución, sea cual sea la parte.";
         };
 
         registroOficial.reintentos = mkOption {
@@ -303,39 +351,14 @@
 
         registroOficial.zonas = mkOption {
           type = listOf zonaDeBarrido;
-          default = [ ];
+          default = zonasDeBarrido;
           example = singleton "cataluna";
           description = ''
-            Zonas de barrido del listado que se barren todas las noches (ADR 0014). Por defecto
-            ninguna: todas se turnan. Cataluña son 9 cuadros de 1° y unas 30 peticiones cada noche.
+            Zonas de barrido del listado de cada ronda (ADR 0014 y 0029), en este orden. La
+            ejecución del primer sábado del mes las barre todas y la del domingo, las que el sábado
+            no completó. Por defecto, las siete: toda España, unas 215 peticiones a una cada 3 s,
+            unos 11 minutos.
           '';
-        };
-
-        registroOficial.zonasEnTurno = mkOption {
-          type = listOf zonaDeBarrido;
-          default = zonasDeBarrido;
-          example = [
-            "centro"
-            "andalucia"
-            "levante"
-            "norte"
-            "ebro-y-duero"
-            "oeste-y-canarias"
-          ];
-          description = ''
-            Zonas de barrido que se turnan: cada noche se barren `zonasPorNoche` de ellas, primero
-            la que quedó a medias, luego las que nunca se han completado, en este orden, y luego las
-            que llevan más tiempo sin barrer. Una zona que también está en `zonas` se barre todas
-            las noches. Por defecto, las siete: toda España en siete noches, unas 31 peticiones cada
-            una.
-          '';
-        };
-
-        registroOficial.zonasPorNoche = mkOption {
-          type = ints.unsigned;
-          default = 1;
-          example = 7;
-          description = "Cuántas de las zonas que se turnan se barren cada noche. Con 7 y las zonas por defecto, toda España cada noche: unas 215 peticiones y 15 minutos.";
         };
 
         registroOficial.userAgent = mkOption {
@@ -347,6 +370,13 @@
       };
 
       config = {
+        assertions = singleton {
+          assertion = !cfg.enable || minutoDelDia + holgura + cfg.tiempoMaximo <= 24 * 60;
+          message = ''
+            services.celda-nocturna: una ejecución que empieza a las ${cfg.hora} y dura hasta ${toString cfg.tiempoMaximo} minutos (tiempoMaximo) acabaría al día siguiente. Tiene que acabar el mismo día, con ${toString holgura} minutos de margen, para no correr entre semana ni pisar la del domingo (ADR 0029): adelanta services.celda-nocturna.hora o acorta registroOficial.fichas.ventana.
+          '';
+        };
+
         warnings =
           optional
             (
@@ -354,10 +384,10 @@
               && config.services.celda-nocturna.credenciales.vercel != null
               && config.services.celda-nocturna.origenPublico == null
             )
-            "services.celda-nocturna.credenciales.vercel sin origenPublico: la noche no sabe qué sirve Vercel y lanza el build cada noche.";
+            "services.celda-nocturna.credenciales.vercel sin origenPublico: la ingesta no sabe qué sirve Vercel y lanza el build en cada ejecución.";
 
         users.users.celda-nocturna = mkIf config.services.celda-nocturna.enable {
-          description = "Ingesta nocturna de Celda";
+          description = "Ingesta de Celda";
           group = "celda-nocturna";
           isSystemUser = true;
         };
@@ -395,7 +425,7 @@
             };
 
         systemd.services.celda-nocturna = mkIf config.services.celda-nocturna.enable {
-          description = "Ingesta nocturna de Celda";
+          description = "Ingesta de Celda, el primer fin de semana de cada mes";
 
           after = singleton "network-online.target";
           wants = singleton "network-online.target";
@@ -403,7 +433,7 @@
           # Espera al disco de copias si lo hay, sin depender de él.
           unitConfig.WantsMountsFor = config.services.celda-nocturna.copias.directorio;
 
-          # Una configuración nueva vale desde la noche siguiente. Activarla no corta la noche que
+          # Una configuración nueva vale desde la ejecución siguiente. Activarla no corta la que
           # está corriendo ni deja `nixos-rebuild switch` esperando horas a que acabe la que
           # arrancaría otra vez. Sin reinicio, `stopIfChanged` no se usa. Cómo aplicarla ya, en
           # docs/patterns/nixos.md.
@@ -417,16 +447,16 @@
             CELDA_INGESTA_BASE = "/var/lib/${config.services.celda-nocturna.directorioDeEstado}/ingesta.sqlite";
             CELDA_INGESTA_COPIAS = config.services.celda-nocturna.copias.directorio;
             CELDA_INGESTA_COPIAS_CONSERVADAS = toString config.services.celda-nocturna.copias.conservar;
+            CELDA_INGESTA_HORA = config.services.celda-nocturna.hora;
             CELDA_INGESTA_MAX_FICHAS =
               mkIf (config.services.celda-nocturna.registroOficial.fichas.maximo != null)
               <| toString config.services.celda-nocturna.registroOficial.fichas.maximo;
+            CELDA_INGESTA_ZONA_HORARIA = config.services.celda-nocturna.zonaHoraria;
             CELDA_PUBLICAR_REINTENTO_MINUTOS = toString config.services.celda-nocturna.reintentoDePublicacion;
             CELDA_REGISTRO_ACTIVO = boolToString config.services.celda-nocturna.registroOficial.enable;
             CELDA_REGISTRO_CAMBIO_MASIVO_MINIMO = toString config.services.celda-nocturna.registroOficial.cambioMasivo.minimo;
             CELDA_REGISTRO_CAMBIO_MASIVO_POR_CIENTO = toString config.services.celda-nocturna.registroOficial.cambioMasivo.porCiento;
             CELDA_REGISTRO_ESPERA_SEGUNDOS = toString config.services.celda-nocturna.registroOficial.espera;
-            CELDA_REGISTRO_FICHAS_PRIORIDAD = listaDelPrograma config.services.celda-nocturna.registroOficial.fichas.prioridad;
-            CELDA_REGISTRO_FICHAS_RELECTURA_DIAS = toString config.services.celda-nocturna.registroOficial.fichas.relectura;
             CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS = toString config.services.celda-nocturna.registroOficial.fichas.ritmo;
             CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS = toString config.services.celda-nocturna.registroOficial.fichas.ventana;
             CELDA_REGISTRO_MAX_PETICIONES = toString config.services.celda-nocturna.registroOficial.maxPeticiones;
@@ -435,19 +465,18 @@
             CELDA_REGISTRO_REINTENTOS = toString config.services.celda-nocturna.registroOficial.reintentos;
             CELDA_REGISTRO_USER_AGENT = config.services.celda-nocturna.registroOficial.userAgent;
             CELDA_REGISTRO_ZONAS = listaDelPrograma config.services.celda-nocturna.registroOficial.zonas;
-            CELDA_REGISTRO_ZONAS_EN_TURNO = listaDelPrograma config.services.celda-nocturna.registroOficial.zonasEnTurno;
-            CELDA_REGISTRO_ZONAS_POR_NOCHE = toString config.services.celda-nocturna.registroOficial.zonasPorNoche;
             NODE_OPTIONS = "--max-old-space-size=${toString config.services.celda-nocturna.memoria.monton}";
           };
 
           serviceConfig = {
+            ExecCondition = getExe aSuHora;
             ExecStart = "${getExe config.services.celda-nocturna.package} noche";
             Type = "oneshot";
-            TimeoutStartSec = config.services.celda-nocturna.tiempoMaximo;
+            TimeoutStartSec = "${toString config.services.celda-nocturna.tiempoMaximo}min";
 
             # MEMORIA
             # El montón de V8 va en NODE_OPTIONS; esto es el techo de todo el proceso, con margen
-            # sobre los unos 760 MB de RSS medidos con el montón a 512 MB.
+            # sobre lo medido con el montón a 512 MB en una ronda entera (ADR 0029).
             MemoryHigh = config.services.celda-nocturna.memoria.alta;
             MemoryMax = config.services.celda-nocturna.memoria.maxima;
 
@@ -513,14 +542,20 @@
           };
         };
 
+        # El primer sábado de cada mes, que cae entre el 1 y el 7, y el domingo siguiente, entre el
+        # 2 y el 8. Sin `Persistent=`: una ejecución perdida con la máquina apagada no se recupera
+        # al encenderla, que podría ser entre semana. La del domingo la sustituye.
         systemd.timers.celda-nocturna = mkIf config.services.celda-nocturna.enable {
-          description = "Noche de la ingesta de Celda";
+          description = "Ejecuciones de la ingesta de Celda, el primer sábado de cada mes y el domingo siguiente";
 
           wantedBy = singleton "timers.target";
 
           timerConfig = {
-            OnCalendar = config.services.celda-nocturna.horario;
-            Persistent = config.services.celda-nocturna.recuperarNochesPerdidas;
+            OnCalendar = [
+              "Sat *-*-01..07 ${cfg.hora}:00 ${cfg.zonaHoraria}"
+              "Sun *-*-02..08 ${cfg.hora}:00 ${cfg.zonaHoraria}"
+            ];
+            Persistent = false;
           };
         };
       };

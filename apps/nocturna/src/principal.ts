@@ -1,4 +1,3 @@
-import { Provincias } from "@celda/ingesta/fichas";
 import { PasadaDeBorde } from "@celda/dominio/cuadrosDelRegistro";
 import { municipioDelPunto } from "@celda/dominio/municipio";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
@@ -51,7 +50,6 @@ import {
   estado,
   Extractores,
   noche,
-  provinciasDe,
   publicadorEn,
   publicarAMano,
   sinAlmacen,
@@ -60,11 +58,12 @@ import {
 import { cuadrosDeBorde, pasadaDeBorde } from "./cuadros.ts";
 
 /**
- * La ingesta nocturna fuera de Convex (ADR 0015). Cuatro órdenes sobre la misma base:
+ * La ingesta fuera de Convex (ADR 0015). Siete órdenes sobre la misma base:
  *
- * - `noche`: la noche entera, ingesta, publicación, build de Vercel y copia de seguridad.
- * - `estado`: la última ejecución de cada fuente, las fichas pendientes, los errores y lo
- *   publicado.
+ * - `noche`: una ejecución entera, ingesta, publicación, build de Vercel y copia de seguridad. La
+ *   lanza el temporizador el primer sábado de cada mes y el domingo siguiente (ADR 0029).
+ * - `estado`: la última ejecución de cada fuente, lo que le queda a la ronda, la próxima
+ *   ejecución, los errores y lo publicado.
  * - `publicar`: publica a mano lo que haya en la base, sin pedir nada a las fuentes, y lanza el
  *   build de Vercel si no sirve la versión vigente.
  * - `copia`: copia la base a la carpeta de copias y, con un cubo de R2, también allí, y saca y
@@ -243,7 +242,7 @@ const principal = Effect.gen(function* () {
   const entorno = Layer.mergeAll(
     publicador,
     extractores,
-    Layer.succeed(Provincias, provinciasDe(zonas.municipios)),
+
     Option.getOrElse(copias, () => Layer.empty),
     Option.getOrElse(archivoEnR2, () => Layer.empty),
     archivoNocturno(c.archivo),
@@ -255,7 +254,7 @@ const principal = Effect.gen(function* () {
         yield* comprobarNoche(yield* noche(c.noche));
         return;
       case "estado":
-        yield* estado(c.noche.proceso);
+        yield* estado(c.noche.proceso, c.noche.calendario);
         return;
       case "publicar":
         yield* publicarAMano;

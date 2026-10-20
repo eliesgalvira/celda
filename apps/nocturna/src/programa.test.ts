@@ -7,9 +7,10 @@ import {
   versionDeCapa,
 } from "@celda/dominio/capa";
 import { leerCapaDeProvincia, leerLoteDeProvincia, leerResumen } from "@celda/dominio/provincias";
+import { BaseDeBarrido } from "@celda/ingesta/barrido";
 import { INTERRUPTOR_POR_DEFECTO, SIN_CAMBIOS } from "@celda/ingesta/ejecucion";
 import { ExtractorPorCajas } from "@celda/ingesta/extractor";
-import { OPCIONES_FICHAS, Provincias } from "@celda/ingesta/fichas";
+import { OPCIONES_FICHAS } from "@celda/ingesta/fichas";
 import {
   capaGrabadaPorCajas,
   type FuenteGrabada,
@@ -20,7 +21,6 @@ import {
   AlmacenDeFicheros,
   AlmacenNoDisponible,
 } from "@celda/publicacion/almacen";
-import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
@@ -36,15 +36,16 @@ import * as Result from "effect/Result";
 import { TestClock } from "effect/testing";
 
 import { BaseNocturna } from "./base.ts";
+import { CALENDARIO } from "./calendario.ts";
 import { configuracion, COPIAS_CONSERVADAS } from "./configuracion.ts";
 import { describirResumen } from "./estado.ts";
-import { estado, provinciasDe } from "./programa.ts";
+import { estado } from "./programa.ts";
 import {
   conBase,
   conEntorno,
   contenidoDe,
+  EN_RONDAS,
   type Entorno,
-  CATALUNA_CADA_NOCHE,
   tablasDe,
   unaNoche,
 } from "./pruebas/entorno.ts";
@@ -241,7 +242,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
   );
 
   it.effect(
-    "repetir la noche sin cambios solo rehace el resumen con el barrido nuevo, y otra vez nada",
+    "repetir la ejecución sin cambios solo rehace el resumen con el barrido nuevo, y otra vez nada",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -270,8 +271,12 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           for (const [fichero, contenido] of almacenAntes) {
             if (fichero !== FICHERO_VIGENTE) assert.strictEqual(almacen.get(fichero), contenido);
           }
+          // La ronda nueva relee las 40 fichas, y ninguna cambia.
           const fuente = yield* registroDe(entorno);
-          assert.deepStrictEqual(fuente.ultima?.cambios, SIN_CAMBIOS);
+          assert.deepStrictEqual(fuente.ultima?.cambios, {
+            ...SIN_CAMBIOS,
+            fichas: { leidas: 40, cambiadas: 0 },
+          });
 
           // Publicar otra vez sin otra ejecución no escribe nada.
           const tras = yield* entorno.escritos;
@@ -575,7 +580,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
   );
 
   it.effect(
-    "el estado dice la última ejecución, las fichas que quedan en la cola y los errores",
+    "el estado dice la última ejecución, las fichas que le quedan a la ronda, también durante una ejecución, la próxima ejecución y los errores",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -593,49 +598,69 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
             ),
           };
           yield* TestClock.setTime(NOCHE);
-          yield* unaNoche(entorno, registroOficial(sinFichas));
+          yield* unaNoche(entorno, registroOficial(sinFichas), { proceso: EN_RONDAS });
 
-          const provincias = provinciasDe((yield* zonasDePublicacion).municipios);
-          const { resumen, cola } = yield* conBase(
+          const { resumen, cola, turno } = yield* conBase(
             entorno.base,
-            estado(CATALUNA_CADA_NOCHE).pipe(Effect.provideService(Provincias, provincias)),
+            estado(EN_RONDAS, CALENDARIO),
           );
           const fuente = resumen.fuentes.find((f) => f.fuente === "registro-oficial");
           assert.strictEqual(fuente?.sinLeer, 40);
           assert.strictEqual(fuente?.ultima?.errores.length, 4);
-          // Las tres que han fallado esperan un día; las demás siguen en la cola.
-          assert.deepStrictEqual(cola, [
-            {
-              grupo: { tipo: "provincia", provincia: "08" },
-              nuevas: 37,
-              porReleer: 0,
-              enEspera: 3,
-            },
-          ]);
-          const texto = describirResumen(entorno.base, resumen, cola, provincias.nombreDe);
+          // Las tres que han fallado esperan a la ronda siguiente; las demás siguen en la cola.
+          assert.deepStrictEqual(cola, { nuevas: 37, porReleer: 0, enEspera: 3 });
+          assert.strictEqual(turno.porLeer, 37);
+          const texto = describirResumen(entorno.base, resumen, turno);
           assert.include(texto, "registro-oficial: encendida");
           assert.include(texto, "2026-09-26 02:15:00 UTC, completada, 40 registros en el listado");
           assert.include(texto, "fichas pendientes: 40 sin leer");
+          assert.include(texto, "- cataluna: último barrido completado 2026-09-26 02:15:00 UTC");
           assert.include(
             texto,
-            "provincia 08 (Barcelona): 37 sin leer, 0 por releer, 3 esperando tras fallar",
+            "fichas por leer: 37 sin leer, 0 por releer, 3 esperando tras fallar",
           );
           assert.include(texto, "Errores (4):");
-          assert.include(texto, "Fichas paradas hasta la próxima noche: 3 fallos seguidos");
+          assert.include(texto, "Fichas paradas: 3 fallos seguidos");
+          // El 26 de septiembre es el último sábado del mes: la próxima es la del primero de octubre.
+          assert.include(
+            texto,
+            "Próxima ejecución: el sábado 3/10/2026 a las 00:30 (Europe/Madrid). Empieza otra " +
+              "ronda, en la que barre su zona y lee todas las fichas",
+          );
           assert.include(texto, `Última versión publicada: ${VERSION}`);
           assert.include(texto, "comunidad: apagada");
+
+          // Durante una ejecución, la orden dice cuántas fichas le quedan a la ronda.
+          yield* conBase(
+            entorno.base,
+            Effect.flatMap(BaseDeBarrido, (base) => base.iniciar("registro-oficial", NOCHE + HORA)),
+          );
+          yield* TestClock.setTime(NOCHE + 2 * HORA);
+          const enCurso = yield* conBase(entorno.base, estado(EN_RONDAS, CALENDARIO));
+          assert.include(
+            describirResumen(entorno.base, enCurso.resumen, enCurso.turno),
+            "Última ejecución: 2026-09-26 03:15:00 UTC, en curso; le quedan 37 fichas por leer de la ronda",
+          );
         }),
       ),
   );
 
-  it.effect("la configuración trae los valores de hoy y se cambia desde fuera", () =>
+  it.effect("la configuración trae los valores de producción y se cambia desde fuera", () =>
     Effect.gen(function* () {
       const porDefecto = yield* configuracion.parse(ConfigProvider.fromEnv({ env: {} }));
       assert.strictEqual(porDefecto.base, "datos/ingesta.sqlite");
       assert.deepStrictEqual(porDefecto.noche.proceso.fichas, OPCIONES_FICHAS);
-      // Las fichas van a su ritmo, con un tope que nunca corta antes que la ventana.
-      assert.strictEqual(Duration.toSeconds(porDefecto.fichasDelRegistro.pausa), 3);
-      assert.strictEqual(porDefecto.fichasDelRegistro.maxPeticiones, 7200);
+      // Una ficha por segundo durante 22 horas, con un tope que nunca corta antes que la ventana.
+      assert.strictEqual(Duration.toSeconds(porDefecto.noche.proceso.fichas.ritmo), 1);
+      assert.strictEqual(Duration.toHours(porDefecto.noche.proceso.fichas.ventana), 22);
+      assert.strictEqual(Duration.toSeconds(porDefecto.fichasDelRegistro.pausa), 1);
+      assert.strictEqual(porDefecto.fichasDelRegistro.maxPeticiones, 79_200);
+      // Lo leído hace menos de día y medio no se repite: el domingo solo lee lo que quedó.
+      assert.strictEqual(Duration.toHours(porDefecto.noche.proceso.reciente), 36);
+      assert.deepStrictEqual(porDefecto.noche.calendario, {
+        minuto: 30,
+        zonaHoraria: "Europe/Madrid",
+      });
       assert.strictEqual(Duration.toMinutes(porDefecto.noche.reintento), 60);
       assert.deepStrictEqual(porDefecto.noche.copias, { carpeta: "datos/copias", conservar: 14 });
       assert.strictEqual(Duration.toSeconds(porDefecto.registroOficial.pausa), 3);
@@ -646,14 +671,11 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
         "Celda (ingesta; contacto en celda.elies.site)",
       );
       assert.deepStrictEqual(porDefecto.interruptores, INTERRUPTOR_POR_DEFECTO);
-      // Toda España en siete noches, una zona cada noche y Cataluña la primera.
-      assert.deepStrictEqual(porDefecto.noche.proceso.zonas.cadaNoche, []);
+      // Toda España en cada ronda: las siete zonas, en su orden.
       assert.deepStrictEqual(
-        porDefecto.noche.proceso.zonas.enTurno.map((zona) => zona.nombre),
+        porDefecto.noche.proceso.zonas.map((zona) => zona.nombre),
         ["cataluna", "centro", "andalucia", "levante", "norte", "ebro-y-duero", "oeste-y-canarias"],
       );
-      assert.strictEqual(porDefecto.noche.proceso.zonas.porNoche, 1);
-      assert.deepStrictEqual(porDefecto.noche.proceso.fichas.prioridad, ["08", "17", "25", "43"]);
 
       const cambiada = yield* configuracion.parse(
         ConfigProvider.fromEnv({
@@ -662,15 +684,13 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
             CELDA_INGESTA_MAX_FICHAS: "5",
             CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS: "5",
             CELDA_REGISTRO_FICHAS_VENTANA_MINUTOS: "120",
-            CELDA_REGISTRO_FICHAS_RELECTURA_DIAS: "14",
-            CELDA_REGISTRO_FICHAS_PRIORIDAD: "08, 17",
             CELDA_PUBLICAR_REINTENTO_MINUTOS: "30",
             CELDA_REGISTRO_PAUSA_SEGUNDOS: "1",
             CELDA_REGISTRO_USER_AGENT: "Celda (pruebas)",
             CELDA_REGISTRO_ACTIVO: "false",
-            CELDA_REGISTRO_ZONAS: "ninguna",
-            CELDA_REGISTRO_ZONAS_EN_TURNO: "cataluna, centro,andalucia",
-            CELDA_REGISTRO_ZONAS_POR_NOCHE: "2",
+            CELDA_REGISTRO_ZONAS: "cataluna, centro,andalucia",
+            CELDA_INGESTA_HORA: "01:15",
+            CELDA_INGESTA_ZONA_HORARIA: "Atlantic/Canary",
           },
         }),
       );
@@ -678,8 +698,10 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       assert.strictEqual(cambiada.noche.proceso.fichas.maximo, 5);
       assert.strictEqual(Duration.toSeconds(cambiada.noche.proceso.fichas.ritmo), 5);
       assert.strictEqual(Duration.toMinutes(cambiada.noche.proceso.fichas.ventana), 120);
-      assert.strictEqual(Duration.toDays(cambiada.noche.proceso.fichas.relectura), 14);
-      assert.deepStrictEqual(cambiada.noche.proceso.fichas.prioridad, ["08", "17"]);
+      assert.deepStrictEqual(cambiada.noche.calendario, {
+        minuto: 75,
+        zonaHoraria: "Atlantic/Canary",
+      });
       assert.strictEqual(Duration.toSeconds(cambiada.fichasDelRegistro.pausa), 5);
       // Las que caben en 120 minutos a una cada 5 s.
       assert.strictEqual(cambiada.fichasDelRegistro.maxPeticiones, 1440);
@@ -688,12 +710,10 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       assert.strictEqual(Duration.toSeconds(cambiada.registroOficial.pausa), 3);
       assert.strictEqual(cambiada.registroOficial.userAgent, "Celda (pruebas)");
       assert.isFalse(cambiada.interruptores["registro-oficial"].activo);
-      assert.deepStrictEqual(cambiada.noche.proceso.zonas.cadaNoche, []);
       assert.deepStrictEqual(
-        cambiada.noche.proceso.zonas.enTurno.map((zona) => zona.nombre),
+        cambiada.noche.proceso.zonas.map((zona) => zona.nombre),
         ["cataluna", "centro", "andalucia"],
       );
-      assert.strictEqual(cambiada.noche.proceso.zonas.porNoche, 2);
 
       // Una zona que no existe es un error de configuración, no una zona vacía.
       const mal = yield* Effect.flip(
@@ -701,25 +721,32 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       );
       assert.include(mal.message, "zonas de barrido desconocidas: catalunya");
 
-      // Las fichas pueden ir a una por segundo, nunca más deprisa, y una provincia se escribe con
-      // su código INE.
-      const aUnSegundo = yield* configuracion.parse(
-        ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS: "1" } }),
+      // Las fichas pueden ir más despacio, pero nunca más deprisa que una por segundo.
+      const despacio = yield* configuracion.parse(
+        ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS: "3" } }),
       );
-      assert.strictEqual(Duration.toSeconds(aUnSegundo.noche.proceso.fichas.ritmo), 1);
-      assert.strictEqual(Duration.toSeconds(aUnSegundo.fichasDelRegistro.pausa), 1);
-      assert.strictEqual(aUnSegundo.fichasDelRegistro.maxPeticiones, 21_600);
+      assert.strictEqual(Duration.toSeconds(despacio.fichasDelRegistro.pausa), 3);
+      assert.strictEqual(despacio.fichasDelRegistro.maxPeticiones, 26_400);
       const deprisa = yield* configuracion.parse(
         ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_RITMO_SEGUNDOS: "0" } }),
       );
       assert.strictEqual(Duration.toSeconds(deprisa.noche.proceso.fichas.ritmo), 1);
       assert.strictEqual(Duration.toSeconds(deprisa.fichasDelRegistro.pausa), 1);
-      const provincia = yield* Effect.flip(
+
+      // La hora va con dos cifras y la zona horaria es una de la IANA.
+      const hora = yield* Effect.flip(
+        configuracion.parse(ConfigProvider.fromEnv({ env: { CELDA_INGESTA_HORA: "0:30" } })),
+      );
+      assert.include(hora.message, "«0:30» no es una hora del día como 00:30");
+      const zona = yield* Effect.flip(
         configuracion.parse(
-          ConfigProvider.fromEnv({ env: { CELDA_REGISTRO_FICHAS_PRIORIDAD: "Barcelona" } }),
+          ConfigProvider.fromEnv({ env: { CELDA_INGESTA_ZONA_HORARIA: "Madrid" } }),
         ),
       );
-      assert.include(provincia.message, "códigos de provincia que no son dos cifras del INE");
+      assert.include(
+        zona.message,
+        "«Madrid» no es una zona horaria de la base de datos de la IANA",
+      );
     }),
   );
 });

@@ -160,6 +160,7 @@ describe("cambio masivo en el registro (ADR 0027)", () => {
               "registro-oficial",
               cataluna,
               NOCHE + DIA,
+              NOCHE + DIA,
             );
             return yield* Effect.flip(
               base.cerrarBarrido(abierto.barrido, NOCHE + DIA, NOCHE + DIA, {

@@ -10,10 +10,10 @@ import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Ref from "effect/Ref";
 
+import { RECIENTE } from "./barrido.ts";
 import type { OpcionesCliente } from "./cliente.ts";
 import { ExtractorPorCajas } from "./extractor.ts";
 import {
-  esperaTrasFallos,
   type FalloDeFicha,
   type FichaEnCola,
   leerFichasEnLaVentana,
@@ -21,7 +21,7 @@ import {
   opcionesClienteDeFichas,
   type OpcionesFichas,
   ordenarFichas,
-  type Prioridad,
+  pendientesPorZona,
   resumirCola,
   SIN_FICHA_SEGUIDAS,
 } from "./fichas.ts";
@@ -31,9 +31,9 @@ import { esperarConReloj } from "./pruebas/reloj.ts";
 import { capaPorCajas, OPCIONES } from "./registro-oficial/extractor.ts";
 
 const DIA = 86_400_000;
-const AHORA = Date.UTC(2026, 8, 30, 2, 15);
+const AHORA = Date.UTC(2026, 10, 7, 0, 0);
 
-/** Tres zonas de un cuadro cada una, como las de barrido. */
+/** Dos zonas de un cuadro cada una, como las de barrido. */
 const CATALUNA: ZonaDeBarrido = {
   nombre: "cataluna",
   titulo: "Cataluña",
@@ -45,26 +45,6 @@ const CENTRO: ZonaDeBarrido = {
   titulo: "Centro",
   comunidades: ["13"],
   cuadros: ["-4,40"],
-};
-const LEVANTE: ZonaDeBarrido = {
-  nombre: "levante",
-  titulo: "Levante",
-  comunidades: ["10"],
-  cuadros: ["-1,39"],
-};
-
-/** Provincias de mentira: al este de 2,5° es Girona (17) y al oeste, Barcelona (08). */
-const provinciaDe = ({ longitud, latitud }: Coordenada): string | undefined =>
-  latitud >= 41 && latitud < 42 && longitud >= 2 && longitud < 3
-    ? longitud >= 2.5
-      ? "17"
-      : "08"
-    : undefined;
-
-const PRIORIDAD: Prioridad = {
-  provincias: ["08"],
-  zonas: [CATALUNA, CENTRO, LEVANTE],
-  provinciaDe,
 };
 
 let siguiente = 0;
@@ -101,62 +81,51 @@ const LISBOA = { longitud: -9.14, latitud: 38.72 };
 const nombres = (cola: ReadonlyArray<FichaEnCola>) => cola.map((f) => f.registro.codigo);
 
 describe("orden de la cola de fichas", () => {
-  it("la provincia con prioridad va primero, luego cada zona en su orden y al final el resto", () => {
-    // Llegan en otro orden del que se leen.
+  it("primero las nuevas y las de listado cambiado, en el orden en que llegaron, y luego las demás de la leída hace más tiempo a la más reciente, en toda España", () => {
+    // Llegan en otro orden del que se leen, de cinco sitios y con lecturas de varios meses.
     const cola = [
-      ficha("fuera", LISBOA),
-      ficha("valencia", VALENCIA),
-      ficha("madrid", MADRID),
-      ficha("girona", GIRONA),
-      ficha("barcelona", BARCELONA),
+      ficha("barcelona-hace-1-mes", BARCELONA, { leidaEn: AHORA - 30 * DIA }),
+      ficha("lisboa-nueva", LISBOA),
+      ficha("madrid-hace-2-meses", MADRID, { leidaEn: AHORA - 61 * DIA }),
+      ficha("barcelona-nueva", BARCELONA),
+      ficha("valencia-hace-1-mes", VALENCIA, { leidaEn: AHORA - 29 * DIA }),
+      ficha("girona-hace-3-meses", GIRONA, { leidaEn: AHORA - 92 * DIA }),
+      ficha("madrid-nueva", MADRID),
     ];
-    assert.deepStrictEqual(nombres(ordenarFichas(cola, PRIORIDAD, AHORA)), [
-      "barcelona",
-      "girona",
-      "madrid",
-      "valencia",
-      "fuera",
-    ]);
-    // Con Girona antes que Barcelona y las zonas en otro orden.
-    assert.deepStrictEqual(
-      nombres(
-        ordenarFichas(
-          cola,
-          { ...PRIORIDAD, provincias: ["17", "08"], zonas: [LEVANTE, CATALUNA, CENTRO] },
-          AHORA,
-        ),
-      ),
-      ["girona", "barcelona", "valencia", "madrid", "fuera"],
-    );
-    // Sin provincias con prioridad, Barcelona es una más de Cataluña.
-    assert.deepStrictEqual(nombres(ordenarFichas(cola, { ...PRIORIDAD, provincias: [] }, AHORA)), [
-      "girona",
-      "barcelona",
-      "madrid",
-      "valencia",
-      "fuera",
+    assert.deepStrictEqual(nombres(ordenarFichas(cola, AHORA)), [
+      "lisboa-nueva",
+      "barcelona-nueva",
+      "madrid-nueva",
+      "girona-hace-3-meses",
+      "madrid-hace-2-meses",
+      "barcelona-hace-1-mes",
+      "valencia-hace-1-mes",
     ]);
   });
 
-  it("dentro de cada grupo, las nuevas en el orden en que llegaron y luego la relectura, de la más vieja a la más nueva", () => {
-    const cola = [
-      ficha("leida-hace-40", BARCELONA, { leidaEn: AHORA - 40 * DIA }),
-      ficha("nueva-1", BARCELONA),
-      ficha("leida-hace-60", BARCELONA, { leidaEn: AHORA - 60 * DIA }),
-      ficha("madrid-nueva", MADRID),
-      ficha("nueva-2", BARCELONA),
-      ficha("girona-leida", GIRONA, { leidaEn: AHORA - 31 * DIA }),
-      ficha("girona-nueva", GIRONA),
-    ];
-    assert.deepStrictEqual(nombres(ordenarFichas(cola, PRIORIDAD, AHORA)), [
-      "nueva-1",
-      "nueva-2",
-      "leida-hace-60",
-      "leida-hace-40",
-      "girona-nueva",
-      "girona-leida",
-      "madrid-nueva",
+  it("ninguna zona ni provincia va por delante: Barcelona y Madrid leídas a la vez van en el orden en que llegaron", () => {
+    const leida = AHORA - 30 * DIA;
+    const madrid = ficha("madrid", MADRID, { leidaEn: leida });
+    const barcelona = ficha("barcelona", BARCELONA, { leidaEn: leida });
+    const girona = ficha("girona", GIRONA, { leidaEn: leida });
+    assert.deepStrictEqual(nombres(ordenarFichas([barcelona, girona, madrid], AHORA)), [
+      "madrid",
+      "barcelona",
+      "girona",
     ]);
+    // El orden no depende del de la lista.
+    assert.deepStrictEqual(nombres(ordenarFichas([girona, madrid, barcelona], AHORA)), [
+      "madrid",
+      "barcelona",
+      "girona",
+    ]);
+  });
+
+  it("cada ficha sale una vez, aunque la cola la traiga repetida", () => {
+    const nueva = ficha("nueva", BARCELONA);
+    const vieja = ficha("vieja", MADRID, { leidaEn: AHORA - 30 * DIA });
+    const orden = ordenarFichas([nueva, vieja, nueva, { ...vieja, orden: 0 }], AHORA);
+    assert.deepStrictEqual(nombres(orden), ["nueva", "vieja"]);
   });
 
   it("una ficha que espera tras fallar se queda fuera hasta que pasa su espera", () => {
@@ -165,58 +134,45 @@ describe("orden de la cola de fichas", () => {
       ficha("ya-puede", BARCELONA, { fallos: 2, esperaHasta: AHORA - 1 }),
       ficha("normal", MADRID),
     ];
-    assert.deepStrictEqual(nombres(ordenarFichas(cola, PRIORIDAD, AHORA)), ["ya-puede", "normal"]);
-    assert.deepStrictEqual(nombres(ordenarFichas(cola, PRIORIDAD, AHORA + DIA + 1)), [
+    assert.deepStrictEqual(nombres(ordenarFichas(cola, AHORA)), ["ya-puede", "normal"]);
+    assert.deepStrictEqual(nombres(ordenarFichas(cola, AHORA + DIA + 1)), [
       "espera",
       "ya-puede",
       "normal",
     ]);
   });
 
-  it("una zona repetida cuenta donde sale primero, y el orden no depende del de llegada", () => {
-    const cola = [ficha("madrid", MADRID), ficha("girona", GIRONA), ficha("valencia", VALENCIA)];
-    const prioridad = { ...PRIORIDAD, zonas: [CENTRO, CATALUNA, CENTRO, LEVANTE] };
-    const orden = nombres(ordenarFichas(cola, prioridad, AHORA));
-    assert.deepStrictEqual(orden, ["madrid", "girona", "valencia"]);
-    assert.deepStrictEqual(nombres(ordenarFichas(cola.toReversed(), prioridad, AHORA)), orden);
-  });
-
-  it("el resumen dice cuántas quedan en cada grupo, en el orden de la cola", () => {
+  it("el resumen dice cuántas quedan en la cola, y en cada zona de barrido", () => {
     const cola = [
       ficha("a", BARCELONA),
       ficha("b", BARCELONA, { leidaEn: AHORA - 40 * DIA }),
       ficha("c", BARCELONA, { fallos: 1, esperaHasta: AHORA + DIA }),
-      ficha("d", VALENCIA),
+      ficha("d", MADRID),
       ficha("e", LISBOA),
     ];
-    assert.deepStrictEqual(resumirCola(cola, PRIORIDAD, AHORA), [
-      { grupo: { tipo: "provincia", provincia: "08" }, nuevas: 1, porReleer: 1, enEspera: 1 },
-      { grupo: { tipo: "zona", zona: "levante" }, nuevas: 1, porReleer: 0, enEspera: 0 },
-      { grupo: { tipo: "fuera" }, nuevas: 1, porReleer: 0, enEspera: 0 },
-    ]);
-  });
-
-  it("tras un fallo se espera un día, el doble con cada fallo seguido, hasta la relectura", () => {
-    const dias = [1, 2, 3, 4, 5, 6, 7].map((fallos) =>
-      Duration.toDays(esperaTrasFallos(fallos, OPCIONES_FICHAS.relectura)),
+    assert.deepStrictEqual(resumirCola(cola, AHORA), { nuevas: 3, porReleer: 1, enEspera: 1 });
+    assert.deepStrictEqual(
+      [...pendientesPorZona(cola, [CATALUNA, CENTRO, CATALUNA], AHORA)],
+      [
+        ["cataluna", { nuevas: 1, porReleer: 1, enEspera: 1 }],
+        ["centro", { nuevas: 1, porReleer: 0, enEspera: 0 }],
+      ],
     );
-    assert.deepStrictEqual(dias, [1, 2, 4, 8, 16, 30, 30]);
   });
 
-  it("el cliente de las fichas va a su ritmo, 3 s por defecto y nunca menos de 1 s, con un tope que cabe en la ventana", () => {
+  it("el cliente de las fichas va a su ritmo, 1 s por defecto y nunca menos, con un tope que cabe en la ventana", () => {
     const cliente = opcionesClienteDeFichas(OPCIONES, OPCIONES_FICHAS);
-    assert.strictEqual(Duration.toSeconds(cliente.pausa), 3);
-    assert.strictEqual(cliente.maxPeticiones, 7200);
+    assert.strictEqual(Duration.toSeconds(cliente.pausa), 1);
+    // Las 22 horas de la ventana por defecto, a una por segundo.
+    assert.strictEqual(cliente.maxPeticiones, 79_200);
     assert.strictEqual(cliente.userAgent, OPCIONES.userAgent);
     const despacio = opcionesClienteDeFichas(OPCIONES, {
       ...OPCIONES_FICHAS,
-      ritmo: Duration.seconds(10),
+      ritmo: Duration.seconds(3),
+      ventana: Duration.hours(6),
     });
-    assert.strictEqual(Duration.toSeconds(despacio.pausa), 10);
-    assert.strictEqual(despacio.maxPeticiones, 2160);
-    const aUnSegundo = opcionesClienteDeFichas(OPCIONES, A_UN_SEGUNDO);
-    assert.strictEqual(Duration.toSeconds(aUnSegundo.pausa), 1);
-    assert.strictEqual(aUnSegundo.maxPeticiones, 21_600);
+    assert.strictEqual(Duration.toSeconds(despacio.pausa), 3);
+    assert.strictEqual(despacio.maxPeticiones, 7200);
     const deprisa = opcionesClienteDeFichas(OPCIONES, {
       ...OPCIONES_FICHAS,
       ritmo: Duration.millis(200),
@@ -232,16 +188,17 @@ interface Apuntado {
   readonly aMitad: ReadonlyArray<number>;
 }
 
-/** `n` fichas nuevas de Barcelona. */
-/** Las fichas al ritmo más rápido que se permite, una por segundo. */
-const A_UN_SEGUNDO: OpcionesFichas = { ...OPCIONES_FICHAS, ritmo: Duration.seconds(1) };
+/** Las fichas al ritmo de producción, una por segundo, el de por defecto. */
+const A_UN_SEGUNDO: OpcionesFichas = OPCIONES_FICHAS;
 
+/** `n` fichas nuevas de Barcelona. */
 const colaDe = (n: number) =>
   Array.from({ length: n }, (_, i) => ficha(String(800_000 + i), BARCELONA));
 
 /**
  * Lee `cola` con el extractor real sobre el geoportal de prueba y el reloj de prueba, empezando
- * la noche a las 0, y apunta cada petición, lo guardado y cuándo se publica a mitad.
+ * la ejecución a las 0, y apunta cada petición, lo guardado y cuándo se publica a mitad. Una
+ * ficha que falla espera lo que dura una ronda, como en producción.
  */
 const leerContraElGeoportal = (
   cola: ReadonlyArray<FichaEnCola>,
@@ -265,6 +222,7 @@ const leerContraElGeoportal = (
         cola,
         opciones,
         inicio: 0,
+        espera: RECIENTE,
         ficha: extractor.ficha,
         aplicar: (clave) =>
           Effect.as(
@@ -356,28 +314,30 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
   );
 
   it.effect(
-    "con los valores por defecto lee unas 5.500 fichas en una noche y deja el resto",
+    "al ritmo medido en producción, 0,1 s de respuesta y 1 s de pausa, sale una ficha cada 1,1 s, y en la ventana por defecto caben las de toda España",
     () =>
       Effect.gen(function* () {
         const html = yield* fichaGrabada;
-        // El geoportal tarda 0,9 s en contestar una ficha, como en la investigación.
+        // Una hora de la ventana. El geoportal contestaba en unos 0,1 s el 07/10/2026.
         const { hechas, peticiones } = yield* leerContraElGeoportal(
-          colaDe(8000),
+          colaDe(4000),
           geoportal(html),
-          OPCIONES_FICHAS,
-          Duration.millis(900),
-          7 * 3600,
+          { ...OPCIONES_FICHAS, ventana: Duration.hours(1) },
+          Duration.millis(100),
+          3700,
         );
-        assert.isAtLeast(hechas.leidas, 5300);
-        assert.isAtMost(hechas.leidas, 5700);
-        assert.strictEqual(hechas.pendientes, 8000 - hechas.leidas);
-        assert.strictEqual(hechas.parada, "ventana cerrada a las 06:00:00 UTC");
-        // Nunca menos de 3 s entre el final de una ficha y la siguiente, y ninguna tras el cierre.
         const huecos = peticiones.slice(1).map((p, i) => p.en - (peticiones[i]?.en ?? 0));
-        assert.isAtLeast(Math.min(...huecos), 3900);
-        assert.isBelow(peticiones.at(-1)?.en ?? Infinity, 6 * 3_600_000);
+        assert.deepStrictEqual(new Set(huecos), new Set([1100]));
+        assert.strictEqual(hechas.leidas, Math.floor((3_600_000 - 1100) / 1100) + 1);
+        assert.strictEqual(hechas.pendientes, 4000 - hechas.leidas);
+        assert.strictEqual(hechas.parada, "ventana cerrada a las 01:00:00 UTC");
+        // A ese ritmo, las 22 horas de la ventana por defecto dan para unas 72.000 fichas, más
+        // que las unas 69.700 de España, y las 500 del diario del 07/10/2026 tardan 9 min 10 s.
+        const porVentana = Duration.toMillis(OPCIONES_FICHAS.ventana) / 1100;
+        assert.isAbove(porVentana, 69_700);
+        assert.strictEqual(Math.round((500 * 1100) / 1000), 9 * 60 + 10);
       }).pipe(Effect.provide(NodeServices.layer)),
-    // Son 25.200 pasos del reloj de prueba y unas 5.500 fichas analizadas.
+    // Son 3.700 pasos del reloj de prueba y unas 3.300 fichas analizadas.
     120_000,
   );
 
@@ -405,7 +365,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
   );
 
   it.effect(
-    "un 401 o un 403 paran las fichas de la noche sin insistir y quedan en los errores",
+    "un 401 o un 403 paran las fichas de la ejecución sin insistir y quedan en los errores",
     () =>
       Effect.gen(function* () {
         const html = yield* fichaGrabada;
@@ -422,7 +382,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
           assert.strictEqual(hechas.pendientes, 7);
           assert.include(hechas.parada ?? "", `FuenteBloqueada: HTTP ${estado}`);
           assert.deepStrictEqual(hechas.errores, [
-            `Fichas paradas hasta la próxima noche: FuenteBloqueada: HTTP ${estado} ` +
+            `Fichas paradas: FuenteBloqueada: HTTP ${estado} ` +
               "(https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=800002)",
           ]);
           // El bloqueo no es culpa de esa ficha: no se la hace esperar.
@@ -431,7 +391,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
       }).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("un 429 para las fichas de la noche sin reintentar y queda en los errores", () =>
+  it.effect("un 429 para las fichas de la ejecución sin reintentar y queda en los errores", () =>
     Effect.gen(function* () {
       const html = yield* fichaGrabada;
       const { hechas, peticiones, apuntado } = yield* leerContraElGeoportal(
@@ -445,14 +405,14 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
       assert.strictEqual(hechas.leidas, 2);
       assert.strictEqual(hechas.pendientes, 7);
       assert.deepStrictEqual(hechas.errores, [
-        "Fichas paradas hasta la próxima noche: FuentePideEsperar: HTTP 429 " +
+        "Fichas paradas: FuentePideEsperar: HTTP 429 " +
           "(https://geoportal.minetur.gob.es/VCTEL/detalleEstacion.do?emplazamiento=800002)",
       ]);
       assert.deepStrictEqual(apuntado.fallos, []);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("un 503 que pide esperar una hora para las fichas de la noche sin reintentar", () =>
+  it.effect("un 503 que pide esperar una hora para las fichas de la ejecución sin reintentar", () =>
     Effect.gen(function* () {
       const html = yield* fichaGrabada;
       const { hechas, peticiones } = yield* leerContraElGeoportal(
@@ -502,7 +462,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("si sigue pidiendo esperar tras los reintentos, para las fichas de la noche", () =>
+  it.effect("si sigue pidiendo esperar tras los reintentos, para las fichas de la ejecución", () =>
     Effect.gen(function* () {
       const html = yield* fichaGrabada;
       const { hechas, peticiones } = yield* leerContraElGeoportal(
@@ -523,7 +483,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("una página que no es una ficha también para las fichas de la noche", () =>
+  it.effect("una página que no es una ficha también para las fichas de la ejecución", () =>
     Effect.gen(function* () {
       const html = yield* fichaGrabada;
       const { hechas, peticiones } = yield* leerContraElGeoportal(
@@ -541,7 +501,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
   );
 
   it.effect(
-    "tres fichas sin ficha en el registro seguidas no paran la noche, y cada una espera un día",
+    "tres fichas sin ficha en el registro seguidas no paran la ejecución, y cada una espera a la ronda siguiente",
     () =>
       Effect.gen(function* () {
         const html = yield* fichaGrabada;
@@ -559,7 +519,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
           A_UN_SEGUNDO,
         );
         // 800003, 800004 y 800005 van seguidas, pero lo que dice el registro no es un fallo de la
-        // fuente: la noche sigue y lee las demás.
+        // fuente: la ejecución sigue y lee las demás.
         assert.strictEqual(hechas.leidas, 6);
         assert.strictEqual(hechas.pendientes, 0);
         assert.strictEqual(hechas.parada, undefined);
@@ -597,23 +557,24 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
           assert.include(fallo.motivo, "Código de emplazamiento no válido");
         }
         // Una línea de aviso en el diario por ficha, con su clave, su URL, el motivo, el intento
-        // y cuándo se vuelve a pedir: un día después la primera vez, cuatro a la tercera.
+        // y cuándo se vuelve a pedir: día y medio después, en la ronda siguiente, sea el intento
+        // que sea. La ejecución del domingo no la repite.
         assert.strictEqual(avisos.length, 4);
         assert.match(
           avisos[0] ?? "",
-          /^Ficha fallida, intento 1: TELEFONICA MOVILES ESPAÑA, S\.A\.U\. - 800001 \(https:\/\/geoportal\.minetur\.gob\.es\/VCTEL\/detalleEstacion\.do\?emplazamiento=800001\): SinFichaEnElRegistro: La ficha dice «Código de emplazamiento no válido»; se vuelve a pedir desde 1970-01-02 00:00:0\d UTC$/u,
+          /^Ficha fallida, intento 1: TELEFONICA MOVILES ESPAÑA, S\.A\.U\. - 800001 \(https:\/\/geoportal\.minetur\.gob\.es\/VCTEL\/detalleEstacion\.do\?emplazamiento=800001\): SinFichaEnElRegistro: La ficha dice «Código de emplazamiento no válido»; se vuelve a pedir desde 1970-01-02 12:00:0\d UTC$/u,
         );
-        assert.match(avisos[1] ?? "", /intento 3: .* - 800003 .*desde 1970-01-05 00:00:\d\d UTC$/u);
-        // Cada una espera un día desde que falló.
+        assert.match(avisos[1] ?? "", /intento 3: .* - 800003 .*desde 1970-01-02 12:00:\d\d UTC$/u);
+        // Cada una espera día y medio desde que falló.
         const [primero] = apuntado.fallos;
         assert.isDefined(primero);
-        assert.isAtLeast(primero[1].esperaHasta, DIA);
-        assert.isBelow(primero[1].esperaHasta, DIA + 60_000);
+        assert.isAtLeast(primero[1].esperaHasta, Duration.toMillis(RECIENTE));
+        assert.isBelow(primero[1].esperaHasta, Duration.toMillis(RECIENTE) + 60_000);
       }).pipe(Effect.provide(NodeServices.layer)),
   );
 
   it.effect(
-    `${SIN_FICHA_SEGUIDAS} fichas seguidas sin ficha en el registro paran la noche: puede que haya cambiado la URL`,
+    `${SIN_FICHA_SEGUIDAS} fichas seguidas sin ficha en el registro paran la ejecución: puede que haya cambiado la URL`,
     () =>
       Effect.gen(function* () {
         const noValido = new Uint8Array(
@@ -631,17 +592,14 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
           `${SIN_FICHA_SEGUIDAS} fichas seguidas dicen «Código de emplazamiento no válido»: ` +
           "puede que haya cambiado la URL de la ficha del registro o el formato de sus códigos";
         assert.strictEqual(hechas.parada, motivo);
-        assert.strictEqual(
-          hechas.errores.at(-1),
-          `Fichas paradas hasta la próxima noche: ${motivo}`,
-        );
+        assert.strictEqual(hechas.errores.at(-1), `Fichas paradas: ${motivo}`);
         // La racha entera es sospechosa: ninguna queda sin ficha en el registro, pero todas
         // esperan y se reintentan como cualquier fallo.
         assert.strictEqual(apuntado.fallos.length, SIN_FICHA_SEGUIDAS);
         for (const [, fallo] of apuntado.fallos) {
           assert.isUndefined(fallo.sinFichaEnRegistro);
           assert.strictEqual(fallo.fallos, 1);
-          assert.isAtLeast(fallo.esperaHasta, DIA);
+          assert.isAtLeast(fallo.esperaHasta, Duration.toMillis(RECIENTE));
         }
       }).pipe(Effect.provide(NodeServices.layer)),
   );
@@ -667,7 +625,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
         }),
         A_UN_SEGUNDO,
       );
-      // Ilegible, sin ficha, ilegible: dos fallos seguidos, y la noche sigue. El tercero, para.
+      // Ilegible, sin ficha, ilegible: dos fallos seguidos, y la ejecución sigue. El tercero, para.
       assert.strictEqual(peticiones.length, 4);
       assert.strictEqual(hechas.leidas, 0);
       assert.strictEqual(hechas.parada, "3 fallos seguidos");
@@ -711,7 +669,7 @@ describe("lectura de fichas en la ventana (fichas grabadas y reloj de prueba)", 
       assert.lengthOf(avisos, 3);
       assert.match(
         avisos[0] ?? "",
-        /^Ficha fallida, intento 1: .* - 800000 \(https:.*\): FuenteNoDisponible: .*; no espera: vuelve a la cola la noche siguiente$/u,
+        /^Ficha fallida, intento 1: .* - 800000 \(https:.*\): FuenteNoDisponible: .*; no espera: vuelve a la cola en la ejecución siguiente$/u,
       );
       assert.deepStrictEqual(
         hechas.fallidas.map((f) => f.esperaHasta),

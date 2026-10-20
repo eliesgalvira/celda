@@ -10,6 +10,7 @@ import {
 } from "@celda/dominio/barrido";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
@@ -17,8 +18,9 @@ import * as Ref from "effect/Ref";
 import {
   DIVISIONES_MAXIMAS,
   type EstadoDeZona,
+  RECIENTE,
   recorrerCuadro,
-  zonasDeLaNoche,
+  zonasPorBarrer,
 } from "./barrido.ts";
 import type { Registro } from "./extractor.ts";
 import {
@@ -183,7 +185,7 @@ describe("recorrido de un cuadro con listados grabados que llegan al tope de 100
   );
 });
 
-describe("zonas de una noche", () => {
+describe("zonas de una ejecución", () => {
   const zona = (nombre: string): ZonaDeBarrido => ({
     nombre,
     titulo: nombre,
@@ -192,43 +194,42 @@ describe("zonas de una noche", () => {
   });
   const [a, b, c, d] = [zona("a"), zona("b"), zona("c"), zona("d")];
   const nombres = (zonas: ReadonlyArray<ZonaDeBarrido>) => zonas.map((z) => z.nombre);
+  const DIA = 86_400_000;
+  /** El primer sábado de noviembre de 2026, a las 00:30 de Madrid. */
+  const SABADO = Date.UTC(2026, 10, 6, 23, 30);
+  const DOMINGO = SABADO + DIA;
 
-  it("las de cada noche van siempre, y de las que se turnan, las que llevan más sin barrer", () => {
+  it("el sábado barre todas, en el orden de la configuración, porque la ronda anterior es de hace un mes", () => {
     const estado = new Map<string, EstadoDeZona>([
-      ["b", { completado: 300, aMedias: false }],
-      ["c", { completado: 100, aMedias: false }],
-      ["d", { completado: 200, aMedias: false }],
+      ["b", { completado: SABADO - 35 * DIA, aMedias: false }],
+      ["c", { completado: SABADO - 28 * DIA, aMedias: false }],
+      ["d", { completado: SABADO - 35 * DIA, aMedias: true }],
     ]);
-    assert.deepStrictEqual(
-      nombres(zonasDeLaNoche({ cadaNoche: [a], enTurno: [b, c, d], porNoche: 2 }, estado)),
-      ["a", "c", "d"],
-    );
-    // Sin ningún barrido todavía, en el orden de la configuración.
-    assert.deepStrictEqual(
-      nombres(zonasDeLaNoche({ cadaNoche: [], enTurno: [b, c, d], porNoche: 1 }, new Map())),
-      ["b"],
-    );
+    const desde = SABADO - 36 * 3_600_000;
+    assert.deepStrictEqual(nombres(zonasPorBarrer([a, b, c, d], estado, desde)), [
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
   });
 
-  it("primero la que quedó a medias, luego las que nunca se completaron", () => {
+  it("el domingo solo las que el sábado no completó, también la que dejó a medias", () => {
     const estado = new Map<string, EstadoDeZona>([
-      ["b", { completado: 100, aMedias: false }],
-      ["c", { completado: 500, aMedias: true }],
+      ["a", { completado: SABADO, aMedias: false }],
+      ["b", { completado: SABADO - 28 * DIA, aMedias: true }],
+      ["c", { completado: SABADO, aMedias: false }],
     ]);
-    assert.deepStrictEqual(
-      nombres(zonasDeLaNoche({ cadaNoche: [], enTurno: [b, c, d], porNoche: 2 }, estado)),
-      ["c", "d"],
+    const desde = DOMINGO - Duration.toMillis(RECIENTE);
+    assert.deepStrictEqual(nombres(zonasPorBarrer([a, b, c, d], estado, desde)), ["b", "d"]);
+    // Con todas completadas el sábado, el domingo no barre ninguna.
+    const todas = new Map<string, EstadoDeZona>(
+      [a, b, c, d].map((z) => [z.nombre, { completado: SABADO, aMedias: false }]),
     );
+    assert.deepStrictEqual(nombres(zonasPorBarrer([a, b, c, d], todas, desde)), []);
   });
 
-  it("una zona de cada noche que también se turna no se barre dos veces", () => {
-    assert.deepStrictEqual(
-      nombres(zonasDeLaNoche({ cadaNoche: [a], enTurno: [a, b], porNoche: 1 }, new Map())),
-      ["a", "b"],
-    );
-    assert.deepStrictEqual(
-      nombres(zonasDeLaNoche({ cadaNoche: [a], enTurno: [b], porNoche: 0 }, new Map())),
-      ["a"],
-    );
+  it("una zona repetida en la configuración se barre una vez", () => {
+    assert.deepStrictEqual(nombres(zonasPorBarrer([a, b, a], new Map(), SABADO)), ["a", "b"]);
   });
 });

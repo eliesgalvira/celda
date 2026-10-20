@@ -23,7 +23,6 @@ import {
   type FuenteGrabada,
   muestraCampusNord,
 } from "@celda/ingesta/pruebas/grabado";
-import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
@@ -46,12 +45,22 @@ import {
   conBase,
   conEntorno,
   contenidoDe,
+  EN_RONDAS,
   type Entorno,
   unaNoche,
 } from "./pruebas/entorno.ts";
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
+const HORA = 3_600_000;
+/** El primer sábado de noviembre de 2026, a las 00:30 de Madrid, y el domingo siguiente. */
+const SABADO = Date.UTC(2026, 10, 6, 23, 30);
+const DOMINGO = SABADO + DIA;
+/** El primer sábado de diciembre, a la misma hora, y el de enero. */
+const DICIEMBRE = Date.UTC(2026, 11, 4, 23, 30);
+const ENERO = Date.UTC(2027, 0, 1, 23, 30);
+/** Lo que espera una ficha que falla, hasta la ronda siguiente. */
+const ESPERA = 36 * HORA;
 
 const codificarObservacion = Schema.encodeEffect(Schema.fromJsonString(ObservacionGuardada));
 const decodificarObservacion = Schema.decodeUnknownEffect(
@@ -61,9 +70,14 @@ const decodificarObservacion = Schema.decodeUnknownEffect(
 /** Una fuente que ya no está en `Fuente`, como la web de antenas que retiró el ADR 0019. */
 const RETIRADA = "fuente-retirada";
 
-/** Las opciones de la noche con otras de fichas. */
+/** Las opciones de una ejecución que es una ronda nueva, con otras de fichas. */
 const conFichas = (fichas: Partial<OpcionesFichas>) => ({
   proceso: { ...CATALUNA_CADA_NOCHE, fichas: { ...OPCIONES_FICHAS, ...fichas } },
+});
+
+/** Las de una ejecución con las rondas de producción, con otras de fichas. */
+const enRonda = (fichas: Partial<OpcionesFichas> = {}) => ({
+  proceso: { ...EN_RONDAS, fichas: { ...OPCIONES_FICHAS, ...fichas } },
 });
 
 /**
@@ -158,19 +172,6 @@ const ultimaDe = (entorno: Entorno) =>
     ),
   );
 
-/** Registros de la muestra movidos a Girona (provincia 17), dentro del cuadro de Barcelona. */
-const conGirona = (grabada: FuenteGrabada, cuantos: number): FuenteGrabada => ({
-  ...grabada,
-  listado: {
-    ...grabada.listado,
-    registros: grabada.listado.registros.map((r, i) =>
-      i >= grabada.listado.registros.length - cuantos
-        ? { ...r, posicion: { longitud: r.posicion.longitud + 0.7, latitud: 41.98 } }
-        : r,
-    ),
-  },
-});
-
 /** Las fichas de la versión vigente del almacén, como las leería la web. */
 const fichasPublicadas = (entorno: Entorno) =>
   Effect.gen(function* () {
@@ -211,9 +212,9 @@ const observacionEn = (entorno: Entorno, clave: string) =>
     return { datos, fallos: fila.fallos, espera: fila.espera };
   }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
 
-describe("fichas en la ventana de la noche (base SQLite y registro grabado)", () => {
+describe("fichas en cada ronda (base SQLite y registro grabado)", () => {
   it.effect(
-    "la ventana se cierra con fichas pendientes, se publica a mitad, y la noche siguiente sigue por donde iba",
+    "el sábado cierra la ventana con fichas pendientes y publica a mitad; el domingo lee solo las que quedan, sin barrer, y una ronda pide cada ficha una vez",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -223,164 +224,194 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           const extractor = conFichasApuntadas(grabada, pedidas, {
             tarda: { cuanto: Duration.seconds(3), hasta },
           });
-          const opciones = conFichas({ ventana: Duration.minutes(1) });
-
-          yield* TestClock.setTime(NOCHE);
-          const primera = yield* hastaQueAcabe(
-            yield* Effect.forkChild(unaNoche(entorno, extractor, opciones)),
+          // El sábado, un minuto de ventana: no da para todas.
+          yield* TestClock.setTime(SABADO);
+          const sabado = yield* hastaQueAcabe(
+            yield* Effect.forkChild(
+              unaNoche(entorno, extractor, enRonda({ ventana: Duration.minutes(1) })),
+            ),
             hasta,
           );
-          const deLaPrimera = yield* Ref.getAndSet(pedidas, []);
-          const trasLaPrimera = yield* leidasEn(entorno);
-          assert.isAbove(deLaPrimera.length, 5);
-          assert.isBelow(deLaPrimera.length, 40);
-          assert.strictEqual(trasLaPrimera.leidas.length, deLaPrimera.length);
+          const delSabado = yield* Ref.getAndSet(pedidas, []);
+          const trasElSabado = yield* leidasEn(entorno);
+          assert.isAbove(delSabado.length, 5);
+          assert.isBelow(delSabado.length, 40);
+          assert.strictEqual(trasElSabado.leidas.length, delSabado.length);
           const ejecucion = yield* ultimaDe(entorno);
-          assert.strictEqual(ejecucion?.cambios.fichas.leidas, deLaPrimera.length);
+          assert.strictEqual(ejecucion?.cambios.fichas.leidas, delSabado.length);
           assert.deepStrictEqual(ejecucion?.errores, []);
+          const registro = sabado.ejecuciones.find((e) => e.fuente === "registro-oficial");
+          assert.deepStrictEqual(registro?.porLeer, { zonas: [], fichas: 40 - delSabado.length });
 
           // A mitad se ha publicado una versión, y al cerrar la ventana, otra posterior.
           const escritos = yield* entorno.escritos;
           const manifiestos = escritos.filter((f) => f.startsWith("ficheros@"));
           assert.strictEqual(manifiestos.length, 2);
           assert.strictEqual(escritos.filter((f) => f === FICHERO_VIGENTE).length, 2);
-          assert.strictEqual(primera.publicacion.tipo, "publicada");
-          if (primera.publicacion.tipo === "publicada") {
-            assert.strictEqual(
-              ficheroDeManifiesto(primera.publicacion.version),
-              manifiestos.at(-1),
-            );
+          assert.strictEqual(sabado.publicacion.tipo, "publicada");
+          if (sabado.publicacion.tipo === "publicada") {
+            assert.strictEqual(ficheroDeManifiesto(sabado.publicacion.version), manifiestos.at(-1));
           }
 
-          // La noche siguiente no repite ninguna y sigue por la cola.
-          yield* TestClock.setTime(NOCHE + DIA);
-          yield* hastaQueAcabe(
-            yield* Effect.forkChild(unaNoche(entorno, extractor, opciones)),
+          // El domingo no barre: Cataluña ya tiene su barrido de la ronda. Lee las que quedan, y
+          // ninguna de las del sábado.
+          yield* TestClock.setTime(DOMINGO);
+          const domingo = yield* hastaQueAcabe(
+            yield* Effect.forkChild(unaNoche(entorno, extractor, enRonda())),
             hasta,
           );
-          const deLaSegunda = yield* Ref.get(pedidas);
-          assert.isAbove(deLaSegunda.length, 5);
-          assert.isFalse(deLaSegunda.some((clave) => deLaPrimera.includes(clave)));
-          const trasLaSegunda = yield* leidasEn(entorno);
-          assert.strictEqual(
-            trasLaSegunda.leidas.length,
-            Math.min(40, deLaPrimera.length + deLaSegunda.length),
+          const delDomingo = yield* Ref.getAndSet(pedidas, []);
+          const delRegistro = domingo.ejecuciones.find((e) => e.fuente === "registro-oficial");
+          assert.deepStrictEqual(delRegistro?.zonas, []);
+          assert.strictEqual(delDomingo.length, 40 - delSabado.length);
+          assert.isFalse(delDomingo.some((clave) => delSabado.includes(clave)));
+          assert.strictEqual(new Set([...delSabado, ...delDomingo]).size, 40);
+          assert.deepStrictEqual(delRegistro?.porLeer, { zonas: [], fichas: 0 });
+          assert.lengthOf((yield* leidasEn(entorno)).leidas, 40);
+
+          // Otra ejecución ese fin de semana no pide nada al registro.
+          yield* TestClock.setTime(DOMINGO + HORA);
+          const otra = yield* unaNoche(entorno, extractor, enRonda());
+          assert.deepStrictEqual(yield* Ref.get(pedidas), []);
+          assert.deepStrictEqual(
+            otra.ejecuciones.find((e) => e.fuente === "registro-oficial")?.zonas,
+            [],
           );
         }),
       ),
     30_000,
   );
 
-  it.effect("la provincia con prioridad se lee antes que el resto de su zona", () =>
-    Effect.gen(function* () {
-      // Las cinco últimas de la muestra, movidas a Girona, siguen en el cuadro de Barcelona.
-      const grabada = conGirona(yield* muestraCampusNord, 5);
-      const girona = grabada.listado.registros.slice(-5).map((r) => r.clave);
-      const leerCon = (fichas: Partial<OpcionesFichas>) =>
-        conEntorno((entorno) =>
-          Effect.gen(function* () {
-            const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
-            yield* TestClock.setTime(NOCHE);
-            yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas), conFichas(fichas));
-            return yield* Ref.get(pedidas);
-          }),
-        );
-
-      // Girona primero: sus cinco, en el orden en que llegaron.
-      assert.deepStrictEqual(yield* leerCon({ prioridad: ["17"], maximo: 5 }), girona);
-      // Barcelona primero, como por defecto: las de Girona, al final, con el resto de Cataluña.
-      const porDefecto = yield* leerCon({});
-      assert.strictEqual(porDefecto.length, 40);
-      assert.deepStrictEqual(porDefecto.slice(-5).toSorted(), girona.toSorted());
-    }).pipe(Effect.provide(NodeServices.layer)),
-  );
-
   it.effect(
-    "un bloqueo para las fichas sin insistir, queda en la ejecución y la noche publica",
+    "la ronda del mes siguiente barre otra vez y relee todas las fichas, de la leída hace más tiempo a la más reciente",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
           const grabada = yield* muestraCampusNord;
           const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
-          yield* TestClock.setTime(NOCHE);
-          const hecha = yield* unaNoche(
-            entorno,
-            conFichasApuntadas(grabada, pedidas, {
-              falla: (registro, vez) =>
-                vez === 3
-                  ? new FuenteBloqueada({ url: registro.url, motivo: "HTTP 403" })
-                  : undefined,
-            }),
-          );
-          assert.strictEqual((yield* Ref.get(pedidas)).length, 3);
+          const extractor = conFichasApuntadas(grabada, pedidas);
+
+          // El sábado solo da tiempo a 25; el domingo, a las 15 que quedan.
+          yield* TestClock.setTime(SABADO);
+          yield* unaNoche(entorno, extractor, enRonda({ maximo: 25 }));
+          const delSabado = yield* Ref.getAndSet(pedidas, []);
+          yield* TestClock.setTime(DOMINGO);
+          yield* unaNoche(entorno, extractor, enRonda());
+          const delDomingo = yield* Ref.getAndSet(pedidas, []);
+          assert.lengthOf(delSabado, 25);
+          assert.lengthOf(delDomingo, 15);
+
+          // En diciembre van primero las del sábado, que se leyeron antes, y luego las del domingo.
+          yield* TestClock.setTime(DICIEMBRE);
+          const diciembre = yield* unaNoche(entorno, extractor, enRonda());
           assert.deepStrictEqual(
-            hecha.ejecuciones.map((e) => [e.fuente, e.estado]),
-            [["registro-oficial", "completada"]],
+            diciembre.ejecuciones
+              .find((e) => e.fuente === "registro-oficial")
+              ?.zonas.map((z) => [z.zona, z.estado]),
+            [["cataluna", "completado"]],
           );
-          assert.strictEqual(hecha.publicacion.tipo, "publicada");
-          const ejecucion = yield* ultimaDe(entorno);
-          assert.strictEqual(ejecucion?.cambios.fichas.leidas, 2);
-          assert.lengthOf(ejecucion?.errores ?? [], 1);
-          assert.include(
-            ejecucion?.errores[0] ?? "",
-            "Fichas paradas hasta la próxima noche: FuenteBloqueada: HTTP 403",
-          );
-          // El bloqueo no hace esperar a la ficha: la noche siguiente se pide la primera.
-          assert.deepStrictEqual((yield* leidasEn(entorno)).fallidas, []);
+          assert.deepStrictEqual(yield* Ref.get(pedidas), [...delSabado, ...delDomingo]);
         }),
       ),
   );
 
-  it.effect("una ficha que falla espera un día y se vuelve a pedir después", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const grabada = yield* muestraCampusNord;
-        const primera = grabada.listado.registros[0];
-        assert.isDefined(primera);
-        const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
-        const invalida = conFichasApuntadas(grabada, pedidas, {
-          falla: (registro) =>
-            registro.clave === primera.clave
-              ? new RespuestaInesperada({
-                  url: registro.url,
-                  motivo: "La ficha no tiene la tabla de características técnicas",
-                })
-              : undefined,
-        });
+  it.effect(
+    "un bloqueo para las fichas sin insistir y queda en la ejecución; el domingo lo intenta otra vez, y si vuelve a parar, lo que queda espera a la ronda del mes siguiente",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
+          // El geoportal da un 403 a la tercera ficha que se le pide y a la quinta.
+          const bloqueado = conFichasApuntadas(grabada, pedidas, {
+            falla: (registro, vez) =>
+              vez === 3 || vez === 5
+                ? new FuenteBloqueada({ url: registro.url, motivo: "HTTP 403" })
+                : undefined,
+          });
+          yield* TestClock.setTime(SABADO);
+          const sabado = yield* unaNoche(entorno, bloqueado, enRonda());
+          assert.strictEqual((yield* Ref.get(pedidas)).length, 3);
+          assert.deepStrictEqual(
+            sabado.ejecuciones.map((e) => [e.fuente, e.estado]),
+            [["registro-oficial", "completada"]],
+          );
+          assert.strictEqual(sabado.publicacion.tipo, "publicada");
+          const ejecucion = yield* ultimaDe(entorno);
+          assert.strictEqual(ejecucion?.cambios.fichas.leidas, 2);
+          assert.lengthOf(ejecucion?.errores ?? [], 1);
+          assert.include(ejecucion?.errores[0] ?? "", "Fichas paradas: FuenteBloqueada: HTTP 403");
+          // El bloqueo no hace esperar a la ficha: el domingo se pide la primera.
+          assert.deepStrictEqual((yield* leidasEn(entorno)).fallidas, []);
+          assert.deepStrictEqual(sabado.ejecuciones[0]?.porLeer, { zonas: [], fichas: 38 });
 
-        yield* TestClock.setTime(NOCHE);
-        yield* unaNoche(entorno, invalida);
-        const trasLaPrimera = yield* leidasEn(entorno);
-        assert.strictEqual(trasLaPrimera.leidas.length, 39);
-        assert.deepStrictEqual(trasLaPrimera.fallidas, [
-          {
-            clave: primera.clave,
-            fallos: 1,
-            espera: NOCHE + DIA,
-            error:
-              "RespuestaInesperada: La ficha no tiene la tabla de características técnicas " +
-              `(${primera.url})`,
-          },
-        ]);
-
-        // Antes de que pase el día no se pide; después sí, y al leerla se borran sus fallos.
-        yield* Ref.set(pedidas, []);
-        yield* TestClock.setTime(NOCHE + DIA - 60_000);
-        yield* unaNoche(entorno, invalida);
-        assert.deepStrictEqual(yield* Ref.get(pedidas), []);
-
-        yield* TestClock.setTime(NOCHE + DIA + 60_000);
-        yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas));
-        assert.deepStrictEqual(yield* Ref.get(pedidas), [primera.clave]);
-        const trasLeerla = yield* leidasEn(entorno);
-        assert.strictEqual(trasLeerla.leidas.length, 40);
-        assert.deepStrictEqual(trasLeerla.fallidas, []);
-      }),
-    ),
+          // El domingo empieza por la que se bloqueó y vuelve a parar en la segunda.
+          yield* TestClock.setTime(DOMINGO);
+          const domingo = yield* unaNoche(entorno, bloqueado, enRonda());
+          const todas = yield* Ref.get(pedidas);
+          assert.lengthOf(todas, 5);
+          assert.strictEqual(todas[3], todas[2]);
+          assert.deepStrictEqual(domingo.ejecuciones[0]?.porLeer, { zonas: [], fichas: 37 });
+          assert.lengthOf((yield* leidasEn(entorno)).leidas, 3);
+        }),
+      ),
   );
 
   it.effect(
-    "una estación base sin ficha en el registro se publica con la marca y su fecha, se vuelve a pedir con la espera de siempre y una lectura buena quita la marca",
+    "una ficha que falla espera a la ronda siguiente: el domingo no la pide y la del mes siguiente sí",
+    () =>
+      conEntorno((entorno) =>
+        Effect.gen(function* () {
+          const grabada = yield* muestraCampusNord;
+          const primera = grabada.listado.registros[0];
+          assert.isDefined(primera);
+          const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
+          const invalida = conFichasApuntadas(grabada, pedidas, {
+            falla: (registro) =>
+              registro.clave === primera.clave
+                ? new RespuestaInesperada({
+                    url: registro.url,
+                    motivo: "La ficha no tiene la tabla de características técnicas",
+                  })
+                : undefined,
+          });
+
+          yield* TestClock.setTime(SABADO);
+          yield* unaNoche(entorno, invalida, enRonda());
+          const trasElSabado = yield* leidasEn(entorno);
+          assert.strictEqual(trasElSabado.leidas.length, 39);
+          assert.deepStrictEqual(trasElSabado.fallidas, [
+            {
+              clave: primera.clave,
+              fallos: 1,
+              espera: SABADO + ESPERA,
+              error:
+                "RespuestaInesperada: La ficha no tiene la tabla de características técnicas " +
+                `(${primera.url})`,
+            },
+          ]);
+
+          // El domingo no la pide: daría lo mismo. No queda nada más de la ronda.
+          yield* Ref.set(pedidas, []);
+          yield* TestClock.setTime(DOMINGO);
+          const domingo = yield* unaNoche(entorno, invalida, enRonda());
+          assert.deepStrictEqual(yield* Ref.get(pedidas), []);
+          assert.deepStrictEqual(domingo.ejecuciones[0]?.porLeer, { zonas: [], fichas: 0 });
+
+          // La ronda de diciembre la pide la primera, porque nunca se ha leído, y al leerla se
+          // borran sus fallos.
+          yield* TestClock.setTime(DICIEMBRE);
+          yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas), enRonda());
+          assert.strictEqual((yield* Ref.get(pedidas))[0], primera.clave);
+          const trasLeerla = yield* leidasEn(entorno);
+          assert.strictEqual(trasLeerla.leidas.length, 40);
+          assert.deepStrictEqual(trasLeerla.fallidas, []);
+        }),
+      ),
+  );
+
+  it.effect(
+    "una estación base sin ficha en el registro se publica con la marca y su fecha, se vuelve a pedir en la ronda siguiente y una lectura buena quita la marca",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -395,7 +426,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
               ...r,
               fuente: "registro-oficial" as const,
               bandas: [],
-              fecha: NOCHE,
+              fecha: SABADO,
               afirma: "presente" as const,
             })),
           ).find((e) => e.estaciones.length > 1 && e.estaciones.some(conBandas));
@@ -407,14 +438,14 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           const sinFicha = { ...grabada, sinFicha: new Set([clave]) };
           const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
 
-          // Primera noche: el registro no tiene su ficha.
-          yield* TestClock.setTime(NOCHE);
-          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas));
+          // El sábado de noviembre el registro no tiene su ficha.
+          yield* TestClock.setTime(SABADO);
+          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas), enRonda());
           const primera = yield* observacionEn(entorno, clave);
-          assert.strictEqual(primera.datos.sinFichaEnRegistro, NOCHE);
+          assert.strictEqual(primera.datos.sinFichaEnRegistro, SABADO);
           assert.deepStrictEqual(primera.datos.bandas, []);
           assert.strictEqual(primera.fallos, 1);
-          assert.strictEqual(primera.espera, NOCHE + DIA);
+          assert.strictEqual(primera.espera, SABADO + ESPERA);
 
           // La ficha publicada lo dice solo de esa compañía, y conserva lo del listado.
           const publicada = (yield* fichasPublicadas(entorno)).find(
@@ -427,7 +458,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             publicada.estaciones.map((e) => [e.compania, e.sinFichaEnRegistro]),
             compartido.estaciones.map((e) => [
               e.compania,
-              e.compania === afectada.compania ? NOCHE : undefined,
+              e.compania === afectada.compania ? SABADO : undefined,
             ]),
           );
           const estacion = publicada.estaciones.find((e) => e.compania === afectada.compania);
@@ -442,7 +473,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             entorno.base,
             yield* conBase(
               entorno.base,
-              Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+              Effect.flatMap(BaseNocturna, (base) => base.resumen(SABADO)),
             ),
           );
           assert.include(
@@ -453,29 +484,28 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             estado,
             `    - ${clave}: SinFichaEnElRegistro: La ficha dice «Código de emplazamiento no válido» ` +
               `(${grabada.listado.registros.find((r) => r.clave === clave)?.url ?? ""}); ` +
-              "intento 2 desde 2026-09-27 02:15:00 UTC",
+              "intento 2 desde 2026-11-08 11:30:00 UTC",
           );
 
-          // Antes del día de espera no se pide. Después sí, y sigue sin ficha: dos días más, y la
-          // fecha de la comprobación es la de esta noche.
+          // El domingo no se pide. En diciembre sí, y sigue sin ficha: espera a la ronda
+          // siguiente, y la fecha de la comprobación es la de esa ejecución.
           yield* Ref.set(pedidas, []);
-          yield* TestClock.setTime(NOCHE + DIA - 60_000);
-          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas));
+          yield* TestClock.setTime(DOMINGO);
+          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas), enRonda());
           assert.deepStrictEqual(yield* Ref.get(pedidas), []);
-          const segunda = NOCHE + DIA + 60_000;
-          yield* TestClock.setTime(segunda);
-          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas));
-          assert.deepStrictEqual(yield* Ref.get(pedidas), [clave]);
-          const trasLaSegunda = yield* observacionEn(entorno, clave);
-          assert.strictEqual(trasLaSegunda.datos.sinFichaEnRegistro, segunda);
-          assert.strictEqual(trasLaSegunda.fallos, 2);
-          assert.strictEqual(trasLaSegunda.espera, segunda + 2 * DIA);
+          yield* TestClock.setTime(DICIEMBRE);
+          yield* unaNoche(entorno, conFichasApuntadas(sinFicha, pedidas), enRonda());
+          assert.include(yield* Ref.get(pedidas), clave);
+          const trasDiciembre = yield* observacionEn(entorno, clave);
+          assert.strictEqual(trasDiciembre.datos.sinFichaEnRegistro, DICIEMBRE);
+          assert.strictEqual(trasDiciembre.fallos, 2);
+          assert.strictEqual(trasDiciembre.espera, DICIEMBRE + ESPERA);
 
-          // El ministerio lo arregla: la siguiente lectura buena quita la marca y la publica.
+          // El ministerio lo arregla: la ronda de enero quita la marca y la publica.
           yield* Ref.set(pedidas, []);
-          yield* TestClock.setTime(segunda + 2 * DIA + 60_000);
-          yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas));
-          assert.deepStrictEqual(yield* Ref.get(pedidas), [clave]);
+          yield* TestClock.setTime(ENERO);
+          yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas), enRonda());
+          assert.include(yield* Ref.get(pedidas), clave);
           const arreglada = yield* observacionEn(entorno, clave);
           assert.notProperty(arreglada.datos, "sinFichaEnRegistro");
           assert.strictEqual(arreglada.fallos, 0);
@@ -523,7 +553,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
               .flatMap((f) => f.estaciones)
               .find((e) => e.origenes.some((o) => o.clave === clave));
 
-          // Primera noche, solo el listado: ninguna ficha leída.
+          // Primera ejecución, solo el listado: ninguna ficha leída.
           yield* TestClock.setTime(NOCHE);
           yield* unaNoche(
             entorno,
@@ -534,7 +564,7 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           assert.isAbove(antes.length, 0);
           assert.isTrue(antes.every((f) => f.estaciones.every((e) => e.bandasSinLeer)));
 
-          // Segunda noche, con las fichas: ninguna queda sin leer, y la de la clave, sin bandas.
+          // Segunda, con las fichas: ninguna queda sin leer, y la de la clave, sin bandas.
           yield* TestClock.setTime(NOCHE + DIA);
           yield* unaNoche(entorno, conFichasApuntadas(sinBandas, pedidas));
           const despues = yield* fichasPublicadas(entorno);
@@ -550,23 +580,27 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
   );
 
   it.effect(
-    "veinte fichas seguidas sin ficha en el registro paran la noche y ninguna queda marcada",
+    "veinte fichas seguidas sin ficha en el registro paran la ejecución y ninguna queda marcada",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
           const grabada = yield* muestraCampusNord;
           const todas = new Set(grabada.listado.registros.map((r) => r.clave));
           const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
-          yield* TestClock.setTime(NOCHE);
-          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, sinFicha: todas }, pedidas));
-          const pedidasEnLaNoche = yield* Ref.get(pedidas);
-          assert.lengthOf(pedidasEnLaNoche, SIN_FICHA_SEGUIDAS);
-          for (const clave of pedidasEnLaNoche) {
+          yield* TestClock.setTime(SABADO);
+          yield* unaNoche(
+            entorno,
+            conFichasApuntadas({ ...grabada, sinFicha: todas }, pedidas),
+            enRonda(),
+          );
+          const pedidasEnLaEjecucion = yield* Ref.get(pedidas);
+          assert.lengthOf(pedidasEnLaEjecucion, SIN_FICHA_SEGUIDAS);
+          for (const clave of pedidasEnLaEjecucion) {
             const guardada = yield* observacionEn(entorno, clave);
             // Esperan como cualquier fallo, pero sin la marca pública.
             assert.notProperty(guardada.datos, "sinFichaEnRegistro");
             assert.strictEqual(guardada.fallos, 1);
-            assert.strictEqual(guardada.espera, NOCHE + DIA);
+            assert.strictEqual(guardada.espera, SABADO + ESPERA);
           }
           assert.isTrue(
             (yield* fichasPublicadas(entorno)).every((f) =>
@@ -581,14 +615,14 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
   );
 
   it.effect(
-    "las fichas leídas con una versión anterior de la lectura se releen sin esperar a la relectura, y sus medidas de exposición se guardan y se publican",
+    "las fichas leídas con una versión anterior de la lectura se releen en la misma ronda, y sus medidas de exposición se guardan y se publican",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
           const grabada = yield* muestraCampusNord;
           const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
-          yield* TestClock.setTime(NOCHE);
-          yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas));
+          yield* TestClock.setTime(SABADO);
+          yield* unaNoche(entorno, conFichasApuntadas(grabada, pedidas), enRonda());
           assert.lengthOf(yield* Ref.get(pedidas), 40);
 
           // Cinco fichas con medidas como las dejaba la lectura de antes, que no las sacaba.
@@ -604,15 +638,15 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
           const resumen = yield* conBase(
             entorno.base,
-            Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+            Effect.flatMap(BaseNocturna, (base) => base.resumen(SABADO)),
           );
           assert.strictEqual(
             resumen.fuentes.find((f) => f.fuente === "registro-oficial")?.porReleer,
             5,
           );
 
-          // Al día siguiente se piden solo esas cinco. Una de ellas publica ahora otras medidas
-          // que las de la muestra, y son las que se guardan.
+          // El domingo se piden solo esas cinco, aunque se leyeron en la ronda. Una de ellas
+          // publica ahora otras medidas que las de la muestra, y son las que se guardan.
           const [cambia = "", ...igualesQueAntes] = viejas;
           const otras = [{ distanciaMetros: 12, acimutGrados: 300, microvatiosPorCm2: 0.02 }];
           const fichas = new Map(grabada.fichas);
@@ -621,17 +655,17 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
           // Sin las tablas en crudo de la muestra, que dirían las medidas de antes.
           fichas.set(cambia, { bandas: antes?.bandas ?? [], medidasDeExposicion: otras });
           yield* Ref.set(pedidas, []);
-          yield* TestClock.setTime(NOCHE + DIA);
-          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, fichas }, pedidas));
+          yield* TestClock.setTime(DOMINGO);
+          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, fichas }, pedidas), enRonda());
           assert.deepStrictEqual(new Set(yield* Ref.get(pedidas)), new Set(viejas));
           const cambiada = yield* observacionEn(entorno, cambia);
           assert.deepStrictEqual(cambiada.datos.medidasDeExposicion, otras);
           // Son las primeras medidas que lee de ellas: el registro ya las publicaba, así que la
           // fecha de la observación no se mueve.
-          assert.strictEqual(cambiada.datos.fecha, NOCHE);
+          assert.strictEqual(cambiada.datos.fecha, SABADO);
           for (const clave of igualesQueAntes) {
             const releida = yield* observacionEn(entorno, clave);
-            assert.strictEqual(releida.datos.fecha, NOCHE);
+            assert.strictEqual(releida.datos.fecha, SABADO);
             assert.deepStrictEqual(
               releida.datos.medidasDeExposicion,
               grabada.fichas.get(clave)?.medidasDeExposicion,
@@ -642,10 +676,10 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             .find((e) => e.origenes.some((o) => o.clave === cambia));
           assert.deepStrictEqual(publicada?.medidasDeExposicion, otras);
 
-          // Ya están leídas con la lectura de hoy: la noche siguiente no pide ninguna.
+          // Ya están leídas con la lectura de hoy: otra ejecución ese domingo no pide ninguna.
           yield* Ref.set(pedidas, []);
-          yield* TestClock.setTime(NOCHE + 2 * DIA);
-          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, fichas }, pedidas));
+          yield* TestClock.setTime(DOMINGO + HORA);
+          yield* unaNoche(entorno, conFichasApuntadas({ ...grabada, fichas }, pedidas), enRonda());
           assert.deepStrictEqual(yield* Ref.get(pedidas), []);
         }),
       ),
@@ -752,8 +786,8 @@ describe("fichas en la ventana de la noche (base SQLite y registro grabado)", ()
             vigentes: 40,
           });
 
-          // La noche pide primero las 30 sin leer, y la que falla queda esperando. Luego relee las
-          // 10 leídas, que se leyeron sin las medidas de exposición.
+          // La ejecución pide primero las 30 sin leer, y la que falla queda esperando. Luego relee
+          // las 10 leídas, que se leyeron sin las medidas de exposición.
           const pedidas = yield* Ref.make<ReadonlyArray<string>>([]);
           const ultima = registros.at(-1);
           assert.isDefined(ultima);

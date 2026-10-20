@@ -857,9 +857,15 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           fuente,
           zona,
           fecha,
+          desde,
         ) {
           return yield* sql.withTransaction(
             Effect.gen(function* () {
+              // Uno a medias de otra ronda no se retoma: sus cuadros guardados son de hace un mes.
+              yield* sql`UPDATE barridos SET estado = 'fallido', fin = ${fecha},
+                  error = 'a medias en una ronda anterior'
+                  WHERE fuente = ${fuente} AND zona = ${zona.nombre} AND estado = 'en curso'
+                    AND inicio < ${desde}`;
               const [aMedias] = yield* decodificar(FilaBarrido)(
                 yield* sql`SELECT id, fuente, inicio, cuadros FROM barridos
                     WHERE fuente = ${fuente} AND zona = ${zona.nombre} AND estado = 'en curso'

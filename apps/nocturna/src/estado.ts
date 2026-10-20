@@ -1,7 +1,7 @@
 import { versionDeCapa } from "@celda/dominio/capa";
 import type { ZonaEnLaEjecucion } from "@celda/ingesta/barrido";
 import type { Cambios } from "@celda/ingesta/ejecucion";
-import type { GrupoDeCola, GrupoPendiente, Pendientes } from "@celda/ingesta/fichas";
+import type { Pendientes } from "@celda/ingesta/fichas";
 import type { ResultadoPublicacion } from "@celda/publicacion/publicar";
 import * as DateTime from "effect/DateTime";
 
@@ -62,13 +62,61 @@ const describirZona = (z: ResumenDeZona, fichas?: Pendientes): string =>
   (fichas === undefined ? "" : `; fichas por leer: ${describirPendientes(fichas)}`);
 
 /**
- * Las zonas de barrido del registro oficial en la configuración, en su orden, con las fichas que
- * le quedan a cada una, y las que barrerá la noche siguiente.
+ * La ronda del registro oficial: las zonas de barrido de la configuración, en su orden, con las
+ * fichas que le quedan a cada una; las fichas que le quedan a la ronda; y la próxima ejecución
+ * del calendario, con las zonas que barrerá.
  */
 export interface Turno {
   readonly zonas: ReadonlyArray<{ readonly zona: string; readonly fichas: Pendientes }>;
-  readonly proxima: ReadonlyArray<string>;
+  /** Fichas sin leer en la ronda, sin las que esperan tras un fallo. */
+  readonly porLeer: number;
+  readonly proxima: {
+    /** «domingo 8/11/2026 a las 00:30 (Europe/Madrid)». */
+    readonly cuando: string;
+    readonly dia: "sabado" | "domingo";
+    /** Cuántas zonas tiene la configuración. */
+    readonly configuradas: number;
+    /** Las que barrerá, por nombre. */
+    readonly zonas: ReadonlyArray<string>;
+  };
 }
+
+/**
+ * La próxima ejecución. La del domingo retoma la ronda y solo pide al registro lo que quede de
+ * ella; la del primer sábado del mes empieza otra y lo vuelve a leer todo.
+ */
+const describirProxima = (turno: Turno): string => {
+  const { proxima } = turno;
+  if (proxima.dia === "sabado") {
+    return (
+      `  Próxima ejecución: el ${proxima.cuando}. Empieza otra ronda, en la que barre ` +
+      `${proxima.configuradas === 1 ? "su zona" : `sus ${proxima.configuradas} zonas`} y lee ` +
+      "todas las fichas"
+    );
+  }
+  const queda = loQueQueda(proxima.zonas, turno.porLeer);
+  return (
+    `  Próxima ejecución: el ${proxima.cuando}. Retoma la ronda y solo pide al registro lo ` +
+    "que quede de ella. " +
+    (queda === undefined
+      ? "Ahora no queda nada, así que no pedirá nada."
+      : `Ahora ${proxima.zonas.length + turno.porLeer === 1 ? "queda" : "quedan"} ${queda}.`)
+  );
+};
+
+/**
+ * Lo que queda de una ronda, «1 zona (norte) y 1204 fichas», sin lo que no queda. Sin nada,
+ * `undefined`.
+ */
+export const loQueQueda = (zonas: ReadonlyArray<string>, fichas: number): string | undefined => {
+  const partes = [
+    ...(zonas.length === 0
+      ? []
+      : [`${zonas.length === 1 ? "1 zona" : `${zonas.length} zonas`} (${zonas.join(", ")})`]),
+    ...(fichas === 0 ? [] : [fichas === 1 ? "1 ficha" : `${fichas} fichas`]),
+  ];
+  return partes.length === 0 ? undefined : partes.join(" y ");
+};
 
 /**
  * Las zonas de la configuración, en su orden y con sus fichas, y luego las demás que se han
@@ -86,13 +134,17 @@ const describirZonasEnTurno = (
       describirZona(deLaBase.get(zona) ?? { zona, completado: null, aMedias: false }, fichas),
     ),
     ...barridas.filter((z) => !configuradas.has(z.zona)).map((z) => describirZona(z)),
-    `  La próxima noche barre: ${turno.proxima.length === 0 ? "ninguna zona" : turno.proxima.join(", ")}`,
+    `  La próxima ejecución barre: ${turno.proxima.zonas.length === 0 ? "ninguna zona" : turno.proxima.zonas.join(", ")}`,
+    describirProxima(turno),
   ];
 };
 
-const describirEjecucion = (e: EjecucionGuardada): ReadonlyArray<string> => [
+const describirEjecucion = (e: EjecucionGuardada, turno?: Turno): ReadonlyArray<string> => [
   `  Última ejecución: ${fecha(e.inicio)}, ${e.estado}` +
-    (e.registros === null ? "" : `, ${e.registros} registros en el listado`),
+    (e.registros === null ? "" : `, ${e.registros} registros en el listado`) +
+    (e.estado === "en curso" && turno !== undefined
+      ? `; le quedan ${turno.porLeer} fichas por leer de la ronda`
+      : ""),
   ...(e.estado === "completada" ? [`  Cambios: ${describirCambios(e.cambios)}`] : []),
   ...(e.zonas === null || e.zonas.length === 0
     ? []
@@ -102,29 +154,6 @@ const describirEjecucion = (e: EjecucionGuardada): ReadonlyArray<string> => [
     ? ["  Errores: ninguno"]
     : [`  Errores (${e.errores.length}):`, ...e.errores.map((error) => `    - ${error}`)]),
 ];
-
-const describirGrupo = (
-  grupo: GrupoDeCola,
-  nombreDe: (codigo: string) => string | undefined,
-): string => {
-  switch (grupo.tipo) {
-    case "provincia": {
-      const nombre = nombreDe(grupo.provincia);
-      return `provincia ${grupo.provincia}` + (nombre === undefined ? "" : ` (${nombre})`);
-    }
-    case "zona":
-      return `resto de la zona ${grupo.zona}`;
-    case "fuera":
-      return "fuera de las zonas de barrido";
-  }
-};
-
-const describirPendiente = (
-  { grupo, nuevas, porReleer, enEspera }: GrupoPendiente,
-  nombreDe: (codigo: string) => string | undefined,
-): string =>
-  `    - ${describirGrupo(grupo, nombreDe)}: ${nuevas} sin leer, ${porReleer} por releer` +
-  (enEspera === 0 ? "" : `, ${enEspera} esperando tras fallar`);
 
 const describirEnEspera = (f: FichaEnEspera): string =>
   `    - ${f.clave}: ${f.motivo ?? "sin motivo apuntado"}; ` +
@@ -144,7 +173,9 @@ const describirFichasEnEspera = (f: ResumenDeFuente): ReadonlyArray<string> =>
 
 const describirFuente = (f: ResumenDeFuente, turno?: Turno): ReadonlyArray<string> => [
   `${f.fuente}: ${f.interruptor.activo ? "encendida" : `apagada (${f.interruptor.motivo})`}`,
-  ...(f.ultima === undefined ? ["  Ninguna ejecución todavía"] : describirEjecucion(f.ultima)),
+  ...(f.ultima === undefined
+    ? ["  Ninguna ejecución todavía"]
+    : describirEjecucion(f.ultima, turno)),
   ...(f.vigentes === 0
     ? []
     : [
@@ -160,28 +191,15 @@ const describirFuente = (f: ResumenDeFuente, turno?: Turno): ReadonlyArray<strin
 ];
 
 /**
- * El estado de la base en texto, para la orden `estado`. `cola` son las fichas que quedan del
- * registro oficial en cada parte de su cola, en el orden en que se leen, y `turno`, sus zonas de
- * barrido en la configuración.
+ * El estado de la base en texto, para la orden `estado`. `turno` es la ronda del registro oficial:
+ * sus zonas de barrido en la configuración, lo que le queda y la próxima ejecución.
  */
-export const describirResumen = (
-  fichero: string,
-  resumen: Resumen,
-  cola: ReadonlyArray<GrupoPendiente> = [],
-  nombreDe: (codigo: string) => string | undefined = () => undefined,
-  turno?: Turno,
-): string =>
+export const describirResumen = (fichero: string, resumen: Resumen, turno?: Turno): string =>
   [
     `Base: ${fichero}`,
-    ...resumen.fuentes.flatMap((f) => [
-      ...describirFuente(f, f.fuente === "registro-oficial" ? turno : undefined),
-      ...(f.fuente !== "registro-oficial" || cola.length === 0
-        ? []
-        : [
-            "  Fichas por leer, en el orden de la cola:",
-            ...cola.map((grupo) => describirPendiente(grupo, nombreDe)),
-          ]),
-    ]),
+    ...resumen.fuentes.flatMap((f) =>
+      describirFuente(f, f.fuente === "registro-oficial" ? turno : undefined),
+    ),
     `Emplazamientos: ${resumen.emplazamientos}` +
       (resumen.version === null ? "" : `; versión de los datos ${versionDeCapa(resumen.version)}`),
     `Última versión publicada: ${resumen.publicada ?? "ninguna"}`,
