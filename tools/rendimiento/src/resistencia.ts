@@ -5,12 +5,19 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 
-import { chromium, devices, type Page } from "playwright-core";
+import { type Browser, chromium, devices, type Page } from "playwright-core";
 
-import { escribirCapaSintetica } from "./capaSintetica.ts";
+import { type CapaSintetica, escribirCapaSintetica } from "./capaSintetica.ts";
 import { CONTADAS, type Contada, instalarContador } from "./contador.ts";
-import { esperarVistaInicial, mapaBaseFalso } from "./mapa.ts";
-import { servirSitio } from "./sitio.ts";
+import { esperarVistaInicial } from "./mapa.ts";
+import {
+  contestarEnLocal,
+  informarDeLaRed,
+  type MapaBase,
+  type RedDeLaPasada,
+  SIN_RED,
+} from "./red.ts";
+import { servirSitio, type Sitio } from "./sitio.ts";
 
 /**
  * Prueba de resistencia: abre Celda en Chromium sin interfaz, como un Android con el permiso de
@@ -23,8 +30,11 @@ import { servirSitio } from "./sitio.ts";
  *
  *   pnpm run resistencia [--web ../../apps/web/dist] [--segundos 30] [--chromium <ruta>]
  *
- * El mapa base no sale de OpenFreeMap: las peticiones se contestan aquí con teselas vacías, así
- * que no hace falta conexión ni GPU (WebGL con SwiftShader).
+ * Hace dos pasadas, cada una en un contexto nuevo, una con el mapa base principal y otra con el de
+ * reserva, con OpenFreeMap cortando la conexión. El mapa base se contesta aquí con teselas vacías y nada
+ * sale a la red (`red.ts`), así que no hace falta conexión ni GPU (WebGL con SwiftShader). La
+ * pasada falla si la página pide algo que la prueba no sabe contestar o si la web no usa el mapa
+ * base de la pasada.
  */
 
 const { values: opciones } = NodeUtil.parseArgs({
@@ -106,38 +116,49 @@ const esperarTexto = (pagina: Page, texto: RegExp) =>
 
 const pausa = (ms: number) => new Promise((resolver) => setTimeout(resolver, ms));
 
-const principal = async () => {
-  const temporal = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "celda-resistencia-"));
-  const capa = await escribirCapaSintetica(temporal);
-  const sitio = await servirSitio(NodePath.resolve(opciones.web), capa.carpeta);
-  const navegador = await chromium.launch({
-    executablePath: opciones.chromium,
-    args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
+const TITULOS: Readonly<Record<MapaBase, string>> = {
+  principal: "Con el mapa base principal",
+  reserva: "Con el mapa base de reserva, con OpenFreeMap cortando la conexión",
+};
+
+/** Si en una pasada se ha abierto algo sin que nadie lo pida y si ha fallado la red. */
+interface Fallos {
+  readonly abre: boolean;
+  readonly red: boolean;
+}
+
+/**
+ * Una pasada en un contexto nuevo con el mapa base `mapaBase`. Prepara la página, espera a que se
+ * quede quieta, la deja así `SEGUNDOS` y dice qué ha fallado.
+ */
+const pasada = async (
+  navegador: Browser,
+  sitio: Sitio,
+  capa: CapaSintetica,
+  mapaBase: MapaBase,
+): Promise<Fallos> => {
+  // Al suroeste del emplazamiento central, a unos 200 m.
+  const posicion = {
+    latitude: capa.centro.latitud - 0.0012,
+    longitude: capa.centro.longitud - 0.0015,
+  };
+  const contexto = await navegador.newContext({
+    // Un Android de pantalla ancha, como una tableta: la ficha a un lado y los controles a la
+    // vista, sin que la hoja tape nada. Sin GPU, mejor pocos píxeles.
+    ...devices["Pixel 7"],
+    viewport: { width: 1100, height: 850 },
+    deviceScaleFactor: 1,
+    locale: "es-ES",
+    // La brújula de Chromium pide permiso a los sensores de movimiento.
+    permissions: ["geolocation", "accelerometer", "gyroscope", "magnetometer"],
+    geolocation: { ...posicion, accuracy: 20 },
   });
   const avisos: Array<string> = [];
   let fallo = false;
+  let falloDeRed = false;
+  let red: RedDeLaPasada | undefined;
   try {
-    // Al suroeste del emplazamiento central, a unos 200 m.
-    const posicion = {
-      latitude: capa.centro.latitud - 0.0012,
-      longitude: capa.centro.longitud - 0.0015,
-    };
-    const contexto = await navegador.newContext({
-      // Un Android de pantalla ancha, como una tableta: la ficha a un lado y los controles a la
-      // vista, sin que la hoja tape nada. Sin GPU, mejor pocos píxeles.
-      ...devices["Pixel 7"],
-      viewport: { width: 1100, height: 850 },
-      deviceScaleFactor: 1,
-      locale: "es-ES",
-      // La brújula de Chromium pide permiso a los sensores de movimiento.
-      permissions: ["geolocation", "accelerometer", "gyroscope", "magnetometer"],
-      geolocation: { ...posicion, accuracy: 20 },
-    });
-    await contexto.route("https://tiles.openfreemap.org/**", mapaBaseFalso);
-    // El mapa base de reserva del IGN, por si el de OpenFreeMap falla: tampoco se pide fuera.
-    await contexto.route(/\.idee\.es\//u, (ruta) =>
-      ruta.fulfill({ contentType: "application/x-protobuf", body: Buffer.alloc(0) }),
-    );
+    red = await contestarEnLocal(contexto, sitio.origen, mapaBase);
     await contexto.addInitScript(instalarContador);
     const pagina = await contexto.newPage();
     pagina.on("console", (mensaje) => {
@@ -148,9 +169,9 @@ const principal = async () => {
     // PREPARAR: lo que haría una persona antes de dejar el móvil quieto
     await pagina.goto(`${sitio.origen}/?emplazamiento=${encodeURIComponent(capa.central)}`);
     await pagina.getByRole("heading", { name: capa.titulo }).waitFor({ timeout: 20_000 });
-    // Con el mapa base puesto, el de OpenFreeMap o el de reserva, y el resumen. Hasta el #81 lo
-    // esperaba sin querer el clic en «Interferencia», que no se activaba antes; el aviso que se
-    // esperaba aquí ya no existía, y el paso al mapa de reserva caía a veces en la ventana quieta.
+    // Con el mapa base de la pasada y el resumen puestos. Hasta el #81 lo esperaba sin querer el
+    // clic en «Interferencia», que no se activaba antes; el aviso que se esperaba aquí ya no
+    // existía, y el paso al mapa de reserva caía a veces en la ventana quieta.
     await esperarVistaInicial(pagina, 20_000);
 
     const referencia = pagina.getByRole("region", { name: "Punto de referencia" });
@@ -212,16 +233,48 @@ const principal = async () => {
     }
     if (avisos.length > 0) console.log(`\nLa página avisó:\n${avisos.join("\n")}`);
   } finally {
+    // También si la pasada se ha cortado antes: lo pedido fuera puede explicar por qué.
+    if (red !== undefined) falloDeRed = informarDeLaRed(red);
+    await contexto.close();
+  }
+  return { abre: fallo, red: falloDeRed };
+};
+
+const principal = async () => {
+  const temporal = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "celda-resistencia-"));
+  const capa = await escribirCapaSintetica(temporal);
+  const sitio = await servirSitio(NodePath.resolve(opciones.web), capa.carpeta);
+  const navegador = await chromium.launch({
+    executablePath: opciones.chromium,
+    args: [
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader",
+      "--ignore-gpu-blocklist",
+      SIN_RED,
+    ],
+  });
+  let abre = false;
+  let red = false;
+  try {
+    for (const mapaBase of ["principal", "reserva"] as const) {
+      console.log(`\n${TITULOS[mapaBase]}\n`);
+      const fallos = await pasada(navegador, sitio, capa, mapaBase);
+      abre ||= fallos.abre;
+      red ||= fallos.red;
+    }
+  } finally {
     await navegador.close();
     await sitio.cerrar();
     await NodeFSP.rm(temporal, { recursive: true, force: true });
   }
-  if (fallo) {
-    console.log("\nAlgo se abre sin que nadie lo pida. Ver docs/patterns/efectos.md.");
-    process.exitCode = 1;
-  } else {
-    console.log("\nNada se abre sin que nadie lo pida.");
+  if (abre) console.log("\nAlgo se abre sin que nadie lo pida. Ver docs/patterns/efectos.md.");
+  if (red) {
+    console.log(
+      "\nLa página pide lo que la prueba no contesta, o no usa el mapa base de la pasada. Ver tools/rendimiento/src/red.ts.",
+    );
   }
+  if (abre || red) process.exitCode = 1;
+  else console.log("\nNada se abre sin que nadie lo pida, y nada sale a la red.");
 };
 
 await principal();

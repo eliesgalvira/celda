@@ -8,7 +8,8 @@ import * as NodeUtil from "node:util";
 import { type BrowserContext, chromium, type Page } from "playwright-core";
 
 import { escribirCapaSintetica } from "./capaSintetica.ts";
-import { atraparMapa, esperarVistaInicial, mapaBaseFalso } from "./mapa.ts";
+import { atraparMapa, esperarVistaInicial } from "./mapa.ts";
+import { contestarEnLocal, informarDeLaRed, type RedDeLaPasada, SIN_RED } from "./red.ts";
 import { servirSitio } from "./sitio.ts";
 
 /**
@@ -18,7 +19,9 @@ import { servirSitio } from "./sitio.ts";
  * empezar, se separaban hasta 360 px de su sitio mientras el mapa seguía alejándose.
  *
  * Abre la web construida en Chromium sin interfaz con la capa sintética (`capaSintetica.ts`), el
- * mapa base con teselas vacías y WebGL por SwiftShader, sin GPU ni conexión. Desde el zoom 15,5,
+ * mapa base principal con teselas vacías y WebGL por SwiftShader, sin GPU, y nada sale a la red
+ * (`red.ts`). Falla también si la página pide algo que la prueba no sabe contestar o si la web no
+ * se queda con el mapa base principal. Desde el zoom 15,5,
  * con los logos a la vista, hace cada gesto con la CPU sin frenar y frenada. En cada fotograma,
  * después de que MapLibre pinte, compara el centro de cada punto que se mueve con
  * `map.project` de su emplazamiento. Falla si alguno se separa más de 1 px, o si en un gesto que
@@ -258,19 +261,22 @@ const principal = async () => {
   const sitio = await servirSitio(NodePath.resolve(opciones.web), capa.carpeta);
   const navegador = await chromium.launch({
     executablePath: opciones.chromium,
-    args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
+    args: [
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader",
+      "--ignore-gpu-blocklist",
+      SIN_RED,
+    ],
   });
   let fallo = false;
+  let falloDeRed = false;
+  let red: RedDeLaPasada | undefined;
   try {
     const contexto = await navegador.newContext({
       viewport: { width: 1100, height: 850 },
       locale: "es-ES",
     });
-    await contexto.route("https://tiles.openfreemap.org/**", mapaBaseFalso);
-    // El mapa base de reserva del IGN, por si el de OpenFreeMap falla: tampoco se pide fuera.
-    await contexto.route(/\.idee\.es\//u, (ruta) =>
-      ruta.fulfill({ contentType: "application/x-protobuf", body: Buffer.alloc(0) }),
-    );
+    red = await contestarEnLocal(contexto, sitio.origen, "principal");
     await ralentizarAlmacen(contexto, RETRASO_DEL_ALMACEN_MS);
     const pagina = await contexto.newPage();
     const avisos: Array<string> = [];
@@ -342,15 +348,25 @@ const principal = async () => {
     }
     if (avisos.length > 0) console.log(`\nLa página avisó:\n${avisos.join("\n")}`);
   } finally {
+    // También si la prueba se ha cortado antes: lo pedido fuera puede explicar por qué.
+    if (red !== undefined) falloDeRed = informarDeLaRed(red);
     await navegador.close();
     await sitio.cerrar();
     await NodeFSP.rm(temporal, { recursive: true, force: true });
   }
   if (fallo) {
     console.log("\nAlgún punto se separa de su emplazamiento. Ver docs/patterns/rendimiento.md.");
-    process.exitCode = 1;
-  } else {
-    console.log(`\nTodos los puntos siguen a menos de ${TOLERANCIA_PX} px de su emplazamiento.`);
+  }
+  if (falloDeRed) {
+    console.log(
+      "\nLa página pide lo que la prueba no contesta, o no usa el mapa base principal. Ver tools/rendimiento/src/red.ts.",
+    );
+  }
+  if (fallo || falloDeRed) process.exitCode = 1;
+  else {
+    console.log(
+      `\nTodos los puntos siguen a menos de ${TOLERANCIA_PX} px de su emplazamiento, y nada sale a la red.`,
+    );
   }
 };
 

@@ -1,5 +1,5 @@
 // Sin Effect: Playwright es de promesas y los scripts corren con Node tal cual.
-import type { CDPSession, Page, Route } from "playwright-core";
+import type { CDPSession, Page } from "playwright-core";
 
 /** Lo que las medidas y las pruebas hacen con el mapa de MapLibre de la página. */
 
@@ -61,22 +61,3 @@ export const atraparMapa = async (cdp: CDPSession): Promise<boolean> => {
  */
 export const esperarVistaInicial = (pagina: Page, plazo = 30_000) =>
   pagina.locator('main[aria-busy="false"]').waitFor({ state: "attached", timeout: plazo });
-
-/** Un TileJSON y teselas vacías en lugar de OpenFreeMap. */
-export const mapaBaseFalso = async (ruta: Route) => {
-  const url = new URL(ruta.request().url());
-  if (url.pathname === "/planet") {
-    await ruta.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        tilejson: "3.0.0",
-        tiles: ["https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf"],
-        minzoom: 0,
-        maxzoom: 14,
-        vector_layers: [],
-      }),
-    });
-    return;
-  }
-  await ruta.fulfill({ contentType: "application/x-protobuf", body: Buffer.alloc(0) });
-};
