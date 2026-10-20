@@ -134,41 +134,6 @@ export const separarPorPapel = <E extends { readonly companias: ReadonlyArray<Co
   return { propios, redUsada };
 };
 
-/** Los emplazamientos con que se calculan las celdas con un filtro, y cuáles son de la red usada. */
-export interface DeLasCeldas<E> {
-  /** Los que salen con el filtro, suyos y de la red usada, en el orden de la lista y una vez cada uno. */
-  readonly emplazamientos: ReadonlyArray<E>;
-  /** Las claves de los de la red usada: sus celdas se dibujan más claras. */
-  readonly redUsada: ReadonlySet<string>;
-}
-
-const NINGUNA_CLAVE: ReadonlySet<string> = new Set();
-
-/**
- * Los emplazamientos de las celdas con un filtro (ADR 0026): todos los que salen, también los de la
- * red usada, porque el móvil de un cliente de DIGI puede conectarse al de Movistar que le queda más
- * cerca. Un compartido por una compañía del filtro y su red es suyo y entra una vez. Sin filtro,
- * todos, y ninguno de la red usada.
- */
-export const deLasCeldas = <
-  E extends { readonly clave: string; readonly companias: ReadonlyArray<Compania> },
->(
-  emplazamientos: ReadonlyArray<E>,
-  filtro: FiltroDeCompanias,
-): DeLasCeldas<E> => {
-  if (!hayFiltro(filtro)) return { emplazamientos, redUsada: NINGUNA_CLAVE };
-  const mascaras = mascarasDeFiltro(filtro);
-  const salen: Array<E> = [];
-  const redUsada = new Set<string>();
-  for (const emplazamiento of emplazamientos) {
-    const papel = papelDeMascara(mascaraDeCompanias(emplazamiento.companias), mascaras);
-    if (papel === undefined) continue;
-    salen.push(emplazamiento);
-    if (papel === "red-usada") redUsada.add(emplazamiento.clave);
-  }
-  return { emplazamientos: salen, redUsada };
-};
-
 /**
  * Las compañías de un emplazamiento que su marcador resalta con el filtro: las del filtro y las
  * redes que usan. Sin filtro, todas. Las demás van apagadas.

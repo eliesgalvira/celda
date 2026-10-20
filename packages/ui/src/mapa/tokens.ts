@@ -47,7 +47,7 @@ export const TOKENS_MAPA = [
   "mapa-pdi-parque",
   "mapa-pdi-otro",
   // Lo que pinta Celda encima.
-  "mapa-celda",
+  "mapa-resaltado",
   "mapa-punto",
   "mapa-referencia",
   // Lo que rodea la silueta de España mientras carga el mapa base.

@@ -1,7 +1,5 @@
-import type { Compania } from "@celda/dominio/compania";
 import {
   claveDeFiltro,
-  deLasCeldas,
   type FiltroDeCompanias,
   hayFiltro,
   mismoFiltro,
@@ -11,7 +9,7 @@ import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
-import { createMemo, createSignal, untrack } from "solid-js";
+import { createSignal, untrack } from "solid-js";
 
 import type { AgrupacionConFiltro, ProvinciaCargada } from "../capa/nacional.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
@@ -132,15 +130,3 @@ export const crearFiltro = (
     },
   };
 };
-
-/**
- * Los emplazamientos de una lista con que se calculan las celdas con el filtro: los que salen, también
- * los de la red usada, y aparte las claves de estos, cuyas celdas van más claras (ADR 0026). Sin
- * filtro, todos.
- */
-export const celdasDelFiltro = <
-  E extends { readonly clave: string; readonly companias: ReadonlyArray<Compania> },
->(
-  lista: () => ReadonlyArray<E>,
-  filtro: () => FiltroDeCompanias,
-) => createMemo(() => deLasCeldas(lista(), filtro()));

@@ -99,13 +99,13 @@ describe("foto aérea en el estilo", () => {
     assert.strictEqual(portales?.minzoom, 15);
   });
 
-  it("el edificio resaltado tiene su fuente vacía y va encima de las celdas y bajo los rótulos", () => {
+  it("el edificio resaltado tiene su fuente vacía y va encima de la zona y bajo los rótulos", () => {
     assert.deepStrictEqual(estilo.sources[FUENTE_EDIFICIO], {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
     });
     const edificio = ids.indexOf("edificio-contorno");
-    assert.isAbove(edificio, ids.indexOf("celda-seleccionada"));
+    assert.isAbove(edificio, ids.indexOf("zona-vecinas"));
     assert.isBelow(edificio, ids.indexOf("nombres-de-calles"));
     // El número, justo encima de los portales: se coloca antes y tapa el mismo número de debajo.
     assert.strictEqual(ids.indexOf("edificio-numero"), ids.indexOf(CAPA_PORTALES) + 1);

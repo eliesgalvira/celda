@@ -1,12 +1,5 @@
-import {
-  cajaDe,
-  type Coordenada,
-  ESPANA,
-  mismaCoordenada,
-  type Rectangulo,
-} from "@celda/dominio/area";
+import { type Coordenada, ESPANA, mismaCoordenada, type Rectangulo } from "@celda/dominio/area";
 import { hayFiltro, papelDe, redesUsadas } from "@celda/dominio/filtro";
-import { origenCerca } from "@celda/dominio/plano";
 import type { ResumenLeido } from "@celda/dominio/provincias";
 import { Atribucion } from "@celda/ui/Atribucion.tsx";
 import { Aviso } from "@celda/ui/Aviso.tsx";
@@ -19,14 +12,13 @@ import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
 import { IconoAjustes, IconoEjercicio } from "@celda/ui/ejercicio/Ejercicio.tsx";
 import { IconoFotoAerea } from "@celda/ui/foto/FotoAerea.tsx";
 import { IconoListaDeEmplazamientos, IconoVistaAgrupada } from "@celda/ui/puntos/Puntos.tsx";
-import { ZOOM_CELDAS } from "@celda/ui/mapa/celdas.ts";
 import { ZOOM_FOTO } from "@celda/ui/mapa/foto.ts";
 import { FUENTE_LINEA_AL_PUNTO } from "@celda/ui/mapa/lineaAlPunto.ts";
 import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
 import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
-import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
+import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import { CONSULTA_DEL_OSCURO } from "@celda/ui/temaElegido.ts";
 import { Termino, TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import { PinCentral } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
@@ -57,6 +49,7 @@ import {
 } from "../capa/nacional.ts";
 import type { PuntosDelMapa } from "../capa/puntos.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
+import { enumerar } from "../lib/enumerar.ts";
 import { DialogoLista } from "../puntos/DialogoLista.tsx";
 import { crearPuntosEnMapa, lienzoDePuntos } from "../puntos/enMapa.ts";
 import {
@@ -73,18 +66,6 @@ import {
   LISTA_DE_EMPLAZAMIENTOS,
   VISTA_AGRUPADA,
 } from "../puntos/textos.ts";
-import {
-  cargadasDe,
-  enumerar,
-  estadoDeLasVecinas,
-  mismasVecinas,
-  provinciasCerca,
-  rectanguloDePunto,
-  VECINAS_LISTAS,
-} from "../capa/vecinas.ts";
-import { type ProvinciaFuera, provinciasQueFaltan } from "../celdas/celdas.ts";
-import { crearPistaDeCeldas } from "../celdas/pista.ts";
-import { crearCeldas, lienzoDelMapa } from "../celdas/enMapa.ts";
 import { AjustesContexto, crearAjustes } from "../ajustes/ajustes.ts";
 import { DialogoAjustes } from "../ajustes/DialogoAjustes.tsx";
 import { almacenDelNavegador, crearTema, repintarConElTema } from "../ajustes/tema.ts";
@@ -98,7 +79,7 @@ import {
   type ZonaEnMapa,
 } from "../ejercicio/zona.ts";
 import { centroLibre, desplazamientoParaVer } from "../ficha/enfoque.ts";
-import { celdasDelFiltro, crearFiltro } from "../filtro/enMapa.ts";
+import { crearFiltro } from "../filtro/enMapa.ts";
 import { AvisoDelFiltro, ControlDeCompanias } from "../filtro/Filtro.tsx";
 import {
   crearFoto,
@@ -144,7 +125,6 @@ import {
 import { type Callejero, esperarDeVerdad } from "./callejero.ts";
 import {
   CREDITO_DE_MARCAS,
-  CREDITO_DE_LAS_CELDAS,
   CREDITO_DEL_LOGO_DE_DIGI,
   CREDITOS_MAPA_BASE,
   CREDITOS_RESERVA,
@@ -181,13 +161,6 @@ const CARGAS_DE_ZONAS: CargasDeZonas = {
 
 /** El ancho a partir del cual el panel va a la izquierda y el punto se elige con un clic. */
 const ESCRITORIO = "(min-width: 48rem)";
-
-/**
- * Hasta dónde, alrededor de lo que se ve al zoom de las celdas, se cargan las provincias vecinas
- * antes de calcular. Una celda de ciudad no pasa de unos cientos de metros; si una del campo llega
- * más lejos, la provincia que la puede recortar se pide igual (`provinciasQueFaltan`).
- */
-const MARGEN_VECINAS_CELDAS_M = 2000;
 
 /** El tamaño de la ventana, que el mapa ocupa entera. */
 const pantalla = (): Pantalla => ({ ancho: window.innerWidth, alto: window.innerHeight });
@@ -226,8 +199,6 @@ export function PantallaMapa() {
   /** El lector de los rótulos de ciudad, que llega con el código del mapa (ADR 0024). */
   const [lectorDeRotulos, setLectorDeRotulos] = createSignal<LectorDeRotulos>();
   const listo = createMemo(() => estado().tipo === "listo");
-  /** Si el mapa está al zoom de las celdas o más cerca. */
-  const [cerca, setCerca] = createSignal(false);
   /** Si el mapa está a pie de calle, donde la pista ofrece la foto aérea. */
   const [calle, setCalle] = createSignal(false);
   /** Si el mapa está al zoom de la foto aérea o más cerca. */
@@ -357,7 +328,6 @@ export function PantallaMapa() {
         callejeroActual,
       );
       const mirarZoom = () => {
-        setCerca(nuevo.getZoom() >= ZOOM_CELDAS);
         setCalle(aPieDeCalle(nuevo.getZoom()));
         setCercaDeLaFoto(nuevo.getZoom() >= ZOOM_FOTO);
       };
@@ -644,7 +614,6 @@ export function PantallaMapa() {
     const deLosLogos = [
       ...(conLogos() ? [CREDITO_DE_MARCAS] : []),
       ...(conDigi() ? [CREDITO_DEL_LOGO_DE_DIGI] : []),
-      ...(cerca() ? [CREDITO_DE_LAS_CELDAS] : []),
     ];
     return fuentes === undefined
       ? [...delCallejero, ...deLosLogos]
@@ -926,196 +895,6 @@ export function PantallaMapa() {
     return suya === undefined ? undefined : textoDeCuenta(suya);
   });
 
-  /**
-   * Lo que miran las celdas: lo que se ve al zoom de las celdas y el emplazamiento seleccionado,
-   * cuyo sector que da servicio usa su celda. Alejado, lo último que miraron: así alejarse no
-   * cambia las provincias de las celdas ni las recalcula.
-   */
-  const zonaDeCeldas = createMemo<ReadonlyArray<Rectangulo> | undefined>((antes) => {
-    const actual = encuadre();
-    if (!cerca() || actual === undefined) return antes;
-    const posicion = posicionSeleccionada();
-    return [
-      { suroeste: actual.suroeste, noreste: actual.noreste },
-      ...(posicion === undefined ? [] : [rectanguloDePunto(posicion)]),
-    ];
-  });
-  /** Las provincias cerca de lo que miran las celdas, por código. */
-  const cercaDeLasCeldas = createMemo(
-    () => {
-      const actual = resumen();
-      const zona = zonaDeCeldas();
-      return actual === undefined || zona === undefined
-        ? []
-        : provinciasCerca(actual, zona, MARGEN_VECINAS_CELDAS_M);
-    },
-    { equals: mismasListas },
-  );
-  /**
-   * Las provincias que alguna celda que se ve necesita además de las cercanas: las que podrían
-   * recortarla (`provinciasQueFaltan`). Valen mientras no cambien las cercanas; se acumulan, y así
-   * una provincia pedida no sale del cálculo en cuanto su celda deja de ser dudosa.
-   */
-  const [lejanas, setLejanas] = createSignal<{
-    readonly cerca: ReadonlyArray<string>;
-    readonly codigos: ReadonlyArray<string>;
-  }>({ cerca: [], codigos: [] });
-  /** Las provincias con que se calculan las celdas, por código. */
-  const provinciasDeCeldas = createMemo(
-    () => {
-      const base = cercaDeLasCeldas();
-      const extra = lejanas();
-      return extra.cerca === base ? [...new Set([...base, ...extra.codigos])].sort() : base;
-    },
-    { equals: mismasListas },
-  );
-  /** Las que ya han llegado: con ellas se calcula. */
-  const cargadasDeCeldas = createMemo(() => cargadasDe(provincias(), provinciasDeCeldas()), {
-    equals: mismasListas,
-  });
-  /**
-   * Con un filtro, las celdas son de los emplazamientos que salen: los de sus compañías y los de la
-   * red que usan, más claras (ADR 0026).
-   */
-  const emplazamientosDeCeldas = celdasDelFiltro(
-    () => cargadasDeCeldas().flatMap((p) => p.capa.emplazamientos),
-    filtro.aplicado,
-  );
-  /** Las provincias con emplazamientos que no entran en el cálculo, con su caja. */
-  const fueraDeCeldas = createMemo((): ReadonlyArray<ProvinciaFuera> => {
-    const actual = resumen();
-    const dentro = new Set(cargadasDeCeldas().map((p) => p.codigo));
-    return (actual?.provincias ?? []).flatMap((p) =>
-      p.caja === undefined || p.fichero === undefined || dentro.has(p.codigo)
-        ? []
-        : [{ codigo: p.codigo, caja: p.caja }],
-    );
-  });
-  /**
-   * Hasta dónde llegan las celdas: la caja de las provincias del cálculo, también de las que aún
-   * no han llegado. Así una celda que ya se dibuja no cambia cuando llegan las demás.
-   */
-  const cajaDeCeldas = createMemo(
-    () => {
-      const codigos = provinciasDeCeldas();
-      const cajas = (resumen()?.provincias ?? []).flatMap((p) =>
-        codigos.includes(p.codigo) && p.caja !== undefined ? [p.caja.suroeste, p.caja.noreste] : [],
-      );
-      return cajaDe(cajas);
-    },
-    {
-      equals: (a, b) =>
-        a === b ||
-        (a !== undefined &&
-          b !== undefined &&
-          mismaCoordenada(a.suroeste, b.suroeste) &&
-          mismaCoordenada(a.noreste, b.noreste)),
-    },
-  );
-  /**
-   * El origen del plano de las celdas: el de la casilla de lo que se ve (`origenCerca`). Así las
-   * celdas que se ven se miden sin deformarse, estén en Barcelona o en Canarias, y moverse dentro
-   * de la casilla no las recalcula.
-   */
-  const origenDeCeldas = createMemo(
-    () => {
-      const [vista] = zonaDeCeldas() ?? [];
-      return vista === undefined
-        ? undefined
-        : origenCerca({
-            longitud: (vista.suroeste.longitud + vista.noreste.longitud) / 2,
-            latitud: (vista.suroeste.latitud + vista.noreste.latitud) / 2,
-          });
-    },
-    { equals: mismaCoordenada },
-  );
-  /** Cómo van las provincias de las celdas: la pista lo dice mientras falta alguna. */
-  const vecinasDeCeldas = createMemo(
-    () => {
-      const actual = resumen();
-      return actual === undefined
-        ? VECINAS_LISTAS
-        : estadoDeLasVecinas(actual, provincias(), provinciasDeCeldas());
-    },
-    { equals: mismasVecinas },
-  );
-
-  const celdas = crearCeldas(datos, {
-    lienzo: createMemo(() => {
-      const actual = mapaListo();
-      return actual === undefined ? undefined : lienzoDelMapa(actual);
-    }),
-    emplazamientos: () => emplazamientosDeCeldas().emplazamientos,
-    redUsada: () => emplazamientosDeCeldas().redUsada,
-    fuera: fueraDeCeldas,
-    caja: cajaDeCeldas,
-    origen: origenDeCeldas,
-    cerca,
-    seleccionada,
-  });
-  /** La pista de las celdas: la salvedad una vez por dispositivo y las esperas solo si tardan. */
-  const pistaCeldas = crearPistaDeCeldas({
-    cerca,
-    calculo: () => celdas.calculo(),
-    vecinas: vecinasDeCeldas,
-    salvedadVista: () =>
-      ajustes.leidos() ? ajustes.ajustes().salvedadDeCeldasVista === true : undefined,
-    marcarSalvedadVista: () => ajustes.marcarSalvedadDeCeldasVista(),
-    esperar: esperarDeVerdad,
-  });
-  // Con la salvedad a la vista, el primer gesto sobre el mapa la quita.
-  recurso(
-    "celdas:salvedad-gesto",
-    () => (pistaCeldas.conSalvedad() ? mapaCreado() : undefined),
-    (actual) => {
-      const lienzo = actual.getCanvasContainer();
-      const quitar = () => pistaCeldas.interactuar();
-      lienzo.addEventListener("pointerdown", quitar);
-      lienzo.addEventListener("wheel", quitar, { passive: true });
-      lienzo.addEventListener("keydown", quitar);
-      return () => {
-        lienzo.removeEventListener("pointerdown", quitar);
-        lienzo.removeEventListener("wheel", quitar);
-        lienzo.removeEventListener("keydown", quitar);
-      };
-    },
-  );
-
-  // Si alguna celda que se ve es dudosa, se piden también las provincias que podrían recortarla.
-  createEffect(
-    () => {
-      const calculadas = celdas.calculadas();
-      const zona = zonaDeCeldas();
-      return {
-        base: cercaDeLasCeldas(),
-        faltan:
-          calculadas === undefined || zona === undefined
-            ? []
-            : zona.flatMap((r) => provinciasQueFaltan(calculadas.dudosas, r)),
-      };
-    },
-    ({ base, faltan }) => {
-      const antes = untrack(lejanas);
-      const previas = antes.cerca === base ? antes.codigos : [];
-      const nuevas = faltan.filter((codigo) => !previas.includes(codigo));
-      if (nuevas.length > 0 || antes.cerca !== base) {
-        setLejanas({ cerca: base, codigos: [...previas, ...nuevas].sort() });
-      }
-    },
-  );
-
-  // Las provincias vecinas que necesitan las celdas se piden como las que se ven: una vez por
-  // visita. Una que falla se reintenta con su botón.
-  recurso(
-    "capa:vecinas",
-    provinciasDeCeldas,
-    (codigos) => {
-      pedirProvincias(codigos);
-      return undefined;
-    },
-    { iguales: mismasListas },
-  );
-
   // La línea del emplazamiento seleccionado al punto de referencia sigue al punto mientras se mueve.
   createEffect(
     () => ({
@@ -1138,34 +917,13 @@ export function PantallaMapa() {
     // Si «Ver el edificio» no encuentra nada que resaltar, la pista lo dice un rato, porque sorprende.
     if (foto.sinContorno()) return <Pista texto={PISTA_SIN_CONTORNO} />;
     if (foto.acercate()) return <Pista texto={PISTA_ACERCATE} />;
-    if (conPistaDeFoto()) {
-      return (
-        <Pista
-          accion={
-            <Boton variante="secundario" onClick={() => foto.encender()}>
-              Ver la foto aérea
-            </Boton>
-          }
-        />
-      );
-    }
-    const actual = pistaCeldas.pista();
-    if (actual === undefined) return undefined;
-    const { reintentar } = actual;
+    if (!conPistaDeFoto()) return undefined;
     return (
       <Pista
-        texto={actual.texto}
         accion={
-          reintentar === false ? undefined : (
-            <Boton
-              variante="secundario"
-              onClick={() =>
-                reintentar === "calculo" ? celdas.reintentar() : reintentarProvincias(reintentar)
-              }
-            >
-              Reintentar
-            </Boton>
-          )
+          <Boton variante="secundario" onClick={() => foto.encender()}>
+            Ver la foto aérea
+          </Boton>
         }
       />
     );

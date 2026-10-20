@@ -78,9 +78,9 @@ const esDelPrincipal = (capa: LayerSpecification): boolean =>
  * El estilo de reserva con todo lo que el mapa ya tiene de Celda, para pasar a él con `setStyle`
  * sin perder nada: el mapa compara los dos y solo cambia el callejero.
  *
- * - Las fuentes de Celda se quedan como están, con lo que la web les ha puesto (las celdas, el
- *   edificio resaltado…). Con las vacías del estilo, el mapa las vaciaría.
- * - Sus capas también, con los cambios que la web les haya hecho (la celda remarcada).
+ * - Las fuentes de Celda se quedan como están, con lo que la web les ha puesto (la línea hasta el
+ *   punto, el edificio resaltado…). Con las vacías del estilo, el mapa las vaciaría.
+ * - Sus capas también, con los cambios que la web les haya hecho.
  * - Las capas y fuentes que la web añadió al principal y la reserva no trae se quedan, en el mismo
  *   sitio respecto a las demás.
  * - El estado del estilo es el de antes: con otro, el mapa volvería a los valores por defecto y

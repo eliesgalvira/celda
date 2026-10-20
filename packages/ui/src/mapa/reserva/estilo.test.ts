@@ -4,10 +4,10 @@ import * as Predicate from "effect/Predicate";
 import type { LayerSpecification, StyleSpecification } from "maplibre-gl";
 
 import { COMUNITAT_DE_PRUEBA, CONTORNO_DE_PRUEBA } from "../../pruebas/contorno.ts";
-import { FUENTE_CELDAS } from "../celdas.ts";
 import { estiloMapa, FUENTE_MAPA_BASE, TOKENS_MAPA } from "../estilo.ts";
 import { FOTO_AEREA } from "../expresiones.ts";
 import { FUENTE_LIMITES } from "../limites.ts";
+import { FUENTE_LINEA_AL_PUNTO } from "../lineaAlPunto.ts";
 import { CAPA_FOTO, FUENTE_EDIFICIO } from "../foto.ts";
 import {
   CAPA_PORTALES,
@@ -144,29 +144,36 @@ describe("estilo del mapa base de reserva", () => {
 /** El estilo principal como lo tiene un mapa en marcha: con lo que la web le ha ido poniendo. */
 const principalEnMarcha = (): StyleSpecification => {
   const estilo = structuredClone(PRINCIPAL);
-  const celdas = estilo.sources[FUENTE_CELDAS];
-  if (celdas?.type === "geojson") {
-    celdas.data = {
+  const linea = estilo.sources[FUENTE_LINEA_AL_PUNTO];
+  if (linea?.type === "geojson") {
+    linea.data = {
       type: "FeatureCollection",
       features: [
         {
           type: "Feature",
-          properties: { clave: "movistar-1" },
-          geometry: { type: "Point", coordinates: [2.15, 41.39] },
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [2.15, 41.39],
+              [2.152, 41.391],
+            ],
+          },
         },
       ],
     };
   }
   const edificio = estilo.sources[FUENTE_EDIFICIO];
   if (edificio?.type === "geojson") edificio.data = { type: "FeatureCollection", features: [] };
-  // La celda remarcada y una capa que la web añadió por su cuenta, entre las vías y las celdas.
+  // Una capa de Celda con otra opacidad y una que la web añadió por su cuenta, entre las vías y la
+  // línea hasta el punto.
   const capas = estilo.layers.map((capa) =>
-    capa.id === "celdas" && capa.type === "line"
+    capa.id === FUENTE_LINEA_AL_PUNTO && capa.type === "line"
       ? { ...capa, paint: { ...capa.paint, "line-opacity": 0.85 } }
       : capa,
   );
-  const antesDeLasCeldas = capas.findIndex((capa) => capa.id.startsWith("celdas"));
-  capas.splice(antesDeLasCeldas, 0, {
+  const antesDeLaLinea = capas.findIndex((capa) => capa.id === FUENTE_LINEA_AL_PUNTO);
+  capas.splice(antesDeLaLinea, 0, {
     id: "capa-de-la-web",
     type: "line",
     source: "de-la-web",
@@ -236,14 +243,14 @@ describe("pasar al mapa base de reserva", () => {
     const ids = siguiente.layers.map((capa) => capa.id);
     const deLaWeb = ids.indexOf("capa-de-la-web");
     assert.isAbove(deLaWeb, ids.indexOf("vias-autopistas"));
-    assert.isBelow(
-      deLaWeb,
-      ids.findIndex((id) => id.startsWith("celdas")),
+    assert.isBelow(deLaWeb, ids.indexOf(FUENTE_LINEA_AL_PUNTO));
+    assert.deepStrictEqual(
+      siguiente.sources[FUENTE_LINEA_AL_PUNTO],
+      anterior.sources[FUENTE_LINEA_AL_PUNTO],
     );
-    assert.deepStrictEqual(siguiente.sources[FUENTE_CELDAS], anterior.sources[FUENTE_CELDAS]);
     assert.isDefined(siguiente.sources["de-la-web"]);
-    const remarcada = siguiente.layers.find((capa) => capa.id === "celdas");
-    assert.isTrue(remarcada?.type === "line" && remarcada.paint?.["line-opacity"] === 0.85);
+    const cambiada = siguiente.layers.find((capa) => capa.id === FUENTE_LINEA_AL_PUNTO);
+    assert.isTrue(cambiada?.type === "line" && cambiada.paint?.["line-opacity"] === 0.85);
     assert.deepStrictEqual(siguiente.state, {
       [MUNICIPIOS_DE_CELDA]: { default: [] },
       [FOTO_AEREA]: { default: false },

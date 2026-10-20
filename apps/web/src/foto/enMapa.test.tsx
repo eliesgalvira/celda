@@ -6,8 +6,8 @@ import { render, waitFor } from "@solidjs/testing-library";
 import { estiloMapa } from "@celda/ui/mapa/estilo.ts";
 import { CONTORNO_DE_ESPANA } from "@celda/ui/mapa/espana.ts";
 import { FOTO_AEREA } from "@celda/ui/mapa/expresiones.ts";
-import { FUENTE_CELDAS } from "@celda/ui/mapa/celdas.ts";
 import { CAPA_FOTO, type EstadoConFoto, FUENTE_EDIFICIO } from "@celda/ui/mapa/foto.ts";
+import { FUENTE_LINEA_AL_PUNTO } from "@celda/ui/mapa/lineaAlPunto.ts";
 import { CAPA_PORTALES } from "@celda/ui/mapa/rotulos.ts";
 import { CAPA_EDIFICIOS } from "@celda/ui/mapa/suelo.ts";
 import type { StyleSpecification } from "maplibre-gl";
@@ -669,8 +669,8 @@ describe("lienzo de la foto en un mapa de MapLibre", () => {
     assert.strictEqual(m.escuchadores(), 0);
     assert.deepStrictEqual(m.prohibidas, []);
     assert.isTrue(m.sinCambiosEnElEstilo());
-    // Las celdas y el edificio siguen con su fuente: nada se ha quitado ni añadido.
-    assert.isDefined(m.mapa.getSource(FUENTE_CELDAS));
+    // La línea hasta el punto y el edificio siguen con su fuente: nada se ha quitado ni añadido.
+    assert.isDefined(m.mapa.getSource(FUENTE_LINEA_AL_PUNTO));
     assert.isDefined(m.mapa.getSource(FUENTE_EDIFICIO));
   });
 

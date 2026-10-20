@@ -132,6 +132,64 @@ describe("AlmacenLocal en IndexedDB", () => {
     }),
   );
 
+  it.effect(
+    "un ajuste guardado de una función que ya no existe se ignora al leer y al guardar",
+    () =>
+      Effect.gen(function* () {
+        const fabrica = new IDBFactory();
+        // El almacén crea la base; después se escribe la fila como la dejó una versión anterior, con
+        // la salvedad de las celdas ya vista.
+        yield* Effect.flatMap(AlmacenLocal, (a) => a.leerAjustes).pipe(
+          Effect.provide(almacen(fabrica)),
+        );
+        yield* Effect.callback<void>((reanudar) => {
+          const apertura = fabrica.open("celda");
+          apertura.addEventListener("success", () => {
+            const tx = apertura.result.transaction("ajustes", "readwrite");
+            tx.objectStore("ajustes").put(
+              {
+                esquema: 1,
+                modoEstudiante: true,
+                vistaAgrupada: true,
+                salvedadDeCeldasVista: true,
+              },
+              "dispositivo",
+            );
+            tx.addEventListener("complete", () => {
+              apertura.result.close();
+              reanudar(Effect.void);
+            });
+          });
+        });
+        const leidos = yield* Effect.flatMap(AlmacenLocal, (a) => a.leerAjustes).pipe(
+          Effect.provide(almacen(fabrica)),
+        );
+        // Lo demás se lee como estaba.
+        assert.deepStrictEqual(leidos, { esquema: 1, modoEstudiante: true, vistaAgrupada: true });
+        yield* Effect.flatMap(AlmacenLocal, (a) =>
+          a.guardarAjustes({ ...leidos, modoEstudiante: false }),
+        ).pipe(Effect.provide(almacen(fabrica)));
+        const guardados = yield* Effect.callback<unknown>((reanudar) => {
+          const apertura = fabrica.open("celda");
+          apertura.addEventListener("success", () => {
+            const peticion = apertura.result
+              .transaction("ajustes", "readonly")
+              .objectStore("ajustes")
+              .get("dispositivo");
+            peticion.addEventListener("success", () => {
+              apertura.result.close();
+              reanudar(Effect.succeed(peticion.result));
+            });
+          });
+        });
+        assert.deepStrictEqual(guardados, {
+          esquema: 1,
+          modoEstudiante: false,
+          vistaAgrupada: true,
+        });
+      }),
+  );
+
   it.effect("al pasar a la base con ajustes, el punto guardado por la versión anterior sigue", () =>
     Effect.gen(function* () {
       const fabrica = new IDBFactory();

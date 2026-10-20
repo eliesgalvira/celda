@@ -24,8 +24,8 @@ const pinturaDe = (capa: LayerSpecification): ReadonlyMap<Propiedad, Valor> =>
  * son el mismo estilo hecho con los colores de cada tema, así que solo difieren en las
  * propiedades de pintura que salen de un token, y solo esas se cambian. Lo demás se queda como
  * está: las fuentes con lo que la web les ha puesto, el estado (la foto aérea, los municipios que
- * son zona), los filtros, la visibilidad y las opacidades que la web cambia mientras se usa (la
- * celda remarcada, la silueta fundida). Una capa que el mapa no tiene se salta.
+ * * son zona), los filtros, la visibilidad y las opacidades que la web cambia mientras se usa (la
+ * silueta fundida). Una capa que el mapa no tiene se salta.
  */
 export const pasarDeTema = (
   mapa: MapaConTema,

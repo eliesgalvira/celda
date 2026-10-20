@@ -22,8 +22,6 @@ export interface ControlAjustes {
   readonly sinGuardar: () => boolean;
   /** Si ya se ha intentado leer lo guardado, haya llegado o no. */
   readonly leidos: () => boolean;
-  /** Apunta en el dispositivo que ya se ha visto la salvedad de las celdas. */
-  readonly marcarSalvedadDeCeldasVista: () => void;
   /** Pasa a la vista agrupada, o vuelve a la de puntos, y lo guarda en el dispositivo (ADR 0028). */
   readonly cambiarVistaAgrupada: (agrupada: boolean) => void;
 }
@@ -78,10 +76,6 @@ export const crearAjustes = (
     },
     sinGuardar,
     leidos,
-    marcarSalvedadDeCeldasVista: () => {
-      if (ajustes().salvedadDeCeldasVista === true) return;
-      cambiar({ ...ajustes(), salvedadDeCeldasVista: true });
-    },
     cambiarVistaAgrupada: (agrupada) => {
       if ((ajustes().vistaAgrupada === true) === agrupada) return;
       cambiar({ ...ajustes(), vistaAgrupada: agrupada });

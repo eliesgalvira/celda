@@ -1,7 +1,6 @@
 import type { Contorno } from "@celda/dominio/comunitatValenciana";
 import type { LayerSpecification, StyleSpecification } from "maplibre-gl";
 
-import { capasCeldas, FUENTE_CELDAS } from "./celdas.ts";
 import { comoRgb, leerOklch } from "./color.ts";
 import { FOTO_AEREA } from "./expresiones.ts";
 import {
@@ -65,15 +64,14 @@ export const estadoDelEstilo = (): NonNullable<StyleSpecification["state"]> => (
 });
 
 /**
- * Las fuentes de lo que pinta Celda sobre el mapa base: la foto aérea, el edificio resaltado, las
- * celdas, la línea hasta el punto de referencia, la zona del ejercicio, los límites de comunidades
- * y provincias, los huecos de los marcadores (ADR 0024) y los puntos de la vista de puntos
+ * Las fuentes de lo que pinta Celda sobre el mapa base: la foto aérea, el edificio resaltado, la
+ * línea hasta el punto de referencia, la zona del ejercicio, los límites de comunidades y
+ * provincias, los huecos de los marcadores (ADR 0024) y los puntos de la vista de puntos
  * (ADR 0028), vacías hasta que la web las llena.
  */
 export const fuentesDeCelda = (): StyleSpecification["sources"] => ({
   [FUENTE_FOTO]: fuenteFoto(),
   [FUENTE_EDIFICIO]: fuenteEdificio(),
-  [FUENTE_CELDAS]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   [FUENTE_LINEA_AL_PUNTO]: {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
@@ -85,12 +83,11 @@ export const fuentesDeCelda = (): StyleSpecification["sources"] => ({
 });
 
 /**
- * Las capas de Celda que van entre las vías y los rótulos del mapa base: las celdas, la línea
- * hasta el punto de referencia, la zona del ejercicio, el edificio resaltado y, encima, los puntos
- * de la vista de puntos.
+ * Las capas de Celda que van entre las vías y los rótulos del mapa base: la línea hasta el punto de
+ * referencia, la zona del ejercicio, el edificio resaltado y, encima, los puntos de la vista de
+ * puntos.
  */
 export const capasDeCelda = (color: ColorDeToken): ReadonlyArray<LayerSpecification> => [
-  ...capasCeldas(color("mapa-celda"), color("mapa-foto-linea")),
   ...capasLineaAlPunto(color("mapa-referencia")),
   ...capasZona(color("mapa-referencia")),
   ...capasEdificio(color),

@@ -32,8 +32,7 @@ import { ficheroDePuntos, generarPuntos } from "../../../packages/dominio/src/pu
 /**
  * Una capa publicada de prueba, sin descargar nada: 25 emplazamientos en una rejilla alrededor
  * del Campus Nord, con sus fichas y sus bandas, en el formato que publica Celda (ADR 0016): un
- * resumen nacional con Barcelona, su capa y sus lotes. Basta para abrir una ficha y calcular las
- * celdas.
+ * resumen nacional con Barcelona, su capa y sus lotes. Basta para abrir una ficha.
  */
 
 const NOCHE = Date.UTC(2026, 8, 26, 0, 15, 3);

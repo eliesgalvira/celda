@@ -170,8 +170,8 @@
   --mapa-pdi-salud: oklch(53.2% 0.198 27.9);
   --mapa-pdi-parque: oklch(48.8% 0.13 149);
   --mapa-pdi-otro: oklch(56% 0.01 248);
-  /* Las líneas de las celdas: el verde azulado del primario */
-  --mapa-celda: oklch(52% 0.077 203.3);
+  /* El edificio resaltado: el verde azulado del primario (mapa/foto.ts). */
+  --mapa-resaltado: oklch(52% 0.077 203.3);
   /* Cada emplazamiento en la vista de puntos: el verde azulado del primario (mapa/puntos.ts). */
   --mapa-punto: oklch(52% 0.077 203.3);
   /* La línea hasta el punto de referencia */
@@ -280,8 +280,9 @@
     --mapa-secundaria-borde: oklch(19% 0.005 100);
     --mapa-principal-borde: oklch(18% 0.005 100);
     /*
-     * Autovías y autopistas en un amarillo apagado: más claras, las celdas, la línea hasta el punto
-     * de referencia y el anillo del seleccionado se perdían al cruzarlas (mapa/color.test.ts).
+     * Autovías y autopistas en un amarillo apagado: más claras, el edificio resaltado, la línea
+     * hasta el punto de referencia y el anillo del seleccionado se perdían al cruzarlas
+     * (mapa/color.test.ts).
      */
     --mapa-autovia: oklch(40% 0.06 85);
     --mapa-autovia-borde: oklch(29% 0.04 80);
@@ -304,7 +305,7 @@
     --mapa-pdi-salud: oklch(74% 0.13 25);
     --mapa-pdi-parque: oklch(76% 0.12 145);
     --mapa-pdi-otro: oklch(76% 0.01 248);
-    --mapa-celda: oklch(72% 0.085 203.3);
+    --mapa-resaltado: oklch(72% 0.085 203.3);
     --mapa-punto: oklch(72% 0.085 203.3);
     --mapa-referencia: oklch(74% 0.14 55);
     --mapa-silueta-fuera: oklch(28% 0.02 245);

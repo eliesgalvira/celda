@@ -14,9 +14,9 @@ import { servirSitio } from "./sitio.ts";
 
 /**
  * Prueba de resistencia: abre Celda en Chromium sin interfaz, como un Android con el permiso de
- * ubicación dado, abre un emplazamiento, enciende el GPS y la brújula, filtra por Digi (sus celdas
- * cuentan también las de Movistar, la red que usa), espera a que la página quede quieta con las
- * celdas calculadas y la deja así. Mientras tanto el GPS da una
+ * ubicación dado, abre un emplazamiento, enciende el GPS y la brújula, filtra por Digi (sus
+ * marcadores salen con los de Movistar, la red que usa), espera a que la página quede quieta y la
+ * deja así. Mientras tanto el GPS da una
  * lectura por segundo en el mismo sitio y la brújula diez por segundo. Cuenta las llamadas a las
  * API que abren algo y falla si alguna crece más de lo que justifican esas lecturas, o si la página
  * no llega a quedarse quieta. Ver docs/patterns/efectos.md.
@@ -164,16 +164,11 @@ const principal = async () => {
     if (await continuar.isVisible()) await continuar.click();
     await esperarTexto(pagina, /Brújula del móvil/u);
 
-    // Con Digi, las celdas se calculan con los suyos y los de Movistar, la red que usa (ADR 0026).
+    // Con Digi salen los suyos y, más claros, los de Movistar, la red que usa (ADR 0026).
     await pagina.getByRole("button", { name: "Compañías" }).click();
     await pagina.getByRole("button", { name: /^Digi/u }).click();
     await pagina.keyboard.press("Escape");
     await esperarTexto(pagina, /Solo Digi/u);
-
-    // La salvedad de las celdas dura 5 s o hasta el primer gesto sobre el mapa, y al irse deja de
-    // escuchar los gestos: si la página se queda quieta antes, eso caía dentro de la ventana. Una
-    // tecla que el mapa no usa es ese primer gesto, como haría quien deja el móvil.
-    await pagina.locator(".maplibregl-canvas").press("Shift");
 
     // Que acaben las transiciones, los cálculos y el pintado de lo que se ha abierto.
     const sinAsentarse = await esperarQuieta(pagina);

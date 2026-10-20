@@ -82,8 +82,8 @@ export interface MapaConFoto {
 /**
  * Enciende o apaga la foto aérea: el estado del estilo, que leen las capas que cambian sobre la
  * foto, y la visibilidad de la capa de la foto. Ni `setStyle` ni capas nuevas, así que las capas
- * de Celda, las celdas y la ficha abierta se quedan como estaban. Si ya estaba así no toca el
- * mapa, que con cualquier cambio de estado se vuelve a pintar.
+ * de Celda y la ficha abierta se quedan como estaban. Si ya estaba así no toca el mapa, que con
+ * cualquier cambio de estado se vuelve a pintar.
  */
 export const ponerFotoAerea = (mapa: MapaConFoto, encendida: boolean): void => {
   if ((mapa.getGlobalState()[FOTO_AEREA] ?? false) === encendida) return;
@@ -121,8 +121,8 @@ export const fuenteEdificio = (): GeoJSONSourceSpecification => ({
 });
 
 /**
- * El edificio resaltado: un relleno tenue y un contorno del color de las celdas sobre un casco
- * claro. Van encima de las celdas y bajo los rótulos; el número va aparte (`capaNumeroDelEdificio`).
+ * El edificio resaltado: un relleno tenue y un contorno verde azulado sobre un casco claro. Van
+ * bajo los rótulos; el número va aparte (`capaNumeroDelEdificio`).
  */
 export const capasEdificio = (color: ColorDeToken): ReadonlyArray<LayerSpecification> => [
   {
@@ -130,7 +130,7 @@ export const capasEdificio = (color: ColorDeToken): ReadonlyArray<LayerSpecifica
     type: "fill",
     source: FUENTE_EDIFICIO,
     filter: ["==", ["geometry-type"], "Polygon"],
-    paint: { "fill-color": color("mapa-celda"), "fill-opacity": 0.16 },
+    paint: { "fill-color": color("mapa-resaltado"), "fill-opacity": 0.16 },
   },
   {
     id: "edificio-casco",
@@ -146,7 +146,7 @@ export const capasEdificio = (color: ColorDeToken): ReadonlyArray<LayerSpecifica
     source: FUENTE_EDIFICIO,
     filter: ["==", ["geometry-type"], "Polygon"],
     layout: { "line-join": "round" },
-    paint: { "line-color": color("mapa-celda"), "line-width": 2.2 },
+    paint: { "line-color": color("mapa-resaltado"), "line-width": 2.2 },
   },
 ];
 

@@ -105,11 +105,15 @@ const PARES_NO_TEXTO: ReadonlyArray<readonly [pieza: string, fondo: string]> = [
   // el oscuro.
   ["control", "superficie-invertida"],
   // Los datos frente a cualquier fondo del mapa: el hexágono de las agrupaciones y las zonas, el
-  // anillo del seleccionado, las celdas y el punto de referencia con su línea. En el tema oscuro,
-  // las autopistas claras se comían las celdas y la línea naranja.
-  ...["superficie-invertida", "primario", "mapa-celda", "referencia", "mapa-referencia"].flatMap(
-    (pieza) => FONDOS_DEL_MAPA.map((fondo) => [pieza, fondo] as const),
-  ),
+  // anillo del seleccionado, el edificio resaltado y el punto de referencia con su línea. En el
+  // tema oscuro, las autopistas claras se comían esas líneas y la naranja.
+  ...[
+    "superficie-invertida",
+    "primario",
+    "mapa-resaltado",
+    "referencia",
+    "mapa-referencia",
+  ].flatMap((pieza) => FONDOS_DEL_MAPA.map((fondo) => [pieza, fondo] as const)),
   // El favicon: lo recortado y el borde frente a la figura oscura.
   ["icono-figura", "icono-fondo"],
   ["icono-acento", "icono-fondo"],

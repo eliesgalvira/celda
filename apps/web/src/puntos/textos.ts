@@ -1,7 +1,7 @@
 import { NOMBRE_COMPANIA, type Compania } from "@celda/dominio/compania";
 import { type FiltroDeCompanias, redesUsadas } from "@celda/dominio/filtro";
 
-import { enumerar } from "../capa/vecinas.ts";
+import { enumerar } from "../lib/enumerar.ts";
 import { nombreRumbo, textoDistancia } from "../ubicacion/textos.ts";
 import type { ListaDePuntos, PuntoDeLaLista } from "./puntos.ts";
 
