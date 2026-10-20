@@ -39,7 +39,7 @@ export const LICENCIAS: Licencias = {
     licencia: DEDICACION_CC0.identificador,
     enlace: DEDICACION_CC0.enlace,
     alcance:
-      "Las correcciones aceptadas, las corroboraciones, los agregados de medidas y lo que Celda calcula sobre los datos de otros: el estado, la confianza, las zonas y las simulaciones.",
+      "Las correcciones aceptadas, las corroboraciones, los agregados de medidas y lo que Celda calcula sobre los datos de otros: el estado, la confianza y las zonas.",
   },
   terceros: [
     {

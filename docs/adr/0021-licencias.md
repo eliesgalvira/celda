@@ -1,6 +1,6 @@
 # Licencias: CC0 para los datos y las aportaciones, 0BSD para el código y créditos de terceros
 
-Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Responde a la nota de licencias que dejaron el ADR 0009 y `../arquitectura.md`. Los ficheros `LICENSE` se añaden cuando Celda pase a su propio repositorio; hasta entonces este ADR es lo que vale. Revisada el 03/10/2026 con el [ADR 0022](0022-mapa-base-como-google-y-foto-aerea.md): la tabla suma la ortofoto PNOA de la foto aérea. Revisada el 06/10/2026 con el ADR 0017: suma las capitales del Nomenclátor del IGN.
+Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Responde a la nota de licencias que dejaron el ADR 0009 y `../arquitectura.md`. Los ficheros `LICENSE` se añaden cuando Celda pase a su propio repositorio; hasta entonces este ADR es lo que vale. Revisada el 03/10/2026 con el [ADR 0022](0022-mapa-base-como-google-y-foto-aerea.md): la tabla suma la ortofoto PNOA de la foto aérea. Revisada el 06/10/2026 con el ADR 0017: suma las capitales del Nomenclátor del IGN. Revisada el 20/10/2026 con la retirada del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md): Celda ya no tiene simulaciones, así que lo propio deja de contarlas, también en el texto de las licencias que acompaña a cada publicación.
 
 ## Contexto
 
@@ -8,7 +8,7 @@ Celda será abierta del todo, y el usuario pidió «la más abierta» para lo qu
 
 ## Decisión
 
-- **Los datos propios de Celda y todas las aportaciones son CC0 1.0.** Propios son los que crea Celda: las correcciones aceptadas, los agregados de medidas, las corroboraciones y lo que calcula sobre los datos de otros, como el estado, la confianza o las simulaciones.
+- **Los datos propios de Celda y todas las aportaciones son CC0 1.0.** Propios son los que crea Celda: las correcciones aceptadas, los agregados de medidas, las corroboraciones y lo que calcula sobre los datos de otros, como el estado, la confianza o las zonas.
 - **El código es 0BSD.** Equivale al dominio público y está aprobada por la OSI. CC0 no lo está para código: excluye de forma expresa las patentes.
 - **Los datos de terceros conservan sus condiciones y su crédito:**
 
