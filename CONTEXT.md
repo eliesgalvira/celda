@@ -129,7 +129,7 @@ Cuánto fiarse de un emplazamiento. Es verificado si el registro oficial lo tien
 _Evitar_: calidad, validez
 
 **Ingesta**:
-Proceso programado que trae observaciones de las fuentes y actualiza los emplazamientos sin que nadie lo lance a mano.
+Proceso programado que trae observaciones de las fuentes y actualiza los emplazamientos sin que nadie lo lance a mano. Corre el primer fin de semana de cada mes (ADR 0029).
 _Evitar_: scraping, importación, sincronización
 
 **Extractor**:
@@ -137,19 +137,23 @@ Parte de la ingesta que lee una sola fuente. Cada uno se puede apagar sin tocar 
 _Evitar_: scraper, crawler, conector
 
 **Ejecución de ingesta**:
-Una pasada de un extractor, con su fecha, los cambios que ha escrito y sus errores. Queda completada, fallida, omitida (con el interruptor apagado) o interrumpida (si se cortó y otra la sustituyó).
-_Evitar_: job, run, lote
+Una pasada de un extractor, con su fecha, los cambios que ha escrito y sus errores. Queda completada, fallida, omitida (con el interruptor apagado) o interrumpida (si se cortó y otra la sustituyó). El temporizador lanza una el primer sábado de cada mes, que empieza una ronda, y otra el domingo siguiente, que solo pide a la fuente lo que la del sábado dejó sin leer o con errores. Nunca corre entre semana.
+_Evitar_: job, run, lote, noche
+
+**Ronda**:
+Las ejecuciones de ingesta que leen una vez todo lo de una fuente: la del primer sábado de cada mes y la del domingo siguiente. Lo leído en el último día y medio es de la ronda y no se vuelve a pedir en ella, ni el listado de una zona con su barrido completado ni una ficha. Si la del sábado no corre, la del domingo lo lee todo.
+_Evitar_: ciclo, pasada, tanda
 
 **Interruptor**:
 Lo que apaga un extractor. Con él apagado, la ejecución queda omitida sin pedir nada a la fuente.
 _Evitar_: flag, kill switch
 
 **Barrido**:
-Lectura completa del listado de una fuente en una zona de barrido. Una observación que falta en dos barridos seguidos de su zona se da por retirada; con uno solo no, por si la fuente falló. Un barrido que falla no cuenta ausencias, y tampoco uno en el que un cuadro con estaciones vuelve vacío. Un barrido cortado se retoma la noche siguiente por el primer cuadro que no llegó a guardarse.
+Lectura completa del listado de una fuente en una zona de barrido. Cada ronda hace uno por zona. Una observación que falta en dos barridos seguidos de su zona se da por retirada, así que retirarla tarda dos meses; con uno solo no, por si la fuente falló. Un barrido que falla no cuenta ausencias, y tampoco uno en el que un cuadro con estaciones vuelve vacío. Un barrido cortado se retoma en la ejecución siguiente de la ronda por el primer cuadro que no llegó a guardarse. Uno que se queda a medias no pasa a la ronda siguiente, que lo empieza de cero.
 _Evitar_: scan, rastreo, crawl
 
 **Zona de barrido**:
-Grupo con nombre de cuadros que la ingesta barre en una misma ejecución, como Cataluña. Hay siete, que juntan comunidades autónomas. La configuración dice cuáles se barren cada noche y cuáles se turnan. La zona de barrido de una observación es la del cuadro en que cae.
+Grupo con nombre de cuadros que la ingesta barre en una misma ejecución, como Cataluña. Hay siete, que juntan comunidades autónomas. Cada ronda barre las de la configuración, por defecto las siete. La zona de barrido de una observación es la del cuadro en que cae.
 _Evitar_: zona a secas (esa es la del mapa y el ejercicio), región, grupo, provincia
 
 **Cuadro**:
@@ -371,6 +375,7 @@ _Evitar_: clientes, carga
 - Un **emplazamiento** cae en un **municipio** y en su **provincia**, o solo en una **provincia** si está en un **territorio compartido**.
 - Con un **filtro de compañías**, un **emplazamiento** es suyo si alguna de sus **compañías** está en el filtro, de la **red usada** si no tiene ninguna pero sí la red que usa una de ellas, y si no, no sale. Solo los suyos cuentan en las **zonas** y las **agrupaciones**.
 - Una **fuente** produce **observaciones** en cada **ejecución de ingesta**. Una **corrección** es una observación.
+- Una **ronda** tiene una **ejecución de ingesta**, la del primer sábado de cada mes, o dos, si la del domingo siguiente retoma lo que la del sábado dejó. Cada **zona de barrido** tiene un **barrido** por ronda.
 - La **fusión** convierte observaciones en **emplazamientos**, con su **confianza**, sus **conflictos** y su **estado**.
 - Una **zona de barrido** tiene uno o varios **cuadros**, y cada cuadro es de una sola zona. Un **barrido** recorre los cuadros de una zona y solo cuenta ausencias a las **observaciones** que caen en ellos.
 - Una **capa** sale de una instantánea de emplazamientos y tiene una **versión de capa**. La **publicación** escribe con ella la **ficha** de cada uno de sus emplazamientos. La ficha lleva además la fecha en que cambió su emplazamiento, y la **marca de agua** de cada vista deja ver si es más reciente que el mapa.
@@ -392,6 +397,7 @@ _Evitar_: clientes, carga
 - El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. Queda por decidir si los textos de primer uso lo aceptan como palabra de entrada.
 - Los ADR 0014 y 0015 y la investigación 08 llaman «celdas de 1°» a los cuadros y «grupos» a las zonas de barrido. Se escribieron antes de fijar estas palabras.
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.
-- La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer. En la interfaz, ficha es solo la del panel, con una excepción: «el registro no tiene ficha para este emplazamiento», que se dice de una estación base sin ficha en el registro.
+- La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer en la ronda. En la interfaz, ficha es solo la del panel, con una excepción: «el registro no tiene ficha para este emplazamiento», que se dice de una estación base sin ficha en el registro.
+- El servicio de NixOS y el paquete se llaman `celda-nocturna`, y la orden que lanza una ejecución de ingesta, `noche`, de cuando la ingesta corría cada noche. Desde el ADR 0029 corre el primer fin de semana de cada mes, y conservan el nombre.
 - Falta decidir si una marca que usa la red de otra empresa aparece como compañía. DIGI y Yoigo sí lo son, y la red que usan sale aparte con el filtro (ADR 0026).
 - El INE escribe con barra los nombres oficiales con dos formas («Valencia/València», «Donostia/San Sebastián»), y OpenStreetMap a veces también. Los datos los guardan así; lo que se ve es el nombre de lugar, en una sola forma.
