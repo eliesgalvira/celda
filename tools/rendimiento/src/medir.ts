@@ -12,7 +12,7 @@ import {
   type Page,
 } from "playwright-core";
 
-import { atraparMapa } from "./mapa.ts";
+import { atraparMapa, esperarVistaInicial } from "./mapa.ts";
 import { type Centro, type FotogramasEnPagina, instalar } from "./pagina.ts";
 import { servirSitio } from "./sitio.ts";
 import { resumirPerfil, type ResumenDeTraza, resumirTraza } from "./traza.ts";
@@ -948,6 +948,8 @@ const ronda = async (
 
   await abrirYEsperar(pagina, origen);
   const carga = await pagina.evaluate(() => window.__celda.carga());
+  // Hasta que la web pone su vista inicial, un salto de la cámara se pierde debajo (#81).
+  await esperarVistaInicial(pagina);
   if (!(await atraparMapa(cdp))) {
     process.stderr.write(
       "  no se encuentra el mapa de MapLibre: los gestos de cámara no harán nada\n",
@@ -1101,6 +1103,7 @@ const ronda = async (
       const cdpOtra = await contexto.newCDPSession(otra);
       await frenar(cdpOtra, cpu);
       await abrirYEsperar(otra, origen);
+      await esperarVistaInicial(otra);
       await atraparMapa(cdpOtra);
       await grupo.hacer(otra, medirEn(otra, cdpOtra), cdpOtra);
       if (grupo.nombre === "saltos") marcadores.espana = await contarMarcadores(otra);

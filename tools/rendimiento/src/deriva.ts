@@ -5,10 +5,10 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 
-import { chromium, type Page } from "playwright-core";
+import { type BrowserContext, chromium, type Page } from "playwright-core";
 
 import { escribirCapaSintetica } from "./capaSintetica.ts";
-import { atraparMapa, mapaBaseFalso } from "./mapa.ts";
+import { atraparMapa, esperarVistaInicial, mapaBaseFalso } from "./mapa.ts";
 import { servirSitio } from "./sitio.ts";
 
 /**
@@ -23,6 +23,11 @@ import { servirSitio } from "./sitio.ts";
  * después de que MapLibre pinte, compara el centro de cada punto que se mueve con
  * `map.project` de su emplazamiento. Falla si alguno se separa más de 1 px, o si en un gesto que
  * cruza el zoom 15 al alejar no se ve ninguno: entonces la prueba no probaría nada.
+ *
+ * La lectura de IndexedDB llega tarde a propósito (`ralentizarAlmacen`): el mapa nace antes de que
+ * la web sepa su vista inicial y la web la pone después, como en un navegador ya caliente. La
+ * cámara solo se mueve cuando la región del mapa deja de estar ocupada, y si aun así la web la
+ * moviera, la prueba falla diciéndolo (#81).
  *
  *   pnpm run deriva [--web ../../apps/web/dist] [--cpu 1,4] [--chromium <ruta>]
  */
@@ -137,6 +142,32 @@ const instalarMedida = (sitios: ReadonlyArray<[number, number]>): void => {
 
 const pausa = (ms: number) => new Promise((resolver) => setTimeout(resolver, ms));
 
+/** Lo que tarda de más cada apertura de IndexedDB en la página que mide. */
+const RETRASO_DEL_ALMACEN_MS = 2500;
+
+/**
+ * Retrasa `ms` el `success` de cada apertura de IndexedDB de las páginas del contexto, sin tocar
+ * la base: la web lee tarde el punto guardado y pone su vista inicial cuando ya hay mapa. Sin esto,
+ * que la web la ponga antes o después de que la prueba mueva la cámara depende de lo caliente que
+ * esté el navegador, y la prueba fallaba de vez en cuando en la CI (#81).
+ */
+const ralentizarAlmacen = (contexto: BrowserContext, ms: number) =>
+  contexto.addInitScript((retraso: number) => {
+    const abrir = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (...argumentos: Parameters<IDBFactory["open"]>) {
+      const peticion = abrir.apply(this, argumentos);
+      // El primero en escuchar: detiene el `success` de verdad y lanza otro más tarde.
+      let retenido = true;
+      peticion.addEventListener("success", (evento) => {
+        if (!retenido) return;
+        retenido = false;
+        evento.stopImmediatePropagation();
+        setTimeout(() => peticion.dispatchEvent(new Event("success")), retraso);
+      });
+      return peticion;
+    };
+  }, ms);
+
 /** Espera a que el mapa quede quieto y pintado, o a que pasen `maximo` ms. */
 const quieto = (pagina: Page, maximo = 15_000): Promise<boolean> =>
   pagina.evaluate(
@@ -240,6 +271,7 @@ const principal = async () => {
     await contexto.route(/\.idee\.es\//u, (ruta) =>
       ruta.fulfill({ contentType: "application/x-protobuf", body: Buffer.alloc(0) }),
     );
+    await ralentizarAlmacen(contexto, RETRASO_DEL_ALMACEN_MS);
     const pagina = await contexto.newPage();
     const avisos: Array<string> = [];
     pagina.on("pageerror", (error) => avisos.push(error.message));
@@ -249,6 +281,7 @@ const principal = async () => {
       if (intento > 60) throw new Error("No se encuentra el mapa de MapLibre de la página");
       await pausa(250);
     }
+    await esperarVistaInicial(pagina);
     const sitios = capa.posiciones.map((p): [number, number] => [p.longitud, p.latitud]);
     await pagina.evaluate(instalarMedida, sitios);
     const centro: [number, number] = [capa.centro.longitud, capa.centro.latitud];
@@ -266,11 +299,26 @@ const principal = async () => {
           [centro, gesto.desde] as const,
         );
         await quieto(pagina);
+        // Si la web movió la cámara después de ponerla la prueba, lo dice en vez de esperar logos.
+        const enSuSitio = async () => {
+          const zoom = await pagina.evaluate(() => window.__celdaMapa?.getZoom() ?? 0);
+          if (Math.abs(zoom - gesto.desde) > 0.01) {
+            throw new Error(
+              `La web ha movido el mapa a z${zoom.toFixed(2)} después de ponerlo en z${gesto.desde}`,
+            );
+          }
+        };
         // Con los logos a la vista, o sin ellos al acercar: que lleguen y se asienten.
         if (gesto.desde >= 15) {
-          await pagina.locator('section[aria-label="Emplazamientos"] > button').first().waitFor();
+          try {
+            await pagina.locator('section[aria-label="Emplazamientos"] > button').first().waitFor();
+          } catch (causa) {
+            await enSuSitio();
+            throw causa;
+          }
         }
         await pausa(1000);
+        await enSuSitio();
         await cdp.send("Emulation.setCPUThrottlingRate", { rate: cpu });
         await pagina.evaluate(() => window.__deriva.empezar());
         await recorrer(pagina, gesto.tramos);

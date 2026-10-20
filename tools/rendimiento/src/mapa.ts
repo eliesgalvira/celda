@@ -1,5 +1,5 @@
 // Sin Effect: Playwright es de promesas y los scripts corren con Node tal cual.
-import type { CDPSession, Route } from "playwright-core";
+import type { CDPSession, Page, Route } from "playwright-core";
 
 /** Lo que las medidas y las pruebas hacen con el mapa de MapLibre de la página. */
 
@@ -53,6 +53,14 @@ export const atraparMapa = async (cdp: CDPSession): Promise<boolean> => {
   await cdp.send("Runtime.releaseObjectGroup", { objectGroup: grupo });
   return encontrado;
 };
+
+/**
+ * Espera a que la región del mapa deje de estar ocupada (`aria-busy="false"`): el mapa base y el
+ * resumen han llegado y la web ya ha puesto su vista inicial. Hasta entonces la web puede mover
+ * la cámara una vez por su cuenta, y un salto que se haga desde fuera se pierde debajo (#81).
+ */
+export const esperarVistaInicial = (pagina: Page, plazo = 30_000) =>
+  pagina.locator('main[aria-busy="false"]').waitFor({ state: "attached", timeout: plazo });
 
 /** Un TileJSON y teselas vacías en lugar de OpenFreeMap. */
 export const mapaBaseFalso = async (ruta: Route) => {
