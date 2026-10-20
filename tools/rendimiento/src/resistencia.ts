@@ -54,7 +54,7 @@ const UMBRALES: Readonly<Record<Contada, { readonly maximo: number; readonly mot
   addEventListener: { maximo: 0, motivo: "nada nuevo que escuchar sin tocar la pantalla" },
   removeEventListener: { maximo: 0, motivo: "ni que dejar de escuchar" },
   fetch: { maximo: 0, motivo: "sin tocar nada no se pide nada" },
-  "new Worker": { maximo: 0, motivo: "el Worker de las simulaciones no se termina" },
+  "new Worker": { maximo: 0, motivo: "no se arranca ningún Worker más" },
   postMessage: { maximo: 0, motivo: "con el punto quieto no se recalcula nada" },
   setInterval: { maximo: 0, motivo: "Celda no usa intervalos" },
   setTimeout: {
