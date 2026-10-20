@@ -47,7 +47,7 @@ pnpm run medir -- --capas <carpeta> --web <antes>,<después> --escenario vuelos 
 - `--pantalla escritorio` mide en una pantalla de 1400 × 900 con ratón, en lugar del móvil.
 - En las tablas, «fps por ronda» da el menor y el mayor de las rondas y su desviación típica. Dos webs que se separan menos que eso no se distinguen.
 - La web abre de lejos, con la península entera: los escenarios `barcelona` y `espana` centran el mapa en Barcelona antes de tocarlo. El de `barcelona` centra también la ciudad tras abrir la provincia, porque su hexágono va en el centro visual de la provincia (ADR 0024).
-- `--escenario borde --ruta "/?emplazamiento=<clave>"` abre la web con el enlace a la ficha de un emplazamiento junto al borde de dos provincias, sin su provincia (#45). Cierra la ficha, cruza el borde con cuatro arrastres de 500 px con las celdas, abre la vista de interferencia, lo cruza otra vez y aleja y acerca dos niveles.
+- `--escenario borde --ruta "/?emplazamiento=<clave>"` abre la web con el enlace a la ficha de un emplazamiento junto al borde de dos provincias, sin su provincia (#45). Cierra la ficha, cruza el borde con cuatro arrastres de 500 px y aleja y acerca dos niveles. Hasta el #81 cruzaba con las celdas, abría la vista de interferencia y lo cruzaba otra vez.
 - Para medir con muchos datos sin ingerir nada, `pnpm run sintetica` en `tools/capas` publica en `CELDA_CAPAS_CARPETA` una España sintética de `CELDA_SINTETICOS` emplazamientos (100.000 por defecto, la de la investigación 08) con la publicación de verdad.
 - El Chromium es el del sistema (`/usr/bin/chromium`, o `--chromium`, o `CELDA_CHROMIUM`): `playwright-core` no descarga navegadores.
 
@@ -460,6 +460,13 @@ Medido el 08/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 
   El vuelo cuesta un fotograma largo al empezar: escribir los dos búferes de los 35.689 puntos y subirlos a la GPU, y la primera vez compilar el programa, que después se guarda para el mapa. Durante el vuelo solo cambia un número por fotograma. Con la escritura directa en los búferes, sin un objeto ni una cadena por punto, el más largo bajó de 150 a 100 ms al separar.
 - **El paso a los logos** mueve en el DOM solo los puntos que se ven: unos 160 a z15 en el centro de Madrid a 1400 px, 600 ms y después se quitan.
+
+## Sin la simulación (20/10/2026, #81)
+
+Medido con `gzip -9` contra `celda/v1` (0631fc3) construida igual.
+
+- **Peso.** La primera pantalla baja 19,0 KB con `gzip -9` (242.853 → 223.890 bytes): salen las celdas, el sector que da servicio, el diagrama de radiación, la vista de interferencia y el simulador que les pasaba los cálculos al Worker. La hoja de estilos baja 0,6 KB (24.216 → 23.634). El Worker de la simulación ya no existe; pesaba 26.398 bytes con `gzip -9` y se pedía con el primer cálculo, al abrir una ficha o al cruzar el zoom 15. El trozo del mapa (305.600 bytes) y el Worker de capas (38.114) quedan igual. Todo el JavaScript, sin los trozos de las zonas del ejercicio, pasa de 864.789 a 819.430 bytes.
+- **Peticiones.** Abrir una ficha ya no arranca un Worker, y a zoom 15 o más el mapa ya no pide las provincias vecinas de lo que se ve, solo las que se ven.
 
 ## Qué entró
 

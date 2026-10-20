@@ -1,8 +1,8 @@
 # Celda
 
-Celda es una web que enseña en un mapa las antenas de telefonía móvil de España, de qué compañía son y cómo llega su señal. Estará en celda.elies.site.
+Celda es una web que enseña en un mapa las antenas de telefonía móvil de España y de qué compañía son. Estará en celda.elies.site.
 
-El mapa abre con un hexágono por provincia y su número de emplazamientos. Al acercarse salen los municipios, los barrios de Barcelona y cada emplazamiento del registro oficial con los logos de sus compañías y la fecha de los datos. La ingesta barre el registro por zonas, empezando por Cataluña, y de las provincias que aún no ha barrido el mapa dice que no las tiene. El panel de cada emplazamiento dibuja el diagrama de radiación de sus sectores, un modelo calculado en un Web Worker. Cada noche la ingesta lee las fuentes, las fusiona en emplazamientos y publica la instantánea como capas estáticas por provincia que la web descarga. El glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
+El mapa abre con un hexágono por provincia y su número de emplazamientos. Al acercarse salen los municipios, los barrios de Barcelona y cada emplazamiento del registro oficial con los logos de sus compañías y la fecha de los datos. La ingesta barre el registro por zonas, empezando por Cataluña, y de las provincias que aún no ha barrido el mapa dice que no las tiene. Cada noche la ingesta lee las fuentes, las fusiona en emplazamientos y publica la instantánea como capas estáticas por provincia que la web descarga. El glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
 
 ## Arrancar
 
@@ -40,7 +40,6 @@ convex/                   Convex con Confect: el buzón de las aportaciones comp
 packages/dominio/         tipos y esquemas del dominio y la fusión, sin E/S
 packages/ingesta/         extractores de las fuentes, el barrido por zonas y la cola de fichas
 packages/publicacion/     publicación de la capa y las fichas en una carpeta o en R2
-packages/sim/             simulaciones puras con su versión y sus resultados de referencia
 packages/ui/              componentes y tema: el único sitio con estilos
 tools/capas/              límites de barrio y de municipios, España sintética y origen estático local
 tools/oxlint-plugin-celda reglas de lint propias

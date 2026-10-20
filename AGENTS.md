@@ -42,8 +42,6 @@ La ingesta, la publicación y Convex tienen su propia guía: [docs/patterns/conv
 
 La ingesta nocturna se empaqueta con Nix y corre con un módulo de NixOS: [docs/patterns/nixos.md](docs/patterns/nixos.md). Si tocas `nix/` o las dependencias de `apps/nocturna`, pasa también `nix flake check`.
 
-Las simulaciones también: [docs/patterns/simulaciones.md](docs/patterns/simulaciones.md). Explica la interfaz fija, cómo se añade una sin tocar el resto y cómo se generan sus ficheros de referencia.
-
 ## Rendimiento
 
 Antes de tocar algo que afecte a la carga o a la fluidez del mapa, lee [docs/patterns/rendimiento.md](docs/patterns/rendimiento.md): qué se midió, qué se descartó y cómo repetir la medida con `tools/rendimiento`.
