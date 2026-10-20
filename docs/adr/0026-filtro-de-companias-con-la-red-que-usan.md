@@ -1,6 +1,6 @@
 # Filtro de compañías, con la red que usa cada una aparte
 
-Estado: aceptada el 04/10/2026, con las decisiones del usuario del 04/10/2026 (#69). Añade al resumen nacional del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) una columna opcional, sin cambiar de formato, y cambia la definición de celda del glosario: con un filtro puesto, se calcula entre los emplazamientos que salen con él, también los de la red que usan DIGI o Yoigo (segunda decisión del usuario del 04/10/2026).
+Estado: aceptada el 04/10/2026, con las decisiones del usuario del 04/10/2026 (#69). Añade al resumen nacional del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) una columna opcional, sin cambiar de formato, y cambia la definición de celda del glosario: con un filtro puesto, se calcula entre los emplazamientos que salen con él, también los de la red que usan DIGI o Yoigo (segunda decisión del usuario del 04/10/2026). El 20/10/2026 salen las celdas con la retirada del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md), y con ellas lo que dice «Las celdas»: el filtro y la red usada se quedan como están para los emplazamientos, las agrupaciones y las zonas.
 
 ## Contexto
 

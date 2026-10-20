@@ -1,6 +1,6 @@
 # Capa por provincias con resumen nacional, indexada en un Worker
 
-Estado: aceptada el 29/09/2026 con el #43, que la implementa de punta a punta. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 3). Cambia el formato de la capa y la parte del ADR 0004 que reservaba PMTiles para más de 20.000 emplazamientos. Lo que se decidió al implementarla va en «Cómo quedó». Cambiada en parte por el [ADR 0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md) (03/10/2026): el resumen nacional se dibuja hasta z9 en lugar de z8, el hexágono de cada provincia va en su centro visual y el mapa ya no enseña ausencias.
+Estado: aceptada el 29/09/2026 con el #43, que la implementa de punta a punta. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 3). Cambia el formato de la capa y la parte del ADR 0004 que reservaba PMTiles para más de 20.000 emplazamientos. Lo que se decidió al implementarla va en «Cómo quedó». Cambiada en parte por el [ADR 0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md) (03/10/2026): el resumen nacional se dibuja hasta z9 en lugar de z8, el hexágono de cada provincia va en su centro visual y el mapa ya no enseña ausencias. El 20/10/2026, con la retirada del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md), salen las celdas y la vista de interferencia, y con ellas lo de «Provincias vecinas»: el mapa ya no pide provincias que no se ven.
 
 ## Contexto
 

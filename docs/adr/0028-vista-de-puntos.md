@@ -1,6 +1,6 @@
 # Vista de puntos, con la agrupada como opción
 
-Estado: aceptada el 08/10/2026, con la decisión del usuario del 08/10/2026 tras ver el prototipo de la rama desechable `prototipo/puntos` (b0d4965, 71da2c3), y las dos animaciones que pidió el mismo día. La lleva a cabo el #74. Cambia del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) el formato, que pasa a 8 con un fichero más por versión, y lo que dibuja el mapa por debajo del zoom 15; del [ADR 0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md), que de lejos los hexágonos de provincias y zonas ya no son lo que se ve al abrir.
+Estado: aceptada el 08/10/2026, con la decisión del usuario del 08/10/2026 tras ver el prototipo de la rama desechable `prototipo/puntos` (b0d4965, 71da2c3), y las dos animaciones que pidió el mismo día. La lleva a cabo el #74. Cambia del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) el formato, que pasa a 8 con un fichero más por versión, y lo que dibuja el mapa por debajo del zoom 15; del [ADR 0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md), que de lejos los hexágonos de provincias y zonas ya no son lo que se ve al abrir. El 20/10/2026, con la retirada del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md), ya no hay celdas ni vista de interferencia que pidan capas de provincia entre z9 y z14, y el verde azulado de los puntos ya no es también el de las celdas.
 
 ## Contexto
 

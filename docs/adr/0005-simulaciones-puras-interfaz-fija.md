@@ -1,6 +1,8 @@
 # Simulaciones como funciones puras detrás de una interfaz fija, sin Bend en la v1
 
-Estado: aceptada el 24/09/2026. El 04/10/2026 el usuario decidió que la interfaz no enseña el `id` ni la `version` de una simulación: es un detalle de implementación que nadie que use la web necesita. Sigue diciendo que es un modelo o una simulación. El `id` y la `version` quedan en el código, en los resultados de referencia y en lo que se exporte.
+Estado: retirada el 20/10/2026 (#81), por decisión del usuario del 15/10/2026 de no incluir la simulación en la versión final. Con los datos públicos no se puede saber el tamaño real de las celdas ni hacia dónde apuntan los sectores, así que las celdas de Voronoi y los sectores con una orientación supuesta engañan a quien mira el mapa. Salen las cuatro simulaciones de abajo y todo lo que dependía de ellas: las celdas del mapa, la vista de interferencia, el sector que da servicio, el diagrama de radiación de la ficha y los consejos que miraban el sector. Ya no existen `packages/sim` ni el Worker que las calculaba. Se quedan los datos reales, que son el rumbo y la distancia del punto de referencia a cada emplazamiento y las medidas propias, y el radio de cobertura del ejercicio de emplazamientos, que es la estimación que pide el propio ejercicio. Si algún día vuelve un cálculo con un modelo, necesitará un ADR nuevo.
+
+Aceptada el 24/09/2026. El 04/10/2026 el usuario decidió que la interfaz no enseña el `id` ni la `version` de una simulación: es un detalle de implementación que nadie que use la web necesita. Sigue diciendo que es un modelo o una simulación. El `id` y la `version` quedan en el código, en los resultados de referencia y en lo que se exporte.
 
 Celda tiene que servir de base para experimentos de simulación, y quien investigue debe poder añadir uno sin tocar el resto de la aplicación. Toda simulación cumple esta interfaz:
 

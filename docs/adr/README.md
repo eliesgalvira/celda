@@ -4,11 +4,11 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 
 | ADR | Decisión |
 |---|---|
-| [0001](0001-monorepo-pnpm-autocontenido.md) | Monorepo pnpm autocontenido con las herramientas de Moli |
+| [0001](0001-monorepo-pnpm-autocontenido.md) | Monorepo pnpm autocontenido con las herramientas de Moli (sin `packages/sim` desde el 20/10/2026) |
 | [0002](0002-solid-2-spa-sin-ssr.md) | Solid 2 como SPA, sin SSR |
 | [0003](0003-convex-con-confect-v10.md) | Convex como fuente canónica, con funciones Effect mediante Confect v10 (desde el 0015 y el 0020, solo el buzón de aportaciones) |
 | [0004](0004-mapa-desde-capas-estaticas.md) | El mapa y las fichas se leen de ficheros estáticos versionados (JSON, desde el formato 5 por provincias; fichas en lotes de 128), con marca de agua por vista |
-| [0005](0005-simulaciones-puras-interfaz-fija.md) | Simulaciones como funciones puras detrás de una interfaz fija, sin Bend en la v1 |
+| [0005](0005-simulaciones-puras-interfaz-fija.md) | Simulaciones como funciones puras detrás de una interfaz fija, sin Bend en la v1 (retirada el 20/10/2026: Celda ya no simula nada) |
 | [0006](0006-libreria-de-componentes-unico-sitio-con-estilos.md) | La librería de componentes es el único sitio con estilos, y lo impone el lint |
 | [0007](0007-aportaciones-locales-formato-definitivo.md) | Las aportaciones se guardan en el dispositivo con su formato definitivo |
 | [0008](0008-limites-de-uso.md) | Límites de uso: el público solo lee ficheros estáticos y Convex no tiene funciones públicas |
@@ -29,6 +29,6 @@ Cada ADR recoge una decisión de `../arquitectura.md`, la propuesta aceptada el 
 | [0023](0023-limites-de-comunidades-y-provincias.md) | Límites de comunidades y provincias en ficheros propios servidos por la web: uno general de 8 KB y uno de detalle de 37 KB desde z7 |
 | [0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md) | Datos discretos: hexágonos más pequeños de lejos, rótulos por población, centro visual de cada provincia, sin ausencias en el mapa y sin rótulos extranjeros por debajo de z9 |
 | [0025](0025-nombres-de-lugar-oficiales-en-una-sola-forma.md) | Nombres de lugar: el oficial, en una sola forma (la local en la Comunitat Valenciana, la castellana en el resto) |
-| [0026](0026-filtro-de-companias-con-la-red-que-usan.md) | Filtro de compañías en chips, con la red de Movistar que usa DIGI y la de Orange que usa Yoigo aparte, celdas del filtro y combinaciones de compañías en el resumen sin cambiar de formato |
+| [0026](0026-filtro-de-companias-con-la-red-que-usan.md) | Filtro de compañías en chips, con la red de Movistar que usa DIGI y la de Orange que usa Yoigo aparte, celdas del filtro (retiradas el 20/10/2026 con el 0005) y combinaciones de compañías en el resumen sin cambiar de formato |
 | [0027](0027-archivo-de-paginas-e-historial-del-registro.md) | Archivo privado de las páginas del registro, aparte de la base y con copia incremental en R2; el historial de cada registro con los hechos tal como los escribe el registro, publicado en las fichas; y la parada de la noche ante un cambio masivo |
 | [0028](0028-vista-de-puntos.md) | Vista de puntos por defecto, con la agrupada como opción en «Funciones»: los puntos de toda España en un fichero del formato 8, tocar que acerca o abre sin saltar a la calle, la lista para el teclado, el paso animado a los logos y el vuelo al cambiar de vista |

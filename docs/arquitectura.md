@@ -85,6 +85,8 @@ Copiamos de Moli el catálogo pnpm con versiones exactas, vite-plus (`vp`: build
 
 ### ▸ 5. Las simulaciones son funciones puras detrás de una interfaz fija
 
+> Retirada el 20/10/2026 con el [ADR 0005](adr/0005-simulaciones-puras-interfaz-fija.md). Celda ya no tiene simulaciones, ni `packages/sim`, ni su Worker.
+
 ```ts
 interface Simulacion<Params, Resultado> {
   id: string; version: string;
