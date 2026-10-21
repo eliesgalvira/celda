@@ -120,6 +120,11 @@
           [ "services" "celda-nocturna" "registroOficial" "zonasPorNoche" ]
           "Cada ejecución barre todas las zonas de services.celda-nocturna.registroOficial.zonas, las siete por defecto (ADR 0029). Las zonas ya no se turnan."
         )
+        # El despliegue lo lanza un flujo de GitHub Actions (ADR 0018, #84).
+        (mkRemovedOptionModule
+          [ "services" "celda-nocturna" "credenciales" "vercel" ]
+          "Despliega un flujo de GitHub Actions, y la ingesta ya no lanza ningún build de Vercel (ADR 0018). Quita services.celda-nocturna.credenciales.vercel y borra de la máquina el fichero del deploy hook."
+        )
       ];
 
       options.services.celda-nocturna = {
@@ -201,19 +206,6 @@
           '';
         };
 
-        credenciales.vercel = mkOption {
-          type = nullOr externalPath;
-          default = null;
-          example = "/etc/secretos/celda-vercel.env";
-          description = ''
-            Fichero con el deploy hook del proyecto de Vercel (`CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/…`),
-            fuera del almacén de Nix y legible solo por root. Se pasa como la credencial de R2. Tras
-            publicar, si Vercel no sirve en `origenPublico` la versión vigente de R2, la ejecución
-            llama al hook y el build de Vercel monta las capas desde R2 (ADR 0018). Sin él, no se
-            lanza ningún build.
-          '';
-        };
-
         credenciales.convex = mkOption {
           type = nullOr externalPath;
           default = null;
@@ -235,12 +227,7 @@
           type = nullOr str;
           default = null;
           example = "https://celda.example.org/capas";
-          description = ''
-            URL pública de las capas, las de la web en Vercel (`CELDA_ALMACEN_ORIGEN`). Se apunta en la
-            base con cada versión. Tras publicar, la ejecución lee ahí `vigente.json` y solo llama al
-            deploy hook si no coincide con el de R2. Sin ella, cada ejecución con
-            `credenciales.vercel` lanza el build.
-          '';
+          description = "URL pública de las capas, las de la web en Vercel (`CELDA_ALMACEN_ORIGEN`). Se apunta en la base con cada versión.";
         };
 
         reintentoDePublicacion = mkOption {
@@ -377,15 +364,6 @@
           '';
         };
 
-        warnings =
-          optional
-            (
-              config.services.celda-nocturna.enable
-              && config.services.celda-nocturna.credenciales.vercel != null
-              && config.services.celda-nocturna.origenPublico == null
-            )
-            "services.celda-nocturna.credenciales.vercel sin origenPublico: la ingesta no sabe qué sirve Vercel y lanza el build en cada ejecución.";
-
         users.users.celda-nocturna = mkIf config.services.celda-nocturna.enable {
           description = "Ingesta de Celda";
           group = "celda-nocturna";
@@ -495,9 +473,6 @@
               optional (
                 config.services.celda-nocturna.credenciales.r2 != null
               ) "r2:${config.services.celda-nocturna.credenciales.r2}"
-              ++ optional (
-                config.services.celda-nocturna.credenciales.vercel != null
-              ) "vercel:${config.services.celda-nocturna.credenciales.vercel}"
               ++ optional (
                 config.services.celda-nocturna.credenciales.convex != null
               ) "convex:${config.services.celda-nocturna.credenciales.convex}";

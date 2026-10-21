@@ -12,7 +12,7 @@
       inherit (lib.meta) getExe;
       inherit (lib.modules) mkIf;
 
-      # Una autoridad y un certificado para el geoportal, el R2, el Vercel y el Convex de mentira. Son de la
+      # Una autoridad y un certificado para el geoportal, el R2 y el Convex de mentira. Son de la
       # prueba: no protegen nada.
       certificados =
         pkgs.runCommand "celda-nocturna-certificados-de-prueba"
@@ -23,7 +23,7 @@
               -days 36500 -subj "/CN=Autoridad de prueba" -keyout ca.key -out "$out/ca.pem"
             openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
               -subj "/CN=Fuentes de prueba" -keyout "$out/servidor.key" -out servidor.csr
-            printf "subjectAltName=DNS:geoportal.minetur.gob.es,DNS:cuenta.r2.cloudflarestorage.com,DNS:api.vercel.com,DNS:celda.prueba,DNS:buzon.convex.prueba" > san
+            printf "subjectAltName=DNS:geoportal.minetur.gob.es,DNS:cuenta.r2.cloudflarestorage.com,DNS:buzon.convex.prueba" > san
             openssl x509 -req -in servidor.csr -CA "$out/ca.pem" -CAkey ca.key -CAcreateserial \
               -days 36500 -extfile san -out "$out/servidor.pem"
           '';
@@ -31,9 +31,7 @@
       # El geoportal contesta el listado de cada caja con los elementos grabados en el Campus Nord
       # que caen en ella, y cada ficha con una grabada. R2 guarda lo que le llega en una carpeta
       # y apunta la firma de cada petición; no contesta nada sin firma ni deja escribir con la clave
-      # de solo lectura del build. Vercel construye un despliegue con la orden `capas`, con esa
-      # clave, en cada llamada al deploy hook y, si acaba bien, lo sirve en `celda.prueba/capas`;
-      # si falla, sigue sirviendo el anterior. El buzón de Convex contesta a su acción HTTP de lo
+      # de solo lectura del build de Vercel. El buzón de Convex contesta a su acción HTTP de lo
       # aceptado, solo con la clave de publicación de la credencial de la ingesta, con una página sin
       # nada aceptado.
       fuentesDePrueba =
@@ -43,14 +41,12 @@
             import json
             import os
             import ssl
-            import subprocess
             import sys
-            import threading
             import time
             import urllib.parse
             from xml.sax.saxutils import escape
 
-            LISTADO, FICHA, CERTIFICADO, CLAVE, CARPETA, CELDA = sys.argv[1:7]
+            LISTADO, FICHA, CERTIFICADO, CLAVE, CARPETA = sys.argv[1:6]
             CUBOS = os.path.join(CARPETA, "r2")
             PETICIONES = os.path.join(CARPETA, "peticiones.log")
             # Con este fichero, el geoportal da las fichas que dice y luego un 429 a cada una.
@@ -62,9 +58,6 @@
             CLAVE_DEL_BUILD = "/run/secretos/vercel-r2.env"
             # La conexión de la ingesta con el buzón. La escribe la prueba.
             CONEXION_CON_CONVEX = "/run/secretos/celda-convex.env"
-            VERCEL = os.path.join(CARPETA, "vercel")
-            DESPLIEGUES = os.path.join(CARPETA, "despliegues.log")
-            despliegues = []
 
 
             def variables_del_build():
@@ -85,21 +78,6 @@
             def es_del_build(firma):
                 clave = variables_del_build().get("CELDA_R2_ID_CLAVE")
                 return clave is not None and f"Credential={clave}/" in firma
-
-
-            def desplegar():
-                """Un build: la orden capas de R2 a una carpeta nueva, que se sirve si acaba bien."""
-                despliegues.append(None)
-                numero = len(despliegues)
-                destino = os.path.join(VERCEL, str(numero))
-                entorno = {**os.environ, **variables_del_build()}
-                build = subprocess.run([CELDA, "capas", destino], capture_output=True, text=True, env=entorno)
-                if build.returncode == 0:
-                    os.symlink(str(numero), os.path.join(VERCEL, "nuevo"))
-                    os.replace(os.path.join(VERCEL, "nuevo"), os.path.join(VERCEL, "actual"))
-                with open(DESPLIEGUES, "a") as registro:
-                    registro.write(f"{numero} {'servido' if build.returncode == 0 else 'fallido'}\n")
-                print(build.stdout, build.stderr, flush=True)
 
 
             def leer(ruta):
@@ -170,11 +148,6 @@
                                 return self.responder(429)
                             return self.responder(200, leer(FICHA), "text/html")
                         return self.responder(404)
-                    if host == "celda.prueba":
-                        fichero = os.path.join(VERCEL, "actual", ruta.removeprefix("/capas/"))
-                        if not ruta.startswith("/capas/") or not os.path.isfile(fichero):
-                            return self.responder(404)
-                        return self.responder(200, leer(fichero), "application/json")
                     if firma == "":
                         return self.responder(403)
                     if es_del_build(firma) and os.path.exists(R2_CAIDO):
@@ -200,14 +173,6 @@
                     if not os.path.isfile(fichero):
                         return self.responder(404, b"<Error><Code>NoSuchKey</Code></Error>")
                     return self.responder(200, leer(fichero), "application/json")
-
-                def do_POST(self):
-                    host, ruta, _ = self.apuntar()
-                    if host != "api.vercel.com" or not ruta.startswith("/v1/integrations/deploy/"):
-                        return self.responder(404)
-                    os.makedirs(VERCEL, exist_ok=True)
-                    threading.Thread(target=desplegar).start()
-                    return self.responder(201, b'{"job":{"state":"PENDING"}}', "application/json")
 
                 def do_PUT(self):
                     _, ruta, firma = self.apuntar()
@@ -256,7 +221,6 @@
             services.celda-nocturna = {
               enable = true;
               credenciales.r2 = "/run/secretos/celda-r2.env";
-              credenciales.vercel = "/run/secretos/celda-vercel.env";
               credenciales.convex = "/run/secretos/celda-convex.env";
               copias.directorio = "/srv/copias/celda";
               origenPublico = "https://celda.prueba/capas";
@@ -274,8 +238,6 @@
             networking.hosts."127.0.0.1" = [
               "geoportal.minetur.gob.es"
               "cuenta.r2.cloudflarestorage.com"
-              "api.vercel.com"
-              "celda.prueba"
               "buzon.convex.prueba"
             ];
 
@@ -284,11 +246,8 @@
             systemd.services.fuentes-de-prueba = {
               wantedBy = singleton "multi-user.target";
 
-              # El build de Vercel lee de R2 con el certificado de la prueba.
-              environment.NODE_EXTRA_CA_CERTS = "${certificados}/ca.pem";
-
               serviceConfig = {
-                ExecStart = "${getExe fuentesDePrueba} ${../docs/investigacion/muestras/geojson-campus-nord.iso-8859-1.json} ${../docs/investigacion/muestras/detalle-telefonica-0800942.iso-8859-1.html} ${certificados}/servidor.pem ${certificados}/servidor.key /var/lib/fuentes-de-prueba ${getExe config.packages.celda-nocturna}";
+                ExecStart = "${getExe fuentesDePrueba} ${../docs/investigacion/muestras/geojson-campus-nord.iso-8859-1.json} ${../docs/investigacion/muestras/detalle-telefonica-0800942.iso-8859-1.html} ${certificados}/servidor.pem ${certificados}/servidor.key /var/lib/fuentes-de-prueba";
                 StateDirectory = "fuentes-de-prueba";
               };
             };
@@ -316,13 +275,6 @@
                   )
                   id_clave = maquina.succeed("sed --quiet 's/^CELDA_R2_ID_CLAVE=//p' /run/secretos/celda-r2.env").strip()
                   secreto = maquina.succeed("sed --quiet 's/^CELDA_R2_SECRETO=//p' /run/secretos/celda-r2.env").strip()
-                  maquina.succeed(
-                      "umask 077; echo CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/prj_prueba/"
-                      "hook$(od --address-radix=n --format=x1 --read-bytes=12 /dev/urandom | tr --delete ' \\n')"
-                      " > /run/secretos/celda-vercel.env"
-                  )
-                  hook = maquina.succeed("sed --quiet 's/^CELDA_VERCEL_DEPLOY_HOOK=//p' /run/secretos/celda-vercel.env").strip()
-                  secreto_del_hook = hook.rsplit("/", 1)[1]
                   # La clave de solo lectura del cubo, en las variables del proyecto de Vercel.
                   maquina.succeed(
                       "umask 077; {"
@@ -525,43 +477,33 @@
                   capas = maquina.succeed("ls /var/lib/fuentes-de-prueba/r2/celda/ | grep --count '^ficheros@'").strip()
                   assert capas == "2", capas
 
-              def llamadas_al_hook():
-                  return [
-                      linea.split()[3]
-                      for linea in maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
-                      if " POST api.vercel.com " in linea
-                  ]
-
-              def publicar_a_mano():
-                  # Como el servicio: su usuario, sus credenciales y la configuración de la máquina.
-                  salida = maquina.succeed(
+              def build_de_vercel(destino):
+                  """El build de Vercel (`vercel.sh`): la orden capas, de R2 a una carpeta nueva, con la clave de solo lectura."""
+                  estado, salida = maquina.execute(
                       "systemd-run --wait --pipe --collect --quiet"
-                      " --uid=celda-nocturna --gid=celda-nocturna"
-                      " --property=LoadCredential=r2:/run/secretos/celda-r2.env"
-                      " --property=LoadCredential=vercel:/run/secretos/celda-vercel.env"
+                      " --property=EnvironmentFile=/run/secretos/vercel-r2.env"
                       " --setenv=NODE_EXTRA_CA_CERTS=${certificados}/ca.pem"
-                      " /run/current-system/sw/bin/celda-nocturna publicar 2>&1"
+                      f" ${getExe config.packages.celda-nocturna} capas {destino} 2>&1"
                   )
                   print(salida)
-                  return salida
+                  return estado
 
-              servida = "/var/lib/fuentes-de-prueba/vercel/actual"
+              montada = "/var/lib/build-de-vercel/1/capas"
               r2 = "/var/lib/fuentes-de-prueba/r2/celda"
 
-              with subtest("tras publicar, la ejecución lanza el build una vez y Vercel monta de R2 la vigente y la anterior"):
-                  assert "Vercel no sirve sitios@" in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
-                  assert llamadas_al_hook() == [hook.removeprefix("https://api.vercel.com")], llamadas_al_hook()
-                  maquina.wait_until_succeeds("grep --line-regexp '1 servido' /var/lib/fuentes-de-prueba/despliegues.log", timeout=60)
-                  maquina.succeed(f"cmp {servida}/vigente.json {r2}/vigente.json")
-                  # R2 tiene las dos versiones de la ejecución, y Vercel las dos: la vigente y su anterior.
-                  assert maquina.succeed(f"ls {servida} | grep --count '^ficheros@'").strip() == "2"
+              with subtest("la ejecución no dice nada de Vercel, y el build monta de R2 la vigente y la anterior"):
+                  assert "Vercel" not in el_diario(), el_diario()
+                  assert build_de_vercel(montada) == 0
+                  maquina.succeed(f"cmp {montada}/vigente.json {r2}/vigente.json")
+                  # R2 tiene las dos versiones de la ejecución, y el build las monta: la vigente y su anterior.
+                  assert maquina.succeed(f"ls {montada} | grep --count '^ficheros@'").strip() == "2"
                   listados = maquina.succeed(
-                      f"cat {servida}/ficheros@*.json | grep --only-matching '\"[a-z]*/[0-9a-f/]*\\.json\"' | sort --unique | wc --lines"
+                      f"cat {montada}/ficheros@*.json | grep --only-matching '\"[a-z]*/[0-9a-f/]*\\.json\"' | sort --unique | wc --lines"
                   ).strip()
-                  ficheros = maquina.succeed(f"find -L {servida} -type f | wc --lines").strip()
+                  ficheros = maquina.succeed(f"find {montada} -type f | wc --lines").strip()
                   # Sus capas, lotes y partes del índice de claves, los dos manifiestos, el resumen y vigente.json.
                   assert int(ficheros) == int(listados) + 4, (ficheros, listados)
-                  maquina.succeed(f"cd {servida} && find . -type f -exec cmp {{}} {r2}/{{}} \\;")
+                  maquina.succeed(f"cd {montada} && find . -type f -exec cmp {{}} {r2}/{{}} \\;")
                   # El build lee R2 con la clave de solo lectura, que nunca escribe ni borra.
                   peticiones = maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
                   del_build = [linea.split()[1] for linea in peticiones if f"Credential={id_de_lectura}/" in linea]
@@ -597,7 +539,7 @@
                   assert en_paquete == lecturas, (en_paquete, lecturas)
                   assert "Archivo de páginas en R2: " in maquina.succeed("journalctl --unit=celda-nocturna.service --no-pager")
                   # El build de Vercel no monta nada privado ni lo pide al cubo.
-                  maquina.fail(f"find -L {servida} -path '*archivo*' -o -path '*copias*' | grep .")
+                  maquina.fail(f"find {montada} -path '*archivo*' -o -path '*copias*' | grep .")
                   peticiones = maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
                   privadas = [
                       linea for linea in peticiones
@@ -620,37 +562,11 @@
                   print(comprobacion)
                   assert "Registros comprobados: 40, distintos: 0" in comprobacion, comprobacion
 
-              with subtest("con Vercel al día, publicar otra vez no llama al hook"):
-                  salida = publicar_a_mano()
-                  assert "Vercel ya sirve sitios@" in salida, salida
-                  assert len(llamadas_al_hook()) == 1, llamadas_al_hook()
-
-              with subtest("un build que no llega a R2 falla, y Vercel sigue sirviendo el despliegue anterior"):
-                  # Lo servido es de otra versión y R2 no contesta al build.
-                  maquina.succeed(
-                      "cp --recursive --dereference /var/lib/fuentes-de-prueba/vercel/1 /var/lib/fuentes-de-prueba/vercel/anterior",
-                      "echo '{\"version\":\"sitios@2026-01-01T00:00:00Z\",\"fecha\":0,\"emplazamientos\":0,\"lotes\":0}'"
-                      " > /var/lib/fuentes-de-prueba/vercel/anterior/vigente.json",
-                      f"ln --symbolic --force --no-dereference anterior {servida}",
-                      "touch /var/lib/fuentes-de-prueba/r2-caido-para-el-build",
-                  )
-                  salida = publicar_a_mano()
-                  assert "Vercel no sirve sitios@" in salida, salida
-                  assert len(llamadas_al_hook()) == 2, llamadas_al_hook()
-                  maquina.wait_until_succeeds("grep --line-regexp '2 fallido' /var/lib/fuentes-de-prueba/despliegues.log", timeout=60)
-                  assert maquina.succeed(f"readlink {servida}").strip() == "anterior"
-                  maquina.succeed(f"grep --fixed-strings 2026-01-01 {servida}/vigente.json")
-                  # El despliegue fallido no llegó a escribir vigente.json.
-                  maquina.fail("test -e /var/lib/fuentes-de-prueba/vercel/2/vigente.json")
-
-              with subtest("cuando R2 vuelve, la siguiente publicación pone Vercel al día"):
+              with subtest("un build de Vercel que no llega a R2 falla sin escribir vigente.json"):
+                  maquina.succeed("touch /var/lib/fuentes-de-prueba/r2-caido-para-el-build")
+                  assert build_de_vercel("/var/lib/build-de-vercel/2/capas") != 0
+                  maquina.fail("test -e /var/lib/build-de-vercel/2/capas/vigente.json")
                   maquina.succeed("rm /var/lib/fuentes-de-prueba/r2-caido-para-el-build")
-                  publicar_a_mano()
-                  assert len(llamadas_al_hook()) == 3, llamadas_al_hook()
-                  maquina.wait_until_succeeds("grep --line-regexp '3 servido' /var/lib/fuentes-de-prueba/despliegues.log", timeout=60)
-                  maquina.succeed(f"cmp {servida}/vigente.json {r2}/vigente.json")
-                  assert "Vercel ya sirve sitios@" in publicar_a_mano()
-                  assert len(llamadas_al_hook()) == 3, llamadas_al_hook()
 
               with subtest("la pasada por los cuadros de borde pide cada uno una vez y no toca la base"):
                   base = "/var/lib/celda-nocturna/ingesta.sqlite"
@@ -743,7 +659,7 @@
                   print(maquina.succeed("systemd-analyze security celda-nocturna.service --no-pager"))
 
               with subtest("ningún secreto acaba en el almacén de Nix"):
-                  for valor in (secreto, secreto_del_hook, clave_de_publicacion_convex):
+                  for valor in (secreto, clave_de_publicacion_convex):
                       maquina.fail(f"systemctl show celda-nocturna.service | grep --fixed-strings '{valor}'")
                   assert "CELDA_RESERVA_ORIGEN" not in entorno, entorno
                   assert "CELDA_ALMACEN_ORIGEN=https://celda.prueba/capas" in entorno, entorno
@@ -761,7 +677,7 @@
 
                   # La búsqueda encuentra lo que sí está en el almacén: la configuración del servicio.
                   assert buscar("Celda (ingesta; contacto en celda.elies.site)").returncode == 0
-                  for valor in (id_clave, secreto, secreto_del_hook, id_de_lectura, secreto_de_lectura, clave_de_publicacion_convex):
+                  for valor in (id_clave, secreto, id_de_lectura, secreto_de_lectura, clave_de_publicacion_convex):
                       encontrado = buscar(valor)
                       assert encontrado.returncode == 1, f"secreto en el almacén: {encontrado.stdout}"
             '';

@@ -1,6 +1,6 @@
 # Las capas, solo desde Vercel; R2, almacén privado, y nada de Cloudflare en la ruta pública
 
-Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Sustituye tres partes del ADR 0010: R2 como origen principal detrás de un Worker o una Pages Function, la copia de reserva con solo la versión vigente y el cliente con dos orígenes. Del ADR 0008 deja sin objeto el límite de la función que sirve R2. Lo lleva a cabo el #54; lo que se decidió al hacerlo va en «Cómo quedó». Revisada el 20/10/2026 con el #78: Celda se despliega desde GitHub Actions, y solo cuando cambian la web o los datos (ver «Cómo quedó el despliegue»).
+Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Sustituye tres partes del ADR 0010: R2 como origen principal detrás de un Worker o una Pages Function, la copia de reserva con solo la versión vigente y el cliente con dos orígenes. Del ADR 0008 deja sin objeto el límite de la función que sirve R2. Lo lleva a cabo el #54; lo que se decidió al hacerlo va en «Cómo quedó». Revisada el 20/10/2026 con el #78: Celda se despliega desde GitHub Actions, y solo cuando cambian la web o los datos (ver «Cómo quedó el despliegue»). Revisada el 21/10/2026 con el #84: la ingesta ya no lleva el código para lanzar el build (ver «La ingesta ya no lanza el build»).
 
 ## Contexto
 
@@ -51,7 +51,7 @@ Si falta un fichero de cualquiera de las tres versiones, el build falla: es un c
 
 ## Cómo quedó el despliegue (#68, #70 y #78, 20/10/2026)
 
-**Quién despliega.** El punto abierto del hook se cerró con el #68 (04/10/2026) por el otro lado. Despliega un flujo de GitHub Actions, `.github/workflows/celda-despliegue.yml` en la rama `main` del repositorio en el que vive Celda, porque GitHub solo programa los flujos de la rama por defecto. Sube el código de `celda/v1` con la CLI de Vercel y el secreto `VERCEL_TOKEN`, y Vercel construye la web y monta las capas desde R2 como explica «Cómo quedó (#54)». El proyecto de Vercel no está conectado al repositorio, así que no hay deploy hook, y la máquina de la ingesta no guarda ninguna clave de Vercel ni de GitHub. Su configuración no tiene `credenciales.vercel`, y `ponerAlDiaVercel` apunta cada noche «Sin deploy hook de Vercel». Desde el #70, tras un push a `celda/v1` el flujo espera a que la integración continua salga en verde, y solo despliega la punta de la rama.
+**Quién despliega.** El punto abierto del hook se cerró con el #68 (04/10/2026) por el otro lado. Despliega un flujo de GitHub Actions, `.github/workflows/celda-despliegue.yml` en la rama `main` del repositorio en el que vive Celda, porque GitHub solo programa los flujos de la rama por defecto. Sube el código de `celda/v1` con la CLI de Vercel y el secreto `VERCEL_TOKEN`, y Vercel construye la web y monta las capas desde R2 como explica «Cómo quedó (#54)». El proyecto de Vercel no está conectado al repositorio, y la máquina de la ingesta no guarda ninguna clave de Vercel ni de GitHub. Desde el #70, tras un push a `celda/v1` el flujo espera a que la integración continua salga en verde, y solo despliega la punta de la rama.
 
 **Lo que pesa un despliegue.** La web construida son unos 6 MB en 72 ficheros. Las capas pesan mucho más. La versión vigente sola son unos 104 MB en 375 ficheros (medido el 20/10/2026 en `celda.elies.site/capas`), y el build monta también lo que cambió en las dos anteriores. Hasta el #78 se desplegaba cada día a las 08:00 UTC y tras cada push en verde, cambiase algo o no. Desde el 9/10 el almacenamiento de despliegues del equipo crecía unos 130 MB al día, y el 20/10 llegaba a 6,34 GB de los 10 GB de Hobby. Al pasar de 10 GB, Vercel borra en el acto los despliegues viejos y puede bloquear los nuevos.
 
@@ -82,7 +82,13 @@ El trabajo que decide copia el repositorio entero, como la integración continua
 
 **Por qué la señal de los datos sale de GitHub.** Lo natural sería que la diera quien publica, la ingesta nocturna, pero entonces esa máquina necesitaría una clave de Vercel o de GitHub, y no la tiene a propósito. El cubo es privado y nada publica una copia de su `vigente.json`, así que sin una clave no se puede saber qué tiene R2. Se descartaron una función de Vercel que leyera R2 y lo dijera en público (una función más en una web estática, con la clave de R2 en tiempo de ejecución), un cubo público o `r2.dev` con una copia de `vigente.json` (Cloudflare otra vez, y más trabajo para el usuario) y las URL prefirmadas, que caducan como mucho a los 7 días. Los secretos del flujo son los de la clave que ya usa el build de Vercel, que solo lee. El usuario los pone con `gh secret set` (`docs/patterns/nixos.md`, «Las cuentas de R2 y Vercel»).
 
-**Lo que sigue igual.** El código del deploy hook de la noche (`ponerAlDiaVercel`, `credenciales.vercel`) se queda sin usar en producción. Quitarlo, con su opción del módulo de NixOS y sus pasos de la máquina virtual, es otro ticket.
+## La ingesta ya no lanza el build (#84, 21/10/2026)
+
+Hasta el #84, la ingesta conservaba el código de «La noche» de arriba: `ponerAlDiaVercel`, la credencial `credenciales.vercel` del módulo de NixOS y sus pasos en la prueba de la máquina virtual. En producción nunca se usó. Se quitó todo, y una configuración con `credenciales.vercel` no se construye y dice que despliega el flujo de GitHub.
+
+El diario de la ingesta deja de decir si Vercel sirve la versión publicada. Con la ingesta de una vez al mes (ADR 0029), cada ejecución publica a mitad de la ventana y al acabar, y el flujo mira las señales cada día a las 08:00 UTC. Justo tras publicar, Vercel casi nunca sirve aún la versión nueva, así que el diario diría casi siempre que no la sirve, sin que fuera un fallo. Qué tiene R2 y qué sirve producción lo dice el registro de cada ejecución del flujo, que es quien decide.
+
+`montarCapas`, que el build de Vercel usa con la orden `capas`, y `leerDeVercel`, con la que el flujo lee producción, siguen en `packages/publicacion/src/vercel.ts`. La prueba de la máquina virtual lanza `capas` como `vercel.sh`, con la clave de solo lectura, sin pasar por Vercel.
 
 ## Consecuencias
 

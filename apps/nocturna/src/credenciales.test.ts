@@ -43,16 +43,16 @@ describe("credenciales de systemd", () => {
           "CELDA_R2_ID_CLAVE=clave",
           "CELDA_R2_SECRETO=secreto",
         ].join("\n"),
-        vercel: "CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/gancho\n",
+        convex: "CELDA_CONVEX_SITE_URL=https://buzon.convex.site\n",
       });
       const leido = yield* Effect.all({
         secreto: Config.Redacted("CELDA_R2_SECRETO"),
-        gancho: Config.String("CELDA_VERCEL_DEPLOY_HOOK"),
+        buzon: Config.String("CELDA_CONVEX_SITE_URL"),
         almacen: almacenDesdeConfig,
       }).pipe(Effect.provide(configuracionCon({ CREDENTIALS_DIRECTORY: directorio })));
 
       assert.isTrue(Option.isSome(leido.almacen));
-      assert.strictEqual(leido.gancho, "https://api.vercel.com/v1/integrations/deploy/gancho");
+      assert.strictEqual(leido.buzon, "https://buzon.convex.site");
       assert.strictEqual(Redacted.value(leido.secreto), "secreto");
     }).pipe(Effect.scoped),
   );

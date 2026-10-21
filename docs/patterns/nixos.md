@@ -19,9 +19,9 @@ nix flake check
 
 Sin variables de entorno, el programa usa `datos/ingesta.sqlite`, `datos/archivo.sqlite` y `datos/copias/` del directorio desde el que se lanza, como `pnpm run ingesta`. La configuración y sus variables están en [convex.md](convex.md#configuración).
 
-`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal, un R2, un Vercel y un buzón de Convex de mentira que contestan por HTTPS. El R2 es privado, como el de verdad (ADR 0018): no contesta nada sin firma, y con la clave de solo lectura del build no deja escribir ni borrar. El Vercel, en cada llamada al deploy hook, construye un despliegue con `celda-nocturna capas <carpeta>` y las variables de R2 del build, con esa clave, y si acaba bien lo sirve en `celda.prueba/capas`; si falla, sigue sirviendo el anterior. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. La prueba:
+`nix flake check` construye el paquete y lanza una máquina virtual de NixOS con el módulo (`nix/nocturna-pruebas.mod.nix`). Hace falta KVM. La máquina tiene un geoportal, un R2 y un buzón de Convex de mentira que contestan por HTTPS. El R2 es privado, como el de verdad (ADR 0018): no contesta nada sin firma, y con la clave de solo lectura del build de Vercel no deja escribir ni borrar. El geoportal da, para cada caja, los elementos del listado grabado en el Campus Nord que caen en ella, y una ficha grabada. La prueba:
 
-1. crea los ficheros de credenciales de R2, del deploy hook y del buzón de Convex con valores al azar;
+1. crea los ficheros de credenciales de R2 y del buzón de Convex con valores al azar;
 2. comprueba que el temporizador tiene los calendarios del primer sábado y del domingo siguiente a las 00:30 de Madrid, sin `Persistent=`;
 3. adelanta el reloj dos días y una hora más allá del próximo disparo, como tras una suspensión: el temporizador se dispara un lunes o un martes, la condición del servicio lo salta, el diario dice por qué y no se pide nada al geoportal;
 4. adelanta el reloj hasta el primer sábado del mes siguiente, espera a que la ejecución acabe bien y comprueba que el disparo siguiente es el del domingo, un día después;
@@ -29,16 +29,15 @@ Sin variables de entorno, el programa usa `datos/ingesta.sqlite`, `datos/archivo
 6. lanza `celda-nocturna estado` como el usuario del servicio y comprueba que dice que la próxima ejecución es la del domingo y que no pedirá nada;
 7. comprueba que la ejecución barrió Cataluña, la zona de la prueba, con una petición por cuadro, con la hora y la zona horaria de producción y sin las variables de los turnos, la prioridad ni la relectura;
 8. comprueba que las 40 fichas llegaron de una en una, a una por segundo como mínimo, dentro de su ventana de 2 minutos, y que se publicó a mitad de la ventana y al acabar;
-9. comprueba que la ejecución llamó una vez al deploy hook y que Vercel monta las dos versiones de la ejecución, la vigente y su anterior, igual byte a byte que R2, leyendo con la clave de solo lectura y sin escribir nada con ella;
-10. comprueba que el archivo de páginas tiene una lectura por cada respuesta del geoportal y un contenido por página distinta, que su paquete está en la carpeta de copias y, igual byte a byte, bajo `archivo/` en R2, que Vercel no monta nada de `archivo/` ni de `copias/` ni lo pide al cubo, que `celda-nocturna releer-archivo` lee todas las fichas archivadas sin pedir nada al geoportal y que `celda-nocturna comprobar-historial` da el historial de los 40 registros igual que la tabla de observaciones;
-11. publica a mano con `systemd-run`, como el servicio, y comprueba que con Vercel al día no se llama al hook;
-12. deja servido un despliegue de otra versión y hace que R2 no conteste al build: la publicación llama al hook, el build falla sin escribir `vigente.json` y Vercel sigue sirviendo el anterior. Con R2 de vuelta, la siguiente publicación lo pone al día;
-13. lanza `celda-nocturna cuadros-de-borde` como el usuario del servicio y comprueba que pide una vez cada uno de los cuatro cuadros de borde, que en el Campus Nord no traen nada, y que no toca la base;
-14. adelanta el reloj hasta el domingo y comprueba que la ejecución, tras un sábado que lo leyó todo, no pide nada al geoportal, y que el disparo siguiente es el primer sábado del mes que viene;
-15. adelanta el reloj hasta el miércoles y comprueba que el temporizador no lanza nada;
-16. hace que el geoportal dé diez fichas y luego un 429, y adelanta el reloj al primer sábado del mes siguiente. La ejecución barre otra vez la zona, para las fichas en el 429 y el diario dice que el domingo lee las 30 que quedan. El domingo, con otras diez fichas y otro 429, no barre nada, retoma las fichas por la que paró, ninguna de las leídas el sábado se pide otra vez y el diario avisa de que las 20 que quedan esperan a la ronda del mes siguiente;
-17. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
-18. busca las dos claves de R2, sus secretos, el hook y la clave de publicación en todo el almacén de Nix de la máquina y no los encuentra.
+9. comprueba que el diario de la ejecución no dice nada de Vercel. Después lanza `celda-nocturna capas <carpeta>` con las variables de R2 del build de Vercel, como `vercel.sh`, y comprueba que monta las dos versiones de la ejecución, la vigente y su anterior, igual byte a byte que R2, leyendo con la clave de solo lectura y sin escribir nada con ella;
+10. comprueba que el archivo de páginas tiene una lectura por cada respuesta del geoportal y un contenido por página distinta, que su paquete está en la carpeta de copias y, igual byte a byte, bajo `archivo/` en R2, que el build no monta nada de `archivo/` ni de `copias/` ni lo pide al cubo, que `celda-nocturna releer-archivo` lee todas las fichas archivadas sin pedir nada al geoportal y que `celda-nocturna comprobar-historial` da el historial de los 40 registros igual que la tabla de observaciones;
+11. hace que R2 no conteste a la clave del build y comprueba que el build falla sin escribir `vigente.json`;
+12. lanza `celda-nocturna cuadros-de-borde` como el usuario del servicio y comprueba que pide una vez cada uno de los cuatro cuadros de borde, que en el Campus Nord no traen nada, y que no toca la base;
+13. adelanta el reloj hasta el domingo y comprueba que la ejecución, tras un sábado que lo leyó todo, no pide nada al geoportal, y que el disparo siguiente es el primer sábado del mes que viene;
+14. adelanta el reloj hasta el miércoles y comprueba que el temporizador no lanza nada;
+15. hace que el geoportal dé diez fichas y luego un 429, y adelanta el reloj al primer sábado del mes siguiente. La ejecución barre otra vez la zona, para las fichas en el 429 y el diario dice que el domingo lee las 30 que quedan. El domingo, con otras diez fichas y otro 429, no barre nada, retoma las fichas por la que paró, ninguna de las leídas el sábado se pide otra vez y el diario avisa de que las 20 que quedan esperan a la ronda del mes siguiente;
+16. comprueba que el servicio no tiene `CELDA_RESERVA_ORIGEN` y que su `CELDA_ALMACEN_ORIGEN` es la URL de las capas en Vercel;
+17. busca las dos claves de R2, sus secretos y la clave de publicación en todo el almacén de Nix de la máquina y no los encuentra.
 
 Con todo construido, la máquina virtual tarda unos 3 min 40 s en arrancar y pasar la prueba. Casi todo son las ejecuciones, con sus pausas entre peticiones, y el build de Vercel que falla.
 
@@ -88,7 +87,6 @@ Un ejemplo mínimo del flake de la máquina:
             services.celda-nocturna = {
               enable = true;
               credenciales.r2 = "/etc/secretos/celda-r2.env";
-              credenciales.vercel = "/etc/secretos/celda-vercel.env";
               credenciales.convex = "/etc/secretos/celda-convex.env";
               copias.directorio = "/srv/copias/celda";
               origenPublico = "https://celda.example.org/capas";
@@ -123,13 +121,7 @@ Es la clave de la ingesta, la que escribe: publica en el cubo, retira las versio
 
 El módulo solo guarda la ruta. systemd copia el fichero a un directorio privado del servicio al arrancarlo (`LoadCredential=`), y el programa lee cada fichero de `$CREDENTIALS_DIRECTORY` detrás de las variables de entorno (`apps/nocturna/src/credenciales.ts`). Los secretos no pasan por el entorno del proceso. Las opciones de credenciales rechazan rutas del almacén de Nix, así que un `./secreto.env` del repositorio no se acepta. Si el fichero no existe, el servicio no arranca.
 
-`credenciales.vercel` funciona igual, con el deploy hook del proyecto de Vercel:
-
-```sh
-CELDA_VERCEL_DEPLOY_HOOK=https://api.vercel.com/v1/integrations/deploy/prj_…/…
-```
-
-`credenciales.convex` también, con la conexión con el buzón de Convex (ADR 0020):
+`credenciales.convex` funciona igual, con la conexión con el buzón de Convex (ADR 0020):
 
 ```sh
 CELDA_CONVEX_SITE_URL=https://nombre-del-despliegue.convex.site
@@ -138,7 +130,7 @@ CELDA_PUBLICACION_CLAVE=la-misma-que-en-el-despliegue
 
 La clave es la clave de publicación, la variable `CELDA_PUBLICACION_CLAVE` del despliegue ([convex.md](convex.md#antes-del-primer-despliegue-del-buzón)). Solo abre la acción HTTP que da lo aceptado para publicar, sin identidades ni huellas de IP. **Nunca pongas aquí una clave de despliegue de Convex**: lo puede todo (desplegar código, leer todas las aportaciones y las huellas, vetar), y esta máquina no la necesita. La clave de despliegue se queda en el portátil de quien modera. Con la de publicación, cada ejecución lee lo aceptado en la moderación desde la última vez y lo publica en las fichas ([convex.md](convex.md#moderar)). El diario dice «Buzón de Convex: N aceptadas leídas, M nuevas» o, si Convex no contesta, que no está disponible y que se publica lo demás. Sin el fichero, la comunidad queda apagada.
 
-Con el hook y `origenPublico`, la ejecución compara tras publicar el `vigente.json` de R2, leído por la API S3, con el que sirve Vercel en `origenPublico` y, si no coinciden, llama al hook. El build de Vercel monta entonces las capas desde R2 (ADR 0018). El diario lo dice en los dos casos: «Vercel no sirve sitios@…: build lanzado» o «Vercel ya sirve sitios@…: no hace falta otro build». Sin `origenPublico`, llama al hook en cada ejecución. En producción no hay hook ni `credenciales.vercel`. Despliega un flujo de GitHub, que mira por su cuenta si R2 tiene una versión que Vercel no sirve (abajo, «Las cuentas de R2 y Vercel»).
+La ingesta no lanza ningún build de Vercel, y su diario no dice nada de Vercel. Despliega un flujo de GitHub, que mira por su cuenta si R2 tiene una versión que Vercel no sirve y dice en su registro si despliega y por qué (abajo, «Las cuentas de R2 y Vercel»).
 
 ### Opciones
 
@@ -155,7 +147,6 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `copias.directorio` | `/var/lib/celda-nocturna/copias` | Dónde van las copias de la base y, en su carpeta `archivo`, los paquetes del archivo de páginas |
 | `copias.conservar` | 14 | Copias que se conservan, en el disco y en R2 |
 | `credenciales.r2` | `null` | Fichero de credenciales de R2, con la clave que escribe; sin él no se publica ni se suben la copia ni los paquetes del archivo |
-| `credenciales.vercel` | `null` | Fichero del deploy hook de Vercel; sin él no se lanza ningún build |
 | `credenciales.convex` | `null` | Fichero con la URL de las acciones HTTP del buzón y su clave de publicación (nunca una clave de despliegue); sin él no se publica lo aceptado en la moderación |
 | `origenPublico` | `null` | URL pública de las capas en Vercel, `https://celda.elies.site/capas` (`CELDA_ALMACEN_ORIGEN`) |
 | `reintentoDePublicacion` | 60 | Minutos antes de repetir una publicación fallida |
@@ -176,6 +167,8 @@ Todas cuelgan de `services.celda-nocturna`. Los valores por defecto son los del 
 | `registroOficial.userAgent` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición. Si montas tu propia ingesta, pon tu contacto |
 
 Ya no existen `horario`, `recuperarNochesPerdidas`, `registroOficial.fichas.relectura`, `registroOficial.fichas.prioridad`, `registroOficial.zonasEnTurno` ni `registroOficial.zonasPorNoche` (ADR 0029). Una configuración que las ponga no se construye, y el error dice qué hacer.
+
+El 21/10/2026 se quitó también `credenciales.vercel`, el fichero del deploy hook con el que la ingesta podía lanzar el build de Vercel (#84). En producción nunca se usó, porque despliega el flujo de GitHub (ADR 0018). Una configuración que la ponga tampoco se construye.
 
 Las zonas de barrido son `cataluna`, `centro`, `andalucia`, `levante`, `norte`, `ebro-y-duero` y `oeste-y-canarias` (la guía de la ingesta, en [convex.md](convex.md), dice qué comunidades lleva cada una). Cada ronda barre las siete, unas 215 peticiones de listado a una cada 3 s, unos 11 minutos. Para barrer solo una parte de España, por ejemplo en otra máquina que monte su propia ingesta:
 
@@ -259,7 +252,7 @@ Desde el ADR 0018, R2 es un almacén privado y la web, las capas y las fichas se
    | `CELDA_R2_SECRETO` | el Secret Access Key de la clave de solo lectura |
 
    Borra `VITE_CAPAS_ORIGEN` y `VITE_CAPAS_RESERVA` si están: la web ya no las lee y `vercel.sh` construye sin ellas. Sin las cuatro de R2, el build falla y Vercel sigue sirviendo el despliegue anterior.
-2. El proyecto no está conectado a Git ni tiene deploy hook. Despliega el flujo de GitHub Actions de abajo, con la CLI de Vercel (ADR 0018, «Cómo quedó el despliegue»). Si un día se conecta, el hook de la rama de producción (Settings → Git → Deploy Hooks) se guarda en la máquina de la ingesta como `credenciales.vercel`.
+2. El proyecto no está conectado a Git. Despliega el flujo de GitHub Actions de abajo, con la CLI de Vercel (ADR 0018, «Cómo quedó el despliegue»).
 3. Desde el 20/10/2026, la retención de los despliegues es de 1 día para todos los estados, puesta en el panel de Vercel para todo el equipo. Hobby guarda siempre los 3 últimos despliegues de producción.
 
 **En GitHub**, en los secretos del repositorio del flujo de despliegue (`.github/workflows/celda-despliegue.yml`):
@@ -288,12 +281,12 @@ Vercel no enseña las variables marcadas como «Sensitive». Si no se guardaron 
 Para comprobarlo tras la primera ejecución:
 
 ```sh
-journalctl --unit=celda-nocturna.service | grep -E 'Vercel|Copia de la base en R2'
-curl --silent https://celda.elies.site/capas/vigente.json   # el mismo que el de R2
+journalctl --unit=celda-nocturna.service | grep 'Copia de la base en R2'
+curl --silent https://celda.elies.site/capas/vigente.json   # el mismo que el de R2, tras el flujo de despliegue
 curl --silent --output /dev/null --write-out '%{http_code}\n' https://celda.elies.site/capas/no-esta.json   # 404
 ```
 
-El build de Vercel dice en su registro «Capas de sitios@… y de sitios@…, sitios@…: N ficheros».
+Producción sirve una versión nueva cuando la despliega el flujo de GitHub, como mucho un día después de publicarla. Su registro dice qué tiene R2 y qué sirve producción, y el build de Vercel dice en el suyo «Capas de sitios@… y de sitios@…, sitios@…: N ficheros».
 
 ### Restaurar la base desde R2
 

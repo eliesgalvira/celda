@@ -19,7 +19,6 @@ import {
   publicar,
   type ResultadoPublicacion,
 } from "@celda/publicacion/publicar";
-import { ponerAlDiaVercel, type ResultadoVercel, SitioEnVercel } from "@celda/publicacion/vercel";
 import type { ZonasDePublicacion } from "@celda/publicacion/zonas";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
@@ -67,16 +66,11 @@ export interface Intento {
   readonly reintentar: boolean;
 }
 
-/**
- * Publica la base en el almacén de la configuración, o no hace nada si no hay almacén, y lanza el
- * build de Vercel si aún no sirve la versión vigente.
- */
+/** Publica la base en el almacén de la configuración, o no hace nada si no hay almacén. */
 export class Publicador extends Context.Service<
   Publicador,
   {
     readonly publicar: Effect.Effect<Intento>;
-    /** Lanza el build de Vercel si no sirve ya la versión vigente del almacén (ADR 0018). */
-    readonly ponerAlDiaVercel: Effect.Effect<ResultadoVercel>;
   }
 >()("@celda/nocturna/programa/Publicador") {}
 
@@ -90,18 +84,12 @@ const PASAJEROS: ReadonlySet<FalloPublicacion["_tag"]> = new Set([
   "InstantaneaMovida",
 ]);
 
-const SIN_HOOK: Effect.Effect<ResultadoVercel> = Effect.succeed({ tipo: "sin-hook" });
-
-/**
- * El publicador sobre los `DatosPublicables` de la base y el almacén del contexto, con Vercel si
- * el contexto lo tiene.
- */
+/** El publicador sobre los `DatosPublicables` de la base y el almacén del contexto. */
 export const publicadorEn = (zonas: ZonasDePublicacion, porLote?: number) =>
   Layer.effect(
     Publicador,
     Effect.gen(function* () {
       const contexto = yield* Effect.context<DatosPublicables | AlmacenDeFicheros>();
-      const sitio = yield* Effect.serviceOption(SitioEnVercel);
       return Publicador.of({
         publicar: publicar(zonas, porLote).pipe(
           Effect.map((publicada): Intento => ({ resultado: publicada, reintentar: false })),
@@ -113,14 +101,6 @@ export const publicadorEn = (zonas: ZonasDePublicacion, porLote?: number) =>
           ),
           Effect.provideContext(contexto),
         ),
-        ponerAlDiaVercel: Option.match(sitio, {
-          onNone: () => SIN_HOOK,
-          onSome: (vercel) =>
-            ponerAlDiaVercel.pipe(
-              Effect.provideService(SitioEnVercel, vercel),
-              Effect.provideContext(contexto),
-            ),
-        }),
       });
     }),
   );
@@ -130,7 +110,6 @@ export const sinAlmacen = Layer.succeed(
   Publicador,
   Publicador.of({
     publicar: Effect.succeed({ resultado: { tipo: "sin-almacen" }, reintentar: false }),
-    ponerAlDiaVercel: SIN_HOOK,
   }),
 );
 
@@ -162,7 +141,7 @@ export interface EjecucionDeLaNoche {
   readonly detenida?: string;
 }
 
-/** Una ejecución parada por un cambio masivo en una fuente: no publica ni lanza el build. */
+/** Una ejecución parada por un cambio masivo en una fuente: no publica. */
 export interface PublicacionDetenida {
   readonly tipo: "detenida";
   readonly motivo: string;
@@ -172,7 +151,6 @@ export interface PublicacionDetenida {
 export interface Noche {
   readonly ejecuciones: ReadonlyArray<EjecucionDeLaNoche>;
   readonly publicacion: ResultadoPublicacion | PublicacionDetenida;
-  readonly vercel: ResultadoVercel;
   /** La copia de seguridad que se ha hecho, o `undefined` si ha fallado. */
   readonly copia: string | undefined;
   readonly copiaEnR2: CopiaEnR2;
@@ -315,30 +293,6 @@ const publicarYApuntar = Effect.fn("Nocturna.publicar")(function* (
   }
   return intento;
 });
-
-/** Lanza el build de Vercel si hace falta y lo apunta en el diario, haya hecho falta o no. */
-const ponerAlDiaYApuntarVercel = Effect.gen(function* () {
-  const publicador = yield* Publicador;
-  const vercel = yield* publicador.ponerAlDiaVercel;
-  switch (vercel.tipo) {
-    case "sin-hook":
-      yield* Effect.logInfo("Sin deploy hook de Vercel: no se lanza ningún build");
-      break;
-    case "sin-publicar":
-      yield* Effect.logInfo("Vercel: no hay nada publicado que montar");
-      break;
-    case "al-dia":
-      yield* Effect.logInfo(`Vercel ya sirve ${vercel.version}: no hace falta otro build`);
-      break;
-    case "desplegada":
-      yield* Effect.logInfo(`Vercel no sirve ${vercel.version}: build lanzado`);
-      break;
-    case "fallida":
-      yield* Effect.logWarning(`Vercel sin poner al día: ${vercel.motivo}`);
-      break;
-  }
-  return vercel;
-}).pipe(Effect.withSpan("Nocturna.ponerAlDiaVercel"));
 
 /** Una ejecución con el extractor que da `capa`, construido para ella sola. */
 const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<A, E, R>) =>
@@ -486,12 +440,9 @@ export const describirLoQueQueda = (
  *    publicar, lo hace ahora. Si falla por algo pasajero, lo apunta, espera `reintento` y lo
  *    intenta otra vez; si vuelve a fallar, queda para la ejecución siguiente. Los datos ya están
  *    en la base.
- * 3. Si Vercel no sirve la versión vigente del almacén, lanza su build con el deploy hook, y el
- *    build monta las capas desde R2 (ADR 0018). Se hace también si la publicación ha fallado:
- *    Vercel sigue a lo que haya en el almacén.
- * 4. Copia la base a la carpeta de copias y deja las `conservar` últimas. Con un cubo de R2,
+ * 3. Copia la base a la carpeta de copias y deja las `conservar` últimas. Con un cubo de R2,
  *    sube también la copia comprimida y deja allí otras tantas.
- * 5. Saca del archivo de páginas un paquete con lo nuevo de la ejecución, en la carpeta `archivo`
+ * 4. Saca del archivo de páginas un paquete con lo nuevo de la ejecución, en la carpeta `archivo`
  *    de la de copias, y sube a R2 los paquetes que aún no están allí (ADR 0027). Si falla, la
  *    ejecución acaba bien y lo que falta va con el paquete siguiente.
  *
@@ -538,7 +489,6 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
   // y lo que sirve Vercel se quedan como estaban hasta que alguien lo mire.
   const detenida = ejecuciones.find((e) => e.detenida !== undefined)?.detenida;
   let publicacion: ResultadoPublicacion | PublicacionDetenida;
-  let vercel: ResultadoVercel;
   if (detenida === undefined) {
     let intento = yield* publicarYApuntar(completadas);
     if (intento.reintentar) {
@@ -549,11 +499,9 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
       intento = yield* publicarYApuntar(completadas);
     }
     publicacion = intento.resultado;
-    vercel = yield* ponerAlDiaYApuntarVercel;
   } else {
     yield* Effect.logError(`La ejecución no publica: ${detenida}`);
     publicacion = { tipo: "detenida", motivo: detenida };
-    vercel = { tipo: "sin-hook" };
   }
 
   const copia = yield* copiarBase(opciones.copias).pipe(
@@ -570,7 +518,6 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
   const hecha: Noche = {
     ejecuciones,
     publicacion,
-    vercel,
     copia,
     copiaEnR2,
     archivo,
@@ -597,12 +544,8 @@ export const comprobarNoche = (hecha: Noche): Effect.Effect<void, NocheDetenida>
     ? Effect.fail(new NocheDetenida({ motivo: hecha.publicacion.motivo }))
     : Effect.void;
 
-/** Publica a mano, sin ingerir nada, lo apunta en la base y lanza el build de Vercel si hace falta. */
-export const publicarAMano = Effect.gen(function* () {
-  const { resultado } = yield* publicarYApuntar([]);
-  const vercel = yield* ponerAlDiaYApuntarVercel;
-  return { publicacion: resultado, vercel };
-});
+/** Publica a mano, sin ingerir nada, y lo apunta en la base. */
+export const publicarAMano = Effect.map(publicarYApuntar([]), ({ resultado }) => resultado);
 
 /**
  * Escribe el estado de la base: cada fuente y, del registro oficial, cuántas fichas le quedan a
