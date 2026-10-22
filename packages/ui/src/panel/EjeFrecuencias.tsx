@@ -21,20 +21,47 @@ export interface EjeFrecuenciasProps {
   readonly filas: ReadonlyArray<FilaEje>;
 }
 
-export const variantesCasilla = cva("hexagono inline-block h-[22px] w-5 align-middle", {
+/**
+ * Donde emite, el hexágono toma el color de la barra bajo su columna (`--en-el-eje`), así que la
+ * barra es su leyenda. La mezcla es en OKLab, como el degradado.
+ */
+const variantesCasilla = cva("hexagono inline-block h-[22px] w-5 align-middle", {
   variants: {
     emite: {
-      true: "bg-tinta",
+      true: "bg-[color-mix(in_oklab,var(--primario)_var(--en-el-eje),var(--eje-lejos))]",
       false: "bg-linea",
     },
   },
   defaultVariants: { emite: false },
 });
 
+/** El centro de la columna `indice` de `total`, en tanto por ciento del ancho de la barra. */
+const enElEje = (indice: number, total: number) => `${(((indice + 0.5) / total) * 100).toFixed(1)}%`;
+
+/** Una flecha de la leyenda, en la tinta del texto. */
+function Flecha(props: { readonly hacia: "izquierda" | "derecha" }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="10"
+      viewBox="0 0 16 10"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.75"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="shrink-0 text-tinta"
+    >
+      <path d={props.hacia === "izquierda" ? "M15 5H1.5M5.5 1 1.5 5l4 4" : "M1 5h13.5M10.5 1l4 4-4 4"} />
+    </svg>
+  );
+}
+
 /**
  * Qué frecuencia usa cada compañía (historia 14): una fila por compañía, una columna por banda y
  * un hexágono relleno donde emite. Debajo, una barra dice que las bandas de la izquierda llegan
- * más lejos y las de la derecha dan más velocidad.
+ * más lejos y las de la derecha dan más velocidad, y da su color a los hexágonos.
  */
 export function EjeFrecuencias(props: EjeFrecuenciasProps) {
   return (
@@ -72,12 +99,13 @@ export function EjeFrecuencias(props: EjeFrecuenciasProps) {
                 when={fila.nota}
                 fallback={
                   <For each={props.bandas}>
-                    {(banda) => (
+                    {(banda, indice) => (
                       <td class="py-1 text-center">
                         <span
                           aria-hidden="true"
                           data-emite={fila.bandas.includes(banda) ? "si" : "no"}
                           class={variantesCasilla({ emite: fila.bandas.includes(banda) })}
+                          style={{ "--en-el-eje": enElEje(indice(), props.bandas.length) }}
                         />
                         <span class="sr-only">{fila.bandas.includes(banda) ? "Sí" : "No"}</span>
                       </td>
@@ -103,13 +131,15 @@ export function EjeFrecuencias(props: EjeFrecuenciasProps) {
           <td colspan={props.bandas.length} class="pt-2">
             <span
               aria-hidden="true"
-              class="block h-1.5 bg-linear-to-r from-eje-lejos via-fondo to-primario"
+              class="block h-1.5 bg-linear-to-r from-eje-lejos to-primario"
             />
-            <span class="float-left mt-1 font-mono text-[10.5px] text-tinta-suave before:mr-1 before:content-['←']">
+            <span class="float-left mt-1.5 flex items-center gap-1.5 font-mono text-[10.5px] text-tinta-suave">
+              <Flecha hacia="izquierda" />
               Llega más lejos
             </span>
-            <span class="float-right mt-1 font-mono text-[10.5px] text-tinta-suave after:ml-1 after:content-['→']">
+            <span class="float-right mt-1.5 flex items-center gap-1.5 font-mono text-[10.5px] text-tinta-suave">
               Más velocidad
+              <Flecha hacia="derecha" />
             </span>
           </td>
         </tr>

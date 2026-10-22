@@ -44,4 +44,22 @@ describe("EjeFrecuencias", () => {
     assert.include(tabla.textContent, "Llega más lejos");
     assert.include(tabla.textContent, "Más velocidad");
   });
+
+  it("cada hexágono toma el color de la barra bajo el centro de su columna", () => {
+    const { getByRole } = render(() => (
+      <EjeFrecuencias
+        titulo="Qué frecuencia usa cada compañía (MHz)"
+        bandas={BANDAS}
+        filas={[{ compania: "movistar", nombre: "Movistar", bandas: [700, 3500] }]}
+      />
+    ));
+    flush();
+    const casillas = Array.from(
+      getByRole("row", { name: /Movistar/u }).querySelectorAll<HTMLElement>("[data-emite]"),
+    );
+    assert.deepStrictEqual(
+      casillas.map((casilla) => casilla.style.getPropertyValue("--en-el-eje")),
+      ["7.1%", "21.4%", "35.7%", "50.0%", "64.3%", "78.6%", "92.9%"],
+    );
+  });
 });

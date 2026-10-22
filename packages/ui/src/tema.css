@@ -80,8 +80,11 @@
   /* Lo que queda detrás de un diálogo */
   --velo: oklch(29.9% 0.005 121.8 / 0.45);
 
-  /* EJE DE FRECUENCIAS: el extremo de «llega más lejos»; el de «más velocidad» es el primario */
-  --eje-lejos: oklch(73% 0.08 78);
+  /*
+   * EJE DE FRECUENCIAS: el extremo de «llega más lejos»; el de «más velocidad» es el primario. Los
+   * hexágonos de las bandas toman su color de la barra, así que es un dato: 3:1 sobre el panel.
+   */
+  --eje-lejos: oklch(58% 0.1 75);
 
   /*
    * COMPAÑÍAS: el color oficial de cada marca, igual en los dos temas (marcadores/logos/FUENTES.md):
