@@ -35,21 +35,13 @@ describe("textos del punto de referencia", () => {
     const textos = textosReferencia(gps(25), EMPLAZAMIENTO);
     assert.strictEqual(textoPlano(textos.desde), "tu ubicación (±25 m)");
     assert.deepStrictEqual(terminosDe([textos.desde]), ["punto-de-referencia", "precision"]);
-    assert.strictEqual(
-      textos.relacion,
-      "El emplazamiento está a 340 m de ti, hacia el noreste (42°).",
-    );
     assert.isUndefined(textos.margen);
   });
 
   it("con un punto elegido habla del punto, nunca de ti", () => {
     const textos = textosReferencia({ tipo: "elegido", punto: PUNTO }, EMPLAZAMIENTO);
     assert.strictEqual(textoPlano(textos.desde), "el punto elegido");
-    assert.strictEqual(
-      textos.relacion,
-      "El emplazamiento está a 340 m del punto, hacia el noreste (42°).",
-    );
-    assert.notMatch(`${textoPlano(textos.desde)} ${textos.relacion}`, /\b(ti|tu|tú|estás)\b/iu);
+    assert.isUndefined(textos.margen);
   });
 
   it("si el margen del GPS es grande frente a la distancia, avisa de que es aproximada", () => {
@@ -58,14 +50,6 @@ describe("textos del punto de referencia", () => {
     // La precisión ya va subrayada en «Desde»: el margen no la repite.
     assert.deepStrictEqual(terminosDe([lejos.margen ?? []]), []);
     assert.isDefined(textosReferencia(gps(160), EMPLAZAMIENTO).margen);
-  });
-
-  it("encima del emplazamiento no inventa una dirección", () => {
-    const textos = textosReferencia(
-      { tipo: "elegido", punto: { ...PUNTO, posicion: EMPLAZAMIENTO } },
-      EMPLAZAMIENTO,
-    );
-    assert.strictEqual(textos.relacion, "El emplazamiento está a 10 m del punto.");
   });
 });
 

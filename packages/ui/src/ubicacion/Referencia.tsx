@@ -2,16 +2,12 @@ import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Show } from "solid-js";
 
-/**
- * El punto de referencia en la ficha del emplazamiento. Las tres formas del bloque (sin punto,
- * esperando y con punto) ocupan el mismo sitio y reservan una altura mínima, así que cambiar de
- * una a otra mueve poco el resto de la ficha.
- */
+/** El punto de referencia en la ficha del emplazamiento: sin punto, esperando o con punto. */
 export function SeccionReferencia(props: { readonly children: JSX.Element }) {
   return (
     <section
       aria-label="Punto de referencia"
-      class="flex min-h-[7.5rem] flex-col justify-center border-b border-linea px-5 py-3 md:px-6"
+      class="flex flex-col border-b border-linea px-5 py-3 md:px-6"
     >
       {props.children}
     </section>
@@ -78,15 +74,13 @@ const variantesMarcaReferencia = cva("hexagono mt-0.5 h-4 w-3.5 shrink-0", {
 export type ConReferenciaProps = VariantProps<typeof variantesMarcaReferencia> & {
   /** Desde dónde se mira: «tu ubicación (±25 m)» o «el punto elegido». Puede llevar términos. */
   readonly desde: JSX.Element;
-  /** Dónde queda el emplazamiento visto desde el punto. */
-  readonly relacion: string;
   /** Si la distancia es aproximada por el margen del GPS. Puede llevar términos. */
   readonly margen?: JSX.Element | undefined;
   /** Cambiar y quitar el punto (historia 33). */
   readonly acciones: JSX.Element;
 };
 
-/** Con punto de referencia: desde dónde se mira y qué da ese punto. */
+/** Con punto de referencia: desde dónde se mira y, con el GPS, si la distancia es aproximada. */
 export function ConReferencia(props: ConReferenciaProps) {
   return (
     <div data-tipo={props.tipo ?? "gps"} class="flex flex-col gap-1.5">
@@ -99,7 +93,6 @@ export function ConReferencia(props: ConReferenciaProps) {
         </p>
         <div class="flex">{props.acciones}</div>
       </div>
-      <p class="text-sm leading-relaxed">{props.relacion}</p>
       <Show when={props.margen}>
         <p class="text-xs leading-snug text-tinta-suave">{props.margen}</p>
       </Show>

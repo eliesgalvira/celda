@@ -165,14 +165,20 @@ export const codificarPng = (tamano: number, pixeles: Uint8Array): Uint8Array =>
   ]);
 };
 
+/**
+ * La descripción de la página y la del manifiesto: la misión de Celda (ADR 0031), corta para que un
+ * buscador o la vista previa de un enlace la enseñen entera.
+ */
+export const DESCRIPCION =
+  "Celda enseña con datos oficiales las antenas de móvil de España, sus compañías, sus bandas y lo que ha medido el ministerio, y a quién acudir si algo va mal.";
+
 const manifiesto = (colores: ColoresIcono): string => {
   const carpeta = CARPETA_ICONOS;
   return `${JSON.stringify(
     {
       name: "Celda",
       short_name: "Celda",
-      description:
-        "Mapa de las antenas de telefonía móvil de España, con la compañía de cada una y una estimación de cómo llega su señal.",
+      description: DESCRIPCION,
       lang: "es",
       start_url: "/",
       display: "standalone",
@@ -258,6 +264,7 @@ export const iconosDeCelda = (): Plugin => {
       handler() {
         const barra = coloresDeLaBarra(leerTema());
         return [
+          { tag: "meta", attrs: { name: "description", content: DESCRIPCION }, injectTo: "head" },
           ...(["claro", "oscuro"] as const).map((tema) => ({
             tag: "meta",
             // `data-tema` dice de qué tema es: con uno elegido en Ajustes, su `media` cambia

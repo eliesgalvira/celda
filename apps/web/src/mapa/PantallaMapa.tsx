@@ -17,6 +17,7 @@ import { FUENTE_LINEA_AL_PUNTO } from "@celda/ui/mapa/lineaAlPunto.ts";
 import { FUENTE_ZONA } from "@celda/ui/mapa/zona.ts";
 import { pixelesDeAltura } from "@celda/ui/panel/hoja.ts";
 import { IconoSenal } from "@celda/ui/medir/Medir.tsx";
+import { IconoSiAlgoVaMal } from "@celda/ui/problemas/Problemas.tsx";
 import { Pista } from "@celda/ui/Pista.tsx";
 import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import { CONSULTA_DEL_OSCURO } from "@celda/ui/temaElegido.ts";
@@ -92,24 +93,19 @@ import { aPieDeCalle, CREDITO_FOTO_AEREA, pideVerFoto } from "../foto/foto.ts";
 import { PanelFicha } from "../ficha/PanelFicha.tsx";
 import { type FichaPedida, FichasPublicadas } from "../ficha/servicio.ts";
 import {
-  ajustesAbiertos,
-  conAjustes,
+  conDialogo,
   conEjercicio,
-  conMedir,
-  aportacionesAbiertas,
-  conAportaciones,
   conEmplazamiento,
-  conLista,
+  dialogoAbierto,
   ejercicioDe,
   emplazamientoDe,
-  listaAbierta,
-  medirAbierto,
   navegar,
   provinciaDe,
   ruta,
   ubicacion,
 } from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
+import { DialogoSiAlgoVaMal } from "../problemas/DialogoSiAlgoVaMal.tsx";
 import { detectarDispositivo } from "../medir/dispositivo.ts";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
 import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
@@ -987,7 +983,6 @@ export function PantallaMapa() {
       vigente = false;
     };
   });
-  const midiendo = createMemo(() => medirAbierto(ubicacion()));
 
   /**
    * Con un filtro, de lejos, y un resumen publicado antes de las combinaciones de compañías: los
@@ -1116,7 +1111,11 @@ export function PantallaMapa() {
                         />
                       )}
                     </Show>
-                    <ReferenciaEnMapa mapa={actual()} escritorio={escritorio()} />
+                    <ReferenciaEnMapa
+                      mapa={actual()}
+                      escritorio={escritorio()}
+                      emplazamiento={posicionSeleccionada()}
+                    />
                   </>
                 )}
               </Show>
@@ -1149,7 +1148,7 @@ export function PantallaMapa() {
                     icono={<IconoListaDeEmplazamientos />}
                     aria-haspopup="dialog"
                     disabled={puntosListos() === undefined}
-                    onClick={() => navegar(conLista(ubicacion(), true))}
+                    onClick={() => navegar(conDialogo(ubicacion(), "lista", true))}
                   />
                 </Show>
                 <ControlDelMapa
@@ -1173,7 +1172,14 @@ export function PantallaMapa() {
                   detalle="Cómo verla en el móvil."
                   icono={<IconoSenal />}
                   aria-haspopup="dialog"
-                  onClick={() => navegar(conMedir(ubicacion(), true))}
+                  onClick={() => navegar(conDialogo(ubicacion(), "medir", true))}
+                />
+                <ControlDelMapa
+                  etiqueta="Si algo va mal"
+                  detalle="A quién acudir en cada problema."
+                  icono={<IconoSiAlgoVaMal />}
+                  aria-haspopup="dialog"
+                  onClick={() => navegar(conDialogo(ubicacion(), "si-algo-va-mal", true))}
                 />
               </>
             }
@@ -1219,13 +1225,13 @@ export function PantallaMapa() {
                   detalle="Para enviar tus medidas y correcciones."
                   icono={<IconoAportaciones />}
                   aria-haspopup="dialog"
-                  onClick={() => navegar(conAportaciones(ubicacion(), true))}
+                  onClick={() => navegar(conDialogo(ubicacion(), "aportaciones", true))}
                 />
                 <ControlDelMapa
                   etiqueta="Ajustes"
                   icono={<IconoAjustes />}
                   aria-haspopup="dialog"
-                  onClick={() => navegar(conAjustes(ubicacion(), true))}
+                  onClick={() => navegar(conDialogo(ubicacion(), "ajustes", true))}
                 />
               </>
             }
@@ -1248,6 +1254,9 @@ export function PantallaMapa() {
                       redUsada={redUsadaDeLaSeleccionada()}
                       barrio={barrioDeLaSeleccionada()}
                       alCerrar={() => navegar(ruta.mapa)}
+                      alAbrirSiAlgoVaMal={() =>
+                        navegar(conDialogo(ubicacion(), "si-algo-va-mal", true))
+                      }
                     />
                   )}
                 </Match>
@@ -1272,41 +1281,57 @@ export function PantallaMapa() {
               </Switch>
             }
           />
-          <Show when={midiendo()}>
+          <Show when={dialogoAbierto(ubicacion(), "si-algo-va-mal")}>
+            <DialogoSiAlgoVaMal
+              alCerrar={() =>
+                navegar(conDialogo(ubicacion(), "si-algo-va-mal", false), { reemplazar: true })
+              }
+              alMedir={() => navegar(conDialogo(ubicacion(), "medir", true))}
+            />
+          </Show>
+          <Show when={dialogoAbierto(ubicacion(), "medir")}>
             <DialogoMedir
               navegador={{ ...leerNavegador(), modelo: modelo() }}
               direccionMovil={new URL(ruta.medir, window.location.origin).href}
-              alCerrar={() => navegar(conMedir(ubicacion(), false), { reemplazar: true })}
+              alCerrar={() =>
+                navegar(conDialogo(ubicacion(), "medir", false), { reemplazar: true })
+              }
             />
           </Show>
-          <Show when={aportacionesAbiertas(ubicacion())}>
+          <Show when={dialogoAbierto(ubicacion(), "aportaciones")}>
             <DialogoAportaciones
               dispositivo={detectarDispositivo({ ...leerNavegador(), modelo: modelo() }).tipo}
-              alCerrar={() => navegar(conAportaciones(ubicacion(), false), { reemplazar: true })}
+              alCerrar={() =>
+                navegar(conDialogo(ubicacion(), "aportaciones", false), { reemplazar: true })
+              }
               alElegirPunto={() => {
-                navegar(conAportaciones(ubicacion(), false), { reemplazar: true });
+                navegar(conDialogo(ubicacion(), "aportaciones", false), { reemplazar: true });
                 puntoDeReferencia.elegirEnMapa();
               }}
             />
           </Show>
-          <Show when={listaAbierta(ubicacion()) ? puntosListos() : undefined}>
+          <Show when={dialogoAbierto(ubicacion(), "lista") ? puntosListos() : undefined}>
             {(actuales) => (
               <DialogoLista
                 puntos={actuales().puntos}
                 caja={vistaDelEncuadre()?.caja}
                 filtro={filtro.aplicado()}
                 alElegir={(indice) => {
-                  navegar(conLista(ubicacion(), false), { reemplazar: true });
+                  navegar(conDialogo(ubicacion(), "lista", false), { reemplazar: true });
                   abrirPunto(indice);
                 }}
-                alCerrar={() => navegar(conLista(ubicacion(), false), { reemplazar: true })}
+                alCerrar={() =>
+                  navegar(conDialogo(ubicacion(), "lista", false), { reemplazar: true })
+                }
               />
             )}
           </Show>
-          <Show when={ajustesAbiertos(ubicacion())}>
+          <Show when={dialogoAbierto(ubicacion(), "ajustes")}>
             <DialogoAjustes
               tema={tema}
-              alCerrar={() => navegar(conAjustes(ubicacion(), false), { reemplazar: true })}
+              alCerrar={() =>
+                navegar(conDialogo(ubicacion(), "ajustes", false), { reemplazar: true })
+              }
             />
           </Show>
         </FotoContexto>

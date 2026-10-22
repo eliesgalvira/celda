@@ -1,8 +1,8 @@
 # Celda
 
-Celda es una web que enseña en un mapa las antenas de telefonía móvil de España y de qué compañía son. Estará en celda.elies.site.
+Celda enseña, con los datos oficiales, qué antenas de móvil hay en un sitio, de qué compañía son, en qué bandas emiten y qué ha medido el ministerio a su alrededor, y explica a quién acudir cuando algo va mal. Estará en celda.elies.site.
 
-El mapa abre con un hexágono por provincia y su número de emplazamientos. Al acercarse salen los municipios, los barrios de Barcelona y cada emplazamiento del registro oficial con los logos de sus compañías y la fecha de los datos. La ingesta barre el registro de toda España por zonas, y de las provincias que aún no ha barrido el mapa dice que no las tiene. El primer fin de semana de cada mes la ingesta lee las fuentes, las fusiona en emplazamientos y publica la instantánea como capas estáticas por provincia que la web descarga. El glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
+El mapa abre con un punto por emplazamiento del registro oficial, y al acercarse salen los logos de sus compañías y la fecha de los datos. La ficha de cada emplazamiento dice en qué bandas emite cada compañía y desde cuándo lo publica el registro. «Si algo va mal», en «Funciones», dice a quién se acude en cada problema, en qué orden y con qué plazos. La ingesta barre el registro de toda España por zonas, y de las provincias que aún no ha barrido el mapa dice que no las tiene. El primer fin de semana de cada mes la ingesta lee las fuentes, las fusiona en emplazamientos y publica la instantánea como capas estáticas por provincia que la web descarga. El glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
 
 ## Arrancar
 

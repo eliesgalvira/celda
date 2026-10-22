@@ -1,7 +1,13 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import tema from "../tema.css?raw";
-import { coloresDeLaBarra, ficherosDeIconos, pixelesDeIcono, coloresDeIconos } from "./iconos.ts";
+import {
+  coloresDeLaBarra,
+  DESCRIPCION,
+  ficherosDeIconos,
+  pixelesDeIcono,
+  coloresDeIconos,
+} from "./iconos.ts";
 
 const ficheros = ficherosDeIconos(tema);
 
@@ -27,7 +33,13 @@ describe("iconos de la marca", () => {
     assert.notInclude(String(svg), "oklch");
     assert.match(String(svg), /fill="#[\da-f]{6}"/u);
     const manifiesto: unknown = JSON.parse(String(ficheros.get("iconos/manifest.webmanifest")));
-    assert.deepInclude(manifiesto, { name: "Celda", lang: "es", start_url: "/" });
+    assert.deepInclude(manifiesto, {
+      name: "Celda",
+      lang: "es",
+      start_url: "/",
+      description: DESCRIPCION,
+    });
+    assert.isAtMost(DESCRIPCION.length, 160);
   });
 
   it("los PNG empiezan por la firma y dicen su tamaño", () => {

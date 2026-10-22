@@ -232,9 +232,10 @@ Las piezas están en `ubicacion/`. Cómo encajan con el estado de la ubicación 
 - `MenuUbicacion.tsx`: el botón hexagonal con la mirilla y su menú, un `fieldset` con `OpcionUbicacion`. Cada opción lleva la etiqueta como nombre accesible y su explicación en `aria-describedby`; una desactivada sigue a la vista con el motivo. Escape o un clic fuera lo cierran.
 - El paso previo es un `Dialogo` con dos piezas de `PasoPrevio.tsx`: `ListaPasoPrevio` y `AccionesPasoPrevio`, la fila de botones del final.
 - `EleccionDePunto.tsx`: en escritorio, una barra bajo la cabecera; en el móvil, una hoja abajo con «Cancelar» y «Usar este punto». `BuscadorDeDirecciones` es un `<search>` con un formulario: busca al enviar, enseña el estado bajo el campo y cita el servicio. Cada resultado lleva su nombre, el detalle y, debajo, el municipio con la provincia.
-- `Referencia.tsx`: el bloque de la ficha. `SinReferencia`, `EsperandoReferencia` y `ConReferencia` van dentro de `SeccionReferencia`, que reserva 7,5rem de alto. Con punto, `ConReferencia` dice a qué distancia y hacia dónde queda el emplazamiento.
+- `Referencia.tsx`: el bloque de la ficha. `SinReferencia`, `EsperandoReferencia` y `ConReferencia` van dentro de `SeccionReferencia`, que mide lo que su contenido. Con punto, `ConReferencia` es una línea con «Desde:» y los botones de cambiarlo y quitarlo, y con el GPS, el margen si la distancia es aproximada. La distancia y el rumbo van en «Mejorar la señal».
 - `PuntoElegido` para el `mousedown` con un escuchador nativo. `onMouseDown` de Solid se atiende en el documento, cuando MapLibre ya ha recibido el evento en su contenedor, y el mapa se movía a la vez que el punto.
 - La línea del emplazamiento seleccionado al punto va en su propia capa del estilo (`mapa/lineaAlPunto.ts`), con `--mapa-referencia`, trazo discontinuo de 1,6 px y bajo los nombres de las calles. Sale desde el zoom 15, en medio nivel de fundido. La web le pone los datos con cada movimiento del punto (`lineaAlPunto` en `apps/web/src/ubicacion`).
+- `EtiquetaReferencia` pone junto al punto la distancia al emplazamiento seleccionado, como «270 m», en cualquier zoom. Va a la izquierda del punto si el emplazamiento queda a su derecha en la pantalla, y a la derecha si no, para no tapar la línea. Sale de las dos posiciones, como la línea, y la ficha ya la dice, así que no se anuncia.
 - `DisposicionMapa` recibe `ubicacion` (bajo la fecha de los datos), `eligiendo`, `pinCentral` y `dialogo`. Con `eligiendo`, en el móvil se aparta la hoja de la ficha y los controles, y los créditos quedan por encima de la hoja de elegir. En escritorio el cursor del mapa es una cruz. Las reglas del móvil que suben piezas por encima del resumen usan `data-hoja` (panel abierto y no eligiendo); las de escritorio, `data-panel`.
 - `Boton` tiene la variante `ancho="completo"` para el botón principal de una fila, como «Usar este punto».
 
@@ -311,6 +312,13 @@ Las piezas están en `buzon/Compartir.tsx`; cuándo se usan, en `apps/web/src/bu
 - La columna de la derecha reserva 12,5 rem de alto: pasar de un estado de la brújula a otro mueve poco la ficha. En el móvil el dial mide 6,5 rem y en escritorio 7,5.
 - La barra que simula el giro es el `Deslizador` de `Eleccion.tsx`, con la etiqueta «Simular el giro».
 
+## Si algo va mal
+
+- `problemas/DialogoSiAlgoVaMal.tsx` es un `Dialogo` con `?si-algo-va-mal` en la URL. Se abre desde «Funciones», tras «Medir mi señal», con `IconoSiAlgoVaMal` (`problemas/Problemas.tsx`), y desde el enlace «A quién acudir si algo va mal», al final de «Mejorar la señal» en la ficha (`alAbrirSiAlgoVaMal` de `PanelFicha`). Va al final de esa sección porque es donde acaba lo que Celda puede hacer por la señal.
+- Los seis casos son `Desplegable` en recuadro, plegados al abrir. Dentro van los pasos con `Pasos` y `Paso`, con los enlaces del paso en `acciones`, y una `Nota` «Qué conviene guardar» con `Puntos`. En los casos de la cobertura, el barrio y el aparato que interfiere, un botón «Medir mi señal» abre su diálogo encima (`?si-algo-va-mal&medir`), y al cerrarlo se vuelve al panel. En los demás no sale, porque ahí una medida propia no sirve.
+- Los textos salen de la investigación 09 ([reclamaciones-y-exposicion.md](../investigacion/reclamaciones-y-exposicion.md)) y solo dan por seguro lo que marca como comprobado. Lo inferido o no confirmado se dice como dudoso («No está claro…», «Lo más probable…») o no sale. Los enlaces son los de `PAGINAS`, todos a páginas oficiales, y se abren aparte. Al final, la fecha en que se leyeron (ADR 0031).
+- Los diálogos de «Funciones» (`?medir`, `?ajustes`, `?aportaciones`, `?lista` y `?si-algo-va-mal`) se abren y se cierran con `dialogoAbierto` y `conDialogo` de `lib/rutas.ts`, que escriben el parámetro sin `=`.
+
 ## Filtro de compañías
 
 Las piezas están en `filtro/FiltroDeCompanias.tsx`; cuándo se usan, en `apps/web/src/filtro` (ADR 0026).
@@ -344,7 +352,7 @@ La marca es la celda de un emplazamiento con sus tres sectores. Sale de `marca/g
 
 ## Favicon, iconos y manifiesto
 
-No hay ficheros de iconos en el repositorio: el plugin `iconosDeCelda` (`marca/iconos.ts`, en `apps/web/vite.config.ts`) los genera desde la geometría de la marca y los tokens `--icono-*` de `tema.css`. En desarrollo los sirve y en la build los escribe en `dist/iconos/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180 px), `icono-192.png`, `icono-512.png` y `manifest.webmanifest`, y pone en el HTML sus enlaces.
+No hay ficheros de iconos en el repositorio: el plugin `iconosDeCelda` (`marca/iconos.ts`, en `apps/web/vite.config.ts`) los genera desde la geometría de la marca y los tokens `--icono-*` de `tema.css`. En desarrollo los sirve y en la build los escribe en `dist/iconos/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180 px), `icono-192.png`, `icono-512.png` y `manifest.webmanifest`, y pone en el HTML sus enlaces y la descripción de la página. La descripción es la misión (ADR 0031) en 160 caracteres como mucho, para que un buscador la enseñe entera, y es la misma del manifiesto (`DESCRIPCION`).
 
 - Los PNG salen de `marca/raster.ts`, un rasterizador de polígonos par-impar con suavizado, sin dependencias, y se codifican con `node:zlib`.
 - El favicon es la figura sin fondo: su parte oscura lleva `--icono-fondo` y lo recortado `--icono-figura`, así que se ve en pestañas claras y oscuras. El icono de la pantalla de inicio va a sangre sobre un cuadrado oscuro, porque el sistema lo recorta a su forma.

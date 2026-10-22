@@ -1,4 +1,4 @@
-import { type Coordenada, distanciaMetros, rumboGrados } from "@celda/dominio/area";
+import { type Coordenada, distanciaMetros } from "@celda/dominio/area";
 import { type AlcanceDeLosDatos, distanciaALosDatos } from "@celda/dominio/cobertura";
 import { bloque, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
@@ -36,31 +36,23 @@ const PRECISION_GRUESA = 100;
 export interface TextosReferencia {
   /** Desde dónde se mira: «tu ubicación (±25 m)» o «el punto elegido». */
   readonly desde: TextoMarcado;
-  /** Dónde queda el emplazamiento visto desde el punto de referencia. */
-  readonly relacion: string;
   /** Si la precisión del GPS no da para fiarse de la distancia, lo dice. */
   readonly margen: TextoMarcado | undefined;
 }
 
 /**
  * Los textos del punto de referencia en la ficha de un emplazamiento. Con la ubicación GPS hablan
- * de «ti» y con un punto elegido, del «punto» (historia 31).
+ * de «ti» y con un punto elegido, del «punto» (historia 31). La distancia y el rumbo los dice
+ * «Mejorar la señal», justo debajo.
  */
 export const textosReferencia = (
   referencia: Referencia,
   emplazamiento: Coordenada,
 ): TextosReferencia => {
-  const desde = posicionDe(referencia);
-  const metros = distanciaMetros(desde, emplazamiento);
-  const rumbo = Math.round(rumboGrados(desde, emplazamiento)) % 360;
-  const hacia = metros < 5 ? "." : `, hacia el ${nombreRumbo(rumbo)} (${rumbo}°).`;
   if (referencia.tipo === "elegido") {
-    return {
-      desde: termino("punto-de-referencia", "el punto elegido"),
-      relacion: `El emplazamiento está a ${textoDistancia(metros)} del punto${hacia}`,
-      margen: undefined,
-    };
+    return { desde: termino("punto-de-referencia", "el punto elegido"), margen: undefined };
   }
+  const metros = distanciaMetros(posicionDe(referencia), emplazamiento);
   const { precision } = referencia.lectura;
   // «Desde» y el margen van en el mismo bloque: la precisión se subraya una sola vez.
   const marcar = bloque();
@@ -68,7 +60,6 @@ export const textosReferencia = (
     desde: marcar(
       marcado`${termino("punto-de-referencia", "tu ubicación")} (${termino("precision", textoPrecision(precision))})`,
     ),
-    relacion: `El emplazamiento está a ${textoDistancia(metros)} de ti${hacia}`,
     margen:
       precision > PRECISION_GRUESA || precision > metros / 2
         ? marcar(

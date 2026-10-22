@@ -40,12 +40,10 @@ describe("queSale", () => {
         "Dónde la tomaste",
         "Código del emplazamiento que daba servicio",
         "Posición del emplazamiento",
-        "Orientación del sector",
         "Creada",
         "Código al azar de esta aportación",
       ],
     );
-    assert.deepInclude(datos, { nombre: "Orientación del sector", valor: "no se sabe" });
   });
 });
 

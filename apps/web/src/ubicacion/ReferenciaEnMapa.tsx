@@ -1,5 +1,7 @@
+import { type Coordenada, distanciaMetros } from "@celda/dominio/area";
 import {
   CapaDeReferencia,
+  EtiquetaReferencia,
   PuntoElegido,
   UbicacionGps,
 } from "@celda/ui/ubicacion/MarcadorReferencia.tsx";
@@ -9,7 +11,7 @@ import { createMemo, createSignal, Match, Show, Switch, useContext } from "solid
 
 import { UbicacionContexto } from "./controlador.ts";
 import { posicionDe } from "./estado.ts";
-import { textoPrecision } from "./textos.ts";
+import { textoDistancia, textoPrecision } from "./textos.ts";
 
 /** Metros de un grado de latitud: basta para dibujar el círculo de precisión. */
 const METROS_POR_GRADO = 111_320;
@@ -18,9 +20,14 @@ export interface ReferenciaEnMapaProps {
   readonly mapa: MapaMapLibre;
   /** En escritorio el punto elegido se arrastra; en el móvil el dedo mueve el mapa. */
   readonly escritorio: boolean;
+  /** Dónde está el emplazamiento seleccionado: junto al punto va la distancia hasta él. */
+  readonly emplazamiento: Coordenada | undefined;
 }
 
-/** El punto de referencia sobre el mapa: la ubicación GPS con su precisión o el punto elegido. */
+/**
+ * El punto de referencia sobre el mapa: la ubicación GPS con su precisión o el punto elegido y, con
+ * un emplazamiento seleccionado, la distancia hasta él.
+ */
 export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
   const control = useContext(UbicacionContexto);
   const [fotograma, setFotograma] = createSignal(0);
@@ -44,16 +51,34 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
     if (referencia === undefined) return undefined;
     // La proyección cambia con cada fotograma aunque no lo lea.
     void fotograma();
-    const { longitud, latitud } = posicionDe(referencia);
-    const punto = props.mapa.project([longitud, latitud]);
+    const posicion = posicionDe(referencia);
+    const punto = props.mapa.project([posicion.longitud, posicion.latitud]);
     const precision = referencia.tipo === "gps" ? referencia.lectura.precision : 0;
-    const borde = props.mapa.project([longitud, latitud + precision / METROS_POR_GRADO]);
+    const borde = props.mapa.project([
+      posicion.longitud,
+      posicion.latitud + precision / METROS_POR_GRADO,
+    ]);
     return {
       tipo: referencia.tipo,
+      posicion,
       precision,
       x: punto.x,
       y: punto.y,
       radio: Math.abs(punto.y - borde.y),
+    };
+  });
+
+  /** La distancia, al lado contrario del emplazamiento para no tapar la línea que los une. */
+  const etiqueta = createMemo(() => {
+    const punto = enPantalla();
+    const emplazamiento = props.emplazamiento;
+    if (punto === undefined || emplazamiento === undefined) return undefined;
+    const enLaPantalla = props.mapa.project([emplazamiento.longitud, emplazamiento.latitud]);
+    return {
+      x: punto.x,
+      y: punto.y,
+      texto: textoDistancia(distanciaMetros(punto.posicion, emplazamiento)),
+      lado: enLaPantalla.x > punto.x ? ("izquierda" as const) : ("derecha" as const),
     };
   });
 
@@ -88,6 +113,16 @@ export function ReferenciaEnMapa(props: ReferenciaEnMapaProps) {
               />
             </Match>
           </Switch>
+          <Show when={etiqueta()}>
+            {(actual) => (
+              <EtiquetaReferencia
+                x={actual().x}
+                y={actual().y}
+                texto={actual().texto}
+                lado={actual().lado}
+              />
+            )}
+          </Show>
         </CapaDeReferencia>
       )}
     </Show>

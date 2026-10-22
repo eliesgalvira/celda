@@ -13,7 +13,6 @@ Fuentes consultadas: un proyecto previo del autor sobre reactividad y el gist `e
 - Sin CSS a medida: las pantallas se componen con la librería de componentes, y el diseño todavía va a cambiar.
 - Primera versión: área de Barcelona, sin cuentas, con las aportaciones guardadas en el dispositivo y límites de uso estrictos.
 - Pública y de código abierto más adelante: todo vive en una carpeta propia.
-- Debe servir de base para experimentos de simulación, y más adelante también con Bend.
 
 ## Vista general
 
@@ -31,7 +30,6 @@ OpenCelliD       └────────────────────
 ┌──────────────────────────── navegador ───────────────────────────────┐
 │ Solid 2 (SPA)  ── lecturas en vivo (ficha) ──►  Convex               │
 │   │  MapLibre (mapa base OpenFreeMap) + capa JSON de emplazamientos    │
-│   │  Worker: simulaciones (radiación, SINR, celdas)                  │
 │   └  IndexedDB: medidas y puntos del usuario (formato definitivo)    │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -47,7 +45,6 @@ celda/
   apps/web/            Solid 2 SPA
   convex/              funciones y esquema de Convex (Confect)
   packages/dominio/    esquemas Effect y tipos del dominio, sin E/S
-  packages/sim/        núcleos de simulación puros (interfaz Simulación)
   packages/ui/         librería de componentes y tema Hexágono
   packages/ingesta/    extractores y fusión de fuentes
   tools/capas/         generador de capas (JSON; PMTiles si la zona crece)
@@ -148,7 +145,6 @@ interface Simulacion<Params, Resultado> {
 |---|---|
 | Cambiar de emplazamiento y ver la ficha del anterior con el nombre nuevo | `<Loading on={idEmplazamiento}>`: el cambio de identidad es un límite duro. |
 | Capa del mapa y ficha con versiones distintas | Marca de agua por vista: se ve la versión de cada una y cuál es más reciente. |
-| Simulación presentada como dato | Toda simulación lleva «modelo» y su `version`, y el azimut estimado lleva ±15°. |
 | Ubicación desconocida tratada como conocida | Estados explícitos: ninguna, denegada, GPS con precisión, punto elegido. |
 | Medida de ejemplo confundida con una propia | Tipo distinto en el dominio, no solo un color. |
 | Corrección de la comunidad presentada como dato oficial | Cada dato lleva su fuente, y los conflictos se muestran, no se esconden. |

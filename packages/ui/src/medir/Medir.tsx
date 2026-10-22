@@ -71,6 +71,8 @@ export interface PasoProps {
   readonly numero: number;
   readonly titulo: string;
   readonly children?: JSX.Element;
+  /** Botones o enlaces del paso, como el de la página oficial a la que lleva. */
+  readonly acciones?: JSX.Element;
 }
 
 /** Un paso con su número en un hexágono. */
@@ -86,6 +88,9 @@ export function Paso(props: PasoProps) {
       <div class="flex min-w-0 flex-col gap-1.5">
         <p class="pt-1 font-semibold">{props.titulo}</p>
         {props.children}
+        <Show when={props.acciones}>
+          <div class="flex flex-wrap gap-x-4">{props.acciones}</div>
+        </Show>
       </div>
     </li>
   );

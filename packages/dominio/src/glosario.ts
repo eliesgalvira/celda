@@ -95,9 +95,10 @@ export const GLOSARIO: Glosario = {
     nombre: "Azimut",
     explicacion:
       "Hacia dónde apunta un sector, en grados, como en una brújula: 0 es el norte, 90 el " +
-      "este, 180 el sur y 270 el oeste. Casi nunca se publica.",
+      "este, 180 el sur y 270 el oeste. El registro oficial no lo publica, así que Celda no " +
+      "dibuja hacia dónde emite cada sector.",
     tecnico: "azimut",
-    relacionados: ["sector"],
+    relacionados: ["sector", "rumbo"],
   },
   cobertura: {
     nombre: "Cobertura",
@@ -265,7 +266,7 @@ export const GLOSARIO: Glosario = {
       "La unidad con que se compara la señal. Perder 3 dB es quedarse con la mitad y perder " +
       "10 dB, con la décima parte. Por eso unos pocos dB ya se notan.",
     tecnico: "decibelio (dB)",
-    relacionados: [],
+    relacionados: ["router-movil"],
   },
   "radio-de-cobertura": {
     nombre: "Radio de cobertura",
