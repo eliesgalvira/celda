@@ -17,8 +17,6 @@ import type { Tema } from "./tokens.ts";
 
 export type EleccionDeTema = "sistema" | Tema;
 
-export const ELECCIONES_DE_TEMA: ReadonlyArray<EleccionDeTema> = ["sistema", "claro", "oscuro"];
-
 /** La clave de la elección en el `localStorage`. Sin ella, Sistema. */
 export const CLAVE_DEL_TEMA = "celda:tema";
 
@@ -100,13 +98,6 @@ export const GUION_DEL_TEMA =
   `m.setAttribute("media",m.getAttribute("data-tema")===t?"all":"not all")});` +
   `var c=d.querySelector('meta[name="color-scheme"]');if(c)c.setAttribute("content",t==="claro"?"light":"dark")}` +
   `}catch(e){}`;
-
-/**
- * El hash del guion para una CSP. Hoy la web no lleva CSP; si un día la lleva, `script-src`
- * tiene que incluir este valor entre comillas simples o el guion no correrá y la web saldrá
- * siempre con el tema del sistema. Una prueba falla si el guion cambia y el hash no.
- */
-export const HASH_DEL_GUION_DEL_TEMA = "sha256-/kNsuin1S0rUl0nQCsonXR3I5I8eha6VIsnlR8K2nGc=";
 
 /**
  * Plugin de Vite que pone `GUION_DEL_TEMA` en el `<head>` del HTML, antes de la hoja de estilos:

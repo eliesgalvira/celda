@@ -27,14 +27,9 @@ export interface OpcionesRecurso<K> {
    * (`mismosCampos`, `mismasListas` o uno propio).
    */
   readonly iguales?: (a: K, b: K) => boolean;
-  /**
-   * Cuántas aperturas por segundo son normales. Pasar de ahí es un bucle y el vigilante avisa. Los
-   * recursos que siguen un gesto (arrastrar, un deslizador) abren uno por evento y suben el tope.
-   */
-  readonly maximoPorSegundo?: number;
 }
 
-/** Aperturas por segundo de un recurso a partir de las cuales el vigilante avisa. */
+/** Aperturas por segundo de un recurso que son normales. Pasar de ahí es un bucle y el vigilante avisa. */
 export const MAXIMO_POR_SEGUNDO = 10;
 
 const cerrada = <K>(clave: K | Cerrado): clave is Cerrado =>
@@ -58,7 +53,6 @@ export function recurso<K>(
   opciones: OpcionesRecurso<K> = {},
 ): void {
   const iguales = opciones.iguales ?? Object.is;
-  const maximo = opciones.maximoPorSegundo ?? MAXIMO_POR_SEGUNDO;
   const actual = createMemo(clave, {
     equals: (a, b) => Object.is(a, b) || (!cerrada(a) && !cerrada(b) && iguales(a, b)),
   });
@@ -75,7 +69,7 @@ export function recurso<K>(
       return;
     }
     cerrarAhora(ahora);
-    contarApertura(nombre, maximo);
+    contarApertura(nombre);
     cerrar = untrack(() => abrir(ahora));
   });
   onCleanup(() => cerrarAhora(undefined));
@@ -122,15 +116,15 @@ const avisarEnConsola = (exceso: Exceso) => {
   );
 };
 
-const contarApertura = (nombre: string, maximo: number) => {
+const contarApertura = (nombre: string) => {
   if (!VIGILAR) return;
   const ahora = performance.now();
   const cuenta = aperturas.get(nombre) ?? { total: 0, recientes: [] };
   cuenta.total += 1;
   cuenta.recientes = [...cuenta.recientes.filter((t) => ahora - t < 1000), ahora];
   aperturas.set(nombre, cuenta);
-  if (cuenta.recientes.length > maximo) {
-    const exceso = { nombre, veces: cuenta.recientes.length, maximo };
+  if (cuenta.recientes.length > MAXIMO_POR_SEGUNDO) {
+    const exceso = { nombre, veces: cuenta.recientes.length, maximo: MAXIMO_POR_SEGUNDO };
     // Un aviso por ráfaga: la cuenta del segundo vuelve a empezar.
     cuenta.recientes = [];
     excesos.push(exceso);

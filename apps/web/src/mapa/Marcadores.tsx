@@ -13,9 +13,13 @@ import {
   radioDePunto,
 } from "@celda/ui/mapa/puntos.ts";
 import { CAPA_DE_VUELO, capaDeVuelo } from "@celda/ui/mapa/vuelo.ts";
-import { DURACION_MOVIMIENTO_MS, type Salto } from "@celda/ui/marcadores/Deslizable.tsx";
-import { CapaDeTraspaso, PuntoDeTraspaso } from "@celda/ui/puntos/Puntos.tsx";
-import { CapaDeRotulos, RotuloDeCiudad } from "@celda/ui/marcadores/RotuloDeCiudad.tsx";
+import {
+  DURACION_MOVIMIENTO_MS,
+  LaminaMuda,
+  type Salto,
+} from "@celda/ui/marcadores/Deslizable.tsx";
+import { PuntoDeTraspaso } from "@celda/ui/puntos/Puntos.tsx";
+import { RotuloDeCiudad } from "@celda/ui/marcadores/RotuloDeCiudad.tsx";
 import { mismasListas, recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import type {
   CustomLayerInterface,
@@ -648,7 +652,7 @@ export function Marcadores(props: MarcadoresProps) {
     <>
       <Show when={moviendose()}>
         {(paso) => (
-          <CapaDeTraspaso contenedor={props.mapa.getCanvasContainer()} salto={lamina().salto}>
+          <LaminaMuda contenedor={props.mapa.getCanvasContainer()} salto={lamina().salto}>
             <For each={paso().puntos} keyed={(punto) => punto.clave}>
               {(punto) => (
                 <PuntoQueSeMueve
@@ -659,7 +663,7 @@ export function Marcadores(props: MarcadoresProps) {
                 />
               )}
             </For>
-          </CapaDeTraspaso>
+          </LaminaMuda>
         )}
       </Show>
       <CapaAgrupada
@@ -681,7 +685,7 @@ export function Marcadores(props: MarcadoresProps) {
         alAbrir={abrir}
         traspaso={traspasoDeCapa()}
       />
-      <CapaDeRotulos contenedor={props.mapa.getCanvasContainer()} salto={lamina().salto}>
+      <LaminaMuda contenedor={props.mapa.getCanvasContainer()} salto={lamina().salto}>
         <For each={rotulosEncima()} keyed={(rotulo) => rotulo.clave}>
           {(rotulo) => (
             <RotuloEnPantalla
@@ -692,7 +696,7 @@ export function Marcadores(props: MarcadoresProps) {
             />
           )}
         </For>
-      </CapaDeRotulos>
+      </LaminaMuda>
     </>
   );
 }

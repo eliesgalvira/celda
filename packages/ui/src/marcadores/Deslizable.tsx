@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import { Portal } from "@solidjs/web";
 import { cva } from "class-variance-authority";
 
 /** Desplazamiento en píxeles de pantalla respecto a la posición del propio marcador. */
@@ -10,6 +11,32 @@ export interface Salto {
 /** El `transform` de una lámina desplazada `salto` píxeles. */
 export const trasladoDeLamina = (salto: Salto): string =>
   `translate(${salto.x.toFixed(1)}px, ${salto.y.toFixed(1)}px)`;
+
+/**
+ * Una lámina dentro del contenedor del mapa que se desplaza con la de los marcadores
+ * (`CapaDeMarcadores`). No recoge gestos y el lector de pantalla no la lee: lo que lleva repite lo
+ * que el mapa ya dice, como los rótulos de ciudad del mapa base o los puntos que se mueven en el
+ * paso a los logos (ADR 0028). Queda bajo los marcadores si se monta antes y encima si se monta
+ * después.
+ */
+export function LaminaMuda(props: {
+  readonly contenedor: HTMLElement;
+  /** Lo que se ha desplazado el mapa desde que se colocó lo que lleva. */
+  readonly salto: Salto;
+  readonly children: JSX.Element;
+}) {
+  return (
+    <Portal mount={props.contenedor}>
+      <div
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 will-change-transform"
+        style={{ transform: trasladoDeLamina(props.salto) }}
+      >
+        {props.children}
+      </div>
+    </Portal>
+  );
+}
 
 /**
  * Cómo aparece o se va un marcador cuando el mapa agrupa o separa emplazamientos.

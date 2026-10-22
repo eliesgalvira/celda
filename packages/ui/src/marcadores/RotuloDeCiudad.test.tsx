@@ -1,14 +1,15 @@
 import { assert, describe, it } from "@effect/vitest";
 import { render } from "@solidjs/testing-library";
 
-import { CapaDeRotulos, RotuloDeCiudad } from "./RotuloDeCiudad.tsx";
+import { LaminaMuda } from "./Deslizable.tsx";
+import { RotuloDeCiudad } from "./RotuloDeCiudad.tsx";
 
 describe("RotuloDeCiudad", () => {
   const montar = (conFoto: boolean, importancia: "capital" | "ciudad" = "ciudad") => {
     const contenedor = document.createElement("div");
     document.body.append(contenedor);
     render(() => (
-      <CapaDeRotulos contenedor={contenedor} salto={{ x: 0, y: 0 }}>
+      <LaminaMuda contenedor={contenedor} salto={{ x: 0, y: 0 }}>
         <RotuloDeCiudad
           x={120.04}
           y={80}
@@ -17,7 +18,7 @@ describe("RotuloDeCiudad", () => {
           importancia={importancia}
           conFoto={conFoto}
         />
-      </CapaDeRotulos>
+      </LaminaMuda>
     ));
     const rotulo = contenedor.querySelector<HTMLElement>("[data-rotulo]");
     return { contenedor, rotulo };

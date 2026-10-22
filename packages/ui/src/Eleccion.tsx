@@ -379,8 +379,6 @@ export interface CampoNumeroProps {
   readonly maximo: number;
   /** Solo recibe números dentro del intervalo; lo demás se queda en el campo sin aplicarse. */
   readonly alCambiar: (valor: number) => void;
-  /** Una frase bajo el campo, como de dónde sale el valor. */
-  readonly ayuda?: JSX.Element;
 }
 
 /** El número como se escribe en castellano, con coma decimal. */
@@ -393,7 +391,6 @@ const escribirNumero = (valor: number): string => String(valor).replace(".", ","
  */
 export function CampoNumero(props: CampoNumeroProps) {
   const id = createUniqueId();
-  const idAyuda = createUniqueId();
   let campo: HTMLInputElement | undefined;
   const leer = (texto: string): number | undefined => {
     const numero = Number(texto.trim().replace(",", "."));
@@ -430,7 +427,6 @@ export function CampoNumero(props: CampoNumeroProps) {
           inputmode="decimal"
           autocomplete="off"
           aria-invalid="false"
-          aria-describedby={props.ayuda === undefined ? undefined : idAyuda}
           onInput={(evento) => {
             const numero = leer(evento.currentTarget.value);
             evento.currentTarget.setAttribute(
@@ -447,11 +443,6 @@ export function CampoNumero(props: CampoNumeroProps) {
         />
         <span class="text-sm text-tinta-suave">{props.unidad}</span>
       </div>
-      <Show when={props.ayuda}>
-        <p id={idAyuda} class="text-xs leading-snug text-tinta-suave">
-          {props.ayuda}
-        </p>
-      </Show>
     </div>
   );
 }

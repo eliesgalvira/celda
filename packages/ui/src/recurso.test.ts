@@ -11,7 +11,14 @@ import {
 } from "solid-js";
 
 import { avisosDeSolid } from "./pruebas/vigilante.ts";
-import { mismasListas, mismosCampos, recurso, recursoFijo, vigilante } from "./recurso.ts";
+import {
+  MAXIMO_POR_SEGUNDO,
+  mismasListas,
+  mismosCampos,
+  recurso,
+  recursoFijo,
+  vigilante,
+} from "./recurso.ts";
 
 /** Los códigos de los avisos de Solid desde el principio de la prueba. */
 const codigosDeAvisos = () => (avisosDeSolid?.events ?? []).map((aviso) => aviso.code);
@@ -319,15 +326,17 @@ describe("recurso", () => {
     vigilante.reiniciar();
     const [n, setN] = createSignal(0);
     const desmontar = enRaiz(() => {
-      recurso("prueba:bucle", n, () => undefined, { maximoPorSegundo: 3 });
+      recurso("prueba:bucle", n, () => undefined);
     });
     flush();
-    for (let i = 1; i <= 4; i += 1) {
+    for (let i = 1; i <= MAXIMO_POR_SEGUNDO; i += 1) {
       setN(i);
       flush();
     }
     desmontar();
-    assert.deepStrictEqual(vigilante.excesos(), [{ nombre: "prueba:bucle", veces: 4, maximo: 3 }]);
+    assert.deepStrictEqual(vigilante.excesos(), [
+      { nombre: "prueba:bucle", veces: MAXIMO_POR_SEGUNDO + 1, maximo: MAXIMO_POR_SEGUNDO },
+    ]);
     vigilante.reiniciar();
   });
 

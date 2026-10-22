@@ -23,7 +23,7 @@ Así que un efecto solo se frena con un memo delante que compare. `recurso()` lo
 `packages/ui/src/recurso.ts`, en `@celda/ui` porque lo usan la librería y la web.
 
 ```ts
-recurso(nombre, clave, abrir, { iguales, maximoPorSegundo });
+recurso(nombre, clave, abrir, { iguales });
 recursoFijo(nombre, abrir); // abre al montar, cierra al desmontar
 ```
 
@@ -47,11 +47,11 @@ Cada lectura cambia `ubicacion()`, pero la clave sigue siendo `true` y el GPS si
 
 ## El vigilante
 
-En desarrollo y en las pruebas (`import.meta.env.DEV`), `recurso()` cuenta las aperturas de cada nombre. Si pasan de `maximoPorSegundo` en un segundo (10 por defecto), avisa en la consola con `[Celda]` y apunta el exceso. `packages/ui/src/pruebas/vigilante.ts` se carga en todas las pruebas de `apps/web` y `packages/ui` y hace fallar la prueba con excesos, aunque lo que comprueba salga bien.
+En desarrollo y en las pruebas (`import.meta.env.DEV`), `recurso()` cuenta las aperturas de cada nombre. Si pasan de `MAXIMO_POR_SEGUNDO` (10) en un segundo, avisa en la consola con `[Celda]` y apunta el exceso. `packages/ui/src/pruebas/vigilante.ts` se carga en todas las pruebas de `apps/web` y `packages/ui` y hace fallar la prueba con excesos, aunque lo que comprueba salga bien.
 
 El mismo fichero hace fallar la prueba en la que Solid avisa de algo, con el código del aviso y el camino de dueños donde salió. El más común es `STRICT_READ_UNTRACKED`, que sale al leer una señal o un memo donde Solid no lo sigue, en el cuerpo de un componente o en la segunda función de un efecto, y es la única forma de distinguir una lectura que no sigue nada a propósito de una que debería seguir algo. Si es a propósito, como el valor inicial de una señal o el estado que un efecto consulta sin depender de él, la lectura va en `untrack`. El vigilante lee los avisos del canal de diagnósticos de Solid, `OBSERVE.diagnostics`.
 
-Un recurso que siga un gesto y abra uno por evento puede subir el tope con `maximoPorSegundo`. Un bucle como el del GPS iba a 450 por segundo.
+Un bucle como el del GPS iba a 450 por segundo.
 
 El mismo fichero desmonta después de cada prueba lo que montó. `@solidjs/testing-library` solo lo hace con los globales de Vitest, que no están activados, y las apps de las pruebas anteriores seguían montadas, con el GPS y los escuchadores abiertos, reaccionando a la dirección de la siguiente prueba. El vigilante lo destapó al contar once paneles abiertos en un segundo.
 

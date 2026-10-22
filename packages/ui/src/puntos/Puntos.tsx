@@ -1,9 +1,8 @@
 import type { Compania } from "@celda/dominio/compania";
 import type { JSX } from "@solidjs/web";
-import { Portal } from "@solidjs/web";
 import { Show } from "solid-js";
 
-import { type Salto, trasladoDeLamina } from "../marcadores/Deslizable.tsx";
+import type { Salto } from "../marcadores/Deslizable.tsx";
 import { LogoCompanias } from "../marcadores/LogoCompanias.tsx";
 
 /**
@@ -93,30 +92,6 @@ export function FilaDeEmplazamiento(props: {
         </span>
       </button>
     </li>
-  );
-}
-
-/**
- * La lámina de los puntos que se mueven en el paso entre la vista de puntos y los logos (ADR
- * 0028): dentro del contenedor del mapa, bajo los marcadores, que se montan después. No recoge
- * gestos y el lector de pantalla no la lee: los puntos del mapa tampoco se leen. Se desplaza con
- * la de los marcadores.
- */
-export function CapaDeTraspaso(props: {
-  readonly contenedor: HTMLElement;
-  readonly salto: Salto;
-  readonly children: JSX.Element;
-}) {
-  return (
-    <Portal mount={props.contenedor}>
-      <div
-        aria-hidden="true"
-        class="pointer-events-none absolute inset-0 will-change-transform"
-        style={{ transform: trasladoDeLamina(props.salto) }}
-      >
-        {props.children}
-      </div>
-    </Portal>
   );
 }
 

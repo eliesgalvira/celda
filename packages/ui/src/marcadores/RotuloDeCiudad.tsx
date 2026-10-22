@@ -1,8 +1,4 @@
-import type { JSX } from "@solidjs/web";
-import { Portal } from "@solidjs/web";
 import { cva } from "class-variance-authority";
-
-import { type Salto, trasladoDeLamina } from "./Deslizable.tsx";
 
 /**
  * Los rótulos de ciudad por encima de los datos (ADR 0024). MapLibre los coloca en capas
@@ -62,29 +58,5 @@ export function RotuloDeCiudad(props: RotuloDeCiudadProps) {
     >
       {props.texto}
     </span>
-  );
-}
-
-/**
- * La lámina de los rótulos, dentro del contenedor del mapa y después de la de los marcadores, así
- * que queda encima. No recoge gestos y el lector de pantalla no la lee: repite lo que dice el mapa
- * base, que tampoco se lee. Se desplaza con la de los marcadores (`CapaDeMarcadores`).
- */
-export function CapaDeRotulos(props: {
-  readonly contenedor: HTMLElement;
-  /** Lo que se ha desplazado el mapa desde que se colocaron los rótulos. */
-  readonly salto: Salto;
-  readonly children: JSX.Element;
-}) {
-  return (
-    <Portal mount={props.contenedor}>
-      <div
-        aria-hidden="true"
-        class="pointer-events-none absolute inset-0 will-change-transform"
-        style={{ transform: trasladoDeLamina(props.salto) }}
-      >
-        {props.children}
-      </div>
-    </Portal>
   );
 }

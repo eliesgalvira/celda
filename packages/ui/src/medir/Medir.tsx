@@ -130,7 +130,7 @@ export function Opcion(props: OpcionProps) {
           <div class="mt-1 flex flex-wrap gap-2">{props.acciones}</div>
         </Show>
       </div>
-      <Show when={props.lado}>{props.lado}</Show>
+      {props.lado}
     </section>
   );
 }

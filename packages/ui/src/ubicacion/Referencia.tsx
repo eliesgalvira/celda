@@ -16,8 +16,6 @@ export function SeccionReferencia(props: { readonly children: JSX.Element }) {
 
 export interface SinReferenciaProps {
   readonly titulo: string;
-  /** Una línea bajo el título, si hace falta. Puede llevar términos. */
-  readonly texto?: JSX.Element;
   /** Por qué no se puede usar la ubicación ahora, y qué hacer. */
   readonly aviso?: string | undefined;
   readonly acciones: JSX.Element;
@@ -28,9 +26,6 @@ export function SinReferencia(props: SinReferenciaProps) {
   return (
     <div class="flex flex-col gap-2 bg-superficie-alta px-4 py-3">
       <h3 class="font-titulo text-lg leading-6">{props.titulo}</h3>
-      <Show when={props.texto}>
-        <p class="text-sm leading-relaxed">{props.texto}</p>
-      </Show>
       <Show when={props.aviso}>
         {(aviso) => (
           <p class="border-l-3 border-aviso bg-aviso-fondo px-3 py-1.5 text-sm leading-relaxed text-aviso-tinta">

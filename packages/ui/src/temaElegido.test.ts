@@ -4,10 +4,9 @@ import {
   type AlmacenDelTema,
   aplicarEleccionDeTema,
   CLAVE_DEL_TEMA,
-  ELECCIONES_DE_TEMA,
+  type EleccionDeTema,
   GUION_DEL_TEMA,
   guardarEleccionDeTema,
-  HASH_DEL_GUION_DEL_TEMA,
   leerEleccionDeTema,
   etiquetasDelTema,
   temaAntesDePintar,
@@ -127,7 +126,8 @@ describe("aplicar la elección al documento", () => {
 
 describe("guion del <head>", () => {
   it("antes de pintar deja el documento igual que aplicar la elección guardada", () => {
-    for (const guardado of [undefined, "azul", ...ELECCIONES_DE_TEMA]) {
+    const elecciones: ReadonlyArray<EleccionDeTema> = ["sistema", "claro", "oscuro"];
+    for (const guardado of [undefined, "azul", ...elecciones]) {
       const conGuion = pagina(guardado);
       correrGuion(conGuion.documento, conGuion.almacen);
       const aMano = pagina(guardado);
@@ -150,12 +150,6 @@ describe("guion del <head>", () => {
     assert.deepStrictEqual(etiquetasDelTema(), [
       { tag: "script", children: GUION_DEL_TEMA, injectTo: "head" },
     ]);
-  });
-
-  it("su hash para una CSP está al día", async () => {
-    const huella = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(GUION_DEL_TEMA));
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(huella)));
-    assert.strictEqual(HASH_DEL_GUION_DEL_TEMA, `sha256-${base64}`);
   });
 
   it("tema.css pone el oscuro con el sistema salvo con Claro elegido, y siempre con Oscuro", () => {
