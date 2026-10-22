@@ -48,7 +48,8 @@ export function Termino(props: TerminoProps) {
         onClick={() => setAbierto((antes) => !antes)}
         class={
           // Se puede tocar aunque vaya en una pieza que deja pasar los gestos al mapa.
-          "pointer-events-auto relative inline cursor-pointer rounded-sm text-left underline decoration-primario " +
+          // La hoja del navegador quita a los botones las mayúsculas del título en el que van.
+          "pointer-events-auto relative inline cursor-pointer rounded-sm text-left [text-transform:inherit] underline decoration-primario " +
           "decoration-dotted decoration-2 underline-offset-[0.22em] hover:decoration-solid " +
           "aria-expanded:bg-primario/15 aria-expanded:decoration-solid " +
           // El objetivo táctil crece por fuera de la palabra sin mover el texto, pero poco: en
