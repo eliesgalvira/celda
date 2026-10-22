@@ -148,6 +148,9 @@ describe("Solid 2: igualdad de efectos y memos", () => {
     flush();
     desmontar();
     assert.deepStrictEqual(registro, ["devuelta", "devuelta"]);
+    assert.deepStrictEqual(codigosDeAvisos(), ["NO_OWNER_CLEANUP", "NO_OWNER_CLEANUP"]);
+    // El vigilante haría fallar esta prueba por el aviso que acaba de comprobar.
+    avisosDeSolid?.clear();
   });
 
   it("`onSettled` corre una vez, no sigue lo que lee, y limpia al desmontar", () => {

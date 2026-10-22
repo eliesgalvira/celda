@@ -80,6 +80,21 @@ export default defineConfig({
       "eslint/no-shadow": "off",
       "eslint/no-await-in-loop": "off",
       "eslint/no-underscore-dangle": "off",
+      // Lo que se cierra se abre con `recurso()`, que es el único que llama a `onCleanup`. Un
+      // `onCleanup` en la segunda función de un efecto no se llamaría nunca (docs/patterns/efectos.md).
+      "eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "solid-js",
+              importNames: ["onCleanup"],
+              message:
+                "Abre y cierra con recurso() o recursoFijo() de @celda/ui/recurso.ts (docs/patterns/efectos.md).",
+            },
+          ],
+        },
+      ],
       "unicorn/consistent-function-scoping": "off",
       "unicorn/no-array-sort": "off",
       "oxc/no-map-spread": "off",
@@ -111,6 +126,10 @@ export default defineConfig({
         // Las pruebas de las reglas escriben a propósito el código que prohíben.
         files: ["tools/oxlint-plugin-celda/**"],
         rules: { "celda/sin-estilos-a-medida": "off" },
+      },
+      {
+        files: ["packages/ui/src/recurso.ts", "packages/ui/src/recurso.test.ts"],
+        rules: { "eslint/no-restricted-imports": "off" },
       },
     ],
     options: {
