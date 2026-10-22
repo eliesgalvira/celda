@@ -36,7 +36,8 @@ const variantesCasilla = cva("hexagono inline-block h-[22px] w-5 align-middle", 
 });
 
 /** El centro de la columna `indice` de `total`, en tanto por ciento del ancho de la barra. */
-const enElEje = (indice: number, total: number) => `${(((indice + 0.5) / total) * 100).toFixed(1)}%`;
+const enElEje = (indice: number, total: number) =>
+  `${(((indice + 0.5) / total) * 100).toFixed(1)}%`;
 
 /** Una flecha de la leyenda, en la tinta del texto. */
 function Flecha(props: { readonly hacia: "izquierda" | "derecha" }) {
@@ -53,7 +54,9 @@ function Flecha(props: { readonly hacia: "izquierda" | "derecha" }) {
       stroke-linejoin="round"
       class="shrink-0 text-tinta"
     >
-      <path d={props.hacia === "izquierda" ? "M15 5H1.5M5.5 1 1.5 5l4 4" : "M1 5h13.5M10.5 1l4 4-4 4"} />
+      <path
+        d={props.hacia === "izquierda" ? "M15 5H1.5M5.5 1 1.5 5l4 4" : "M1 5h13.5M10.5 1l4 4-4 4"}
+      />
     </svg>
   );
 }
