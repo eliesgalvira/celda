@@ -61,7 +61,7 @@ export type BotonProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "clas
 
 /** El hexágono que gira mientras un botón espera. */
 function Girando() {
-  return <span class="hexagono size-3.5 animate-spin bg-primario motion-reduce:animate-none" />;
+  return <span class="hexagono size-3.5 animate-spin bg-current motion-reduce:animate-none" />;
 }
 
 /** El botón de Celda. Si una pantalla necesita otro aspecto, se añade una variante aquí. */

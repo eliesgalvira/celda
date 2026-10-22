@@ -76,7 +76,7 @@ export function FilaDeEmplazamiento(props: {
     <li>
       <button
         type="button"
-        class="flex min-h-11 w-full items-center gap-3 bg-superficie-alta px-3 py-2 text-left shadow-[inset_0_0_0_1.5px_var(--linea)] transition-colors duration-150 hover:bg-control-hover active:bg-primario-activo active:text-primario-fg"
+        class="group/punto flex min-h-11 w-full items-center gap-3 bg-superficie-alta px-3 py-2 text-left shadow-[inset_0_0_0_1.5px_var(--linea)] transition-colors duration-150 hover:bg-control-hover active:bg-primario-activo active:text-primario-fg"
         onClick={() => props.alElegir()}
       >
         <span
@@ -86,7 +86,7 @@ export function FilaDeEmplazamiento(props: {
         </span>
         <span class="flex min-w-0 flex-col">
           <span class="font-semibold">{props.nombre}</span>
-          <span class="text-sm text-tinta-suave">
+          <span class="text-sm text-tinta-suave group-active/punto:text-primario-fg">
             {props.detalle}
             <Show when={props.redUsada}>{(texto) => <> · {texto()}</>}</Show>
           </span>
