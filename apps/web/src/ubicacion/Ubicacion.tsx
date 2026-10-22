@@ -233,6 +233,7 @@ export function AvisosDeUbicacion(props: {
           <Aviso
             tono="fallo"
             titulo={TITULO_FALLO[motivo]}
+            alCerrar={() => control.cerrarAviso()}
             acciones={
               <>
                 <Boton onClick={() => control.elegirEnMapa()}>Elegir en el mapa</Boton>
@@ -241,9 +242,6 @@ export function AvisosDeUbicacion(props: {
                     Volver a intentarlo
                   </Boton>
                 </Show>
-                <Boton variante="secundario" onClick={() => control.cerrarAviso()}>
-                  Cerrar
-                </Boton>
               </>
             }
           >
@@ -256,11 +254,7 @@ export function AvisosDeUbicacion(props: {
           <Aviso
             tono="limite"
             titulo={aviso().titulo}
-            acciones={
-              <Boton variante="secundario" onClick={() => setSinDatosCerrado(aviso().clave)}>
-                Cerrar
-              </Boton>
-            }
+            alCerrar={() => setSinDatosCerrado(aviso().clave)}
           >
             {aviso().texto}
           </Aviso>
@@ -287,15 +281,11 @@ export function AvisosDeUbicacion(props: {
           <Aviso
             tono="fallo"
             titulo={TEXTO_ALMACEN[aviso].titulo}
+            alCerrar={() => control.cerrarAvisoAlmacen()}
             acciones={
-              <>
-                <Show when={aviso === "sin-borrar"}>
-                  <Boton onClick={() => control.quitar()}>Quitar otra vez</Boton>
-                </Show>
-                <Boton variante="secundario" onClick={() => control.cerrarAvisoAlmacen()}>
-                  Cerrar
-                </Boton>
-              </>
+              aviso === "sin-borrar" ? (
+                <Boton onClick={() => control.quitar()}>Quitar otra vez</Boton>
+              ) : undefined
             }
           >
             {TEXTO_ALMACEN[aviso].texto}

@@ -1,7 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { createSignal } from "solid-js";
 
-import { Boton } from "../Boton.tsx";
+import { BotonCerrar } from "../Boton.tsx";
 import { recursoFijo } from "../recurso.ts";
 import {
   type AlturaHoja,
@@ -47,6 +47,9 @@ export interface PanelEmplazamientoProps {
  * tres alturas en el móvil (historia 21). La hoja se cambia arrastrando el tirador, tocándolo o
  * con las flechas del teclado; Escape cierra el panel. Al abrirse se lleva el foco y al cerrarse
  * lo devuelve a donde estaba, normalmente el marcador.
+ *
+ * Arriba va una franja que no se desplaza, con la ✕ a la derecha y, en el móvil, el tirador debajo
+ * de ella. Así la ✕ nunca tapa la ficha al desplazarla.
  */
 export function PanelEmplazamiento(props: PanelEmplazamientoProps) {
   const [altoVentana, setAltoVentana] = createSignal(window.innerHeight);
@@ -147,42 +150,41 @@ export function PanelEmplazamiento(props: PanelEmplazamientoProps) {
         "md:inset-y-0 md:left-0 md:w-[27rem] md:data-[ancho=ancho]:w-[min(46rem,calc(100vw-8rem))]"
       }
     >
-      <button
-        type="button"
-        title="Arrastra o toca para cambiar la altura de la ficha"
-        class={
-          "flex min-h-11 w-full shrink-0 cursor-grab touch-none flex-col items-center justify-center gap-1 select-none " +
-          "active:cursor-grabbing md:hidden"
-        }
-        onPointerDown={empezar}
-        onPointerMove={mover}
-        onPointerUp={soltar}
-        onPointerCancel={soltar}
-        onClick={() => {
-          if (acabaDeArrastrar) {
-            acabaDeArrastrar = false;
-            return;
+      <div class="relative flex min-h-11 shrink-0 justify-end bg-superficie-alta pr-1 md:pr-2">
+        <button
+          type="button"
+          title="Arrastra o toca para cambiar la altura de la ficha"
+          class={
+            "absolute inset-0 flex cursor-grab touch-none flex-col items-center justify-center gap-1 select-none " +
+            "active:cursor-grabbing md:hidden"
           }
-          props.alCambiarAltura(alturaTrasToque(props.altura));
-        }}
-        onKeyDown={(evento) => {
-          const nueva = alturaConTecla(props.altura, evento.key);
-          if (nueva !== undefined) {
-            evento.preventDefault();
-            props.alCambiarAltura(nueva);
-          }
-        }}
-      >
-        <span aria-hidden="true" class="h-1.5 w-11 rounded-full bg-linea-fuerte" />
-        <span class="font-mono text-[11px] leading-none text-tinta-suave">
-          {props.altura === "completa" ? "Ver menos" : "Ver más"}
-        </span>
-      </button>
-
-      <div class="absolute top-2 right-2 z-10 max-md:top-11">
-        <Boton variante="secundario" onClick={() => props.alCerrar()}>
-          Cerrar
-        </Boton>
+          onPointerDown={empezar}
+          onPointerMove={mover}
+          onPointerUp={soltar}
+          onPointerCancel={soltar}
+          onClick={() => {
+            if (acabaDeArrastrar) {
+              acabaDeArrastrar = false;
+              return;
+            }
+            props.alCambiarAltura(alturaTrasToque(props.altura));
+          }}
+          onKeyDown={(evento) => {
+            const nueva = alturaConTecla(props.altura, evento.key);
+            if (nueva !== undefined) {
+              evento.preventDefault();
+              props.alCambiarAltura(nueva);
+            }
+          }}
+        >
+          <span aria-hidden="true" class="h-1.5 w-11 rounded-full bg-linea-fuerte" />
+          <span class="font-mono text-[11px] leading-none text-tinta-suave">
+            {props.altura === "completa" ? "Ver menos" : "Ver más"}
+          </span>
+        </button>
+        <div class="relative">
+          <BotonCerrar alCerrar={() => props.alCerrar()} />
+        </div>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain max-md:group-data-[altura=resumen]/panel:overflow-hidden">

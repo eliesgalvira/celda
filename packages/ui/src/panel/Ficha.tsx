@@ -11,7 +11,7 @@ import { LogoCompanias } from "../marcadores/LogoCompanias.tsx";
  */
 
 const CONTENEDOR_CABECERA =
-  "flex flex-col gap-1 border-b border-linea bg-superficie-alta px-5 pr-28 pb-4 md:px-6 md:pt-5 md:pr-28";
+  "flex flex-col gap-1 border-b border-linea bg-superficie-alta px-5 pb-4 md:px-6";
 const ANTETITULO = "font-mono text-[11px] leading-4 tracking-[0.14em] uppercase";
 const TITULO = "font-titulo text-[1.375rem] leading-7 md:text-[1.625rem] md:leading-8";
 /**
@@ -20,11 +20,7 @@ const TITULO = "font-titulo text-[1.375rem] leading-7 md:text-[1.625rem] md:lead
  */
 const LUGAR =
   "font-mono text-xs leading-4 text-tinta-suave max-md:group-data-[altura=resumen]/panel:truncate";
-/**
- * La fila de los logos llega por debajo de «Cerrar», que queda a la altura del título: así caben
- * los logos, «Ver el edificio» y el estado sin partirse en dos líneas.
- */
-const FILA_LOGOS = "mt-2 -mr-23 flex min-h-10 items-center gap-3 md:-mr-22";
+const FILA_LOGOS = "mt-2 flex min-h-10 items-center gap-3";
 
 export interface CabeceraFichaProps {
   /** Qué es, en pocas palabras: «Emplazamiento compartido». Puede llevar un `Termino`. */
@@ -238,7 +234,7 @@ export function MarcaDeAguaFicha(props: MarcaDeAguaFichaProps) {
   );
 }
 
-/** Un aviso dentro del panel, como que la ficha no ha llegado o no existe. Deja libre el botón de cerrar. */
+/** Un aviso dentro del panel, como que la ficha no ha llegado o no existe. */
 export function AvisoFicha(props: { readonly children: JSX.Element }) {
-  return <div class="px-4 pt-14 pb-4 md:px-5 md:pt-16">{props.children}</div>;
+  return <div class="p-4 md:px-5">{props.children}</div>;
 }

@@ -1,7 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { createEffect, createUniqueId, Show } from "solid-js";
 
-import { Boton } from "./Boton.tsx";
+import { BotonCerrar } from "./Boton.tsx";
 import { recursoFijo } from "./recurso.ts";
 
 /** Lo que puede recibir el foco dentro del diálogo. */
@@ -25,8 +25,8 @@ export interface DialogoProps {
 
 /**
  * Diálogo modal del tema Hexágono. En el móvil sube desde abajo a todo el ancho y en escritorio
- * queda centrado. Al abrirse lleva el foco a su título, el tabulador no sale de él, Escape y el
- * botón «Cerrar» lo cierran, y al cerrarse devuelve el foco a donde estaba.
+ * queda centrado. Al abrirse lleva el foco a su título, el tabulador no sale de él, Escape y la
+ * ✕ («Cerrar») lo cierran, y al cerrarse devuelve el foco a donde estaba.
  *
  * Si cambia el título, es otra vista: vuelve arriba y el foco pasa al título nuevo.
  *
@@ -132,9 +132,9 @@ export function Dialogo(props: DialogoProps) {
                 {props.titulo}
               </h2>
             </div>
-            <Boton variante="secundario" onClick={() => props.alCerrar()}>
-              Cerrar
-            </Boton>
+            <div class="-mt-2 -mr-3">
+              <BotonCerrar alCerrar={() => props.alCerrar()} />
+            </div>
           </header>
           <div
             ref={(elemento) => {
