@@ -40,9 +40,6 @@ const PROVINCIA = "provincia";
  */
 export const PROVINCIA_DE_LOS_ENLACES_VIEJOS = "08";
 
-/** El parámetro de la URL que abre el paso de medir la señal. No lleva valor. */
-const MEDIR = "medir";
-
 /** Los destinos con nombre: la única forma de escribir una URL de la app. */
 export const ruta = {
   mapa: "/",
@@ -56,23 +53,40 @@ export const ruta = {
    * El mapa con el paso de medir abierto. Es la dirección del código QR que se enseña en un
    * ordenador: en el móvil se abre directamente en este paso.
    */
-  medir: `/?${MEDIR}`,
+  medir: "/?medir",
 } as const;
 
-/** Si la ubicación tiene abierto el paso de medir. */
-export const medirAbierto = (ubicacion: Ubicacion): boolean => ubicacion.search.has(MEDIR);
+/** Los diálogos que se abren desde «Funciones», cada uno con un parámetro de la URL sin valor. */
+const DIALOGOS = ["medir", "ajustes", "aportaciones", "lista", "si-algo-va-mal"] as const;
 
-/** La misma ubicación con el paso de medir abierto o cerrado; el resto de la URL no cambia. */
-export const conMedir = (ubicacion: Ubicacion, abierto: boolean): string => {
+export type DialogoDeLaUrl = (typeof DIALOGOS)[number];
+
+/** El `=` vacío que `URLSearchParams` pone a los parámetros de los diálogos. */
+const IGUAL_DE_UN_DIALOGO = new RegExp(`(^|&)(${DIALOGOS.join("|")})=(?=&|$)`, "gu");
+
+/** La dirección con esos parámetros, con los de los diálogos sin `=`. */
+const direccion = (pathname: string, parametros: URLSearchParams): string => {
+  const busqueda = parametros.toString().replace(IGUAL_DE_UN_DIALOGO, "$1$2");
+  return busqueda === "" ? pathname : `${pathname}?${busqueda}`;
+};
+
+/** Si la ubicación tiene abierto ese diálogo. */
+export const dialogoAbierto = (ubicacion: Ubicacion, dialogo: DialogoDeLaUrl): boolean =>
+  ubicacion.search.has(dialogo);
+
+/** La misma ubicación con ese diálogo abierto o cerrado; el resto de la URL no cambia. */
+export const conDialogo = (
+  ubicacion: Ubicacion,
+  dialogo: DialogoDeLaUrl,
+  abierto: boolean,
+): string => {
   const parametros = new URLSearchParams(ubicacion.search);
   if (abierto) {
-    parametros.set(MEDIR, "");
+    parametros.set(dialogo, "");
   } else {
-    parametros.delete(MEDIR);
+    parametros.delete(dialogo);
   }
-  // `medir` va sin `=`: la dirección queda como la del código QR.
-  const busqueda = parametros.toString().replace(/(^|&)medir=(?=&|$)/u, "$1medir");
-  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
+  return direccion(ubicacion.pathname, parametros);
 };
 
 /**
@@ -80,9 +94,6 @@ export const conMedir = (ubicacion: Ubicacion, abierto: boolean): string => {
  * barrio o el del municipio.
  */
 const EJERCICIO = "ejercicio";
-
-/** El parámetro de la URL que abre los ajustes. No lleva valor. */
-const AJUSTES = "ajustes";
 
 /**
  * El ejercicio abierto en una ubicación: `null` si está cerrado y, abierto, el código de la zona
@@ -104,63 +115,7 @@ export const conEjercicio = (ubicacion: Ubicacion, zona: string | null): string 
   } else {
     parametros.set(EJERCICIO, zona);
   }
-  const busqueda = parametros.toString();
-  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
-};
-
-/** Si la ubicación tiene abiertos los ajustes. */
-export const ajustesAbiertos = (ubicacion: Ubicacion): boolean => ubicacion.search.has(AJUSTES);
-
-/** La misma ubicación con los ajustes abiertos o cerrados; el resto de la URL no cambia. */
-export const conAjustes = (ubicacion: Ubicacion, abiertos: boolean): string => {
-  const parametros = new URLSearchParams(ubicacion.search);
-  if (abiertos) {
-    parametros.set(AJUSTES, "");
-  } else {
-    parametros.delete(AJUSTES);
-  }
-  const busqueda = parametros.toString().replace(/(^|&)ajustes=(?=&|$)/u, "$1ajustes");
-  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
-};
-
-/** El parámetro de la URL que abre «Tus aportaciones». No lleva valor. */
-const APORTACIONES = "aportaciones";
-
-/** Si la ubicación tiene abiertas «Tus aportaciones». */
-export const aportacionesAbiertas = (ubicacion: Ubicacion): boolean =>
-  ubicacion.search.has(APORTACIONES);
-
-/** La misma ubicación con «Tus aportaciones» abiertas o cerradas; el resto de la URL no cambia. */
-export const conAportaciones = (ubicacion: Ubicacion, abiertas: boolean): string => {
-  const parametros = new URLSearchParams(ubicacion.search);
-  if (abiertas) {
-    parametros.set(APORTACIONES, "");
-  } else {
-    parametros.delete(APORTACIONES);
-  }
-  const busqueda = parametros.toString().replace(/(^|&)aportaciones=(?=&|$)/u, "$1aportaciones");
-  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
-};
-
-/**
- * El parámetro de la URL que abre la lista de los emplazamientos que se ven, en la vista de puntos
- * (ADR 0028). No lleva valor.
- */
-const LISTA = "lista";
-
-/** Si la ubicación tiene abierta la lista de los emplazamientos que se ven. */
-export const listaAbierta = (ubicacion: Ubicacion): boolean => ubicacion.search.has(LISTA);
-
-/** La misma ubicación con la lista abierta o cerrada; el resto de la URL no cambia. */
-export const conLista = (ubicacion: Ubicacion, abierta: boolean): string => {
-  const parametros = new URLSearchParams(ubicacion.search);
-  if (abierta) {
-    parametros.set(LISTA, "");
-  } else {
-    parametros.delete(LISTA);
-  }
-  const busqueda = parametros.toString().replace(/(^|&)lista=(?=&|$)/u, "$1lista");
-  return busqueda === "" ? ubicacion.pathname : `${ubicacion.pathname}?${busqueda}`;
+  return direccion(ubicacion.pathname, parametros);
 };
 
 /** La clave del emplazamiento seleccionado en una ubicación, o `null` si no hay ninguno. */
@@ -191,10 +146,7 @@ export const conEmplazamiento = (
   const parametros = new URLSearchParams(ubicacion.search);
   parametros.set(EMPLAZAMIENTO, situado.clave);
   parametros.set(PROVINCIA, situado.provincia);
-  const busqueda = parametros
-    .toString()
-    .replace(/(^|&)(medir|ajustes|aportaciones|lista)=(?=&|$)/gu, "$1$2");
-  return `${ubicacion.pathname}?${busqueda}`;
+  return direccion(ubicacion.pathname, parametros);
 };
 
 /** Un clic normal con el botón principal y sin modificadores: el que navega dentro de la app. */

@@ -338,6 +338,12 @@ _Evitar_: decisión, recomendación, voto
 Lo que impide a una identidad del dispositivo o a una huella de la IP enviar nada más, con su motivo. Lo que tenía pendiente sale marcado en la moderación. El de una huella dura lo que ella, 24 horas.
 _Evitar_: bloqueo, ban
 
+### Si algo va mal
+
+**Si algo va mal**:
+El panel que dice, para seis problemas, a quién se acude, en qué orden, con qué plazos y qué conviene guardar, con enlaces a las páginas oficiales: la cobertura en casa, un barrio entero, la televisión estropeada por el 4G o el 5G, un aparato que interfiere, un emplazamiento sin licencia municipal y la exposición cerca de un colegio. Se abre desde «Funciones» y desde el final de «Mejorar la señal». No tiene formularios ni envía nada, y solo da por seguro lo que la investigación 09 comprobó en una fuente primaria (ADR 0031).
+_Evitar_: reclamaciones, denuncias, ayuda, soporte
+
 ### Ejercicios
 
 **Modo estudiante**:

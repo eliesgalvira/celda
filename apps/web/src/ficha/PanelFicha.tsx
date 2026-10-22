@@ -90,6 +90,8 @@ export interface PanelFichaProps {
    */
   readonly barrio?: string | undefined;
   readonly alCerrar: () => void;
+  /** Abre «Si algo va mal», desde el final de «Mejorar la señal». */
+  readonly alAbrirSiAlgoVaMal: () => void;
 }
 
 /**
@@ -154,6 +156,7 @@ export function PanelFicha(props: PanelFichaProps) {
                 fechaCapa={props.fechaCapa}
                 redUsada={props.redUsada ?? []}
                 barrio={props.barrio}
+                alAbrirSiAlgoVaMal={() => props.alAbrirSiAlgoVaMal()}
               />
             )}
           </Show>
@@ -184,7 +187,8 @@ function FichaInexistente(props: { readonly clave: string; readonly alCerrar: ()
 
 /**
  * La ficha ya leída: cabecera, frase de resumen, marca de agua, el punto de referencia, cómo
- * mejorar la señal, eje de frecuencias, de dónde sale cada dato y, plegados, los datos técnicos.
+ * mejorar la señal con el enlace a «Si algo va mal», eje de frecuencias, de dónde sale cada dato y,
+ * plegados, los datos técnicos.
  */
 function ContenidoFicha(props: {
   readonly ficha: Ficha;
@@ -196,6 +200,7 @@ function ContenidoFicha(props: {
   readonly fechaCapa: number | undefined;
   readonly redUsada: ReadonlyArray<RedUsada>;
   readonly barrio: string | undefined;
+  readonly alAbrirSiAlgoVaMal: () => void;
 }) {
   const marca = createMemo(() =>
     textosMarca(props.ficha, compararConCapa(props.fechaCapa, props.ficha.version)),
@@ -292,6 +297,15 @@ function ContenidoFicha(props: {
       <ReferenciaEnFicha emplazamiento={props.ficha.posicion} />
       <SeccionFicha titulo={TITULO_MEJORAR}>
         <MejorarSenal emplazamiento={props.ficha.posicion} />
+        <div>
+          <Boton
+            variante="enlace"
+            aria-haspopup="dialog"
+            onClick={() => props.alAbrirSiAlgoVaMal()}
+          >
+            A quién acudir si algo va mal
+          </Boton>
+        </div>
       </SeccionFicha>
       <SeccionFicha titulo={<TextoConTerminos texto={TITULO_EJE} />}>
         <EjeFrecuencias

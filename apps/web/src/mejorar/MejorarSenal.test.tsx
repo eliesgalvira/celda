@@ -2,7 +2,7 @@ import type { PuntoElegido } from "@celda/dominio/aportacion";
 import { rumboGrados } from "@celda/dominio/area";
 import type { Ficha } from "@celda/dominio/ficha";
 import { assert, describe, it } from "@effect/vitest";
-import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
@@ -10,7 +10,7 @@ import { flush } from "solid-js";
 import { App } from "../App.tsx";
 import { type CapaDePrueba, capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
-import { navegar, ruta } from "../lib/rutas.ts";
+import { navegar, ruta, ubicacion } from "../lib/rutas.ts";
 import { type OpcionesDeUbicacion, ubicacionDePrueba } from "../ubicacion/pruebas.ts";
 
 const NOCHE = Date.UTC(2026, 8, 26, 0, 15, 3);
@@ -149,6 +149,14 @@ describe("mejorar la señal: consejos", () => {
         "Toma el rumbo como punto de partida y ajusta mirando la señal del router.",
       ),
     );
+  });
+
+  it("acaba con un enlace a «Si algo va mal»", async () => {
+    const { pulsar } = await abrir();
+    pulsar("A quién acudir si algo va mal");
+    assert.isNotNull(await screen.findByRole("dialog", { name: "Si algo va mal" }));
+    assert.isTrue(ubicacion().search.has("si-algo-va-mal"));
+    assert.isTrue(ubicacion().search.has("emplazamiento"));
   });
 
   it("al pie del emplazamiento no enseña rumbo, brújula ni la nota del rumbo", async () => {

@@ -311,6 +311,13 @@ Las piezas están en `buzon/Compartir.tsx`; cuándo se usan, en `apps/web/src/bu
 - La columna de la derecha reserva 12,5 rem de alto: pasar de un estado de la brújula a otro mueve poco la ficha. En el móvil el dial mide 6,5 rem y en escritorio 7,5.
 - La barra que simula el giro es el `Deslizador` de `Eleccion.tsx`, con la etiqueta «Simular el giro».
 
+## Si algo va mal
+
+- `problemas/DialogoSiAlgoVaMal.tsx` es un `Dialogo` con `?si-algo-va-mal` en la URL. Se abre desde «Funciones», tras «Medir mi señal», con `IconoSiAlgoVaMal` (`problemas/Problemas.tsx`), y desde el enlace «A quién acudir si algo va mal», al final de «Mejorar la señal» en la ficha (`alAbrirSiAlgoVaMal` de `PanelFicha`). Va al final de esa sección porque es donde acaba lo que Celda puede hacer por la señal.
+- Los seis casos son `Desplegable` en recuadro, plegados al abrir. Dentro van los pasos con `Pasos` y `Paso`, con los enlaces del paso en `acciones`, y una `Nota` «Qué conviene guardar» con `Puntos`. En los casos de la cobertura, el barrio y el aparato que interfiere, un botón «Medir mi señal» abre su diálogo encima (`?si-algo-va-mal&medir`), y al cerrarlo se vuelve al panel. En los demás no sale, porque ahí una medida propia no sirve.
+- Los textos salen de la investigación 09 ([reclamaciones-y-exposicion.md](../investigacion/reclamaciones-y-exposicion.md)) y solo dan por seguro lo que marca como comprobado. Lo inferido o no confirmado se dice como dudoso («No está claro…», «Lo más probable…») o no sale. Los enlaces son los de `PAGINAS`, todos a páginas oficiales, y se abren aparte. Al final, la fecha en que se leyeron (ADR 0031).
+- Los diálogos de «Funciones» (`?medir`, `?ajustes`, `?aportaciones`, `?lista` y `?si-algo-va-mal`) se abren y se cierran con `dialogoAbierto` y `conDialogo` de `lib/rutas.ts`, que escriben el parámetro sin `=`.
+
 ## Filtro de compañías
 
 Las piezas están en `filtro/FiltroDeCompanias.tsx`; cuándo se usan, en `apps/web/src/filtro` (ADR 0026).
