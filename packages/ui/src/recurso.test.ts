@@ -5,6 +5,7 @@ import {
   createRoot,
   createSignal,
   flush,
+  mapArray,
   onCleanup,
   onSettled,
   untrack,
@@ -34,8 +35,9 @@ const enRaiz = (montar: () => void): (() => void) =>
   });
 
 /**
- * Lo que hace Solid 2.0.0-rc.9 con los efectos y los memos, comprobado aquí para que una subida
- * de versión que lo cambie se note. Es la razón de `recurso` (docs/patterns/efectos.md).
+ * Lo que hace la versión de Solid del catálogo con los efectos y los memos, comprobado aquí para
+ * que una subida de versión que lo cambie se note. Es la razón de `recurso`
+ * (docs/patterns/efectos.md).
  */
 describe("Solid 2: igualdad de efectos y memos", () => {
   it("un efecto vuelve a correr, y limpia antes, aunque su primera función devuelva lo mismo", () => {
@@ -307,6 +309,42 @@ describe("recurso", () => {
     desmontar();
     assert.deepStrictEqual(registro, ["abre a 0", "cierra a 1", "abre b 1", "cierra b 1"]);
     assert.deepStrictEqual(codigosDeAvisos(), []);
+  });
+
+  it("una fila que sale de una lista en el mismo flush en que vuelve a correr cierra sus recursos", () => {
+    const abiertos = new Set<string>();
+    const [comun, setComun] = createSignal(0);
+    const [lista, setLista] = createSignal(["a", "b", "c", "d"]);
+    const desmontar = enRaiz(() => {
+      const filas = mapArray(lista, (id) =>
+        createMemo(() => {
+          const valor = comun();
+          recurso(
+            `fila ${id}`,
+            () => valor,
+            (clave) => {
+              abiertos.add(`${id} ${clave}`);
+              return () => abiertos.delete(`${id} ${clave}`);
+            },
+          );
+          return valor;
+        }),
+      );
+      createEffect(
+        () => filas().map((fila) => fila()),
+        () => undefined,
+      );
+    });
+    flush();
+    setComun(1);
+    setLista(["a", "c", "d"]);
+    flush();
+    assert.deepStrictEqual([...abiertos].toSorted(), ["a 1", "c 1", "d 1"]);
+    setComun(2);
+    flush();
+    assert.deepStrictEqual([...abiertos].toSorted(), ["a 2", "c 2", "d 2"]);
+    desmontar();
+    assert.deepStrictEqual([...abiertos], []);
   });
 
   it("recursoFijo abre una vez y cierra al desmontar", () => {

@@ -8,13 +8,14 @@ En septiembre de 2026 el GPS se abrió 3135 veces en 7 s en Chromium (commits 48
 
 ## Qué hace Solid 2
 
-Comprobado con `solid-js` 2.0.0-rc.9 en `packages/ui/src/recurso.test.ts`, bloque «Solid 2: igualdad de efectos y memos». Si una subida de versión lo cambia, esas pruebas fallan.
+Comprobado con la versión de `solid-js` del catálogo en `packages/ui/src/recurso.test.ts`, bloque «Solid 2: igualdad de efectos y memos». Si una subida de versión lo cambia, esas pruebas fallan.
 
 - La segunda función de `createEffect` corre otra vez, y antes llama a la limpieza que devolvió, cada vez que cambia algo que lee la primera. No compara lo que devuelve la primera: ni un primitivo igual (`true` y `true`) ni el mismo objeto. En el código de Solid, el nodo de un efecto nace con `_equals: false`.
 - `createMemo` compara con `===` por defecto. Un primitivo igual no avisa a quien lo lee; un objeto nuevo con los mismos campos, sí. Con `{ equals }` compara con esa función.
 - Una señal a la que se escribe el mismo valor no avisa.
 - `onSettled` corre una vez, no sigue lo que lee y llama a su limpieza al desmontar.
 - `onCleanup` dentro de la segunda función de un efecto no se llama nunca: la limpieza hay que devolverla. En el cuerpo del dueño sí se llama al desmontar.
+- Una fila que sale de una lista (`<For>`, `mapArray`) en el mismo flush en que vuelve a correr un memo suyo cierra lo que abrió esa vuelta. Con rc.9 no lo hacía: un `recurso` dentro de un `<Show>` de la fila quedaba abierto. Lo arregló `@solidjs/signals` rc.10, y lo comprueba la prueba de `recurso.test.ts` sobre la fila que sale de una lista.
 
 Así que un efecto solo se frena con un memo delante que compare. `recurso()` lo lleva dentro.
 
