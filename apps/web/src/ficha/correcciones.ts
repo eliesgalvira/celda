@@ -10,7 +10,8 @@ import type {
 } from "@celda/dominio/ficha";
 import { llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
-import { haciaDonde, textoCoordenada, textoDistancia } from "../buzon/textos.ts";
+import { haciaDonde, textoCoordenada } from "../buzon/textos.ts";
+import { textoDistancia } from "../ubicacion/textos.ts";
 import { ENLACE_FUENTE, fechaCorta, NOMBRE_FUENTE } from "./textos.ts";
 
 /** Lo que dice una fuente de una estación base, ya escrito para la ficha. */

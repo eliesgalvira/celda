@@ -9,7 +9,7 @@ import {
   EnvioVetado,
   LimiteDelBuzon,
 } from "./sincronizacion.ts";
-import { cuantoFalta, haciaDonde, queSale, textosDelFallo } from "./textos.ts";
+import { cuantoFalta, haciaDonde, queSale, textoCambio, textosDelFallo } from "./textos.ts";
 
 const AHORA = Date.UTC(2026, 9, 3, 12);
 
@@ -93,5 +93,18 @@ describe("cuantoFalta y haciaDonde", () => {
     const desde = { longitud: 2, latitud: 41 };
     assert.strictEqual(haciaDonde(desde, { longitud: 2.01, latitud: 41 }), "al este");
     assert.strictEqual(haciaDonde(desde, { longitud: 2, latitud: 41.01 }), "al norte");
+  });
+
+  it("la distancia de un punto propuesto se escribe como en la ficha: de 10 en 10 m y en km", () => {
+    const desde = { longitud: 2, latitud: 41 };
+    // 0,0014° de longitud a 41° son unos 118 m.
+    assert.match(
+      textoCambio({ tipo: "posicion", posicion: { longitud: 2.0014, latitud: 41 } }, desde),
+      /^Está a 120 m al este, en /u,
+    );
+    assert.match(
+      textoCambio({ tipo: "posicion", posicion: { longitud: 2.012, latitud: 41 } }, desde),
+      /^Está a 1 km al este, en /u,
+    );
   });
 });

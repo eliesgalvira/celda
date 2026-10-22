@@ -7,7 +7,7 @@ import type { DatoQueSale } from "@celda/ui/buzon/Compartir.tsx";
 
 import { fechaCorta } from "../ficha/textos.ts";
 import { valoresDeLaLectura } from "../medir/textos.ts";
-import { nombreRumbo } from "../ubicacion/textos.ts";
+import { nombreRumbo, textoDistancia } from "../ubicacion/textos.ts";
 import type { FalloAlCompartir } from "./sincronizacion.ts";
 
 /** Una coordenada como se lee: latitud y longitud con cinco decimales, unos 1 m. */
@@ -26,10 +26,6 @@ export const fechaYHora = (fecha: number): string => `${fechaCorta(fecha)}, ${HO
 /** Hacia dónde queda un punto visto desde otro, con la rosa de ocho rumbos: «al noreste». */
 export const haciaDonde = (desde: Coordenada, hasta: Coordenada): string =>
   `al ${nombreRumbo(rumboGrados(desde, hasta))}`;
-
-/** Una distancia redondeada para leerla: metros hasta 1 km y kilómetros con una cifra después. */
-export const textoDistancia = (metros: number): string =>
-  metros < 1000 ? `${Math.round(metros)} m` : `${(metros / 1000).toFixed(1).replace(".", ",")} km`;
 
 /** Lo que dice el cambio de una corrección propuesta, en una frase. */
 export const textoCambio = (cambio: Cambio, desde?: Coordenada): string => {
