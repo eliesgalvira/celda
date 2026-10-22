@@ -27,14 +27,14 @@ convex/convex/             generado por Confect y Convex; no se edita
 
 ## Ingesta nocturna
 
-`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Se llama nocturna de cuando corría cada noche. Es un programa de Node 24 que hace una ejecución entera y se para: el registro oficial de lo que le falte a la ronda (las siete zonas de barrido y todas las fichas en la del primer sábado de cada mes, ADR 0029), la publicación, el build de Vercel si aún no sirve la versión vigente, una copia de la base, en el disco y en R2, y los paquetes del archivo de páginas. El paquete de Nix y el módulo de NixOS que la lanzan están en [nixos.md](nixos.md).
+`apps/nocturna` es la ingesta y la publicación fuera de Convex (ADR 0015). Se llama nocturna de cuando corría cada noche. Es un programa de Node 24 que hace una ejecución entera y se para: el registro oficial de lo que le falte a la ronda (las siete zonas de barrido y todas las fichas en la del primer sábado de cada mes, ADR 0029), la publicación, una copia de la base, en el disco y en R2, y los paquetes del archivo de páginas. El paquete de Nix y el módulo de NixOS que la lanzan están en [nixos.md](nixos.md).
 
 ### Lanzarla en local
 
 Desde la raíz de Celda, dentro de `nix develop`:
 
 ```sh
-pnpm run ingesta noche      # ingesta, publicación, build de Vercel y copia de seguridad
+pnpm run ingesta noche      # ingesta, publicación y copia de seguridad
 pnpm run ingesta estado     # última ejecución de cada fuente, lo que le queda a la ronda, la próxima ejecución y lo publicado
 pnpm run ingesta publicar   # publica lo que haya en la base, sin pedir nada a las fuentes
 pnpm run ingesta copia      # copia la base a la carpeta de copias y, con R2, también allí; y los paquetes del archivo
@@ -326,9 +326,9 @@ pnpm --filter @celda/nocturna run capas <carpeta vacía>
 
 Lee del almacén de la configuración, el cubo de R2 por la API S3 (en Vercel, con una clave de solo lectura) o `CELDA_ALMACEN_CARPETA`. Monta la versión vigente y los ficheros de las dos anteriores, según sus manifiestos (`ANTERIORES_EN_VERCEL` en `packages/publicacion/src/vercel.ts`), para que una pestaña abierta con un `vigente.json` viejo siga encontrando sus provincias y sus lotes. Comprueba la huella de cada fichero nombrado por su contenido, reintenta tres veces un fallo del almacén y escribe `vigente.json` el último; si falta algo, falla sin escribirlo, y Vercel sigue sirviendo el despliegue anterior. Una versión posterior a la vigente, que puede ser otra publicación a medias, no se monta.
 
-Tras publicar, la orden `noche` y `pnpm run ingesta publicar` comparan el `vigente.json` del almacén con el que sirve Vercel en `CELDA_ALMACEN_ORIGEN` (`https://celda.elies.site/capas`) y, si no coinciden o Vercel no contesta, llaman al deploy hook (`CELDA_VERCEL_DEPLOY_HOOK`). Sin el hook no lanzan ningún build. El diario lo dice en los dos casos. En producción no hay hook, y despliega el flujo de GitHub de abajo.
+Publicar, con la orden `noche` o con `pnpm run ingesta publicar`, solo escribe en el almacén y no lanza ningún build. Despliega el flujo de GitHub de abajo, que mira por su cuenta si producción sirve lo que hay en R2.
 
-Las pruebas están en `apps/nocturna/src/vercel.test.ts`, con un Vercel de mentira que construye cada despliegue con la misma orden: que monta la vigente y las dos anteriores y nada de la cuarta, igual byte a byte que R2 salvo el baremo de exposición de la vigente (ADR 0030), que una pestaña con cualquiera de los resúmenes que ha servido encuentra sus provincias, sus lotes y su índice de claves, que falta un fichero de la vigente o de una anterior y el build falla sin `vigente.json`, y que `vigente.json` es lo último que escribe. Qué pone quien administra las cuentas de R2 y Vercel: [nixos.md](nixos.md#las-cuentas-de-r2-y-vercel).
+Las pruebas están en `apps/nocturna/src/vercel.test.ts`. Publican noches con la muestra del Campus Nord, montan las capas con la misma orden que el build y comprueban que monta la vigente y las dos anteriores y nada de la cuarta, igual byte a byte que R2 salvo el baremo de exposición de la vigente (ADR 0030), que una pestaña con cualquiera de los resúmenes publicados encuentra sus provincias, sus lotes y su índice de claves, que si falta un fichero de la vigente o de una anterior el build falla sin `vigente.json`, y que `vigente.json` es lo último que escribe. Qué pone quien administra las cuentas de R2 y Vercel: [nixos.md](nixos.md#las-cuentas-de-r2-y-vercel).
 
 ### Cuándo se despliega
 

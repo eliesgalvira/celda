@@ -14,17 +14,13 @@ import {
   type FuenteGrabada,
   muestraCampusNord,
 } from "@celda/ingesta/pruebas/grabado";
-import { INTERRUPTOR_POR_DEFECTO } from "@celda/ingesta/ejecucion";
 import { AlmacenDeFicheros } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
-import { SitioEnVercel, VercelNoDisponible } from "@celda/publicacion/vercel";
 import { NodeServices } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
@@ -94,68 +90,16 @@ const montar = (origen: string, carpeta: string, escritos?: Ref.Ref<ReadonlyArra
 const porQue = (fallo: Effect.Error<ReturnType<typeof montar>>): string =>
   fallo._tag === "CapasIncompletas" ? fallo.motivo : fallo._tag;
 
-/** Qué hace el Vercel de mentira con cada llamada al deploy hook. */
-interface Vercel {
-  /** El build no llega a R2: falla. */
-  readonly sinR2: Ref.Ref<boolean>;
-  /** El deploy hook no contesta. */
-  readonly hookCaido: Ref.Ref<boolean>;
-  /** La web servida no contesta. */
-  readonly webCaida: Ref.Ref<boolean>;
-  /** Llamadas al deploy hook que ha aceptado. */
-  readonly despliegues: Effect.Effect<number>;
-  /** La carpeta `/capas` del despliegue que se sirve, si hay alguno. */
-  readonly servido: Effect.Effect<Option.Option<string>>;
-  readonly capa: Layer.Layer<SitioEnVercel>;
-}
-
 /**
- * Un Vercel de mentira. Cada llamada al deploy hook construye un despliegue nuevo en su carpeta
- * con la orden `capas`, que lee del almacén del entorno como el build lee de R2. Si el build
- * acaba bien, ese despliegue pasa a servirse; si falla, se sigue sirviendo el anterior.
+ * Un build de Vercel tras las noches de la prueba: la orden `capas`, que lee del almacén del
+ * entorno como el build lee de R2, en una carpeta nueva. Devuelve la carpeta.
  */
-const vercelDePrueba = (entorno: Entorno) =>
+const construir = (entorno: Entorno) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const sinR2 = yield* Ref.make(false);
-    const hookCaido = yield* Ref.make(false);
-    const webCaida = yield* Ref.make(false);
-    const despliegues = yield* Ref.make(0);
-    const servido = yield* Ref.make(Option.none<string>());
-    const carpeta = path.join(path.dirname(entorno.almacen), "vercel");
-
-    const vigente = Effect.gen(function* () {
-      if (yield* Ref.get(webCaida)) {
-        return yield* new VercelNoDisponible({ motivo: "ERR_CONNECTION_RESET" });
-      }
-      const actual = yield* Ref.get(servido);
-      if (Option.isNone(actual)) return Option.none<string>();
-      return Option.some(
-        yield* Effect.orDie(fs.readFileString(path.join(actual.value, FICHERO_VIGENTE))),
-      );
-    });
-
-    const desplegar = Effect.gen(function* () {
-      if (yield* Ref.get(hookCaido)) {
-        return yield* new VercelNoDisponible({ motivo: "el deploy hook contesta 503" });
-      }
-      const numero = yield* Ref.updateAndGet(despliegues, (n) => n + 1);
-      const destino = path.join(carpeta, String(numero), "capas");
-      const origen = (yield* Ref.get(sinR2)) ? path.join(carpeta, "sin-r2") : entorno.almacen;
-      const build = yield* Effect.exit(montar(origen, destino));
-      if (Exit.isSuccess(build)) yield* Ref.set(servido, Option.some(destino));
-    });
-
-    const hecho: Vercel = {
-      sinR2,
-      hookCaido,
-      webCaida,
-      despliegues: Ref.get(despliegues),
-      servido: Ref.get(servido),
-      capa: Layer.succeed(SitioEnVercel, SitioEnVercel.of({ vigente, desplegar })),
-    };
-    return hecho;
+    const destino = path.join(path.dirname(entorno.almacen), "vercel", "capas");
+    yield* montar(entorno.almacen, destino);
+    return destino;
   });
 
 /** El sello de la versión vigente de un almacén. */
@@ -199,44 +143,27 @@ const loQuePideUnaPestana = (almacen: ReadonlyMap<string, string>, resumen: stri
 
 describe("las capas en Vercel", () => {
   it.effect(
-    "tras cada versión nueva la noche lanza el build, que monta la vigente y las dos anteriores",
+    "el build monta la vigente y las dos anteriores, y nada de la cuarta",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
           const grabada = yield* muestraCampusNord;
-          const vercel = yield* vercelDePrueba(entorno);
           // Cuatro versiones: cada estación que falta en dos barridos seguidos se retira.
           const claves = grabada.listado.registros.map((r) => r.clave).slice(0, 3);
           const muestras = [grabada, ...claves.map((_, i) => sin(grabada, claves.slice(0, i + 1)))];
           yield* TestClock.setTime(NOCHE);
-          const primera = yield* unaNoche(entorno, registroOficial(grabada), {
-            vercel: vercel.capa,
-          });
-          assert.deepStrictEqual(primera.vercel, {
-            tipo: "desplegada",
-            version: primera.publicacion.tipo === "publicada" ? primera.publicacion.version : "",
-          });
+          yield* unaNoche(entorno, registroOficial(grabada));
           for (const muestra of muestras.slice(1)) {
             yield* TestClock.adjust(DIA);
-            const barrido = yield* unaNoche(entorno, registroOficial(muestra), {
-              vercel: vercel.capa,
-            });
-            // La misma versión con otro resumen, que Vercel aún no tiene.
+            const barrido = yield* unaNoche(entorno, registroOficial(muestra));
             assert.strictEqual(barrido.publicacion.tipo, "barrido");
-            assert.strictEqual(barrido.vercel.tipo, "desplegada");
             yield* TestClock.adjust(DIA);
-            const nueva = yield* unaNoche(entorno, registroOficial(muestra), {
-              vercel: vercel.capa,
-            });
+            const nueva = yield* unaNoche(entorno, registroOficial(muestra));
             assert.strictEqual(nueva.publicacion.tipo, "publicada");
-            assert.strictEqual(nueva.vercel.tipo, "desplegada");
           }
-          assert.strictEqual(yield* vercel.despliegues, 7);
 
           const almacen = yield* contenidoDe(entorno.almacen);
-          const servido = yield* vercel.servido;
-          assert.isTrue(Option.isSome(servido));
-          const montado = yield* contenidoDe(Option.getOrElse(servido, () => ""));
+          const montado = yield* contenidoDe(yield* construir(entorno));
           const sellos = sellosDe(almacen);
           assert.lengthOf(sellos, 4);
           const [vieja, ...montadas] = sellos;
@@ -273,31 +200,28 @@ describe("las capas en Vercel", () => {
       conEntorno((entorno) =>
         Effect.gen(function* () {
           const grabada = yield* muestraCampusNord;
-          const vercel = yield* vercelDePrueba(entorno);
           const claves = grabada.listado.registros.map((r) => r.clave).slice(0, 2);
           yield* TestClock.setTime(NOCHE);
-          // Cada pestaña abre con el resumen que servía Vercel la noche en que se abrió.
+          // Cada pestaña abre con el resumen vigente la noche en que se abrió.
           const resumenes: Array<string> = [];
           const apuntar = Effect.gen(function* () {
-            const servido = yield* vercel.servido;
-            const montado = yield* contenidoDe(Option.getOrElse(servido, () => ""));
-            const resumen = montado.get(FICHERO_VIGENTE)?.match(/resumen@[^"]+/u)?.[0];
+            const publicado = yield* contenidoDe(entorno.almacen);
+            const resumen = publicado.get(FICHERO_VIGENTE)?.match(/resumen@[^"]+/u)?.[0];
             if (resumen !== undefined) resumenes.push(resumen);
           });
-          yield* unaNoche(entorno, registroOficial(grabada), { vercel: vercel.capa });
+          yield* unaNoche(entorno, registroOficial(grabada));
           yield* apuntar;
           for (const muestra of [sin(grabada, claves.slice(0, 1)), sin(grabada, claves)]) {
             for (let noche = 0; noche < 2; noche++) {
               yield* TestClock.adjust(DIA);
-              yield* unaNoche(entorno, registroOficial(muestra), { vercel: vercel.capa });
+              yield* unaNoche(entorno, registroOficial(muestra));
               yield* apuntar;
             }
           }
           const almacen = yield* contenidoDe(entorno.almacen);
           assert.lengthOf(sellosDe(almacen), 3);
-          const servido = yield* vercel.servido;
-          const montado = yield* contenidoDe(Option.getOrElse(servido, () => ""));
-          // Los cinco resúmenes que ha servido Vercel: tres versiones, dos con un barrido más.
+          const montado = yield* contenidoDe(yield* construir(entorno));
+          // Los cinco resúmenes que ha habido: tres versiones, dos con un barrido más.
           assert.lengthOf(new Set(resumenes), 5);
           for (const resumen of resumenes) {
             const pedidos = loQuePideUnaPestana(almacen, resumen);
@@ -308,99 +232,6 @@ describe("las capas en Vercel", () => {
         }),
       ),
     60_000,
-  );
-
-  it.effect("con Vercel al día no se vuelve a desplegar", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const grabada = yield* muestraCampusNord;
-        const vercel = yield* vercelDePrueba(entorno);
-        yield* TestClock.setTime(NOCHE);
-        yield* unaNoche(entorno, registroOficial(grabada), { vercel: vercel.capa });
-        const apagada = yield* unaNoche(entorno, registroOficial(grabada), {
-          vercel: vercel.capa,
-          interruptores: {
-            ...INTERRUPTOR_POR_DEFECTO,
-            "registro-oficial": { activo: false, motivo: "prueba" },
-          },
-        });
-        assert.strictEqual(apagada.publicacion.tipo, "al-dia");
-        assert.strictEqual(apagada.vercel.tipo, "al-dia");
-        assert.strictEqual(yield* vercel.despliegues, 1);
-      }),
-    ),
-  );
-
-  it.effect("un build que no llega a R2 falla y Vercel sigue sirviendo el anterior", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const grabada = yield* muestraCampusNord;
-        const vercel = yield* vercelDePrueba(entorno);
-        yield* TestClock.setTime(NOCHE);
-        yield* unaNoche(entorno, registroOficial(grabada), { vercel: vercel.capa });
-        const anterior = yield* vercel.servido;
-
-        yield* Ref.set(vercel.sinR2, true);
-        yield* TestClock.adjust(DIA);
-        const segunda = yield* unaNoche(entorno, registroOficial(sinUna(grabada)), {
-          vercel: vercel.capa,
-        });
-        assert.strictEqual(segunda.vercel.tipo, "desplegada");
-        assert.strictEqual(yield* vercel.despliegues, 2);
-        assert.deepStrictEqual(yield* vercel.servido, anterior);
-
-        // La noche siguiente Vercel sigue sin la versión nueva: se vuelve a lanzar el build.
-        yield* Ref.set(vercel.sinR2, false);
-        const tercera = yield* unaNoche(entorno, registroOficial(sinUna(grabada)), {
-          vercel: vercel.capa,
-        });
-        assert.strictEqual(tercera.vercel.tipo, "desplegada");
-        assert.strictEqual(yield* vercel.despliegues, 3);
-        const servido = yield* vercel.servido;
-        const almacen = yield* contenidoDe(entorno.almacen);
-        const montado = yield* contenidoDe(Option.getOrElse(servido, () => ""));
-        assert.strictEqual(montado.get(FICHERO_VIGENTE), almacen.get(FICHERO_VIGENTE));
-      }),
-    ),
-  );
-
-  it.effect("si Vercel no contesta se despliega igual, y un hook caído no tumba la noche", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        const grabada = yield* muestraCampusNord;
-        const vercel = yield* vercelDePrueba(entorno);
-        yield* TestClock.setTime(NOCHE);
-        yield* Ref.set(vercel.hookCaido, true);
-        const primera = yield* unaNoche(entorno, registroOficial(grabada), {
-          vercel: vercel.capa,
-        });
-        assert.strictEqual(primera.publicacion.tipo, "publicada");
-        assert.deepStrictEqual(primera.vercel, {
-          tipo: "fallida",
-          motivo: "el deploy hook contesta 503",
-        });
-        assert.isDefined(primera.copia);
-
-        yield* Ref.set(vercel.hookCaido, false);
-        yield* Ref.set(vercel.webCaida, true);
-        yield* TestClock.adjust(DIA);
-        const segunda = yield* unaNoche(entorno, registroOficial(grabada), {
-          vercel: vercel.capa,
-        });
-        assert.strictEqual(segunda.vercel.tipo, "desplegada");
-        assert.strictEqual(yield* vercel.despliegues, 1);
-      }),
-    ),
-  );
-
-  it.effect("sin deploy hook la noche no lanza ningún build", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        yield* TestClock.setTime(NOCHE);
-        const hecha = yield* unaNoche(entorno, registroOficial(yield* muestraCampusNord));
-        assert.deepStrictEqual(hecha.vercel, { tipo: "sin-hook" });
-      }),
-    ),
   );
 
   describe("la orden capas", () => {

@@ -13,7 +13,6 @@ import {
   type AlmacenDelArchivo,
 } from "@celda/publicacion/almacen";
 import { almacenEnCarpeta } from "@celda/publicacion/almacenes/carpeta";
-import type { SitioEnVercel } from "@celda/publicacion/vercel";
 import { zonasDePublicacion } from "@celda/publicacion/zonas";
 import { NodeServices } from "@effect/platform-node";
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient";
@@ -131,8 +130,6 @@ export interface Variante {
   readonly sinPublicar?: boolean;
   /** Emplazamientos por lote de fichas; por defecto, `POR_LOTE`. */
   readonly porLote?: number;
-  /** La web en Vercel. Sin ella, la noche no lanza ningún build. */
-  readonly vercel?: Layer.Layer<SitioEnVercel>;
   /** Las copias de la base en R2. Sin ellas, la copia se queda en el disco. */
   readonly copiasEnR2?: Layer.Layer<AlmacenDeCopias>;
   /** El archivo de páginas en otro fichero que el del entorno. */
@@ -168,7 +165,6 @@ export const unaNoche = (
         ? sinAlmacen
         : publicadorEn(zonas, variante.porLote ?? POR_LOTE).pipe(
             Layer.provide(variante.almacen ?? entorno.almacenVigilado),
-            Layer.provide(variante.vercel ?? Layer.empty),
           ),
       Layer.succeed(
         Extractores,

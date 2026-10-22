@@ -9,7 +9,6 @@ import {
   archivoDesdeConfig,
   copiasDesdeConfig,
   despliegueDesdeConfig,
-  vercelDesdeConfig,
 } from "@celda/publicacion/configuracion";
 import { produccionEn } from "@celda/publicacion/despliegue";
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
@@ -60,12 +59,11 @@ import { cuadrosDeBorde, pasadaDeBorde } from "./cuadros.ts";
 /**
  * La ingesta fuera de Convex (ADR 0015). Siete órdenes sobre la misma base:
  *
- * - `noche`: una ejecución entera, ingesta, publicación, build de Vercel y copia de seguridad. La
- *   lanza el temporizador el primer sábado de cada mes y el domingo siguiente (ADR 0029).
+ * - `noche`: una ejecución entera, ingesta, publicación y copia de seguridad. La lanza el
+ *   temporizador el primer sábado de cada mes y el domingo siguiente (ADR 0029).
  * - `estado`: la última ejecución de cada fuente, lo que le queda a la ronda, la próxima
  *   ejecución, los errores y lo publicado.
- * - `publicar`: publica a mano lo que haya en la base, sin pedir nada a las fuentes, y lanza el
- *   build de Vercel si no sirve la versión vigente.
+ * - `publicar`: publica a mano lo que haya en la base, sin pedir nada a las fuentes.
  * - `copia`: copia la base a la carpeta de copias y, con un cubo de R2, también allí, y saca y
  *   sube el paquete del archivo de páginas.
  * - `releer-archivo [--aplicar]`: relee con la lectura de hoy la última lectura archivada de cada
@@ -215,20 +213,11 @@ const principal = Effect.gen(function* () {
     archivo: c.archivo,
   });
   const almacen = yield* almacenDesdeConfig;
-  const vercel = yield* vercelDesdeConfig;
   const copias = yield* copiasDesdeConfig;
   const archivoEnR2 = yield* archivoDesdeConfig;
   const publicador = Option.match(almacen, {
     onNone: () => sinAlmacen,
-    onSome: (capa) =>
-      publicadorEn(zonas).pipe(
-        Layer.provide(
-          Option.match(vercel, {
-            onNone: () => capa,
-            onSome: (sitio) => Layer.merge(capa, sitio),
-          }),
-        ),
-      ),
+    onSome: (capa) => publicadorEn(zonas).pipe(Layer.provide(capa)),
   });
   const extractores = Layer.succeed(
     Extractores,

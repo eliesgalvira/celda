@@ -8,7 +8,6 @@ import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import type { AlmacenDeCopias, AlmacenDeFicheros, AlmacenDelArchivo } from "./almacen.ts";
 import { almacenEnCarpeta } from "./almacenes/carpeta.ts";
 import { almacenEnR2, archivoEnR2, copiasEnR2 } from "./almacenes/r2.ts";
-import { type SitioEnVercel, sitioEnVercel } from "./vercel.ts";
 
 /**
  * Dónde se publica, según la configuración:
@@ -77,26 +76,6 @@ export const archivoDesdeConfig = Effect.map(
   (r2): Option.Option<Layer.Layer<AlmacenDelArchivo>> =>
     Option.map(r2, (credenciales) =>
       archivoEnR2(credenciales).pipe(Layer.provide(FetchHttpClient.layer)),
-    ),
-);
-
-/**
- * La web en Vercel, según la configuración (ADR 0018):
- *
- * - `CELDA_VERCEL_DEPLOY_HOOK`: el deploy hook del proyecto de Vercel. Sin él, la noche no lanza
- *   ningún build.
- * - `CELDA_ALMACEN_ORIGEN`: la URL pública de las capas, `https://celda.elies.site/capas`, la
- *   misma que se apunta con cada versión. Sin ella no se sabe qué sirve Vercel, y cada
- *   publicación lanza el build.
- */
-export const vercelDesdeConfig = Effect.map(
-  Config.all({
-    hook: Config.option(Config.Redacted("CELDA_VERCEL_DEPLOY_HOOK")),
-    origen: Config.option(Config.String("CELDA_ALMACEN_ORIGEN")),
-  }),
-  ({ hook, origen }): Option.Option<Layer.Layer<SitioEnVercel>> =>
-    Option.map(hook, (valor) =>
-      sitioEnVercel({ hook: valor, origen }).pipe(Layer.provide(FetchHttpClient.layer)),
     ),
 );
 

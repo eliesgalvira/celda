@@ -1,4 +1,4 @@
-import { decodificarVigente, FICHERO_VIGENTE, type Vigente } from "@celda/dominio/capa";
+import { decodificarVigente, FICHERO_VIGENTE } from "@celda/dominio/capa";
 import {
   decodificarManifiesto,
   ficheroDeManifiesto,
@@ -6,12 +6,9 @@ import {
   leerResumen,
   selloDeVersion,
 } from "@celda/dominio/provincias";
-import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
@@ -26,8 +23,8 @@ import { montarBaremos } from "./baremo.ts";
 /**
  * Las capas, solo desde Vercel (ADR 0018). La web lee las capas y las fichas de `/capas`, en su
  * mismo origen. El build de Vercel las monta en `dist/capas` desde el cubo privado de R2
- * (`montarCapas`), y la ingesta nocturna lanza ese build cuando Vercel aún no sirve la versión
- * vigente de R2 (`ponerAlDiaVercel`).
+ * (`montarCapas`). El flujo de despliegue de GitHub lee lo que sirve producción (`leerDeVercel`)
+ * para saber si hace falta otro build (`despliegue.ts`).
  */
 
 // ── Las capas, en el build ───────────────────────────────────────────────────────────────────────
@@ -303,108 +300,13 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
   return montadas;
 });
 
-// ── El build, desde la ingesta ───────────────────────────────────────────────────────────────────
+// ── Lo que sirve Vercel ──────────────────────────────────────────────────────────────────────────
 
-/** Vercel no ha contestado, o no ha aceptado el build. */
+/** Vercel no ha contestado. */
 export class VercelNoDisponible extends Schema.TaggedError<VercelNoDisponible>()(
   "VercelNoDisponible",
   { motivo: Schema.String },
 ) {}
-
-/** La web en Vercel, vista desde la ingesta. */
-export class SitioEnVercel extends Context.Service<
-  SitioEnVercel,
-  {
-    /**
-     * El `vigente.json` que sirve Vercel en `/capas`; `None` si no tiene, o si no se sabe su URL.
-     * Entonces siempre se lanza el build.
-     */
-    readonly vigente: Effect.Effect<Option.Option<string>, VercelNoDisponible>;
-    /** Lanza un build, que vuelve a montar las capas desde R2. */
-    readonly desplegar: Effect.Effect<void, VercelNoDisponible>;
-  }
->()("@celda/publicacion/vercel/SitioEnVercel") {}
-
-/** Lo que ha pasado con Vercel tras publicar. Nunca es un fallo de la noche. */
-export const ResultadoVercel = Schema.Union([
-  /** No hay deploy hook configurado. */
-  Schema.Struct({ tipo: Schema.Literal("sin-hook") }),
-  /** El almacén no tiene `vigente.json`: no hay nada que montar. */
-  Schema.Struct({ tipo: Schema.Literal("sin-publicar") }),
-  /** Vercel ya sirve la versión vigente con su resumen. */
-  Schema.Struct({ tipo: Schema.Literal("al-dia"), version: Schema.String }),
-  /** Se ha lanzado el build. Vercel lo construye después, por su cuenta. */
-  Schema.Struct({ tipo: Schema.Literal("desplegada"), version: Schema.String }),
-  Schema.Struct({ tipo: Schema.Literal("fallida"), motivo: Schema.String }),
-]);
-export type ResultadoVercel = typeof ResultadoVercel.Type;
-
-/** Si dos `vigente.json` dicen lo mismo: la misma versión con el mismo resumen. */
-const igual = (a: Vigente, b: string): boolean => {
-  const otro = decodificarVigente(b);
-  return (
-    Result.isSuccess(otro) &&
-    otro.success.version === a.version &&
-    otro.success.resumen === a.resumen
-  );
-};
-
-/**
- * Tras publicar, comprueba que Vercel sirve lo que dice el `vigente.json` del almacén, leído por
- * la API S3, y si no, lanza el build. Si Vercel no contesta, también. Repetirla con Vercel al día
- * no hace nada, y una que falló una noche se repite la siguiente.
- */
-export const ponerAlDiaVercel = Effect.gen(function* () {
-  const almacen = yield* AlmacenDeFicheros;
-  const sitio = yield* SitioEnVercel;
-  const publicado = yield* almacen.leer(FICHERO_VIGENTE);
-  if (Option.isNone(publicado)) {
-    const nada: ResultadoVercel = { tipo: "sin-publicar" };
-    return nada;
-  }
-  const vigente = decodificarVigente(publicado.value);
-  if (Result.isFailure(vigente)) {
-    const fallida: ResultadoVercel = {
-      tipo: "fallida",
-      motivo: `vigente.json no se entiende: ${vigente.failure.message}`,
-    };
-    return fallida;
-  }
-  const version = vigente.success.version;
-  const servido = yield* sitio.vigente.pipe(
-    Effect.catchTag("VercelNoDisponible", (error) =>
-      Effect.as(Effect.logWarning(`Vercel no contesta: ${error.motivo}`), Option.none<string>()),
-    ),
-  );
-  if (Option.isSome(servido) && igual(vigente.success, servido.value)) {
-    const alDia: ResultadoVercel = { tipo: "al-dia", version };
-    return alDia;
-  }
-  yield* sitio.desplegar;
-  const desplegada: ResultadoVercel = { tipo: "desplegada", version };
-  return desplegada;
-}).pipe(
-  Effect.catchTags({
-    AlmacenNoDisponible: (error) =>
-      Effect.succeed<ResultadoVercel>({
-        tipo: "fallida",
-        motivo: `el almacén no responde: ${error.motivo}`,
-      }),
-    VercelNoDisponible: (error) =>
-      Effect.succeed<ResultadoVercel>({ tipo: "fallida", motivo: error.motivo }),
-  }),
-  Effect.withSpan("Vercel.ponerAlDia"),
-);
-
-export interface OpcionesVercel {
-  /** El deploy hook del proyecto de Vercel: quien lo tiene puede lanzar builds. */
-  readonly hook: Redacted.Redacted<string>;
-  /**
-   * La URL pública de las capas, `https://celda.elies.site/capas`. Sin ella no se puede comprobar
-   * qué sirve Vercel, y cada publicación lanza el build.
-   */
-  readonly origen: Option.Option<string>;
-}
 
 /** Lo que se espera a Vercel antes de darlo por caído. */
 const ESPERA = Duration.seconds(30);
@@ -429,39 +331,5 @@ export const leerDeVercel = (http: HttpClient.HttpClient, url: string) =>
     Effect.catchTags({
       HttpClientError: (error) => Effect.fail(new VercelNoDisponible({ motivo: error.message })),
       TimeoutError: () => Effect.fail(new VercelNoDisponible({ motivo: "Vercel no contesta" })),
-    }),
-  );
-
-/** La web en Vercel: se lee por su URL pública y se despliega con el deploy hook. */
-export const sitioEnVercel = (opciones: OpcionesVercel) =>
-  Layer.effect(
-    SitioEnVercel,
-    Effect.gen(function* () {
-      const http = yield* HttpClient.HttpClient;
-      const noDisponible = (motivo: string) => new VercelNoDisponible({ motivo });
-
-      const vigente = Option.match(opciones.origen, {
-        onNone: () => Effect.succeed(Option.none<string>()),
-        onSome: (origen) => leerDeVercel(http, `${origen.replace(/\/$/u, "")}/${FICHERO_VIGENTE}`),
-      });
-
-      // La URL del hook es el secreto: no va en los mensajes.
-      const desplegar = Effect.gen(function* () {
-        const respuesta = yield* http.execute(
-          HttpClientRequest.post(Redacted.value(opciones.hook)),
-        );
-        if (respuesta.status < 200 || respuesta.status >= 300) {
-          return yield* noDisponible(`el deploy hook contesta ${respuesta.status}`);
-        }
-      }).pipe(
-        Effect.timeout(ESPERA),
-        Effect.catchTags({
-          HttpClientError: (error) =>
-            Effect.fail(noDisponible(`el deploy hook no contesta (${error.reason._tag})`)),
-          TimeoutError: () => Effect.fail(noDisponible("el deploy hook no contesta")),
-        }),
-      );
-
-      return SitioEnVercel.of({ vigente, desplegar });
     }),
   );
