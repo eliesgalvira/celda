@@ -50,9 +50,8 @@ const PARES: ReadonlyArray<readonly [texto: string, fondo: string]> = [
   ["primario-texto", "superficie"],
   ["primario-texto", "superficie-alta"],
   ["primario-texto", "fondo"],
-  // Las etiquetas de barrio, escritas sobre el mapa con un halo del color de su fondo.
-  ["tinta", "mapa-halo"],
-  ["primario-texto", "mapa-halo"],
+  // El nombre de una zona, bajo su hexágono, con un halo del color del fondo del mapa.
+  ["tinta-suave", "mapa-halo"],
   // Los rótulos del mapa base, con su halo.
   ["mapa-rotulo-capital", "mapa-halo"],
   ["mapa-rotulo-ciudad", "mapa-halo"],

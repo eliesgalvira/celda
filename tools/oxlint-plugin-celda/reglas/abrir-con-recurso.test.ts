@@ -37,7 +37,7 @@ describe("celda/abrir-con-recurso", () => {
       const [n, setN] = createSignal(0);
       createEffect(n, (valor) => {
         document.title = String(valor);
-        mapa.getSource("celdas")?.setData(valor);
+        mapa.getSource("puntos")?.setData(valor);
         mapa.jumpTo(valor);
         setN(valor);
       });

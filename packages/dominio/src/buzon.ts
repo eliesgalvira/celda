@@ -17,7 +17,7 @@ export const DISTANCIA_MAXIMA_MEDIDA_M = 35_000;
 
 /**
  * Por debajo de esta distancia el rumbo no dice nada y no se comprueba el sector: es el umbral
- * de la fusión (ADR 0012) y el del sector que da servicio.
+ * de la fusión (ADR 0012).
  */
 export const DISTANCIA_SIN_RUMBO_M = 15;
 

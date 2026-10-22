@@ -138,7 +138,7 @@ describe("AlmacenLocal en IndexedDB", () => {
       Effect.gen(function* () {
         const fabrica = new IDBFactory();
         // El almacén crea la base; después se escribe la fila como la dejó una versión anterior, con
-        // la salvedad de las celdas ya vista.
+        // el ajuste de una función retirada.
         yield* Effect.flatMap(AlmacenLocal, (a) => a.leerAjustes).pipe(
           Effect.provide(almacen(fabrica)),
         );
@@ -151,7 +151,7 @@ describe("AlmacenLocal en IndexedDB", () => {
                 esquema: 1,
                 modoEstudiante: true,
                 vistaAgrupada: true,
-                salvedadDeCeldasVista: true,
+                funcionRetirada: true,
               },
               "dispositivo",
             );
