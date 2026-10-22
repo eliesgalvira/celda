@@ -30,16 +30,43 @@ import {
 } from "@celda/dominio/provincias";
 import { ficheroDePuntos, generarPuntos } from "@celda/dominio/puntos";
 import { cajaDe } from "@celda/dominio/area";
-import { combinacionesDe } from "@celda/dominio/filtro";
+import {
+  claveDeFiltro,
+  combinacionesDe,
+  type FiltroDeCompanias,
+  hayFiltro,
+} from "@celda/dominio/filtro";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 
 import { crearAgrupador } from "./agrupacion.ts";
-import { agrupacionEnHilo, type ProvinciaCargada, prefijoDeProvincia } from "./nacional.ts";
+import {
+  type AgrupacionConFiltro,
+  agrupacionConFiltro,
+  agrupacionSinFiltro,
+  type ProvinciaCargada,
+  prefijoDeProvincia,
+} from "./nacional.ts";
 import { leerPuntosDelMapa, type PuntosDelMapa } from "./puntos.ts";
 import { CapaEmplazamientos, type FalloCapa } from "./servicio.ts";
+
+/**
+ * La agrupación de una provincia lista con un filtro, hecha en el hilo, sin el Worker: la de las
+ * pruebas de pantalla.
+ */
+export const agrupacionEnHilo = (
+  cargada: ProvinciaCargada,
+  resumen: ResumenLeido,
+  filtro: FiltroDeCompanias,
+): AgrupacionConFiltro =>
+  hayFiltro(filtro)
+    ? agrupacionConFiltro(cargada.capa, resumen, {
+        companias: filtro,
+        clave: claveDeFiltro(filtro),
+      })
+    : agrupacionSinFiltro(cargada);
 
 /** El fichero de los puntos en los resúmenes de prueba. */
 export const FICHERO_DE_PUNTOS_DE_PRUEBA = ficheroDePuntos("prueba");

@@ -132,6 +132,7 @@ import type { LectorDeRotulos } from "./rotulosDeCiudad.ts";
 import { cuentaDelSitio, textoDeCuenta } from "./cuenta.ts";
 import { type CargasDeZonas, crearLugares } from "./lugar.ts";
 import { Marcadores } from "./Marcadores.tsx";
+import { vistaDe } from "./vista.ts";
 import {
   crearVistaInicial,
   type Pantalla,
@@ -141,13 +142,6 @@ import {
 } from "./vistaInicial.ts";
 
 type ModuloMapaBase = typeof import("./mapaBase.ts");
-
-/** Lo que se ve del mapa: sus esquinas y su zoom. */
-interface Encuadre {
-  readonly suroeste: Coordenada;
-  readonly noreste: Coordenada;
-  readonly zoom: number;
-}
 
 /** De dónde salen las provincias y sus contornos para saber dónde cae un punto. */
 const CARGAS_DE_ZONAS: CargasDeZonas = {
@@ -199,8 +193,8 @@ export function PantallaMapa() {
   const [calle, setCalle] = createSignal(false);
   /** Si el mapa está al zoom de la foto aérea o más cerca. */
   const [cercaDeLaFoto, setCercaDeLaFoto] = createSignal(false);
-  /** Lo que se ve del mapa, puesto cada vez que se para. */
-  const [encuadre, setEncuadre] = createSignal<Encuadre>();
+  /** Lo que se ve del mapa, puesto cada vez que se para: el centro dice el lugar de la cabecera. */
+  const [vistaDelEncuadre, setVistaDelEncuadre] = createSignal<Vista>();
   let contenedor: HTMLDivElement | undefined;
   let mapa: MapaMapLibre | undefined;
   /** Repinta el mapa con los colores del tema activo (`crearMapaBase`). */
@@ -256,13 +250,6 @@ export function PantallaMapa() {
   const nivelDePedir = () =>
     vistaDibujada() === "agrupada" ? NIVEL_DE_PROVINCIAS : NIVEL_DE_PROVINCIAS_CON_PUNTOS;
 
-  /** Lo que se ve, como vista de la capa: el centro dice el lugar de la cabecera. */
-  const vistaDelEncuadre = createMemo((): Vista | undefined => {
-    const actual = encuadre();
-    return actual === undefined
-      ? undefined
-      : { caja: { suroeste: actual.suroeste, noreste: actual.noreste }, zoom: actual.zoom };
-  });
   /** El punto de referencia guardado en el dispositivo, mientras decide la vista inicial. */
   const puntoAlAbrir = createMemo((): Coordenada | null | undefined => {
     if (!puntoDeReferencia.puntoGuardadoLeido()) return undefined;
@@ -330,14 +317,7 @@ export function PantallaMapa() {
       };
       nuevo.on("zoom", mirarZoom);
       mirarZoom();
-      const mirarEncuadre = () => {
-        const limites = nuevo.getBounds();
-        setEncuadre({
-          suroeste: { longitud: limites.getWest(), latitud: limites.getSouth() },
-          noreste: { longitud: limites.getEast(), latitud: limites.getNorth() },
-          zoom: nuevo.getZoom(),
-        });
-      };
+      const mirarEncuadre = () => setVistaDelEncuadre(vistaDe(nuevo));
       nuevo.on("moveend", mirarEncuadre);
       nuevo.once("load", mirarEncuadre);
       mapa = nuevo;
@@ -1078,7 +1058,7 @@ export function PantallaMapa() {
                   <EleccionConBuscador
                     alUsarCentro={usarCentro}
                     alIrA={irA}
-                    encuadre={encuadre()}
+                    encuadre={vistaDelEncuadre()?.caja}
                   />
                 </Show>
               </>

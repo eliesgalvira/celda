@@ -17,7 +17,6 @@ import {
   type Escena,
 } from "./agrupacion.ts";
 import {
-  agrupacionEnHilo,
   claveDeProvincia,
   crearAgrupadorNacional,
   NIVEL_DE_PROVINCIAS,
@@ -34,6 +33,7 @@ import {
   RESUMEN,
   resumenConBarcelona,
 } from "./pruebasNacional.ts";
+import { agrupacionEnHilo } from "./pruebas.ts";
 import { NIVEL_DE_MUNICIPIOS } from "./zonas.ts";
 
 const LISTAS = estados(

@@ -4,6 +4,7 @@ import type { Asignacion } from "@celda/dominio/municipio";
 import type { ProvinciaConCaja } from "@celda/dominio/zonaDelEjercicio";
 import { recurso } from "@celda/ui/recurso.ts";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { MUNDO, mercatorY } from "../lib/mercator.ts";
 
 /**
  * Qué se ve al abrir el mapa, sin preguntar nada a nadie:
@@ -93,18 +94,10 @@ const LO_QUE_TAPA_EN_ESCRITORIO: LoQueTapa = {
   creditos: 64,
 };
 
-/** Tamaño del mundo en píxeles a zoom 0, con las teselas de 512 de MapLibre. */
-const MUNDO = 512;
-
-const yMercator = (latitud: number): number => {
-  const seno = Math.sin((latitud * Math.PI) / 180);
-  return 0.5 - Math.log((1 + seno) / (1 - seno)) / (4 * Math.PI);
-};
-
 /** El zoom al que `caja` llena lo que deja libre `relleno`, sin topes. */
 const zoomQueLlena = (caja: Rectangulo, pantalla: Pantalla, relleno: Relleno): number => {
   const dx = (caja.noreste.longitud - caja.suroeste.longitud) / 360;
-  const dy = yMercator(caja.suroeste.latitud) - yMercator(caja.noreste.latitud);
+  const dy = mercatorY(caja.suroeste.latitud) - mercatorY(caja.noreste.latitud);
   const ancho = Math.max(1, pantalla.ancho - relleno.left - relleno.right);
   const alto = Math.max(1, pantalla.alto - relleno.top - relleno.bottom);
   return Math.min(

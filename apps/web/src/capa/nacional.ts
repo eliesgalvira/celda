@@ -239,22 +239,6 @@ export const agrupacionSinFiltro = (cargada: ProvinciaCargada): AgrupacionConFil
   redUsada: undefined,
 });
 
-/**
- * La agrupación de una provincia lista con un filtro, hecha en el hilo, sin el Worker: la de las
- * pruebas de pantalla.
- */
-export const agrupacionEnHilo = (
-  cargada: ProvinciaCargada,
-  resumen: ResumenLeido,
-  filtro: FiltroDeCompanias,
-): AgrupacionConFiltro =>
-  hayFiltro(filtro)
-    ? agrupacionConFiltro(cargada.capa, resumen, {
-        companias: filtro,
-        clave: claveDeFiltro(filtro),
-      })
-    : agrupacionSinFiltro(cargada);
-
 /** Lo que cambia el agrupador de toda España, además del resumen y las provincias. */
 export interface OpcionesNacional {
   /** Dónde va el hexágono de cada provincia. Sin él, en su centro visual. */

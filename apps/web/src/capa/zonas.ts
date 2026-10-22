@@ -1,4 +1,5 @@
 import type { Coordenada } from "@celda/dominio/area";
+import { MUNDO, mercatorY } from "../lib/mercator.ts";
 
 /**
  * Qué municipios se ven como zona en cada nivel de municipios (ADR 0017, #44 y su corrección, y
@@ -78,14 +79,6 @@ export const MINIMO_DE_ZONA = 4;
  */
 export const LADO_MAXIMO_DE_ZONA = 240;
 
-/** El tamaño del mundo en píxeles a zoom 0, con teselas de 512 como MapLibre y supercluster. */
-const MUNDO = 512;
-
-const yMercator = (latitud: number): number => {
-  const seno = Math.sin((latitud * Math.PI) / 180);
-  return 0.5 - Math.log((1 + seno) / (1 - seno)) / (4 * Math.PI);
-};
-
 /** Lo que el criterio necesita de cada emplazamiento. */
 export interface ConMunicipio {
   readonly posicion: Coordenada;
@@ -126,7 +119,7 @@ export const zonasDeMunicipios = (
   const habitantes = new Map(municipios.map((m) => [m.codigo, m.habitantes ?? 0]));
   const extensiones = new Map<string, Extension>();
   const anadir = (codigo: string, { longitud, latitud }: Coordenada, cuenta: boolean) => {
-    const y = yMercator(latitud);
+    const y = mercatorY(latitud);
     const e = extensiones.get(codigo);
     if (e === undefined) {
       extensiones.set(codigo, {

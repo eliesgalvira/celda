@@ -4,6 +4,7 @@ import { type MascarasDeFiltro, papelDeMascara } from "@celda/dominio/filtro";
 import { ESCALA_DE_PUNTOS, type PuntosLeidos } from "@celda/dominio/puntos";
 
 import type { Elemento, Escena } from "../capa/agrupacion.ts";
+import { mercatorX, mercatorY } from "../lib/mercator.ts";
 
 /**
  * Hacia dónde vuela cada punto al cambiar de vista (ADR 0028): el sitio del marcador de la vista
@@ -21,13 +22,6 @@ export interface PosicionesDelVuelo {
 /** Una posición al metro, como van los puntos: así se encuentra el marcador de cada uno. */
 const claveDeSitio = (posicion: Coordenada): string =>
   `${Math.round(posicion.longitud * ESCALA_DE_PUNTOS)},${Math.round(posicion.latitud * ESCALA_DE_PUNTOS)}`;
-
-/** La x de una longitud en la proyección de Mercator de MapLibre, de 0 a 1. */
-const mercatorX = (longitud: number): number => (longitud + 180) / 360;
-
-/** La y de una latitud en la proyección de Mercator de MapLibre, de 0 a 1. */
-const mercatorY = (latitud: number): number =>
-  (1 - Math.log(Math.tan(Math.PI / 4 + (latitud * Math.PI) / 360)) / Math.PI) / 2;
 
 /**
  * Lo que vuela: los puntos de `caja` que salen con el filtro, cada uno de su sitio al marcador de

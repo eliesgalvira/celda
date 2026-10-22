@@ -13,8 +13,9 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { crearAgrupador } from "../capa/agrupacion.ts";
-import { agrupacionEnHilo, type ProvinciaCargada, prefijoDeProvincia } from "../capa/nacional.ts";
+import { type ProvinciaCargada, prefijoDeProvincia } from "../capa/nacional.ts";
 import {
+  agrupacionEnHilo,
   cajaDeBarcelona,
   FICHERO_DE_PUNTOS_DE_PRUEBA,
   FUENTES_DE_PRUEBA,

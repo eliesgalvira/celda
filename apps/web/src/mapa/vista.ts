@@ -22,7 +22,7 @@ export interface MapaQueSeMueve {
 }
 
 /** La vista que enseña ahora el mapa. */
-const vistaDe = (mapa: MapaQueSeMueve): Vista => {
+export const vistaDe = (mapa: MapaQueSeMueve): Vista => {
   const caja = mapa.getBounds();
   return {
     caja: {
