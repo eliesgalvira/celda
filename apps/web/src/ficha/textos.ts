@@ -3,6 +3,7 @@ import type { Estado } from "@celda/dominio/emplazamiento";
 import type { EstacionDeFicha, Ficha, OrigenDeFicha } from "@celda/dominio/ficha";
 import { bloque, llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "@celda/dominio/nombreDeLugar";
+import type { Lugar } from "@celda/dominio/municipio";
 import type { Fuente } from "@celda/dominio/observacion";
 
 import type { ComparacionConCapa } from "./marcaDeAgua.ts";
@@ -87,6 +88,20 @@ const municipioYProvinciaDe = (ficha: Ficha): string => {
 };
 
 /**
+ * Cómo se nombra en una frase una zona, con su nombre de lugar (ADR 0025): un municipio, «Gavà»,
+ * o una provincia, «la provincia de Barcelona», salvo Ceuta y Melilla, que se nombran solas.
+ */
+export const nombreDeZona = (zona: {
+  readonly tipo: "municipio" | "provincia";
+  readonly lugar: NonNullable<Lugar["provincia"]>;
+}): string => {
+  const { codigo, nombre } = zona.lugar;
+  if (zona.tipo === "municipio") return nombreDeLugarDeMunicipio(codigo, nombre);
+  const deProvincia = nombreDeLugarDeProvincia(codigo, nombre);
+  return CIUDADES_AUTONOMAS.has(codigo) ? deProvincia : `la provincia de ${deProvincia}`;
+};
+
+/**
  * El crédito del municipio y la provincia, en la forma que piden las condiciones del IGN para
  * una obra derivada: producto, fecha, licencia y atribución.
  */
@@ -123,11 +138,6 @@ export const textoTramo = (banda: Banda): string =>
     ? "Sin tramo publicado"
     : `${enumerar(banda.rangos.map((r) => `${MHZ.format(r.desdeMhz)}–${MHZ.format(r.hastaMhz)}`))} MHz`;
 
-export const SIN_BANDAS = "Celda aún no ha leído sus bandas en el registro oficial.";
-
-/** Lo que se dice de una estación base cuya ficha del registro Celda ha leído sin bandas (#41). */
-export const SIN_BANDAS_EN_REGISTRO = "El registro oficial no publica sus bandas.";
-
 /**
  * Lo que se dice de una estación base sin ficha en el registro: el listado del registro la
  * incluye, pero su página de detalle dice «Código de emplazamiento no válido».
@@ -138,19 +148,34 @@ export const SIN_FICHA_EN_REGISTRO = "El registro no tiene ficha para este empla
 export const comprobadoEl = (fecha: number): string => `comprobado el ${fechaCorta(fecha)}`;
 
 /**
- * Qué decir de una estación base sin bandas: si el registro no tiene su ficha, que no la tiene y
- * desde cuándo se sabe; si no está en el registro, que no hay de dónde leerlas; si Celda aún no
- * ha leído su ficha, que no la ha leído; y si la ha leído, que el registro no las publica.
+ * Qué decir de una estación base de la que no se conoce algo que sale de su ficha del registro,
+ * `que`: si el registro no tiene su ficha, que no la tiene y desde cuándo se sabe; si no está en
+ * el registro, que no hay de dónde leerlo; si Celda aún no ha leído su ficha (`sinLeer`), que no
+ * la ha leído; y si la ha leído, que el registro no lo publica (#41).
  */
-export const sinBandasDe = (estacion: EstacionDeFicha): string => {
+const faltaDe = (estacion: EstacionDeFicha, que: string, sinLeer: boolean): string => {
   if (estacion.sinFichaEnRegistro !== undefined) {
-    return `${SIN_FICHA_EN_REGISTRO} (${comprobadoEl(estacion.sinFichaEnRegistro)}), así que no se conocen sus bandas.`;
+    return `${SIN_FICHA_EN_REGISTRO} (${comprobadoEl(estacion.sinFichaEnRegistro)}), así que no se conocen ${que}.`;
   }
   if (!estacion.origenes.some((o) => o.fuente === "registro-oficial")) {
-    return "No está en el registro oficial, así que no se conocen sus bandas.";
+    return `No está en el registro oficial, así que no se conocen ${que}.`;
   }
-  return estacion.bandasSinLeer ? SIN_BANDAS : SIN_BANDAS_EN_REGISTRO;
+  return sinLeer
+    ? `Celda aún no ha leído ${que} en el registro oficial.`
+    : `El registro oficial no publica ${que}.`;
 };
+
+/** Qué decir de una estación base sin bandas. */
+export const sinBandasDe = (estacion: EstacionDeFicha): string =>
+  faltaDe(estacion, "sus bandas", estacion.bandasSinLeer);
+
+/**
+ * Qué decir de una estación base sin medidas de exposición del ministerio. Sin la lista, Celda
+ * aún no ha leído su ficha desde que las guarda (#73); con la lista vacía, el registro no publica
+ * ninguna.
+ */
+export const sinMedidasDe = (estacion: EstacionDeFicha): string =>
+  faltaDe(estacion, "sus medidas de exposición", estacion.medidasDeExposicion === undefined);
 
 export const NOMBRE_FUENTE: Readonly<Record<Fuente, string>> = {
   "registro-oficial": "Registro oficial",

@@ -48,6 +48,8 @@ import { TITULO_MEJORAR } from "../mejorar/textos.ts";
 import { UbicacionContexto } from "../ubicacion/controlador.ts";
 import { ReferenciaEnFicha } from "../ubicacion/Ubicacion.tsx";
 import { textosCorrecciones, TITULO_CORRECCIONES } from "./correcciones.ts";
+import { ExposicionEnFicha } from "./Exposicion.tsx";
+import { TITULO_EXPOSICION } from "./exposicion.ts";
 import { compararConCapa } from "./marcaDeAgua.ts";
 import {
   datosTecnicosDe,
@@ -184,7 +186,8 @@ function FichaInexistente(props: { readonly clave: string; readonly alCerrar: ()
 
 /**
  * La ficha ya leída: cabecera, frase de resumen, marca de agua, el punto de referencia, cómo
- * mejorar la señal, eje de frecuencias, de dónde sale cada dato y, plegados, los datos técnicos.
+ * mejorar la señal, eje de frecuencias, medidas de exposición, de dónde sale cada dato y, plegados,
+ * los datos técnicos.
  */
 function ContenidoFicha(props: {
   readonly ficha: Ficha;
@@ -299,6 +302,9 @@ function ContenidoFicha(props: {
           bandas={BANDAS_NOMINALES}
           filas={filasDelEje(props.ficha.estaciones)}
         />
+      </SeccionFicha>
+      <SeccionFicha titulo={<TextoConTerminos texto={TITULO_EXPOSICION} />}>
+        <ExposicionEnFicha ficha={props.ficha} />
       </SeccionFicha>
       <SeccionFicha titulo="De dónde salen los datos">
         <For each={props.ficha.estaciones}>

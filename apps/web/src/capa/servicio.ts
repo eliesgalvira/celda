@@ -192,7 +192,7 @@ export const descargarResumen = (http: HttpClient.HttpClient, origen: string, vi
   });
 
 /** Lo que se guarda para la visita: una vez leído, no se vuelve a pedir. */
-const guardado = <A, E>(turno: Semaphore.Semaphore, cargar: Effect.Effect<A, E>) => {
+export const guardado = <A, E>(turno: Semaphore.Semaphore, cargar: Effect.Effect<A, E>) => {
   let leido = Option.none<A>();
   return turno.withPermits(1)(
     Effect.suspend(() =>
