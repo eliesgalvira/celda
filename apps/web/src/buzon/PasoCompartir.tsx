@@ -49,7 +49,7 @@ export function PasoCompartir(props: PasoCompartirProps) {
   const [estado, setEstado] = createSignal<EstadoDelEnvio>({ tipo: "listo" });
 
   const enviar = () => {
-    if (datos === undefined || estado().tipo === "enviando") return;
+    if (estado().tipo === "enviando") return;
     setEstado({ tipo: "enviando" });
     void datos
       .runPromiseExit(Effect.flatMap(Sincronizacion, (s) => s.compartir(props.aportacion)))

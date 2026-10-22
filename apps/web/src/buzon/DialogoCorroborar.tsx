@@ -29,7 +29,7 @@ export function DialogoCorroborar(props: DialogoCorroborarProps) {
   recursoFijo("buzon:corroboracion", () => {
     const parar = new AbortController();
     void datos
-      ?.runPromiseExit(
+      .runPromiseExit(
         nuevaAportacion({
           tipo: "corroboracion",
           esquema: ESQUEMA_CORROBORACION,

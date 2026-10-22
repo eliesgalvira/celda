@@ -76,7 +76,7 @@ export function Proponer(props: ProponerProps) {
   const [borrador, setBorrador] = createSignal<CorreccionPropuesta>();
 
   const punto = createMemo(() => {
-    const referencia = ubicacion?.referencia();
+    const referencia = ubicacion.referencia();
     return referencia === undefined ? undefined : posicionDe(referencia);
   });
 
@@ -108,7 +108,7 @@ export function Proponer(props: ProponerProps) {
 
   const revisar = () => {
     const propuesto = cambio();
-    if (datos === undefined || propuesto === undefined) return;
+    if (propuesto === undefined) return;
     const escrita = nota().trim();
     void datos
       .runPromiseExit(

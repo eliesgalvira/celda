@@ -40,11 +40,10 @@ export function DialogoAjustes(props: {
       <Interruptor
         etiqueta="Modo estudiante"
         descripcion="Añade un ejercicio que calcula, para un municipio o un barrio, las estaciones base de cada compañía, su radio de cobertura y los usuarios por estación."
-        encendido={control?.ajustes().modoEstudiante ?? false}
-        disabled={control === undefined}
-        alCambiar={(encendido) => control?.cambiarModoEstudiante(encendido)}
+        encendido={control.ajustes().modoEstudiante}
+        alCambiar={(encendido) => control.cambiarModoEstudiante(encendido)}
       />
-      <Show when={control?.sinGuardar() === true || props.tema.sinGuardar()}>
+      <Show when={control.sinGuardar() || props.tema.sinGuardar()}>
         <Nota tono="aviso" titulo="No se ha podido guardar">
           <p>Este navegador no deja guardar datos. El cambio durará hasta que cierres la página.</p>
         </Nota>

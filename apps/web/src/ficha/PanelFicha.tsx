@@ -228,14 +228,10 @@ function ContenidoFicha(props: {
         accion={
           // El edificio que resalta es el de OpenStreetMap: su número no es la dirección del
           // registro, que sigue en el título de la ficha.
-          <Show when={foto}>
-            {(delMapa) => (
-              <BotonEdificio
-                estado={delMapa().edificio(props.clave)}
-                alPulsar={() => delMapa().verEdificio(props.clave, props.ficha.posicion)}
-              />
-            )}
-          </Show>
+          <BotonEdificio
+            estado={foto.edificio(props.clave)}
+            alPulsar={() => foto.verEdificio(props.clave, props.ficha.posicion)}
+          />
         }
         etiquetas={
           <Etiqueta tono={props.ficha.estado}>
@@ -379,7 +375,7 @@ function ContenidoFicha(props: {
           alCerrar={() => setComunidad(undefined)}
           alElegirPunto={() => {
             setComunidad(undefined);
-            ubicacion?.elegirEnMapa();
+            ubicacion.elegirEnMapa();
           }}
         />
       </Show>

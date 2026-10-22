@@ -80,7 +80,6 @@ export function DialogoAportaciones(props: DialogoAportacionesProps) {
     () => (vista().tipo === "lista" ? lectura() + 1 : undefined),
     () => {
       const parar = new AbortController();
-      if (datos === undefined) return () => undefined;
       void datos.runPromiseExit(leerDelDispositivo, { signal: parar.signal }).then((salida) => {
         if (Exit.isSuccess(salida)) setLeido(salida.value);
         else if (!parar.signal.aborted) setSinAlmacen(true);

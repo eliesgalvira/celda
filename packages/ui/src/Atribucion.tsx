@@ -25,17 +25,16 @@ export interface Credito {
 }
 
 /**
- * Los créditos se pliegan tras un botón «i», en el móvil y en escritorio. Se ven al cargar y se
- * pliegan al tocar el mapa o a los cinco segundos, como permiten las pautas de atribución de
- * OpenStreetMap. Lo decide `DisposicionMapa`, que sabe cuándo se toca el mapa; sin ella, los
- * créditos no se pliegan.
+ * Los créditos se pliegan tras un botón «i», en el móvil y en escritorio, como permiten las pautas
+ * de atribución de OpenStreetMap. Empiezan plegados y, abiertos, se vuelven a plegar al tocar el
+ * mapa o a los cinco segundos. Lo decide `DisposicionMapa`, que sabe cuándo se toca el mapa.
  */
 export interface PliegueCreditos {
   readonly plegada: () => boolean;
   readonly cambiar: (plegada: boolean) => void;
 }
 
-export const PliegueDeCreditos = createContext<PliegueCreditos | undefined>(undefined);
+export const PliegueDeCreditos = createContext<PliegueCreditos>();
 
 export interface AtribucionProps {
   readonly creditos: ReadonlyArray<Credito>;
@@ -110,37 +109,31 @@ function UnCredito(props: { readonly credito: Credito; readonly children: JSX.El
 export function Atribucion(props: AtribucionProps) {
   const id = createUniqueId();
   const pliegue = useContext(PliegueDeCreditos);
-  const plegable = () => pliegue !== undefined;
-  const plegada = () => plegable() && pliegue?.plegada() === true;
+  const plegada = () => pliegue.plegada();
   const fijos = () => props.creditos.filter((credito) => credito.fijo === true);
   return (
     <div class="flex items-end gap-1">
-      <Show when={plegable()}>
-        <button
-          type="button"
-          aria-expanded={plegada() ? "false" : "true"}
-          aria-controls={id}
-          title="Créditos del mapa"
-          class={variantesDiana({ class: "drop-shadow-marcador" })}
-          onClick={() => pliegue?.cambiar(!plegada())}
-        >
-          <span
-            aria-hidden="true"
-            class="chaflan grid size-8 bg-control-borde p-[2px] [--corte:6px]"
-          >
-            <span class="chaflan grid place-items-center bg-control font-titulo text-lg leading-none font-semibold text-control-tinta italic [--corte:5px] group-hover:bg-control-hover">
-              i
-            </span>
+      <button
+        type="button"
+        aria-expanded={plegada() ? "false" : "true"}
+        aria-controls={id}
+        title="Créditos del mapa"
+        class={variantesDiana({ class: "drop-shadow-marcador" })}
+        onClick={() => pliegue.cambiar(!plegada())}
+      >
+        <span aria-hidden="true" class="chaflan grid size-8 bg-control-borde p-[2px] [--corte:6px]">
+          <span class="chaflan grid place-items-center bg-control font-titulo text-lg leading-none font-semibold text-control-tinta italic [--corte:5px] group-hover:bg-control-hover">
+            i
           </span>
-          <span class="sr-only">Créditos del mapa</span>
-        </button>
-      </Show>
+        </span>
+        <span class="sr-only">Créditos del mapa</span>
+      </button>
       <p
         id={id}
         class={cn(
           CINTA,
           // Abiertos pueden quedar sobre la pista o la vista: fondo opaco.
-          plegable() && "bg-superficie",
+          "bg-superficie",
           plegada() && "hidden",
         )}
       >
