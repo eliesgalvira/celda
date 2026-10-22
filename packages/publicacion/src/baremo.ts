@@ -12,6 +12,7 @@ import {
   type RectaDelBaremo,
   type ZonaDelBaremo,
 } from "@celda/dominio/baremo";
+import { claveDeMedida } from "@celda/dominio/exposicion";
 import type { Ficha } from "@celda/dominio/ficha";
 import { leerLoteDeProvincia } from "@celda/dominio/provincias";
 import * as Arr from "effect/Array";
@@ -67,10 +68,7 @@ export const medidasDeFichas = (fichas: ReadonlyArray<Ficha>): ReadonlyArray<Med
     const unicas = new Map(
       ficha.estaciones
         .flatMap((estacion) => estacion.medidasDeExposicion ?? [])
-        .map((medida) => [
-          `${medida.distanciaMetros}/${medida.acimutGrados}/${medida.microvatiosPorCm2}`,
-          medida,
-        ]),
+        .map((medida) => [claveDeMedida(medida), medida]),
     );
     return [...unicas.values()].map((medida) => ({
       provincia,

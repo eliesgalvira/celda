@@ -10,7 +10,7 @@ import type {
   EstacionBase,
   Procedencia,
 } from "./emplazamiento.ts";
-import { compararMedidas, type MedidaDeExposicion } from "./exposicion.ts";
+import { claveDeMedida, compararMedidas, type MedidaDeExposicion } from "./exposicion.ts";
 import { type Fuente, normalizarCodigo, type Observacion } from "./observacion.ts";
 
 /** Parámetros de la fusión. Ver el ADR 0012. */
@@ -195,7 +195,7 @@ const unirMedidas = (
   if (observaciones.every((o) => o.medidasDeExposicion === undefined)) return undefined;
   const unicas = new Map<string, MedidaDeExposicion>();
   for (const medida of observaciones.flatMap((o) => o.medidasDeExposicion ?? [])) {
-    const clave = `${medida.distanciaMetros}|${medida.acimutGrados}|${medida.microvatiosPorCm2}`;
+    const clave = claveDeMedida(medida);
     if (!unicas.has(clave)) unicas.set(clave, medida);
   }
   return [...unicas.values()].sort(compararMedidas);
