@@ -94,13 +94,16 @@ export const createOxlintRuleHarness = (
     const sourcePath = path.join(fixtureDir, options.filename ?? "fixture.ts");
     const pluginDir = path.join(import.meta.dirname, "..");
     const oxlintBin = path.join(pluginDir, "node_modules", ".bin", "oxlint");
-    const pluginPath = path.join(pluginDir, "index.ts");
+    const pluginPath = path.join(
+      pluginDir,
+      pluginName === "anti-slop" ? "anti-slop/index.ts" : "index.ts",
+    );
     const sourceDir = sourcePath.slice(0, sourcePath.lastIndexOf("/"));
 
     yield* fs.writeFileString(
       configPath,
       yield* encodeOxlintConfig({
-        jsPlugins: [{ name: "celda", specifier: pluginPath }],
+        jsPlugins: [{ name: pluginName, specifier: pluginPath }],
         rules: { [ruleName]: "error" },
       }),
     );
