@@ -1,6 +1,8 @@
 # Celda
 
-Celda es una web pública que enseña en un mapa las antenas de telefonía móvil de España y de qué compañía son. Tiene las de las zonas que la ingesta ya ha barrido, y de las demás dice que aún no las tiene. Barcelona solo es especial donde tiene datos propios: sus barrios y su padrón por barrio. Este glosario fija las palabras que usan la interfaz, el código y las conversaciones sobre el proyecto. Lo que la interfaz explica al tocar un término subrayado está en `packages/dominio/src/glosario.ts`, con palabras más llanas, y no puede contradecir a este glosario.
+Celda enseña, con los datos oficiales, qué antenas de móvil hay en un sitio, de qué compañía son, en qué bandas emiten y qué ha medido el ministerio a su alrededor, y explica a quién acudir cuando algo va mal (ADR 0031).
+
+Es una web pública con las antenas de telefonía móvil de España en un mapa. Tiene las de las zonas que la ingesta ya ha barrido, y de las demás dice que aún no las tiene. Barcelona solo es especial donde tiene datos propios: sus barrios y su padrón por barrio. Este glosario fija las palabras que usan la interfaz, el código y las conversaciones sobre el proyecto. Lo que la interfaz explica al tocar un término subrayado está en `packages/dominio/src/glosario.ts`, con palabras más llanas, y no puede contradecir a este glosario.
 
 ## Lenguaje
 
@@ -394,7 +396,7 @@ _Evitar_: clientes, carga
 ## Ambigüedades señaladas
 
 - En telecomunicaciones, «celda» suele ser un sector con su banda, y así la usaba el documento de UX v0 (`celda-ux.html`). En Celda es solo el nombre de la web. Hasta el 20/10/2026 nombraba también la zona de un emplazamiento, una simulación que se retiró con el ADR 0005. El «identificador de celda» de los datos técnicos conserva el sentido técnico, y la historia de usuario «ver la medida unida a la celda que me da servicio» se lee como unida al emplazamiento que le daba servicio.
-- El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. Queda por decidir si los textos de primer uso lo aceptan como palabra de entrada.
+- El público dice «antena» para un emplazamiento, una estación base o el elemento que radia. El glosario lo evita en los tres sentidos. La misión y la descripción de la web lo usan como palabra de entrada, porque es la que busca el público (ADR 0031).
 - Los ADR 0014 y 0015 y la investigación 08 llaman «celdas de 1°» a los cuadros y «grupos» a las zonas de barrido. Se escribieron antes de fijar estas palabras.
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.
 - La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer en la ronda. En la interfaz, ficha es solo la del panel, con una excepción: «el registro no tiene ficha para este emplazamiento», que se dice de una estación base sin ficha en el registro.

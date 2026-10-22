@@ -343,7 +343,7 @@ La marca es la celda de un emplazamiento con sus tres sectores. Sale de `marca/g
 
 ## Favicon, iconos y manifiesto
 
-No hay ficheros de iconos en el repositorio: el plugin `iconosDeCelda` (`marca/iconos.ts`, en `apps/web/vite.config.ts`) los genera desde la geometría de la marca y los tokens `--icono-*` de `tema.css`. En desarrollo los sirve y en la build los escribe en `dist/iconos/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180 px), `icono-192.png`, `icono-512.png` y `manifest.webmanifest`, y pone en el HTML sus enlaces.
+No hay ficheros de iconos en el repositorio: el plugin `iconosDeCelda` (`marca/iconos.ts`, en `apps/web/vite.config.ts`) los genera desde la geometría de la marca y los tokens `--icono-*` de `tema.css`. En desarrollo los sirve y en la build los escribe en `dist/iconos/`: `favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` (180 px), `icono-192.png`, `icono-512.png` y `manifest.webmanifest`, y pone en el HTML sus enlaces y la descripción de la página. La descripción es la misión (ADR 0031) en 160 caracteres como mucho, para que un buscador la enseñe entera, y es la misma del manifiesto (`DESCRIPCION`).
 
 - Los PNG salen de `marca/raster.ts`, un rasterizador de polígonos par-impar con suavizado, sin dependencias, y se codifican con `node:zlib`.
 - El favicon es la figura sin fondo: su parte oscura lleva `--icono-fondo` y lo recortado `--icono-figura`, así que se ve en pestañas claras y oscuras. El icono de la pantalla de inicio va a sangre sobre un cuadrado oscuro, porque el sistema lo recorta a su forma.
