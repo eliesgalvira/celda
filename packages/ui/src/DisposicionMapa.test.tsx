@@ -5,6 +5,7 @@ import { flush } from "solid-js";
 import { Atribucion, type Credito } from "./Atribucion.tsx";
 import { ControlDelMapa } from "./ControlDelMapa.tsx";
 import { DisposicionMapa } from "./DisposicionMapa.tsx";
+import { FlechaDelNorte } from "./FlechaDelNorte.tsx";
 
 const OPENSTREETMAP: Credito = {
   texto: "OpenStreetMap",
@@ -29,6 +30,7 @@ const montar = (creditos: ReadonlyArray<Credito> = [OPENSTREETMAP]) => {
       ocupado={false}
       lienzo={() => {}}
       cabecera={<header>Celda</header>}
+      norte={<FlechaDelNorte conFoto={false} />}
       zoom={<ControlDelMapa etiqueta="Acercar" icono="+" />}
       controles={<ControlDelMapa etiqueta="Vista agrupada" icono="⬡" />}
       botonUbicacion={<ControlDelMapa etiqueta="Ubicación" icono="⌖" />}
@@ -122,6 +124,11 @@ describe("DisposicionMapa", () => {
       aLaVista()[0]?.querySelector(".md\\:hidden")?.textContent,
       "© CC BY 4.0 scne.es",
     );
+  });
+
+  it("la flecha del norte dice que el norte queda arriba", () => {
+    const { getByRole } = montar();
+    assert.isDefined(getByRole("img", { name: "El norte queda arriba" }));
   });
 
   it("a la vista, Ubicación y Funciones; el resto, dentro de Funciones", () => {
