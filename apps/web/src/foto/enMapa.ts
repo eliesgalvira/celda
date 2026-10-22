@@ -351,10 +351,7 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
       const lienzo = entrada.lienzo();
       return lienzo === undefined ? undefined : { lienzo, encendida: seVe() };
     },
-    ({ lienzo, encendida: si }) => {
-      const dejar = lienzo.ponerFoto(si);
-      return dejar === undefined ? undefined : () => dejar();
-    },
+    ({ lienzo, encendida: si }) => lienzo.ponerFoto(si),
     { iguales: mismosCampos },
   );
 

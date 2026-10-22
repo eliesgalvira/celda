@@ -1,4 +1,3 @@
-import type { Mhz } from "@celda/dominio/banda";
 import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import {
   calidadDeLaSenal,
@@ -8,6 +7,7 @@ import {
   potenciaDeLaSenal,
   type TipoDeRed,
 } from "@celda/dominio/medida";
+import { FRANJA_DE_BANDA, type Franja } from "@celda/dominio/tecnologia";
 import type { ValorDeSenal } from "@celda/ui/medir/Medir.tsx";
 
 /** Un número negativo con el signo menos tipográfico y la coma decimal. */
@@ -42,11 +42,11 @@ const NOMBRE_RED: Readonly<Record<TipoDeRed, string>> = {
   "5g": "5G",
 };
 
-/** Para qué sirve una banda, de «llega más lejos» a «más velocidad». */
-const explicacionBanda = (mhz: Mhz): string => {
-  if (mhz <= 900) return "Es una banda baja, de mucho alcance y menos velocidad.";
-  if (mhz <= 2100) return "Es una banda media, con alcance y velocidad intermedios.";
-  return "Es una banda alta, de más velocidad y menos alcance.";
+/** Para qué sirve cada franja de bandas, de «llega más lejos» a «más velocidad». */
+const EXPLICACION_DE_FRANJA: Readonly<Record<Franja, string>> = {
+  baja: "Es una banda baja, de mucho alcance y menos velocidad.",
+  media: "Es una banda media, con alcance y velocidad intermedios.",
+  alta: "Es una banda alta, de más velocidad y menos alcance.",
 };
 
 /** Los valores de una lectura, cada uno con lo que quiere decir y su nombre técnico al final. */
@@ -66,7 +66,7 @@ export const valoresDeLaLectura = (senal: LecturaDeSenal): ReadonlyArray<ValorDe
     valores.push({
       nombre: "Banda",
       valor: `${senal.mhz} MHz`,
-      explicacion: explicacionBanda(senal.mhz),
+      explicacion: EXPLICACION_DE_FRANJA[FRANJA_DE_BANDA[senal.mhz]],
     });
   }
   valores.push({

@@ -29,8 +29,6 @@ export interface PasoCompartirProps {
   /** El botón de salir del paso: «Volver» a la lista o al formulario, o «Cerrar». */
   readonly textoSalir: string;
   readonly alSalir: () => void;
-  /** Se llama cuando el buzón la ha recibido. */
-  readonly alCompartir?: () => void;
   /**
    * Sale después de enviarla, con el botón «Hecho». Sin él, sale como `alSalir`: volver al
    * formulario de una corrección ya enviada no tiene sentido.
@@ -56,7 +54,6 @@ export function PasoCompartir(props: PasoCompartirProps) {
       .then((salida) => {
         if (Exit.isSuccess(salida)) {
           setEstado({ tipo: "enviada", compartidaEl: salida.value.compartidaEl });
-          props.alCompartir?.();
           return;
         }
         const fallo = Option.getOrUndefined(Cause.findErrorOption(salida.cause));

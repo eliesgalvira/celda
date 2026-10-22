@@ -72,12 +72,11 @@ export function DialogoAportaciones(props: DialogoAportacionesProps) {
   const [vista, setVista] = createSignal<Vista>({ tipo: "lista" });
   const [leido, setLeido] = createSignal<EnElDispositivo>();
   const [sinAlmacen, setSinAlmacen] = createSignal(false);
-  /** Sube al volver a la lista: se vuelve a leer lo que hay, por si se ha compartido algo. */
-  const [lectura, setLectura] = createSignal(0);
 
+  // Se lee al abrir la lista y otra vez al volver a ella, por si se ha compartido algo.
   recurso(
     "buzon:aportaciones",
-    () => (vista().tipo === "lista" ? lectura() + 1 : undefined),
+    () => vista().tipo === "lista",
     () => {
       const parar = new AbortController();
       void datos.runPromiseExit(leerDelDispositivo, { signal: parar.signal }).then((salida) => {
@@ -88,10 +87,7 @@ export function DialogoAportaciones(props: DialogoAportacionesProps) {
     },
   );
 
-  const volver = () => {
-    setLectura((n) => n + 1);
-    setVista({ tipo: "lista" });
-  };
+  const volver = () => setVista({ tipo: "lista" });
 
   const titulo = () => {
     switch (vista().tipo) {
