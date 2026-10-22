@@ -71,18 +71,6 @@ describe("consejos para mejorar la señal", () => {
     }
   });
 
-  it("cerca y lejos cambian el consejo de la distancia", () => {
-    assert.strictEqual(
-      consejo(consejos(punto({ distancia: 150 })), "distancia"),
-      "A 150 m la señal suele llegar con fuerza.",
-    );
-    assert.isUndefined(consejo(consejos(punto()), "distancia"));
-    assert.strictEqual(
-      consejo(consejos(punto({ distancia: 1240 })), "distancia"),
-      "A 1,2 km la señal llega más débil, y es donde más se nota una antena exterior.",
-    );
-  });
-
   it("al pie del emplazamiento no hay rumbo al que apuntar", () => {
     const resultado = alPie(consejos(punto({ distancia: 8 })));
     assert.notProperty(resultado, "rumbo");

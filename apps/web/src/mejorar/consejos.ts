@@ -8,10 +8,6 @@ import { nombreRumbo, textoDistancia } from "../ubicacion/textos.ts";
  * (ADR 0012), así que la posición del emplazamiento tampoco se conoce mejor.
  */
 const DISTANCIA_JUNTO_M = 15;
-/** Más cerca que esto, la señal suele llegar con fuerza. */
-export const CERCA_METROS = 300;
-/** Desde aquí, la señal llega más débil y una antena exterior se nota más. */
-export const LEJOS_METROS = 1000;
 
 /** Lo que se sabe del punto de referencia para aconsejar. */
 export interface PuntoParaConsejos {
@@ -22,7 +18,7 @@ export interface PuntoParaConsejos {
   readonly rumbo: number;
 }
 
-export type ClaveConsejo = "router" | "antena" | "distancia" | "movil";
+export type ClaveConsejo = "router" | "antena" | "movil";
 
 export interface Consejo {
   readonly clave: ClaveConsejo;
@@ -72,8 +68,7 @@ const enteros = (grados: number): number => ((Math.round(grados) % 360) + 360) %
 /**
  * Los consejos para mejorar la señal (historias 34, 35 y 37). Sin punto de referencia son
  * generales y dicen qué se ganaría con uno. Al pie del emplazamiento no hay nada que orientar. Con
- * rumbo dicen hacia qué ventana poner un router 4G/5G y a qué rumbo apuntar una antena exterior, y
- * cambian si el punto está cerca o lejos.
+ * rumbo dicen hacia qué ventana poner un router 4G/5G y a qué rumbo apuntar una antena exterior.
  *
  * Con un punto elegido hablan del «punto», nunca de «ti» (historia 31). Cada término se subraya
  * una vez en toda la sección.
@@ -130,7 +125,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
     };
   }
 
-  const lista: Array<Consejo> = [
+  const lista: ReadonlyArray<Consejo> = [
     {
       clave: "router",
       tono: "principal",
@@ -141,23 +136,8 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
       tono: "principal",
       texto: marcado`Si usas una ${termino("antena-exterior", "antena exterior")} direccional, apúntala a ${String(rumbo)}°. La brújula de abajo sirve para alinearla.`,
     },
+    MOVIL,
   ];
-
-  if (punto.distancia < CERCA_METROS) {
-    lista.push({
-      clave: "distancia",
-      tono: "principal",
-      texto: marcado`A ${distancia} la señal suele llegar con fuerza.`,
-    });
-  } else if (punto.distancia >= LEJOS_METROS) {
-    lista.push({
-      clave: "distancia",
-      tono: "principal",
-      texto: marcado`A ${distancia} la señal llega más débil, y es donde más se nota una antena exterior.`,
-    });
-  }
-
-  lista.push(MOVIL);
 
   return {
     tipo: "con-rumbo",
