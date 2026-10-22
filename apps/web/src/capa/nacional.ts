@@ -1,5 +1,5 @@
 import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area";
-import { COMPANIAS_DE_CAPA, type EmplazamientoLeido } from "@celda/dominio/capa";
+import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import { centroVisual } from "@celda/dominio/centroVisual";
 import { seCortan } from "@celda/dominio/cobertura";
 import {
@@ -11,7 +11,7 @@ import {
   SIN_FILTRO,
 } from "@celda/dominio/filtro";
 import type { CapaDeProvincia, ProvinciaDelResumen, ResumenLeido } from "@celda/dominio/provincias";
-import { ausentesDeProvincia, companiasDelResumen, resumirMunicipios } from "@celda/dominio/zona";
+import { resumirMunicipios } from "@celda/dominio/zona";
 
 import {
   type Agrupador,
@@ -181,9 +181,8 @@ export const agrupacionConFiltro = (
 
 /**
  * El agrupador de una provincia leída, con sus barrios y, si está cubierta en `resumen`, sus
- * municipios. Las ausencias de los municipios cuentan con las compañías de todo el resumen, como
- * las de las provincias. Una provincia a medias va en hexágonos también en los niveles de
- * municipios: un municipio del borde de lo barrido contaría solo una parte de sus emplazamientos.
+ * municipios. Una provincia a medias va en hexágonos también en los niveles de municipios: un
+ * municipio del borde de lo barrido contaría solo una parte de sus emplazamientos.
  */
 export const agrupadorDeProvincia = (
   capa: CapaDeProvincia,
@@ -198,8 +197,6 @@ export const agrupadorDeProvincia = (
       ? resumirMunicipios(
           capa.municipios,
           capa.emplazamientos.map((e) => ({ ...e, municipio: e.municipio ?? null })),
-          companiasDelResumen(resumen.provincias),
-          COMPANIAS_DE_CAPA,
         )
       : [],
   };
@@ -289,7 +286,6 @@ export const crearAgrupadorNacional = (
   const filtro = opciones.filtro ?? SIN_FILTRO;
   const conFiltro = hayFiltro(filtro);
   const agrupaciones = opciones.agrupaciones ?? new Map<string, AgrupacionConFiltro>();
-  const enElResumen = companiasDelResumen(resumen.provincias);
   const cargadas = new Map(
     [...provincias].flatMap(([codigo, estado]) =>
       estado.tipo === "lista" ? [[codigo, estado.provincia] as const] : [],
@@ -328,7 +324,6 @@ export const crearAgrupadorNacional = (
     posicion,
     provincia: p,
     carga,
-    ausentes: ausentesDeProvincia(p, enElResumen, COMPANIAS_DE_CAPA),
     ...cuentaDeProvincia(p, filtro),
   });
 

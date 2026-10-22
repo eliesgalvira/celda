@@ -61,10 +61,8 @@ describe("nombre accesible de una provincia", () => {
       (e): e is ElementoProvincia => e.tipo === "provincia",
     );
 
-  it("dice su número y qué hace al pulsarla, no qué compañías faltan aunque las tenga", () => {
+  it("dice su número y qué hace al pulsarla", () => {
     const [barcelona, , lleida] = hexagonos();
-    // A Barcelona le falta Vodafone en sus datos; el nombre no lo dice.
-    assert.deepStrictEqual(barcelona?.ausentes, ["vodafone"]);
     assert.strictEqual(
       barcelona && nombreDeProvincia(barcelona),
       "Barcelona, 40 emplazamientos, acercar",

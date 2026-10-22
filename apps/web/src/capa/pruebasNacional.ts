@@ -225,8 +225,6 @@ const sinDigi = (
  * emplazamientos juntos y menos de 20.000 habitantes, zona solo en el 11 y el 12; Cuarte, 6 en
  * 5 km, zona solo en el 11; Pinseque, con uno; y dos sin municipio. En Barcelona, la ciudad con dos
  * barrios, zona en el 9 y el 10, y Badalona, compacta, zona del 10 al 12. Lleida no tiene nada.
- * Hay ausencias en cada tipo de zona: Digi no está en la provincia de Zaragoza, en Badalona ni
- * en el Poblenou.
  */
 export const espanaDePrueba = (conResumen?: ResumenLeido) => {
   const capas: ReadonlyArray<CapaDeProvincia> = [

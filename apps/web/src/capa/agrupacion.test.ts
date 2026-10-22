@@ -2,7 +2,7 @@ import type { Rectangulo } from "@celda/dominio/area";
 import type { Barrio } from "@celda/dominio/barrio";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import type { MunicipioDeCapa } from "@celda/dominio/provincias";
-import { resumirMunicipios, UMBRAL_DE_AUSENCIAS } from "@celda/dominio/zona";
+import { resumirMunicipios } from "@celda/dominio/zona";
 import { assert, describe, it } from "@effect/vitest";
 
 import {
@@ -365,17 +365,14 @@ describe("nivel de barrios", () => {
     assert.isAbove(escena.elementos.size, barrios.length, "hay emplazamientos fuera de Barcelona");
   });
 
-  it("cada barrio dice sus ausencias, y el vacío las tiene todas", () => {
+  it("un barrio sin emplazamientos también sale, con cero", () => {
     const porCodigo = new Map(
       barriosDe(agrupador.escena(NIVEL_DE_BARRIOS, MUNDO)).map((b) => [
         b.resumen.barrio.codigo,
         b.resumen,
       ]),
     );
-    assert.deepStrictEqual(porCodigo.get("02")?.ausentes, []);
-    assert.deepStrictEqual(porCodigo.get("03")?.ausentes, ["vodafone"]);
     assert.strictEqual(porCodigo.get("04")?.emplazamientos, 0);
-    assert.deepStrictEqual(porCodigo.get("04")?.ausentes, ["movistar", "vodafone"]);
   });
 
   it("fuera del nivel de barrios, la agrupación es la de siempre", () => {
@@ -493,7 +490,6 @@ const municipiosDePrueba = () => {
   const resumenes = resumirMunicipios(
     municipios,
     emplazamientos.map((e) => ({ ...e, municipio: e.municipio ?? null })),
-    new Set(["movistar", "vodafone"]),
   );
   return { emplazamientos, barrios, resumenes };
 };
@@ -547,18 +543,6 @@ describe("niveles de municipios", () => {
       const claves = municipiosDe(agrupador.escena(nivel, MUNDO)).map((m) => m.clave);
       for (const clave of ["m:08200", "m:08300", "m:08019"]) assert.notInclude(claves, clave);
     }
-  });
-
-  it("solo los municipios con 10 emplazamientos o más dicen sus ausencias", () => {
-    const porCodigo = new Map(
-      municipiosDe(agrupador.escena(NIVEL_DE_MUNICIPIOS, MUNDO)).map((m) => [
-        m.resumen.municipio.codigo,
-        m.resumen,
-      ]),
-    );
-    assert.isAtLeast(porCodigo.get("08101")?.emplazamientos ?? 0, UMBRAL_DE_AUSENCIAS);
-    assert.deepStrictEqual(porCodigo.get("08101")?.ausentes, ["vodafone"]);
-    assert.deepStrictEqual(porCodigo.get("08015")?.ausentes, []);
   });
 
   it("fuera de los niveles de municipios, la agrupación y los barrios son los de siempre", () => {
@@ -663,7 +647,6 @@ describe("índice construido en un Worker y rehidratado aquí", () => {
       },
     ],
     CON_BARRIO.map((e) => ({ ...e, municipio: e.municipio ?? null })),
-    new Set(["movistar", "vodafone"]),
   );
   const BARRIOS: ReadonlyArray<Barrio> = [
     { codigo: "01", nombre: "Oeste", etiqueta: { longitud: 2.1, latitud: 41.4 } },

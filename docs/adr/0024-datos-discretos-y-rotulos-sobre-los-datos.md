@@ -42,7 +42,7 @@ Así «VALÈNCIA» junto al hexágono de la provincia y «València» sobre la c
 
 ### Sin ausencias en el mapa (54f3339)
 
-Ya no sale la cinta «sin [logo]» en ningún zoom, ni en provincias, ni en municipios, ni en barrios, y el nombre accesible de una zona deja de decir «sin Digi». Celda enseña emplazamientos, no cobertura. Que una compañía no tenga emplazamientos en una zona no quiere decir que no haya servicio: Yoigo es una marca de MasOrange y tiene cobertura en toda España, y Digi usa la red de Movistar en itinerancia donde no tiene emplazamientos propios. Los datos se quedan (`resumirBarrios` en `barrio.ts`, `resumirMunicipios` y `ausentesDeProvincia` en `zona.ts`), pero el mapa no los dibuja. El ejercicio de emplazamientos nunca los usó.
+Ya no sale la cinta «sin [logo]» en ningún zoom, ni en provincias, ni en municipios, ni en barrios, y el nombre accesible de una zona deja de decir «sin Digi». Celda enseña emplazamientos, no cobertura. Que una compañía no tenga emplazamientos en una zona no quiere decir que no haya servicio: Yoigo es una marca de MasOrange y tiene cobertura en toda España, y Digi usa la red de Movistar en itinerancia donde no tiene emplazamientos propios. Los datos se quedaron (`resumirBarrios` en `barrio.ts`, `resumirMunicipios` y `ausentesDeProvincia` en `zona.ts`) sin que el mapa los dibujara, y el ejercicio de emplazamientos nunca los usó. Desde el 22/10/2026 tampoco se calculan: solo los leían las pruebas que comprobaban que no se enseñan. Si vuelven a hacer falta, salen de las compañías de cada provincia y municipio del resumen y de las de cada emplazamiento.
 
 ### Sin rótulos de fuera de España por debajo de z9 (944bdf8)
 

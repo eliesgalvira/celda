@@ -87,13 +87,6 @@ describe("escena del resumen", () => {
     assert.strictEqual(escena.elementos.size, 3);
   });
 
-  it("una provincia cubierta dice sus ausencias; una sin cubrir no dice ninguna", () => {
-    const [barcelona, girona, lleida] = provinciasDe(agrupador.escena(6, MUNDO));
-    assert.deepStrictEqual(barcelona?.ausentes, ["vodafone"]);
-    assert.deepStrictEqual(girona?.ausentes, ["movistar"]);
-    assert.deepStrictEqual(lleida?.ausentes, []);
-  });
-
   it("solo dibuja las provincias cuya etiqueta cae en la caja", () => {
     const soloLleida = {
       suroeste: { longitud: 0.5, latitud: 41.5 },
@@ -267,19 +260,6 @@ describe("zonas de cada provincia", () => {
     }
   });
 
-  it("las ausencias de un municipio cuentan con las compañías de todo el resumen", () => {
-    const resumen = resumenConBarcelona(true);
-    const escena = crearAgrupadorNacional(resumen, cargadaCon(resumen)).escena(
-      NIVEL_DE_MUNICIPIOS,
-      BORDE,
-    );
-    // Solo hay Movistar en Barcelona y Vodafone en Girona: a los municipios les falta Vodafone.
-    assert.deepStrictEqual(
-      municipiosDe(escena).map((m) => m.resumen.ausentes),
-      [["vodafone"], ["vodafone"]],
-    );
-  });
-
   it("una provincia a medias sigue en hexágonos: sus municipios del borde contarían solo una parte", () => {
     const resumen = resumenConBarcelona(false);
     const escena = crearAgrupadorNacional(resumen, cargadaCon(resumen)).escena(
@@ -301,7 +281,6 @@ describe("zonas de cada provincia", () => {
     if (lleida?.tipo !== "provincia") return;
     assert.isFalse(lleida.provincia.cubierta);
     assert.strictEqual(lleida.provincia.emplazamientos, 0);
-    assert.deepStrictEqual(lleida.ausentes, []);
   });
 
   it("al acercar desde el resumen, cada municipio sale del hexágono de su provincia", () => {

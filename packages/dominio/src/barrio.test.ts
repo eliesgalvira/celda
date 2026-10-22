@@ -88,57 +88,26 @@ describe("asignación de barrio", () => {
   });
 });
 
-describe("recuentos y ausencias por barrio", () => {
+describe("recuentos por barrio", () => {
   const barrios: ReadonlyArray<Barrio> = [OESTE, ESTE, CON_AGUJERO];
-  const en = (
-    barrio: string | null,
-    ...companias: EmplazamientoConBarrio["companias"]
-  ): EmplazamientoConBarrio => ({ barrio, companias });
+  const en = (barrio: string | null): EmplazamientoConBarrio => ({ barrio });
 
   const resumen = (emplazamientos: ReadonlyArray<EmplazamientoConBarrio>) =>
     new Map(resumirBarrios(barrios, emplazamientos).map((r) => [r.barrio.codigo, r]));
 
-  it("un barrio sin emplazamientos de una compañía la tiene como ausente", () => {
-    const porBarrio = resumen([
-      en("01", "movistar", "orange"),
-      en("01", "movistar"),
-      en("02", "movistar", "vodafone", "orange"),
-    ]);
+  it("cuenta los emplazamientos de cada barrio, y un barrio vacío tiene cero", () => {
+    const porBarrio = resumen([en("01"), en("01"), en("02")]);
     assert.strictEqual(porBarrio.get("01")?.emplazamientos, 2);
-    assert.deepStrictEqual(porBarrio.get("01")?.ausentes, ["vodafone"]);
-  });
-
-  it("un barrio con todas las compañías de la capa no tiene ausencias", () => {
-    const porBarrio = resumen([
-      en("01", "digi"),
-      en("02", "movistar", "vodafone"),
-      en("02", "orange"),
-      en("02", "digi"),
-    ]);
-    assert.strictEqual(porBarrio.get("02")?.emplazamientos, 3);
-    assert.deepStrictEqual(porBarrio.get("02")?.ausentes, []);
-  });
-
-  it("un barrio vacío tiene cero emplazamientos y todas las compañías de la capa ausentes", () => {
-    const porBarrio = resumen([en("01", "vodafone", "movistar"), en("02", "digi")]);
+    assert.strictEqual(porBarrio.get("02")?.emplazamientos, 1);
     assert.strictEqual(porBarrio.get("03")?.emplazamientos, 0);
-    assert.deepStrictEqual(porBarrio.get("03")?.ausentes, ["movistar", "vodafone", "digi"]);
   });
 
-  it("una compañía sin emplazamientos en toda la capa no cuenta como ausente en ningún barrio", () => {
-    // Yoigo no aparece en ninguna parte: no se puede decir que falte en un barrio.
-    const porBarrio = resumen([en("01", "movistar"), en("02", "orange")]);
-    for (const r of porBarrio.values()) assert.notInclude(r.ausentes, "yoigo");
-    assert.deepStrictEqual(porBarrio.get("01")?.ausentes, ["orange"]);
-  });
-
-  it("los emplazamientos de fuera de Barcelona cuentan para la capa pero no para ningún barrio", () => {
-    const porBarrio = resumen([en("01", "movistar"), en(null, "vodafone"), en(null, "orange")]);
+  it("los emplazamientos de fuera de Barcelona no cuentan para ningún barrio", () => {
+    const porBarrio = resumen([en("01"), en(null), en(null)]);
     assert.strictEqual(
       [...porBarrio.values()].reduce((suma, r) => suma + r.emplazamientos, 0),
       1,
     );
-    assert.deepStrictEqual(porBarrio.get("01")?.ausentes, ["vodafone", "orange"]);
   });
 
   it("devuelve los barrios en el orden en que llegan, también los vacíos", () => {

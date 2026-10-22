@@ -52,7 +52,6 @@ describe("hacia dónde vuela cada punto al cambiar de vista", () => {
       posicion: { longitud: 2.5, latitud: 41.8 },
       provincia: BARCELONA,
       carga: "resumen",
-      ausentes: [],
       cuantos: 3,
       deLaRed: 0,
       sinFiltrar: false,

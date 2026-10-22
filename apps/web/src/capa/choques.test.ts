@@ -32,7 +32,6 @@ const barrio = (codigo: string, x: number, emplazamientos: number): ElementoBarr
   resumen: {
     barrio: { codigo, nombre: `Barrio ${codigo}`, etiqueta: en(x) },
     emplazamientos,
-    ausentes: [],
   },
 });
 
@@ -56,7 +55,6 @@ const municipio = (
       companias: [],
     },
     emplazamientos: 20,
-    ausentes: [],
     caja: undefined,
   },
 });
@@ -84,7 +82,6 @@ const provincia = (codigo: string, nombre: string, posicion: Coordenada): Elemen
     fichero: undefined,
   },
   carga: "resumen",
-  ausentes: [],
   cuantos: 100,
   deLaRed: 0,
   sinFiltrar: false,
@@ -387,9 +384,9 @@ describe("forma de las zonas de barrio", () => {
 });
 
 describe("nombre accesible de una zona", () => {
-  it("dice lo que se ve en la etiqueta y qué hace al pulsarla, no qué compañías faltan", () => {
+  it("dice lo que se ve en la etiqueta y qué hace al pulsarla", () => {
     assert.strictEqual(
-      nombreDeBarrio({ ...barrio("07", 0, 94).resumen, ausentes: ["digi"] }),
+      nombreDeBarrio(barrio("07", 0, 94).resumen),
       "Barrio 07, 94 emplazamientos, acercar",
     );
     assert.strictEqual(

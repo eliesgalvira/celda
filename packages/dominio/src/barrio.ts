@@ -1,7 +1,6 @@
 import * as Schema from "effect/Schema";
 
 import { Coordenada } from "./area.ts";
-import { Compania } from "./compania.ts";
 import { dentroDelPoligono } from "./poligono.ts";
 
 export { dentroDelPoligono };
@@ -68,44 +67,22 @@ export interface ResumenDeBarrio {
   readonly barrio: Barrio;
   /** Cuántos emplazamientos caen en el barrio. */
   readonly emplazamientos: number;
-  /** Compañías de la capa sin ningún emplazamiento en el barrio, en el orden de `companias`. */
-  readonly ausentes: ReadonlyArray<Compania>;
 }
 
 /** Lo que el resumen necesita de cada emplazamiento. */
 export interface EmplazamientoConBarrio {
   /** Código del barrio en que cae, o `null` si queda fuera de Barcelona. */
   readonly barrio: string | null;
-  readonly companias: ReadonlyArray<Compania>;
 }
 
-/**
- * Cuántos emplazamientos tiene cada barrio y qué compañías no tienen ninguno allí (sus
- * ausencias). Solo cuentan como ausentes las compañías que tienen algún emplazamiento en la capa:
- * de una que no aparece en ninguna parte no se puede decir que falte en un barrio. `companias` da
- * el orden en que salen las ausencias.
- */
+/** Cuántos emplazamientos tiene cada barrio. */
 export const resumirBarrios = (
   barrios: ReadonlyArray<Barrio>,
   emplazamientos: ReadonlyArray<EmplazamientoConBarrio>,
-  companias: ReadonlyArray<Compania> = Compania.literals,
 ): ReadonlyArray<ResumenDeBarrio> => {
-  const enLaCapa = new Set<Compania>();
-  const porBarrio = new Map<string, { cuantos: number; presentes: Set<Compania> }>();
-  for (const emplazamiento of emplazamientos) {
-    for (const compania of emplazamiento.companias) enLaCapa.add(compania);
-    if (emplazamiento.barrio === null) continue;
-    const cuenta = porBarrio.get(emplazamiento.barrio) ?? { cuantos: 0, presentes: new Set() };
-    cuenta.cuantos += 1;
-    for (const compania of emplazamiento.companias) cuenta.presentes.add(compania);
-    porBarrio.set(emplazamiento.barrio, cuenta);
+  const porBarrio = new Map<string, number>();
+  for (const { barrio } of emplazamientos) {
+    if (barrio !== null) porBarrio.set(barrio, (porBarrio.get(barrio) ?? 0) + 1);
   }
-  return barrios.map((barrio) => {
-    const cuenta = porBarrio.get(barrio.codigo);
-    return {
-      barrio,
-      emplazamientos: cuenta?.cuantos ?? 0,
-      ausentes: companias.filter((c) => enLaCapa.has(c) && cuenta?.presentes.has(c) !== true),
-    };
-  });
+  return barrios.map((barrio) => ({ barrio, emplazamientos: porBarrio.get(barrio.codigo) ?? 0 }));
 };

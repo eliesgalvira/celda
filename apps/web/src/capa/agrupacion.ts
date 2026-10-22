@@ -1,8 +1,7 @@
 import { type Coordenada, contiene, type Rectangulo } from "@celda/dominio/area";
 import { type Barrio, type ResumenDeBarrio, resumirBarrios } from "@celda/dominio/barrio";
-import { COMPANIAS_DE_CAPA, type EmplazamientoLeido } from "@celda/dominio/capa";
+import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import { seCortan } from "@celda/dominio/cobertura";
-import type { Compania } from "@celda/dominio/compania";
 import type { ProvinciaDelResumen } from "@celda/dominio/provincias";
 import type { ResumenDeMunicipio } from "@celda/dominio/zona";
 
@@ -24,10 +23,9 @@ import {
  * emplazamiento al alejar y de cuál sale al acercar.
  *
  * En los niveles de municipios, los emplazamientos de una provincia cubierta se recogen por
- * municipio, con su nombre, su número y, si tiene 10 o más, sus ausencias (ADR 0017), pero solo los
- * municipios que en ese nivel son zona (`zonasDeMunicipios`): en el 9 y el 10, los grandes, y el
- * resto en agrupaciones más anchas (ADR 0024). Las ausencias se calculan, pero el mapa no las
- * dibuja (ADR 0024). En el nivel de barrios, los de Barcelona se recogen por barrio.
+ * municipio, con su nombre y su número (ADR 0017), pero solo los municipios que en ese nivel son
+ * zona (`zonasDeMunicipios`): en el 9 y el 10, los grandes, y el resto en agrupaciones más anchas
+ * (ADR 0024). En el nivel de barrios, los de Barcelona se recogen por barrio.
  * El resto siguen sueltos o agrupados en hexágonos. Las transiciones que entran o salen de esos
  * niveles se calculan por los emplazamientos que recoge cada elemento: cada uno va al elemento que
  * se queda con la mayoría de los suyos.
@@ -59,7 +57,7 @@ export interface ElementoAgrupacion {
   readonly redUsada?: boolean;
 }
 
-/** Un barrio en el nivel de barrios: su etiqueta, con su número de emplazamientos y sus ausencias. */
+/** Un barrio en el nivel de barrios: su etiqueta, con su número de emplazamientos. */
 export interface ElementoBarrio {
   readonly tipo: "barrio";
   readonly clave: string;
@@ -68,10 +66,7 @@ export interface ElementoBarrio {
   readonly resumen: ResumenDeBarrio;
 }
 
-/**
- * Un municipio en los niveles de municipios: su etiqueta, con su número de emplazamientos y, si
- * tiene 10 o más, sus ausencias.
- */
+/** Un municipio en los niveles de municipios: su etiqueta, con su número de emplazamientos. */
 export interface ElementoMunicipio {
   readonly tipo: "municipio";
   readonly clave: string;
@@ -99,11 +94,6 @@ export interface ElementoProvincia {
   readonly posicion: Coordenada;
   readonly provincia: ProvinciaDelResumen;
   readonly carga: CargaDeProvincia;
-  /**
-   * Compañías con algún emplazamiento en el resumen y ninguno en la provincia. Solo en una
-   * provincia cubierta: de una a medias no se puede decir que falte nadie.
-   */
-  readonly ausentes: ReadonlyArray<Compania>;
   /**
    * El número que enseña: sus emplazamientos o, con un filtro de compañías, los de las compañías
    * del filtro (ADR 0026).
@@ -270,7 +260,7 @@ export const crearAgrupador = (
   const indice = indices.todos;
   // Los de fuera de Barcelona se agrupan aparte en el nivel de barrios. Sin barrios no hace falta.
   const fuera = indices.fuera ?? indice;
-  const resumenes = resumirBarrios(barrios, emplazamientos, COMPANIAS_DE_CAPA);
+  const resumenes = resumirBarrios(barrios, emplazamientos);
   const hayBarrios = resumenes.length > 0;
   const deBarrio = new Map<string, Array<number>>();
   for (const [i, emplazamiento] of emplazamientos.entries()) {
