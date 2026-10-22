@@ -1,4 +1,5 @@
 import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { enumerar } from "@celda/dominio/enumerar";
 import {
   type FiltroDeCompanias,
   hayFiltro,
@@ -13,11 +14,6 @@ import {
 
 /** El chip que quita el filtro. */
 export const ETIQUETA_TODAS = "Todas";
-
-const enumerar = (nombres: ReadonlyArray<string>): string =>
-  nombres.length <= 1
-    ? (nombres[0] ?? "")
-    : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1) ?? ""}`;
 
 /** Lo que se ve, en una frase: el lector de pantalla la oye al cambiar. */
 export const estadoDelFiltro = (filtro: FiltroDeCompanias): string =>

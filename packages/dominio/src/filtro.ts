@@ -1,5 +1,6 @@
 import { companiasDeMascara, mascaraDeCompanias } from "./capa.ts";
 import { Compania, NOMBRE_COMPANIA } from "./compania.ts";
+import { enumerar } from "./enumerar.ts";
 
 /**
  * El filtro de compañías del mapa (ADR 0026): qué compañías quiere ver la persona. Vacío es sin
@@ -186,11 +187,6 @@ export const contarConFiltro = (
   }
   return { propios, redUsada };
 };
-
-const enumerar = (nombres: ReadonlyArray<string>): string =>
-  nombres.length <= 1
-    ? (nombres[0] ?? "")
-    : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1) ?? ""}`;
 
 /** «Movistar», «Movistar y Vodafone», «Movistar, Vodafone y Digi». */
 export const nombresDelFiltro = (filtro: FiltroDeCompanias): string =>

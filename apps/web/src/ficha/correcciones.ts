@@ -1,6 +1,7 @@
 import { distanciaMetros } from "@celda/dominio/area";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import type { Conflicto } from "@celda/dominio/emplazamiento";
+import { enumerar } from "@celda/dominio/enumerar";
 import type {
   CorreccionDeFicha,
   EstacionDeFicha,
@@ -10,7 +11,7 @@ import type {
 import { llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
 import { haciaDonde, textoCoordenada, textoDistancia } from "../buzon/textos.ts";
-import { ENLACE_FUENTE, enumerar, fechaCorta, NOMBRE_FUENTE } from "./textos.ts";
+import { ENLACE_FUENTE, fechaCorta, NOMBRE_FUENTE } from "./textos.ts";
 
 /** Lo que dice una fuente de una estación base, ya escrito para la ficha. */
 interface TextosLado {

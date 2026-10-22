@@ -50,7 +50,7 @@ import {
 } from "../capa/nacional.ts";
 import type { PuntosDelMapa } from "../capa/puntos.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
-import { enumerar } from "../lib/enumerar.ts";
+import { enumerar } from "@celda/dominio/enumerar";
 import { DialogoLista } from "../puntos/DialogoLista.tsx";
 import { crearPuntosEnMapa, lienzoDePuntos } from "../puntos/enMapa.ts";
 import {

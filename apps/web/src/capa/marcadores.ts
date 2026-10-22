@@ -1,5 +1,6 @@
 import type { Rectangulo } from "@celda/dominio/area";
 import type { ResumenDeBarrio } from "@celda/dominio/barrio";
+import { enumerar } from "@celda/dominio/enumerar";
 import type { ResumenDeMunicipio } from "@celda/dominio/zona";
 import {
   mascaraDeCompanias,
@@ -55,11 +56,6 @@ export const cajaVisible = (conMargen: Rectangulo): Rectangulo => {
     noreste: { longitud: conMargen.noreste.longitud - dx, latitud: conMargen.noreste.latitud - dy },
   };
 };
-
-const enumerar = (nombres: ReadonlyArray<string>): string =>
-  nombres.length <= 1
-    ? (nombres[0] ?? "")
-    : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1) ?? ""}`;
 
 /**
  * De quién son los emplazamientos que se cuentan con un filtro: « de Movistar y Vodafone». Sin

@@ -1,11 +1,13 @@
 import type { AportacionCompartible, Cambio, CorreccionPropuesta } from "@celda/dominio/aportacion";
 import { type Coordenada, distanciaMetros, rumboGrados } from "@celda/dominio/area";
 import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { enumerar } from "@celda/dominio/enumerar";
 import type { MedidaPropia } from "@celda/dominio/medida";
 import type { DatoQueSale } from "@celda/ui/buzon/Compartir.tsx";
 
-import { enumerar, fechaCorta } from "../ficha/textos.ts";
+import { fechaCorta } from "../ficha/textos.ts";
 import { valoresDeLaLectura } from "../medir/textos.ts";
+import { nombreRumbo } from "../ubicacion/textos.ts";
 import type { FalloAlCompartir } from "./sincronizacion.ts";
 
 /** Una coordenada como se lee: latitud y longitud con cinco decimales, unos 1 m. */
@@ -21,11 +23,9 @@ const HORA = new Intl.DateTimeFormat("es-ES", {
 /** Una fecha con su hora: «3 oct 2026, 12:00». */
 export const fechaYHora = (fecha: number): string => `${fechaCorta(fecha)}, ${HORA.format(fecha)}`;
 
-const RUMBOS = ["norte", "noreste", "este", "sureste", "sur", "suroeste", "oeste", "noroeste"];
-
 /** Hacia dónde queda un punto visto desde otro, con la rosa de ocho rumbos: «al noreste». */
 export const haciaDonde = (desde: Coordenada, hasta: Coordenada): string =>
-  `al ${RUMBOS[Math.round(rumboGrados(desde, hasta) / 45) % 8] ?? "norte"}`;
+  `al ${nombreRumbo(rumboGrados(desde, hasta))}`;
 
 /** Una distancia redondeada para leerla: metros hasta 1 km y kilómetros con una cifra después. */
 export const textoDistancia = (metros: number): string =>

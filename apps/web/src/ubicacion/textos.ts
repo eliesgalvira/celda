@@ -27,6 +27,9 @@ const RUMBOS = [
 export const nombreRumbo = (grados: number): string =>
   RUMBOS[Math.round((((grados % 360) + 360) % 360) / 45) % 8] ?? "norte";
 
+/** Un rumbo en grados enteros entre 0 y 359. */
+export const gradosEnteros = (grados: number): number => ((Math.round(grados) % 360) + 360) % 360;
+
 /** La precisión de una lectura del GPS: «±25 m». */
 export const textoPrecision = (metros: number): string => `±${Math.max(1, Math.round(metros))} m`;
 

@@ -1,5 +1,6 @@
 import type { Banda } from "@celda/dominio/banda";
 import type { Estado } from "@celda/dominio/emplazamiento";
+import { enumerar } from "@celda/dominio/enumerar";
 import type { EstacionDeFicha, Ficha, OrigenDeFicha } from "@celda/dominio/ficha";
 import { bloque, llano, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 import { nombreDeLugarDeMunicipio, nombreDeLugarDeProvincia } from "@celda/dominio/nombreDeLugar";
@@ -29,12 +30,6 @@ const fechasDistinguibles = (a: number, b: number): readonly [string, string] =>
   fechaCorta(a) === fechaCorta(b)
     ? [`${fechaCorta(a)} a las ${HORA.format(a)}`, `${fechaCorta(b)} a las ${HORA.format(b)}`]
     : [fechaCorta(a), fechaCorta(b)];
-
-/** «a», «a y b», «a, b y c». */
-export const enumerar = (partes: ReadonlyArray<string>): string =>
-  partes.length <= 1
-    ? (partes[0] ?? "")
-    : `${partes.slice(0, -1).join(", ")} y ${partes.at(-1) ?? ""}`;
 
 /** Qué es, sobre el título: «Emplazamiento» o «Emplazamiento compartido». */
 export const antetituloDe = (ficha: Ficha): TextoMarcado =>

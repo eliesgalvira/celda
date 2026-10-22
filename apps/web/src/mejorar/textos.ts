@@ -1,4 +1,4 @@
-import { nombreRumbo } from "../ubicacion/textos.ts";
+import { gradosEnteros, nombreRumbo } from "../ubicacion/textos.ts";
 import { guiaDeGiro, type MotivoSinSensor } from "./estado.ts";
 
 /** Título de la sección de la ficha. */
@@ -54,7 +54,7 @@ export const TEXTOS_BRUJULA = {
 
 /** Un rumbo como se lee: «48° (noreste)». */
 const rumboLeido = (grados: number): string => {
-  const enteros = ((Math.round(grados) % 360) + 360) % 360;
+  const enteros = gradosEnteros(grados);
   return `${enteros}° (${nombreRumbo(enteros)})`;
 };
 

@@ -1,7 +1,7 @@
 import { bloque, marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
 
 import type { Referencia } from "../ubicacion/estado.ts";
-import { nombreRumbo, textoDistancia } from "../ubicacion/textos.ts";
+import { gradosEnteros, nombreRumbo, textoDistancia } from "../ubicacion/textos.ts";
 
 /**
  * Más cerca que esto del emplazamiento no hay hacia dónde apuntar. Es el radio de la fusión
@@ -66,9 +66,6 @@ const MOVIL: Consejo = {
   texto: marcado`Girar el móvil en la mano apenas cambia la señal. La mano y el cuerpo influyen más.`,
 };
 
-/** Grados enteros entre 0 y 359. */
-const enteros = (grados: number): number => ((Math.round(grados) % 360) + 360) % 360;
-
 /**
  * Los consejos para mejorar la señal (historias 34, 35 y 37). Sin punto de referencia son
  * generales y dicen qué se ganaría con uno. Al pie del emplazamiento no hay nada que orientar. Con
@@ -105,7 +102,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
 
   const tu = punto.tipo === "gps";
   const distancia = textoDistancia(punto.distancia);
-  const rumbo = enteros(punto.rumbo);
+  const rumbo = gradosEnteros(punto.rumbo);
   const lado = nombreRumbo(rumbo);
 
   if (punto.distancia < DISTANCIA_JUNTO_M) {

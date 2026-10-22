@@ -1,4 +1,5 @@
 import { decodificarVigente, FICHERO_VIGENTE } from "@celda/dominio/capa";
+import { enumerar } from "@celda/dominio/enumerar";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -190,11 +191,6 @@ export type R2DelDespliegue =
   | { readonly tipo: "cubo"; readonly origen: AlmacenDeFicheros["Service"] }
   | { readonly tipo: "sin-clave"; readonly faltan: ReadonlyArray<string> };
 
-const enFrase = (partes: ReadonlyArray<string>): string =>
-  partes.length <= 1
-    ? (partes[0] ?? "")
-    : `${partes.slice(0, -1).join(", ")} y ${partes.at(-1) ?? ""}`;
-
 /** Lo que dice un `vigente.json` de sí mismo, para explicar en qué se diferencian dos. */
 const versionDe = (contenido: string): { version: string; resumen: string } => {
   const vigente = decodificarVigente(contenido);
@@ -215,7 +211,7 @@ export const senalDeLosDatos = (r2: R2DelDespliegue) =>
     if (r2.tipo === "sin-clave") {
       return senal(
         "no-se-sabe",
-        `Sin la clave de R2 de solo lectura no se sabe qué versión tiene R2. Faltan ${enFrase(r2.faltan)}.`,
+        `Sin la clave de R2 de solo lectura no se sabe qué versión tiene R2. Faltan ${enumerar(r2.faltan)}.`,
       );
     }
     const plan = yield* planearCapas(r2.origen);
@@ -256,7 +252,7 @@ export const senalDeLosDatos = (r2: R2DelDespliegue) =>
       "igual",
       anteriores.length === 0
         ? `Producción sirve ${plan.version}, la versión vigente de R2.`
-        : `Producción sirve ${plan.version}, la versión vigente de R2, y las anteriores que montaría el build, ${enFrase(anteriores)}.`,
+        : `Producción sirve ${plan.version}, la versión vigente de R2, y las anteriores que montaría el build, ${enumerar(anteriores)}.`,
     );
   }).pipe(
     Effect.catchTags({
@@ -300,7 +296,7 @@ export const decidir = (entrada: {
       motivo: "No se despliega porque producción ya sirve esta web y estos datos.",
     };
   }
-  return { desplegar: true, motivo: `Se despliega porque ${enFrase(porque)}.` };
+  return { desplegar: true, motivo: `Se despliega porque ${enumerar(porque)}.` };
 };
 
 /** Lo que ha visto `comprobarDespliegue`. */

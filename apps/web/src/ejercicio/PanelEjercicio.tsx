@@ -13,6 +13,7 @@ import {
   resolverEjercicio,
   type ResultadoDelEjercicio,
 } from "@celda/dominio/ejercicio";
+import { enumerar } from "@celda/dominio/enumerar";
 import type { IndiceDeMunicipios } from "@celda/dominio/municipio";
 import type { PoblacionDeBarrios } from "@celda/dominio/poblacion";
 import type { ResumenLeido } from "@celda/dominio/provincias";
@@ -132,12 +133,6 @@ const descargar = (contenido: BlobPart, tipo: string, nombre: string) => {
   // El navegador empieza la descarga al hacer clic: la dirección ya no hace falta.
   URL.revokeObjectURL(url);
 };
-
-/** «Girona», «Girona y Lleida», «Girona, Lleida y Huesca». */
-const enumerar = (nombres: ReadonlyArray<string>): string =>
-  nombres.length <= 1
-    ? (nombres[0] ?? "")
-    : `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1) ?? ""}`;
 
 /**
  * Lo que se dice de las estaciones base sin ficha en el registro tras leer las fichas: cuántas y

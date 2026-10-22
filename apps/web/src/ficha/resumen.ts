@@ -1,5 +1,6 @@
 import type { Mhz } from "@celda/dominio/banda";
 import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import { enumerar } from "@celda/dominio/enumerar";
 import type { EstacionDeFicha } from "@celda/dominio/ficha";
 import { llano, marcado, termino, textoPlano, type TextoMarcado } from "@celda/dominio/glosario";
 import {
@@ -14,7 +15,6 @@ import type { FilaEje } from "@celda/ui/panel/EjeFrecuencias.tsx";
 import {
   claveDeOrigen,
   comprobadoEl,
-  enumerar,
   fechaCorta,
   NOMBRE_FUENTE,
   SIN_FICHA_EN_REGISTRO,
