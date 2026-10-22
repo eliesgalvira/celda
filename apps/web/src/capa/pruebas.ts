@@ -314,7 +314,7 @@ const huellaDePrueba = (contenido: string): string => {
   return `${a.toString(16).padStart(8, "0")}${b.toString(16).padStart(8, "0")}`;
 };
 
-/** Una versión publicada en el formato 6, con todos sus ficheros, como la leería la web. */
+/** Una versión publicada, con todos sus ficheros, como la leería la web. */
 export interface PublicacionDePrueba {
   readonly version: string;
   readonly fecha: number;

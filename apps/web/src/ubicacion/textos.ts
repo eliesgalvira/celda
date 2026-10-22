@@ -120,8 +120,8 @@ export interface TextosFueraDeLosDatos {
 }
 
 /**
- * Qué decir cuando el punto de referencia queda lejos de los datos. Los kilómetros van con un
- * espacio que no parte la línea. No nombra la zona cubierta: sale de la distancia a lo barrido, y
+ * Qué decir cuando el punto de referencia queda lejos de los datos. Desde 10 km, los kilómetros van
+ * con un espacio que no parte la línea. No nombra la zona cubierta: sale de la distancia a lo barrido, y
  * sigue siendo verdad al ampliarlo.
  */
 export const textosFueraDeLosDatos = (

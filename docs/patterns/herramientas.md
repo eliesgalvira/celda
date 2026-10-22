@@ -36,7 +36,7 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 
 `vite.config.ts` de la raíz configura oxlint: categorías de corrección, sospechosos y rendimiento como errores, `jsx-a11y`, y tres plugins locales de `tools/oxlint-plugin-celda`:
 
-- `celda`: la regla de estilos (ver [ui.md](ui.md)), `abrir-con-recurso` (ver [efectos.md](efectos.md)) y cuatro reglas genéricas de Effect copiadas de un proyecto anterior del autor.
+- `celda`: la regla de estilos (ver [ui.md](ui.md)), `abrir-con-recurso` (ver [efectos.md](efectos.md)) y cuatro reglas genéricas copiadas de otro proyecto, tres de Effect y una de Node.
 - `anti-slop` y `anti-slop-effect`: copia de `dmmulroy/anti-slop` (MIT), con su licencia en la carpeta.
 
 El modo con tipos de oxlint está apagado: los diagnósticos de Effect los da `typecheck`.

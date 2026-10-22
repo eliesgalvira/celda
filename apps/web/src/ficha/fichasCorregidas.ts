@@ -2,7 +2,7 @@ import type { Ficha } from "@celda/dominio/ficha";
 
 /**
  * Fichas de prueba con correcciones de la comunidad, con la forma que les da la fusión (ADR 0012).
- * Cómo llega una corrección aceptada a la ficha lo decide el buzón (#56); el enlace es de prueba.
+ * El enlace es de prueba.
  */
 
 /** 04:15 en Barcelona: la ingesta del registro oficial. */

@@ -4,7 +4,7 @@ import * as Option from "effect/Option";
 import { getPropertyName, isIdentifier, unwrapExpression } from "../utils.ts";
 
 // A failure that vanishes without a user-visible outcome or a logged cause is
-// the classic silent-swallow: the erasure tenet demands catches with meaning.
+// the classic silent swallow.
 const SWALLOWERS = new Set(["ignore", "ignoreCause"]);
 
 const CATCHERS = new Set([

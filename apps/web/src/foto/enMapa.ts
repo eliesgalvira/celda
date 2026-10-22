@@ -122,8 +122,7 @@ const comoPunto = (posicion: Coordenada): [number, number] => [posicion.longitud
 /**
  * El lienzo de un mapa de MapLibre. La foto se enciende con el estado del estilo; el edificio se
  * busca en lo que el mapa ha pintado (`queryRenderedFeatures`) y no en las teselas: las partidas
- * por encima del zoom 15 dan las coordenadas desplazadas. Se busca en un radio de píxeles que a
- * ese zoom cubre la distancia que hace falta.
+ * por encima del zoom 15 dan las coordenadas desplazadas.
  *
  * Los números de portal se buscan en las teselas de su capa (`querySourceFeatures`) y no en lo
  * pintado: MapLibre no pinta el número que queda bajo un marcador, y suele ser el del edificio.

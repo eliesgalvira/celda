@@ -188,7 +188,7 @@ export interface EntradaDeChoques {
 }
 
 /**
- * La regla de choques, en tres pasos. Nada se aparta de su sitio para hacer hueco.
+ * La regla de choques, en cuatro pasos. Nada se aparta de su sitio para hacer hueco.
  *
  * 1. Los logos, las agrupaciones y los hexágonos de los barrios se colocan primero y no ceden
  *    nunca: esconderlos escondería emplazamientos que no están en ningún otro sitio.

@@ -330,10 +330,7 @@ const indexadaDe = (
 const indexarEnHilo = (parte: ParteDeCapa) =>
   indexarCapa(parte.emplazamientos, parte.conBarrios, parte.municipios);
 
-/**
- * El indexador en el mismo hilo, sin serializar nada: el de las pruebas que no miran el Worker y
- * el de Node.
- */
+/** El indexador en el mismo hilo, sin serializar nada: el de las pruebas que no miran el Worker. */
 export const indexadorEnHilo = Layer.succeed(
   IndexadorDeProvincias,
   IndexadorDeProvincias.of({

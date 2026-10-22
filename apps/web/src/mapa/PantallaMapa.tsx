@@ -323,7 +323,6 @@ export function PantallaMapa() {
       mapa = nuevo;
       repintarMapa = repintar;
       setLectorDeRotulos(() => modulo.LECTOR_DE_ROTULOS);
-      // Los marcadores esperan a que se vea la silueta de España.
       modulo.trasLaSilueta(nuevo, () => {
         if (mapa === nuevo) setMapaCreado(nuevo);
       });
@@ -1104,8 +1103,8 @@ export function PantallaMapa() {
             pista={pista()}
             zoom={
               <>
-                {/* Como los controles de MapLibre, llevan el evento de la pulsación: son un
-                  gesto de la persona, no un vuelo, y no apagan la foto aérea (#67). */}
+                {/* Como los controles de MapLibre, llevan el evento de la pulsación. Así la foto
+                  aérea sigue al zoom en el acto y la vista inicial los toma por un gesto. */}
                 <ControlDelMapa
                   etiqueta="Acercar"
                   icono="+"

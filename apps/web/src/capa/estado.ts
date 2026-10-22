@@ -82,9 +82,9 @@ const DIA = new Intl.DateTimeFormat("es-ES", {
 const textoDeFecha = (fecha: number): string => FECHA.format(fecha).replace(".", "");
 
 /**
- * El texto de la marca de agua del mapa: la fecha de los datos que se ven, en Barcelona. Si lo que
- * se ve se barrió después, también la fecha de ese barrido (historia 13). Si las provincias que se
- * ven son de versiones distintas, las dos fechas.
+ * El texto de la marca de agua del mapa: la fecha de los datos que se ven, en hora de Madrid. Si
+ * lo que se ve se barrió después, también la fecha de ese barrido (historia 13). Si las provincias
+ * que se ven son de versiones distintas, las dos fechas.
  */
 export const textoDatosDelMapa = (
   fecha: number,

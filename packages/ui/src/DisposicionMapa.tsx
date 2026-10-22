@@ -163,10 +163,11 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         </div>
       </Show>
 
-      {/* 11.75rem es el alto del resumen de la hoja (`ALTO_RESUMEN`, 188 px). */}
       {/*
-        Abajo a la derecha, solo dos pastillas claras: «Ubicación», que se usa también con la ficha
-        abierta, y «Funciones», que despliega el resto con una línea que explica cada uno.
+        Abajo a la derecha, cuatro pastillas claras: «Compañías», «Foto aérea», «Ubicación», que se
+        usa también con la ficha abierta, y «Funciones», que despliega el resto con una línea que
+        explica cada uno. Aquí, en la pista y en los créditos, 11.75rem es el alto del resumen de la
+        hoja (`ALTO_RESUMEN`, 188 px).
       */}
       <div class="absolute right-1.5 bottom-[max(0.25rem,env(safe-area-inset-bottom))] z-10 flex flex-col items-end gap-1 max-md:group-data-hoja/mapa:bottom-[calc(11.75rem+0.25rem)] max-md:group-data-eligiendo/mapa:hidden md:right-[18px] md:bottom-14">
         <div class="mr-3 mb-1 flex flex-col gap-1 max-md:hidden">

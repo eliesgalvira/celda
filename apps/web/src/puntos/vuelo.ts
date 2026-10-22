@@ -49,7 +49,8 @@ export const posicionesDelVuelo = (
     }
   }
   // Se escribe directamente en los búferes: con 40.000 puntos y la CPU de un móvil, crear un objeto
-  // o una cadena por punto se notaba en el fotograma del cambio.
+  // por punto se notaba en el fotograma del cambio. Con marcadores en la escena, cada punto de la
+  // caja crea aún la cadena de su sitio para buscar el suyo.
   const desde = new Float32Array(2 * puntos.cuantos);
   const hasta = new Float32Array(2 * puntos.cuantos);
   const { suroeste, noreste } = caja;
