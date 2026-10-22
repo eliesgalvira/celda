@@ -1,5 +1,6 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
+import { ficheroDeBaremo, leerBaremo } from "@celda/dominio/baremo";
 import { decodificarVigente, FICHERO_VIGENTE } from "@celda/dominio/capa";
 import {
   decodificarManifiesto,
@@ -242,16 +243,22 @@ describe("las capas en Vercel", () => {
           assert.strictEqual(montadas.at(-1), selloVigente(almacen));
 
           // La vigente y las dos anteriores, cada una con su manifiesto, el resumen de la vigente
-          // y vigente.json; nada de la cuarta que no compartan. Igual byte a byte que R2.
+          // y vigente.json; nada de la cuarta que no compartan. Igual byte a byte que R2, salvo el
+          // baremo de exposición de la vigente, que calcula el build (ADR 0030).
+          const vigente = `sitios@${selloVigente(almacen)}`;
+          const baremo = ficheroDeBaremo(vigente, "08");
           const esperados = new Set([
             FICHERO_VIGENTE,
             ...(almacen.get(FICHERO_VIGENTE)?.match(/resumen@[^"]+/u) ?? []),
             ...montadas.flatMap((s) => [ficheroDeManifiesto(s), ...listadosEn(almacen, s)]),
+            baremo,
           ]);
           assert.deepStrictEqual([...montado.keys()].toSorted(), [...esperados].toSorted());
-          for (const [fichero, contenido] of montado) {
+          for (const [fichero, contenido] of [...montado].filter(([f]) => f !== baremo)) {
             assert.strictEqual(contenido, almacen.get(fichero), fichero);
           }
+          assert.isFalse(almacen.has(baremo));
+          assert.isTrue(Result.isSuccess(leerBaremo(montado.get(baremo) ?? "", vigente, "08")));
           const soloDeLaVieja = listadosEn(almacen, vieja ?? "").filter((f) => !esperados.has(f));
           assert.isNotEmpty(soloDeLaVieja);
           assert.isTrue(soloDeLaVieja.every((f) => !montado.has(f)));

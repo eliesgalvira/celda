@@ -38,6 +38,8 @@ export const TERMINOS = [
   "router-movil",
   "antena-exterior",
   "barrido",
+  "medida-de-exposicion",
+  "nivel-de-referencia",
 ] as const;
 
 export type Termino = (typeof TERMINOS)[number];
@@ -323,6 +325,24 @@ export const GLOSARIO: Glosario = {
       "cambie nada, dice hasta cuándo se sabe que los datos seguían así.",
     tecnico: "barrido del listado por zonas",
     relacionados: ["registro-oficial", "version-de-los-datos"],
+  },
+  "medida-de-exposicion": {
+    nombre: "Medida de exposición",
+    explicacion:
+      "Una comprobación del ministerio cerca de una antena para ver que no se pasa del límite " +
+      "legal. Suma todo lo que llega a ese punto, de cualquier compañía, la radio o la " +
+      "televisión, y no dice nada de la señal que recibe un móvil.",
+    tecnico: "nivel de exposición medido, en µW/cm²",
+    relacionados: ["nivel-de-referencia", "registro-oficial"],
+  },
+  "nivel-de-referencia": {
+    nombre: "Nivel de referencia",
+    explicacion:
+      "Lo que la norma no deja superar donde suele haber gente. Va de 200 a 1.000 µW/cm² según " +
+      "la frecuencia, y una medida que lo suma todo se compara con el más bajo, 200, que es el " +
+      "de la radio FM.",
+    tecnico: "nivel de referencia del Real Decreto 1066/2001",
+    relacionados: ["medida-de-exposicion"],
   },
 };
 

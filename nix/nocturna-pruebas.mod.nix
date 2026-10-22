@@ -558,10 +558,16 @@
                   listados = maquina.succeed(
                       f"cat {servida}/ficheros@*.json | grep --only-matching '\"[a-z]*/[0-9a-f/]*\\.json\"' | sort --unique | wc --lines"
                   ).strip()
-                  ficheros = maquina.succeed(f"find -L {servida} -type f | wc --lines").strip()
+                  ficheros = maquina.succeed(f"find -L {servida} -type f -not -path '*/baremos/*' | wc --lines").strip()
                   # Sus capas, lotes y partes del índice de claves, los dos manifiestos, el resumen y vigente.json.
                   assert int(ficheros) == int(listados) + 4, (ficheros, listados)
-                  maquina.succeed(f"cd {servida} && find . -type f -exec cmp {{}} {r2}/{{}} \\;")
+                  maquina.succeed(f"cd {servida} && find . -type f -not -path './baremos/*' -exec cmp {{}} {r2}/{{}} \\;")
+                  # Y el baremo de exposición de la provincia de la vigente, que calcula el build y no está en R2.
+                  baremos = maquina.succeed(f"cd {servida} && find baremos -type f").split()
+                  assert len(baremos) == 1 and baremos[0].startswith("baremos/1/") and baremos[0].endswith("/08.json"), baremos
+                  sello = baremos[0].split("/")[2]
+                  maquina.succeed(f"grep --fixed-strings '\"version\":\"sitios@{sello}\"' {servida}/vigente.json")
+                  maquina.fail(f"test -e {r2}/baremos")
                   # El build lee R2 con la clave de solo lectura, que nunca escribe ni borra.
                   peticiones = maquina.succeed("cat /var/lib/fuentes-de-prueba/peticiones.log").splitlines()
                   del_build = [linea.split()[1] for linea in peticiones if f"Credential={id_de_lectura}/" in linea]

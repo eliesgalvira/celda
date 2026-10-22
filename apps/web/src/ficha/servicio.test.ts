@@ -1,5 +1,11 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
+import {
+  type Baremo,
+  ficheroDeBaremo,
+  FORMATO_DEL_BAREMO,
+  generarBaremo,
+} from "@celda/dominio/baremo";
 import { versionDeCapa } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
 import { generarLoteDeProvincia } from "@celda/dominio/provincias";
@@ -307,4 +313,34 @@ describe("fichas publicadas en el origen estático", () => {
       );
     });
   });
+
+  it.effect(
+    "el baremo de una provincia se pide una vez; uno que no llega se vuelve a pedir la próxima vez",
+    () => {
+      const origen = origenDePrueba();
+      const url = `${ORIGEN}/${ficheroDeBaremo(HOY.capa.version, "08")}`;
+      const baremo: Baremo = {
+        formato: FORMATO_DEL_BAREMO,
+        version: HOY.capa.version,
+        provincia: "08",
+        tipica: { nivel: -7, pendiente: 0 },
+        separacion: { nivel: 0.6, pendiente: 0 },
+        zonaProvincial: null,
+        municipios: [],
+      };
+      return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
+        Effect.gen(function* () {
+          const caido = yield* Effect.forkChild(fichas.baremo("08"));
+          yield* contestar(origen, url, 503, "");
+          assert.isTrue(Option.isNone(yield* Fiber.join(caido)));
+
+          const leido = yield* Effect.forkChild(fichas.baremo("08"));
+          yield* contestar(origen, url, 200, generarBaremo(baremo));
+          assert.deepStrictEqual(yield* Fiber.join(leido), Option.some(baremo));
+          assert.deepStrictEqual(yield* fichas.baremo("08"), Option.some(baremo));
+          assert.deepStrictEqual(origen.pedidas(), [url, url]);
+        }),
+      );
+    },
+  );
 });

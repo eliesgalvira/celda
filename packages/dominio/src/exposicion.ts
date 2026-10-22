@@ -24,6 +24,13 @@ export const MedidaDeExposicion = Schema.Struct({
 });
 export type MedidaDeExposicion = typeof MedidaDeExposicion.Type;
 
+/**
+ * Lo que identifica una medida: su distancia, su acimut y su valor. Dos estaciones base o dos
+ * registros que publican la misma medida publican una sola.
+ */
+export const claveDeMedida = (medida: MedidaDeExposicion): string =>
+  `${medida.distanciaMetros}|${medida.acimutGrados}|${medida.microvatiosPorCm2}`;
+
 /** Orden estable de las medidas: por acimut, por distancia y por valor. */
 export const compararMedidas = (a: MedidaDeExposicion, b: MedidaDeExposicion): number =>
   a.acimutGrados - b.acimutGrados ||

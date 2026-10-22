@@ -100,6 +100,14 @@ _Evitar_: ficha pendiente, ficha rota, error de ficha
 Punto alrededor de una estación base donde se midió la exposición a campos electromagnéticos, tal como lo publica su ficha en el registro oficial: a qué distancia, en qué dirección vista desde la estación (acimut) y cuántos µW/cm². El ministerio no dice cuándo se midió. Sirve para comparar con los límites legales y no dice nada de la señal que recibe un móvil allí. Su acimut tampoco es la orientación de un sector. Es otra cosa que una medida.
 _Evitar_: medición, nivel de señal, potencia, cobertura, medida a secas
 
+**Nivel de referencia**:
+La densidad de potencia que la norma no deja superar donde suele haber gente, de 200 a 1.000 µW/cm² según la frecuencia (anexo II del Real Decreto 1066/2001). Una medida de exposición del ministerio suma todas las frecuencias, así que se compara con el más bajo, 200 µW/cm², el de la radio FM.
+_Evitar_: límite de seguridad, umbral peligroso
+
+**Baremo de exposición**:
+Con lo que Celda compara cada medida de exposición del ministerio con las de su zona, teniendo en cuenta la distancia a la antena: por provincia, lo típico a cada distancia y cuánto se aparta de ello la mitad de las medidas, y por zona, cuántas de cada 100 quedan por debajo. La zona es el municipio si tiene medidas de bastantes emplazamientos, y si no, la provincia. Lo calcula el montaje de las capas (ADR 0030). Dice cómo queda una medida entre las publicadas. No dice si es segura ni nada de la señal.
+_Evitar_: ranking, nota, puntuación, índice de riesgo
+
 **Archivo de páginas**:
 Copia privada de cada página del registro oficial que lee la ingesta, el listado de cada caja y la página de cada estación base, tal como llegó y con la fecha de cada lectura. Sirve para volver a leerlas sin pedirlas otra vez cuando cambia la forma de leerlas. Nunca se publica (ADR 0027).
 _Evitar_: caché, histórico, backup

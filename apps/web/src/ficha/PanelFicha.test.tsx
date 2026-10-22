@@ -1,3 +1,10 @@
+import {
+  type Baremo,
+  CORTES,
+  ficheroDeBaremo,
+  FORMATO_DEL_BAREMO,
+  generarBaremo,
+} from "@celda/dominio/baremo";
 import { versionDeCapa } from "@celda/dominio/capa";
 import type { Ficha } from "@celda/dominio/ficha";
 import {
@@ -7,7 +14,7 @@ import {
 } from "@celda/dominio/municipio";
 import { generarLoteDeProvincia } from "@celda/dominio/provincias";
 import { assert, describe, it } from "@effect/vitest";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -62,6 +69,7 @@ const CAMPUS_NORD: Ficha = {
         },
       ],
       bandasSinLeer: false,
+      medidasDeExposicion: [],
       origenes: [
         {
           fuente: "registro-oficial",
@@ -668,6 +676,113 @@ describe("panel del emplazamiento", () => {
       urlDelLote(CAMPUS_NORD.clave),
       urlDelLote(CAMPUS_NORD.clave),
     ]);
+  });
+
+  describe("medidas de exposición", () => {
+    const BARCELONA = {
+      municipio: { codigo: "08019", nombre: "Barcelona" },
+      provincia: { codigo: "08", nombre: "Barcelona" },
+    };
+    const CON_MEDIDAS: Ficha = {
+      ...CAMPUS_NORD,
+      lugar: BARCELONA,
+      estaciones: CAMPUS_NORD.estaciones.map((estacion) =>
+        estacion.compania === "movistar"
+          ? {
+              ...estacion,
+              medidasDeExposicion: [
+                { distanciaMetros: 7, acimutGrados: 320, microvatiosPorCm2: 0.66219 },
+                { distanciaMetros: 13, acimutGrados: 330, microvatiosPorCm2: 0.08923 },
+              ],
+            }
+          : estacion,
+      ),
+    };
+    const PEDRALBES_CON_MEDIDAS: Ficha = {
+      ...PEDRALBES,
+      lugar: BARCELONA,
+      estaciones: PEDRALBES.estaciones.map((estacion) => ({
+        ...estacion,
+        medidasDeExposicion: [{ distanciaMetros: 55, acimutGrados: 227, microvatiosPorCm2: 2.15 }],
+      })),
+    };
+    const BAREMO: Baremo = {
+      formato: FORMATO_DEL_BAREMO,
+      version: CAPA.version,
+      provincia: "08",
+      tipica: { nivel: -7, pendiente: 0 },
+      separacion: { nivel: Math.log10(4), pendiente: 0 },
+      zonaProvincial: {
+        codigo: "08",
+        medidas: 19_595,
+        emplazamientos: 2865,
+        cortes: Array.from({ length: CORTES }, (_, i) => Math.round((i - 49) * 10) / 100),
+      },
+      municipios: [],
+    };
+    const URL_DEL_BAREMO = `${ORIGEN}/${ficheroDeBaremo(CAPA.version, "08")}`;
+    const pedidosDeBaremos = (origen: OrigenDePrueba) =>
+      origen.pedidas().filter((url) => url.includes("/baremos/"));
+
+    it("enseña las medidas de cada compañía en seguida y las compara con su zona al llegar el baremo", async () => {
+      const { findByRole, getByRole, findByText, getByText, origen } = abrir(CON_MEDIDAS.clave);
+      await responder(origen, CON_MEDIDAS);
+      await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+
+      const tabla = () => getByRole("table", { name: "Medidas de exposición de Movistar" });
+      assert.deepStrictEqual(
+        within(tabla())
+          .getAllByRole("row")
+          .map((fila) => fila.textContent),
+        ["DistanciaDirecciónµW/cm²", "7 mnoroeste0,662", "13 mnoroeste0,0892"],
+      );
+      assert.isNotNull(
+        getByText("Celda aún no ha leído sus medidas de exposición en el registro oficial."),
+      );
+      assert.isNotNull(
+        getByText(textoEntero("La medida más alta es de 0,662 µW/cm², el 0,33 % de 200 µW/cm².")),
+      );
+
+      await contestar(origen, URL_DEL_BAREMO, 200, generarBaremo(BAREMO));
+      assert.isNotNull(
+        await findByText(
+          /es más alta que 63 de cada 100 medidas de la provincia de Barcelona y unas 3 veces la típica\./u,
+        ),
+      );
+      assert.deepStrictEqual(
+        within(tabla())
+          .getAllByRole("columnheader")
+          .map((celda) => celda.textContent),
+        ["Distancia", "Dirección", "µW/cm²", "Típica", "Más alta que"],
+      );
+      assert.deepStrictEqual(jergaEn(document.body), []);
+    });
+
+    it("pide el baremo de la provincia una vez en la visita, aunque no lo haya, y la ficha sin medidas no lo pide", async () => {
+      const { findByRole, getByRole, origen } = abrir(CAMPUS_NORD.clave);
+      await responder(origen, CAMPUS_NORD);
+      await findByRole("heading", { name: TITULO_CAMPUS_NORD });
+      assert.deepStrictEqual(pedidosDeBaremos(origen), []);
+
+      navegar(ruta.emplazamiento(PEDRALBES.clave, "08"));
+      flush();
+      await responder(origen, PEDRALBES_CON_MEDIDAS);
+      await findByRole("heading", { name: TITULO_PEDRALBES });
+      // Una versión sin baremo: las medidas se ven sin comparar.
+      await contestar(origen, URL_DEL_BAREMO, 404, "");
+      const tabla = getByRole("table", { name: "Medidas de exposición de Orange" });
+      assert.lengthOf(within(tabla).getAllByRole("columnheader"), 3);
+
+      for (const clave of [CAMPUS_NORD.clave, PEDRALBES.clave, CAMPUS_NORD.clave]) {
+        navegar(ruta.emplazamiento(clave, "08"));
+        flush();
+        await findByRole("heading", {
+          name: clave === PEDRALBES.clave ? TITULO_PEDRALBES : TITULO_CAMPUS_NORD,
+        });
+      }
+      assert.deepStrictEqual(pedidosDeBaremos(origen), [URL_DEL_BAREMO]);
+      assert.deepStrictEqual(origen.abiertas(), []);
+    });
   });
 
   it("la dirección con el emplazamiento se puede compartir: al cargarla abre su ficha", () => {

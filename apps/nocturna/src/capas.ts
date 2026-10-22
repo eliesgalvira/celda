@@ -15,7 +15,8 @@ export class CarpetaOcupada extends Schema.TaggedError<CarpetaOcupada>()("Carpet
 
 /**
  * La orden `capas <carpeta>`: monta en el almacén del contexto, que es la carpeta `carpeta`, la
- * versión vigente de lo publicado en `origen` y las dos anteriores (`montarCapas`). Es lo que hace
+ * versión vigente de lo publicado en `origen` y las dos anteriores, con los baremos de exposición
+ * de la vigente (`montarCapas`). Es lo que hace
  * el build de Vercel para servir las capas en `/capas` (`apps/web/scripts/vercel.sh`, ADR 0018),
  * con `origen` el cubo privado de R2. La carpeta tiene que estar vacía o no existir. Si falta
  * algo, falla sin escribir `vigente.json`, y el build con ella.
@@ -32,7 +33,7 @@ export const montarCapasEn = Effect.fn("Nocturna.montarCapas")(function* (
   yield* Effect.logInfo(
     `Capas de ${montadas.version}` +
       (montadas.anteriores.length === 0 ? "" : ` y de ${montadas.anteriores.join(", ")}`) +
-      `: ${montadas.ficheros} ficheros, ${(montadas.bytes / 1e6).toFixed(1)} MB en ${carpeta}`,
+      `: ${montadas.ficheros} ficheros, ${montadas.baremos} de ellos baremos de exposición, ${(montadas.bytes / 1e6).toFixed(1)} MB en ${carpeta}`,
   );
   return montadas;
 });

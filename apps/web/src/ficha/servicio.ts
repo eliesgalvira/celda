@@ -1,3 +1,4 @@
+import { type Baremo, ficheroDeBaremo, leerBaremo } from "@celda/dominio/baremo";
 import type { Ficha } from "@celda/dominio/ficha";
 import { leerCapaDeProvincia, leerLoteDeProvincia } from "@celda/dominio/provincias";
 import * as Context from "effect/Context";
@@ -13,6 +14,7 @@ import {
   CapaEmplazamientos,
   descargarFichero,
   descargarResumen,
+  guardado,
   leerVigente,
   origenDeCapas,
 } from "../capa/servicio.ts";
@@ -54,6 +56,13 @@ export class FichasPublicadas extends Context.Service<
      * emplazamientos tienen. No falla: si no llega, abrir la ficha lo vuelve a intentar.
      */
     readonly precargar: (pedidas: ReadonlyArray<FichaPedida>) => Effect.Effect<void>;
+    /**
+     * El baremo de exposición de una provincia en la versión de su capa (ADR 0030), con el que la
+     * ficha compara sus medidas de exposición con las de su zona. Se pide una vez por visita. Es
+     * `None` si el origen no lo tiene o no llega: la ficha enseña entonces las medidas sin
+     * compararlas, y la próxima que se abra lo vuelve a pedir si no llegó.
+     */
+    readonly baremo: (provincia: string) => Effect.Effect<Option.Option<Baremo>>;
   }
 >()("@celda/web/ficha/servicio/FichasPublicadas") {}
 
@@ -223,6 +232,39 @@ export const fichasDelOrigen = Layer.effect(
       ),
     );
 
-    return FichasPublicadas.of({ leer, precargar });
+    /** Cada baremo leído, por su fichero: una sola petición por baremo y visita. */
+    const baremos = new Map<string, Effect.Effect<Option.Option<Baremo>, FichaNoLeida>>();
+    const baremo = Effect.fn("FichasPublicadas.baremo")(
+      function* (provincia: string) {
+        const { version } = yield* capas.provincia(provincia);
+        const fichero = ficheroDeBaremo(version, provincia);
+        let carga = baremos.get(fichero);
+        if (carga === undefined) {
+          carga = guardado(
+            Semaphore.makeUnsafe(1),
+            Effect.gen(function* () {
+              const texto = yield* descargarFichero(http, origen, fichero).pipe(
+                Effect.mapError((error) => noLeida(error.motivo)),
+              );
+              if (Option.isNone(texto)) return Option.none<Baremo>();
+              const leido = yield* Effect.fromResult(
+                leerBaremo(texto.value, version, provincia),
+              ).pipe(Effect.mapError((error) => noLeida(error.motivo)));
+              return Option.some(leido);
+            }),
+          );
+          baremos.set(fichero, carga);
+        }
+        return yield* carga;
+      },
+      Effect.catch((error) =>
+        Effect.as(
+          Effect.logDebug("No se ha podido leer el baremo de exposición", error),
+          Option.none<Baremo>(),
+        ),
+      ),
+    );
+
+    return FichasPublicadas.of({ leer, precargar, baremo });
   }),
 );

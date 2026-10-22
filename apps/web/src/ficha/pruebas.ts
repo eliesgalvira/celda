@@ -50,7 +50,11 @@ export const fichasDePrueba = (): FichasDePrueba => {
   return {
     capa: Layer.succeed(
       FichasPublicadas,
-      FichasPublicadas.of({ leer, precargar: () => Effect.void }),
+      FichasPublicadas.of({
+        leer,
+        precargar: () => Effect.void,
+        baremo: () => Effect.succeed(Option.none()),
+      }),
     ),
     responder: (clave, respuesta) => {
       for (const lectura of lecturas.filter((l) => l.clave === clave)) {

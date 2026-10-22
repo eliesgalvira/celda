@@ -22,6 +22,10 @@ import { leerDeVercel, planearCapas, type VercelNoDisponible } from "./vercel.ts
  * - **Los datos.** Producción no sirve el `vigente.json` de R2 y los manifiestos de la vigente y de
  *   las anteriores que montaría un build nuevo (`planearCapas`).
  *
+ * El baremo de exposición que calcula el build (ADR 0030) no entra en ninguna: sale de los lotes que
+ * listan esos manifiestos, y la web lo pide por un nombre con su formato, que sube si cambia el
+ * cálculo y cambia así la web.
+ *
  * Una señal que no se puede saber cuenta como un cambio. La huella es función pura del commit, así
  * que el flujo de despliegue de GitHub la calcula una vez por commit (orden `huella-web`) y la
  * guarda en su caché, y cada ejecución compara la que ya sabe con la de producción (orden
