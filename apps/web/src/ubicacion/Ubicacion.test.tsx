@@ -1,7 +1,7 @@
 import type { PuntoElegido } from "@celda/dominio/aportacion";
 import type { Ficha } from "@celda/dominio/ficha";
 import { assert, describe, it } from "@effect/vitest";
-import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
@@ -141,7 +141,7 @@ describe("punto de referencia: pedir la ubicación", () => {
   });
 
   it("antes del aviso del navegador explica para qué se usa; solo al continuar se pide", async () => {
-    const { panel, pulsar, findByRole, queryByRole, gps, almacen } = await abrir();
+    const { panel, pulsar, findByRole, getByRole, queryByRole, gps, almacen } = await abrir();
     fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
     flush();
 
@@ -163,13 +163,11 @@ describe("punto de referencia: pedir la ubicación", () => {
     await waitFor(() => {
       assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /tu ubicación \(±25 m\)/u);
     });
-    // A qué distancia y hacia dónde queda el emplazamiento.
-    await waitFor(() => {
-      assert.match(
-        panel().getByText(/^El emplazamiento está/u).textContent ?? "",
-        /^El emplazamiento está a 340 m de ti, hacia el noreste \(\d+°\)\.$/u,
-      );
-    });
+    // La distancia y el rumbo los dice «Mejorar la señal», justo debajo, y aquí no se repiten.
+    assert.notMatch(
+      getByRole("region", { name: "Punto de referencia" }).textContent ?? "",
+      /340 m/u,
+    );
     // «Tu ubicación» y su precisión abren su explicación.
     const desde = panel().getByText(/^Desde:/u);
     assert.deepStrictEqual(terminosSubrayados(desde), ["punto-de-referencia", "precision"]);
@@ -223,6 +221,36 @@ describe("punto de referencia: pedir la ubicación", () => {
     }
     assert.strictEqual(gps.pedidas(), 1);
     assert.strictEqual(gps.abiertas(), 1);
+  });
+
+  it("una lectura nueva no cierra la explicación de un término abierta en la ficha", async () => {
+    const { panel, gps } = await abrir({ permiso: "concedido" });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    gps.responder(LECTURA);
+    // Cada lectura cambia la precisión, así que se ve cuándo ha llegado.
+    for (const [termino, explicacion, precision] of [
+      [/^±\d+ m$/u, "Precisión", 30],
+      ["router 4G/5G", "Router 4G/5G", 40],
+    ] as const) {
+      fireEvent.click(await screen.findByRole("button", { name: termino }));
+      flush();
+      assert.isNotNull(screen.getByRole("dialog", { name: explicacion }));
+      gps.responder({ ...LECTURA, precision });
+      flush();
+      await waitFor(() => {
+        assert.match(
+          panel().getByText(/^Desde:/u).textContent ?? "",
+          new RegExp(`±${precision} m`, "u"),
+        );
+      });
+      assert.isNotNull(screen.queryByRole("dialog", { name: explicacion }), explicacion);
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      flush();
+    }
   });
 });
 
@@ -383,12 +411,9 @@ describe("punto de referencia: punto elegido", () => {
     await waitFor(() => {
       assert.match(panel().getByText(/^Desde:/u).textContent ?? "", /el punto elegido/u);
     });
-    assert.match(
-      panel().getByText(/^El emplazamiento está/u).textContent ?? "",
-      /^El emplazamiento está a 340 m del punto, hacia el noreste \(\d+°\)\.$/u,
-    );
     const region = getByRole("region", { name: "Punto de referencia" });
     assert.notMatch(region.textContent ?? "", /\b(ti|tu|tú)\b/iu);
+    assert.notMatch(region.textContent ?? "", /340 m/u);
 
     fireEvent.click(panel().getByRole("button", { name: "Quitar" }));
     flush();

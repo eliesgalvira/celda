@@ -266,18 +266,17 @@ function Explicacion(props: ExplicacionProps) {
 
 /**
  * Un texto con sus términos marcados: subraya la primera aparición de cada término y deja el
- * resto llano.
+ * resto llano. Va por posición: el mismo texto vuelto a escribir, como con cada lectura del GPS,
+ * no rehace sus términos, y una explicación abierta sigue abierta.
  */
 export function TextoConTerminos(props: { readonly texto: TextoMarcado }) {
   return (
-    <For each={primeraVez(props.texto)}>
-      {(fragmento) =>
-        fragmento.termino === undefined ? (
-          fragmento.texto
-        ) : (
-          <Termino termino={fragmento.termino}>{fragmento.texto}</Termino>
-        )
-      }
+    <For each={primeraVez(props.texto)} keyed={false}>
+      {(fragmento) => (
+        <Show when={fragmento().termino} fallback={fragmento().texto}>
+          {(termino) => <Termino termino={termino()}>{fragmento().texto}</Termino>}
+        </Show>
+      )}
     </For>
   );
 }

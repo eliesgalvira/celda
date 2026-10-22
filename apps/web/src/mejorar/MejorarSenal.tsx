@@ -118,9 +118,9 @@ const crearBrujula = (
 
 /**
  * La sección «Mejorar la señal» de la ficha (historias 34 a 37). Sin punto de referencia da
- * consejos generales y dice qué se ganaría con uno. Con punto, hacia dónde orientar un router
- * 4G/5G y a qué rumbo apuntar una antena exterior, con la brújula del móvil o, en un ordenador,
- * con la barra que simula el giro.
+ * consejos generales y dice qué se ganaría con uno. Al pie del emplazamiento no hay nada que
+ * orientar. Con rumbo, hacia dónde orientar un router 4G/5G y a qué rumbo apuntar una antena
+ * exterior, con la brújula del móvil o, en un ordenador, con la barra que simula el giro.
  */
 export function MejorarSenal(props: { readonly emplazamiento: Coordenada }) {
   const control = useContext(UbicacionContexto);
@@ -139,11 +139,15 @@ export function MejorarSenal(props: { readonly emplazamiento: Coordenada }) {
 
   const conPunto = createMemo(() => {
     const actuales = textos();
-    return actuales.tipo === "con-punto" ? actuales : undefined;
+    return actuales.tipo === "sin-punto" ? undefined : actuales;
   });
   const sinPunto = createMemo(() => {
     const actuales = textos();
     return actuales.tipo === "sin-punto" ? actuales : undefined;
+  });
+  const conRumbo = createMemo(() => {
+    const actuales = textos();
+    return actuales.tipo === "con-rumbo" ? actuales : undefined;
   });
 
   return (
@@ -156,10 +160,10 @@ export function MejorarSenal(props: { readonly emplazamiento: Coordenada }) {
         )}
       </Show>
       <ListaConsejos>
-        <For each={textos().consejos}>
+        <For each={textos().consejos} keyed={(consejo) => consejo.clave}>
           {(consejo) => (
-            <Consejo tono={consejo.tono}>
-              <TextoConTerminos texto={consejo.texto} />
+            <Consejo tono={consejo().tono}>
+              <TextoConTerminos texto={consejo().texto} />
             </Consejo>
           )}
         </For>
@@ -181,15 +185,12 @@ export function MejorarSenal(props: { readonly emplazamiento: Coordenada }) {
           />
         )}
       </Show>
-      <Show when={conPunto()}>
+      <Show when={conRumbo()}>
         {(actuales) => (
           <>
-            {/* Un rumbo de 0° (el norte) también es un objetivo: `when` no puede ser el número. */}
-            <Show when={actuales().objetivo !== undefined}>
-              <BrujulaEnFicha objetivo={actuales().objetivo ?? 0} control={brujula} />
-            </Show>
+            <BrujulaEnFicha objetivo={actuales().rumbo} control={brujula} />
             <NotaMejorar>
-              <TextoConTerminos texto={actuales().nota} />
+              Toma el rumbo como punto de partida y ajusta mirando la señal del router.
             </NotaMejorar>
           </>
         )}

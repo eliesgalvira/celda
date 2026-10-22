@@ -11,10 +11,11 @@ const punto = (extra: Partial<PuntoParaConsejos> = {}): PuntoParaConsejos => ({
   ...extra,
 });
 
-const textos = (resultado: Consejos): ReadonlyArray<string> => [
-  ...(resultado.tipo === "con-punto" ? [textoPlano(resultado.hacia)] : []),
-  ...resultado.consejos.map((c) => textoPlano(c.texto)),
-  textoPlano(resultado.tipo === "con-punto" ? resultado.nota : resultado.llamada),
+/** Todos los textos de la sección, en orden de lectura. */
+const todos = (resultado: Consejos) => [
+  ...(resultado.tipo === "sin-punto" ? [] : [resultado.hacia]),
+  ...resultado.consejos.map((c) => c.texto),
+  ...(resultado.tipo === "sin-punto" ? [resultado.llamada] : []),
 ];
 
 const consejo = (resultado: Consejos, clave: string): string | undefined => {
@@ -22,10 +23,11 @@ const consejo = (resultado: Consejos, clave: string): string | undefined => {
   return encontrado === undefined ? undefined : textoPlano(encontrado.texto);
 };
 
-const conPunto = (resultado: Consejos) => {
-  assert.strictEqual(resultado.tipo, "con-punto");
-  return resultado.tipo === "con-punto" ? resultado : assert.fail("sin punto");
-};
+const conRumbo = (resultado: Consejos) =>
+  resultado.tipo === "con-rumbo" ? resultado : assert.fail(`sin rumbo: ${resultado.tipo}`);
+
+const alPie = (resultado: Consejos) =>
+  resultado.tipo === "al-pie" ? resultado : assert.fail(`no está al pie: ${resultado.tipo}`);
 
 describe("consejos para mejorar la señal", () => {
   it("sin punto de referencia da consejos generales y dice qué se ganaría con uno", () => {
@@ -44,7 +46,7 @@ describe("consejos para mejorar la señal", () => {
   });
 
   it("con punto dice hacia dónde queda, hacia qué ventana poner el router y a qué rumbo apuntar la antena", () => {
-    const resultado = conPunto(consejos(punto()));
+    const resultado = conRumbo(consejos(punto()));
     assert.strictEqual(
       textoPlano(resultado.hacia),
       "Desde donde estás, el emplazamiento queda hacia el noreste, con rumbo 48°, a 340 m.",
@@ -57,7 +59,7 @@ describe("consejos para mejorar la señal", () => {
       consejo(resultado, "antena"),
       "Si usas una antena exterior direccional, apúntala a 48°. La brújula de abajo sirve para alinearla.",
     );
-    assert.strictEqual(resultado.objetivo, 48);
+    assert.strictEqual(resultado.rumbo, 48);
   });
 
   it("siempre dice que girar el móvil en la mano apenas cambia nada, como un aparte", () => {
@@ -82,43 +84,31 @@ describe("consejos para mejorar la señal", () => {
   });
 
   it("al pie del emplazamiento no hay rumbo al que apuntar", () => {
-    const resultado = conPunto(consejos(punto({ distancia: 8 })));
-    assert.isUndefined(resultado.objetivo);
+    const resultado = alPie(consejos(punto({ distancia: 8 })));
+    assert.notProperty(resultado, "rumbo");
     assert.strictEqual(textoPlano(resultado.hacia), "Estás al pie del emplazamiento, a 10 m.");
     assert.match(consejo(resultado, "router") ?? "", /^Desde tan cerca no hace falta orientar/u);
     // A 15 m ya hay hacia dónde apuntar: es el radio de la fusión.
-    assert.strictEqual(conPunto(consejos(punto({ distancia: 15 }))).objetivo, 48);
+    assert.strictEqual(conRumbo(consejos(punto({ distancia: 15 }))).rumbo, 48);
   });
 
   it("con un punto elegido habla del punto, nunca de ti", () => {
     for (const extra of [{}, { distancia: 1240 }, { distancia: 8 }]) {
-      const todo = textos(consejos(punto({ tipo: "elegido", ...extra }))).join(" ");
+      const todo = todos(consejos(punto({ tipo: "elegido", ...extra })))
+        .map(textoPlano)
+        .join(" ");
       assert.notMatch(todo, /\b(ti|te|tu|tú|estás|pierdes)\b/iu, todo);
       assert.match(todo, /\bpunto\b/u);
     }
     assert.match(
-      textoPlano(conPunto(consejos(punto({ tipo: "elegido" }))).hacia),
+      textoPlano(conRumbo(consejos(punto({ tipo: "elegido" }))).hacia),
       /^Desde el punto, el emplazamiento queda/u,
     );
   });
 
-  it("dice que el rumbo es un punto de partida, también al pie del emplazamiento", () => {
-    for (const distancia of [340, 8]) {
-      assert.strictEqual(
-        textoPlano(conPunto(consejos(punto({ distancia }))).nota),
-        "Toma el rumbo como punto de partida y ajusta mirando la señal del router.",
-      );
-    }
-  });
-
   it("subraya cada término una vez en toda la sección, en orden de lectura", () => {
     for (const resultado of [consejos(undefined), consejos(punto({ distancia: 1240 }))]) {
-      const todos = [
-        ...(resultado.tipo === "con-punto" ? [resultado.hacia] : []),
-        ...resultado.consejos.map((c) => c.texto),
-        resultado.tipo === "con-punto" ? resultado.nota : resultado.llamada,
-      ];
-      const terminos = terminosDe(todos);
+      const terminos = terminosDe(todos(resultado));
       assert.deepStrictEqual(terminos, [...new Set(terminos)]);
       assert.includeMembers([...terminos], ["router-movil", "antena-exterior", "decibelio"]);
     }

@@ -414,7 +414,7 @@ export function EleccionConBuscador(props: EleccionConBuscadorProps) {
 
 /**
  * El punto de referencia en la ficha de un emplazamiento. Sin punto, explica qué se ganaría y
- * cómo darlo; con punto, desde dónde se mira y a qué distancia y rumbo queda el emplazamiento.
+ * cómo darlo; con punto, desde dónde se mira y deja cambiarlo o quitarlo.
  */
 export function ReferenciaEnFicha(props: { readonly emplazamiento: Coordenada }) {
   const control = useContext(UbicacionContexto);
@@ -491,7 +491,6 @@ export function ReferenciaEnFicha(props: { readonly emplazamiento: Coordenada })
               <ConReferencia
                 tipo={referencia().tipo}
                 desde={<TextoConTerminos texto={textos().desde} />}
-                relacion={textos().relacion}
                 margen={(() => {
                   const margen = textos().margen;
                   return margen === undefined ? undefined : <TextoConTerminos texto={margen} />;

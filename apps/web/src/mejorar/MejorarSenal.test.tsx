@@ -150,6 +150,17 @@ describe("mejorar la señal: consejos", () => {
       ),
     );
   });
+
+  it("al pie del emplazamiento no enseña rumbo, brújula ni la nota del rumbo", async () => {
+    const { seccion } = await abrir({
+      guardadas: [{ ...PUNTO, posicion: CAMPUS_NORD.posicion }],
+    });
+    await waitFor(() => {
+      assert.isNotNull(seccion().getByText(/^El punto está al pie del/u));
+    });
+    assert.isNull(seccion().queryByRole("img", { name: /Brújula/u }));
+    assert.isNull(seccion().queryByText(/Toma el rumbo/u));
+  });
 });
 
 describe("mejorar la señal: brújula", () => {

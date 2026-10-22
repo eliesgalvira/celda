@@ -75,10 +75,6 @@ const datosDeMedida = (medida: MedidaPropia): ReadonlyArray<DatoQueSale> => [
   { nombre: "Dónde la tomaste", valor: textoCoordenada(medida.punto) },
   { nombre: "Código del emplazamiento que daba servicio", valor: medida.unidaA.emplazamiento },
   { nombre: "Posición del emplazamiento", valor: textoCoordenada(medida.unidaA.posicion) },
-  {
-    nombre: "Orientación del sector",
-    valor: medida.unidaA.azimut === null ? "no se sabe" : `${Math.round(medida.unidaA.azimut)}°`,
-  },
 ];
 
 const datosDeCambio = (correccion: CorreccionPropuesta): ReadonlyArray<DatoQueSale> => {

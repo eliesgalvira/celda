@@ -1116,7 +1116,11 @@ export function PantallaMapa() {
                         />
                       )}
                     </Show>
-                    <ReferenciaEnMapa mapa={actual()} escritorio={escritorio()} />
+                    <ReferenciaEnMapa
+                      mapa={actual()}
+                      escritorio={escritorio()}
+                      emplazamiento={posicionSeleccionada()}
+                    />
                   </>
                 )}
               </Show>

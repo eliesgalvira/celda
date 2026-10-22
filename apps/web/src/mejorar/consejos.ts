@@ -31,6 +31,10 @@ export interface Consejo {
   readonly tono: "principal" | "secundario";
 }
 
+/**
+ * Sin punto de referencia, al pie del emplazamiento, donde no hay hacia dónde apuntar, o con un
+ * rumbo al que apuntar.
+ */
 export type Consejos =
   | {
       readonly tipo: "sin-punto";
@@ -39,17 +43,18 @@ export type Consejos =
       readonly llamada: TextoMarcado;
     }
   | {
-      readonly tipo: "con-punto";
+      readonly tipo: "al-pie";
+      /** A qué distancia queda el emplazamiento. */
+      readonly hacia: TextoMarcado;
+      readonly consejos: ReadonlyArray<Consejo>;
+    }
+  | {
+      readonly tipo: "con-rumbo";
       /** Hacia dónde queda el emplazamiento y a qué distancia. */
       readonly hacia: TextoMarcado;
       readonly consejos: ReadonlyArray<Consejo>;
-      /**
-       * El rumbo al que apuntar, en grados enteros, o `undefined` al pie del emplazamiento,
-       * donde no hay hacia dónde apuntar.
-       */
-      readonly objetivo: number | undefined;
-      /** Cuánto fiarse del rumbo. */
-      readonly nota: TextoMarcado;
+      /** El rumbo al que apuntar, en grados enteros. */
+      readonly rumbo: number;
     };
 
 const ROUTER = termino("router-movil", "router 4G/5G");
@@ -61,17 +66,14 @@ const MOVIL: Consejo = {
   texto: marcado`Girar el móvil en la mano apenas cambia la señal. La mano y el cuerpo influyen más.`,
 };
 
-/** Cuánto fiarse de los consejos con punto. */
-const NOTA: TextoMarcado = marcado`Toma el rumbo como punto de partida y ajusta mirando la señal del router.`;
-
 /** Grados enteros entre 0 y 359. */
 const enteros = (grados: number): number => ((Math.round(grados) % 360) + 360) % 360;
 
 /**
  * Los consejos para mejorar la señal (historias 34, 35 y 37). Sin punto de referencia son
- * generales y dicen qué se ganaría con uno. Con punto dicen hacia qué ventana poner un router
- * 4G/5G y a qué rumbo apuntar una antena exterior, y cambian si el punto está al pie del
- * emplazamiento, cerca o lejos.
+ * generales y dicen qué se ganaría con uno. Al pie del emplazamiento no hay nada que orientar. Con
+ * rumbo dicen hacia qué ventana poner un router 4G/5G y a qué rumbo apuntar una antena exterior, y
+ * cambian si el punto está cerca o lejos.
  *
  * Con un punto elegido hablan del «punto», nunca de «ti» (historia 31). Cada término se subraya
  * una vez en toda la sección.
@@ -108,8 +110,7 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
 
   if (punto.distancia < DISTANCIA_JUNTO_M) {
     return {
-      tipo: "con-punto",
-      objetivo: undefined,
+      tipo: "al-pie",
       ...ordenar(
         marcado`${tu ? "Estás" : "El punto está"} al pie del ${termino("emplazamiento", "emplazamiento")}, a ${distancia}.`,
         [
@@ -125,7 +126,6 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
           },
           MOVIL,
         ],
-        NOTA,
       ),
     };
   }
@@ -160,25 +160,20 @@ export const consejos = (punto: PuntoParaConsejos | undefined): Consejos => {
   lista.push(MOVIL);
 
   return {
-    tipo: "con-punto",
-    objetivo: rumbo,
+    tipo: "con-rumbo",
+    rumbo,
     ...ordenar(
       marcado`${tu ? "Desde donde estás" : "Desde el punto"}, el ${termino("emplazamiento", "emplazamiento")} queda hacia el ${lado}, con ${termino("rumbo", `rumbo ${String(rumbo)}°`)}, a ${distancia}.`,
       lista,
-      NOTA,
     ),
   };
 };
 
-/**
- * Marca los términos en el orden en que se leen: primero hacia dónde queda, luego los consejos y
- * al final la nota.
- */
-const ordenar = (hacia: TextoMarcado, lista: ReadonlyArray<Consejo>, nota: TextoMarcado) => {
+/** Marca los términos en el orden en que se leen: primero hacia dónde queda y luego los consejos. */
+const ordenar = (hacia: TextoMarcado, lista: ReadonlyArray<Consejo>) => {
   const marcar = bloque();
   return {
     hacia: marcar(hacia),
     consejos: lista.map((consejo) => ({ ...consejo, texto: marcar(consejo.texto) })),
-    nota: marcar(nota),
   };
 };
