@@ -12,7 +12,7 @@ import { CAPA_PORTALES } from "@celda/ui/mapa/rotulos.ts";
 import { CAPA_EDIFICIOS } from "@celda/ui/mapa/suelo.ts";
 import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
 import * as Predicate from "effect/Predicate";
-import { createContext, createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { createContext, createMemo, createSignal } from "solid-js";
 
 import type { Esperar } from "../mapa/callejero.ts";
 import type { Movimiento } from "../mapa/vistaInicial.ts";
@@ -324,7 +324,10 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
   const [encendida, setEncendida] = createSignal(false);
   // El lienzo cuya cámara está volando. Un lienzo nuevo empieza quieto aunque el viejo volara.
   const [enVuelo, setEnVuelo] = createSignal<LienzoDeFoto>();
-  const [pedido, setPedido] = createSignal<PedidoDeEdificio>();
+  // Lo pedido vale para el emplazamiento seleccionado: con otro, o con la ficha cerrada, no hay.
+  const [pedido, setPedido] = createSignal<PedidoDeEdificio | undefined>((antes) =>
+    antes?.clave === entrada.seleccionada() ? antes : undefined,
+  );
   // El último pedido cuyo vuelo ya ha empezado.
   const [volado, setVolado] = createSignal<PedidoDeEdificio>();
   const [hallado, setHallado] = createSignal<Hallado>();
@@ -354,11 +357,6 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
     ({ lienzo, encendida: si }) => lienzo.ponerFoto(si),
     { iguales: mismosCampos },
   );
-
-  // Otro emplazamiento o la ficha cerrada: lo pedido para el anterior ya no vale.
-  createEffect(entrada.seleccionada, (clave) => {
-    if (untrack(pedido)?.clave !== clave) setPedido(undefined);
-  });
 
   recurso(
     "mapa:edificio",
