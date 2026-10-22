@@ -8,7 +8,7 @@ Las rutas usan el router mínimo de Moli, una señal de ubicación con construct
 
 ## Consecuencias
 
-Solid 2 es una RC (`2.0.0-rc.9`). Se asume el riesgo en una web pública nueva con versiones exactas, actualizaciones en commits deliberados y lectura del `CHEATSHEET.md` del paquete en cada subida. Se siguen las convenciones de Moli para Solid 2:
+Solid 2 es una RC (`2.0.0-rc.9` al decidirlo; la versión de ahora va en el catálogo de `pnpm-workspace.yaml`). Se asume el riesgo en una web pública nueva con versiones exactas, actualizaciones en commits deliberados y lectura del `CHEATSHEET.md` del paquete en cada subida. Se siguen las convenciones de Moli para Solid 2:
 
 - no desestructurar props;
 - no escribir señales dentro de memos ni en el cuerpo de un componente;
