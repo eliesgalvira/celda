@@ -29,7 +29,7 @@ import { GmlIlegible, sinEntidades } from "./gml.ts";
  */
 
 /** El servicio WFS INSPIRE del NGBE. */
-export const SERVICIO_NGBE = "https://www.ign.es/wfs-inspire/ngbe";
+const SERVICIO_NGBE = "https://www.ign.es/wfs-inspire/ngbe";
 
 /** Las capacidades del servicio, que dicen su título y su licencia. */
 export const CAPACIDADES_NGBE = `${SERVICIO_NGBE}?service=WFS&request=GetCapabilities`;
@@ -162,7 +162,7 @@ const seLlamaComo = (capital: CapitalDelNgbe, municipio: Territorio): boolean =>
 };
 
 /** Una capital que fue a otro municipio que el de su punto, porque se llama como él. */
-export interface CapitalPorNombre {
+interface CapitalPorNombre {
   readonly capital: string;
   readonly delPunto: string;
   readonly municipio: string;

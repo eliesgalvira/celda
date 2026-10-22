@@ -41,14 +41,14 @@ export interface ZonasDelMapa {
 export const SIN_ZONAS: ZonasDelMapa = { provincias: undefined, contornos: new Map() };
 
 /** Las provincias cuya caja contiene el punto: solo en sus contornos puede caer. */
-export const provinciasCandidatas = (
+const provinciasCandidatas = (
   punto: Coordenada,
   provincias: ReadonlyArray<ProvinciaConCaja>,
 ): ReadonlyArray<string> =>
   provincias.flatMap((p) => (contiene(rectanguloDeCaja(p.caja), punto) ? [p.codigo] : []));
 
 /** Los contornos que hacen falta para saber dónde caen los puntos y aún no se han pedido. */
-export const contornosQueFaltan = (
+const contornosQueFaltan = (
   puntos: ReadonlyArray<Coordenada>,
   zonas: ZonasDelMapa,
 ): ReadonlyArray<string> => {
@@ -95,7 +95,7 @@ export const centroDe = (vista: Vista): Coordenada => ({
  * Lo que mide de ancho, en grados de longitud, una vista que ya enseña una provincia y no varias:
  * Barcelona mide 1,4°, Soria 1,8° y Badajoz, la más ancha de la península, 2,7°.
  */
-export const ANCHO_DE_UNA_PROVINCIA = 2.7;
+const ANCHO_DE_UNA_PROVINCIA = 2.7;
 
 /**
  * Si la cabecera nombra un sitio y no España entera: desde el nivel de provincias, o antes si lo
@@ -124,7 +124,7 @@ const ESPANA_ENTERA: SitioDeLaVista = { tipo: "espana", nombre: ESPANA.nombre };
  * Con el centro fuera de las provincias (en el mar o al otro lado de la frontera), España. Los
  * nombres son los de lugar, en una sola forma: «Elx», «San Sebastián» (ADR 0025).
  */
-export const sitioDeLaVista = (
+const sitioDeLaVista = (
   vista: Vista | undefined,
   zonas: ZonasDelMapa,
 ): SitioDeLaVista | undefined => {

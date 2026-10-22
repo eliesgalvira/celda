@@ -135,7 +135,7 @@ const lineas = <A>(elementos: ReadonlyArray<A>) =>
   elementos.map((elemento) => JSON.stringify(elemento)).join(",\n");
 
 /** El fichero del índice, con una provincia o un municipio por línea. */
-export const ficheroDeIndice = (indice: IndiceDeZonas): string =>
+const ficheroDeIndice = (indice: IndiceDeZonas): string =>
   `{"fuente":${JSON.stringify(indice.fuente)},` +
   `"toleranciaMetros":${indice.toleranciaMetros},"provincias":[\n` +
   `${lineas(indice.provincias)}\n],"municipios":[\n` +
@@ -145,7 +145,7 @@ export const ficheroDeIndice = (indice: IndiceDeZonas): string =>
  * El fichero de las provincias del índice, sin los municipios, con una provincia por línea: lo
  * que la web necesita para saber en qué provincia cae el centro del mapa.
  */
-export const ficheroDeProvincias = (indice: IndiceDeZonas): string =>
+const ficheroDeProvincias = (indice: IndiceDeZonas): string =>
   `{"fuente":${JSON.stringify(indice.fuente)},"provincias":[\n${lineas(indice.provincias)}\n]}\n`;
 
 /**

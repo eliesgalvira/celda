@@ -55,7 +55,7 @@ const modeloDelUserAgent = (userAgent: string): string | undefined => {
 };
 
 /** La marca de un móvil Android, o nada si no se reconoce con seguridad. */
-export const marcaAndroid = (datos: DatosDelNavegador): MarcaAndroid | undefined => {
+const marcaAndroid = (datos: DatosDelNavegador): MarcaAndroid | undefined => {
   const modelos = [datos.modelo?.trim(), modeloDelUserAgent(datos.userAgent)].filter(
     (modelo): modelo is string => modelo !== undefined && modelo !== "",
   );

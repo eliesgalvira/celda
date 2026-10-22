@@ -1,4 +1,4 @@
-import type { Barrio, FuenteDeBarrios, LimitesDeBarrios } from "@celda/dominio/barrio";
+import type { Barrio, FuenteDeBarrios } from "@celda/dominio/barrio";
 import {
   codificarVigente,
   type EmplazamientoDeCapa,
@@ -102,28 +102,6 @@ export const FUENTES_DE_PRUEBA: FuentesDeZonas = {
     referencia: "2025-01-01",
     publicada: "2025-12-11",
   },
-};
-
-/** Un solo barrio, Pedralbes, dibujado como un rectángulo alrededor del Campus Nord. */
-export const LIMITES_DE_PRUEBA: LimitesDeBarrios = {
-  fuente: FUENTE_DE_BARRIOS,
-  barrios: [
-    {
-      codigo: "21",
-      nombre: "Pedralbes",
-      etiqueta: { longitud: 2.11, latitud: 41.39 },
-      poligonos: [
-        [
-          [
-            [2.1, 41.385],
-            [2.12, 41.385],
-            [2.12, 41.395],
-            [2.1, 41.395],
-          ],
-        ],
-      ],
-    },
-  ],
 };
 
 /** La caja de Barcelona como zona barrida la noche de `barrido`. */

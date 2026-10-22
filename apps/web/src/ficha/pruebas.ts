@@ -11,7 +11,7 @@ import { FUENTE_DE_MUNICIPIOS } from "../capa/pruebas.ts";
 import { FichaNoLeida, FichasPublicadas } from "./servicio.ts";
 
 /** Lo que el servicio de prueba contesta: una ficha, que no existe o un fallo. */
-export type RespuestaDePrueba = Ficha | "no-existe" | FichaNoLeida;
+type RespuestaDePrueba = Ficha | "no-existe" | FichaNoLeida;
 
 export interface FichasDePrueba {
   readonly capa: Layer.Layer<FichasPublicadas>;

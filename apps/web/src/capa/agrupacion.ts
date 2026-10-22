@@ -37,7 +37,7 @@ import {
 const TOPE_DE_PASOS = 4000;
 
 /** Un emplazamiento que se dibuja suelto, con su marcador de logos. */
-export interface ElementoEmplazamiento {
+interface ElementoEmplazamiento {
   readonly tipo: "emplazamiento";
   readonly clave: string;
   readonly posicion: Coordenada;

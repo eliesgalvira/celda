@@ -14,7 +14,7 @@ const A_LA_VEZ = 3;
 const ESPERA = "10 seconds";
 
 /** Las bandas de cada compañía en una ficha, como las necesita el ejercicio. */
-export const bandasDeFicha = (ficha: Ficha): BandasPorCompania =>
+const bandasDeFicha = (ficha: Ficha): BandasPorCompania =>
   Object.fromEntries(
     ficha.estaciones.map((estacion) => [estacion.compania, estacion.bandas.map((b) => b.mhz)]),
   );

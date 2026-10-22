@@ -43,7 +43,7 @@ const NOMBRE_RED: Readonly<Record<TipoDeRed, string>> = {
 };
 
 /** Para qué sirve una banda, de «llega más lejos» a «más velocidad». */
-export const explicacionBanda = (mhz: Mhz): string => {
+const explicacionBanda = (mhz: Mhz): string => {
   if (mhz <= 900) return "Es una banda baja, de mucho alcance y menos velocidad.";
   if (mhz <= 2100) return "Es una banda media, con alcance y velocidad intermedios.";
   return "Es una banda alta, de más velocidad y menos alcance.";

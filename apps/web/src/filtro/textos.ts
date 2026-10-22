@@ -33,7 +33,7 @@ export const textoDelAviso = (filtro: FiltroDeCompanias): string =>
  * Lo que sale aparte con las compañías del filtro que usan otra red, en una línea: «La red de
  * Movistar que usa Digi sale más clara.» Sin ninguna, `undefined`.
  */
-export const textoDeLaRedUsada = (filtro: FiltroDeCompanias): string | undefined => {
+const textoDeLaRedUsada = (filtro: FiltroDeCompanias): string | undefined => {
   const redes = redesUsadas(filtro);
   if (redes.length === 0) return undefined;
   const de = enumerar(redes.map((r) => NOMBRE_COMPANIA[r.red]));
@@ -44,7 +44,7 @@ export const textoDeLaRedUsada = (filtro: FiltroDeCompanias): string | undefined
 };
 
 /** Con el mapa alejado y unos datos de antes, los números aún son de todas las compañías. */
-export const DE_LEJOS_SIN_FILTRAR = "Los números de lejos incluyen todas las compañías.";
+const DE_LEJOS_SIN_FILTRAR = "Los números de lejos incluyen todas las compañías.";
 
 /**
  * La línea de debajo del aviso, solo si algo sorprendería: que de lejos los números aún cuentan

@@ -9,9 +9,9 @@ import { nombreRumbo, textoDistancia } from "../ubicacion/textos.ts";
  */
 const DISTANCIA_JUNTO_M = 15;
 /** Más cerca que esto, la señal suele llegar con fuerza. */
-export const CERCA_METROS = 300;
+const CERCA_METROS = 300;
 /** Desde aquí, la señal llega más débil y una antena exterior se nota más. */
-export const LEJOS_METROS = 1000;
+const LEJOS_METROS = 1000;
 
 /** Lo que se sabe del punto de referencia para aconsejar. */
 export interface PuntoParaConsejos {
@@ -22,7 +22,7 @@ export interface PuntoParaConsejos {
   readonly rumbo: number;
 }
 
-export type ClaveConsejo = "router" | "antena" | "distancia" | "movil";
+type ClaveConsejo = "router" | "antena" | "distancia" | "movil";
 
 export interface Consejo {
   readonly clave: ClaveConsejo;

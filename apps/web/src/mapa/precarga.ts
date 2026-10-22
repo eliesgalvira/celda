@@ -15,7 +15,7 @@ import urlDeLimites from "./limites.json?url";
  * También pide ya los límites de comunidades y provincias (8 KB con gzip, del mismo origen): así
  * están cuando se crea el mapa y salen con la silueta de España en su primer pintado.
  */
-export const precargarMapaBase = (documento: Document): void => {
+const precargarMapaBase = (documento: Document): void => {
   if (!("WebGLRenderingContext" in globalThis)) return;
   // `mapaBase.ts` pone en marcha los workers de MapLibre en cuanto se evalúa.
   void import("./mapaBase.ts").catch(() => {

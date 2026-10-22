@@ -43,7 +43,7 @@ export const estaEnElGlosario = (termino: string): termino is Termino =>
  * emplazamiento, un UUID o una fecha ISO con hora. Se comprueba sobre lo que se ve y lo que oye
  * un lector de pantalla.
  */
-export const JERGA: ReadonlyArray<{ readonly que: string; readonly patron: RegExp }> = [
+const JERGA: ReadonlyArray<{ readonly que: string; readonly patron: RegExp }> = [
   { que: "identificador con versión", patron: /[\p{L}\d-]@\d/u },
   { que: "versión suelta", patron: /\bv\d+\b/u },
   { que: "versión de capa o de fichas", patron: /\b(?:sitios|fichas)@/u },

@@ -13,7 +13,7 @@ import { haciaDonde, textoCoordenada, textoDistancia } from "../buzon/textos.ts"
 import { ENLACE_FUENTE, enumerar, fechaCorta, NOMBRE_FUENTE } from "./textos.ts";
 
 /** Lo que dice una fuente de una estación base, ya escrito para la ficha. */
-export interface TextosLado {
+interface TextosLado {
   readonly fuente: string;
   readonly dice: string;
   readonly fecha?: string;
@@ -22,7 +22,7 @@ export interface TextosLado {
 }
 
 /** Una estación base, o el emplazamiento, en el que el registro oficial y otra fuente no coinciden. */
-export interface TextosContraste {
+interface TextosContraste {
   readonly tono: "corregido" | "nuevo";
   /** La compañía, o nada si la corrección es de todo el emplazamiento. */
   readonly compania?: Compania;

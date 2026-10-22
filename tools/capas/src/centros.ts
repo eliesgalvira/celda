@@ -78,7 +78,7 @@ export interface AnilloEnGrados {
  * contiene. Un enclave rodeado por varios municipios (el condado de Treviño dentro de Álava) no
  * es el agujero de ninguno: sale como un anillo que gira al revés.
  */
-export const poligonosDeAnillos = (
+const poligonosDeAnillos = (
   anillos: ReadonlyArray<AnilloEnGrados>,
 ): ReadonlyArray<PoligonoEnGrados> => {
   const mayor = anillos.reduce<AnilloEnGrados | undefined>(
@@ -114,14 +114,14 @@ export const poligonosDeAnillos = (
 };
 
 /** Un polígono de una provincia, con los habitantes de los municipios cuya etiqueta cae en él. */
-export interface PoligonoPoblado {
+interface PoligonoPoblado {
   readonly poligono: PoligonoEnGrados;
   readonly habitantes: number;
   readonly areaKm2: number;
 }
 
 /** El centro visual de un polígono en grados, y lo que dista de su borde en metros de verdad. */
-export interface CentroCalculado {
+interface CentroCalculado {
   readonly centro: readonly [number, number];
   readonly distanciaAlBordeKm: number;
 }
@@ -192,7 +192,7 @@ const simplificarAnillo = (
  * Mercator, y su polo de inaccesibilidad con `precisionMetros`. Los anillos que se quedan en menos
  * de cuatro vértices no cuentan.
  */
-export const centroDelPoligono = (
+const centroDelPoligono = (
   poligono: PoligonoEnGrados,
   toleranciaMetros: number,
   precisionMetros: number,

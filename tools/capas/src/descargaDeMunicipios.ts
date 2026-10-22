@@ -2,7 +2,6 @@ import {
   type FuenteDeMunicipios,
   indexarMunicipios,
   LimitesDeMunicipios,
-  PadronDeMunicipios,
 } from "@celda/dominio/municipio";
 import {
   type ClienteDeFuente,
@@ -41,7 +40,7 @@ import { entradasDelZip, leerEntrada } from "./zip.ts";
 export const USER_AGENT = "Celda (generador de capas; contacto en celda.elies.site)";
 
 /** El aviso legal del INE, que dice con qué licencia se reutilizan sus datos. */
-export const AVISO_LEGAL_INE = "https://www.ine.es/dyngs/AYU/index.htm?cid=125";
+const AVISO_LEGAL_INE = "https://www.ine.es/dyngs/AYU/index.htm?cid=125";
 
 /** Solo se aceptan datos con esta licencia; si cambia, hay que revisar la atribución. */
 export const LICENCIA = "CC BY 4.0";
@@ -230,12 +229,4 @@ const decodificarMunicipios = Schema.decodeEffect(Schema.fromJsonString(LimitesD
 export const leerMunicipios = Effect.fn("Capas.leerMunicipios")(function* (ruta: string) {
   const fs = yield* FileSystem.FileSystem;
   return indexarMunicipios(yield* decodificarMunicipios(yield* fs.readFileString(ruta)));
-});
-
-const decodificarPadron = Schema.decodeEffect(Schema.fromJsonString(PadronDeMunicipios));
-
-/** Lee el padrón de los municipios guardado en el repositorio. */
-export const leerPadron = Effect.fn("Capas.leerPadron")(function* (ruta: string) {
-  const fs = yield* FileSystem.FileSystem;
-  return yield* decodificarPadron(yield* fs.readFileString(ruta));
 });

@@ -25,7 +25,7 @@ import { BuscadorDeDirecciones, BusquedaFallida, ordenarPorEncuadre } from "./bu
 import type { LecturaGps, MotivoFalloGps, Permiso } from "./estado.ts";
 import { Geolocalizacion, UbicacionNoDisponible } from "./geolocalizacion.ts";
 
-export interface GeolocalizacionDePrueba {
+interface GeolocalizacionDePrueba {
   readonly capa: Layer.Layer<Geolocalizacion>;
   /** Cuántas veces se ha pedido la ubicación: cada una sería un aviso del navegador. */
   readonly pedidas: () => number;
@@ -61,7 +61,7 @@ export interface GeolocalizacionDePrueba {
  *   con `maximumAge`), sin esperar al GPS. La primera, `enCache`; después, la última entregada.
  * - Lo demás llega cuando la prueba lo pide.
  */
-export const geolocalizacionDePrueba = (
+const geolocalizacionDePrueba = (
   permiso: Permiso,
   enCache?: LecturaGps,
 ): GeolocalizacionDePrueba => {
@@ -197,7 +197,7 @@ export const almacenDePrueba = (
   };
 };
 
-export interface BuscadorDePrueba {
+interface BuscadorDePrueba {
   readonly capa: Layer.Layer<BuscadorDeDirecciones>;
   /** Las consultas que ha recibido, en orden. */
   readonly consultas: () => ReadonlyArray<string>;
@@ -209,7 +209,7 @@ const esFalloDeBusqueda = Schema.is(BusquedaFallida);
  * Un buscador que contesta con lo que diga `respuestas` para cada consulta, o que no hay nada. Como
  * la red, contesta en otra tarea, y como el de verdad, pone primero lo que cae en el encuadre.
  */
-export const buscadorDePrueba = (
+const buscadorDePrueba = (
   respuestas: ReadonlyMap<string, ReadonlyArray<Direccion> | BusquedaFallida>,
 ): BuscadorDePrueba => {
   const consultas: Array<string> = [];

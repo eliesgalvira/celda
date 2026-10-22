@@ -12,7 +12,7 @@ import * as Predicate from "effect/Predicate";
  * Lo que mide como poco un edificio que se resalta. Las casetas de equipos al pie de una torre
  * miden de 8 a 21 m², y las azoteas con antenas, al menos 50 m².
  */
-export const AREA_MINIMA_M2 = 30;
+const AREA_MINIMA_M2 = 30;
 /**
  * A cuánto del contorno cuenta todavía un número de portal como del edificio. El de una entrada
  * es un punto de la fachada, y la tesela lo redondea a medio metro.
@@ -185,7 +185,7 @@ export const abreviarPortal = (numero: string): string => {
 };
 
 /** El edificio resaltado o el punto de su número, en la fuente `edificio`. */
-export type RasgoDelEdificio =
+type RasgoDelEdificio =
   | {
       readonly type: "Feature";
       readonly properties: Readonly<Record<string, never>>;

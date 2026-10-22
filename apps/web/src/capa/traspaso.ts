@@ -21,7 +21,7 @@ export interface PuntoDelTraspaso {
  * Cuántos puntos se mueven como mucho. En el escritorio, a zoom 15 en el centro de Madrid, se ven
  * unos 500 emplazamientos; más nodos solo costarían fotogramas en el paso.
  */
-export const MAXIMO_DEL_TRASPASO = 1500;
+const MAXIMO_DEL_TRASPASO = 1500;
 
 /**
  * Los puntos que se mueven entre los marcadores de `escena` y sus emplazamientos: los de los

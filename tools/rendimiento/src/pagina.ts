@@ -3,7 +3,7 @@
  * importar nada ni cerrar sobre variables de fuera.
  */
 
-export interface CargaEnPagina {
+interface CargaEnPagina {
   /** Cuándo se quita el aviso «Cargando el mapa base»: ha llegado la primera tesela. */
   readonly mapaBase: number | undefined;
   /** Cuándo se pinta el primer marcador, aunque sea el hexágono de una provincia que llega. */
@@ -47,7 +47,7 @@ export interface FotogramasEnPagina {
   readonly marcadores: number;
 }
 
-export interface Interaccion {
+interface Interaccion {
   readonly duracion: number;
   readonly tipo: string;
 }

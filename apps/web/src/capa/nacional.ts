@@ -96,7 +96,7 @@ const DE_LA_RED = "r";
  * El prefijo de las agrupaciones de la red que usa una compañía del filtro en una provincia
  * (`a:08r:12`), que no chocan con las suyas (ADR 0026).
  */
-export const prefijoDeRedUsada = (codigo: string): string => `${codigo}${DE_LA_RED}:`;
+const prefijoDeRedUsada = (codigo: string): string => `${codigo}${DE_LA_RED}:`;
 
 /**
  * La provincia de una clave de agrupación, de barrio o de municipio (`a:08:123`, `s11:08:4`), o
@@ -463,7 +463,7 @@ export const crearAgrupadorNacional = (
  * transición de su agrupador si hay detalle a los dos lados, y desde su hexágono o hacia él si
  * está en el resumen a un lado. Sirve también al mismo nivel, cuando llega una provincia.
  */
-export const transicionNacional = (antes: Escena, despues: Escena): Transicion => {
+const transicionNacional = (antes: Escena, despues: Escena): Transicion => {
   const partesAntes = partesDe.get(antes);
   const partesDespues = partesDe.get(despues);
   if (partesAntes === undefined || partesDespues === undefined) return SIN_TRANSICION;

@@ -37,7 +37,7 @@ export const ENLACE_PADRON_INE = "https://www.ine.es/jaxiT3/Tabla.htm?t=29005";
 export const TOLERANCIA_METROS = 50;
 
 /** Resolución de los arcos guardados: cien milésimas de grado, un metro más o menos. */
-export const UNIDADES_POR_GRADO = 100_000;
+const UNIDADES_POR_GRADO = 100_000;
 
 /** Código de la «provincia» del IGN que junta los territorios que no son de ninguna. */
 const SIN_PROVINCIA = "54";

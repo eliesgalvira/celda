@@ -21,7 +21,7 @@ import {
 import { Geolocalizacion } from "./geolocalizacion.ts";
 
 /** Qué no ha podido hacer el almacén del dispositivo con el punto elegido. */
-export type AvisoAlmacen = "sin-guardar" | "sin-borrar";
+type AvisoAlmacen = "sin-guardar" | "sin-borrar";
 
 /** El estado de la ubicación y lo que se puede hacer con él, para toda la pantalla del mapa. */
 export interface ControlUbicacion {

@@ -26,7 +26,7 @@ export const criptoDelNavegador: Layer.Layer<Crypto.Crypto> = Layer.succeed(
  * Un `Crypto` de prueba con bytes que no se repiten y se pueden prever: el primer UUID que da es
  * `00000001-0000-4000-8000-000000000000` y el segundo empieza por `00000002`.
  */
-export const criptoContador = (): Crypto.Crypto => {
+const criptoContador = (): Crypto.Crypto => {
   let llamadas = 0;
   return Crypto.make({
     randomBytes: (tamano) => {

@@ -27,7 +27,7 @@ const LISTA: ReadonlySet<string> = new Set(VARIABLES_DE_LA_WEB);
  * Si la variable no puede salir en `dist`, por ser una `VITE_*` que la web no lee o una
  * `CELDA_R2_*`.
  */
-export const esAjena = (variable: string): boolean =>
+const esAjena = (variable: string): boolean =>
   variable.startsWith("CELDA_R2_") || (variable.startsWith("VITE_") && !LISTA.has(variable));
 
 /** Un nombre de variable `VITE_*` o `CELDA_R2_*` que no es parte de otro nombre más largo. */

@@ -49,7 +49,7 @@ export type TipoDeLimite = "pais" | "comunidad" | "provincia";
  * frontera. Los arcos, a 50 m, y las fronteras, a 20 m, salen de las mismas líneas del IGN: en
  * frontera quedan a menos de 70 m, y la costa más cercana, a más de 200 m.
  */
-export const UMBRAL_FRONTERA_METROS = 100;
+const UMBRAL_FRONTERA_METROS = 100;
 
 /** Metros en un grado de latitud. */
 const METROS_POR_GRADO = 111_195;
@@ -90,7 +90,7 @@ const aLaRecta = (
  * Lo que hay, en metros, de un punto en grados a la frontera más cercana. Solo mira las celdas
  * de alrededor: más allá de un kilómetro da infinito.
  */
-export const distanciaALaFrontera = (
+const distanciaALaFrontera = (
   fronteras: FronterasDeEspana,
 ): ((punto: readonly [number, number]) => number) => {
   type Tramo = readonly [readonly [number, number], readonly [number, number]];
@@ -331,7 +331,7 @@ export const ficheroDeLimites = (limites: LimitesDeComunidadesYProvincias): stri
 const decodificarLimites = Schema.decodeEffect(Schema.fromJsonString(LimitesDeMunicipios));
 
 /** Dónde escribe la orden `limites` cada fichero. */
-export interface DestinosDeLimites {
+interface DestinosDeLimites {
   readonly general: string;
   readonly detalle: string;
 }

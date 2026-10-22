@@ -69,7 +69,7 @@ const constructorDe = (ventana: Window): ConstructorDeOrientacion | undefined =>
     .DeviceOrientationEvent;
 
 /** Qué ofrece el navegador, sin preguntar nada. */
-export const disponibilidadDe = (ventana: Window, tipo: TipoDeDispositivo): Disponibilidad => {
+const disponibilidadDe = (ventana: Window, tipo: TipoDeDispositivo): Disponibilidad => {
   if (tipo === "ordenador") return "ordenador";
   const constructor = constructorDe(ventana);
   if (constructor === undefined || !ventana.isSecureContext) return "sin-api";

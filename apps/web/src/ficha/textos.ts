@@ -113,7 +113,7 @@ export const creditoDelLugar = (ficha: Ficha): string | undefined => {
   return `Municipio y provincia: obra derivada de ${fuente.producto} ${cuando}, ${fuente.licencia}, ${fuente.atribucion} (ign.es).`;
 };
 
-export const NOMBRE_ESTADO: Readonly<Record<Estado, string>> = {
+const NOMBRE_ESTADO: Readonly<Record<Estado, string>> = {
   verificado: "Verificado",
   corregido: "Corregido",
   nuevo: "Nuevo",
@@ -192,7 +192,7 @@ export const ENLACE_FUENTE: Readonly<Record<Fuente, string>> = {
  * clave la razón social y el código («VODAFONE ESPAÑA, S.A.U. - 086040»); la comunidad, la
  * compañía y el código («vodafone - 086040»). Una clave sin código no da nada.
  */
-export const codigoDeLaClave = (clave: string): string => {
+const codigoDeLaClave = (clave: string): string => {
   const codigo = clave.split(" - ").at(-1)?.trim() ?? "";
   return codigo === clave ? "" : codigo;
 };

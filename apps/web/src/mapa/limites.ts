@@ -19,7 +19,7 @@ import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 export const ZOOM_DEL_DETALLE = 7;
 
 /** El fichero de límites no ha llegado o no se puede leer. */
-export class LimitesNoDescargados extends Schema.TaggedError<LimitesNoDescargados>()(
+class LimitesNoDescargados extends Schema.TaggedError<LimitesNoDescargados>()(
   "LimitesNoDescargados",
   { url: Schema.String, motivo: Schema.String },
 ) {}

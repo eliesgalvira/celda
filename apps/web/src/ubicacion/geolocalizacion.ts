@@ -56,7 +56,7 @@ export const ESPERA_MAXIMA_MS = 60_000;
  * calcular» (2) y «se ha agotado el tiempo» (3) quieren decir lo mismo: el navegador no tiene de
  * dónde sacar la posición.
  */
-export const motivoDeCodigo = (codigo: number, tipo: TipoDeDispositivo): MotivoFalloGps => {
+const motivoDeCodigo = (codigo: number, tipo: TipoDeDispositivo): MotivoFalloGps => {
   if (codigo === 1) return "denegado";
   if (tipo === "ordenador") return "sin-fuente";
   if (codigo === 3) return "tiempo-agotado";

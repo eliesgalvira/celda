@@ -25,7 +25,7 @@ interface Entrada {
 }
 
 /** Un ZIP con las entradas guardadas tal cual (método 0), con fecha fija para que sea estable. */
-export const zipSinComprimir = (entradas: ReadonlyArray<Entrada>): Uint8Array<ArrayBuffer> => {
+const zipSinComprimir = (entradas: ReadonlyArray<Entrada>): Uint8Array<ArrayBuffer> => {
   const codificador = new TextEncoder();
   const partes: Array<Uint8Array> = [];
   const centrales: Array<Uint8Array> = [];

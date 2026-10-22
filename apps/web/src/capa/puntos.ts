@@ -23,7 +23,7 @@ const DECIMALES = 5;
  * La colección GeoJSON de los puntos: cada uno con su fila como `id` y la máscara de sus compañías
  * en `c`, lo único que miran los filtros. Se escribe a mano, sin crear un objeto por punto.
  */
-export const geojsonDePuntos = (puntos: PuntosLeidos): string => {
+const geojsonDePuntos = (puntos: PuntosLeidos): string => {
   const partes = Array.from({ length: puntos.cuantos }, (_, i) => {
     const lon = (puntos.longitud[i] ?? 0).toFixed(DECIMALES);
     const lat = (puntos.latitud[i] ?? 0).toFixed(DECIMALES);

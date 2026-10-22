@@ -14,7 +14,7 @@ import * as Schema from "effect/Schema";
 type Vertice = [number, number];
 
 /** Una parte del límite de la zona o una línea de una estación base a su vecina. */
-export type RasgoDeZona =
+type RasgoDeZona =
   | {
       type: "Feature";
       properties: Record<string, string>;

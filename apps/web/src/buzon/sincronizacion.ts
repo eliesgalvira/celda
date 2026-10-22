@@ -15,7 +15,7 @@ import { AlmacenLocal, type AlmacenNoDisponible } from "../ubicacion/almacen.ts"
  */
 
 /** Dónde se ha llegado a un límite: el del dispositivo, el de su red o el de todo el buzón. */
-export const AmbitoDelLimite = Schema.Literals(["dispositivo", "ip", "total"]);
+const AmbitoDelLimite = Schema.Literals(["dispositivo", "ip", "total"]);
 export type AmbitoDelLimite = typeof AmbitoDelLimite.Type;
 
 /** El buzón ha rechazado el envío por un límite. `reintentarA` es la hora local en que se puede. */

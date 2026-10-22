@@ -148,10 +148,7 @@ const lugarDe = (
  * llega en `namedetails`, y las de la dirección por la tabla de bilingües o, si no está, la
  * primera.
  */
-export const direccionDe = (
-  resultado: Resultado,
-  enLaComunitat: boolean,
-): Direccion | undefined => {
+const direccionDe = (resultado: Resultado, enLaComunitat: boolean): Direccion | undefined => {
   const unaForma = (nombre: string | undefined, es?: string): string | undefined =>
     nombre === undefined ? undefined : nombreDeResultado(nombre, es, enLaComunitat);
   const original = resultado.address ?? {};
@@ -205,7 +202,7 @@ export const direccionDe = (
  * Las direcciones de la respuesta, en su orden y sin repetir las que se leen igual.
  * `enLaComunitat` dice si un punto cae en la Comunitat Valenciana.
  */
-export const direccionesDe = (
+const direccionesDe = (
   resultados: ReadonlyArray<Resultado>,
   enLaComunitat: (posicion: Coordenada) => boolean,
 ): ReadonlyArray<Direccion> => {

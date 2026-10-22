@@ -1347,7 +1347,7 @@ export function PantallaMapa() {
  * mismo con cada provincia que se ve, y si lo que se ve queda fuera de lo barrido, lo dice
  * (ADR 0016).
  */
-export function EstadoDeLaCapa(props: {
+function EstadoDeLaCapa(props: {
   readonly estado: EstadoCapa;
   readonly vista: EstadoDeLaVista | undefined;
   /** Cuántos emplazamientos tiene el resumen. */

@@ -17,7 +17,7 @@ import { codificarArco, simplificarArco } from "./topologia.ts";
  */
 
 /** El GML de las líneas de frontera dentro del ZIP del IGN. */
-export const GML_FRONTERAS = "au_AdministrativeBoundary_1stOrder0.gml";
+const GML_FRONTERAS = "au_AdministrativeBoundary_1stOrder0.gml";
 
 /**
  * El país al otro lado de una línea de primer orden, por el código del IGN que va tras el de
@@ -25,7 +25,7 @@ export const GML_FRONTERAS = "au_AdministrativeBoundary_1stOrder0.gml";
  * dónde cae cada línea, y `fronterasReal.test.ts` lo comprueba con sitios conocidos. Los códigos
  * 97, 98 y 99 son el mar (el Atlántico, el Mediterráneo y el Cantábrico) y no se guardan.
  */
-export const PAIS_DEL_IGN: ReadonlyMap<string, Vecino> = new Map([
+const PAIS_DEL_IGN: ReadonlyMap<string, Vecino> = new Map([
   ["21", "MA"],
   ["33", "FR"],
   ["35", "PT"],
@@ -52,13 +52,13 @@ export type FronterasDeEspana = typeof FronterasDeEspana.Type;
  * 20 m: los arcos de los municipios, simplificados a 50 m, quedan a menos de 100 m de la línea
  * guardada, y la costa más cercana, a más de 200 m (`tiposDeLimite`).
  */
-export const TOLERANCIA_FRONTERAS_METROS = 20;
+const TOLERANCIA_FRONTERAS_METROS = 20;
 
 /** Cienmilésimas de grado, como los municipios: unos 1,1 m. */
-export const UNIDADES_FRONTERAS_POR_GRADO = 100_000;
+const UNIDADES_FRONTERAS_POR_GRADO = 100_000;
 
 /** Una línea de frontera del GML, en millonésimas y con longitud antes que latitud. */
-export interface LineaDeFrontera {
+interface LineaDeFrontera {
   readonly vecino: Vecino;
   readonly vertices: ReadonlyArray<number>;
 }
@@ -97,7 +97,7 @@ const leerLineas = (texto: string): ReadonlyArray<LineaDeFrontera> => {
 };
 
 /** Las líneas de frontera terrestre de un GML de primer orden del IGN, sin la costa. */
-export const fronterasDelGml = (
+const fronterasDelGml = (
   texto: string,
 ): Result.Result<ReadonlyArray<LineaDeFrontera>, GmlIlegible> =>
   Result.try({
@@ -107,7 +107,7 @@ export const fronterasDelGml = (
   });
 
 /** Las fronteras simplificadas a `TOLERANCIA_FRONTERAS_METROS`, listas para guardar. */
-export const fronterasDeEspana = (
+const fronterasDeEspana = (
   lineas: ReadonlyArray<LineaDeFrontera>,
   fuente: FuenteDeMunicipios,
 ): FronterasDeEspana => ({
@@ -124,7 +124,7 @@ export const fronterasDeEspana = (
 });
 
 /** El fichero de las fronteras, con una línea por renglón. */
-export const ficheroDeFronteras = (fronteras: FronterasDeEspana): string =>
+const ficheroDeFronteras = (fronteras: FronterasDeEspana): string =>
   `{"fuente":${JSON.stringify(fronteras.fuente)},` +
   `"toleranciaMetros":${fronteras.toleranciaMetros},"unidadesPorGrado":${fronteras.unidadesPorGrado},"lineas":[\n` +
   `${fronteras.lineas.map((linea) => JSON.stringify(linea)).join(",\n")}\n]}\n`;

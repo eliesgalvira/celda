@@ -117,7 +117,7 @@ const dejarPintar = Effect.yieldNow;
  * Cuántas agrupaciones con filtro se guardan por provincia, además de la de todas: las de los
  * últimos filtros. Cada una son los índices de lo que sale con su filtro.
  */
-export const AGRUPACIONES_GUARDADAS = 4;
+const AGRUPACIONES_GUARDADAS = 4;
 
 /**
  * De dónde se leen las capas y las fichas publicadas: `/capas`, en el mismo origen que la web, sin

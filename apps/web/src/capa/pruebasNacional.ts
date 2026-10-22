@@ -141,7 +141,7 @@ const municipio = (
  * 3 (menos del mínimo de una zona) y dos sin municipio, como en un territorio compartido. Oeste y
  * Este caben en la pantalla en los dos niveles de municipios: son zona en los dos.
  */
-export const CAPA_CON_MUNICIPIOS: CapaDeProvincia = {
+const CAPA_CON_MUNICIPIOS: CapaDeProvincia = {
   ...BARCELONA.capa,
   emplazamientos: BARCELONA.capa.emplazamientos.map((e, i) => ({
     ...e,

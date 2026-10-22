@@ -41,7 +41,7 @@ export const ZOOM_PARA_ABRIR_SIEMPRE = 13;
 export const CERCANOS_PARA_ABRIR = 3;
 
 /** Lo que acerca un toque que no abre ninguna ficha, en niveles de zoom. */
-export const SALTO_AL_ACERCAR = 2.5;
+const SALTO_AL_ACERCAR = 2.5;
 
 /** Un punto bajo el dedo: su fila y a cuántos píxeles del dedo queda. */
 export interface PuntoTocado {
@@ -118,7 +118,7 @@ export const emplazamientoDelPunto = (
 };
 
 /** Cuántos emplazamientos enseña como mucho la lista de los que se ven. */
-export const MAXIMO_DE_LA_LISTA = 40;
+const MAXIMO_DE_LA_LISTA = 40;
 
 /** Un emplazamiento de la lista de los que se ven. */
 export interface PuntoDeLaLista {

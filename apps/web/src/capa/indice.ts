@@ -64,7 +64,7 @@ export class Indice extends Supercluster<PropiedadesDePunto, PropiedadesDeAgrupa
  * `NIVEL_MAXIMO`. Con `nivel`, solo agrupa en ese nivel: es el de un nivel de municipios grandes,
  * que no se mira en ningún otro, y así el Worker no agrupa los demás.
  */
-export interface OpcionesDeIndice {
+interface OpcionesDeIndice {
   readonly radio?: number;
   readonly nivel?: number;
 }

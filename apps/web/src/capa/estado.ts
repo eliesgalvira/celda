@@ -79,7 +79,7 @@ const DIA = new Intl.DateTimeFormat("es-ES", {
 });
 
 /** «26 sep 2026», sin el punto de la abreviatura. */
-export const textoDeFecha = (fecha: number): string => FECHA.format(fecha).replace(".", "");
+const textoDeFecha = (fecha: number): string => FECHA.format(fecha).replace(".", "");
 
 /**
  * El texto de la marca de agua del mapa: la fecha de los datos que se ven, en Barcelona. Si lo que
@@ -159,7 +159,7 @@ export const dondeHayDatos = (resumen: ResumenLeido): ReadonlyArray<string> =>
     : resumen.cobertura.filter((z) => z.barrido !== null).map((z) => z.titulo);
 
 /** Una provincia por su código y su nombre. */
-export interface ProvinciaNombrada {
+interface ProvinciaNombrada {
   readonly codigo: string;
   readonly nombre: string;
 }

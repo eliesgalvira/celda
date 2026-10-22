@@ -35,7 +35,7 @@ export type Descarga<A> =
   | { readonly tipo: "fallo" };
 
 /** Una zona con todo lo que hace falta para el ejercicio. */
-export interface ZonaResuelta {
+interface ZonaResuelta {
   readonly zona: ZonaDelEjercicio;
   readonly nombre: string;
   /** Cómo se lee en el título y en la tabla: «Pedralbes» o «Tordera (Barcelona)». */

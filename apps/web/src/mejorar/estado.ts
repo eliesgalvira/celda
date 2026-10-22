@@ -65,10 +65,10 @@ export type EventoBrujula =
   | { readonly tipo: "apagar" };
 
 /** Por encima de este margen, en grados, la brújula está mal calibrada. */
-export const MARGEN_DUDOSO = 20;
+const MARGEN_DUDOSO = 20;
 
 /** Si una lectura es de fiar, según lo que dice el dispositivo de sí mismo. */
-export const esDudosa = (lectura: LecturaBrujula): boolean =>
+const esDudosa = (lectura: LecturaBrujula): boolean =>
   lectura.margen !== undefined && (lectura.margen < 0 || lectura.margen > MARGEN_DUDOSO);
 
 /** Cómo empieza la brújula en un dispositivo. */
@@ -153,7 +153,7 @@ export const rumboMostrado = (
     : { rumbo: simulado, fuente: "barra" };
 
 /** A menos de estos grados del objetivo, el móvil apunta al emplazamiento. */
-export const ALINEADO_GRADOS = 10;
+const ALINEADO_GRADOS = 10;
 
 /** Cuánto hay que girar y hacia dónde para apuntar al objetivo. */
 export interface GuiaDeGiro {

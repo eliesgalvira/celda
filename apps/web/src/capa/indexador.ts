@@ -91,7 +91,7 @@ export class IndexadorDeProvincias extends Context.Service<
  * Una parte de una capa como viaja al Worker: en columnas, para transferirla sin copiar sus
  * búferes. Es lo único que los índices necesitan de cada emplazamiento.
  */
-export interface ParteEnColumnas {
+interface ParteEnColumnas {
   readonly cuantos: number;
   /** Longitud y latitud de cada emplazamiento, una detrás de otra. */
   readonly posiciones: Float64Array<ArrayBuffer>;
@@ -122,7 +122,7 @@ export type SolicitudDeIndice =
   | { readonly tipo: "puntos"; readonly numero: number; readonly texto: string };
 
 /** Los índices de una capa o de una parte, serializados (`IndicesDeCapa`). */
-export interface IndicesSerializados {
+interface IndicesSerializados {
   readonly todos: IndiceSerializado;
   readonly fuera: IndiceSerializado | undefined;
   /** Por nivel de municipios, el de los que no van en zona (`IndicesDeCapa`). */
@@ -146,13 +146,13 @@ export type RespuestaDeIndice =
   | { readonly numero: number; readonly tipo: "fallo"; readonly motivo: string };
 
 /** Algo que viaja al Worker o viene de él, con los búferes que se transfieren sin copiarse. */
-export interface ConTransferibles<A> {
+interface ConTransferibles<A> {
   readonly valor: A;
   readonly transferibles: ReadonlyArray<ArrayBuffer>;
 }
 
 /** Una parte de una capa en columnas, con los búferes que se transfieren con ella. */
-export const parteEnColumnas = (parte: ParteDeCapa): ConTransferibles<ParteEnColumnas> => {
+const parteEnColumnas = (parte: ParteDeCapa): ConTransferibles<ParteEnColumnas> => {
   const n = parte.emplazamientos.length;
   const posiciones = new Float64Array(2 * n);
   const enBarrio = new Uint8Array(n);

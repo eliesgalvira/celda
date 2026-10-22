@@ -18,7 +18,7 @@ import { nombreDeZona, sinMedidasDe } from "./textos.ts";
  * 400 MHz, donde está la radio FM. La norma compara con él una medida que suma todas las
  * frecuencias (investigación 09, apartado 2.2).
  */
-export const NIVEL_DE_REFERENCIA_MAS_BAJO = 200;
+const NIVEL_DE_REFERENCIA_MAS_BAJO = 200;
 
 const NIVEL = `${NIVEL_DE_REFERENCIA_MAS_BAJO} µW/cm²`;
 

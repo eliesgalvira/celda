@@ -9,7 +9,7 @@
  */
 
 /** Un punto del plano. */
-export type PuntoPlano = readonly [number, number];
+type PuntoPlano = readonly [number, number];
 
 /** Un polígono del plano: el anillo exterior y, detrás, sus agujeros. Cada anillo, cerrado o no. */
 export type PoligonoPlano = ReadonlyArray<ReadonlyArray<PuntoPlano>>;
