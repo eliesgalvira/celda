@@ -15,7 +15,7 @@ Reglas que comprueban las pruebas sobre todos los estados alcanzables y todos lo
 
 - El GPS solo se enciende tras el paso previo, o sin él si el permiso ya estaba concedido, porque entonces el navegador no pregunta nada.
 - Una lectura del GPS solo cuenta si se estaba esperando. Si llega después de quitar o cancelar, se descarta.
-- Con el permiso bloqueado no hay ubicación GPS, ni se pide ni se explica.
+- Con el permiso bloqueado no hay ubicación GPS, ni se pide ni se explica, ni queda un fallo del GPS que ofrezca volver a intentarlo. Bloquearlo tras un fallo deja la ubicación denegada, salvo `no-disponible`, que no depende del permiso.
 - Quitar deja siempre sin punto y con el GPS apagado.
 - Si se deniega el permiso teniendo un punto elegido, el punto se queda y el aviso dice qué ha pasado.
 - Quitar nunca impide volver a encender el GPS, salvo con el permiso bloqueado, y de `pidiendo` siempre se sale con cancelar, elegir en el mapa, quitar, una lectura o un fallo.

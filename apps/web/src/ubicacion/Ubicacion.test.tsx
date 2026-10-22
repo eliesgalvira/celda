@@ -398,6 +398,23 @@ describe("punto de referencia: ubicación denegada", () => {
     );
   });
 
+  it("si se bloquea después de un fallo, deja de ofrecer volver a intentarlo", async () => {
+    const { panel, gps } = await abrir({ permiso: "concedido" });
+    fireEvent.click(await panel().findByRole("button", { name: "Usar mi ubicación" }));
+    flush();
+    await waitFor(() => {
+      assert.strictEqual(gps.abiertas(), 1);
+    });
+    gps.fallar("sin-senal");
+    await panel().findByRole("button", { name: "Volver a intentarlo" });
+
+    gps.cambiarPermiso("denegado");
+    await panel().findByText(/La ubicación está bloqueada\. Para activarla/u);
+    assert.isNull(panel().queryByRole("button", { name: "Volver a intentarlo" }));
+    assert.isNull(panel().queryByRole("button", { name: "Usar mi ubicación" }));
+    assert.isNotNull(panel().getByRole("button", { name: "Elegir en el mapa" }));
+  });
+
   it("si ya estaba bloqueada al abrir, lo dice sin pedir nada", async () => {
     const { panel, gps } = await abrir({ permiso: "denegado" });
     await panel().findByText(/La ubicación está bloqueada\. Para activarla/u);

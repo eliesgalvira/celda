@@ -171,6 +171,30 @@ describe("estado de la ubicación: permiso denegado", () => {
     assert.isUndefined(referenciaDe(bloqueada.estado));
   });
 
+  it("si se bloquea tras un fallo del GPS, queda denegada y lo avisa: volver a intentarlo no serviría", () => {
+    const fallida = tras(
+      con("concedido"),
+      { tipo: "usar-ubicacion" },
+      { tipo: "fallo-gps", motivo: "sin-senal" },
+    );
+    assert.deepStrictEqual(fallida.estado, { tipo: "fallo", motivo: "sin-senal" });
+    const bloqueada = transicion(fallida, { tipo: "permiso", permiso: "denegado" });
+    assert.deepStrictEqual(bloqueada.estado, { tipo: "denegada" });
+    assert.strictEqual(bloqueada.aviso, "denegado");
+    assert.deepStrictEqual(
+      transicion(bloqueada, { tipo: "permiso", permiso: "concedido" }).estado,
+      { tipo: "ninguna" },
+    );
+  });
+
+  it("sin https o sin la API, el fallo sigue aunque se bloquee: desbloquearlo no lo arreglaría", () => {
+    const sinApi = con("preguntar", { tipo: "fallo", motivo: "no-disponible" });
+    assert.deepStrictEqual(transicion(sinApi, { tipo: "permiso", permiso: "denegado" }).estado, {
+      tipo: "fallo",
+      motivo: "no-disponible",
+    });
+  });
+
   it("si se bloquea durante el paso previo, el paso previo se cierra", () => {
     const explicando = transicion(con("preguntar"), { tipo: "usar-ubicacion" });
     assert.deepStrictEqual(
@@ -418,7 +442,11 @@ const alcanzables = (): ReadonlyArray<Ubicacion> => {
 };
 const TODAS = alcanzables();
 
-/** Un estado es coherente si no dice «denegada» con el permiso sin bloquear, ni al revés. */
+/**
+ * Un estado es coherente si no dice «denegada» con el permiso sin bloquear, ni al revés, y si con
+ * el permiso bloqueado no queda nada del GPS: ni su lectura ni un fallo que ofrezca volver a
+ * intentarlo.
+ */
 const coherente = (ubicacion: Ubicacion): boolean => {
   const actual =
     ubicacion.estado.tipo === "explicando" ||
@@ -429,6 +457,9 @@ const coherente = (ubicacion: Ubicacion): boolean => {
   if (actual.tipo === "denegada") return ubicacion.permiso === "denegado";
   if (actual.tipo === "ninguna") return ubicacion.permiso !== "denegado";
   if (actual.tipo === "gps") return ubicacion.permiso !== "denegado";
+  if (actual.tipo === "fallo" && actual.motivo !== "no-disponible") {
+    return ubicacion.permiso !== "denegado";
+  }
   return true;
 };
 

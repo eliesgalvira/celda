@@ -99,19 +99,27 @@ const sinPunto = (permiso: Permiso): EstadoAsentado =>
   permiso === "denegado" ? DENEGADA : NINGUNA;
 
 /**
- * Un asentado al día con el permiso: sin punto, pasa a denegada o a ninguna, y la ubicación GPS
- * deja de valer si se bloquea. El punto elegido no depende del permiso.
+ * Lo que sale del GPS del dispositivo: su lectura o por qué no la ha dado. Con el permiso
+ * bloqueado deja de valer. `no-disponible` no depende del permiso: sin https o sin la API,
+ * desbloquearlo no lo arregla.
+ */
+const delGps = (estado: EstadoUbicacion): boolean =>
+  estado.tipo === "gps" || (estado.tipo === "fallo" && estado.motivo !== "no-disponible");
+
+/**
+ * Un asentado al día con el permiso: sin punto, pasa a denegada o a ninguna, y lo que salió del
+ * GPS deja de valer si se bloquea. El punto elegido no depende del permiso.
  */
 const conPermiso = (estado: EstadoAsentado, permiso: Permiso): EstadoAsentado => {
   if (estado.tipo === "ninguna" || estado.tipo === "denegada") return sinPunto(permiso);
-  return estado.tipo === "gps" && permiso === "denegado" ? DENEGADA : estado;
+  return delGps(estado) && permiso === "denegado" ? DENEGADA : estado;
 };
 
 const alCambiarPermiso = (ubicacion: Ubicacion, permiso: Permiso): Ubicacion => {
   const { estado, aviso } = ubicacion;
   if (permiso === "denegado") {
-    // Si lo bloquea mientras se usa, la ubicación deja de valer en el acto.
-    if (estado.tipo === "gps") return { estado: DENEGADA, permiso, aviso: "denegado" };
+    // Si lo bloquea mientras se usa o tras un fallo del GPS, la ubicación deja de valer en el acto.
+    if (delGps(estado)) return { estado: DENEGADA, permiso, aviso: "denegado" };
     // Mientras se pide, es la respuesta al aviso del navegador.
     if (estado.tipo === "pidiendo") {
       return { estado: conPermiso(estado.anterior, permiso), permiso, aviso: "denegado" };
