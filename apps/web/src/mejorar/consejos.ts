@@ -63,7 +63,7 @@ const DB = termino("decibelio", "dB");
 const MOVIL: Consejo = {
   clave: "movil",
   tono: "secundario",
-  texto: marcado`Girar el móvil en la mano apenas cambia la señal. La mano y el cuerpo influyen más.`,
+  texto: marcado`Girar el móvil apenas cambia la señal. Lo que más la reduce es tapar con la mano o el cuerpo los bordes de arriba y de abajo, donde suelen ir sus antenas.`,
 };
 
 /** Grados enteros entre 0 y 359. */

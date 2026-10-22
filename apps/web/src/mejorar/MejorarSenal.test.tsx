@@ -113,7 +113,7 @@ describe("mejorar la señal: consejos", () => {
     assert.match(seccion().getByRole("list").textContent ?? "", /router 4G\/5G/u);
     assert.match(
       seccion().getByRole("list").textContent ?? "",
-      /Girar el móvil en la mano apenas cambia la señal/u,
+      /Girar el móvil apenas cambia la señal. Lo que más la reduce es tapar/u,
     );
     assert.match(
       seccion()

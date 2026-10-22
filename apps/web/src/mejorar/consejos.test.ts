@@ -62,12 +62,12 @@ describe("consejos para mejorar la señal", () => {
     assert.strictEqual(resultado.rumbo, 48);
   });
 
-  it("siempre dice que girar el móvil en la mano apenas cambia nada, como un aparte", () => {
+  it("siempre dice que girar el móvil apenas cambia la señal y que taparlo sí, como un aparte", () => {
     for (const resultado of [consejos(undefined), consejos(punto())]) {
       const movil = resultado.consejos.at(-1);
       assert.strictEqual(movil?.clave, "movil");
       assert.strictEqual(movil?.tono, "secundario");
-      assert.match(textoPlano(movil?.texto ?? []), /^Girar el móvil en la mano apenas cambia/u);
+      assert.match(textoPlano(movil?.texto ?? []), /^Girar el móvil apenas cambia/u);
     }
   });
 
