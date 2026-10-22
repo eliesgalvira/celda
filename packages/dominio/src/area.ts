@@ -111,6 +111,12 @@ export const cajaDe = (puntos: ReadonlyArray<Coordenada>): Rectangulo | undefine
   };
 };
 
+/** El centro de un rectángulo, a medio camino entre sus esquinas. */
+export const centroDelRectangulo = (rectangulo: Rectangulo): Coordenada => ({
+  longitud: (rectangulo.suroeste.longitud + rectangulo.noreste.longitud) / 2,
+  latitud: (rectangulo.suroeste.latitud + rectangulo.noreste.latitud) / 2,
+});
+
 /** El punto del rectángulo más cercano a `punto`: él mismo si cae dentro. */
 export const alRectangulo = (rectangulo: Rectangulo, punto: Coordenada): Coordenada => ({
   longitud: Math.min(

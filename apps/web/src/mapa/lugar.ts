@@ -1,4 +1,4 @@
-import { type Coordenada, contiene, ESPANA } from "@celda/dominio/area";
+import { centroDelRectangulo, type Coordenada, contiene, ESPANA } from "@celda/dominio/area";
 import { rectanguloDeCaja } from "@celda/dominio/cobertura";
 import {
   type Asignacion,
@@ -85,12 +85,6 @@ export const dondeCae = (punto: Coordenada, zonas: ZonasDelMapa): Asignacion | u
   return FUERA;
 };
 
-/** El centro de lo que se ve. */
-export const centroDe = (vista: Vista): Coordenada => ({
-  longitud: (vista.caja.suroeste.longitud + vista.caja.noreste.longitud) / 2,
-  latitud: (vista.caja.suroeste.latitud + vista.caja.noreste.latitud) / 2,
-});
-
 /**
  * Lo que mide de ancho, en grados de longitud, una vista que ya enseña una provincia y no varias:
  * Barcelona mide 1,4°, Soria 1,8° y Badajoz, la más ancha de la península, 2,7°.
@@ -129,7 +123,7 @@ const sitioDeLaVista = (
   zonas: ZonasDelMapa,
 ): SitioDeLaVista | undefined => {
   if (!nombraUnSitio(vista)) return ESPANA_ENTERA;
-  const asignacion = dondeCae(centroDe(vista), zonas);
+  const asignacion = dondeCae(centroDelRectangulo(vista.caja), zonas);
   if (asignacion === undefined) return undefined;
   const { municipio, provincia } = asignacion;
   if (Math.floor(vista.zoom) >= NIVEL_DE_MUNICIPIOS && municipio !== undefined) {
@@ -192,7 +186,9 @@ export const crearLugares = (entrada: {
 
   const puntos = createMemo(() => {
     const vista = entrada.vista();
-    return nombraUnSitio(vista) ? [centroDe(vista), ...entrada.puntos()] : entrada.puntos();
+    return nombraUnSitio(vista)
+      ? [centroDelRectangulo(vista.caja), ...entrada.puntos()]
+      : entrada.puntos();
   });
 
   // Se piden una vez, con el primer punto que hay que situar.

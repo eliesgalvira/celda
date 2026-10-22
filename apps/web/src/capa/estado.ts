@@ -1,4 +1,4 @@
-import { type Coordenada, contiene, ESPANA } from "@celda/dominio/area";
+import { centroDelRectangulo, contiene, ESPANA } from "@celda/dominio/area";
 import type { FuenteDeBarrios } from "@celda/dominio/barrio";
 import { distanciaALosDatos, seCortan } from "@celda/dominio/cobertura";
 import { marcado, termino, type TextoMarcado } from "@celda/dominio/glosario";
@@ -185,11 +185,6 @@ export type EstadoDeLaVista =
       readonly barrido: number | null;
     };
 
-const centroDe = (vista: Vista): Coordenada => ({
-  longitud: (vista.caja.suroeste.longitud + vista.caja.noreste.longitud) / 2,
-  latitud: (vista.caja.suroeste.latitud + vista.caja.noreste.latitud) / 2,
-});
-
 /**
  * La marca de agua de lo que se ve: una función pura del resumen, de cómo va cada provincia pedida
  * y de la vista. Sin vista todavía, la del resumen.
@@ -217,7 +212,7 @@ export const estadoDeLaVista = (
   const cargando = conEstado("cargando");
   if (cargando.length > 0) return { tipo: "cargando", provincias: cargando };
   if (cerca) {
-    const distancia = distanciaALosDatos(centroDe(vista), resumen);
+    const distancia = distanciaALosDatos(centroDelRectangulo(vista.caja), resumen);
     if (distancia === undefined || distancia > MARGEN_DE_LOS_DATOS) {
       return {
         tipo: "sin-datos",

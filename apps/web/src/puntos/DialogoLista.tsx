@@ -1,4 +1,4 @@
-import type { Coordenada, Rectangulo } from "@celda/dominio/area";
+import { centroDelRectangulo, type Rectangulo } from "@celda/dominio/area";
 import { type FiltroDeCompanias, mascarasDeFiltro } from "@celda/dominio/filtro";
 import type { PuntosLeidos } from "@celda/dominio/puntos";
 import { Dialogo } from "@celda/ui/Dialogo.tsx";
@@ -31,11 +31,12 @@ export function DialogoLista(props: {
   const lista = createMemo(() => {
     const caja = props.caja;
     if (caja === undefined) return { total: 0, primeros: [] };
-    const centro: Coordenada = {
-      longitud: (caja.suroeste.longitud + caja.noreste.longitud) / 2,
-      latitud: (caja.suroeste.latitud + caja.noreste.latitud) / 2,
-    };
-    return listaDePuntos(props.puntos, caja, centro, mascarasDeFiltro(props.filtro));
+    return listaDePuntos(
+      props.puntos,
+      caja,
+      centroDelRectangulo(caja),
+      mascarasDeFiltro(props.filtro),
+    );
   });
   return (
     <Dialogo titulo={TITULO_DE_LA_LISTA} alCerrar={props.alCerrar}>
