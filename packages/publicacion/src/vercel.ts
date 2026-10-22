@@ -21,6 +21,7 @@ import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import { AlmacenDeFicheros } from "./almacen.ts";
 import { sha256 } from "./almacenes/firma.ts";
 import { PREFIJOS_PRIVADOS } from "./almacenes/r2.ts";
+import { montarBaremos } from "./baremo.ts";
 
 /**
  * Las capas, solo desde Vercel (ADR 0018). La web lee las capas y las fichas de `/capas`, en su
@@ -146,7 +147,7 @@ export interface PlanDeCapas {
   readonly vigente: string;
   readonly resumen: { readonly fichero: string; readonly contenido: string };
   /** El de la vigente y después los de las anteriores, de la más reciente a la más vieja. */
-  readonly manifiestos: ReadonlyArray<ManifiestoMontado>;
+  readonly manifiestos: readonly [ManifiestoMontado, ...ReadonlyArray<ManifiestoMontado>];
   /** Cada fichero que listan los manifiestos, una vez aunque lo compartan varias versiones. */
   readonly ficheros: ReadonlyArray<string>;
 }
@@ -216,7 +217,7 @@ export const planearCapas = Effect.fn("Vercel.planearCapas")(function* (origen: 
     (otro) => Effect.map(manifiestoAnterior(origen, otro), (m) => (m === undefined ? [] : [m])),
     { concurrency: A_LA_VEZ },
   )).flat();
-  const manifiestos = [suyo, ...anteriores];
+  const manifiestos = [suyo, ...anteriores] as const;
   const ficheros = [...new Set(manifiestos.flatMap((m) => m.ficheros))];
   // Lo privado del cubo, las copias de la base y el archivo de páginas, nunca llega a la web,
   // aunque un manifiesto lo liste por un error (ADR 0027).
@@ -242,8 +243,10 @@ export interface CapasMontadas {
   readonly version: string;
   /** Las versiones anteriores montadas, de la más reciente a la más vieja. */
   readonly anteriores: ReadonlyArray<string>;
-  /** Ficheros copiados, contando los manifiestos, el resumen y `vigente.json`. */
+  /** Ficheros escritos, contando los manifiestos, el resumen, los baremos y `vigente.json`. */
   readonly ficheros: number;
+  /** Baremos de exposición calculados, uno por provincia con medidas (ADR 0030). */
+  readonly baremos: number;
   /** Suma de sus tamaños sin comprimir. */
   readonly bytes: number;
 }
@@ -256,7 +259,9 @@ export interface CapasMontadas {
  * 4. Lee y guarda cada fichero de esos manifiestos, una vez aunque lo compartan varias versiones.
  *    Si falta alguno o su contenido no coincide con la huella de su nombre, falla sin escribir
  *    `vigente.json`.
- * 5. Guarda los manifiestos y el resumen y, al final, `vigente.json`.
+ * 5. Calcula con los lotes de la vigente el baremo de exposición de cada provincia y lo guarda
+ *    (`montarBaremos`, ADR 0030). Es lo único que no sale tal cual de R2.
+ * 6. Guarda los manifiestos y el resumen y, al final, `vigente.json`.
  *
  * Así lo montado nunca anuncia algo que no tiene.
  */
@@ -274,6 +279,7 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
       }),
     { concurrency: A_LA_VEZ },
   );
+  const baremos = yield* montarBaremos(plan.version, plan.manifiestos[0].ficheros);
   for (const manifiesto of plan.manifiestos) {
     yield* destino.guardar(manifiesto.fichero, manifiesto.contenido);
   }
@@ -283,14 +289,15 @@ export const montarCapas = Effect.fn("Vercel.montarCapas")(function* (origen: Or
   const montadas: CapasMontadas = {
     version: plan.version,
     anteriores: plan.manifiestos.slice(1).map((m) => `sitios@${m.sello}`),
-    ficheros: plan.ficheros.length + plan.manifiestos.length + 2,
+    ficheros: plan.ficheros.length + baremos.ficheros.length + plan.manifiestos.length + 2,
+    baremos: baremos.ficheros.length,
     bytes: [
       ...plan.manifiestos.map((m) => m.contenido),
       plan.resumen.contenido,
       plan.vigente,
     ].reduce(
       (suma, texto) => suma + bytesDe(texto),
-      bytes.reduce((suma, n) => suma + n, 0),
+      bytes.reduce((suma, n) => suma + n, baremos.bytes),
     ),
   };
   return montadas;
