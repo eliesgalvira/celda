@@ -113,6 +113,10 @@ const PARES_NO_TEXTO: ReadonlyArray<readonly [pieza: string, fondo: string]> = [
     "referencia",
     "mapa-referencia",
   ].flatMap((pieza) => FONDOS_DEL_MAPA.map((fondo) => [pieza, fondo] as const)),
+  // Los hexágonos del eje de frecuencias frente al panel: los dos extremos de la barra. Los de en
+  // medio son mezclas en OKLab entre ellos.
+  ["eje-lejos", "superficie"],
+  ["primario", "superficie"],
   // El favicon: lo recortado y el borde frente a la figura oscura.
   ["icono-figura", "icono-fondo"],
   ["icono-acento", "icono-fondo"],

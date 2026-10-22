@@ -61,7 +61,7 @@ export type BotonProps = Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "clas
 
 /** El hexágono que gira mientras un botón espera. */
 function Girando() {
-  return <span class="hexagono size-3.5 animate-spin bg-primario motion-reduce:animate-none" />;
+  return <span class="hexagono size-3.5 animate-spin bg-current motion-reduce:animate-none" />;
 }
 
 /** El botón de Celda. Si una pantalla necesita otro aspecto, se añade una variante aquí. */
@@ -135,5 +135,41 @@ export function Enlace(props: EnlaceProps) {
         {props.children}
       </span>
     </a>
+  );
+}
+
+/**
+ * La ✕ de todos los cierres: la ficha, los diálogos, la explicación de un término y los avisos. Va
+ * sin fondo y en la tinta de lo que la rodea, así que sirve igual sobre el panel, sobre la
+ * explicación invertida y sobre un aviso de fallo. Su nombre es «Cerrar».
+ */
+export function BotonCerrar(props: { readonly alCerrar: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Cerrar"
+      title="Cerrar"
+      class={variantesDiana()}
+      onClick={() => props.alCerrar()}
+    >
+      <span
+        class={
+          "chaflan grid size-9 place-items-center transition-colors duration-150 [--corte:7px] " +
+          "group-hover:bg-current/10 group-active:bg-current/20 motion-reduce:transition-none"
+        }
+      >
+        <svg
+          viewBox="0 0 24 24"
+          class="size-5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </span>
+    </button>
   );
 }

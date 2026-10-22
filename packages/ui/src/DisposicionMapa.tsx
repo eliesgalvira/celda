@@ -14,6 +14,11 @@ export interface DisposicionMapaProps {
   /** El mapa aún no está listo: la región se anuncia como ocupada. */
   readonly ocupado: boolean;
   readonly cabecera: JSX.Element;
+  /**
+   * La flecha del norte (`FlechaDelNorte`): arriba a la derecha y, en el móvil, bajo la cabecera.
+   * Va antes que la cabecera, así que los avisos que bajan de ella la tapan.
+   */
+  readonly norte?: JSX.Element;
   /** Bajo la cabecera: la fecha de los datos del mapa. */
   readonly datos?: JSX.Element;
   /**
@@ -123,6 +128,10 @@ export function DisposicionMapa(props: DisposicionMapaProps) {
         <div ref={props.lienzo} class="size-full" />
         {props.marcadores}
       </main>
+
+      <div class="pointer-events-none absolute top-[4.5rem] right-1.5 z-10 md:top-[18px] md:right-[18px]">
+        {props.norte}
+      </div>
 
       <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-1.5 px-3 md:top-[18px]">
         {props.cabecera}

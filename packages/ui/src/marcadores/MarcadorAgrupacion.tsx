@@ -15,7 +15,7 @@ const variantesNumero = cva("relative font-mono font-semibold", {
       muchas: "text-xs",
     },
     tono: {
-      propio: "text-tinta-invertida",
+      propio: "text-tinta-invertida group-hover:text-primario-fg",
       "red-usada": "text-tinta",
     },
   },

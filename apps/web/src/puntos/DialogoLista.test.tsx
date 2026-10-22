@@ -46,7 +46,7 @@ describe("la lista de los emplazamientos que se ven", () => {
     ));
     flush();
     assert.isNotNull(getByRole("dialog", { name: "Emplazamientos a la vista" }));
-    const botones = getAllByRole("button").filter((b) => b.textContent !== "Cerrar");
+    const botones = getAllByRole("button").filter((b) => b.getAttribute("aria-label") !== "Cerrar");
     assert.deepStrictEqual(
       botones.map((b) => b.textContent),
       ["Movistar y Orangeen el centro del mapa", "Vodafonea 170 m al este del centro"],
@@ -69,7 +69,7 @@ describe("la lista de los emplazamientos que se ven", () => {
     flush();
     assert.isNotNull(getByText("No se ve ninguno. Mueve o aleja el mapa."));
     assert.deepStrictEqual(
-      getAllByRole("button").map((b) => b.textContent),
+      getAllByRole("button").map((b) => b.getAttribute("aria-label")),
       ["Cerrar"],
     );
   });

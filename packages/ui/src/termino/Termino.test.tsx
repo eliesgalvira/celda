@@ -117,7 +117,7 @@ describe("Termino", () => {
     assert.isNull(screen.queryByRole("dialog"));
   });
 
-  it("«Cerrar» es un botón con etiqueta visible que la cierra", () => {
+  it("la ✕ se llama «Cerrar» y la cierra", () => {
     montar();
     const boton = screen.getByRole("button", { name: "bandas" });
     abrir(boton);

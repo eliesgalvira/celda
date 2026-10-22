@@ -22,7 +22,7 @@ export const variantesConsejo = cva("flex gap-2.5 text-sm leading-relaxed", {
   variants: {
     tono: {
       principal: "",
-      /** Un aparte, como que girar el móvil en la mano apenas cambia nada. */
+      /** Un aparte, como que girar el móvil apenas cambia la señal. */
       secundario: "text-tinta-suave",
     },
   },

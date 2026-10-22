@@ -91,7 +91,7 @@ const variantesNumero = cva("relative font-mono font-semibold", {
       demasiadas: "text-[10px]",
     },
     relleno: {
-      oscuro: "text-tinta-invertida",
+      oscuro: "text-tinta-invertida group-hover:text-primario-fg",
       claro: "text-tinta",
     },
   },

@@ -53,6 +53,8 @@ export interface EntradaGlosario {
   readonly tecnico: string;
   /** Otros términos que ayudan a entender este. */
   readonly relacionados: ReadonlyArray<Termino>;
+  /** El nombre es el símbolo de una unidad y conserva sus mayúsculas, también en un título. */
+  readonly simbolo?: true;
 }
 
 /** Una entrada por término, ni una más ni una menos. */
@@ -126,6 +128,7 @@ export const GLOSARIO: Glosario = {
       "segundo.",
     tecnico: "megahercio (MHz)",
     relacionados: ["banda"],
+    simbolo: true,
   },
   tramo: {
     nombre: "Tramo publicado",

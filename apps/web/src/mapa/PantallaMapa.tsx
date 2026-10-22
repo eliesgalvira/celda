@@ -8,6 +8,7 @@ import { ControlDelMapa } from "@celda/ui/ControlDelMapa.tsx";
 import { Cabecera } from "@celda/ui/Cabecera.tsx";
 import { CargaDelMapa, DatosDelMapa } from "@celda/ui/DatosDelMapa.tsx";
 import { DisposicionMapa } from "@celda/ui/DisposicionMapa.tsx";
+import { FlechaDelNorte } from "@celda/ui/FlechaDelNorte.tsx";
 import { IconoAportaciones } from "@celda/ui/buzon/Compartir.tsx";
 import { IconoAjustes, IconoEjercicio } from "@celda/ui/ejercicio/Ejercicio.tsx";
 import { IconoFotoAerea } from "@celda/ui/foto/FotoAerea.tsx";
@@ -1028,6 +1029,7 @@ export function PantallaMapa() {
               contenedor = elemento;
             }}
             cabecera={<Cabecera lugar={lugares.nombre()} cuenta={cuenta()} />}
+            norte={<FlechaDelNorte conFoto={foto.seVe()} />}
             datos={
               <EstadoDeLaCapa
                 estado={capa()}

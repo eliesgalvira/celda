@@ -26,7 +26,7 @@ type EstadoDelEnvio =
 
 export interface PasoCompartirProps {
   readonly aportacion: AportacionCompartible;
-  /** El botón de salir del paso: «Volver» a la lista o al formulario, o «Cerrar». */
+  /** El botón de salir del paso: «Volver» a la lista o al formulario, o «Cancelar». */
   readonly textoSalir: string;
   readonly alSalir: () => void;
   /**

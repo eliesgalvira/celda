@@ -2,6 +2,8 @@ import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Show } from "solid-js";
 
+import { BotonCerrar } from "./Boton.tsx";
+
 export const variantesAviso = cva("chaflan flex w-full flex-col gap-2 px-5 py-4 [--corte:16px]", {
   variants: {
     tono: {
@@ -35,6 +37,8 @@ export type AvisoProps = VariantProps<typeof variantesAviso> &
     readonly children?: JSX.Element;
     /** Botones o enlaces para salir del aviso. */
     readonly acciones?: JSX.Element;
+    /** Con él, el aviso lleva la ✕ arriba a la derecha. */
+    readonly alCerrar?: () => void;
   };
 
 /**
@@ -49,21 +53,30 @@ export function Aviso(props: AvisoProps) {
         data-tono={props.tono ?? "espera"}
         class={variantesAviso({ tono: props.tono })}
       >
-        <h2 class="flex items-center gap-2 font-titulo text-lg tracking-wide">
-          <span
-            aria-hidden="true"
-            class={
-              {
-                fallo: "hexagono size-3 shrink-0 bg-aviso",
-                limite: "hexagono size-3 shrink-0 bg-aviso",
-                espera:
-                  "hexagono size-3 shrink-0 animate-pulse bg-primario motion-reduce:animate-none",
-                hecho: "hexagono size-3 shrink-0 bg-primario",
-              }[props.tono ?? "espera"]
-            }
-          />
-          {props.titulo}
-        </h2>
+        <div class="flex items-start gap-2">
+          <h2 class="flex flex-1 items-center gap-2 font-titulo text-lg tracking-wide">
+            <span
+              aria-hidden="true"
+              class={
+                {
+                  fallo: "hexagono size-3 shrink-0 bg-aviso",
+                  limite: "hexagono size-3 shrink-0 bg-aviso",
+                  espera:
+                    "hexagono size-3 shrink-0 animate-pulse bg-primario motion-reduce:animate-none",
+                  hecho: "hexagono size-3 shrink-0 bg-primario",
+                }[props.tono ?? "espera"]
+              }
+            />
+            {props.titulo}
+          </h2>
+          <Show when={props.alCerrar}>
+            {(alCerrar) => (
+              <div class="-my-2 -mr-3">
+                <BotonCerrar alCerrar={alCerrar()} />
+              </div>
+            )}
+          </Show>
+        </div>
         <Show when={props.children}>
           <div class="text-sm leading-relaxed">{props.children}</div>
         </Show>

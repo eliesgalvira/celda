@@ -7,7 +7,7 @@ import {
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 
-import { variantesDiana } from "../Boton.tsx";
+import { BotonCerrar, variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
 import { recursoFijo } from "../recurso.ts";
 import { colocarExplicacion } from "./posicion.ts";
@@ -22,7 +22,7 @@ export interface TerminoProps {
 /**
  * Un término técnico dentro de un texto (historia 53): sale subrayado y, al tocarlo o pulsarlo
  * con el teclado, abre su explicación llana con el término técnico al final. La explicación se
- * cierra con Escape, con «Cerrar» o tocando fuera, y devuelve el foco al término si lo tenía.
+ * cierra con Escape, con la ✕ o tocando fuera, y devuelve el foco al término si lo tenía.
  */
 export function Termino(props: TerminoProps) {
   const [abierto, setAbierto] = createSignal(false);
@@ -48,6 +48,11 @@ export function Termino(props: TerminoProps) {
         onClick={() => setAbierto((antes) => !antes)}
         class={
           // Se puede tocar aunque vaya en una pieza que deja pasar los gestos al mapa.
+          // La hoja del navegador quita a los botones las mayúsculas del título en el que van. Un
+          // símbolo como MHz las conserva siempre.
+          (GLOSARIO[props.termino].simbolo === true
+            ? "normal-case "
+            : "[text-transform:inherit] ") +
           "pointer-events-auto relative inline cursor-pointer rounded-sm text-left underline decoration-primario " +
           "decoration-dotted decoration-2 underline-offset-[0.22em] hover:decoration-solid " +
           "aria-expanded:bg-primario/15 aria-expanded:decoration-solid " +
@@ -228,13 +233,9 @@ function Explicacion(props: ExplicacionProps) {
           >
             {entrada().nombre}
           </h2>
-          <button
-            type="button"
-            onClick={() => props.alCerrar(true)}
-            class={cn(variantesDiana(), "ml-auto px-3", DIANA_TEXTO)}
-          >
-            Cerrar
-          </button>
+          <div class="-my-2 ml-auto">
+            <BotonCerrar alCerrar={() => props.alCerrar(true)} />
+          </div>
         </div>
         <p class="pr-3 text-[0.9375rem] leading-relaxed">{entrada().explicacion}</p>
         <p class="pr-3 font-mono text-xs leading-5 text-tinta-invertida-suave">

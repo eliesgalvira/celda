@@ -261,7 +261,7 @@ _Evitar_: azimut (ese es el de un sector), dirección, orientación
 ### Mejorar la señal
 
 **Consejo**:
-Lo que Celda dice que se puede hacer para recibir mejor: hacia qué ventana poner un router 4G/5G, a qué rumbo apuntar una antena exterior y que girar el móvil en la mano apenas cambia nada. Sin punto de referencia es general; con punto, depende del rumbo y la distancia.
+Lo que Celda dice que se puede hacer para recibir mejor: hacia qué ventana poner un router 4G/5G, a qué rumbo apuntar una antena exterior y que girar el móvil apenas cambia la señal y taparlo con la mano sí. Sin punto de referencia es general; con punto, depende del rumbo y la distancia.
 _Evitar_: recomendación, truco, optimización
 
 **Router 4G/5G**:
