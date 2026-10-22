@@ -171,17 +171,11 @@ export const agrupacionConFiltro = (
     redUsada:
       red === undefined
         ? undefined
-        : crearAgrupador(
-            red.emplazamientos,
-            [],
-            indicesDeLaRed === undefined
-              ? { prefijo: prefijoDeRedUsada(capa.provincia), redUsada: true }
-              : {
-                  prefijo: prefijoDeRedUsada(capa.provincia),
-                  redUsada: true,
-                  indices: indicesDeLaRed,
-                },
-          ),
+        : crearAgrupador(red.emplazamientos, [], {
+            prefijo: prefijoDeRedUsada(capa.provincia),
+            redUsada: true,
+            indices: indicesDeLaRed,
+          }),
   };
 };
 
@@ -198,6 +192,7 @@ export const agrupadorDeProvincia = (
 ): Agrupador => {
   const cubierta = resumen.provincias.find((p) => p.codigo === capa.provincia)?.cubierta === true;
   const opciones: OpcionesAgrupador = {
+    indices,
     prefijo: prefijoDeProvincia(capa.provincia),
     municipios: cubierta
       ? resumirMunicipios(
@@ -208,11 +203,7 @@ export const agrupadorDeProvincia = (
         )
       : [],
   };
-  return crearAgrupador(
-    capa.emplazamientos,
-    capa.barrios,
-    indices === undefined ? opciones : { ...opciones, indices },
-  );
+  return crearAgrupador(capa.emplazamientos, capa.barrios, opciones);
 };
 
 /**

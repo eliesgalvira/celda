@@ -80,28 +80,20 @@ export const crearFiltro = (
     new Map(),
   );
 
-  // La clave es el filtro y las provincias que han llegado, en texto: llegar otra provincia la
-  // cambia, y las que ya tenían su agrupación no se vuelven a pedir.
+  // La clave es el filtro y las provincias que han llegado: llegar otra provincia la cambia, y las
+  // que ya tenían su agrupación no se vuelven a pedir.
   recurso(
     "capa:filtro",
     () => {
       const filtro = aplicado();
       return hayFiltro(filtro)
-        ? {
-            filtro: claveDeFiltro(filtro),
-            provincias: entrada
-              .cargadas()
-              .map((p) => p.codigo)
-              .join(" "),
-          }
+        ? { filtro: claveDeFiltro(filtro), provincias: entrada.cargadas().map((p) => p.codigo) }
         : undefined;
     },
     ({ filtro: clave, provincias }) => {
       const filtro = aplicado();
       const ya = agrupaciones();
-      const faltan = provincias
-        .split(" ")
-        .filter((codigo) => codigo !== "" && ya.get(codigo)?.filtro !== clave);
+      const faltan = provincias.filter((codigo) => ya.get(codigo)?.filtro !== clave);
       if (faltan.length === 0) return undefined;
       const parar = new AbortController();
       for (const codigo of faltan) {

@@ -290,7 +290,7 @@ export const atenderIndice = (solicitud: SolicitudDeIndice): RespuestaParaEnviar
  */
 const rehidratarIndices = (
   serializados: IndicesSerializados,
-  parte: ParteDeCapa,
+  parte: Pick<ParteDeCapa, "emplazamientos" | "municipios">,
 ): IndicesDeCapa<Indice> => {
   const posiciones = indicesDeCapa(
     parte.emplazamientos,
@@ -322,7 +322,6 @@ const indexadaDe = (
     indices: rehidratarIndices(respuesta, {
       emplazamientos: capa.emplazamientos,
       municipios: municipiosDeZona(capa, cubierta),
-      conBarrios: respuesta.fuera !== undefined,
     }),
   };
 };

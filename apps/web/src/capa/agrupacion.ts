@@ -205,7 +205,7 @@ export interface OpcionesAgrupador {
    * Los índices ya construidos, por ejemplo en un Worker (`rehidratarIndice`). Sin ellos, se
    * construyen aquí.
    */
-  readonly indices?: IndicesDeCapa<Indice>;
+  readonly indices?: IndicesDeCapa<Indice> | undefined;
   /**
    * Lo que llevan detrás de su tipo las claves de agrupaciones y barrios, para que no se
    * confundan con las de otro agrupador en la misma escena: el código de la provincia y «:».
@@ -518,18 +518,11 @@ export const crearAgrupador = (
     return relacion;
   };
 
-  const transicion = (antes: Escena, despues: Escena): Transicion => {
-    if (antes.nivel === despues.nivel || !propias.has(antes) || !propias.has(despues)) {
-      return SIN_TRANSICION;
-    }
-    const alejar = despues.nivel < antes.nivel;
-    const [fina, gruesa] = alejar ? [antes, despues] : [despues, antes];
-    if (esDeZonas(fina.nivel) || esDeZonas(gruesa.nivel)) {
-      const relacion = relacionPorHojas(fina, gruesa);
-      return alejar
-        ? { destino: relacion, origen: SIN_TRANSICION.origen }
-        : { destino: SIN_TRANSICION.destino, origen: relacion };
-    }
+  /**
+   * A qué agrupación de `gruesa` va cada elemento de `fina`, bajando por la jerarquía de supercluster
+   * desde cada una.
+   */
+  const relacionPorJerarquia = (fina: Escena, gruesa: Escena): Map<string, string> => {
     const relacion = new Map<string, string>();
     const tope = { pasos: TOPE_DE_PASOS };
     for (const elemento of gruesa.elementos.values()) {
@@ -543,6 +536,19 @@ export const crearAgrupador = (
         }
       }
     }
+    return relacion;
+  };
+
+  const transicion = (antes: Escena, despues: Escena): Transicion => {
+    if (antes.nivel === despues.nivel || !propias.has(antes) || !propias.has(despues)) {
+      return SIN_TRANSICION;
+    }
+    const alejar = despues.nivel < antes.nivel;
+    const [fina, gruesa] = alejar ? [antes, despues] : [despues, antes];
+    const relacion =
+      esDeZonas(fina.nivel) || esDeZonas(gruesa.nivel)
+        ? relacionPorHojas(fina, gruesa)
+        : relacionPorJerarquia(fina, gruesa);
     return alejar
       ? { destino: relacion, origen: SIN_TRANSICION.origen }
       : { destino: SIN_TRANSICION.destino, origen: relacion };

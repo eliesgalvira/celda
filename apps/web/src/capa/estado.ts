@@ -200,13 +200,11 @@ export const estadoDeLaVista = (
   vista: Vista | undefined,
 ): EstadoDeLaVista => {
   const cerca = vista !== undefined && Math.floor(vista.zoom) >= NIVEL_DE_PROVINCIAS;
-  const seVen = resumen.provincias.filter((p) =>
-    vista === undefined
-      ? false
-      : cerca
-        ? p.caja !== undefined && seCortan(p.caja, vista.caja)
-        : contiene(vista.caja, p.etiqueta) ||
-          (p.caja !== undefined && seCortan(p.caja, vista.caja)),
+  const seVen = resumen.provincias.filter(
+    (p) =>
+      vista !== undefined &&
+      ((p.caja !== undefined && seCortan(p.caja, vista.caja)) ||
+        (!cerca && contiene(vista.caja, p.etiqueta))),
   );
   const conEstado = (tipo: EstadoProvincia["tipo"]) =>
     cerca
