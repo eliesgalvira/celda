@@ -371,10 +371,8 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
       return lienzo === undefined || actual === undefined ? undefined : { lienzo, pedido: actual };
     },
     ({ lienzo, pedido: actual }) => {
-      const dejar = lienzo.verEdificio(
-        actual.posicion,
-        untrack(entrada.desplazamiento),
-        (encontrado) => setHallado({ pedido: actual, encontrado }),
+      const dejar = lienzo.verEdificio(actual.posicion, entrada.desplazamiento(), (encontrado) =>
+        setHallado({ pedido: actual, encontrado }),
       );
       setVolado(actual);
       return (siguiente) => {
@@ -435,7 +433,7 @@ export function crearFoto(entrada: EntradaFoto): FotoDelMapa {
     encendida,
     seVe,
     alternar: () => {
-      if (untrack(entrada.deCerca)) setEncendida((si) => !si);
+      if (entrada.deCerca()) setEncendida((si) => !si);
       else setPulsadoLejos({});
     },
     encender: () => setEncendida(true),

@@ -7,9 +7,14 @@ import {
   flush,
   onCleanup,
   onSettled,
+  untrack,
 } from "solid-js";
 
+import { avisosDeSolid } from "./pruebas/vigilante.ts";
 import { mismasListas, mismosCampos, recurso, recursoFijo, vigilante } from "./recurso.ts";
+
+/** Los códigos de los avisos de Solid desde el principio de la prueba. */
+const codigosDeAvisos = () => (avisosDeSolid?.events ?? []).map((aviso) => aviso.code);
 
 /**
  * Monta `montar` en una raíz y devuelve cómo desmontarla. Las señales se crean fuera: Solid no
@@ -161,6 +166,31 @@ describe("Solid 2: igualdad de efectos y memos", () => {
     assert.deepStrictEqual(registro, ["abre 0", "cierra"]);
   });
 
+  it("leer una señal en la segunda función de un efecto avisa `STRICT_READ_UNTRACKED`, y con `untrack` no", () => {
+    const [n, setN] = createSignal(0);
+    const [otra] = createSignal("a");
+    const desmontar = enRaiz(() => {
+      createEffect(n, () => {
+        untrack(otra);
+      });
+    });
+    flush();
+    setN(1);
+    flush();
+    assert.deepStrictEqual(codigosDeAvisos(), []);
+    desmontar();
+    const sinUntrack = enRaiz(() => {
+      createEffect(n, () => {
+        otra();
+      });
+    });
+    flush();
+    sinUntrack();
+    assert.deepStrictEqual(codigosDeAvisos(), ["STRICT_READ_UNTRACKED"]);
+    // El vigilante haría fallar esta prueba por el aviso que acaba de comprobar.
+    avisosDeSolid?.clear();
+  });
+
   it("`onCleanup` en el cuerpo del dueño se llama al desmontar", () => {
     const registro: Array<string> = [];
     const desmontar = enRaiz(() => {
@@ -247,6 +277,26 @@ describe("recurso", () => {
     flush();
     assert.strictEqual(abiertos, 2);
     desmontar();
+  });
+
+  it("lo que leen la apertura y el cierre no reabre nada ni hace avisar a Solid", () => {
+    const registro: Array<string> = [];
+    const [clave, setClave] = createSignal("a");
+    const [otra, setOtra] = createSignal(0);
+    const desmontar = enRaiz(() => {
+      recurso("prueba:lecturas", clave, (actual) => {
+        registro.push(`abre ${actual} ${otra()}`);
+        return () => registro.push(`cierra ${actual} ${otra()}`);
+      });
+    });
+    flush();
+    setOtra(1);
+    flush();
+    setClave("b");
+    flush();
+    desmontar();
+    assert.deepStrictEqual(registro, ["abre a 0", "cierra a 1", "abre b 1", "cierra b 1"]);
+    assert.deepStrictEqual(codigosDeAvisos(), []);
   });
 
   it("recursoFijo abre una vez y cierra al desmontar", () => {

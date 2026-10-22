@@ -208,7 +208,7 @@ function ComoSeAbre(props: { readonly codigo: CodigoModoInformacion; readonly de
     <>
       <p>
         {COMO_SE_ABRE[props.codigo.seAbre](props.codigo.pantalla)}
-        <Show when={props.codigo.despues}>{(despues) => ` ${despues()}`}</Show>
+        <Show when={props.codigo.despues}>{(despues) => <>{` ${despues()}`}</>}</Show>
       </p>
       <Show when={props.deducida}>
         <p>Si no es tu marca, cámbiala arriba.</p>

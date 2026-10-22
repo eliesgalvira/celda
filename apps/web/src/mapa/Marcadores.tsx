@@ -290,16 +290,16 @@ export function Marcadores(props: MarcadoresProps) {
     () => estadoDelTraspaso()?.traspaso ?? (estadoDelTraspaso()?.con === false ? SIN : CON),
     (paso) => {
       const apagar = props.alApagarPuntos;
-      if (paso.tipo !== "traspaso" || untrack(reducido)) {
+      if (paso.tipo !== "traspaso" || reducido()) {
         apagar?.(paso.tipo === "traspaso" ? paso.hacia === "logos" : paso.tipo === "con");
         setMoviendose(undefined);
         return undefined;
       }
-      const enPantalla = untrack(proyectar);
-      const seVeAhora = untrack(seVe);
+      const enPantalla = proyectar();
+      const seVeAhora = seVe();
       const puntos = puntosDelTraspaso(
         paso.marcadores,
-        (elemento) => untrack(agrupador).emplazamientosDe(elemento),
+        (elemento) => agrupador().emplazamientosDe(elemento),
         (posicion) => seVeAhora(enPantalla(posicion)),
       );
       setMoviendose({ hacia: paso.hacia, puntos });
@@ -341,24 +341,24 @@ export function Marcadores(props: MarcadoresProps) {
     () => cambioDeVista().cambio,
     ({ hacia }) => {
       const mapa = props.mapa;
-      const ahora = untrack(vista);
+      const ahora = vista();
       const puntos = props.puntos;
       const zoom = mapa.getZoom();
       const escenaAgrupada =
         ahora === undefined
           ? undefined
           : hacia === "agrupada"
-            ? untrack(agrupador).escena(
+            ? agrupador().escena(
                 nivelDeZoom(ahora.zoom),
                 cajaConMargen(ahora.caja),
                 props.seleccionada,
               )
-            : untrack(estadoDelTraspaso)?.ultima;
+            : estadoDelTraspaso()?.ultima;
       const color = leerOklch(
         getComputedStyle(document.documentElement).getPropertyValue("--mapa-punto"),
       );
       if (
-        untrack(reducido) ||
+        reducido() ||
         puntos === undefined ||
         ahora === undefined ||
         escenaAgrupada === undefined ||
@@ -372,9 +372,9 @@ export function Marcadores(props: MarcadoresProps) {
       const posiciones = posicionesDelVuelo(
         puntos,
         escenaAgrupada,
-        (elemento) => untrack(agrupador).emplazamientosDe(elemento),
+        (elemento) => agrupador().emplazamientosDe(elemento),
         cajaConMargen(ahora.caja),
-        mascarasDeFiltro(untrack(filtro)),
+        mascarasDeFiltro(filtro()),
       );
       const juntan = hacia === "agrupada";
       const quitar = () => {
@@ -570,9 +570,10 @@ export function Marcadores(props: MarcadoresProps) {
     () => ({
       huecos: huecosDe([...(escena()?.elementos.values() ?? [])], choques(), tamano()),
       quieto: quieto(),
+      poner: ponerHuecos(),
     }),
-    ({ huecos }) => {
-      if (!props.mapa.isMoving()) ponerHuecos()(huecos);
+    ({ huecos, poner }) => {
+      if (!props.mapa.isMoving()) poner(huecos);
     },
   );
 

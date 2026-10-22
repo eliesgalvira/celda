@@ -9,7 +9,7 @@ import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
-import { createSignal, untrack } from "solid-js";
+import { createSignal } from "solid-js";
 
 import type { AgrupacionConFiltro, ProvinciaCargada } from "../capa/nacional.ts";
 import { CapaEmplazamientos } from "../capa/servicio.ts";
@@ -97,8 +97,8 @@ export const crearFiltro = (
         : undefined;
     },
     ({ filtro: clave, provincias }) => {
-      const filtro = untrack(aplicado);
-      const ya = untrack(agrupaciones);
+      const filtro = aplicado();
+      const ya = agrupaciones();
       const faltan = provincias
         .split(" ")
         .filter((codigo) => codigo !== "" && ya.get(codigo)?.filtro !== clave);

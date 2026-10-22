@@ -1,4 +1,4 @@
-import { createEffect, createMemo, onCleanup } from "solid-js";
+import { createEffect, createMemo, onCleanup, untrack } from "solid-js";
 
 /**
  * La única forma de abrir desde Solid algo que hay que cerrar: el GPS, la brújula, escuchadores de
@@ -42,7 +42,8 @@ const cerrada = <K>(clave: K | Cerrado): clave is Cerrado =>
 
 /**
  * Abre un recurso mientras `clave` diga que tiene que estar abierto y lo cierra al cambiar la clave
- * o al desmontarse quien lo llama. `abrir` corre fuera del seguimiento: lo que lea no reabre nada.
+ * o al desmontarse quien lo llama. `abrir` y el cierre corren fuera del seguimiento: lo que lean
+ * no reabre nada, y Solid no avisa de que lo lean sin seguirlo.
  *
  * - `false`, `null` o `undefined` dejan el recurso cerrado.
  * - Una clave igual a la anterior (según `iguales`) no hace nada: ni cierra ni abre.
@@ -65,7 +66,7 @@ export function recurso<K>(
   const cerrarAhora = (siguiente: K | undefined) => {
     const pendiente = cerrar;
     cerrar = undefined;
-    pendiente?.(siguiente);
+    untrack(() => pendiente?.(siguiente));
   };
   // La limpieza no va en lo que devuelve el efecto: así el cierre sabe con qué se reabre.
   createEffect(actual, (ahora) => {
@@ -75,7 +76,7 @@ export function recurso<K>(
     }
     cerrarAhora(ahora);
     contarApertura(nombre, maximo);
-    cerrar = abrir(ahora);
+    cerrar = untrack(() => abrir(ahora));
   });
   onCleanup(() => cerrarAhora(undefined));
 }

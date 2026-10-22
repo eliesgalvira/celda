@@ -13,7 +13,7 @@ import { AreaDeTexto, Casillas, Segmentado, Selector } from "@celda/ui/Eleccion.
 import { Nota } from "@celda/ui/medir/Medir.tsx";
 import { Termino } from "@celda/ui/termino/Termino.tsx";
 import * as Exit from "effect/Exit";
-import { createMemo, createSignal, Show, useContext } from "solid-js";
+import { createMemo, createSignal, Show, untrack, useContext } from "solid-js";
 
 import { usarDatos } from "../datos.tsx";
 import { posicionDe } from "../ubicacion/estado.ts";
@@ -67,7 +67,7 @@ export function Proponer(props: ProponerProps) {
   const datos = usarDatos();
   const ubicacion = useContext(UbicacionContexto);
   const [tipo, setTipo] = createSignal<TipoDeCambio>(
-    props.emplazamiento === undefined ? "falta" : "posicion",
+    untrack(() => (props.emplazamiento === undefined ? "falta" : "posicion")),
   );
   const [compania, setCompania] = createSignal<Compania>();
   const [esta, setEsta] = createSignal<"si" | "no">();

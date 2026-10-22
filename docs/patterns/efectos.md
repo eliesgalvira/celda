@@ -30,7 +30,7 @@ recursoFijo(nombre, abrir); // abre al montar, cierra al desmontar
 - `clave` es una lectura reactiva. `false`, `null` o `undefined` dejan el recurso cerrado.
 - La clave pasa por un memo con `iguales` (por defecto `Object.is`). Mientras no cambie, no se cierra ni se abre nada.
 - Una clave que es un objeto nuevo en cada cálculo necesita comparador: `mismosCampos` compara campo a campo, `mismasListas` elemento a elemento, `mismaCoordenada` (`@celda/dominio/area`) por coordenadas.
-- `abrir(clave)` corre sin seguimiento y devuelve el cierre. El cierre recibe la clave con la que se va a reabrir, o `undefined` si se cierra del todo.
+- `abrir(clave)` corre sin seguimiento y devuelve el cierre, que también corre sin seguimiento. Lo que lean no reabre nada, y no hace falta `untrack` dentro. El cierre recibe la clave con la que se va a reabrir, o `undefined` si se cierra del todo.
 - `nombre` identifica el recurso ante el vigilante.
 
 Ejemplo, el GPS (`apps/web/src/ubicacion/controlador.ts`):
@@ -48,6 +48,8 @@ Cada lectura cambia `ubicacion()`, pero la clave sigue siendo `true` y el GPS si
 ## El vigilante
 
 En desarrollo y en las pruebas (`import.meta.env.DEV`), `recurso()` cuenta las aperturas de cada nombre. Si pasan de `maximoPorSegundo` en un segundo (10 por defecto), avisa en la consola con `[Celda]` y apunta el exceso. `packages/ui/src/pruebas/vigilante.ts` se carga en todas las pruebas de `apps/web` y `packages/ui` y hace fallar la prueba con excesos, aunque lo que comprueba salga bien.
+
+El mismo fichero hace fallar la prueba en la que Solid avisa `STRICT_READ_UNTRACKED`, con el camino de dueños donde se leyó. El aviso sale al leer una señal o un memo donde Solid no lo sigue, en el cuerpo de un componente o en la segunda función de un efecto, y es la única forma de distinguir una lectura que no sigue nada a propósito de una que debería seguir algo. Si es a propósito, como el valor inicial de una señal o el estado que un efecto consulta sin depender de él, la lectura va en `untrack`. El vigilante lee los avisos del canal de diagnósticos de Solid, `OBSERVE.diagnostics`.
 
 Un recurso que siga un gesto y abra uno por evento puede subir el tope con `maximoPorSegundo`. Un bucle como el del GPS iba a 450 por segundo.
 

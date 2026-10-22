@@ -254,7 +254,7 @@ export function PantallaMapa() {
   });
   /** Desde qué nivel se piden las provincias de lo que se ve: con puntos, solo cerca de los logos. */
   const nivelDePedir = () =>
-    untrack(vistaDibujada) === "agrupada" ? NIVEL_DE_PROVINCIAS : NIVEL_DE_PROVINCIAS_CON_PUNTOS;
+    vistaDibujada() === "agrupada" ? NIVEL_DE_PROVINCIAS : NIVEL_DE_PROVINCIAS_CON_PUNTOS;
 
   /** Lo que se ve, como vista de la capa: el centro dice el lugar de la cabecera. */
   const vistaDelEncuadre = createMemo((): Vista | undefined => {
@@ -279,9 +279,10 @@ export function PantallaMapa() {
     },
     cargas: CARGAS_DE_ZONAS,
   });
-  // Con un emplazamiento en la dirección, el mapa empieza en él (más abajo).
+  /** Si la página se abrió sin un emplazamiento en la dirección: con uno, el mapa empieza en él. */
+  const sinEmplazamientoAlAbrir = untrack(() => emplazamientoDe(ubicacion()) === null);
   const vistaInicial = crearVistaInicial({
-    activa: emplazamientoDe(ubicacion()) === null,
+    activa: sinEmplazamientoAlAbrir,
     alAbrir: () => {
       const punto = puntoAlAbrir();
       return {
@@ -781,7 +782,7 @@ export function PantallaMapa() {
   );
 
   // Al cambiar de vista, se piden las provincias que esa vista dibuja en lo que se ve.
-  createEffect(vistaDibujada, () => pedirLoQueSeVe());
+  createEffect(vistaDibujada, () => untrack(pedirLoQueSeVe));
 
   /**
    * Si se dibujan los marcadores: siempre con la vista agrupada y, con la de puntos, desde el zoom
@@ -818,7 +819,7 @@ export function PantallaMapa() {
     if (actuales === undefined) return;
     const provincia = provinciaDePunto(actuales.puntos, indice);
     setPendiente({ provincia, posicion: posicionDePunto(actuales.puntos, indice) });
-    if (untrack(provincias).get(provincia)?.tipo === "fallo") reintentarProvincias([provincia]);
+    if (provincias().get(provincia)?.tipo === "fallo") reintentarProvincias([provincia]);
     else pedirProvincias([provincia]);
   };
   createEffect(
@@ -949,7 +950,7 @@ export function PantallaMapa() {
   // Si la página se abre con un emplazamiento en la URL, el mapa empieza en él. Solo al cargar:
   // después, abrir o cerrar la ficha no mueve el mapa (historia 22). Sin emplazamiento al abrir no
   // hay nada que enfocar: la primera ficha que se abre después tampoco salta a pie de calle.
-  let enfocadoAlCargar = emplazamientoDe(ubicacion()) === null;
+  let enfocadoAlCargar = sinEmplazamientoAlAbrir;
   createEffect(
     () => {
       const clave = seleccionada();
