@@ -171,7 +171,7 @@ export const textosExposicion = (ficha: Ficha, baremo: Baremo | undefined): Text
   const explicacion = [
     marcado`Cada medida suma todo lo que llega a ese punto, de todas las compañías y también de la radio y la televisión, y por eso la norma la compara con ${NIVEL}, su ${termino("nivel-de-referencia", "nivel de referencia")} más bajo.${conMedidas.length > 1 ? " Por lo mismo, las de dos compañías no se suman." : ""}`,
     llano(
-      "Son comprobaciones de las Jefaturas de Inspección o certificaciones de las compañías, y el ministerio no dice cuál es cada una ni cuándo se hizo. Sirven para comprobar que se cumple el límite legal y no dicen nada de cómo funciona un móvil allí.",
+      "Son comprobaciones de las Jefaturas de Inspección o certificaciones de las compañías, y el ministerio no dice cuál es cada una ni cuándo se hizo. Sirven para comprobar que no se pasa del nivel de referencia, y no dicen nada de cómo funciona un móvil allí.",
     ),
   ];
   const [, notaMarcada = nota] = primeraVezEn([TITULO_EXPOSICION, nota]);
