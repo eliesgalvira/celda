@@ -315,7 +315,7 @@ function ContenidoFicha(props: {
       <SeccionFicha titulo={<TextoConTerminos texto={TITULO_EXPOSICION} />}>
         <ExposicionEnFicha ficha={props.ficha} />
       </SeccionFicha>
-      <SeccionFicha titulo="De dónde salen los datos">
+      <SeccionFicha titulo="¿De dónde salen los datos?">
         <For each={props.ficha.estaciones}>
           {(estacion, i) => (
             <EstacionFicha

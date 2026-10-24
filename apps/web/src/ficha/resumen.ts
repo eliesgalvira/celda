@@ -159,7 +159,7 @@ export const fraseDeResumen = (estaciones: ReadonlyArray<EstacionDeFicha>): Text
 };
 
 /** El título del eje de frecuencias, con la frecuencia y los MHz explicados. */
-export const TITULO_EJE: TextoMarcado = marcado`Qué ${termino("banda", "frecuencia")} usa cada compañía (${termino("mhz", "MHz")})`;
+export const TITULO_EJE: TextoMarcado = marcado`¿Qué ${termino("banda", "frecuencia")} usa cada compañía (${termino("mhz", "MHz")})?`;
 
 /** El mismo título, llano: el nombre accesible de la tabla. */
 export const NOMBRE_EJE = textoPlano(TITULO_EJE);

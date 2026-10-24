@@ -113,7 +113,7 @@ describe("DialogoMedir en Android", () => {
     assert.isNotNull(getByText(/Si no es tu marca, cámbiala arriba/u));
 
     // Abierto desde el principio: es lo que da confianza para marcar el código.
-    const queLePasa = getByRole("button", { name: "Qué hace el código en el móvil" });
+    const queLePasa = getByRole("button", { name: "¿Qué hace el código en el móvil?" });
     assert.strictEqual(queLePasa.getAttribute("aria-expanded"), "true");
     const contenido = document.getElementById(queLePasa.getAttribute("aria-controls") ?? "");
     assert.isFalse(contenido?.hidden);

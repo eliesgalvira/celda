@@ -60,7 +60,7 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
     assert.strictEqual(etiqueta.closest("[data-tono]")?.getAttribute("data-tono"), "corregido");
 
     assert.isNotNull(getByRole("heading", { name: /Registro oficial y comunidad/u }));
-    const vodafone = within(panel).getByLabelText("Qué dice cada fuente de Vodafone");
+    const vodafone = within(panel).getByLabelText("¿Qué dice cada fuente de Vodafone?");
     assert.isNotNull(within(vodafone).getByText("La tiene dada de alta"));
     assert.isNotNull(within(vodafone).getByText("desde el 26 sept 2026"));
     assert.isNotNull(within(vodafone).getByText("La da por desmontada"));
@@ -88,7 +88,7 @@ describe("panel de un emplazamiento con correcciones de la comunidad", () => {
     const etiqueta = within(panel).getByRole("button", { name: "Nuevo" });
     assert.strictEqual(etiqueta.getAttribute("data-termino"), "nuevo");
     assert.strictEqual(etiqueta.closest("[data-tono]")?.getAttribute("data-tono"), "nuevo");
-    const movistar = within(panel).getByLabelText("Qué dice cada fuente de Movistar");
+    const movistar = within(panel).getByLabelText("¿Qué dice cada fuente de Movistar?");
     assert.isNotNull(within(movistar).getByText("No la tiene"));
     assert.isNotNull(within(movistar).getByText("La sitúa aquí"));
     assert.isNotEmpty(within(panel).getAllByText(/no se conocen sus bandas/u));

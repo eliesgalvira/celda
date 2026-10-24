@@ -161,7 +161,7 @@ export function DialogoMedir(props: DialogoMedirProps) {
                 </p>
               </Paso>
             </Pasos>
-            <Desplegable titulo="Qué hace el código en el móvil" abierto variante="recuadro">
+            <Desplegable titulo="¿Qué hace el código en el móvil?" abierto variante="recuadro">
               <Puntos>
                 <li>Abre una pantalla de fábrica del móvil. No instala ni cambia nada.</li>
                 <li>No llama ni cuesta nada.</li>

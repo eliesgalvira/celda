@@ -78,7 +78,7 @@ describe("ficha: correcciones aceptadas de la comunidad", () => {
   it("enseña cada una junto al registro, con cuántas personas la sostienen", async () => {
     const { panel } = await abrirFicha();
     const posicion = within(panel).getByLabelText(
-      "Qué dice cada fuente de Posición del emplazamiento",
+      "¿Qué dice cada fuente de Posición del emplazamiento?",
     );
     // El registro sigue a la vista con su dato; la comunidad, al lado.
     assert.isNotNull(within(posicion).getByText("Registro oficial"));
@@ -89,7 +89,7 @@ describe("ficha: correcciones aceptadas de la comunidad", () => {
     assert.isNotNull(within(posicion).getByText("Comunidad de Celda · CC0"));
     assert.isNotNull(within(posicion).getByText("aceptada el 3 oct 2026"));
 
-    const vodafone = within(panel).getByLabelText("Qué dice cada fuente de Vodafone");
+    const vodafone = within(panel).getByLabelText("¿Qué dice cada fuente de Vodafone?");
     assert.isNotNull(within(vodafone).getByText("La tiene dada de alta"));
     assert.isNotNull(within(vodafone).getByText("1 persona dice que Vodafone no está"));
   });
@@ -139,7 +139,7 @@ describe("ficha: correcciones aceptadas de la comunidad", () => {
     fireEvent.click(revisar);
     flush();
     const sale = await within(abierto).findByRole("region", {
-      name: "Lo que sale de tu dispositivo",
+      name: "¿Qué se envía desde tu dispositivo?",
     });
     assert.isNotNull(within(sale).getByText("Orange no está en este emplazamiento"));
     assert.isNotNull(within(sale).getByText("Quitaron sus antenas en verano."));
@@ -182,7 +182,9 @@ describe("Tus aportaciones", () => {
     fireEvent.click(within(medidas).getByRole("button", { name: "Compartir" }));
     flush();
     const abierto = await dialogo(pantalla, "Compartir una aportación");
-    const sale = within(abierto).getByRole("region", { name: "Lo que sale de tu dispositivo" });
+    const sale = within(abierto).getByRole("region", {
+      name: "¿Qué se envía desde tu dispositivo?",
+    });
     for (const valor of ["−90 dBm", "−10 dB", "1800 MHz", "41.38780, 2.11550", MEDIDA.id]) {
       assert.isNotNull(within(sale).getByText(valor));
     }

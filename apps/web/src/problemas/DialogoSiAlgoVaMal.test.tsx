@@ -87,7 +87,7 @@ describe("si algo va mal", () => {
     // Cada caso lleva al menos un paso y lo que conviene guardar.
     for (const { titulo, contenido } of casos) {
       assert.isNotEmpty(within(contenido).getAllByRole("listitem"), titulo);
-      assert.isNotNull(within(contenido).queryByText("Qué conviene guardar"), titulo);
+      assert.isNotNull(within(contenido).queryByText("¿Qué conviene guardar?"), titulo);
     }
   });
 

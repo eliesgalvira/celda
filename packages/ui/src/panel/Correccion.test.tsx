@@ -28,7 +28,7 @@ describe("ContrasteFicha", () => {
     ));
 
     const lista = getByText("La tiene dada de alta").closest("dl");
-    assert.strictEqual(lista?.getAttribute("aria-label"), "Qué dice cada fuente de Vodafone");
+    assert.strictEqual(lista?.getAttribute("aria-label"), "¿Qué dice cada fuente de Vodafone?");
     assert.isNotNull(getByText("La tiene dada de alta"));
     assert.isNotNull(getByText("desde el 27 sept 2026"));
     const comunidad = getByRole("link", { name: /Ver la corrección/u });

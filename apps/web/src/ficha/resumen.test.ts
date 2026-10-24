@@ -277,7 +277,7 @@ describe("datosTecnicosDe", () => {
 
 describe("términos de la ficha", () => {
   it("el título del eje explica la frecuencia y los MHz", () => {
-    assert.strictEqual(textoPlano(TITULO_EJE), "Qué frecuencia usa cada compañía (MHz)");
+    assert.strictEqual(textoPlano(TITULO_EJE), "¿Qué frecuencia usa cada compañía (MHz)?");
     assert.deepStrictEqual(terminosDe([TITULO_EJE]), ["banda", "mhz"]);
   });
 

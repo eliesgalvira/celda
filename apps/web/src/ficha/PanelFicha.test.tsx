@@ -351,7 +351,7 @@ describe("panel del emplazamiento", () => {
       ),
     );
 
-    const eje = getByRole("table", { name: "Qué frecuencia usa cada compañía (MHz)" });
+    const eje = getByRole("table", { name: "¿Qué frecuencia usa cada compañía (MHz)?" });
     const movistar = getByRole("row", { name: /^Movistar/u });
     assert.isTrue(eje.contains(movistar));
     assert.deepStrictEqual(

@@ -62,7 +62,7 @@ function EnlaceOficial(props: { readonly pagina: keyof typeof PAGINAS }) {
 /** Lo que conviene guardar en un caso. */
 function QueGuardar(props: { readonly children: JSX.Element }) {
   return (
-    <Nota titulo="Qué conviene guardar">
+    <Nota titulo="¿Qué conviene guardar?">
       <Puntos>{props.children}</Puntos>
     </Nota>
   );

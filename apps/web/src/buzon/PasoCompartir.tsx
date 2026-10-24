@@ -76,7 +76,7 @@ export function PasoCompartir(props: PasoCompartirProps) {
 
   return (
     <>
-      <QueSale titulo="Lo que sale de tu dispositivo" datos={queSale(props.aportacion)}>
+      <QueSale titulo="¿Qué se envía desde tu dispositivo?" datos={queSale(props.aportacion)}>
         <Show when={esMedida()}>
           <p>Solo se envían estos números. La captura se queda en tu dispositivo.</p>
         </Show>

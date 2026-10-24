@@ -10,7 +10,7 @@ describe("EjeFrecuencias", () => {
   it("una fila por compañía, con una casilla rellena en cada banda donde emite", () => {
     const { getByRole } = render(() => (
       <EjeFrecuencias
-        titulo="Qué frecuencia usa cada compañía (MHz)"
+        titulo="¿Qué frecuencia usa cada compañía (MHz)?"
         bandas={BANDAS}
         filas={[
           { compania: "movistar", nombre: "Movistar", bandas: [800, 3500] },
@@ -24,7 +24,7 @@ describe("EjeFrecuencias", () => {
       />
     ));
     flush();
-    const tabla = getByRole("table", { name: "Qué frecuencia usa cada compañía (MHz)" });
+    const tabla = getByRole("table", { name: "¿Qué frecuencia usa cada compañía (MHz)?" });
     const cabeceras = Array.from(tabla.querySelectorAll("thead th"), (th) => th.textContent);
     assert.deepStrictEqual(
       cabeceras.slice(1),
@@ -48,7 +48,7 @@ describe("EjeFrecuencias", () => {
   it("cada hexágono toma el color de la barra bajo el centro de su columna", () => {
     const { getByRole } = render(() => (
       <EjeFrecuencias
-        titulo="Qué frecuencia usa cada compañía (MHz)"
+        titulo="¿Qué frecuencia usa cada compañía (MHz)?"
         bandas={BANDAS}
         filas={[{ compania: "movistar", nombre: "Movistar", bandas: [700, 3500] }]}
       />

@@ -95,7 +95,7 @@ export function ContrasteFicha(props: ContrasteFichaProps) {
         </Show>
         <h4 class="font-semibold">{props.nombre}</h4>
       </div>
-      <dl aria-label={`Qué dice cada fuente de ${props.nombre}`} class="grid grid-cols-2 gap-2">
+      <dl aria-label={`¿Qué dice cada fuente de ${props.nombre}?`} class="grid grid-cols-2 gap-2">
         <Lado lado={props.oficial} tono="oficial" />
         <Lado lado={props.comunidad} tono={props.tono} />
       </dl>
