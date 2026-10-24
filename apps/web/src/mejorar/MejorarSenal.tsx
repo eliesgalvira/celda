@@ -1,5 +1,6 @@
 import { type Coordenada, distanciaMetros, rumboGrados } from "@celda/dominio/area";
 import { Boton } from "@celda/ui/Boton.tsx";
+import { Desplegable } from "@celda/ui/Desplegable.tsx";
 import { Deslizador } from "@celda/ui/Eleccion.tsx";
 import {
   AccionesBrujula,
@@ -11,6 +12,12 @@ import {
   NotaMejorar,
   TextoBrujula,
 } from "@celda/ui/mejorar/Mejorar.tsx";
+import {
+  BloqueDeReferencia,
+  FuentesDeReferencia,
+  GraficaDeTramos,
+  TextoDeReferencia,
+} from "@celda/ui/mejorar/Referencias.tsx";
 import { recurso, recursoFijo } from "@celda/ui/recurso.ts";
 import { TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import * as Effect from "effect/Effect";
@@ -24,6 +31,16 @@ import { posicionDe } from "../ubicacion/estado.ts";
 import { puedePedirUbicacion } from "../ubicacion/Ubicacion.tsx";
 import { Brujula } from "./brujula.ts";
 import { consejos } from "./consejos.ts";
+import {
+  FUENTES_PERDIDAS,
+  FUENTES_REPARTO,
+  GRAFICA_PERDIDAS,
+  GRAFICA_REPARTO,
+  TEXTOS_DISTANCIAS,
+  TITULO_DISTANCIAS,
+  TITULO_PERDIDAS,
+  TITULO_REPARTO,
+} from "./distancias.ts";
 import {
   escuchando,
   type EventoBrujula,
@@ -195,6 +212,25 @@ export function MejorarSenal(props: { readonly emplazamiento: Coordenada }) {
           </>
         )}
       </Show>
+      <Desplegable variante="seccion" titulo={TITULO_DISTANCIAS}>
+        <TextoDeReferencia>
+          <TextoConTerminos texto={TEXTOS_DISTANCIAS.respuesta} />
+        </TextoDeReferencia>
+        <BloqueDeReferencia titulo={TITULO_REPARTO}>
+          <TextoDeReferencia>
+            <TextoConTerminos texto={TEXTOS_DISTANCIAS.reparto} />
+          </TextoDeReferencia>
+          <GraficaDeTramos {...GRAFICA_REPARTO} />
+          <FuentesDeReferencia>{FUENTES_REPARTO}</FuentesDeReferencia>
+        </BloqueDeReferencia>
+        <BloqueDeReferencia titulo={TITULO_PERDIDAS}>
+          <TextoDeReferencia>
+            <TextoConTerminos texto={TEXTOS_DISTANCIAS.perdidas} />
+          </TextoDeReferencia>
+          <GraficaDeTramos {...GRAFICA_PERDIDAS} />
+          <FuentesDeReferencia>{FUENTES_PERDIDAS}</FuentesDeReferencia>
+        </BloqueDeReferencia>
+      </Desplegable>
     </>
   );
 }

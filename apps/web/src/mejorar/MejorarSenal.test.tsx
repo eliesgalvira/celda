@@ -171,6 +171,49 @@ describe("mejorar la señal: consejos", () => {
   });
 });
 
+describe("mejorar la señal: a qué distancia llega bien", () => {
+  it("plegado, responde que no hay una distancia fija y enseña dos referencias con sus fuentes", async () => {
+    const { seccion, pulsar } = await abrir();
+    const boton = seccion().getByRole("button", {
+      name: "¿A qué distancia de una antena llega bien la señal?",
+    });
+    assert.strictEqual(boton.getAttribute("aria-expanded"), "false");
+    assert.isNull(seccion().queryByRole("heading", { name: "¿Cada cuánto hay un emplazamiento?" }));
+
+    pulsar("¿A qué distancia de una antena llega bien la señal?");
+    assert.match(
+      seccion().getByText(/^No hay una distancia fija\./u).textContent ?? "",
+      /medirlo allí\.$/u,
+    );
+    const reparto = seccion().getByRole("heading", { name: "¿Cada cuánto hay un emplazamiento?" });
+    const perdidas = seccion().getByRole("heading", {
+      name: "¿Qué reduce la señal en interiores?",
+    });
+    assert.match(
+      within(reparto.closest("section") ?? document.body)
+        .getByRole("img")
+        .getAttribute("aria-label") ?? "",
+      /Centro de ciudad grande, 200 m; Ciudad, 500 m;.*Campo muy despoblado, 5–6 km\.$/u,
+    );
+    assert.match(
+      within(perdidas.closest("section") ?? document.body)
+        .getByRole("img")
+        .getAttribute("aria-label") ?? "",
+      /Junto a una ventana, 8–16 dB; A 10–15 m de la ventana, 14–22 dB; Cristales metalizados, 18–32 dB; Dentro de un coche, 9 dB\.$/u,
+    );
+    assert.isNotNull(
+      seccion().getByText(
+        /^Fuentes: los informes TR 38\.913 y TR 38\.901 del 3GPP, el grupo que escribe/u,
+      ),
+    );
+    assert.isNotNull(
+      seccion().getByText(
+        /^Fuentes: el informe TR 38\.901 del 3GPP, un estudio de 2012 de Ofcom, el regulador/u,
+      ),
+    );
+  });
+});
+
 describe("mejorar la señal: brújula", () => {
   it("en un ordenador simula el giro con una barra y lo dice, sin pedir nada", async () => {
     const { seccion, brujula } = await abrir({ guardadas: [PUNTO] });
