@@ -506,7 +506,7 @@
                   maquina.succeed(f"cd {montada} && find . -type f -not -path './baremos/*' -exec cmp {{}} {r2}/{{}} \\;")
                   # Y el baremo de exposición de la provincia de la vigente, que calcula el build y no está en R2.
                   baremos = maquina.succeed(f"cd {montada} && find baremos -type f").split()
-                  assert len(baremos) == 1 and baremos[0].startswith("baremos/1/") and baremos[0].endswith("/08.json"), baremos
+                  assert len(baremos) == 1 and baremos[0].startswith("baremos/2/") and baremos[0].endswith("/08.json"), baremos
                   sello = baremos[0].split("/")[2]
                   maquina.succeed(f"grep --fixed-strings '\"version\":\"sitios@{sello}\"' {montada}/vigente.json")
                   maquina.fail(f"test -e {r2}/baremos")

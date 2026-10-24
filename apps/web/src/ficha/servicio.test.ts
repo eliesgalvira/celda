@@ -327,6 +327,7 @@ describe("fichas publicadas en el origen estático", () => {
         separacion: { nivel: 0.6, pendiente: 0 },
         zonaProvincial: null,
         municipios: [],
+        espana: { medidas: 244_227, bajoElUnoPorCiento: 229_688, maxima: 49.93179 },
       };
       return conFichas(Effect.succeed(HOY.capa), origen, (fichas) =>
         Effect.gen(function* () {

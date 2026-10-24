@@ -7,12 +7,14 @@ import {
   FORMATO_DEL_BAREMO,
   ficheroDeBaremo,
   generarBaremo,
+  type MedidasDeEspana,
   puntoDeMedida,
   type PuntoDeMedida,
   type RectaDelBaremo,
+  UNO_POR_CIENTO_DEL_NIVEL,
   type ZonaDelBaremo,
 } from "@celda/dominio/baremo";
-import { claveDeMedida } from "@celda/dominio/exposicion";
+import { claveDeMedida, type MedidaDeExposicion } from "@celda/dominio/exposicion";
 import type { Ficha } from "@celda/dominio/ficha";
 import { leerLoteDeProvincia } from "@celda/dominio/provincias";
 import * as Arr from "effect/Array";
@@ -57,20 +59,23 @@ export interface MedidaDeZona {
 }
 
 /**
- * Las medidas de exposición de unas fichas. Si dos estaciones base del mismo emplazamiento
- * publican la misma medida (distancia, acimut y valor), cuenta una vez: es la misma. Una ficha sin
- * provincia no entra en ninguna zona.
+ * Las medidas de exposición de un emplazamiento. Si dos de sus estaciones base publican la misma
+ * medida (distancia, acimut y valor), cuenta una vez: es la misma.
  */
+const medidasUnicasDe = (ficha: Ficha): ReadonlyArray<MedidaDeExposicion> => [
+  ...new Map(
+    ficha.estaciones
+      .flatMap((estacion) => estacion.medidasDeExposicion ?? [])
+      .map((medida) => [claveDeMedida(medida), medida]),
+  ).values(),
+];
+
+/** Las medidas de exposición de unas fichas, con su zona. Una ficha sin provincia no entra en ninguna. */
 export const medidasDeFichas = (fichas: ReadonlyArray<Ficha>): ReadonlyArray<MedidaDeZona> =>
   fichas.flatMap((ficha) => {
     const provincia = ficha.lugar?.provincia?.codigo;
     if (provincia === undefined) return [];
-    const unicas = new Map(
-      ficha.estaciones
-        .flatMap((estacion) => estacion.medidasDeExposicion ?? [])
-        .map((medida) => [claveDeMedida(medida), medida]),
-    );
-    return [...unicas.values()].map((medida) => ({
+    return medidasUnicasDe(ficha).map((medida) => ({
       provincia,
       municipio: ficha.lugar?.municipio?.codigo ?? null,
       emplazamiento: ficha.clave,
@@ -78,6 +83,17 @@ export const medidasDeFichas = (fichas: ReadonlyArray<Ficha>): ReadonlyArray<Med
       microvatiosPorCm2: medida.microvatiosPorCm2,
     }));
   });
+
+/** Los valores de las medidas de unas fichas, en µW/cm², también de las fichas sin provincia. */
+export const valoresDeFichas = (fichas: ReadonlyArray<Ficha>): ReadonlyArray<number> =>
+  fichas.flatMap((ficha) => medidasUnicasDe(ficha).map((medida) => medida.microvatiosPorCm2));
+
+/** Las medidas de toda España, con los valores de todas sus fichas (`valoresDeFichas`). */
+export const medidasDeEspana = (valores: ReadonlyArray<number>): MedidasDeEspana => ({
+  medidas: valores.length,
+  bajoElUnoPorCiento: valores.filter((valor) => valor < UNO_POR_CIENTO_DEL_NIVEL).length,
+  maxima: valores.reduce((mayor, valor) => Math.max(mayor, valor), 0),
+});
 
 const sumaDeDesviaciones = (puntos: ReadonlyArray<PuntoDeMedida>, recta: RectaDelBaremo): number =>
   puntos.reduce((suma, punto) => suma + Math.abs(punto.y - enLaRecta(recta, punto.x)), 0);
@@ -162,14 +178,15 @@ const zonaDe = (
 };
 
 /**
- * El baremo de `provincia` con las medidas de sus emplazamientos en `version`. Las rectas salen de
- * todas las medidas de la provincia y se redondean antes de calcular las desviaciones, así que la
- * web, que las lee redondeadas, da las mismas.
+ * El baremo de `provincia` con las medidas de sus emplazamientos en `version`, y las de toda
+ * España. Las rectas salen de todas las medidas de la provincia y se redondean antes de calcular
+ * las desviaciones, así que la web, que las lee redondeadas, da las mismas.
  */
 export const baremoDeProvincia = (
   version: string,
   provincia: string,
   medidas: ReadonlyArray<MedidaDeZona>,
+  espana: MedidasDeEspana,
 ): Baremo => {
   const puntos = medidas.map(puntoDeMedida);
   const tipica = redondearRecta(rectaMediana(puntos));
@@ -201,6 +218,7 @@ export const baremoDeProvincia = (
     municipios: Object.entries(porMunicipio)
       .toSorted(([a], [b]) => (a < b ? -1 : 1))
       .flatMap(([codigo, suyas]) => zonaDe(codigo, suyas) ?? []),
+    espana,
   };
 };
 
@@ -245,17 +263,24 @@ export const montarBaremos = Effect.fn("Baremo.montar")(function* (
             motivo: `${fichero} no se entiende: ${fichas.failure.motivo}`,
           });
         }
-        return medidasDeFichas(fichas.success);
+        return {
+          deZona: medidasDeFichas(fichas.success),
+          valores: valoresDeFichas(fichas.success),
+        };
       }),
     { concurrency: 8 },
   );
-  const porProvincia = Arr.groupBy(medidas.flat(), (medida) => medida.provincia);
+  const espana = medidasDeEspana(medidas.flatMap((lote) => lote.valores));
+  const porProvincia = Arr.groupBy(
+    medidas.flatMap((lote) => lote.deZona),
+    (medida) => medida.provincia,
+  );
   const escritos = yield* Effect.forEach(
     Object.entries(porProvincia).toSorted(([a], [b]) => (a < b ? -1 : 1)),
     ([provincia, suyas]) =>
       Effect.gen(function* () {
         const fichero = ficheroDeBaremo(version, provincia);
-        const contenido = generarBaremo(baremoDeProvincia(version, provincia, suyas));
+        const contenido = generarBaremo(baremoDeProvincia(version, provincia, suyas, espana));
         yield* almacen.guardar(fichero, contenido);
         return { fichero, bytes: new TextEncoder().encode(contenido).length };
       }),

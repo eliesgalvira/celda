@@ -73,47 +73,49 @@ const BAREMO: Baremo = {
   separacion: { nivel: Math.log10(4), pendiente: 0 },
   zonaProvincial: zona("08"),
   municipios: [],
+  espana: { medidas: 244_227, bajoElUnoPorCiento: 229_688, maxima: 49.93179 },
 };
 
-const frases = (ficha: Ficha, baremo: Baremo | undefined) =>
-  textosExposicion(ficha, baremo).frases.map(textoPlano);
+const plano = (textos: ReadonlyArray<Parameters<typeof textoPlano>[0]>) => textos.map(textoPlano);
 
 describe("las medidas de exposición de la ficha", () => {
-  it("dicen la más alta frente a 200 µW/cm² y, con el baremo, frente a las de su zona", () => {
-    const [maxima, norma, procedencia] = frases(GAVA, BAREMO);
-    // 2,15 µW/cm² son 3,3 dB, 10,3 dB sobre lo típico: 2,6 desviaciones.
+  it("dan la más alta frente al nivel de referencia y a la más alta de España, y frente a las de su zona", () => {
+    const { maxima, explicacion } = textosExposicion(GAVA, BAREMO);
+    assert.strictEqual(maxima?.valor, "2,15");
+    assert.deepStrictEqual(maxima?.companias, ["orange"]);
+    assert.strictEqual(maxima?.quien, "Orange, a 55\u00a0m de la antena");
+    assert.deepStrictEqual(maxima?.barra, { parte: 2.15456 / 49.93179, final: "49,9" });
     assert.strictEqual(
-      maxima,
-      "La medida más alta es de 2,15 µW/cm², el 1,1 % de 200 µW/cm². Teniendo en cuenta la " +
-        "distancia a la antena, es más alta que 75 de cada 100 medidas de la provincia de " +
-        "Barcelona y unas 11 veces la típica.",
+      textoPlano(maxima?.nota ?? []),
+      "Es el 1,1\u00a0% del nivel de referencia, que es 200\u00a0µW/cm². La barra llega hasta la medida " +
+        "más alta de España, 49,9\u00a0µW/cm². 94 de cada 100 medidas de España no llegan al 1\u00a0% del " +
+        "nivel de referencia.",
     );
+    // 2,15 µW/cm² son 3,3 dB, 10,3 dB sobre lo típico: 2,6 desviaciones.
+    assert.deepStrictEqual(maxima?.frente, {
+      tipo: "comparada",
+      masAltaQue: 75,
+      nota:
+        "Se compara con las medidas de la provincia de Barcelona, porque en Gavà hay pocas. La " +
+        "típica a 55\u00a0m de la antena es 0,2\u00a0µW/cm², y esta es unas 11 veces mayor.",
+    });
+    const [norma, procedencia] = plano(explicacion);
     assert.strictEqual(
       norma,
       "Cada medida suma todo lo que llega a ese punto, de todas las compañías y también de la " +
-        "radio y la televisión, y por eso la norma la compara con 200 µW/cm², su nivel de " +
+        "radio y la televisión, y por eso la norma la compara con 200\u00a0µW/cm², su nivel de " +
         "referencia más bajo. Por lo mismo, las de dos compañías no se suman.",
     );
     assert.match(procedencia ?? "", /^Son comprobaciones de las Jefaturas de Inspección/u);
     assert.match(procedencia ?? "", /no dicen nada de cómo funciona un móvil allí\.$/u);
   });
 
-  it("dan cada medida por compañía, con su distancia, su dirección, su valor y su comparación", () => {
+  it("dan cada medida por compañía, con su distancia, su dirección, su valor y su puesto", () => {
     const [orange, vodafone] = textosExposicion(GAVA, BAREMO).estaciones;
     assert.strictEqual(orange?.nombre, "Orange");
     assert.deepStrictEqual(orange?.filas, [
-      {
-        distancia: "80 m",
-        direccion: "noreste",
-        valor: "0,535",
-        comparacion: { tipica: "0,2", masAltaQue: "60 de cada 100" },
-      },
-      {
-        distancia: "55 m",
-        direccion: "suroeste",
-        valor: "2,15",
-        comparacion: { tipica: "0,2", masAltaQue: "75 de cada 100" },
-      },
+      { distancia: "80 m", direccion: "noreste", valor: "0,535", comparacion: { masAltaQue: 60 } },
+      { distancia: "55 m", direccion: "suroeste", valor: "2,15", comparacion: { masAltaQue: 75 } },
     ]);
     assert.deepStrictEqual(
       vodafone?.filas.map((f) => [f.distancia, f.direccion, f.valor]),
@@ -121,14 +123,16 @@ describe("las medidas de exposición de la ficha", () => {
     );
   });
 
-  it("sin el baremo, enseñan las mismas medidas sin compararlas", () => {
-    const sin = textosExposicion(GAVA, undefined);
+  it("sin el baremo, enseñan las mismas medidas sin barra y sin compararlas", () => {
+    const { maxima, estaciones, explicacion } = textosExposicion(GAVA, undefined);
     assert.strictEqual(
-      textoPlano(sin.frases[0] ?? []),
-      "La medida más alta es de 2,15 µW/cm², el 1,1 % de 200 µW/cm².",
+      textoPlano(maxima?.nota ?? []),
+      "Es el 1,1\u00a0% del nivel de referencia, que es 200\u00a0µW/cm².",
     );
-    assert.lengthOf(sin.frases, 3);
-    assert.isTrue(sin.estaciones.flatMap((e) => e.filas).every((f) => f.comparacion === undefined));
+    assert.isUndefined(maxima?.barra);
+    assert.isUndefined(maxima?.frente);
+    assert.lengthOf(explicacion, 2);
+    assert.isTrue(estaciones.flatMap((e) => e.filas).every((f) => f.comparacion === undefined));
   });
 
   it("con su municipio como zona, lo nombran; y de una sola compañía no hablan de sumar", () => {
@@ -144,17 +148,20 @@ describe("las medidas de exposición de la ficha", () => {
         }),
       ],
     };
-    const [maxima, norma] = frases(enBarcelona, { ...BAREMO, municipios: [zona("08019")] });
+    const { maxima, explicacion } = textosExposicion(enBarcelona, {
+      ...BAREMO,
+      municipios: [zona("08019")],
+    });
     // Cerca de la típica: sin «veces».
-    assert.strictEqual(
-      maxima,
-      "La medida más alta es de 0,2 µW/cm², el 0,1 % de 200 µW/cm². Teniendo en cuenta la " +
-        "distancia a la antena, es más alta que 50 de cada 100 medidas de Barcelona.",
-    );
-    assert.notInclude(norma ?? "", "no se suman");
+    assert.deepStrictEqual(maxima?.frente, {
+      tipo: "comparada",
+      masAltaQue: 50,
+      nota: "Se compara con las medidas de Barcelona. La típica a 7\u00a0m de la antena es 0,2\u00a0µW/cm².",
+    });
+    assert.notInclude(textoPlano(explicacion[0] ?? []), "no se suman");
   });
 
-  it("si la provincia tiene medidas de pocos emplazamientos, dicen que no las comparan", () => {
+  it("si la provincia tiene medidas de pocos emplazamientos, dicen que no la comparan", () => {
     const enCeuta: Ficha = {
       ...GAVA,
       lugar: {
@@ -163,12 +170,45 @@ describe("las medidas de exposición de la ficha", () => {
       },
     };
     const textos = textosExposicion(enCeuta, { ...BAREMO, provincia: "51", zonaProvincial: null });
-    assert.strictEqual(
-      textoPlano(textos.frases[1] ?? []),
-      "Celda no las compara con las de su zona porque en Ceuta hay medidas de pocos emplazamientos.",
-    );
+    assert.deepStrictEqual(textos.maxima?.frente, {
+      tipo: "sin-zona",
+      nota: "No se compara con otras medidas porque en Ceuta hay medidas de pocos emplazamientos.",
+    });
+    assert.isDefined(textos.maxima?.barra);
     assert.isTrue(
       textos.estaciones.flatMap((e) => e.filas).every((f) => f.comparacion === undefined),
+    );
+  });
+
+  it("la más alta de un emplazamiento compartido es de las dos compañías, y a 0 m está a menos de 1", () => {
+    const compartida = { distanciaMetros: 6, acimutGrados: 180, microvatiosPorCm2: 47.13344 };
+    const tarradellas: Ficha = {
+      ...GAVA,
+      estaciones: [
+        estacion("digi", { medidasDeExposicion: [compartida] }),
+        estacion("movistar", { medidasDeExposicion: [compartida] }),
+        estacion("vodafone", {
+          medidasDeExposicion: [{ distanciaMetros: 18, acimutGrados: 225, microvatiosPorCm2: 0.5 }],
+        }),
+      ],
+    };
+    const { maxima } = textosExposicion(tarradellas, BAREMO);
+    assert.deepStrictEqual(maxima?.companias, ["digi", "movistar"]);
+    assert.strictEqual(maxima?.quien, "Digi y Movistar, a 6\u00a0m de la antena");
+
+    const enLaAzotea: Ficha = {
+      ...GAVA,
+      estaciones: [
+        estacion("orange", {
+          medidasDeExposicion: [{ distanciaMetros: 0, acimutGrados: 0, microvatiosPorCm2: 3.23 }],
+        }),
+      ],
+    };
+    const deLaAzotea = textosExposicion(enLaAzotea, BAREMO).maxima;
+    assert.strictEqual(deLaAzotea?.quien, "Orange, a menos de 1\u00a0m de la antena");
+    assert.include(
+      deLaAzotea?.frente?.nota ?? "",
+      "La típica a menos de 1\u00a0m de la antena es 0,2\u00a0µW/cm², y esta es unas 16 veces mayor.",
     );
   });
 
@@ -183,7 +223,8 @@ describe("las medidas de exposición de la ficha", () => {
       ],
     };
     const textos = textosExposicion(ficha, BAREMO);
-    assert.deepStrictEqual(textos.frases, []);
+    assert.isUndefined(textos.maxima);
+    assert.deepStrictEqual(textos.explicacion, []);
     assert.deepStrictEqual(
       textos.estaciones.map((e) => [e.filas.length, e.sinMedidas]),
       [
@@ -199,9 +240,9 @@ describe("las medidas de exposición de la ficha", () => {
     );
   });
 
-  it("subrayan el nivel de referencia, y no el término del título de la sección", () => {
-    assert.deepStrictEqual(terminosDe(textosExposicion(GAVA, BAREMO).frases), [
-      "nivel-de-referencia",
-    ]);
+  it("subrayan el nivel de referencia una vez fuera y otra en el plegable, y no el término del título", () => {
+    const { maxima, explicacion } = textosExposicion(GAVA, BAREMO);
+    assert.deepStrictEqual(terminosDe([maxima?.nota ?? []]), ["nivel-de-referencia"]);
+    assert.deepStrictEqual(terminosDe(explicacion), ["nivel-de-referencia"]);
   });
 });

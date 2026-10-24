@@ -6,6 +6,7 @@ import {
   ficheroDeBaremo,
   generarBaremo,
   leerBaremo,
+  type MedidasDeEspana,
   type RectaDelBaremo,
 } from "@celda/dominio/baremo";
 import type { MedidaDeExposicion } from "@celda/dominio/exposicion";
@@ -21,12 +22,17 @@ import { sha256 } from "./almacenes/firma.ts";
 import {
   baremoDeProvincia,
   type MedidaDeZona,
+  medidasDeEspana,
   medidasDeFichas,
   montarBaremos,
   rectaMediana,
+  valoresDeFichas,
 } from "./baremo.ts";
 
 const VERSION = "sitios@2026-10-20T22:30:02Z";
+
+/** Las de España en las pruebas de una provincia, que no dependen de ellas. */
+const ESPANA: MedidasDeEspana = { medidas: 244_227, bajoElUnoPorCiento: 229_688, maxima: 49.93179 };
 
 /** Números pseudoaleatorios reproducibles entre 0 y 1 (Park y Miller). */
 const aleatorios = (semilla: number) => {
@@ -203,6 +209,26 @@ const provincia = (
   );
 };
 
+describe("medidasDeEspana", () => {
+  it("cuenta una vez la medida repetida, también las de fichas sin provincia, y la más alta", () => {
+    const comun = medida(55, 227, 2.15456);
+    const valores = valoresDeFichas([
+      ficha("a", enBarcelona("08089"), [
+        estacion("orange", [comun, medida(80, 25, 1.99999)]),
+        estacion("vodafone", [comun, medida(6, 180, 47.13344)]),
+      ]),
+      ficha("mar", { municipio: null, provincia: null }, [estacion("orange", [medida(5, 0, 2)])]),
+      ficha("viejo", undefined, [estacion("movistar", [medida(9, 90, 0)])]),
+    ]);
+    // 2 µW/cm² es justo el 1 % de 200: no queda por debajo.
+    assert.deepStrictEqual(medidasDeEspana(valores), {
+      medidas: 5,
+      bajoElUnoPorCiento: 2,
+      maxima: 47.13344,
+    });
+  });
+});
+
 describe("baremoDeProvincia", () => {
   it("encuentra la caída con la distancia y compara cada medida con lo típico a su distancia", () => {
     const baremo = baremoDeProvincia(
@@ -212,6 +238,7 @@ describe("baremoDeProvincia", () => {
         ["08019", 400],
         ["08089", 60],
       ]),
+      ESPANA,
     );
     assert.closeTo(baremo.tipica.pendiente, -4, 0.6);
     assert.closeTo(baremo.tipica.nivel, -3, 1);
@@ -252,7 +279,7 @@ describe("baremoDeProvincia", () => {
 
   it("las medidas de la zona quedan repartidas: de cada 100, cada puesto lo ocupa una", () => {
     const medidas = provincia([["08019", 300]]);
-    const baremo = baremoDeProvincia(VERSION, "08", medidas);
+    const baremo = baremoDeProvincia(VERSION, "08", medidas, ESPANA);
     const zona = baremo.zonaProvincial ?? assert.fail("sin zona provincial");
     const puestos = medidas.map((m) => compararMedida(baremo, zona, m).masAltaQue);
     const media = puestos.reduce((s, p) => s + p, 0) / puestos.length;
@@ -268,6 +295,7 @@ describe("baremoDeProvincia", () => {
         ["08019", EMPLAZAMIENTOS_MINIMOS],
         ["08089", EMPLAZAMIENTOS_MINIMOS - 1],
       ]),
+      ESPANA,
     );
     assert.deepStrictEqual(
       baremo.municipios.map((m) => [m.codigo, m.emplazamientos]),
@@ -277,6 +305,7 @@ describe("baremoDeProvincia", () => {
       VERSION,
       "51",
       provincia([["51001", EMPLAZAMIENTOS_MINIMOS - 1]]),
+      ESPANA,
     );
     assert.isNull(pocos.zonaProvincial);
     assert.deepStrictEqual(pocos.municipios, []);
@@ -298,9 +327,9 @@ describe("baremoDeProvincia", () => {
       .map((m) => ({ m, orden: azar() }))
       .toSorted((a, b) => a.orden - b.orden)
       .map(({ m }) => m);
-    const baremo = baremoDeProvincia(VERSION, "08", medidas);
+    const baremo = baremoDeProvincia(VERSION, "08", medidas, ESPANA);
     assert.strictEqual(
-      generarBaremo(baremoDeProvincia(VERSION, "08", barajadas)),
+      generarBaremo(baremoDeProvincia(VERSION, "08", barajadas, ESPANA)),
       generarBaremo(baremo),
     );
     const zona = baremo.zonaProvincial ?? assert.fail("sin zona provincial");
@@ -317,6 +346,7 @@ describe("baremoDeProvincia", () => {
    */
   const HUELLAS = {
     1: "98273fa4417e6debc1baf238b2784c5e05ebaac294a35263d8379b42ff234875",
+    2: "988f686bf2f60d03fd3dea134e6afe1124598f06e7a0132cb003e9b7e276f487",
   } satisfies Readonly<Record<number, string>>;
 
   it.effect("cada formato del baremo da siempre lo mismo", () =>
@@ -329,6 +359,7 @@ describe("baremoDeProvincia", () => {
             ["08019", 150],
             ["08089", 40],
           ]),
+          ESPANA,
         ),
       );
       const huella = yield* Effect.orDie(sha256(contenido));
@@ -371,8 +402,8 @@ const FUENTE = {
   huella: "sha256:prueba",
 };
 
-const lote = (fichas: ReadonlyArray<Ficha>) =>
-  generarLoteDeProvincia("08", fichas, new Map(), FUENTE);
+const lote = (fichas: ReadonlyArray<Ficha>, provincia = "08") =>
+  generarLoteDeProvincia(provincia, fichas, new Map(), FUENTE);
 
 describe("montarBaremos", () => {
   it.effect("guarda un baremo por provincia con medidas, con los lotes de la vigente", () =>
@@ -388,7 +419,21 @@ describe("montarBaremos", () => {
           "fichas/08/bbbbbbbbbbbbbbbb.json",
           lote([
             ficha("b", enBarcelona("08019"), [estacion("vodafone", [medida(7, 320, 0.66219)])]),
+            ficha("mar", { municipio: null, provincia: null }, [
+              estacion("orange", [medida(5, 0, 0.1)]),
+            ]),
           ]),
+        ],
+        [
+          "fichas/51/dddddddddddddddd.json",
+          lote(
+            [
+              ficha("c", { municipio: null, provincia: { codigo: "51", nombre: "Ceuta" } }, [
+                estacion("orange", [medida(7, 270, 38.4523)]),
+              ]),
+            ],
+            "51",
+          ),
         ],
         ["provincias/08/cccccccccccccccc.json", "{}"],
       ]);
@@ -397,14 +442,19 @@ describe("montarBaremos", () => {
       );
       const fichero = ficheroDeBaremo(VERSION, "08");
       assert.strictEqual(fichero, `baremos/${FORMATO_DEL_BAREMO}/2026-10-20T22:30:02Z/08.json`);
-      assert.deepStrictEqual(montados.ficheros, [fichero]);
+      assert.deepStrictEqual(montados.ficheros, [fichero, ficheroDeBaremo(VERSION, "51")]);
       const leido = leerBaremo(ficheros.get(fichero) ?? "", VERSION, "08");
-      assert.isTrue(Result.isSuccess(leido));
+      const baremo = Result.isSuccess(leido) ? leido.success : assert.fail("no se lee");
       // Dos emplazamientos no bastan para comparar con nadie.
-      if (Result.isSuccess(leido)) assert.isNull(leido.success.zonaProvincial);
+      assert.isNull(baremo.zonaProvincial);
+      // Las de toda España, también la de Ceuta y la de la ficha sin provincia.
+      assert.deepStrictEqual(baremo.espana, { medidas: 4, bajoElUnoPorCiento: 2, maxima: 38.4523 });
       assert.strictEqual(
         montados.bytes,
-        new TextEncoder().encode(ficheros.get(fichero) ?? "").length,
+        montados.ficheros.reduce(
+          (suma, f) => suma + new TextEncoder().encode(ficheros.get(f) ?? "").length,
+          0,
+        ),
       );
     }),
   );

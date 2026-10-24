@@ -2,7 +2,7 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 import { CapaIlegible } from "./capa.ts";
-import type { MedidaDeExposicion } from "./exposicion.ts";
+import { type MedidaDeExposicion, NIVEL_DE_REFERENCIA_MAS_BAJO } from "./exposicion.ts";
 import type { Lugar } from "./municipio.ts";
 import { selloDeVersion } from "./provincias.ts";
 
@@ -16,7 +16,8 @@ import { selloDeVersion } from "./provincias.ts";
  * las medidas. La desviación de una medida (`desviacionDe`) es lo que se aparta de la típica en
  * esas unidades. Una zona, la provincia o uno de sus municipios, guarda las desviaciones de los
  * percentiles 1 a 99 de sus medidas, y con ellas se dice de cada 100 medidas de la zona cuántas
- * quedan por debajo de una (`compararMedida`).
+ * quedan por debajo de una (`compararMedida`). Lleva además la medida más alta de toda España y
+ * cuántas no llegan al 1 % del nivel de referencia (`MedidasDeEspana`), para situar cualquier medida.
  *
  * Lo calcula el montaje de las capas, en el build de Vercel, con las fichas de cada versión que
  * monta (`packages/publicacion/src/baremo.ts`). No está en R2.
@@ -27,7 +28,7 @@ import { selloDeVersion } from "./provincias.ts";
  * (`ficheroDeBaremo`), así que subirlo cambia la web y el flujo de despliegue vuelve a montar las
  * capas con el cálculo nuevo (ADR 0030).
  */
-export const FORMATO_DEL_BAREMO = 1;
+export const FORMATO_DEL_BAREMO = 2;
 
 /** Una medida a menos de 1 m cuenta como tomada a 1 m: el registro da las distancias en metros. */
 export const DISTANCIA_MINIMA_METROS = 1;
@@ -66,6 +67,26 @@ export const ZonaDelBaremo = Schema.Struct({
 });
 export type ZonaDelBaremo = typeof ZonaDelBaremo.Type;
 
+/** El 1 % del nivel de referencia más bajo, en µW/cm². */
+export const UNO_POR_CIENTO_DEL_NIVEL = NIVEL_DE_REFERENCIA_MAS_BAJO / 100;
+
+/**
+ * Las medidas de toda España en la versión, contando una vez la que publican varias estaciones
+ * base de un emplazamiento, como en las zonas. Las de una ficha sin provincia también cuentan.
+ */
+export const MedidasDeEspana = Schema.Struct({
+  medidas: Schema.Int,
+  /** Cuántas no llegan al 1 % del nivel de referencia más bajo (`UNO_POR_CIENTO_DEL_NIVEL`). */
+  bajoElUnoPorCiento: Schema.Int,
+  /** La más alta, en µW/cm², tal como la publica el registro. */
+  maxima: Schema.Finite,
+});
+export type MedidasDeEspana = typeof MedidasDeEspana.Type;
+
+/** De cada 100 medidas de España, cuántas no llegan al 1 % del nivel de referencia. */
+export const bajoElUnoDeCadaCien = (espana: MedidasDeEspana): number =>
+  Math.floor((100 * espana.bajoElUnoPorCiento) / espana.medidas);
+
 export const Baremo = Schema.Struct({
   formato: Schema.Literal(FORMATO_DEL_BAREMO),
   /** La versión de cuyas fichas sale. */
@@ -79,6 +100,7 @@ export const Baremo = Schema.Struct({
   zonaProvincial: Schema.NullOr(ZonaDelBaremo),
   /** Los municipios con medidas de bastantes emplazamientos, por código. */
   municipios: Schema.Array(ZonaDelBaremo),
+  espana: MedidasDeEspana,
 });
 export type Baremo = typeof Baremo.Type;
 
@@ -89,7 +111,7 @@ const decodificarBaremo = Schema.decodeUnknownResult(BaremoEnJson);
 /** El contenido del fichero de un baremo. Los mismos datos dan siempre los mismos bytes. */
 export const generarBaremo = (baremo: Baremo): string => codificarBaremo(baremo);
 
-/** El baremo de una provincia en una versión: `baremos/1/2026-10-20T22:30:02Z/08.json`. */
+/** El baremo de una provincia en una versión: `baremos/2/2026-10-20T22:30:02Z/08.json`. */
 export const ficheroDeBaremo = (version: string, provincia: string): string =>
   `baremos/${FORMATO_DEL_BAREMO}/${selloDeVersion(version)}/${provincia}.json`;
 

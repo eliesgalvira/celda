@@ -9,6 +9,8 @@ const variantesDesplegable = cva("", {
       panel: "border-t border-linea",
       /** Un recuadro dentro de un diálogo, como «¿Qué le pasa a mi móvil?». */
       recuadro: "bg-superficie-alta shadow-[inset_0_0_0_1.5px_var(--linea)]",
+      /** Una parte de una sección de la ficha, como «Las medidas de cada compañía». */
+      seccion: "border-t border-linea",
     },
   },
   defaultVariants: { variante: "panel" },
@@ -22,6 +24,7 @@ const variantesBotonDesplegable = cva(
         panel:
           "min-h-12 px-5 font-mono text-[11px] font-semibold tracking-[0.14em] text-primario-texto uppercase hover:bg-superficie-alta md:px-6",
         recuadro: "min-h-11 px-4 text-base font-semibold text-tinta hover:bg-fondo",
+        seccion: "min-h-11 text-sm font-semibold text-tinta",
       },
     },
     defaultVariants: { variante: "panel" },
@@ -33,6 +36,7 @@ const variantesContenidoDesplegable = cva("", {
     variante: {
       panel: "px-5 pb-5 md:px-6",
       recuadro: "px-4 pb-4",
+      seccion: "flex flex-col gap-3 pb-3",
     },
   },
   defaultVariants: { variante: "panel" },
@@ -43,7 +47,7 @@ export interface DesplegableProps {
   readonly titulo: string;
   /** Abierto al aparecer. Luego lo abre y lo cierra quien lo lee. Por defecto, cerrado. */
   readonly abierto?: boolean;
-  readonly variante?: "panel" | "recuadro";
+  readonly variante?: "panel" | "recuadro" | "seccion";
   readonly children: JSX.Element;
 }
 

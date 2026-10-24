@@ -517,10 +517,16 @@ describe("panel del emplazamiento", () => {
         "azimut",
       ],
     );
-    // Cada bloque de la ficha (cabecera, frase, marca de agua, secciones y datos técnicos)
-    // subraya un término solo la primera vez.
-    for (const bloque of Array.from(ficha.children)) {
-      const deBloque = terminosSubrayados(bloque);
+    // Cada bloque de la ficha (cabecera, frase, marca de agua, secciones, datos técnicos y cada
+    // plegable de una sección) subraya un término solo la primera vez.
+    const plegables = Array.from(
+      ficha.querySelectorAll("button[aria-controls]:not([data-termino])"),
+      (boton) => document.getElementById(boton.getAttribute("aria-controls") ?? ""),
+    ).filter((plegable) => plegable !== null);
+    for (const bloque of [...Array.from(ficha.children), ...plegables]) {
+      const deBloque = Array.from(bloque.querySelectorAll("[data-termino]"))
+        .filter((t) => !plegables.some((p) => p !== bloque && bloque.contains(p) && p.contains(t)))
+        .map((t) => t.getAttribute("data-termino") ?? "");
       assert.strictEqual(new Set(deBloque).size, deBloque.length, deBloque.join(", "));
     }
   });
@@ -719,16 +725,28 @@ describe("panel del emplazamiento", () => {
         cortes: Array.from({ length: CORTES }, (_, i) => Math.round((i - 49) * 10) / 100),
       },
       municipios: [],
+      espana: { medidas: 244_227, bajoElUnoPorCiento: 229_688, maxima: 49.93179 },
     };
     const URL_DEL_BAREMO = `${ORIGEN}/${ficheroDeBaremo(CAPA.version, "08")}`;
     const pedidosDeBaremos = (origen: OrigenDePrueba) =>
       origen.pedidas().filter((url) => url.includes("/baremos/"));
 
-    it("enseña las medidas de cada compañía en seguida y las compara con su zona al llegar el baremo", async () => {
-      const { findByRole, getByRole, findByText, getByText, origen } = abrir(CON_MEDIDAS.clave);
+    it("enseña la más alta en seguida, y al llegar el baremo, la barra y dónde queda entre las de su zona", async () => {
+      const { findByRole, getByRole, findByText, getByText, queryByText, origen } = abrir(
+        CON_MEDIDAS.clave,
+      );
       await responder(origen, CON_MEDIDAS);
       await findByRole("heading", { name: TITULO_CAMPUS_NORD });
 
+      assert.isNotNull(
+        getByText(
+          textoEntero("Es el 0,33\u00a0% del nivel de referencia, que es 200\u00a0µW/cm²."),
+        ),
+      );
+      assert.isNull(queryByText("Frente a otras medidas"));
+      // Las de cada compañía, plegadas.
+      fireEvent.click(getByRole("button", { name: "Las medidas de cada compañía" }));
+      flush();
       const tabla = () => getByRole("table", { name: "Medidas de exposición de Movistar" });
       assert.deepStrictEqual(
         within(tabla())
@@ -739,21 +757,39 @@ describe("panel del emplazamiento", () => {
       assert.isNotNull(
         getByText("Celda aún no ha leído sus medidas de exposición en el registro oficial."),
       );
-      assert.isNotNull(
-        getByText(textoEntero("La medida más alta es de 0,662 µW/cm², el 0,33 % de 200 µW/cm².")),
-      );
 
       await contestar(origen, URL_DEL_BAREMO, 200, generarBaremo(BAREMO));
       assert.isNotNull(
         await findByText(
-          /es más alta que 63 de cada 100 medidas de la provincia de Barcelona y unas 3 veces la típica\./u,
+          "Se compara con las medidas de la provincia de Barcelona, porque en Barcelona hay " +
+            "pocas. La típica a 7 m de la antena es 0,2 µW/cm², y esta es unas 3 veces mayor.",
+        ),
+      );
+      assert.isNotNull(getByText(textoEntero("más alta que 63 de 100")));
+      assert.isNotNull(
+        getByText(
+          textoEntero(
+            "Es el 0,33\u00a0% del nivel de referencia, que es 200\u00a0µW/cm². La barra llega hasta la " +
+              "medida más alta de España, 49,9\u00a0µW/cm². 94 de cada 100 medidas de España no " +
+              "llegan al 1\u00a0% del nivel de referencia.",
+          ),
         ),
       );
       assert.deepStrictEqual(
         within(tabla())
           .getAllByRole("columnheader")
           .map((celda) => celda.textContent),
-        ["Distancia", "Dirección", "µW/cm²", "Típica", "Más alta que"],
+        ["Distancia", "Dirección", "µW/cm²", "Más alta que"],
+      );
+      assert.deepStrictEqual(
+        within(tabla())
+          .getAllByRole("row")
+          .map((fila) => fila.textContent),
+        [
+          "DistanciaDirecciónµW/cm²Más alta que",
+          "7 mnoroeste0,66263 de 100",
+          "13 mnoroeste0,089241 de 100",
+        ],
       );
       assert.deepStrictEqual(jergaEn(document.body), []);
     });
@@ -770,6 +806,8 @@ describe("panel del emplazamiento", () => {
       await findByRole("heading", { name: TITULO_PEDRALBES });
       // Una versión sin baremo: las medidas se ven sin comparar.
       await contestar(origen, URL_DEL_BAREMO, 404, "");
+      fireEvent.click(getByRole("button", { name: "Las medidas de cada compañía" }));
+      flush();
       const tabla = getByRole("table", { name: "Medidas de exposición de Orange" });
       assert.lengthOf(within(tabla).getAllByRole("columnheader"), 3);
 

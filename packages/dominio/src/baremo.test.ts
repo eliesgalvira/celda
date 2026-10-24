@@ -3,6 +3,7 @@ import * as Result from "effect/Result";
 
 import {
   type Baremo,
+  bajoElUnoDeCadaCien,
   CORTES,
   compararMedida,
   desviacionDe,
@@ -34,6 +35,7 @@ const BAREMO: Baremo = {
   separacion: { nivel: Math.log10(4), pendiente: 0 },
   zonaProvincial: zona("08"),
   municipios: [zona("08019", 1)],
+  espana: { medidas: 244_227, bajoElUnoPorCiento: 229_688, maxima: 49.93179 },
 };
 
 const BARCELONA = { codigo: "08", nombre: "Barcelona" };
@@ -52,7 +54,23 @@ describe("el fichero del baremo", () => {
     assert.isTrue(Result.isFailure(leerBaremo(contenido, "sitios@2026-10-19T22:30:02Z", "08")));
     assert.isTrue(Result.isFailure(leerBaremo(contenido, VERSION, "28")));
     assert.isTrue(
-      Result.isFailure(leerBaremo(contenido.replace('"formato":1', '"formato":0'), VERSION, "08")),
+      Result.isFailure(
+        leerBaremo(
+          contenido.replace(`"formato":${FORMATO_DEL_BAREMO}`, '"formato":0'),
+          VERSION,
+          "08",
+        ),
+      ),
+    );
+  });
+});
+
+describe("las medidas de España", () => {
+  it("dicen de cada 100 cuántas no llegan al 1 % del nivel de referencia, sin redondear hacia arriba", () => {
+    assert.strictEqual(bajoElUnoDeCadaCien(BAREMO.espana), 94);
+    assert.strictEqual(
+      bajoElUnoDeCadaCien({ medidas: 1000, bajoElUnoPorCiento: 949, maxima: 1 }),
+      94,
     );
   });
 });

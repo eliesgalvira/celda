@@ -1,6 +1,6 @@
 # Baremo de exposición: cada medida del ministerio frente a las de su zona, teniendo en cuenta la distancia
 
-Estado: aceptada el 22/10/2026 con el #86, que la implementa. Decide cómo enseña la ficha las medidas de exposición del ministerio, que el [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) dejó en los lotes desde el #73 sin enseñarlas. Las normas y lo que se sabe de las medidas salen de la investigación 09 (`docs/investigacion/reclamaciones-y-exposicion.md`, #79). El glosario gana el nivel de referencia y el baremo de exposición.
+Estado: aceptada el 22/10/2026 con el #86, que la implementa. Decide cómo enseña la ficha las medidas de exposición del ministerio, que el [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) dejó en los lotes desde el #73 sin enseñarlas. Las normas y lo que se sabe de las medidas salen de la investigación 09 (`docs/investigacion/reclamaciones-y-exposicion.md`, #79). El glosario gana el nivel de referencia y el baremo de exposición. Revisada el 24/10/2026: cómo se enseña cambió tras una sesión con el usuario, y el baremo pasa al formato 2 con las medidas de toda España (abajo, «Revisión del 24/10/2026»).
 
 ## Contexto
 
@@ -20,6 +20,8 @@ Las medidas bajan con la distancia, y no se puede comparar una tomada en la mism
 ## Decisión
 
 ### Qué enseña la ficha
+
+Así quedó el 22/10/2026. Lo que cambió el 24/10/2026 está en «Revisión del 24/10/2026».
 
 - **Una sección «Medidas de exposición»** tras la de las bandas, con una tabla por compañía: la distancia, la dirección del punto de medida vista desde la antena, en ocho direcciones (`nombreRumbo`), y el valor en µW/cm². Con el baremo de su provincia, cada medida lleva además la típica de su zona a esa distancia y «Más alta que», cuántas de cada 100 medidas de la zona quedan por debajo.
 - **Una frase con la más alta del emplazamiento** frente a 200 µW/cm²: «La medida más alta es de 2,15 µW/cm², el 1,1 % de 200 µW/cm²». Con el baremo sigue «Teniendo en cuenta la distancia a la antena, es más alta que 95 de cada 100 medidas de la provincia de Barcelona y unas 11 veces la típica». Las veces solo se dicen desde 2, que es lo menos que permite la frase.
@@ -73,7 +75,7 @@ Todas están en `packages/dominio/src/baremo.ts` y `packages/publicacion/src/bar
 - **97 emplazamientos** (`EMPLAZAMIENTOS_MINIMOS`), por la cuenta de arriba.
 - **99 cortes** (`CORTES`), los percentiles 1 a 99, porque la frase dice «de cada 100».
 - **Dos decimales** en los números del fichero. 0,01 dB es la décima parte del paso con que se publican los valores, 0,01 V/m, que en 1 V/m son unos 0,09 dB. Las rectas se redondean antes de calcular las desviaciones, así que la web, que las lee redondeadas, da las mismas.
-- **El formato del baremo** (`FORMATO_DEL_BAREMO`, 1), abajo.
+- **El formato del baremo** (`FORMATO_DEL_BAREMO`, 2 desde el 24/10/2026), abajo.
 
 ### Dónde se calcula
 
@@ -99,6 +101,27 @@ Si falta un lote de la vigente o no se entiende, el build falla, como cuando fal
 - Nunca dice ni da a entender que una medida alta sea más cobertura o más señal. Cada medida suma todo lo que llega a ese punto, de cualquier compañía, la radio y la televisión, y se tomó para comprobar el límite legal.
 - La comparación es con las medidas que publica el registro, y no con la exposición en cualquier punto de la zona. Las elige quien mide, en los puntos de más exposición entre los sitios donde suele haber gente, y sin fecha.
 - Las cifras son de una versión de los datos: con otra, el baremo cambia.
+
+## Revisión del 24/10/2026
+
+El usuario vio la sección con las frases y las tablas, y pidió algo más visual. Se eligió entre maquetas con datos reales. Esto es lo que cambia.
+
+### Qué enseña la ficha ahora
+
+- **La medida más alta en grande**, con el logo y el nombre de las compañías que la publican y su distancia: «Orange, a 55 m de la antena». Si la publican las dos de un emplazamiento compartido, salen las dos: «Digi y Movistar, a 6 m de la antena». A 0 m dice «a menos de 1 m».
+- **Una barra de 0 a la medida más alta de España.** Con 200 µW/cm² al final, casi todas las barras salían vacías: en España, 94 de cada 100 medidas no llegan al 1 % de 200, y la más alta es de 49,93 µW/cm², una cuarta parte. Bajo la barra solo van «0» y el número del final; el usuario rechazó escribir allí «49,9, la más alta de España» porque el texto largo empieza hacia la mitad de la barra y parece marcar otro punto. Debajo, una frase: «Es el 1,1 % del nivel de referencia, que es 200 µW/cm². La barra llega hasta la medida más alta de España, 49,9 µW/cm². 94 de cada 100 medidas de España no llegan al 1 % del nivel de referencia.» La barra no dice nada que no diga la frase, así que el lector de pantalla no la lee.
+- **«Frente a otras medidas»**, un punto sobre una línea que va de «la más baja» a «la más alta», con «más alta que 95 de 100» escrito. Sin marca en el centro: la típica siempre caería allí, y el usuario no entendía qué marcaba. Debajo, con qué medidas se compara y la típica a su distancia: «Se compara con las medidas de la provincia de Barcelona, porque en Gavà hay pocas. La típica a 55 m de la antena es 0,2 µW/cm², y esta es unas 11 veces mayor.» El «porque en Gavà hay pocas» sale cuando la zona es la provincia y el emplazamiento tiene municipio, que no llega a `EMPLAZAMIENTOS_MINIMOS`. Se descartaron una cuadrícula de 100 puntos, porque el usuario no la vio clara, y una regla logarítmica, porque pedía leer cómo va la escala.
+- **Sin zona**, una frase en su lugar: «No se compara con otras medidas porque en Ceuta hay medidas de pocos emplazamientos.»
+- **Plegados**, «Las medidas de cada compañía», con las tablas, y «¿Qué son estas medidas?», con las frases de por qué 200 y de quién mide. Las tablas pierden la columna «Típica» y cada fila lleva el mismo punto, pequeño, y «95 de 100».
+- **Sin baremo**, la cifra y el porcentaje del nivel de referencia, sin barra y sin comparar. Sin ninguna medida, como antes, solo por qué no las hay.
+
+### El formato 2
+
+Cada fichero de provincia lleva además `espana` (`MedidasDeEspana`): cuántas medidas hay en España, cuántas no llegan al 1 % del nivel de referencia más bajo, 2 µW/cm², y la más alta, tal como la publica el registro. Las cuenta `montarBaremos` con todos los lotes de la vigente, también las fichas sin provincia, y una medida que publican varias estaciones base de un emplazamiento cuenta una vez, como en las zonas. Con la versión del 20/10/2026 son 244.227 medidas, 229.688 por debajo de 2 µW/cm² y 49,93179 la más alta. La web dice «de cada 100» redondeando hacia abajo (`bajoElUnoDeCadaCien`), así que nunca dice más de las que son.
+
+- **Por qué en cada provincia.** La web ya pide el baremo de la provincia al abrir una ficha con medidas. Un fichero nacional sería otra petición y otro estado de carga para tres números. Repetirlos cuesta menos de 100 bytes por fichero.
+- **La barra no puede salirse.** La más alta de España sale de los mismos lotes que la ficha, sin redondear, así que ninguna medida de esa versión la pasa.
+- La huella de su prueba es la del formato 2, y la prueba de la máquina virtual busca `baremos/2/`.
 
 ## Consecuencias
 

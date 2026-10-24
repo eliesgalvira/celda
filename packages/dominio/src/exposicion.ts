@@ -25,6 +25,13 @@ export const MedidaDeExposicion = Schema.Struct({
 export type MedidaDeExposicion = typeof MedidaDeExposicion.Type;
 
 /**
+ * El nivel de referencia más bajo del anexo II del Real Decreto 1066/2001, en µW/cm²: el de 10 a
+ * 400 MHz, donde está la radio FM. La norma compara con él una medida que suma todas las
+ * frecuencias (investigación 09, apartado 2.2).
+ */
+export const NIVEL_DE_REFERENCIA_MAS_BAJO = 200;
+
+/**
  * Lo que identifica una medida: su distancia, su acimut y su valor. Dos estaciones base o dos
  * registros que publican la misma medida publican una sola.
  */

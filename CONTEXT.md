@@ -107,7 +107,7 @@ La densidad de potencia que la norma no deja superar donde suele haber gente, de
 _Evitar_: límite de seguridad, umbral peligroso
 
 **Baremo de exposición**:
-Con lo que Celda compara cada medida de exposición del ministerio con las de su zona, teniendo en cuenta la distancia a la antena: por provincia, lo típico a cada distancia y cuánto se aparta de ello la mitad de las medidas, y por zona, cuántas de cada 100 quedan por debajo. La zona es el municipio si tiene medidas de bastantes emplazamientos, y si no, la provincia. Lo calcula el montaje de las capas (ADR 0030). Dice cómo queda una medida entre las publicadas. No dice si es segura ni nada de la señal.
+Con lo que Celda compara cada medida de exposición del ministerio con las de su zona, teniendo en cuenta la distancia a la antena: por provincia, lo típico a cada distancia y cuánto se aparta de ello la mitad de las medidas, y por zona, cuántas de cada 100 quedan por debajo. La zona es el municipio si tiene medidas de bastantes emplazamientos, y si no, la provincia. Lleva además, de toda España, la medida más alta y cuántas no llegan al 1 % del nivel de referencia. Lo calcula el montaje de las capas (ADR 0030). Dice cómo queda una medida entre las publicadas. No dice si es segura ni nada de la señal.
 _Evitar_: ranking, nota, puntuación, índice de riesgo
 
 **Archivo de páginas**:
