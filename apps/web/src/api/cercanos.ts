@@ -2,6 +2,8 @@
  * Los emplazamientos más cercanos a un punto, sacados de la publicación vigente (ADR 0032). Es
  * una función pura: recibe el resumen y las capas de provincia ya leídas y no pide nada.
  */
+import * as DateTime from "effect/DateTime";
+
 import {
   distanciaAlRectangulo,
   distanciaMetros,
@@ -88,7 +90,7 @@ export const cercanos = (
   dentro.sort(porCercania);
   return {
     version: resumen.version,
-    fecha: new Date(resumen.fecha).toISOString(),
+    fecha: DateTime.formatIso(DateTime.makeUnsafe(resumen.fecha)),
     consulta: {
       lat: consulta.latitud,
       lon: consulta.longitud,

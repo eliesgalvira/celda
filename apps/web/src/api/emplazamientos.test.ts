@@ -73,9 +73,7 @@ const conOrigen = (inicial: ReadonlyMap<string, string>) =>
       }),
     );
     const publicacion = yield* Effect.provide(
-      Effect.gen(function* () {
-        return yield* Publicacion;
-      }),
+      Effect.service(Publicacion),
       publicacionDelOrigen.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, cliente))),
     );
     const consultar = (busqueda: string) =>
@@ -157,7 +155,7 @@ describe("GET /api/emplazamientos", () => {
       assert.strictEqual(t1?.ficha, `${WEB}/capas/fichas/45/${V1.replace(/\W/gu, "")}.json`);
       assert.strictEqual(t1?.enlace, `${WEB}/?emplazamiento=t1&provincia=45`);
       assert.strictEqual(comoRespuesta(texto).version, V1);
-      assert.strictEqual(comoRespuesta(texto).fecha, new Date(NOCHE).toISOString());
+      assert.strictEqual(comoRespuesta(texto).fecha, "2026-10-03T22:30:00.000Z");
       // Una publicación sin licencias en `vigente.json` lleva las del código.
       assert.deepStrictEqual(comoRespuesta(texto).licencias, LICENCIAS);
       assert.strictEqual(respuesta.headers.get("Access-Control-Allow-Origin"), "*");

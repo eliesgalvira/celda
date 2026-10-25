@@ -63,7 +63,7 @@ export class Publicacion extends Context.Service<
       fichero: string,
     ) => Effect.Effect<CapaDeProvincia, DatosNoDisponibles>;
   }
->()("@celda/web/api/publicacion/Publicacion") {}
+>()("@celda/web/api/publicacion") {}
 
 /**
  * Un valor por clave que se carga una sola vez aunque lo pidan varias consultas a la vez, y que no
@@ -103,24 +103,17 @@ const guardadoPorClave = <A, E>(maximo: number) => {
 /** El texto de un fichero publicado; `None` si el origen no lo tiene (404). */
 const descargar = (http: HttpClient.HttpClient, url: string) =>
   Effect.gen(function* () {
-    const respuesta = yield* http
-      .get(url)
-      .pipe(Effect.mapError((error) => new DatosNoDisponibles({ url, motivo: error.message })));
+    const respuesta = yield* http.get(url);
     if (respuesta.status === 404) return Option.none<string>();
-    return Option.some(
-      yield* HttpClientResponse.filterStatusOk(respuesta).pipe(
-        Effect.flatMap((ok) => ok.text),
-        Effect.mapError((error) => new DatosNoDisponibles({ url, motivo: error.message })),
-      ),
-    );
-  });
+    const ok = yield* HttpClientResponse.filterStatusOk(respuesta);
+    return Option.some(yield* ok.text);
+  }).pipe(Effect.mapError((error) => new DatosNoDisponibles({ url, motivo: error.message })));
 
 const exigir = (http: HttpClient.HttpClient, url: string) =>
   Effect.flatMap(descargar(http, url), (texto) =>
-    Option.match(texto, {
-      onNone: () => Effect.fail(new DatosNoDisponibles({ url, motivo: "el origen no lo tiene" })),
-      onSome: Effect.succeed,
-    }),
+    Effect.fromOption(texto).pipe(
+      Effect.mapError(() => new DatosNoDisponibles({ url, motivo: "el origen no lo tiene" })),
+    ),
   );
 
 const ilegible =
