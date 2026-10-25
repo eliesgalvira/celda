@@ -14,5 +14,8 @@ export default defineConfig({
   test: {
     environment: "node",
     sequence: { shuffle: true },
+    // `limitesReal.test.ts` lee los límites de municipios de toda España y recorre cada vértice
+    // de la frontera: con la máquina cargada pasa de los 5 s por defecto (7,4 s en la CI).
+    testTimeout: 30_000,
   },
 });
