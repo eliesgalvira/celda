@@ -99,7 +99,7 @@ Estación base que el listado del registro oficial incluye pero cuya página de 
 _Evitar_: ficha pendiente, ficha rota, error de ficha
 
 **Medida de exposición del ministerio**:
-Punto alrededor de una estación base donde se midió la exposición a campos electromagnéticos, tal como lo publica su ficha en el registro oficial: a qué distancia, en qué dirección vista desde la estación (acimut) y cuántos µW/cm². El ministerio no dice cuándo se midió. Sirve para comparar con los límites legales y no dice nada de la señal que recibe un móvil allí. Su acimut tampoco es la orientación de un sector. Es otra cosa que una medida.
+Punto alrededor de una estación base donde se midió la exposición a campos electromagnéticos, tal como lo publica su ficha en el registro oficial: a qué distancia, en qué dirección vista desde la estación (acimut) y cuántos µW/cm². El ministerio no dice cuándo se midió. Sirve para comprobar que no se pasa del nivel de referencia y no dice nada de la señal que recibe un móvil allí. Su acimut tampoco es la orientación de un sector. No hay que confundirla con una **medida**, que es una lectura de la señal.
 _Evitar_: medición, nivel de señal, potencia, cobertura, medida a secas
 
 **Nivel de referencia**:
