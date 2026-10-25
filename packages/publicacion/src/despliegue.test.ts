@@ -27,7 +27,7 @@ import { VercelNoDisponible } from "./vercel.ts";
 /**
  * Una carpeta `apps/web` de mentira dentro de un monorepo de mentira: la web construida en `dist`,
  * con las capas montadas y el `despliegue.json` del build de Vercel, su código, sus pruebas, su
- * configuración de Vercel y, al lado, la documentación, la ingesta y Nix.
+ * configuración de Vercel, la API y, al lado, la documentación, la ingesta y Nix.
  */
 const MONOREPO = {
   "apps/web/dist/index.html": "<!doctype html><script src=/assets/index-a1.js></script>",
@@ -43,6 +43,10 @@ const MONOREPO = {
   "apps/web/src/entrada.tsx": "export {}",
   "apps/web/src/entrada.test.tsx": "export {}",
   "apps/web/package.json": "{}",
+  "apps/web/api/emplazamientos.ts": "export const GET = () => new Response()",
+  "apps/web/src/api/cercanos.ts": "export {}",
+  "apps/web/src/api/cercanos.test.ts": "export {}",
+  "apps/web/src/api/pruebas.ts": "export {}",
   "apps/web/.env.development": "VITE_CAPAS_ORIGEN=http://127.0.0.1:8852",
   "docs/adr/0018-capas-solo-desde-vercel.md": "# ADR",
   "apps/nocturna/src/programa.ts": "export {}",
@@ -92,8 +96,9 @@ describe("la huella de la web", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 
-  // Lo que entra en el build de Vercel y lo que no. La huella solo lee lo construido y cómo lo
-  // construye y lo sirve Vercel, así que el resto solo cuenta si cambia lo construido.
+  // Lo que entra en el build de Vercel y lo que no. La huella solo lee lo construido, cómo lo
+  // construye y lo sirve Vercel y el código de la API, así que el resto solo cuenta si cambia lo
+  // construido.
   const cuentan: ReadonlyArray<readonly [string, Readonly<Record<string, string | undefined>>]> = [
     ["un fichero de la web construida", { "apps/web/dist/index.html": "<!doctype html>" }],
     ["un fichero nuevo en dist", { "apps/web/dist/assets/worker-c3.js": "onmessage=null" }],
@@ -104,6 +109,9 @@ describe("la huella de la web", () => {
     ],
     ["las cabeceras o las reescrituras de vercel.json", { "apps/web/vercel.json": "{}" }],
     ["el build de Vercel, scripts/vercel.sh", { "apps/web/scripts/vercel.sh": "pnpm build" }],
+    ["la función de la API", { "apps/web/api/emplazamientos.ts": "export {}" }],
+    ["el código de la API en src/api", { "apps/web/src/api/cercanos.ts": "export const a = 1" }],
+    ["un fichero nuevo de la API", { "apps/web/src/api/respuesta.ts": "export {}" }],
   ];
   const noCuentan: ReadonlyArray<readonly [string, Readonly<Record<string, string | undefined>>]> =
     [
@@ -112,6 +120,11 @@ describe("la huella de la web", () => {
       ["el despliegue.json del build de Vercel", { "apps/web/dist/despliegue.json": "{}" }],
       ["el código de la web, si no cambia lo construido", { "apps/web/src/entrada.tsx": "//" }],
       ["una prueba de la web", { "apps/web/src/entrada.test.tsx": "it()" }],
+      ["una prueba de la API", { "apps/web/src/api/cercanos.test.ts": "it()" }],
+      [
+        "las ayudas de las pruebas de la API",
+        { "apps/web/src/api/pruebas.ts": "export const b = 2" },
+      ],
       ["el package.json de la web, si no cambia lo construido", { "apps/web/package.json": "[]" }],
       ["la vista previa local, scripts/sitio.sh", { "apps/web/scripts/sitio.sh": "echo" }],
       ["las variables de desarrollo", { "apps/web/.env.development": "" }],

@@ -6,8 +6,8 @@
 #
 # Cada despliegue lleva unos 100 MB de capas, así que solo se despliega si cambia algo (#78). La
 # orden `despliegue` de la ingesta nocturna mira dos señales y lo explica en el registro:
-# - la web: la huella de lo que construye `pnpm run build`, con `vercel.json` y `vercel.sh`, no es
-#   la que sirve producción en `/despliegue.json`;
+# - la web: la huella de lo que construye `pnpm run build`, con `vercel.json`, `vercel.sh` y el
+#   código de la API (ADR 0032), no es la que sirve producción en `/despliegue.json`;
 # - los datos: producción no sirve lo que un build nuevo montaría desde R2. Lee R2 con la clave de
 #   solo lectura del build de Vercel, en los secretos `CELDA_R2_*`. Sin ellos, despliega siempre.
 # Una señal que no se puede saber cuenta como un cambio.
@@ -80,14 +80,14 @@ jobs:
           ref: ${{ steps.commit.outputs.commit }}
           persist-credentials: false
 
-      # La huella de la web es función del commit. El `1` cambia si cambia la forma de calcularla.
+      # La huella de la web es función del commit. El `2` cambia si cambia la forma de calcularla.
       - name: Huella de la web ya calculada
         id: memoria
         if: steps.commit.outputs.commit != ''
         uses: actions/cache/restore@v6
         with:
           path: huella-web
-          key: celda-web-huella-1-${{ steps.commit.outputs.commit }}
+          key: celda-web-huella-2-${{ steps.commit.outputs.commit }}
 
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
         if: steps.commit.outputs.commit != ''
@@ -117,7 +117,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: huella-web
-          key: celda-web-huella-1-${{ steps.commit.outputs.commit }}
+          key: celda-web-huella-2-${{ steps.commit.outputs.commit }}
 
       # La orden corre desde el paquete de Nix de la ingesta, que no instala las dependencias de
       # la web.

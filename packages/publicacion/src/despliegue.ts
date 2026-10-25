@@ -46,6 +46,17 @@ const CARPETA_DE_CAPAS = "capas";
  */
 export const CONFIGURACION_DEL_DESPLIEGUE = ["vercel.json", "scripts/vercel.sh"] as const;
 
+/**
+ * Las carpetas, desde la de la web, con el código de la API (ADR 0032), que Vercel compila aparte
+ * y no deja nada en `dist`. Sin ellas, un cambio solo en la API no se desplegaría. Las pruebas y
+ * sus ayudas (`*.test.ts`, `pruebas.ts`) no cuentan. El dominio que importa la API no entra: son
+ * los mismos lectores de capas que usa la web, y un cambio en ellos cambia lo construido.
+ */
+export const CODIGO_DE_LA_API = ["api", "src/api"] as const;
+
+const esDeLaApi = (ruta: string): boolean =>
+  !ruta.endsWith(".test.ts") && !ruta.endsWith("pruebas.ts");
+
 /** En la carpeta de la web no hay nada construido. */
 export class WebSinConstruir extends Schema.TaggedError<WebSinConstruir>()("WebSinConstruir", {
   carpeta: Schema.String,
@@ -57,10 +68,10 @@ export class WebSinConstruir extends Schema.TaggedError<WebSinConstruir>()("WebS
 
 /**
  * La huella de la web de `carpeta` (`apps/web`) es el SHA-256, en hexadecimal, de la lista de cada
- * fichero de `dist` con el SHA-256 de su contenido, y lo mismo de `CONFIGURACION_DEL_DESPLIEGUE`.
- * No cuentan las capas montadas en `dist/capas` ni `dist/despliegue.json`, ni nada de fuera de
- * `dist`, así que el código, las pruebas o la documentación solo cambian la huella si cambian lo
- * construido.
+ * fichero de `dist` con el SHA-256 de su contenido, y lo mismo de `CONFIGURACION_DEL_DESPLIEGUE` y
+ * del código de la API (`CODIGO_DE_LA_API`). No cuentan las capas montadas en `dist/capas` ni
+ * `dist/despliegue.json`, ni nada más de fuera de `dist`, así que el resto del código, las pruebas
+ * o la documentación solo cambian la huella si cambian lo construido.
  */
 export const huellaDeLaWeb = Effect.fn("Despliegue.huellaDeLaWeb")(function* (carpeta: string) {
   const fs = yield* FileSystem.FileSystem;
@@ -79,9 +90,22 @@ export const huellaDeLaWeb = Effect.fn("Despliegue.huellaDeLaWeb")(function* (ca
   const ficheros = yield* Effect.filter(deLaWeb, (ruta) =>
     Effect.map(fs.stat(path.join(dist, ruta)), (info) => info.type === "File"),
   );
+  const deLaApi = yield* Effect.forEach(CODIGO_DE_LA_API, (carpetaDeLaApi) =>
+    Effect.gen(function* () {
+      const raiz = path.join(carpeta, carpetaDeLaApi);
+      if (!(yield* fs.exists(raiz))) return [];
+      const rutas = (yield* fs.readDirectory(raiz, { recursive: true }))
+        .map((entrada) => `${carpetaDeLaApi}/${entrada.split(path.sep).join("/")}`)
+        .filter(esDeLaApi);
+      return yield* Effect.filter(rutas, (ruta) =>
+        Effect.map(fs.stat(path.join(carpeta, ruta)), (info) => info.type === "File"),
+      );
+    }),
+  );
   const lineas = yield* Effect.forEach(
     [
       ...ficheros.map((ruta) => ({ nombre: `dist/${ruta}`, fichero: path.join(dist, ruta) })),
+      ...deLaApi.flat().map((ruta) => ({ nombre: ruta, fichero: path.join(carpeta, ruta) })),
       ...CONFIGURACION_DEL_DESPLIEGUE.map((ruta) => ({
         nombre: ruta,
         fichero: path.join(carpeta, ruta),
