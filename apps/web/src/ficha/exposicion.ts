@@ -173,6 +173,9 @@ export const textosExposicion = (ficha: Ficha, baremo: Baremo | undefined): Text
     llano(
       "Son comprobaciones de las Jefaturas de Inspección o certificaciones de las compañías, y el ministerio no dice cuál es cada una ni cuándo se hizo. Sirven para comprobar que no se pasa del nivel de referencia, y no dicen nada de cómo funciona un móvil allí.",
     ),
+    llano(
+      "Casi todas las medidas quedan muy por debajo del nivel de referencia porque las antenas emiten en un haz estrecho que apunta casi al horizonte. En la calle, cerca del edificio de la antena, ese haz suele pasar por encima. Además, al doble de distancia llega la cuarta parte de la potencia.",
+    ),
   ];
   const [, notaMarcada = nota] = primeraVezEn([TITULO_EXPOSICION, nota]);
 

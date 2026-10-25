@@ -113,7 +113,7 @@ describe("mejorar la señal: consejos", () => {
     assert.match(seccion().getByRole("list").textContent ?? "", /router 4G\/5G/u);
     assert.match(
       seccion().getByRole("list").textContent ?? "",
-      /Girar el móvil apenas cambia la señal. Lo que más la reduce es tapar/u,
+      /Girar el móvil apenas cambia la señal. Tapar con la mano o el cuerpo los bordes de arriba y de abajo la reduce mucho más/u,
     );
     assert.match(
       seccion()

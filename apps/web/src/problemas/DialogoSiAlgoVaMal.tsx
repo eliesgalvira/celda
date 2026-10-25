@@ -120,7 +120,7 @@ export function DialogoSiAlgoVaMal(props: DialogoSiAlgoVaMalProps) {
             <p>
               Tienes tres meses desde la respuesta, o desde que acabó el mes sin ella. Se reclama
               por internet, con certificado electrónico o Cl@ve, o en papel. La Oficina tiene seis
-              meses para resolver, y lo que resuelve obliga a la compañía.
+              meses para resolver, y su resolución obliga a la compañía.
             </p>
             <p>
               En lugar de la Oficina, puedes ir a una Junta Arbitral de Consumo si la compañía está

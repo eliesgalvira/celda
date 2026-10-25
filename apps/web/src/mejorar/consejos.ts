@@ -59,7 +59,7 @@ const DB = termino("decibelio", "dB");
 const MOVIL: Consejo = {
   clave: "movil",
   tono: "secundario",
-  texto: marcado`Girar el móvil apenas cambia la señal. Lo que más la reduce es tapar con la mano o el cuerpo los bordes de arriba y de abajo, donde suelen ir sus antenas.`,
+  texto: marcado`Girar el móvil apenas cambia la señal. Tapar con la mano o el cuerpo los bordes de arriba y de abajo la reduce mucho más, porque ahí suelen ir sus antenas.`,
 };
 
 /**

@@ -989,7 +989,7 @@ function EstadoDeLaZona(props: {
         <Aviso
           tono="fallo"
           encaje="panel"
-          titulo={`No ha llegado lo que hace falta para ${nombre() === "" ? "la zona" : nombre()}`}
+          titulo={`No han llegado los datos de ${nombre() === "" ? "la zona" : nombre()}`}
           acciones={<Boton onClick={() => props.alReintentar()}>Reintentar</Boton>}
         >
           Puede que falle la conexión o que el servidor esté bloqueado.

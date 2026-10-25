@@ -1,6 +1,6 @@
 # Investigación 10 · Distancias de referencia entre el móvil y un emplazamiento
 
-> **Qué usa Celda (24/10/2026).** El plegable «¿A qué distancia de una antena llega bien la señal?» de «Mejorar la señal» (`apps/web/src/mejorar/distancias.ts`) enseña dos gráficas: la tabla A, con la distancia entre emplazamientos por entorno, y la tabla C, con lo que se pierde en interiores. La fila «A 10–15 m de la ventana», de 14 a 22 dB, suma la de junto a la ventana y los unos 6 dB de ir hacia dentro. La respuesta de arriba sale de la frase propuesta 3. Ninguna da una distancia buena, por lo que explica el apartado «Lo que no está bien respaldado».
+> **Qué usa Celda (24/10/2026).** El plegable «¿A qué distancia de una antena llega bien la señal?» de «Mejorar la señal» (`apps/web/src/mejorar/distancias.ts`) enseña dos gráficas: la tabla A, con la distancia entre emplazamientos por entorno, y la tabla C, con cuánto se pierde en interiores. La fila «A 10–15 m de la ventana», de 14 a 22 dB, es la de junto a la ventana más 6 dB por ir hacia dentro. La respuesta de arriba sale de la frase propuesta 3. Ninguna da una distancia buena, por lo que explica el apartado «¿Qué no está bien respaldado y no conviene mostrar?».
 
 Investigación del 22/10/2026 para sustituir en «Mejorar la señal» los umbrales a ojo («a 270 m la señal suele llegar con fuerza», «a más de 1 km llega más débil»). Uso solo fuentes primarias o de alta confianza, y la GSMA porque se pidió expresamente. Las citas van en su idioma original y todos los enlaces se comprobaron el 22/10/2026 contra la copia descargada, salvo los de Ofcom, que bloquea las peticiones automáticas.
 
@@ -38,7 +38,7 @@ Los escenarios rurales de 3GPP a ~4 GHz suponen paneles de hasta 256 elementos (
 
 Para 3500 MHz solo hay factores relativos como los de la fórmula UMa. Ninguna fuente fiable le da un alcance en metros.
 
-### C. Lo que se pierde al entrar en un edificio
+### C. ¿Cuánto se pierde al entrar en un edificio?
 
 | Situación | Pérdida típica | Fuente |
 |---|---|---|
@@ -253,7 +253,7 @@ URL de la página que enlaza el anexo: https://www.ofcom.org.uk/phones-and-broad
 
 Aquí un regulador reconoce por escrito que su cifra de interior es una simplificación y que el error de las predicciones ronda los 12 dB. Es otro motivo para no prometer nada en una dirección concreta.
 
-## Lo que no está bien respaldado y no conviene mostrar
+## ¿Qué no está bien respaldado y no conviene mostrar?
 
 1. **Un umbral único de «buena señal hasta X m».** Ninguna fuente lo da. 3GPP añade a sus fórmulas una variación por sombras de 10 dB de desviación típica (F2 §4.5.2), que equivale a multiplicar o dividir la distancia por 1,8. Ofcom cifra el error conjunto de las predicciones de los operadores en unos 12 dB (F12 §61). Los antiguos «270 m» y «1 km» se parecen por casualidad a lo más lejos que queda alguien en las rejillas de ciudad (≈ 290 m) y de campo (≈ 1 km) de la tabla A. Esas cifras describen cómo se reparten los emplazamientos en una rejilla ideal y nada dicen de la calidad de la señal.
 2. **Una tabla de metros por banda y entorno.** No hay fuente que la publique. Los multiplicadores entre bandas cambian con el entorno (900 frente a ~2000 MHz da 1,55 veces en ciudad según F2 y unas 2 veces en campo abierto según F8), así que cualquier casilla en metros sería una cuenta propia.

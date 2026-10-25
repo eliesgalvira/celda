@@ -34,7 +34,7 @@ export const FUENTES_REPARTO =
 export const FUENTES_PERDIDAS =
   "Fuentes: el informe TR 38.901 del 3GPP, un estudio de 2012 de Ofcom, el regulador de las telecomunicaciones del Reino Unido, y la recomendación P.2109 de la Unión Internacional de Telecomunicaciones.";
 
-/** Lo que dice entera una gráfica, para un lector de pantalla. */
+/** La gráfica entera en texto, para un lector de pantalla. */
 const nombreDe = (titulo: string, filas: GraficaDeTramosProps["filas"]): string =>
   `${titulo} ${filas.map((fila) => `${fila.etiqueta}, ${fila.cifra}`).join("; ")}.`;
 
@@ -45,7 +45,7 @@ const filasReparto: GraficaDeTramosProps["filas"] = [
     hasta: 0.2,
     cifra: "200 m",
     explicacion:
-      "Centro de ciudad grande: 200 m entre emplazamientos. En ese reparto, lo más lejos que queda alguien de uno es unos 115 m.",
+      "Centro de ciudad grande: 200 m entre emplazamientos. En ese reparto, nadie queda a más de unos 115 m de un emplazamiento.",
   },
   {
     etiqueta: "Ciudad",
@@ -54,7 +54,7 @@ const filasReparto: GraficaDeTramosProps["filas"] = [
     margen: { desde: 0.2, hasta: 0.75 },
     cifra: "500 m",
     explicacion:
-      "Ciudad: 500 m entre emplazamientos, y las fuentes admiten de 200 a 750 m. En ese reparto, lo más lejos que queda alguien de uno es unos 290 m.",
+      "Ciudad: 500 m entre emplazamientos, y las fuentes admiten de 200 a 750 m. En ese reparto, nadie queda a más de unos 290 m de un emplazamiento.",
   },
   {
     etiqueta: "Afueras y pueblos",
@@ -63,7 +63,7 @@ const filasReparto: GraficaDeTramosProps["filas"] = [
     margen: { desde: 1.2, hasta: 1.8 },
     cifra: "1,3 km",
     explicacion:
-      "Afueras y pueblos: 1,3 km entre emplazamientos, y las fuentes admiten de 1,2 a 1,8 km. En ese reparto, lo más lejos que queda alguien de uno es unos 750 m.",
+      "Afueras y pueblos: 1,3 km entre emplazamientos, y las fuentes admiten de 1,2 a 1,8 km. En ese reparto, nadie queda a más de unos 750 m de un emplazamiento.",
   },
   {
     etiqueta: "Campo",
@@ -71,7 +71,7 @@ const filasReparto: GraficaDeTramosProps["filas"] = [
     hasta: 1.7,
     cifra: "1,7 km",
     explicacion:
-      "Campo: 1,7 km entre emplazamientos. En ese reparto, lo más lejos que queda alguien de uno es 1 km.",
+      "Campo: 1,7 km entre emplazamientos. En ese reparto, nadie queda a más de 1 km de un emplazamiento.",
   },
   {
     etiqueta: "Campo muy despoblado",
@@ -80,7 +80,7 @@ const filasReparto: GraficaDeTramosProps["filas"] = [
     margen: { desde: 5, hasta: 6 },
     cifra: "5–6 km",
     explicacion:
-      "Campo muy despoblado: de 5 a 6 km entre emplazamientos. En ese reparto, lo más lejos que queda alguien de uno es unos 3 km.",
+      "Campo muy despoblado: de 5 a 6 km entre emplazamientos. En ese reparto, nadie queda a más de unos 3 km de un emplazamiento.",
   },
 ];
 
@@ -111,7 +111,7 @@ const filasPerdidas: GraficaDeTramosProps["filas"] = [
     hasta: 22,
     cifra: "14–22 dB",
     explicacion:
-      "Lo de junto a la ventana y unos 6 dB más, de ir de 10 a 15 m hacia dentro: de 14 a 22 dB.",
+      "De 10 a 15 m hacia dentro se pierden 6 dB más que junto a la ventana: de 14 a 22 dB.",
   },
   {
     etiqueta: "Cristales metalizados",
@@ -125,13 +125,13 @@ const filasPerdidas: GraficaDeTramosProps["filas"] = [
     desde: 9,
     hasta: 9,
     cifra: "9 dB",
-    explicacion: "Lo que se pierde de media dentro de un coche: 9 dB.",
+    explicacion: "Dentro de un coche se pierden de media 9 dB.",
   },
 ];
 
-/** Lo que se pierde al entrar en un sitio, en dB (investigación 10, tabla C). */
+/** Cuánto se pierde al entrar en un sitio, en dB (investigación 10, tabla C). */
 export const GRAFICA_PERDIDAS: GraficaDeTramosProps = {
-  nombre: nombreDe("Lo que se pierde en interiores:", filasPerdidas),
+  nombre: nombreDe("Pérdida de señal en interiores:", filasPerdidas),
   maximo: 35,
   marcas: [
     { valor: 10, lineas: ["10 dB", "1/10"] },

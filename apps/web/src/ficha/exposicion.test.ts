@@ -99,7 +99,7 @@ describe("las medidas de exposición de la ficha", () => {
         "Se compara con las medidas de la provincia de Barcelona, porque en Gavà hay pocas. La " +
         "típica a 55\u00a0m de la antena es 0,2\u00a0µW/cm², y esta es unas 11 veces mayor.",
     });
-    const [norma, procedencia] = plano(explicacion);
+    const [norma, procedencia, porQueBajas] = plano(explicacion);
     assert.strictEqual(
       norma,
       "Cada medida suma todo lo que llega a ese punto, de todas las compañías y también de la " +
@@ -108,6 +108,13 @@ describe("las medidas de exposición de la ficha", () => {
     );
     assert.match(procedencia ?? "", /^Son comprobaciones de las Jefaturas de Inspección/u);
     assert.match(procedencia ?? "", /no dicen nada de cómo funciona un móvil allí\.$/u);
+    assert.strictEqual(
+      porQueBajas,
+      "Casi todas las medidas quedan muy por debajo del nivel de referencia porque las antenas " +
+        "emiten en un haz estrecho que apunta casi al horizonte. En la calle, cerca del edificio " +
+        "de la antena, ese haz suele pasar por encima. Además, al doble de distancia llega la " +
+        "cuarta parte de la potencia.",
+    );
   });
 
   it("dan cada medida por compañía, con su distancia, su dirección, su valor y su puesto", () => {
@@ -131,7 +138,7 @@ describe("las medidas de exposición de la ficha", () => {
     );
     assert.isUndefined(maxima?.barra);
     assert.isUndefined(maxima?.frente);
-    assert.lengthOf(explicacion, 2);
+    assert.lengthOf(explicacion, 3);
     assert.isTrue(estaciones.flatMap((e) => e.filas).every((f) => f.comparacion === undefined));
   });
 

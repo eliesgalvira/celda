@@ -333,8 +333,8 @@ export const GLOSARIO: Glosario = {
   "medida-de-exposicion": {
     nombre: "Medida de exposición",
     explicacion:
-      "Una comprobación del ministerio cerca de una antena para ver que no se pasa del límite " +
-      "legal. Suma todo lo que llega a ese punto, de cualquier compañía, la radio o la " +
+      "Una comprobación del ministerio cerca de una antena para ver que no se pasa del nivel " +
+      "de referencia. Suma todo lo que llega a ese punto, de cualquier compañía, la radio o la " +
       "televisión, y no dice nada de la señal que recibe un móvil.",
     tecnico: "nivel de exposición medido, en µW/cm²",
     relacionados: ["nivel-de-referencia", "registro-oficial"],
@@ -342,9 +342,9 @@ export const GLOSARIO: Glosario = {
   "nivel-de-referencia": {
     nombre: "Nivel de referencia",
     explicacion:
-      "Lo que la norma no deja superar donde suele haber gente. Va de 200 a 1.000 µW/cm² según " +
-      "la frecuencia, y una medida que lo suma todo se compara con el más bajo, 200, que es el " +
-      "de la radio FM.",
+      "El máximo que permite la norma donde suele haber gente. Depende de la frecuencia, y el " +
+      "más bajo es 200 µW/cm². Incluso en el peor caso, a ese nivel el cuerpo absorbe 50 veces " +
+      "menos energía de la necesaria para calentarse un grado.",
     tecnico: "nivel de referencia del Real Decreto 1066/2001",
     relacionados: ["medida-de-exposicion"],
   },

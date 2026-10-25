@@ -7,7 +7,7 @@ import { GraficaDeTramos } from "./Referencias.tsx";
 const montar = () => {
   const pantalla = render(() => (
     <GraficaDeTramos
-      nombre="Lo que se pierde en interiores"
+      nombre="Pérdida de señal en interiores"
       maximo={35}
       marcas={[
         { valor: 10, lineas: ["10 dB", "1/10"] },
@@ -48,7 +48,7 @@ const cifra = (svg: Element, texto: string) =>
 describe("GraficaDeTramos", () => {
   it("es una imagen con nombre, y cada fila explica su cifra al pasar por encima", () => {
     const { getByRole } = montar();
-    const svg = getByRole("img", { name: "Lo que se pierde en interiores" });
+    const svg = getByRole("img", { name: "Pérdida de señal en interiores" });
     assert.deepStrictEqual(
       Array.from(svg.querySelectorAll("g > title"), (t) => t.textContent),
       [
@@ -62,7 +62,7 @@ describe("GraficaDeTramos", () => {
 
   it("pone la cifra tras el tramo y, si no cabe, delante; un valor solo es un punto", () => {
     const { getByRole } = montar();
-    const svg = getByRole("img", { name: "Lo que se pierde en interiores" });
+    const svg = getByRole("img", { name: "Pérdida de señal en interiores" });
     assert.strictEqual(cifra(svg, "8–16 dB")?.getAttribute("text-anchor"), "start");
     assert.strictEqual(cifra(svg, "18–32 dB")?.getAttribute("text-anchor"), "end");
     assert.lengthOf(svg.querySelectorAll("circle"), 1);

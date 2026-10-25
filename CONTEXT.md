@@ -103,7 +103,7 @@ Punto alrededor de una estación base donde se midió la exposición a campos el
 _Evitar_: medición, nivel de señal, potencia, cobertura, medida a secas
 
 **Nivel de referencia**:
-La densidad de potencia que la norma no deja superar donde suele haber gente, de 200 a 1.000 µW/cm² según la frecuencia (anexo II del Real Decreto 1066/2001). Una medida de exposición del ministerio suma todas las frecuencias, así que se compara con el más bajo, 200 µW/cm², el de la radio FM.
+La densidad de potencia que la norma no deja superar donde suele haber gente, de 200 a 1.000 µW/cm² según la frecuencia (anexo II del Real Decreto 1066/2001). Una medida de exposición del ministerio suma todas las frecuencias, así que se compara con el más bajo, 200 µW/cm², el de la radio FM. El decreto sigue la Recomendación 1999/519/CE, hecha con las guías de la Comisión Internacional de Protección contra la Radiación No Ionizante (ICNIRP). Una persona expuesta justo al nivel de referencia absorbe, incluso en el peor caso, 0,08 W/kg, 50 veces menos de los 4 W/kg que en 30 minutos calientan el cuerpo un grado.
 _Evitar_: límite de seguridad, umbral peligroso
 
 **Baremo de exposición**:

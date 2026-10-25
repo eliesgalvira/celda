@@ -149,7 +149,7 @@ export function GrupoVacio(props: { readonly children: JSX.Element }) {
 export function EsqueletoAportaciones() {
   return (
     <output class="block min-h-24 animate-aparecer text-sm text-tinta-suave">
-      Leyendo lo que hay en este dispositivo…
+      Leyendo las aportaciones de este dispositivo…
     </output>
   );
 }
