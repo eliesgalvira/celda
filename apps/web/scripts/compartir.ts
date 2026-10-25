@@ -4,7 +4,8 @@
  *
  *   node scripts/compartir.ts dist/capas dist/iconos/compartir.png
  *
- * Las capas pueden ser una carpeta o un origen HTTP, como `https://celda.elies.site/capas`.
+ * Para probarla en local basta una carpeta con `vigente.json`, su resumen y sus puntos, bajados de
+ * `https://celda.elies.site/capas`.
  * Va con los colores del tema oscuro, que destacan más entre las publicaciones; `--tema claro` la
  * pinta con los del claro. Si algo falla, sale con error y el build se para.
  */
@@ -31,17 +32,12 @@ if (origen === undefined || salida === undefined) {
 }
 const tema = opciones.join(" ") === "--tema claro" ? "claro" : "oscuro";
 
-const leer = async (fichero: string): Promise<string> => {
-  if (!/^https?:\/\//u.test(origen)) return NodeFS.readFileSync(`${origen}/${fichero}`, "utf8");
-  const respuesta = await fetch(`${origen}/${fichero}`);
-  if (!respuesta.ok) throw new Error(`${origen}/${fichero}: HTTP ${respuesta.status}`);
-  return respuesta.text();
-};
+const leer = (fichero: string): string => NodeFS.readFileSync(`${origen}/${fichero}`, "utf8");
 
-const vigente = Result.getOrThrow(decodificarVigente(await leer(FICHERO_VIGENTE)));
+const vigente = Result.getOrThrow(decodificarVigente(leer(FICHERO_VIGENTE)));
 if (vigente.resumen === undefined) throw new Error(`${vigente.version} no tiene resumen nacional`);
-const resumen = Result.getOrThrow(leerResumen(await leer(vigente.resumen), vigente.version));
-const puntos = Result.getOrThrow(leerPuntos(await leer(resumen.puntos)));
+const resumen = Result.getOrThrow(leerResumen(leer(vigente.resumen), vigente.version));
+const puntos = Result.getOrThrow(leerPuntos(leer(resumen.puntos)));
 
 const datos: DatosAlCompartir = {
   contorno: { type: "MultiPolygon", coordinates: espana.contorno.coordinates },
@@ -55,6 +51,6 @@ const css = NodeFS.readFileSync(
 );
 const png = pngAlCompartir(datos, coloresAlCompartir(css, tema));
 NodeFS.writeFileSync(salida, png);
-console.log(
-  `${salida}: ${puntos.cuantos} emplazamientos de ${vigente.version}, tema ${tema}, ${png.length} bytes`,
+process.stdout.write(
+  `${salida}: ${puntos.cuantos} emplazamientos de ${vigente.version}, tema ${tema}, ${png.length} bytes\n`,
 );
