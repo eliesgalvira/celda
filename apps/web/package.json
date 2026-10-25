@@ -7,7 +7,7 @@
     "build": "vp build",
     "preview": "vp preview",
     "compartir": "node scripts/compartir.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p api",
     "test": "vp test run"
   },
   "dependencies": {

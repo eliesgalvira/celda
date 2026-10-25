@@ -7,3 +7,5 @@ dist/
 *.bundled_*
 result
 .direnv/
+# Lo que deja `vercel build` al probar en local las funciones de apps/web/api.
+.vercel/
