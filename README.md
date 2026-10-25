@@ -28,7 +28,7 @@ pnpm run build
 
 El origen local de las capas se arranca aparte, con lo que haya publicado la ingesta o con una España sintética; ver [docs/patterns/convex.md](docs/patterns/convex.md#publicación). Sin él la web enseña el mapa base y dice que no ha podido cargar los emplazamientos.
 
-El entorno trae Node 24, pnpm 10, tippecanoe y pmtiles.
+El entorno trae Node 24 y pnpm 10.
 
 ## Estructura
 
