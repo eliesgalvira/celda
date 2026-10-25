@@ -4,8 +4,8 @@ import { cva } from "class-variance-authority";
 const variantesFlecha = cva("block", {
   variants: {
     foto: {
-      no: "text-rotulo-ciudad [--halo:var(--mapa-halo)]",
-      si: "text-rotulo-foto [--halo:var(--mapa-foto-halo)]",
+      false: "text-rotulo-ciudad [--halo:var(--mapa-halo)]",
+      true: "text-rotulo-foto [--halo:var(--mapa-foto-halo)]",
     },
   },
 });
@@ -27,7 +27,7 @@ export function FlechaDelNorte(props: { readonly conFoto: boolean }) {
       width="24"
       height="46"
       viewBox="0 0 24 46"
-      class={variantesFlecha({ foto: props.conFoto ? "si" : "no" })}
+      class={variantesFlecha({ foto: props.conFoto })}
     >
       <g
         fill="var(--halo)"

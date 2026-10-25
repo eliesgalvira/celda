@@ -20,6 +20,19 @@ export const variantesAviso = cva("chaflan flex w-full flex-col gap-2 px-5 py-4 
   defaultVariants: { tono: "espera" },
 });
 
+/** El hexágono delante del título, del color de su tono. */
+const variantesHexagonoAviso = cva("hexagono size-3 shrink-0", {
+  variants: {
+    tono: {
+      espera: "animate-pulse bg-primario motion-reduce:animate-none",
+      fallo: "bg-aviso",
+      limite: "bg-aviso",
+      hecho: "bg-primario",
+    },
+  },
+  defaultVariants: { tono: "espera" },
+});
+
 /** Dónde va el aviso: flotando sobre el mapa o dentro de un panel, a todo su ancho. */
 export const variantesEncajeAviso = cva("", {
   variants: {
@@ -35,7 +48,7 @@ export type AvisoProps = VariantProps<typeof variantesAviso> &
   VariantProps<typeof variantesEncajeAviso> & {
     readonly titulo: string;
     readonly children?: JSX.Element;
-    /** Botones o enlaces para salir del aviso. */
+    /** Botones o enlaces con lo que se puede hacer. */
     readonly acciones?: JSX.Element;
     /** Con él, el aviso lleva la ✕ arriba a la derecha. */
     readonly alCerrar?: () => void;
@@ -55,18 +68,7 @@ export function Aviso(props: AvisoProps) {
       >
         <div class="flex items-start gap-2">
           <h2 class="flex flex-1 items-center gap-2 font-titulo text-lg tracking-wide">
-            <span
-              aria-hidden="true"
-              class={
-                {
-                  fallo: "hexagono size-3 shrink-0 bg-aviso",
-                  limite: "hexagono size-3 shrink-0 bg-aviso",
-                  espera:
-                    "hexagono size-3 shrink-0 animate-pulse bg-primario motion-reduce:animate-none",
-                  hecho: "hexagono size-3 shrink-0 bg-primario",
-                }[props.tono ?? "espera"]
-              }
-            />
+            <span aria-hidden="true" class={variantesHexagonoAviso({ tono: props.tono })} />
             {props.titulo}
           </h2>
           <Show when={props.alCerrar}>
