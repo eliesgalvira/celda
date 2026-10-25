@@ -447,10 +447,12 @@ export function PantallaMapa() {
       });
   };
 
-  // Cuando se sabe la vista inicial, sus provincias se piden sin esperar al mapa.
+  // Cuando se sabe la vista inicial, sus provincias se piden sin esperar al mapa. La clave es si
+  // se sabe: la caja de la provincia del punto se vuelve a calcular, igual, con cada contorno que
+  // llega para la cabecera.
   recurso(
     "capa:vista-inicial",
-    () => vistaInicial.encuadre(),
+    () => vistaInicial.encuadre() !== undefined,
     () => {
       pedirLoQueSeVe();
       return undefined;
