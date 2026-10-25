@@ -169,9 +169,8 @@ const pasada = async (
     // PREPARAR: lo que haría una persona antes de dejar el móvil quieto
     await pagina.goto(`${sitio.origen}/?emplazamiento=${encodeURIComponent(capa.central)}`);
     await pagina.getByRole("heading", { name: capa.titulo }).waitFor({ timeout: 20_000 });
-    // Con el mapa base de la pasada y el resumen puestos. Hasta el #81 lo esperaba sin querer el
-    // clic en «Interferencia», que no se activaba antes; el aviso que se esperaba aquí ya no
-    // existía, y el paso al mapa de reserva caía a veces en la ventana quieta.
+    // Con el mapa base de la pasada y el resumen puestos: si no, el paso al mapa de reserva puede
+    // caer en la ventana quieta (efectos.md, «Prueba de resistencia»).
     await esperarVistaInicial(pagina, 20_000);
 
     const referencia = pagina.getByRole("region", { name: "Punto de referencia" });

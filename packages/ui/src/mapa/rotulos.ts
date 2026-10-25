@@ -44,6 +44,35 @@ export interface ContornoDeEspana {
 export const ZOOM_DE_FUERA = 9;
 
 /**
+ * Dos rectángulos que contienen todo el contorno de España: la península con Baleares, Ceuta y
+ * Melilla, y Canarias. MapLibre proyecta el contorno entero en cada evaluación de `within`, y con
+ * un rectángulo delante lo de fuera se descarta sin mirarlo (`docs/patterns/rendimiento.md`).
+ */
+export const CAJAS_DE_ESPANA: ContornoDeEspana = {
+  type: "MultiPolygon",
+  coordinates: [
+    [
+      [
+        [-9.6, 35.1],
+        [4.6, 35.1],
+        [4.6, 44],
+        [-9.6, 44],
+        [-9.6, 35.1],
+      ],
+    ],
+    [
+      [
+        [-18.4, 27.5],
+        [-13.2, 27.5],
+        [-13.2, 29.5],
+        [-18.4, 29.5],
+        [-18.4, 27.5],
+      ],
+    ],
+  ],
+};
+
+/**
  * Los lugares que se rotulan: los de dentro de España y, desde `ZOOM_DE_FUERA`, también los de
  * fuera. Los filtros se evalúan con el zoom entero de cada tesela, así que hasta el 8,99 no sale
  * ninguno de fuera. Gibraltar no sale nunca: OpenMapTiles lo da como capital de país y salía
@@ -52,7 +81,11 @@ export const ZOOM_DE_FUERA = 9;
 const soloDeEspana = (espana: ContornoDeEspana): ExpressionSpecification => [
   "all",
   ["!=", ["get", "name"], "Gibraltar"],
-  ["any", [">=", ["zoom"], ZOOM_DE_FUERA], ["within", espana]],
+  [
+    "any",
+    [">=", ["zoom"], ZOOM_DE_FUERA],
+    ["all", ["within", CAJAS_DE_ESPANA], ["within", espana]],
+  ],
 ];
 
 /**
@@ -265,7 +298,7 @@ const capaDeLugares = (
     "source-layer": "place",
     minzoom: capa.desde,
     maxzoom: capa.hasta,
-    filter: ["all", soloDeEspana(espana), capa.propio, sinLosDeCelda(nombre)],
+    filter: ["all", capa.propio, soloDeEspana(espana), sinLosDeCelda(nombre)],
     layout: {
       "text-field": textoDeRotulo(nombre),
       "text-font": [capa.letra],

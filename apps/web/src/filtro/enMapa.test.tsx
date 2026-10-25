@@ -1,5 +1,6 @@
 import type { Compania } from "@celda/dominio/compania";
 import { claveDeFiltro, type FiltroDeCompanias, SIN_FILTRO } from "@celda/dominio/filtro";
+import { vigilante } from "@celda/ui/recurso.ts";
 import { assert, describe, it } from "@effect/vitest";
 import { render, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
@@ -60,6 +61,11 @@ interface Mandos {
   readonly filtro: FiltroDelMapa;
   /** Cada filtro que ha dibujado el mapa, en orden. */
   readonly aplicados: ReadonlyArray<string>;
+  /**
+   * Las provincias cambian sin que llegue ninguna, como cuando otra empieza a cargar: la lista de
+   * las que han llegado es otra con las mismas.
+   */
+  readonly cambianLasProvincias: () => void;
 }
 
 function Prueba(props: {
@@ -69,16 +75,24 @@ function Prueba(props: {
   const datos = usarDatos();
   const [guardado, setGuardado] = createSignal<FiltroDeCompanias>(props.guardado);
   const provincia = provinciaDePrueba(CAPA);
+  const [provincias, setProvincias] = createSignal(0);
   const filtro = crearFiltro(datos, {
     guardado,
     guardar: (nuevo) => setGuardado(nuevo),
-    cargadas: () => [provincia],
+    cargadas: () => {
+      provincias();
+      return [provincia];
+    },
   });
   const aplicados: Array<string> = [];
   createEffect(filtro.aplicado, (actual) => {
     aplicados.push(claveDeFiltro(actual));
   });
-  props.mandos({ filtro, aplicados });
+  props.mandos({
+    filtro,
+    aplicados,
+    cambianLasProvincias: () => setProvincias((antes) => antes + 1),
+  });
   return null;
 }
 
@@ -159,6 +173,17 @@ describe("filtro de compañías en el mapa (ADR 0026)", () => {
     await dormir(2 * ESPERA_DEL_FILTRO_MS);
     flush();
     assert.deepStrictEqual(m.pedidas, ["08 orange"]);
+    m.desmontar();
+  });
+
+  it("las provincias que cambian sin que llegue ninguna no vuelven a abrir las agrupaciones del filtro", async () => {
+    const m = await montar(["digi"]);
+    await esperar(() => assert.strictEqual(m.filtro.agrupaciones().get("08")?.filtro, "digi"));
+    const abiertas = vigilante.aperturas("capa:filtro");
+    m.cambianLasProvincias();
+    m.cambianLasProvincias();
+    flush();
+    assert.strictEqual(vigilante.aperturas("capa:filtro"), abiertas);
     m.desmontar();
   });
 });

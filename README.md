@@ -26,15 +26,15 @@ pnpm run test
 pnpm run build
 ```
 
-El origen local de las capas se arranca aparte, con lo que haya publicado la ingesta nocturna o con una España sintética; ver [docs/patterns/convex.md](docs/patterns/convex.md#publicación). Sin ellos la web enseña el mapa base y dice que no ha podido cargar los emplazamientos.
+El origen local de las capas se arranca aparte, con lo que haya publicado la ingesta o con una España sintética; ver [docs/patterns/convex.md](docs/patterns/convex.md#publicación). Sin él la web enseña el mapa base y dice que no ha podido cargar los emplazamientos.
 
-El entorno trae Node 24, pnpm 10, tippecanoe y pmtiles.
+El entorno trae Node 24 y pnpm 10.
 
 ## Estructura
 
 ```
-apps/web/                 la web, una SPA de Solid 2
-apps/nocturna/            la ingesta nocturna fuera de Convex, con su estado en SQLite
+apps/web/                 la web, de una sola página, en Solid 2
+apps/nocturna/            la ingesta, fuera de Convex, con su estado en SQLite
 apps/moderacion/          la herramienta de moderación del buzón (`pnpm -s moderar`)
 convex/                   Convex con Confect: el buzón de las aportaciones compartidas (ADR 0020)
 packages/dominio/         tipos y esquemas del dominio y la fusión, sin E/S

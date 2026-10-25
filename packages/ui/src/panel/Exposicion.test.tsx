@@ -38,7 +38,7 @@ describe("la sección de las medidas de exposición", () => {
     ));
     flush();
     assert.strictEqual(getByText(/más alta que/u).textContent, "más alta que 95 de 100");
-    assert.include(container.querySelector("[style]")?.getAttribute("style") ?? "", "* 0.95)");
+    assert.strictEqual(container.querySelector("[style]")?.getAttribute("style"), "left: 95%;");
   });
 
   it("la tabla de cada compañía dice cuántas de cada 100 quedan por debajo solo si se compara", () => {

@@ -345,7 +345,6 @@ describe("baremoDeProvincia", () => {
    * pide los baremos por otro nombre y el flujo de despliegue los vuelve a montar (ADR 0030).
    */
   const HUELLAS = {
-    1: "98273fa4417e6debc1baf238b2784c5e05ebaac294a35263d8379b42ff234875",
     2: "988f686bf2f60d03fd3dea134e6afe1124598f06e7a0132cb003e9b7e276f487",
   } satisfies Readonly<Record<number, string>>;
 

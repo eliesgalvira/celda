@@ -87,7 +87,7 @@ describe("Dialogo", () => {
     );
   });
 
-  it("el botón con la etiqueta «Cerrar» lo cierra", () => {
+  it("la ✕, que se llama «Cerrar», lo cierra", () => {
     const { getByRole, cierres } = montar();
     fireEvent.click(getByRole("button", { name: "Cerrar" }));
     flush();

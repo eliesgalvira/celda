@@ -5,6 +5,7 @@ import {
   type TextoMarcado,
 } from "@celda/dominio/glosario";
 import { type JSX, Portal } from "@solidjs/web";
+import { cva } from "class-variance-authority";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 
 import { BotonCerrar, variantesDiana } from "../Boton.tsx";
@@ -18,6 +19,23 @@ export interface TerminoProps {
   /** Las palabras que se subrayan, tal como van en la frase. */
   readonly children: JSX.Element;
 }
+
+const variantesTermino = cva(
+  // Se puede tocar aunque vaya en una pieza que deja pasar los gestos al mapa.
+  "pointer-events-auto relative inline cursor-pointer rounded-sm text-left underline decoration-primario " +
+    "decoration-dotted decoration-2 underline-offset-[0.22em] hover:decoration-solid " +
+    "aria-expanded:bg-primario/15 aria-expanded:decoration-solid " +
+    // El objetivo táctil crece por fuera de la palabra sin mover el texto, pero poco: en letra
+    // pequeña, más se metería en la línea de al lado y taparía otro término.
+    "after:absolute after:-inset-x-1 after:-inset-y-1 after:content-['']",
+  {
+    variants: {
+      // La hoja del navegador quita a los botones las mayúsculas del título en el que van. Un
+      // símbolo como MHz conserva siempre las suyas.
+      simbolo: { true: "normal-case", false: "[text-transform:inherit]" },
+    },
+  },
+);
 
 /**
  * Un término técnico dentro de un texto (historia 53): sale subrayado y, al tocarlo o pulsarlo
@@ -46,20 +64,7 @@ export function Termino(props: TerminoProps) {
         aria-expanded={abierto() ? "true" : "false"}
         aria-controls={abierto() ? id : undefined}
         onClick={() => setAbierto((antes) => !antes)}
-        class={
-          // Se puede tocar aunque vaya en una pieza que deja pasar los gestos al mapa.
-          // La hoja del navegador quita a los botones las mayúsculas del título en el que van. Un
-          // símbolo como MHz las conserva siempre.
-          (GLOSARIO[props.termino].simbolo === true
-            ? "normal-case "
-            : "[text-transform:inherit] ") +
-          "pointer-events-auto relative inline cursor-pointer rounded-sm text-left underline decoration-primario " +
-          "decoration-dotted decoration-2 underline-offset-[0.22em] hover:decoration-solid " +
-          "aria-expanded:bg-primario/15 aria-expanded:decoration-solid " +
-          // El objetivo táctil crece por fuera de la palabra sin mover el texto, pero poco: en
-          // letra pequeña, más se metería en la línea de al lado y taparía otro término.
-          "after:absolute after:-inset-x-1 after:-inset-y-1 after:content-['']"
-        }
+        class={variantesTermino({ simbolo: GLOSARIO[props.termino].simbolo === true })}
       >
         {props.children}
       </button>

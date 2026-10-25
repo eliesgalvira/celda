@@ -8,7 +8,7 @@ Fuentes consultadas: un proyecto previo del autor sobre reactividad y el gist `e
 
 ## Restricciones de partida
 
-- Solid 2.0 (`2.0.0-rc.17`, sin versión estable), Effect v4 (`4.0.0-rc.117`) y Convex.
+- Solid 2.0 y Effect v4, los dos sin versión estable (las versiones exactas van en el catálogo de `pnpm-workspace.yaml`), y Convex.
 - UI que nunca miente: no se muestra nunca un estado incorrecto. Todo dato lleva su origen y su fecha. Un valor pendiente se trata de una de tres maneras honestas: esperar, mostrar el anterior o predecir de forma explícita.
 - Sin CSS a medida: las pantallas se componen con la librería de componentes, y el diseño todavía va a cambiar.
 - Primera versión: área de Barcelona, sin cuentas, con las aportaciones guardadas en el dispositivo y límites de uso estrictos.

@@ -7,7 +7,7 @@ const variantesDesplegable = cva("", {
     variante: {
       /** Una sección más del panel del emplazamiento, separada por una línea. */
       panel: "border-t border-linea",
-      /** Un recuadro dentro de un diálogo, como «¿Qué le pasa a mi móvil?». */
+      /** Un recuadro dentro de un diálogo, como «¿Qué hace el código en el móvil?». */
       recuadro: "bg-superficie-alta shadow-[inset_0_0_0_1.5px_var(--linea)]",
       /** Una parte de una sección de la ficha, como «Las medidas de cada compañía». */
       seccion: "border-t border-linea",

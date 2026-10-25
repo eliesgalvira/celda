@@ -5,7 +5,7 @@ import {
   mismoFiltro,
   SIN_FILTRO,
 } from "@celda/dominio/filtro";
-import { mismosCampos, recurso } from "@celda/ui/recurso.ts";
+import { mismasListas, recurso } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
@@ -109,7 +109,7 @@ export const crearFiltro = (
       }
       return () => parar.abort();
     },
-    { iguales: mismosCampos },
+    { iguales: (a, b) => a.filtro === b.filtro && mismasListas(a.provincias, b.provincias) },
   );
 
   return {

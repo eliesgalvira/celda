@@ -447,10 +447,12 @@ export function PantallaMapa() {
       });
   };
 
-  // Cuando se sabe la vista inicial, sus provincias se piden sin esperar al mapa.
+  // Cuando se sabe la vista inicial, sus provincias se piden sin esperar al mapa. La clave es si
+  // se sabe: la caja de la provincia del punto se vuelve a calcular, igual, con cada contorno que
+  // llega para la cabecera.
   recurso(
     "capa:vista-inicial",
-    () => vistaInicial.encuadre(),
+    () => vistaInicial.encuadre() !== undefined,
     () => {
       pedirLoQueSeVe();
       return undefined;
@@ -762,7 +764,10 @@ export function PantallaMapa() {
   );
 
   // Al cambiar de vista, se piden las provincias que esa vista dibuja en lo que se ve.
-  createEffect(vistaDibujada, () => untrack(pedirLoQueSeVe));
+  recurso("capa:vista", vistaDibujada, () => {
+    pedirLoQueSeVe();
+    return undefined;
+  });
 
   /**
    * Si se dibujan los marcadores: siempre con la vista agrupada y, con la de puntos, desde el zoom

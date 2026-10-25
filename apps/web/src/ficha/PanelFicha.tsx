@@ -149,7 +149,7 @@ export function PanelFicha(props: PanelFichaProps) {
         <Loading on={props.clave} fallback={<EsqueletoFicha />}>
           <Show
             when={Option.getOrUndefined(ficha())}
-            fallback={<FichaInexistente clave={props.clave} alCerrar={() => props.alCerrar()} />}
+            fallback={<FichaInexistente alCerrar={() => props.alCerrar()} />}
           >
             {(leida) => (
               <ContenidoFicha
@@ -168,7 +168,7 @@ export function PanelFicha(props: PanelFichaProps) {
   );
 }
 
-function FichaInexistente(props: { readonly clave: string; readonly alCerrar: () => void }) {
+function FichaInexistente(props: { readonly alCerrar: () => void }) {
   return (
     <AvisoFicha>
       <Aviso

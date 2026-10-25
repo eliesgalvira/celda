@@ -13,14 +13,14 @@ import { TextoConTerminos } from "@celda/ui/termino/Termino.tsx";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
-import { createMemo, For, Match, Show, Switch } from "solid-js";
+import { createMemo, For, Show } from "solid-js";
 
 import { leerEnSolid, usarDatos } from "../datos.tsx";
 import { estacionesConMedidas, type FrenteAOtrasMedidas, textosExposicion } from "./exposicion.ts";
 import { FichasPublicadas } from "./servicio.ts";
 
-const comparada = (frente: FrenteAOtrasMedidas | undefined) =>
-  frente?.tipo === "comparada" ? frente : undefined;
+const comparada = (frente: FrenteAOtrasMedidas) =>
+  frente.tipo === "comparada" ? frente : undefined;
 
 /**
  * La sección con el baremo si lo hay: la medida más alta y dónde queda, y plegadas, las medidas de
@@ -44,16 +44,20 @@ function Medidas(props: { readonly ficha: Ficha; readonly baremo: Baremo | undef
             >
               <TextoConTerminos texto={maxima().nota} />
             </MedidaMasAlta>
-            <Switch>
-              <Match when={comparada(maxima().frente)}>
-                {(frente) => (
-                  <FrenteAOtras masAltaQue={frente().masAltaQue}>{frente().nota}</FrenteAOtras>
-                )}
-              </Match>
-              <Match when={maxima().frente?.tipo === "sin-zona"}>
-                <NotaExposicion>{maxima().frente?.nota}</NotaExposicion>
-              </Match>
-            </Switch>
+            <Show when={maxima().frente}>
+              {(frente) => (
+                <Show
+                  when={comparada(frente())}
+                  fallback={<NotaExposicion>{frente().nota}</NotaExposicion>}
+                >
+                  {(conSuZona) => (
+                    <FrenteAOtras masAltaQue={conSuZona().masAltaQue}>
+                      {conSuZona().nota}
+                    </FrenteAOtras>
+                  )}
+                </Show>
+              )}
+            </Show>
             <Desplegable variante="seccion" titulo="Las medidas de cada compañía">
               <MedidasDeExposicion estaciones={textos().estaciones} />
             </Desplegable>

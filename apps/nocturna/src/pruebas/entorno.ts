@@ -142,7 +142,6 @@ export interface Variante {
    * encendido, salvo si `interruptores` dice otra cosa.
    */
   readonly buzon?: Layer.Layer<AceptadasDelBuzon>;
-  readonly reintento?: Duration.Duration;
   readonly proceso?: OpcionesBarrido;
   /** Cambia la base del barrido de la noche, para que falle donde quiera la prueba. */
   readonly envolverBase?: (base: BaseDeBarrido["Service"]) => BaseDeBarrido["Service"];
@@ -190,7 +189,6 @@ export const unaNoche = (
     );
     const laNoche = noche({
       ...opcionesDe(entorno),
-      reintento: variante.reintento ?? REINTENTO_DE_PUBLICACION,
       proceso: variante.proceso ?? CATALUNA_CADA_NOCHE,
     });
     const { envolverBase } = variante;

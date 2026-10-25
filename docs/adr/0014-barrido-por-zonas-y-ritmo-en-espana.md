@@ -32,7 +32,7 @@ En producción las fichas van a una por segundo desde el 07/10/2026 (`registroOf
 
 - Una alta tarda en verse lo que tarda en volver a barrerse su grupo: una noche en Cataluña, hasta una semana en el resto con siete grupos.
 - Hacen falta tipos nuevos en el dominio: la celda de barrido con sus cajas y el grupo con su nombre.
-- La simulación del teselado (`muestras/espana/teselas.mjs`) sirve de referencia: con la densidad de `showf` reproduce las peticiones medidas en todas las cajas.
+- La simulación del teselado (`muestras/espana/teselas.mjs`) sirvió de referencia: con la densidad de `showf` reproducía las peticiones medidas en todas las cajas. Se borró el 03/10/2026 con las demás muestras de antenasmoviles.es (#55, ADR 0019).
 
 ## Alternativas descartadas
 
