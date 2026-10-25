@@ -89,7 +89,7 @@ interface ExplicacionProps {
 }
 
 const DIANA_TEXTO =
-  "font-mono text-xs font-semibold tracking-wide text-tinta-invertida underline " +
+  "font-mono text-xs font-semibold tracking-wide text-tinta-explicacion underline " +
   "decoration-dotted underline-offset-4 hover:decoration-solid";
 
 /**
@@ -213,7 +213,7 @@ function Explicacion(props: ExplicacionProps) {
       <span
         aria-hidden="true"
         class={
-          "absolute left-(--pico) size-3.5 -translate-x-1/2 rotate-45 bg-superficie-invertida " +
+          "absolute left-(--pico) size-3.5 -translate-x-1/2 rotate-45 bg-superficie-explicacion " +
           "group-data-[lado=abajo]/explicacion:-top-1.5 group-data-[lado=arriba]/explicacion:-bottom-1.5"
         }
       />
@@ -222,8 +222,8 @@ function Explicacion(props: ExplicacionProps) {
           cuerpo = elemento;
         }}
         class={
-          "chaflan flex flex-col gap-2 overflow-y-auto overscroll-contain bg-superficie-invertida " +
-          "py-3 pr-2 pl-5 text-tinta-invertida [--corte:12px]"
+          "chaflan flex flex-col gap-2 overflow-y-auto overscroll-contain bg-superficie-explicacion " +
+          "py-3 pr-2 pl-5 text-tinta-explicacion [--corte:12px]"
         }
       >
         <div class="flex items-center gap-2.5">
@@ -243,13 +243,13 @@ function Explicacion(props: ExplicacionProps) {
           </div>
         </div>
         <p class="pr-3 text-[0.9375rem] leading-relaxed">{entrada().explicacion}</p>
-        <p class="pr-3 font-mono text-xs leading-5 text-tinta-invertida-suave">
+        <p class="pr-3 font-mono text-xs leading-5 text-tinta-explicacion-suave">
           Término técnico:{" "}
-          <span class="font-semibold text-tinta-invertida">{entrada().tecnico}</span>
+          <span class="font-semibold text-tinta-explicacion">{entrada().tecnico}</span>
         </p>
         <Show when={entrada().relacionados.length > 0}>
-          <div class="-mb-2 flex flex-wrap items-center gap-x-3 border-t border-tinta-invertida-suave/30 pr-3">
-            <span class="w-full pt-2 font-mono text-xs text-tinta-invertida-suave">
+          <div class="-mb-2 flex flex-wrap items-center gap-x-3 border-t border-tinta-explicacion-suave/30 pr-3">
+            <span class="w-full pt-2 font-mono text-xs text-tinta-explicacion-suave">
               Ver también
             </span>
             <For each={entrada().relacionados}>
