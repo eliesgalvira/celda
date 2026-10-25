@@ -13,6 +13,7 @@ import {
   RECURSOS_INICIALES_MAPA_BASE,
   TOKENS_MAPA,
 } from "./estilo.ts";
+import { CONTORNO_DE_ESPANA } from "./espana.ts";
 import { nombreDelRotulo } from "./nombres.ts";
 import { estiloDeReserva } from "./reserva/estilo.ts";
 import {
@@ -23,6 +24,7 @@ import {
   puestaDeHuecos,
 } from "./huecos.ts";
 import {
+  CAJAS_DE_ESPANA,
   CAPAS_DE_CIUDADES,
   CAPAS_DE_LUGARES,
   tamanoDeRotulo,
@@ -212,18 +214,39 @@ describe("estiloMapa", () => {
     const soloDeEspana = [
       "all",
       ["!=", ["get", "name"], "Gibraltar"],
-      ["any", [">=", ["zoom"], ZOOM_DE_FUERA], ["within", CONTORNO_DE_PRUEBA]],
+      [
+        "any",
+        [">=", ["zoom"], ZOOM_DE_FUERA],
+        ["all", ["within", CAJAS_DE_ESPANA], ["within", CONTORNO_DE_PRUEBA]],
+      ],
     ];
     assert.strictEqual(ZOOM_DE_FUERA, 9);
     for (const capa of estiloDePrueba().layers) {
       if (!CAPAS_DE_LUGARES.includes(capa.id)) continue;
       const filtro = "filter" in capa ? capa.filter : undefined;
+      // Después de la clase, que descarta casi todo sin mirar el contorno.
       assert.deepStrictEqual<unknown>(
-        Array.isArray(filtro) ? filtro.slice(0, 2) : undefined,
+        Array.isArray(filtro) ? [filtro[0], filtro[2]] : undefined,
         ["all", soloDeEspana],
         capa.id,
       );
     }
+  });
+
+  it("las cajas de España contienen todo su contorno", () => {
+    const cajas = CAJAS_DE_ESPANA.coordinates.map(([anillo = []]) => ({
+      oeste: Math.min(...anillo.map(([lon = 0]) => lon)),
+      este: Math.max(...anillo.map(([lon = 0]) => lon)),
+      sur: Math.min(...anillo.map(([, lat = 0]) => lat)),
+      norte: Math.max(...anillo.map(([, lat = 0]) => lat)),
+    }));
+    const fuera = CONTORNO_DE_ESPANA.coordinates
+      .flat(2)
+      .filter(
+        ([lon = 0, lat = 0]) =>
+          !cajas.some((c) => lon >= c.oeste && lon <= c.este && lat >= c.sur && lat <= c.norte),
+      );
+    assert.deepStrictEqual(fuera, []);
   });
 
   it("las capas de lugares dejan fuera, sin mirar mayúsculas, los municipios que lleva Celda", () => {

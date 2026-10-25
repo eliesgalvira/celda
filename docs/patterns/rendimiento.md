@@ -515,6 +515,23 @@ Las cuentas al empezar cambian unas veinte de una pasada a otra en los tres caso
 
 Antes y después salen los mismos puntos por gesto (25, 25 y 15), la misma media (0,04 px) y el mismo máximo (0,07 px al alejar y 0,05 al acercar), y después se contestan 31 teselas de OpenFreeMap y ninguna del IGN. Hay de un 5 a un 10 % menos de medidas porque con el mapa base principal cada gesto pinta algún fotograma menos en SwiftShader. Con el TileJSON de antes, la misma prueba volvió a dar 800, 1450 y 240 con la CPU a ×1. Cada gesto sigue midiendo cientos de veces el paso entero, y con la web de antes del #74 la prueba daba de 242 a 259 px.
 
+## La clase y dos rectángulos antes que el contorno de España (25/10/2026)
+
+Las capas de lugares no rotulan de lejos lo de fuera de España con un `within` sobre el contorno de `espana.json` (ADR 0024). MapLibre 6.11 proyecta los 4.075 vértices del contorno en cada evaluación de `within`, una vez por rasgo y por capa, en su worker. El filtro iba antes que el de la clase, y las cuatro teselas de zoom 4 de la vista inicial del móvil traen 2.085 lugares, casi todos de fuera y de clases que Celda no rotula. Eran 1,2 s de CPU del worker en el móvil y 1,0 s en el escritorio.
+
+Ahora la clase va primero, y antes del contorno se mira si el lugar cae en uno de dos rectángulos (`CAJAS_DE_ESPANA` en `packages/ui/src/mapa/rotulos.ts`): la península con Baleares, Ceuta y Melilla, y Canarias. Lo de fuera se descarta con un rectángulo de 5 vértices. Los rótulos salen iguales, porque las cajas contienen todo el contorno, y `estilo.test.ts` lo comprueba con `espana.json`.
+
+Medido el 25/10/2026 con un prototipo que hacía lo mismo, la build local servida como en Vercel, la publicación de toda España y OpenFreeMap de verdad, en medianas de tres rondas. El móvil va con «Fast 4G» y la CPU a ×4, y el escritorio con la red de verdad y la CPU sin frenar. El mapa base completo es el momento en que están pintadas todas las teselas de la vista.
+
+| Mapa base completo, ms desde que se pide la página | Antes | Después |
+|---|---|---|
+| Móvil, primera visita | 4.723–4.753 | 3.575–3.576 |
+| Móvil, visita repetida | 2.932–3.218 | 1.282–1.308 |
+| Escritorio, primera visita | 1.584 | 624 |
+| Escritorio, visita repetida | 1.260 | 548 |
+
+Con el filtro así, en el móvil el mapa base completo llega 60 ms después del último byte de las teselas, así que ya solo espera a la red. Quitar `within` del todo salió más lento, 3.800 ms en el móvil, porque entran los rótulos de fuera y hay más que colocar.
+
 ## Qué entró
 
 **La cadena de descargas del mapa base se adelanta** (`apps/web/src/mapa/precarga.ts`). Antes iba en serie: la web, MapLibre al acabar de pintar la pantalla, su worker al crear el mapa, el TileJSON, las teselas y por último los glifos, que la primera tesela necesita para sus rótulos. Ahora `entrada.tsx` importa `precarga.ts` lo primero, y en cuanto llega el código de la web pide MapLibre, deja el código del worker en la caché HTTP con un `prefetch` y precarga el TileJSON y los glifos que usa la vista inicial (`RECURSOS_INICIALES_MAPA_BASE` en `packages/ui/src/mapa/estilo.ts`). Un `import()` normal no empieza a descargar hasta que acaba la tarea que lo llama, y evaluar la web es una tarea de 300 ms con ×4. Por eso `vite.config.ts` pone el propio trozo en `modulePreload.resolveDependencies`: el cargador de Vite lo pide en el acto con un `<link rel="modulepreload">`. Con ×4, el mapa base sale 510 ms antes.
