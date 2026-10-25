@@ -4,7 +4,7 @@ El código de Celda es 0BSD (ver `LICENSE`). Los datos llevan otras condiciones,
 
 ## Datos de Celda: CC0 1.0
 
-Los datos que crea Celda y todas las aportaciones del público están dedicados al dominio público con [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/deed.es). Son las correcciones aceptadas, los agregados de medidas, las corroboraciones y lo que Celda calcula sobre los datos de otros, como el estado, la confianza o las zonas. Se pueden copiar, cambiar y republicar sin pedir permiso ni citar.
+Lo que añade Celda a los datos de otros es de dominio público, con [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/deed.es): las aportaciones del público y lo que calcula Celda, como el estado y la confianza de cada emplazamiento, los recuentos por zona o cómo queda cada medida de exposición frente a las de su zona. Se puede copiar, cambiar y republicar sin pedir permiso ni citar.
 
 ## Datos de otros
 
