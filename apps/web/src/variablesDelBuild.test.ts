@@ -55,6 +55,15 @@ describe("fugasDeVariables", () => {
     ]);
   });
 
+  it("no busca un valor público que el código escribe, como el dominio en las etiquetas para compartir", () => {
+    const entorno = { VITE_VERCEL_PROJECT_PRODUCTION_URL: "celda.elies.site" };
+    const contenido = '<meta property="og:url" content="https://celda.elies.site/">';
+    assert.deepStrictEqual(fugasDeVariables(fichero(contenido), entorno), [
+      fuga("VITE_VERCEL_PROJECT_PRODUCTION_URL", "valor"),
+    ]);
+    assert.deepStrictEqual(fugasDeVariables(fichero(contenido), entorno, ["celda.elies.site"]), []);
+  });
+
   it("no busca los valores cortos, los de la lista ni los de una variable de Vite", () => {
     const corto = "x".repeat(LARGO_MINIMO - 1);
     const entorno = {

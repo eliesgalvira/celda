@@ -5,8 +5,11 @@
  * `VARIABLES_DE_LA_WEB` (`variables.ts`), ni el de una `CELDA_R2_*`, las credenciales del cubo.
  * Tampoco el valor que tiene en el entorno del build una de esas variables. En Vercel eso cubre las
  * `VITE_VERCEL_*`, que cambian en cada despliegue y dicen el commit, su autor y el repositorio.
+ * El dominio de Celda no cuenta: es público y el HTML lo lleva en las etiquetas para compartir,
+ * aunque también sea el valor de `VITE_VERCEL_PROJECT_PRODUCTION_URL`.
  * `soloLasVariablesDeLaWeb` es el plugin de Vite que hace fallar el build en ese caso.
  */
+import { SITIO } from "@celda/ui/marca/compartir.ts";
 import { loadEnv, type Plugin } from "vite";
 
 import { VARIABLES_DE_LA_WEB } from "./variables.ts";
@@ -57,18 +60,20 @@ const tramoBuscado = (valor: string): string =>
  * pone siempre en `import.meta.env`, como `MODE`. Un valor ajeno se busca si su tramo sin nada
  * escapable tiene al menos `LARGO_MINIMO` caracteres y no es también el de una variable que el
  * build puede llevar. El `production` de `VITE_VERCEL_ENV` es el de `MODE`, y encontrarlo no dice
- * nada.
+ * nada. Tampoco se buscan los valores de `publicos`, que el código escribe a propósito.
  */
 export const fugasDeVariables = (
   ficheros: ReadonlyMap<string, string>,
   entorno: EntornoDelBuild,
+  publicos: ReadonlyArray<string> = [],
 ): Array<Fuga> => {
   const variables = Object.entries(entorno).flatMap(([variable, valor]) =>
     valor === undefined ? [] : [{ variable, valor }],
   );
-  const permitidos = new Set(
-    variables.filter(({ variable }) => !esAjena(variable)).map(({ valor }) => valor),
-  );
+  const permitidos = new Set([
+    ...publicos,
+    ...variables.filter(({ variable }) => !esAjena(variable)).map(({ valor }) => valor),
+  ]);
   const buscados = variables.flatMap(({ variable, valor }) => {
     const tramo = tramoBuscado(valor);
     return esAjena(variable) && tramo.length >= LARGO_MINIMO && !permitidos.has(valor)
@@ -123,7 +128,7 @@ export const soloLasVariablesDeLaWeb = (): Plugin => ({
             : fichero.source,
       ]),
     );
-    const fugas = fugasDeVariables(ficheros, entorno);
+    const fugas = fugasDeVariables(ficheros, entorno, [new URL(SITIO).host]);
     if (fugas.length > 0) this.error(avisoDeFugas(fugas));
   },
 });
