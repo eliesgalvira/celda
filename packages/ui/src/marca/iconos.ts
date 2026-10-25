@@ -9,7 +9,6 @@
 // El plugin corre en Node al construir, fuera de cualquier programa de Effect.
 // @effect-diagnostics-next-line nodeBuiltinImport:off
 import * as NodeFS from "node:fs";
-import * as NodeZlib from "node:zlib";
 
 import type { Plugin } from "vite";
 
@@ -25,6 +24,8 @@ import {
   type Tono,
   trayecto,
 } from "./geometria.ts";
+import { ALTERNATIVO_AL_COMPARTIR, COMPARTIR, SITIO, TITULO_AL_COMPARTIR } from "./compartir.ts";
+import { codificarPng } from "./png.ts";
 import { type Capa, rasterizar, type Rgb } from "./raster.ts";
 
 /** Los colores de un icono, leídos de los tokens `--icono-*` y del tema claro. */
@@ -132,45 +133,15 @@ export const pixelesDeIcono = (
       color: tonos[pieza.tono],
     });
   }
-  return rasterizar(tamano, capas);
-};
-
-const trozo = (tipo: string, datos: Uint8Array): Uint8Array => {
-  const cabecera = Buffer.alloc(8);
-  cabecera.writeUInt32BE(datos.length, 0);
-  cabecera.write(tipo, 4, "ascii");
-  const cola = Buffer.alloc(4);
-  cola.writeUInt32BE(NodeZlib.crc32(Buffer.concat([cabecera.subarray(4), datos])), 0);
-  return Buffer.concat([cabecera, datos, cola]);
-};
-
-/** Un PNG RGBA de 8 bits a partir de sus píxeles. */
-export const codificarPng = (tamano: number, pixeles: Uint8Array): Uint8Array => {
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(tamano, 0);
-  ihdr.writeUInt32BE(tamano, 4);
-  ihdr.writeUInt8(8, 8);
-  ihdr.writeUInt8(6, 9);
-  const filas = Buffer.alloc(tamano * (tamano * 4 + 1));
-  for (let fila = 0; fila < tamano; fila += 1) {
-    const inicio = fila * (tamano * 4 + 1);
-    // Filtro 0 (ninguno) en cada fila.
-    filas.set(pixeles.subarray(fila * tamano * 4, (fila + 1) * tamano * 4), inicio + 1);
-  }
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    trozo("IHDR", ihdr),
-    trozo("IDAT", NodeZlib.deflateSync(filas, { level: 9 })),
-    trozo("IEND", new Uint8Array()),
-  ]);
+  return rasterizar(tamano, tamano, capas);
 };
 
 /**
- * La descripción de la página y la del manifiesto: la misión de Celda (ADR 0031), corta para que un
- * buscador o la vista previa de un enlace la enseñen entera.
+ * La descripción de la página, del manifiesto y de la tarjeta al compartir un enlace, con la misión
+ * de Celda (ADR 0031). Cabe entera en un buscador y en la vista previa de WhatsApp.
  */
 export const DESCRIPCION =
-  "Celda enseña con datos oficiales las antenas de móvil de España, sus compañías, sus bandas y lo que ha medido el ministerio, y a quién acudir si algo va mal.";
+  "Las antenas de telefonía móvil de España en un mapa, con datos oficiales: de qué compañía son, en qué bandas emiten y qué ha medido el ministerio.";
 
 const manifiesto = (colores: ColoresIcono): string => {
   const carpeta = CARPETA_ICONOS;
@@ -215,7 +186,7 @@ export const ficherosDeIconos = (css: string): ReadonlyMap<string, string | Uint
   const ficheros = new Map<string, string | Uint8Array>();
   const carpeta = CARPETA_ICONOS.slice(1);
   const png = (destino: Destino, tamano: number) =>
-    codificarPng(tamano, pixelesDeIcono(destino, tamano, colores));
+    codificarPng(tamano, tamano, pixelesDeIcono(destino, tamano, colores));
   ficheros.set(`${carpeta}/${ICONOS.svg}`, svgDeIcono(colores));
   ficheros.set(`${carpeta}/${ICONOS.png32}`, png("favicon", 32));
   ficheros.set(`${carpeta}/${ICONOS.toque}`, png("tapiz", 180));
@@ -232,6 +203,38 @@ const tipoDe = (ruta: string): string =>
     : ruta.endsWith(".png")
       ? "image/png"
       : "application/manifest+json";
+
+/**
+ * Las etiquetas Open Graph, que leen WhatsApp, Telegram, LinkedIn y las demás, y la de X, que con
+ * ellas enseña la tarjeta grande. La imagen la escribe el build de Vercel (`compartir.ts`).
+ */
+export const etiquetasAlCompartir = () => {
+  const propiedades: ReadonlyArray<readonly [string, string]> = [
+    ["og:type", "website"],
+    ["og:site_name", "Celda"],
+    ["og:locale", "es_ES"],
+    ["og:url", `${SITIO}/`],
+    ["og:title", TITULO_AL_COMPARTIR],
+    ["og:description", DESCRIPCION],
+    ["og:image", `${SITIO}${COMPARTIR.ruta}`],
+    ["og:image:type", "image/png"],
+    ["og:image:width", String(COMPARTIR.ancho)],
+    ["og:image:height", String(COMPARTIR.alto)],
+    ["og:image:alt", ALTERNATIVO_AL_COMPARTIR],
+  ];
+  return [
+    ...propiedades.map(([property, content]) => ({
+      tag: "meta",
+      attrs: { property, content },
+      injectTo: "head" as const,
+    })),
+    {
+      tag: "meta",
+      attrs: { name: "twitter:card", content: "summary_large_image" },
+      injectTo: "head" as const,
+    },
+  ];
+};
 
 /** El plugin de Vite que sirve, escribe y enlaza los iconos. */
 export const iconosDeCelda = (): Plugin => {
@@ -265,6 +268,7 @@ export const iconosDeCelda = (): Plugin => {
         const barra = coloresDeLaBarra(leerTema());
         return [
           { tag: "meta", attrs: { name: "description", content: DESCRIPCION }, injectTo: "head" },
+          ...etiquetasAlCompartir(),
           ...(["claro", "oscuro"] as const).map((tema) => ({
             tag: "meta",
             // `data-tema` dice de qué tema es: con uno elegido en Ajustes, su `media` cambia
