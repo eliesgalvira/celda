@@ -38,7 +38,7 @@ export const estaEnElGlosario = (termino: string): termino is Termino =>
 
 /**
  * Lo que delata un detalle de implementación en un texto de la interfaz (docs/patterns/ui.md,
- * «Sin detalles de implementación»): un identificador con versión como «celdas@1», una versión
+ * «Sin detalles de implementación»): un identificador con versión como «baremos@2», una versión
  * suelta como «v1», el nombre de una versión de capa o de fichas, una clave interna de fuente o de
  * emplazamiento, un UUID o una fecha ISO con hora. Se comprueba sobre lo que se ve y lo que oye
  * un lector de pantalla.

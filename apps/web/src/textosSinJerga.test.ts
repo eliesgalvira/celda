@@ -10,9 +10,8 @@ import { parseSync, Visitor } from "vite/rolldown/utils";
 
 /**
  * Ningún texto de la interfaz enseña un detalle de implementación (docs/patterns/ui.md, «Sin
- * detalles de implementación»): ni el identificador y la versión de una simulación, como
- * «celdas@1» o «sector-servicio v1», ni la versión de una capa o de unas fichas, como
- * «sitios@2026-09-26T02:15:00Z». Esta prueba lee las cadenas, las plantillas y el texto JSX de la
+ * detalles de implementación»): ni un identificador con versión, como «baremos@2» o «indice v1»,
+ * ni la versión de una capa o de unas fichas, como «sitios@2026-09-26T02:15:00Z». Esta prueba lee las cadenas, las plantillas y el texto JSX de la
  * web, la librería de componentes y los módulos del dominio que escriben textos, sin comentarios
  * ni pruebas. Una plantilla se lee con un hueco en cada `${…}`, así que también ve
  * `${id}@${version}` y `v${version}`. Lo que se ve al renderizar lo comprueba `jergaEn` en las
@@ -87,7 +86,7 @@ const jerga = (fichero: string, textos: ReadonlyArray<string>): ReadonlyArray<st
   );
 
 describe("textos sin detalles de implementación", () => {
-  it("ningún texto de la interfaz lleva un identificador de simulación ni una versión", () => {
+  it("ningún texto de la interfaz lleva un identificador con versión ni una versión", () => {
     const ficheros = [...CARPETAS.flatMap(codigoDe), ...DEL_DOMINIO];
     const encontrados = [
       ...ficheros.flatMap((fichero) =>
@@ -112,12 +111,12 @@ describe("textos sin detalles de implementación", () => {
     const textos = textosDe(
       "prueba.tsx",
       [
-        "// Modelo celdas@1 en un comentario no cuenta",
-        'const a = "Modelo celdas@1";',
-        "const b = `${simulacion.id}@${simulacion.version}`;",
+        "// Formato baremos@2 en un comentario no cuenta",
+        'const a = "Formato baremos@2";',
+        "const b = `${baremo.id}@${baremo.formato}`;",
         "const c = `${diagrama.id} v${diagrama.version}`;",
         "const d = `capa sitios@${fecha}`;",
-        "const E = () => <p>sector-servicio v1</p>;",
+        "const E = () => <p>indice v1</p>;",
         'const f = "Ver en el registro oficial";',
         'const g = "Banda de 700 MHz · CC BY 4.0";',
       ].join("\n"),
