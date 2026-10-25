@@ -764,7 +764,10 @@ export function PantallaMapa() {
   );
 
   // Al cambiar de vista, se piden las provincias que esa vista dibuja en lo que se ve.
-  createEffect(vistaDibujada, () => untrack(pedirLoQueSeVe));
+  recurso("capa:vista", vistaDibujada, () => {
+    pedirLoQueSeVe();
+    return undefined;
+  });
 
   /**
    * Si se dibujan los marcadores: siempre con la vista agrupada y, con la de puntos, desde el zoom
