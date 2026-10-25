@@ -1,8 +1,6 @@
 /**
  * Un codificador de PNG mínimo, sin dependencias, para los iconos y la imagen para compartir.
  */
-// Corre en Node al construir, fuera de cualquier programa de Effect.
-// @effect-diagnostics-next-line nodeBuiltinImport:off
 import * as NodeZlib from "node:zlib";
 
 const trozo = (tipo: string, datos: Uint8Array): Uint8Array => {
