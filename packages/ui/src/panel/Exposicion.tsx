@@ -101,8 +101,6 @@ export function MedidaMasAlta(props: MedidaMasAltaProps) {
   );
 }
 
-const DIAMETRO = { grande: "0.75rem", fila: "0.5rem" } as const;
-
 const variantesPuesto = cva("relative", {
   variants: { tamano: { grande: "h-3.5", fila: "h-2.5 w-15" } },
 });
@@ -112,7 +110,7 @@ const variantesLineaPuesto = cva("absolute top-1/2 h-[1.5px] -translate-y-1/2 bg
 });
 
 const variantesPunto = cva(
-  "absolute top-1/2 -translate-y-1/2 rounded-full bg-primario shadow-[0_0_0_2px_var(--superficie)]",
+  "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primario shadow-[0_0_0_2px_var(--superficie)]",
   { variants: { tamano: { grande: "size-3", fila: "size-2" } } },
 );
 
@@ -128,11 +126,12 @@ function PuestoEnLinea(props: {
 }) {
   return (
     <div aria-hidden="true" class={variantesPuesto({ tamano: props.tamano })}>
-      <div class={variantesLineaPuesto({ tamano: props.tamano })} />
-      <div
-        class={variantesPunto({ tamano: props.tamano })}
-        style={{ left: `calc((100% - ${DIAMETRO[props.tamano]}) * ${props.puesto / 100})` }}
-      />
+      <div class={variantesLineaPuesto({ tamano: props.tamano })}>
+        <div
+          class={variantesPunto({ tamano: props.tamano })}
+          style={{ left: `${props.puesto}%` }}
+        />
+      </div>
     </div>
   );
 }
@@ -228,19 +227,17 @@ export function MedidasDeExposicion(props: MedidasDeExposicionProps) {
                         <td class={`${CELDA} whitespace-nowrap`}>{fila.distancia}</td>
                         <td class={CELDA}>{fila.direccion}</td>
                         <td class={`${NUMERO} font-semibold`}>{fila.valor}</td>
-                        <Show when={comparada(estacion)}>
-                          <Show when={fila.comparacion}>
-                            {(comparacion) => (
-                              <>
-                                <td class="py-1 pr-2.5 align-middle">
-                                  <PuestoEnLinea puesto={comparacion().masAltaQue} tamano="fila" />
-                                </td>
-                                <td class="py-1 text-right align-middle whitespace-nowrap">
-                                  {`${comparacion().masAltaQue} de 100`}
-                                </td>
-                              </>
-                            )}
-                          </Show>
+                        <Show when={fila.comparacion}>
+                          {(comparacion) => (
+                            <>
+                              <td class="py-1 pr-2.5 align-middle">
+                                <PuestoEnLinea puesto={comparacion().masAltaQue} tamano="fila" />
+                              </td>
+                              <td class="py-1 text-right align-middle whitespace-nowrap">
+                                {`${comparacion().masAltaQue} de 100`}
+                              </td>
+                            </>
+                          )}
                         </Show>
                       </tr>
                     )}
