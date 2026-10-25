@@ -7,6 +7,10 @@ Celda enseña, con los datos oficiales, qué antenas de móvil hay en un sitio, 
 
 El mapa abre con un punto por emplazamiento del registro oficial, y al acercarse salen los logos de sus compañías y la fecha de los datos. La ficha de cada emplazamiento dice en qué bandas emite cada compañía y desde cuándo lo publica el registro. «Si algo va mal», en «Funciones», dice a quién se acude en cada problema, en qué orden y con qué plazos. La ingesta barre el registro de toda España por zonas, y de las provincias que aún no ha barrido el mapa dice que no las tiene. El primer fin de semana de cada mes la ingesta lee las fuentes, las fusiona en emplazamientos y publica la instantánea como capas estáticas por provincia que la web descarga. El glosario está en [CONTEXT.md](CONTEXT.md) y las decisiones en [docs/adr](docs/adr/README.md).
 
+## Reutilizar los datos
+
+Los emplazamientos, sus fichas y las medidas de exposición del ministerio se pueden reutilizar sin clave: una consulta busca los más cercanos a un punto (`GET https://celda.elies.site/api/emplazamientos?lat=…&lon=…`), y los ficheros que lee el mapa están en `/capas`. Cómo se usan, qué dicen y qué crédito hay que dar: [docs/api.md](docs/api.md).
+
 ## Arrancar
 
 Hace falta Nix con `flakes`, `nix-command` y `pipe-operators`. Desde la raíz del repositorio:
@@ -36,7 +40,7 @@ El entorno trae Node 24 y pnpm 10.
 ## Estructura
 
 ```
-apps/web/                 la web, de una sola página, en Solid 2
+apps/web/                 la web, de una sola página, en Solid 2, y la API en apps/web/api
 apps/nocturna/            la ingesta, fuera de Convex, con su estado en SQLite
 apps/moderacion/          la herramienta de moderación del buzón (`pnpm -s moderar`)
 convex/                   Convex con Confect: el buzón de las aportaciones compartidas (ADR 0020)

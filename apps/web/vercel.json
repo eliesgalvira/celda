@@ -6,7 +6,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!capas/|assets/|iconos/|despliegue\\.json).*)",
+      "source": "/((?!api/|capas/|assets/|iconos/|despliegue\\.json).*)",
       "destination": "/index.html"
     }
   ],
