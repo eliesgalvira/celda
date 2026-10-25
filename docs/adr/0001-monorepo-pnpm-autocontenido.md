@@ -1,6 +1,6 @@
 # Monorepo pnpm autocontenido con las herramientas de Moli
 
-Estado: aceptada el 24/09/2026. El 20/10/2026 sale `packages/sim`, con la retirada de las simulaciones del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md).
+Estado: aceptada el 24/09/2026. El 20/10/2026 sale `packages/sim`, con la retirada de las simulaciones del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md). El 25/10/2026 Celda pasa a su propio repositorio con su historial.
 
 Celda nace dentro de un archivo privado y se irá a su propio repositorio de código abierto. Por eso su código, su documentación y sus herramientas viven dentro de una sola carpeta, y nada de ella enlaza fuera. Mudarse será copiar la carpeta.
 

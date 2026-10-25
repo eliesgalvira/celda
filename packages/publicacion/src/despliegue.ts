@@ -105,7 +105,7 @@ const FORMA_DE_HUELLA = /^[0-9a-f]{64}$/u;
 /** Si `texto` tiene la forma de una huella de la web. */
 export const esHuella = (texto: string): boolean => FORMA_DE_HUELLA.test(texto);
 
-/** Lo que dice `/despliegue.json`, la huella de la web y el commit de `celda/v1` del que salió. */
+/** Lo que dice `/despliegue.json`, la huella de la web y el commit de `main` del que salió. */
 export const Despliegue = Schema.Struct({
   web: Schema.String.pipe(Schema.check(Schema.isPattern(FORMA_DE_HUELLA))),
   commit: Schema.String,

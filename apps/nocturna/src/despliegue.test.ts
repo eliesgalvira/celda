@@ -38,7 +38,7 @@ const NOCHE = Date.UTC(2026, 8, 26, 2, 15);
 const DIA = 86_400_000;
 const COMMIT = "0631fc3eb2352cd994c79009743808d78e0e9eeb";
 
-/** El commit del push número `n` a `celda/v1` en una prueba. */
+/** El commit del push número `n` a `main` en una prueba. */
 const commitNumero = (n: number): string => `${String(n).padStart(4, "0")}${COMMIT.slice(4)}`;
 
 const registroOficial = (grabada: FuenteGrabada) =>
@@ -99,7 +99,7 @@ const vercelDePrueba = (entorno: Entorno) =>
     const memoria = new Map<string, string>();
 
     /**
-     * Un push a `celda/v1`: un commit nuevo que cambia, añade o quita (`undefined`) ficheros de la
+     * Un push a `main`: un commit nuevo que cambia, añade o quita (`undefined`) ficheros de la
      * web de prueba.
      */
     const empujar = (cambios: Readonly<Record<string, string | undefined>>) =>

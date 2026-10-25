@@ -235,7 +235,7 @@ Medido el 04/10/2026 contra `celda/v1` (con la foto aérea del #64 y los nombres
 
 ## Datos discretos y rótulos por población (#66)
 
-Medido el 04/10/2026 contra `celda/v1` (cf5457a) construida igual, con la publicación de toda España del 30/09/2026 (35.667 emplazamientos) servida en local.
+Medido el 04/10/2026 contra `celda/v1` (8ab4910) construida igual, con la publicación de toda España del 30/09/2026 (35.667 emplazamientos) servida en local.
 
 - **Peso.** La primera pantalla crece 4,9 KB con `gzip -9` (217.362 → 222.214 bytes): la regla de choques, los centros visuales con los habitantes de cada provincia (1,3 KB por sí solos), los niveles de municipios grandes y el rótulo copiado. El trozo del mapa crece 8,0 KB (301.378 → 309.392): la tabla de habitantes de las ciudades (6,9 KB) y la lectura de los rótulos. Por eso la tabla y la lectura van con el mapa: la pantalla las recibe al crearlo.
 - **Capas al abrir y a z8.** Con el resumen hasta z9, una vista a z8 ya no pide ninguna capa de provincia. En el móvil, al saltar de España a Valencia a z8, `celda/v1` pedía siete capas de provincia y dos lotes de fichas, 127 KB con gzip, y Cataluña a z8 cuatro capas más, 228 KB en total; ahora, en las dos, solo `vigente.json` y el resumen, 4,6 KB. Al abrir, lo mismo en las dos: el resumen.
@@ -252,11 +252,11 @@ Medido el 04/10/2026 contra `celda/v1` (cf5457a) construida igual, con la public
 
 ## Fluidez tras la paleta A (#67)
 
-Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repeticiones 5`, en el móvil (390 × 844, DPR 2,6, Chromium con GPU), con la publicación de toda España del 30/09/2026 (35.667 emplazamientos) y las tres webs alternadas ronda a ronda: `165faf1` (`celda/v1` antes del #61), `celda/v1` (9b2a85f, con el #61 al #66) y esta rama. La máquina tenía otros agentes compilando: cada ronda esperó a bajar del 12 % de CPU, y aun así hay rondas sueltas peores (ver «fps por ronda»).
+Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repeticiones 5`, en el móvil (390 × 844, DPR 2,6, Chromium con GPU), con la publicación de toda España del 30/09/2026 (35.667 emplazamientos) y las tres webs alternadas ronda a ronda: `e8ae875` (`celda/v1` antes del #61), `celda/v1` (ed9a513, con el #61 al #66) y esta rama. La máquina tenía otros agentes compilando: cada ronda esperó a bajar del 12 % de CPU, y aun así hay rondas sueltas peores (ver «fps por ronda»).
 
 **Dónde se iba el tiempo.** Perfiles de CPU de V8 de los vuelos, el alejamiento y los niveles sobre Barcelona, con la web sin minificar y MapLibre de desarrollo, sumando el tiempo del hilo principal con la CPU a ×4 por lo que lo llama:
 
-| Hilo principal, ms | `165faf1` | `celda/v1` | Esta rama |
+| Hilo principal, ms | `e8ae875` | `celda/v1` | Esta rama |
 |---|---|---|---|
 | Pintar (WebGL, subir cubos a la GPU) | 2746 | 4139 | 4462 |
 | Recalcular las capas del estilo en cada fotograma | 489 | 2016 | 1467 |
@@ -271,11 +271,11 @@ Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 
   El total de esta rama salió con la máquina más cargada; en las rondas alternadas de abajo su hilo principal gasta de un 8 a un 25 % menos que `celda/v1`. Lo que pesaba:
 
-  - **Los valores por vértice.** El #61 juntó las vías en dos capas con el color, el grosor y la opacidad por clase, y el suelo en dos con el color y la opacidad por clase. Con eso MapLibre guarda esos valores en cada vértice: en Barcelona a z12, 25 MB de pintura por 5 MB de líneas, y en Cataluña a z8, 12 MB por 3,8 MB de geometría. `165faf1` no tenía ninguno. Cada tesela que llega los manda del worker al hilo principal y los sube a la GPU.
+  - **Los valores por vértice.** El #61 juntó las vías en dos capas con el color, el grosor y la opacidad por clase, y el suelo en dos con el color y la opacidad por clase. Con eso MapLibre guarda esos valores en cada vértice: en Barcelona a z12, 25 MB de pintura por 5 MB de líneas, y en Cataluña a z8, 12 MB por 3,8 MB de geometría. `e8ae875` no tenía ninguno. Cada tesela que llega los manda del worker al hilo principal y los sube a la GPU.
   - **`_setPaintOverrides`.** En cada fotograma en que cambia el zoom, MapLibre recorre entera la expresión del `text-field` de cada capa de símbolos. La del nombre de lugar (ADR 0025) tiene 112 nodos y va en siete capas: 809 ms de los 2016 de recalcular.
   - **Leer los rótulos de ciudad** (#66) con `queryRenderedFeatures` lee entera cada tesela a la vista, también desde el zoom 14, donde las capas de ciudades ya no salen.
   - **Más capas y más rótulos**, que es lo decidido en el ADR 0022: unas 67 capas frente a 20 (cada una se recalcula y se pinta por tesela en cada fotograma), las vías, los números de carretera y los nombres de avenidas, ríos, pueblos y puntos de interés, y tres fuentes GeoJSON más (límites, huecos y edificio).
-  - **No es de Celda**: los marcadores, los hexágonos, los rótulos copiados en el DOM y su estilo y maquetación cuestan lo mismo que en `165faf1`, y su estilo y maquetación en el DOM no crecen: de 120 a 400 ms por vuelo en las tres webs.
+  - **No es de Celda**: los marcadores, los hexágonos, los rótulos copiados en el DOM y su estilo y maquetación cuestan lo mismo que en `e8ae875`, y su estilo y maquetación en el DOM no crecen: de 120 a 400 ms por vuelo en las tres webs.
   - **Un artefacto de medida**: `jumpTo` devuelve el mapa, y la primera versión del escenario lo devolvía a Playwright, que lo serializaba: hasta 2 s de JavaScript por salto que no eran de Celda.
 
 **Qué se cambió**, un commit cada uno, medido contra el anterior en rondas alternadas (hilo principal de los niveles sobre Barcelona, que es el gesto más estable, y fps):
@@ -291,7 +291,7 @@ Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 
 **Resultado**, medianas de cinco rondas con la CPU a ×4 en el móvil. Fps y fotogramas de más de 20 ms; la dispersión entre rondas está en la salida de la medida.
 
-| Gesto | `165faf1` | `celda/v1` | Esta rama |
+| Gesto | `e8ae875` | `celda/v1` | Esta rama |
 |---|---|---|---|
 | Salto a València z8 | 51,6 | 58,0 | 58,0 |
 | Salto a Barcelona z12 | 55,3 | 50,4 | 50,7 |
@@ -307,7 +307,7 @@ Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 | Zaragoza, del 9,5 al 14,5 y vuelta | 58,2 | 56,1 | 57,3 |
 | Barcelona, del 9,5 al 14,5 y vuelta | 57,5 | 52,7 | 56,4 |
 
-  Ocho de trece gestos quedan a 2 fps o menos de `165faf1`; el alejamiento del Eixample, los niveles y los saltos lejanos, en su sitio. Quedan por encima los vuelos que acaban o empiezan en la ciudad (de 2,9 a 4,7 fps menos) y el salto a Barcelona z12 (4,6). Ahí el hilo principal gasta de 300 a 600 ms más de JavaScript por vuelo que en `165faf1`: pintar más capas por tesela (los nombres de avenidas, que se colocan a lo largo de la calle en cada fotograma, y los números de carretera son las dos capas que más cuestan), recalcular 67 capas en cada fotograma, colocar más rótulos y servir glifos de tres letras a los workers. Es lo que añadió el ADR 0022, no un desperdicio: bajar más pide quitar capas o rótulos, y eso lo decide el usuario. El peor fotograma del salto a Barcelona z12 es otro: la capa de la provincia de Barcelona al llegar del Worker de Celda, 235 ms frente a 188 en `165faf1` (#66).
+  Ocho de trece gestos quedan a 2 fps o menos de `e8ae875`; el alejamiento del Eixample, los niveles y los saltos lejanos, en su sitio. Quedan por encima los vuelos que acaban o empiezan en la ciudad (de 2,9 a 4,7 fps menos) y el salto a Barcelona z12 (4,6). Ahí el hilo principal gasta de 300 a 600 ms más de JavaScript por vuelo que en `e8ae875`: pintar más capas por tesela (los nombres de avenidas, que se colocan a lo largo de la calle en cada fotograma, y los números de carretera son las dos capas que más cuestan), recalcular 67 capas en cada fotograma, colocar más rótulos y servir glifos de tres letras a los workers. Es lo que añadió el ADR 0022, no un desperdicio: bajar más pide quitar capas o rótulos, y eso lo decide el usuario. El peor fotograma del salto a Barcelona z12 es otro: la capa de la provincia de Barcelona al llegar del Worker de Celda, 235 ms frente a 188 en `e8ae875` (#66).
 
 - **Igual que antes.** Capturas de `celda/v1` y de esta rama en el móvil y a 1400 px: España z5,5, València z8, Barcelona z12, el Eixample z17 y z18, y la foto en Barcelona z12 y el Eixample z18. Comparadas píxel a píxel con un 2 % de tolerancia salen iguales salvo 16 píxeles de 2,2 millones en Barcelona z12, menos que lo que cambian dos capturas seguidas de la misma web (322).
 - **Quieto.** Al abrir, tras volar al Eixample z18, con la foto encendida y tras volar con ella a España, 20 s quieto en el móvil y a 1400 px: 0 peticiones, 0 `render` de MapLibre y 0 llamadas a `fetch`, `requestAnimationFrame`, `setTimeout`, `setInterval` y `postMessage`.
@@ -317,7 +317,7 @@ Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 
 Deshecho el 06/10/2026 por decisión del usuario: la foto ya no se quita en los vuelos, porque el parpadeo al despegar y al llegar molestaba más que lo que ahorraba (ADR 0022). Las medidas de abajo dicen lo que cuesta tenerla.
 
-Con la foto encendida, mientras la web mueve la cámara con una animación el mapa va sin ella, y la foto vuelve al pararse (`apps/web/src/foto/enMapa.ts`, [ui.md](ui.md#foto-aérea)). Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --foto` en el móvil (390 × 844, DPR 2,6, CPU ×4, «Fast 4G», GPU), la capa de `celda-noche`, OpenFreeMap y el PNOA de verdad, rondas alternadas de `celda/v1` (81cc535) y esta rama. Los bytes son los de la primera página, con la caché vacía; los fps, los de las páginas medidas, con las teselas ya en la caché HTTP.
+Con la foto encendida, mientras la web mueve la cámara con una animación el mapa va sin ella, y la foto vuelve al pararse (`apps/web/src/foto/enMapa.ts`, [ui.md](ui.md#foto-aérea)). Medido el 04/10/2026 con `pnpm run medir -- --escenario vuelos --foto` en el móvil (390 × 844, DPR 2,6, CPU ×4, «Fast 4G», GPU), la capa de `celda-noche`, OpenFreeMap y el PNOA de verdad, rondas alternadas de `celda/v1` (a47a53f) y esta rama. Los bytes son los de la primera página, con la caché vacía; los fps, los de las páginas medidas, con las teselas ya en la caché HTTP.
 
 | Medida | `celda/v1` | Esta rama |
 |---|---|---|
@@ -363,7 +363,7 @@ Medido el 04/10/2026 en Chromium sin interfaz con SwiftShader, con la build loca
 
 ## Silueta y límites al arrancar (05/10/2026)
 
-Medido el 05/10/2026 en Chromium sin interfaz con SwiftShader, con la build local servida como en Vercel, la publicación de toda España del 30/09/2026 y OpenFreeMap retrasado 3 s con `page.route`. Móvil de 390 × 844 a DPR 2 con la CPU a ×4, cinco rondas alternadas contra `celda/v1` (ba690a3), medianas desde que se pide la página:
+Medido el 05/10/2026 en Chromium sin interfaz con SwiftShader, con la build local servida como en Vercel, la publicación de toda España del 30/09/2026 y OpenFreeMap retrasado 3 s con `page.route`. Móvil de 390 × 844 a DPR 2 con la CPU a ×4, cinco rondas alternadas contra `celda/v1` (03ade0a), medianas desde que se pide la página:
 
 | | `celda/v1` | Con la silueta |
 |---|---|---|
@@ -465,14 +465,14 @@ Medido el 08/10/2026 con `pnpm run medir -- --escenario vuelos --cpu 4 --repetic
 
 ## Sin la simulación (20/10/2026, #81)
 
-Medido con `gzip -9` contra `celda/v1` (0631fc3) construida igual.
+Medido con `gzip -9` contra `celda/v1` (377fbee) construida igual.
 
 - **Peso.** La primera pantalla baja 19,0 KB con `gzip -9` (242.853 → 223.890 bytes): salen las celdas, el sector que da servicio, el diagrama de radiación, la vista de interferencia y el simulador que les pasaba los cálculos al Worker. La hoja de estilos baja 0,6 KB (24.216 → 23.634). El Worker de la simulación ya no existe; pesaba 26.398 bytes con `gzip -9` y se pedía con el primer cálculo, al abrir una ficha o al cruzar el zoom 15. El trozo del mapa (305.600 bytes) y el Worker de capas (38.114) quedan igual. Todo el JavaScript, sin los trozos de las zonas del ejercicio, pasa de 864.789 a 819.430 bytes.
 - **Peticiones.** Abrir una ficha ya no arranca un Worker, y a zoom 15 o más el mapa ya no pide las provincias vecinas de lo que se ve, solo las que se ven.
 
 ## Las pruebas del navegador, sin red (20/10/2026, #85)
 
-`pnpm run resistencia` y `pnpm run deriva` dicen que no necesitan conexión. Para comprobarlo, cada una corrió con `celda/v1` (1935684) en un espacio de red de Linux con solo 127.0.0.1 (`unshare -rn`), y Chromium escribió su registro de red (`--log-net-log`) sin resolver ningún nombre fuera de 127.0.0.1. El registro ve todo lo que llega a la pila de red de Chromium, lo pida la página, uno de sus Workers o el propio navegador. Lo que contesta Playwright no llega a ella.
+`pnpm run resistencia` y `pnpm run deriva` dicen que no necesitan conexión. Para comprobarlo, cada una corrió con `celda/v1` (4299cfc) en un espacio de red de Linux con solo 127.0.0.1 (`unshare -rn`), y Chromium escribió su registro de red (`--log-net-log`) sin resolver ningún nombre fuera de 127.0.0.1. El registro ve todo lo que llega a la pila de red de Chromium, lo pida la página, uno de sus Workers o el propio navegador. Lo que contesta Playwright no llega a ella.
 
 | Peticiones que llegaron a la pila de red en una pasada | `resistencia` | `deriva` |
 |---|---|---|
@@ -484,7 +484,7 @@ Las de Chromium fueron las mismas en las dos pruebas: una a `clients2.google.com
 
 Playwright contestaba todo lo que la página pedía fuera del sitio, también lo que pide el Worker de MapLibre. Una sonda que repetía el arranque de `deriva` encontró las cuatro teselas de la vista inicial en las entradas de `performance` del propio Worker y en el registro de la ruta del contexto, contestadas con un 200. La sospecha del #85, que las teselas del Worker se saltaban el enrutado y llegaban a `tiles.openfreemap.org`, no se cumplía.
 
-Las teselas falsas de OpenFreeMap no contaban como cargadas porque la web no llegaba a pedirlas. El TileJSON falso declaraba `vector_layers: []`. Al leerlo, MapLibre lanzaba un error sin fuente, `Source layer "landuse" does not exist on source "openmaptiles" as specified by style layer "usos"`. `vigilarCallejero` cuenta los errores sin fuente contra el mapa base principal, porque así llegan los fallos de sus glifos. La web pasaba a la reserva en cuanto llegaba el TileJSON. Desde el #60 (04/10/2026) las dos pruebas iban siempre con la reserva, y `resistencia` pidió sus teselas al IGN de verdad en cada pasada hasta 1935684, que también las contesta en local.
+Las teselas falsas de OpenFreeMap no contaban como cargadas porque la web no llegaba a pedirlas. El TileJSON falso declaraba `vector_layers: []`. Al leerlo, MapLibre lanzaba un error sin fuente, `Source layer "landuse" does not exist on source "openmaptiles" as specified by style layer "usos"`. `vigilarCallejero` cuenta los errores sin fuente contra el mapa base principal, porque así llegan los fallos de sus glifos. La web pasaba a la reserva en cuanto llegaba el TileJSON. Desde el #60 (04/10/2026) las dos pruebas iban siempre con la reserva, y `resistencia` pidió sus teselas al IGN de verdad en cada pasada hasta 4299cfc, que también las contesta en local.
 
 Ahora `tools/rendimiento/src/red.ts` lleva la red de las dos pruebas:
 

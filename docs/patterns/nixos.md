@@ -72,8 +72,7 @@ Un ejemplo mínimo del flake de la máquina:
 {
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  # La URL del flake de Celda. Si está en un subdirectorio de su repositorio, añade ?dir=<ruta>.
-  inputs.celda.url = "github:ejemplo/celda";
+  inputs.celda.url = "github:eliesgalvira/celda";
 
   outputs =
     { nixpkgs, celda, ... }:

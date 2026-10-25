@@ -5,3 +5,5 @@ dist/
 # Bundles que confect codegen escribe junto a cada fuente y borra al acabar; un codegen
 # matado de golpe los deja (convex/scripts/codegen.sh).
 *.bundled_*
+result
+.direnv/

@@ -30,7 +30,7 @@ El usuario quiere además que Celda sea la fuente de verdad, y no una copia de o
 - Hasta que lleguen las correcciones aceptadas, todo emplazamiento es `verificado` con confianza `media`, como ya pasaba con el interruptor apagado.
 - Se pierden las estaciones que antenasmoviles.es tenía fuera del registro (las ER5: 42 en la caja de Barcelona). Celda las tendrá que recibir como aportaciones de «falta un emplazamiento».
 - La unión por código del ADR 0012 con observaciones de otras fuentes se queda sin ninguna fuente que la use. Se deja o se quita en el ticket, según lo que pida el buzón.
-- Las muestras borradas siguen en el historial de git. Cuando Celda pase a su propio repositorio, el historial que se lleve no debe incluirlas.
+- Las muestras borradas se quitaron del historial de git al pasar Celda a su propio repositorio, el 25/10/2026.
 - OpenCelliD (#21) quedó fuera de esta decisión. El usuario lo descartó el 07/10/2026 (ver «OpenCelliD, descartado»).
 
 ## Alternativas descartadas

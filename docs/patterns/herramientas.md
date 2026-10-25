@@ -40,7 +40,3 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 - `anti-slop` y `anti-slop-effect`: copia de `dmmulroy/anti-slop` (MIT), con su licencia en la carpeta.
 
 El modo con tipos de oxlint está apagado: los diagnósticos de Effect los da `typecheck`.
-
-## Mudanza
-
-Al mover Celda a su propio repositorio se mueve también `.github/workflows/celda.yml`, que hoy vive en la raíz del archivo. Allí sobran el filtro de rutas y el `working-directory`.

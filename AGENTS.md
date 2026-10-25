@@ -49,3 +49,7 @@ Antes de tocar algo que afecte a la carga o a la fluidez del mapa, lee [docs/pat
 ## Herramientas
 
 Qué hace cada herramienta y qué hubo que ajustar para las RC: [docs/patterns/herramientas.md](docs/patterns/herramientas.md). Las versiones se fijan exactas en el catálogo de `pnpm-workspace.yaml` y se suben en commits propios.
+
+## Incidencias y documentos de agentes
+
+Las incidencias están en GitHub Issues de eliesgalvira/celda y se manejan con `gh` ([docs/agents/issue-tracker.md](docs/agents/issue-tracker.md)). Las etiquetas de triaje son `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human` y `wontfix` ([docs/agents/triage-labels.md](docs/agents/triage-labels.md)). El glosario y los ADR están en la raíz ([docs/agents/domain.md](docs/agents/domain.md)).

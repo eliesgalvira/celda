@@ -1,0 +1,230 @@
+# Celda: tipos, lint, pruebas y build con el entorno Nix del proyecto.
+name: Celda
+
+on:
+  push:
+  # Cada commit pasa una vez: el `if` de cada trabajo deja este evento solo para las PR desde un
+  # fork, porque las de una rama de este repositorio ya pasan por `push`. El despliegue espera a la
+  # ejecución de `push` de «Celda» en main.
+  pull_request:
+  # La máquina virtual de NixOS pasa cada noche aunque nada la toque.
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: celda-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Tipos, lint, formato, las pruebas de Convex en varios órdenes y los builds.
+  comprobar:
+    if: &una-vez-por-commit github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - &checkout
+        uses: actions/checkout@v7
+
+      - &instalar-nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes pipe-operators
+
+      # Sin caché del almacén de Nix: lo que cuesta el entorno (unos 15 s) es desempaquetar el
+      # código de nixpkgs, y sacarlo de la caché de GitHub cuesta lo mismo (medido con
+      # nix-community/cache-nix-action en octubre de 2026).
+      - &cache-pnpm
+        name: Caché del almacén de pnpm
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - &entorno
+        name: Entorno Nix
+        run: nix develop --command true
+
+      - &dependencias
+        name: Dependencias
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Tipos
+        run: nix develop --command pnpm run typecheck
+
+      - name: Lint
+        run: nix develop --command pnpm run lint
+
+      - name: Formato
+        run: nix develop --command pnpm run fmt:check
+
+      # Cinco vueltas más en otros órdenes (unos 15 s): destapan las pruebas que dependen del
+      # orden o de una carrera. Si falla, el registro dice la semilla.
+      - name: Pruebas de Convex en varios órdenes
+        run: nix develop --command pnpm --filter @celda/convex run test:repetido
+
+      - name: Build
+        run: nix develop --command pnpm run build
+
+      # El fichero único de `pnpm run ingesta`. El del paquete de Nix se construye en el trabajo nix.
+      - name: Build de la ingesta nocturna
+        run: nix develop --command pnpm --filter @celda/nocturna run build
+
+  # Las pruebas de `pnpm run test`, en cuatro trabajos a la vez. Cada máquina de la CI tiene dos
+  # núcleos y Vitest usa uno por defecto: la ingesta nocturna y la web, que van solas, usan los dos.
+  # En la ingesta, src/espana.test.ts se lleva un minuto en un núcleo y el resto de ficheros, el
+  # otro. «resto» es todo lo demás, así que un paquete nuevo cae ahí sin tocar este fichero.
+  # --no-sort: las pruebas no esperan a las de sus dependencias, que se importan como TypeScript
+  # sin compilar.
+  pruebas:
+    if: *una-vez-por-commit
+    name: pruebas (${{ matrix.grupo }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - grupo: nocturna
+            paquetes: --filter @celda/nocturna --fail-if-no-match
+            vitest: --maxWorkers=2
+          - grupo: web
+            paquetes: --filter @celda/web --fail-if-no-match
+            vitest: --maxWorkers=2
+          - grupo: ui y capas
+            paquetes: --filter @celda/ui --filter @celda/capas --fail-if-no-match
+          - grupo: resto
+            paquetes: >-
+              --recursive --filter '!@celda/monorepo' --filter '!@celda/nocturna'
+              --filter '!@celda/web' --filter '!@celda/ui' --filter '!@celda/capas'
+    steps:
+      - *checkout
+      - *instalar-nix
+      - *cache-pnpm
+      - *entorno
+      - *dependencias
+
+      - name: Pruebas
+        run: nix develop --command pnpm ${{ matrix.paquetes }} --no-sort run test ${{ matrix.vitest }}
+
+  # El paquete de Nix de la ingesta nocturna y nix flake check, con la máquina virtual de NixOS
+  # que prueba su módulo (docs/patterns/nixos.md). La máquina virtual necesita KVM.
+  nix:
+    if: *una-vez-por-commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - *checkout
+
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes pipe-operators
+            system-features = nixos-test benchmark big-parallel kvm
+
+      - name: Paquete de la ingesta nocturna
+        run: nix build .#celda-nocturna --print-build-logs
+
+      - name: La orden de estado del paquete
+        run: nix run .#celda-nocturna -- estado
+
+      # La máquina virtual (unos 4 min) pasa en main, cada noche, a mano y cuando el commit toca
+      # algo que llega a ella: Nix, el flake, apps/nocturna y los paquetes del espacio de trabajo
+      # de los que depende (los da pnpm), los ficheros de pnpm que lee el paquete, las muestras
+      # que sirve la prueba y este fichero.
+      - name: ¿Hace falta la máquina virtual?
+        id: cambios
+        env:
+          EVENTO: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          ANTES: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          motivo=""
+          case "$EVENTO" in
+            schedule | workflow_dispatch) motivo="evento $EVENTO" ;;
+            *) [ "$REF" != refs/heads/main ] || motivo="push a main" ;;
+          esac
+          if [ -z "$motivo" ] && { [[ "$ANTES" =~ ^0*$ ]] || ! git fetch --quiet --depth=1 origin "$ANTES"; }; then
+            motivo="no hay commit anterior con el que comparar"
+          fi
+
+          if [ -z "$motivo" ]; then
+            raiz="$(git rev-parse --show-prefix)"
+            paquetes="$(nix develop --command pnpm ls --filter '@celda/nocturna...' --depth -1 --parseable)"
+            grep --quiet --line-regexp "$PWD/apps/nocturna" <<< "$paquetes"
+            vigilados=(.github/workflows/celda.yml)
+            for vigilado in nix/ flake.nix flake.lock package.json pnpm-lock.yaml pnpm-workspace.yaml \
+              tsconfig.base.json docs/investigacion/muestras/; do
+              vigilados+=("$raiz$vigilado")
+            done
+            while IFS= read -r paquete; do
+              vigilados+=("$raiz${paquete#"$PWD"/}/")
+            done <<< "$paquetes"
+            printf 'Vigilados:\n'; printf '  %s\n' "${vigilados[@]}"
+
+            cambiados="$(git diff --name-only "$ANTES" "$GITHUB_SHA")"
+            while IFS= read -r fichero; do
+              for vigilado in "${vigilados[@]}"; do
+                if [[ "$fichero" == "$vigilado" || ( "$vigilado" == */ && "$fichero" == "$vigilado"* ) ]]; then
+                  motivo="cambia $fichero"
+                fi
+              done
+            done <<< "$cambiados"
+          fi
+
+          if [ -n "$motivo" ]; then
+            echo "maquina-virtual=true" >> "$GITHUB_OUTPUT"
+            echo "La máquina virtual de NixOS pasa: $motivo." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "maquina-virtual=false" >> "$GITHUB_OUTPUT"
+            echo "La máquina virtual de NixOS no pasa: el commit no toca nada que llegue a ella." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Comprobaciones del flake
+        if: steps.cambios.outputs.maquina-virtual == 'true'
+        run: nix flake check --print-build-logs
+
+      # Sin la máquina virtual, el flake se evalúa entero (también la prueba de la máquina) y el
+      # paquete ya está construido.
+      - name: Comprobaciones del flake sin la máquina virtual
+        if: steps.cambios.outputs.maquina-virtual != 'true'
+        run: nix flake check --no-build
+
+  # Celda abierta 30 s en Chromium sin interfaz, contando lo que abre sin que nadie toque nada
+  # (docs/patterns/efectos.md), y los puntos del paso a los logos al alejar y acercar. Va aparte
+  # porque descarga Chromium y tarda.
+  resistencia:
+    if: *una-vez-por-commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - *checkout
+      - *instalar-nix
+      - *cache-pnpm
+
+      - name: Entorno Nix con Chromium
+        run: nix develop .#resistencia --command true
+
+      - name: Dependencias
+        run: nix develop .#resistencia --command pnpm install --frozen-lockfile
+
+      - name: Build
+        run: nix develop .#resistencia --command pnpm run build
+
+      - name: Resistencia
+        run: nix develop .#resistencia --command pnpm run resistencia
+
+      # Los puntos del paso a los logos siguen en su sitio aunque el zoom cambie a mitad (#74).
+      - name: Puntos del paso en su sitio
+        run: nix develop .#resistencia --command pnpm run deriva

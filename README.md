@@ -6,7 +6,7 @@ El mapa abre con un punto por emplazamiento del registro oficial, y al acercarse
 
 ## Arrancar
 
-Hace falta Nix con `flakes`, `nix-command` y `pipe-operators`. Desde esta carpeta:
+Hace falta Nix con `flakes`, `nix-command` y `pipe-operators`. Desde la raíz del repositorio:
 
 ```sh
 nix run
@@ -49,8 +49,16 @@ nix/                      módulos del flake: entorno, paquete y módulo de NixO
 
 ## Integración continua
 
-`.github/workflows/celda.yml` comprueba tipos, lint, formato, pruebas y build con este mismo entorno Nix, y construye con Nix el paquete de la ingesta nocturna. Mientras Celda viva dentro de otro repositorio, ese fichero está en la raíz de aquel. Al mover Celda a su propio repositorio, se mueve con ella.
+`.github/workflows/celda.yml` comprueba tipos, lint, formato, pruebas y build con este mismo entorno Nix, y construye con Nix el paquete de la ingesta nocturna. `.github/workflows/celda-despliegue.yml` despliega `main` en Vercel cuando cambian la web o los datos ([ADR 0018](docs/adr/0018-capas-solo-desde-vercel.md)).
 
 ## Datos del mapa
 
 El callejero es de [OpenFreeMap](https://openfreemap.org), con datos de [OpenMapTiles](https://www.openmaptiles.org/) y de los colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright).
+
+## Licencias
+
+El código es 0BSD ([LICENSE](LICENSE)). Los datos propios de Celda y las aportaciones son CC0 1.0, y los de otros conservan sus condiciones ([LICENCIA-DATOS.md](LICENCIA-DATOS.md)).
+
+## Incidencias
+
+Los fallos y las propuestas van a las [incidencias de GitHub](https://github.com/eliesgalvira/celda/issues).

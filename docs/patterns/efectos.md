@@ -4,7 +4,7 @@ Léelo antes de escribir un `createEffect` o un `onSettled`, o de tocar algo que
 
 ## El fallo que lo motivó
 
-En septiembre de 2026 el GPS se abrió 3135 veces en 7 s en Chromium (commits 480e670 y 119001f). El efecto que lo abría leía todo el estado de la ubicación en su primera función. Cada lectura del GPS escribía ese estado, el efecto volvía a correr aunque el `true` fuera el mismo, cerraba el GPS (`clearWatch`) y lo reabría, y el navegador entregaba al momento la posición en caché. Vuelta a empezar. La brújula tenía el mismo fallo. Las pruebas no lo vieron por dos motivos: el GPS de prueba no emitía al abrirse y nadie contaba aperturas.
+En septiembre de 2026 el GPS se abrió 3135 veces en 7 s en Chromium (commits d34ea08 y 1351233). El efecto que lo abría leía todo el estado de la ubicación en su primera función. Cada lectura del GPS escribía ese estado, el efecto volvía a correr aunque el `true` fuera el mismo, cerraba el GPS (`clearWatch`) y lo reabría, y el navegador entregaba al momento la posición en caché. Vuelta a empezar. La brújula tenía el mismo fallo. Las pruebas no lo vieron por dos motivos: el GPS de prueba no emitía al abrirse y nadie contaba aperturas.
 
 ## Qué hace Solid 2
 
@@ -78,7 +78,7 @@ Imitan lo que hace el navegador con el recurso, no lo que conviene a la prueba:
 - La brújula (`mejorar/pruebas.ts`) da lo último leído al empezar a escuchar, como `deviceorientation` al añadir el escuchador; la primera vez, `rumbo`. `pedirPermiso` contesta en otra tarea.
 - El almacén y el buscador contestan en otra tarea, como IndexedDB y la red.
 
-Con el GPS y la brújula nuevos, las pruebas «con una posición ya guardada en el navegador…» (`Ubicacion.test.tsx`) y «con el móvil ya apuntando…» (`MejorarSenal.test.tsx`) fallan con el código de antes de 480e670 y 119001f.
+Con el GPS y la brújula nuevos, las pruebas «con una posición ya guardada en el navegador…» (`Ubicacion.test.tsx`) y «con el móvil ya apuntando…» (`MejorarSenal.test.tsx`) fallan con el código de antes de d34ea08 y 1351233.
 
 ## Prueba de resistencia
 
@@ -92,7 +92,7 @@ Con el GPS y la brújula nuevos, las pruebas «con una posición ya guardada en 
 | `requestAnimationFrame` | 0 | No hay nada animándose. |
 | `setTimeout` | 2 por lectura (660) | Effect agenda con `setTimeout` el trabajo de cada lectura que llega por una cola. |
 
-También falla si al preparar `watchPosition` se llamó más de una vez, si la web no usa el mapa base de la pasada y si la página o sus Workers piden algo que la prueba no sabe contestar. En ese caso da su URL. Chromium no resuelve ningún nombre salvo 127.0.0.1, así que nada de lo que pida llega a la red. Hasta el 04/10/2026 esperaba 3 s fijos antes de empezar a contar, y en una CI lenta el último fotograma de MapLibre llegaba ya dentro de la ventana: un `removeEventListener` sin `addEventListener`, el de la cancelación del fotograma, sin nada abierto. Con la espera recortada a 0,9 s fallaba igual 6f00c28, de antes de las celdas con la red usada. El 28/09/2026 creció 0 en todo salvo `setTimeout`, que subió 332 con 330 lecturas. Con el GPS de antes de 480e670 salieron 3825 `watchPosition` en 7 s; con la vista de interferencia de antes de este arreglo, 140 `postMessage` y 52 fotogramas en 10 s.
+También falla si al preparar `watchPosition` se llamó más de una vez, si la web no usa el mapa base de la pasada y si la página o sus Workers piden algo que la prueba no sabe contestar. En ese caso da su URL. Chromium no resuelve ningún nombre salvo 127.0.0.1, así que nada de lo que pida llega a la red. Hasta el 04/10/2026 esperaba 3 s fijos antes de empezar a contar, y en una CI lenta el último fotograma de MapLibre llegaba ya dentro de la ventana: un `removeEventListener` sin `addEventListener`, el de la cancelación del fotograma, sin nada abierto. Con la espera recortada a 0,9 s fallaba igual 211d945, de antes de las celdas con la red usada. El 28/09/2026 creció 0 en todo salvo `setTimeout`, que subió 332 con 330 lecturas. Con el GPS de antes de d34ea08 salieron 3825 `watchPosition` en 7 s; con la vista de interferencia de antes de este arreglo, 140 `postMessage` y 52 fotogramas en 10 s.
 
 Para correrla, desde la raíz de Celda:
 
@@ -106,7 +106,7 @@ Fuera de ese entorno usa `/usr/bin/chromium`. En la CI va en su propio trabajo, 
 
 ## Auditoría
 
-Septiembre de 2026, sobre `celda/v1` después de 480e670 y 119001f. Todos los `createEffect`, `onSettled` y memos que abren algo, y todo lo que abre un recurso en `apps/web/src` y `packages/ui/src`. «Antes» dice qué hacía el sitio en `celda/v1`; la columna «Ahora», con qué se abre en esta rama.
+Septiembre de 2026, sobre `celda/v1` después de d34ea08 y 1351233. Todos los `createEffect`, `onSettled` y memos que abren algo, y todo lo que abre un recurso en `apps/web/src` y `packages/ui/src`. «Antes» dice qué hacía el sitio en `celda/v1`; la columna «Ahora», con qué se abre en esta rama.
 
 Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arreglado**, lo hacía y ya no; **riesgo**, no lo hacía, pero volvía a correr por cambios que no le tocan y dependía de que otra pieza lo frenara.
 
@@ -114,10 +114,10 @@ Veredictos: **seguro**, no podía reabrirse solo ni por cambios ajenos; **arregl
 
 | Sitio | Abre | Clave (depende de) | Antes | Veredicto | Ahora |
 |---|---|---|---|---|---|
-| `ubicacion/controlador.ts`, GPS | `watchPosition` por el servicio | `gpsEncendido(estado)` | Reabría con cada lectura hasta 480e670; después, un memo lo frenaba | arreglado (480e670) | `recurso("gps")` |
+| `ubicacion/controlador.ts`, GPS | `watchPosition` por el servicio | `gpsEncendido(estado)` | Reabría con cada lectura hasta d34ea08; después, un memo lo frenaba | arreglado (d34ea08) | `recurso("gps")` |
 | `ubicacion/controlador.ts`, permiso | `permissions.query` y su `change` | fija | `onSettled`, una vez | seguro | `recursoFijo` |
 | `ubicacion/controlador.ts`, punto guardado | lectura de IndexedDB | fija | `onSettled`, una vez | seguro | `recursoFijo` |
-| `mejorar/MejorarSenal.tsx`, brújula | `deviceorientationabsolute` y una espera de 3 s | `escuchando(estado)` | Reabría con cada lectura hasta 119001f | arreglado (119001f) | `recurso("brujula")` |
+| `mejorar/MejorarSenal.tsx`, brújula | `deviceorientationabsolute` y una espera de 3 s | `escuchando(estado)` | Reabría con cada lectura hasta 1351233 | arreglado (1351233) | `recurso("brujula")` |
 | `mejorar/MejorarSenal.tsx`, disponibilidad | lectura del servicio | fija | `onSettled`, sin cancelar al desmontar | seguro | `recursoFijo`, descarta la respuesta tras desmontar |
 | `ajustes/ajustes.ts` | lectura de IndexedDB | fija | `onSettled` | seguro | `recursoFijo` |
 | `datos.tsx`, runtime | los servicios (Worker, GPS…) hasta desmontar | fija | `onSettled` que solo cierra | seguro | `recursoFijo` |
@@ -183,4 +183,4 @@ Se abre una vez por lo que lo crea, no por una reejecución:
 - Escuchadores en el propio nodo desde un `ref` (`Dialogo`, `MenuDeControles`, `MenuUbicacion`, `PanelEmplazamiento`, `MarcadorReferencia`): uno por nodo, y mueren con él.
 - Manejadores de eventos (usar la ubicación, elegir, quitar, pedir permiso a la brújula): los abre la persona. Buscar una dirección solo escribe la búsqueda pedida, y la abre `recurso("buscador:busqueda")`.
 
-Resumen: 39 sitios abren algo desde Solid (29 en la auditoría, los dos del #45, los dos de la foto aérea del #64, la lectura de los rótulos de ciudad del #66, los vuelos de la cámara del #67, los tres del filtro de compañías del #69 y los colores del mapa con el tema del #75); el resto de efectos y memos, en la segunda tabla, no abren nada. Cuatro tenían el fallo: el GPS y la brújula (ya arreglados en 480e670 y 119001f) y la vista de interferencia y el sector que da servicio, que recalculaban con cada lectura del GPS en el mismo sitio. La precarga de fichas era un riesgo sin fallo visible. Todos abren ahora con `recurso()` o `recursoFijo()`. El 20/10/2026 (#81) salen con la simulación las celdas, la vista de interferencia, el sector que da servicio y las provincias vecinas que pedían, y la primera tabla queda con 39 sitios.
+Resumen: 39 sitios abren algo desde Solid (29 en la auditoría, los dos del #45, los dos de la foto aérea del #64, la lectura de los rótulos de ciudad del #66, los vuelos de la cámara del #67, los tres del filtro de compañías del #69 y los colores del mapa con el tema del #75); el resto de efectos y memos, en la segunda tabla, no abren nada. Cuatro tenían el fallo: el GPS y la brújula (ya arreglados en d34ea08 y 1351233) y la vista de interferencia y el sector que da servicio, que recalculaban con cada lectura del GPS en el mismo sitio. La precarga de fichas era un riesgo sin fallo visible. Todos abren ahora con `recurso()` o `recursoFijo()`. El 20/10/2026 (#81) salen con la simulación las celdas, la vista de interferencia, el sector que da servicio y las provincias vecinas que pedían, y la primera tabla queda con 39 sitios.

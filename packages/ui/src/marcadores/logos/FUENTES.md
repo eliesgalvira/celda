@@ -10,7 +10,7 @@ Descargados y revisados el 04/10/2026.
 
 - **Qué es.** El isotipo de Movistar, la «M» de 2025, en el lienzo de 72 × 72 de Mística, el sistema de diseño de Telefónica. El color es `movistarBlue`, `#0066FF`, de su `palette`.
 - **Origen.** [Telefonica/mistica-web](https://github.com/Telefonica/mistica-web), `src/logo-movistar.tsx` (el tipo `isotype`, que es el de por defecto) y `src/skins/movistar.tsx`, commit `95a8692a73a8a4953831cf854d20c327737e96bd` (01/09/2026). El fichero es el `<path>` de ese componente con su `viewBox` de `src/logo-movistar-shell.tsx`.
-- **Licencia.** MIT, © Telefonica Digital España S.L.U. El repositorio no lleva ningún aviso sobre la marca. «movistar» es marca registrada del Grupo Telefónica.
+- **Licencia.** MIT, © Telefonica Digital España S.L.U. Su aviso está en `LICENSE-mistica`. El repositorio no lleva ningún aviso sobre la marca. «movistar» es marca registrada del Grupo Telefónica.
 - **Por qué no de movistar.es.** La web sirve la misma «M» (`ssr.col.movistar.es/api/v1/get-glyph/movistar-logo-h-m`), pero su aviso legal solo deja reproducir su contenido para uso personal y privado y pide «que ningún gráfico, icono o imagen disponible en esta Web sea utilizado, copiado o distribuido, separadamente». Mística es de Telefónica y tiene licencia MIT.
 - **En el marcador.** La «M» en blanco sobre su azul, como la variante de marca de Mística (`neutralHighBrand` sobre `brand`).
 

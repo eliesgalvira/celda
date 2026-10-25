@@ -32,7 +32,7 @@ export class UsoDeLaHuella extends Schema.TaggedError<UsoDeLaHuella>()("UsoDeLaH
 export interface ArgumentosDelDespliegue {
   /** La huella de la web del commit (`huellaDeLaWeb`), calculada ahora o guardada de antes. */
   readonly huella: string;
-  /** El commit de `celda/v1` del que sale la web. */
+  /** El commit de `main` del que sale la web. */
   readonly commit: string;
   /** Se ha pedido a mano: se despliega aunque nada cambie. */
   readonly aMano: boolean;
