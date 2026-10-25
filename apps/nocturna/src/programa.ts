@@ -486,7 +486,7 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
   const completadas = ejecuciones.filter((e) => e.estado === "completada").map((e) => e.ejecucion);
 
   // Un cambio masivo en el registro para la ejecución antes de publicar (ADR 0027): lo publicado
-  // y lo que sirve Vercel se quedan como estaban hasta que alguien lo mire.
+  // se queda como estaba hasta que alguien lo mire.
   const detenida = ejecuciones.find((e) => e.detenida !== undefined)?.detenida;
   let publicacion: ResultadoPublicacion | PublicacionDetenida;
   if (detenida === undefined) {
@@ -545,7 +545,7 @@ export const comprobarNoche = (hecha: Noche): Effect.Effect<void, NocheDetenida>
     : Effect.void;
 
 /** Publica a mano, sin ingerir nada, y lo apunta en la base. */
-export const publicarAMano = Effect.map(publicarYApuntar([]), ({ resultado }) => resultado);
+export const publicarAMano = publicarYApuntar([]);
 
 /**
  * Escribe el estado de la base: cada fuente y, del registro oficial, cuántas fichas le quedan a
