@@ -10,9 +10,11 @@
 #    ficheros de las dos anteriores, con vigente.json escrito el último. Las credenciales son las de
 #    una clave de R2 de solo lectura, en las variables de entorno del proyecto de Vercel:
 #    CELDA_R2_CUENTA, CELDA_R2_CUBO, CELDA_R2_ID_CLAVE y CELDA_R2_SECRETO.
+# 4. Escribe en dist/iconos/compartir.png la imagen que enseñan las redes al compartir un enlace,
+#    con los puntos de la versión que acaba de montar.
 #
-# Si no llega a R2, si falta un fichero o si alguno no coincide con su huella, el build falla y
-# Vercel sigue sirviendo el despliegue anterior entero, web y capas.
+# Si no llega a R2, si falta un fichero, si alguno no coincide con su huella o si no sale la imagen,
+# el build falla y Vercel sigue sirviendo el despliegue anterior entero, web y capas.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${CELDA_R2_CUENTA:?Falta CELDA_R2_CUENTA: la cuenta de Cloudflare del cubo de R2}"
@@ -25,3 +27,4 @@ if [ -n "${CELDA_DESPLIEGUE:-}" ]; then
   printf '%s\n' "$CELDA_DESPLIEGUE" > dist/despliegue.json
 fi
 pnpm --filter @celda/nocturna run capas "$PWD/dist/capas"
+pnpm run compartir dist/capas dist/iconos/compartir.png

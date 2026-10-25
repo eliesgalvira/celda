@@ -5,6 +5,7 @@ import {
   coloresDeLaBarra,
   DESCRIPCION,
   ficherosDeIconos,
+  etiquetasAlCompartir,
   pixelesDeIcono,
   coloresDeIconos,
 } from "./iconos.ts";
@@ -66,5 +67,16 @@ describe("iconos de la marca", () => {
     assert.match(barra.claro, /^#[\da-f]{6}$/u);
     assert.match(barra.oscuro, /^#[\da-f]{6}$/u);
     assert.notStrictEqual(barra.claro, barra.oscuro);
+  });
+
+  it("el HTML enlaza la imagen para compartir con su URL entera y pide la tarjeta grande", () => {
+    const etiquetas = etiquetasAlCompartir();
+    const valor = (clave: string) =>
+      etiquetas.find((e) => Object.values(e.attrs).includes(clave))?.attrs.content;
+    assert.strictEqual(valor("og:image"), "https://celda.elies.site/iconos/compartir.png");
+    assert.strictEqual(valor("og:image:width"), "1200");
+    assert.strictEqual(valor("og:image:height"), "630");
+    assert.strictEqual(valor("og:description"), DESCRIPCION);
+    assert.strictEqual(valor("twitter:card"), "summary_large_image");
   });
 });
