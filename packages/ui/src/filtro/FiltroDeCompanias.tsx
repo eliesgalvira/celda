@@ -1,7 +1,8 @@
-import type { Compania } from "@celda/dominio/compania";
+import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
+import type { GrupoSinRedPropia, SinRedPropia } from "@celda/dominio/filtro";
 import type { JSX } from "@solidjs/web";
 import { cva } from "class-variance-authority";
-import { createSignal, createUniqueId, Show } from "solid-js";
+import { createSignal, createUniqueId, flush, For, Show } from "solid-js";
 
 import { variantesDiana } from "../Boton.tsx";
 import { cn } from "../cn.ts";
@@ -11,7 +12,7 @@ import { recursoFijo } from "../recurso.ts";
 
 /**
  * El filtro de compañías del mapa (ADR 0026): una pastilla «Compañías» junto a «Foto aérea» y
- * «Ubicación», que abre encima una fila de chips, y el aviso que dice bajo la cabecera que hay un
+ * «Ubicación», que abre encima los chips, y el aviso que dice bajo la cabecera que hay un
  * filtro puesto. Son controles: claros, con borde de tinta y rectangulares, para no confundirse
  * con los marcadores, que son los datos (redondos o hexagonales).
  */
@@ -99,32 +100,40 @@ export function ChipDeCompania(props: ChipDeCompaniaProps) {
   );
 }
 
-export interface PanelDeCompaniasProps {
-  /** El chip de todas (`ChipDeCompania` sin compañía). */
-  readonly todas: JSX.Element;
-  /** Un chip por compañía. */
-  readonly children: JSX.Element;
-  /** Qué se ve ahora, en una frase. Solo la oye el lector de pantalla, al cambiar. */
-  readonly estado: string;
+/** La raya que separa partes del panel. */
+function Raya() {
+  return <span aria-hidden="true" class="mx-1 my-1 border-t border-linea" />;
 }
 
-/**
- * Lo que se despliega: «Todas», una raya y las compañías, todos en una columna del mismo ancho.
- * Lo que se ve ya lo dicen los chips pulsados; la frase de `estado` solo se anuncia.
- */
-export function PanelDeCompanias(props: PanelDeCompaniasProps) {
+/** «Red de Orange», con su logo, y debajo las compañías que la usan, en filas que se parten. */
+function CompaniasDeLaRed(props: {
+  readonly grupo: GrupoSinRedPropia;
+  readonly alElegir: (compania: string) => void;
+}) {
+  const titulo = createUniqueId();
   return (
-    <>
-      <fieldset class="flex flex-col">
-        <legend class="sr-only">Compañías que se ven</legend>
-        {props.todas}
-        <span aria-hidden="true" class="mx-1 my-1 border-t border-linea" />
-        {props.children}
-      </fieldset>
-      <output aria-live="polite" class="sr-only">
-        {props.estado}
-      </output>
-    </>
+    <div role="group" aria-labelledby={titulo} class="flex flex-col pt-1.5">
+      <span
+        id={titulo}
+        class="flex items-center gap-1.5 px-0.5 font-texto text-xs font-semibold text-tinta"
+      >
+        <span aria-hidden="true" class="grid size-4 place-items-center">
+          <LogoCompanias companias={[props.grupo.red]} tamano={16} />
+        </span>
+        Red de {NOMBRE_COMPANIA[props.grupo.red]}
+      </span>
+      <div class="flex flex-wrap gap-x-1">
+        <For each={props.grupo.companias}>
+          {(compania) => (
+            <button type="button" class={variantesDiana()} onClick={() => props.alElegir(compania)}>
+              <span class="border-[1.5px] border-control-borde bg-control px-2 py-1 font-texto text-xs font-semibold text-control-tinta group-hover:bg-control-hover group-active:bg-primario group-active:text-primario-fg">
+                {compania}
+              </span>
+            </button>
+          )}
+        </For>
+      </div>
+    </div>
   );
 }
 
@@ -132,18 +141,44 @@ export interface MenuDeCompaniasProps {
   /** Hay un filtro puesto: la pastilla se ve encendida. */
   readonly activo: boolean;
   readonly disabled?: boolean;
-  /** Lo que se despliega (`PanelDeCompanias`). */
+  /** El chip de todas (`ChipDeCompania` sin compañía). */
+  readonly todas: JSX.Element;
+  /** Un chip por compañía. */
   readonly children: JSX.Element;
+  /** Qué se ve ahora, en una frase. Solo la oye el lector de pantalla, al cambiar. */
+  readonly estado: string;
+  /** Las compañías sin red propia, por la red que usan: las de «¿No sale la tuya?». */
+  readonly sinRedPropia: ReadonlyArray<GrupoSinRedPropia>;
+  /** Se ha tocado una compañía sin red propia. El panel se cierra. */
+  readonly alElegirSinRedPropia: (eleccion: SinRedPropia) => void;
 }
 
 /**
- * La pastilla «Compañías» y su panel, que sale encima, como el de «Ubicación». Tocar un chip no
- * lo cierra: se pueden elegir varias. Escape o un toque fuera lo cierran.
+ * La pastilla «Compañías» y su panel, que sale encima, como el de «Ubicación»: «Todas», una raya,
+ * las compañías, todas en una columna del mismo ancho, y «¿No sale la tuya?», que cambia el panel
+ * por las compañías sin red propia. Tocar un chip no lo cierra, para elegir varias; tocar una
+ * compañía sin red propia, sí. Escape vuelve a los chips o cierra, y un toque fuera cierra. Lo que
+ * se ve ya lo dicen los chips pulsados; la frase de `estado` solo se anuncia, también con el panel
+ * cerrado.
  */
 export function MenuDeCompanias(props: MenuDeCompaniasProps) {
   const id = createUniqueId();
+  const nota = createUniqueId();
   const [abierto, setAbierto] = createSignal(false);
+  const [viendoSinRed, setViendoSinRed] = createSignal(false);
   let caja: HTMLDivElement | undefined;
+  let noSale: HTMLButtonElement | undefined;
+  let volver: HTMLButtonElement | undefined;
+
+  const verSinRed = (ver: boolean) => {
+    setViendoSinRed(ver);
+    flush();
+    (ver ? volver : noSale)?.focus();
+  };
+  const cerrar = () => {
+    setAbierto(false);
+    caja?.querySelector<HTMLButtonElement>("[aria-controls]")?.focus();
+  };
 
   recursoFijo("menu-de-companias:fuera", () => {
     const fuera = (evento: PointerEvent) => {
@@ -163,8 +198,8 @@ export function MenuDeCompanias(props: MenuDeCompaniasProps) {
         elemento.addEventListener("keydown", (evento) => {
           if (evento.key === "Escape" && abierto()) {
             evento.stopPropagation();
-            setAbierto(false);
-            elemento.querySelector<HTMLButtonElement>("[aria-controls]")?.focus();
+            if (viendoSinRed()) verSinRed(false);
+            else cerrar();
           }
         });
       }}
@@ -177,7 +212,10 @@ export function MenuDeCompanias(props: MenuDeCompaniasProps) {
         disabled={props.disabled === true}
         aria-expanded={abierto() ? "true" : "false"}
         aria-controls={id}
-        onClick={() => setAbierto(!abierto())}
+        onClick={() => {
+          setViendoSinRed(false);
+          setAbierto(!abierto());
+        }}
       />
       <Show when={abierto()}>
         <div
@@ -191,13 +229,77 @@ export function MenuDeCompanias(props: MenuDeCompaniasProps) {
             );
           }}
           class={cn(
-            "chaflan absolute right-0 bottom-full z-20 mb-2 flex w-48 flex-col",
+            "chaflan absolute right-0 bottom-full z-20 mb-2 flex flex-col",
             "bg-superficie px-2 py-1.5 drop-shadow-panel [--corte:10px]",
+            viendoSinRed() ? "w-60" : "w-48",
           )}
         >
-          {props.children}
+          <Show
+            when={viendoSinRed()}
+            fallback={
+              <>
+                <fieldset class="flex flex-col">
+                  <legend class="sr-only">Compañías que se ven</legend>
+                  {props.todas}
+                  <Raya />
+                  {props.children}
+                </fieldset>
+                <Raya />
+                <button
+                  type="button"
+                  ref={(boton) => {
+                    noSale = boton;
+                  }}
+                  class={variantesDiana({ class: "w-full" })}
+                  onClick={() => verSinRed(true)}
+                >
+                  <span class="flex w-full items-center justify-between px-1 font-texto text-sm font-semibold text-primario-texto group-hover:text-tinta">
+                    <span class="underline underline-offset-4">¿No sale la tuya?</span>
+                    <span aria-hidden="true">›</span>
+                  </span>
+                </button>
+              </>
+            }
+          >
+            <div role="group" aria-labelledby={nota} class="flex flex-col">
+              <button
+                type="button"
+                aria-label="Volver a las compañías"
+                ref={(boton) => {
+                  volver = boton;
+                }}
+                class={variantesDiana({ class: "justify-start" })}
+                onClick={() => verSinRed(false)}
+              >
+                <span class="flex items-center gap-1.5 px-0.5 font-texto text-sm font-semibold text-tinta group-hover:text-primario-texto">
+                  <span aria-hidden="true">‹</span>
+                  Compañías
+                </span>
+              </button>
+              <p id={nota} class="px-0.5 pb-1 font-texto text-xs leading-snug text-tinta-suave">
+                Estas compañías no tienen antenas propias y usan las de otra. Toca la tuya para ver
+                esa red.
+              </p>
+              <div class="flex flex-col divide-y divide-linea">
+                <For each={props.sinRedPropia}>
+                  {(grupo) => (
+                    <CompaniasDeLaRed
+                      grupo={grupo}
+                      alElegir={(compania) => {
+                        props.alElegirSinRedPropia({ compania, red: grupo.red });
+                        cerrar();
+                      }}
+                    />
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
         </div>
       </Show>
+      <output aria-live="polite" class="sr-only">
+        {props.estado}
+      </output>
     </div>
   );
 }

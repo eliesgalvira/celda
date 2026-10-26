@@ -27,6 +27,13 @@ describe("textos del filtro de compañías (ADR 0026)", () => {
     );
   });
 
+  it("dicen qué red usa la compañía sin red propia tocada mientras el filtro es el de esa red", () => {
+    const simyo = { compania: "Simyo", red: "orange" } as const;
+    assert.strictEqual(detalleDelAviso(["orange"], simyo), "Simyo usa la red de Orange.");
+    assert.isUndefined(detalleDelAviso(["movistar"], simyo));
+    assert.isUndefined(detalleDelAviso(["orange", "movistar"], simyo));
+  });
+
   it("sin nada que sorprenda, no añaden ninguna línea", () => {
     assert.isUndefined(detalleDelAviso(["movistar"]));
     assert.isUndefined(detalleDelAviso(["movistar", "digi"]));

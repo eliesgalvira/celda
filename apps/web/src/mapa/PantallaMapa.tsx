@@ -1041,7 +1041,11 @@ export function PantallaMapa() {
               estado().tipo === "cargando" ? <CargaDelMapa texto="Cargando el mapa…" /> : undefined
             }
             filtro={
-              <AvisoDelFiltro filtro={filtro.aplicado()} alQuitar={() => filtro.elegir([])} />
+              <AvisoDelFiltro
+                filtro={filtro.aplicado()}
+                sinRedPropia={filtro.sinRedPropia()}
+                alQuitar={() => filtro.elegir([])}
+              />
             }
             ubicacion={
               <>

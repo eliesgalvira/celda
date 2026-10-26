@@ -4,6 +4,7 @@ import {
   hayFiltro,
   mismoFiltro,
   SIN_FILTRO,
+  type SinRedPropia,
 } from "@celda/dominio/filtro";
 import { mismasListas, recurso } from "@celda/ui/recurso.ts";
 import * as Effect from "effect/Effect";
@@ -32,8 +33,13 @@ export interface FiltroDelMapa {
    * cuanto está y, mientras tanto, la que ya se veía.
    */
   readonly agrupaciones: () => ReadonlyMap<string, AgrupacionConFiltro>;
-  /** Cambia el filtro desde los chips o el aviso: el mapa lo sigue tras la espera. */
-  readonly elegir: (filtro: FiltroDeCompanias) => void;
+  /** La compañía sin red propia con la que se puso el filtro, hasta que cambie de otra forma. */
+  readonly sinRedPropia: () => SinRedPropia | undefined;
+  /**
+   * Cambia el filtro desde los chips, desde una compañía sin red propia o desde el aviso: el mapa
+   * lo sigue tras la espera.
+   */
+  readonly elegir: (filtro: FiltroDeCompanias, sinRedPropia?: SinRedPropia) => void;
 }
 
 /** De dónde sale el filtro. Cada campo es una lectura reactiva o una orden. */
@@ -59,6 +65,7 @@ export const crearFiltro = (
   const [aplicado, setAplicado] = createSignal<FiltroDeCompanias>(SIN_FILTRO, {
     equals: mismoFiltro,
   });
+  const [sinRedPropia, setSinRedPropia] = createSignal<SinRedPropia | undefined>(undefined);
   /** Si la persona ya ha tocado el filtro: desde entonces se espera a que deje de cambiar. */
   let tocado = false;
 
@@ -116,8 +123,10 @@ export const crearFiltro = (
     elegido: entrada.guardado,
     aplicado,
     agrupaciones,
-    elegir: (filtro) => {
+    sinRedPropia,
+    elegir: (filtro, desde) => {
       tocado = true;
+      setSinRedPropia(desde);
       entrada.guardar(filtro);
     },
   };

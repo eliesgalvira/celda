@@ -1,7 +1,7 @@
 import { ESQUEMA_AJUSTES } from "@celda/dominio/ajustes";
 import type { Ficha } from "@celda/dominio/ficha";
 import { assert, describe, it } from "@effect/vitest";
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { flush } from "solid-js";
@@ -132,6 +132,77 @@ describe("filtro de compañías (ADR 0026)", () => {
     flush();
     await waitFor(() => assert.isNull(aviso()));
     await waitFor(() => assert.deepStrictEqual(almacen.ajustes().companias, []));
+  });
+
+  it("«¿No sale la tuya?» enseña las compañías sin red propia por su red; «Compañías» y Escape vuelven a los chips", async () => {
+    navegar(ruta.mapa, { reemplazar: true });
+    const { findByRole, getByRole, queryByRole } = montar();
+    const pastilla = await findByRole("button", { name: "Compañías" });
+    await waitFor(() => assert.isFalse(pastilla.hasAttribute("disabled")));
+    fireEvent.click(pastilla);
+    flush();
+
+    fireEvent.click(getByRole("button", { name: "¿No sale la tuya?" }));
+    flush();
+    assert.isNull(queryByRole("group", { name: "Compañías que se ven" }));
+    const volver = getByRole("button", { name: "Volver a las compañías" });
+    assert.strictEqual(document.activeElement, volver);
+    const de = (red: string) =>
+      within(getByRole("group", { name: `Red de ${red}` }))
+        .getAllByRole("button")
+        .map((boton) => boton.textContent);
+    assert.deepStrictEqual(de("Movistar"), ["O2"]);
+    assert.deepStrictEqual(de("Vodafone"), ["Lowi", "Finetwork"]);
+    assert.includeMembers(de("Orange"), ["Simyo", "Jazztel", "Pepephone"]);
+
+    fireEvent.click(volver);
+    flush();
+    getByRole("group", { name: "Compañías que se ven" });
+    assert.strictEqual(document.activeElement, getByRole("button", { name: "¿No sale la tuya?" }));
+
+    fireEvent.click(getByRole("button", { name: "¿No sale la tuya?" }));
+    flush();
+    fireEvent.keyDown(getByRole("button", { name: "Simyo" }), { key: "Escape" });
+    flush();
+    getByRole("group", { name: "Compañías que se ven" });
+    assert.strictEqual(pastilla.getAttribute("aria-expanded"), "true");
+    assert.strictEqual(document.activeElement, getByRole("button", { name: "¿No sale la tuya?" }));
+
+    fireEvent.keyDown(getByRole("button", { name: "Todas" }), { key: "Escape" });
+    flush();
+    assert.strictEqual(pastilla.getAttribute("aria-expanded"), "false");
+  });
+
+  it("tocar una compañía sin red propia deja solo su red, cierra el panel y el aviso dice por qué hasta que el filtro cambia", async () => {
+    navegar(ruta.mapa, { reemplazar: true });
+    const { findByRole, getByRole, almacen } = montar();
+    const pastilla = await findByRole("button", { name: "Compañías" });
+    await waitFor(() => assert.isFalse(pastilla.hasAttribute("disabled")));
+    fireEvent.click(pastilla);
+    flush();
+    fireEvent.click(getByRole("button", { name: "¿No sale la tuya?" }));
+    flush();
+
+    fireEvent.click(getByRole("button", { name: "Simyo" }));
+    flush();
+    assert.strictEqual(pastilla.getAttribute("aria-expanded"), "false");
+    assert.strictEqual(document.activeElement, pastilla);
+    assert.isNotNull(screen.getByText("Se ven solo los emplazamientos de Orange."));
+    await waitFor(() => assert.deepStrictEqual(almacen.ajustes().companias, ["orange"]));
+    await waitFor(() =>
+      assert.strictEqual(aviso()?.textContent, "Solo OrangeVer todasSimyo usa la red de Orange."),
+    );
+
+    // Al volver a abrir, el chip de su red está pulsado, y cambiar el filtro con él quita la línea.
+    fireEvent.click(pastilla);
+    flush();
+    assert.strictEqual(getByRole("button", { name: "Orange" }).getAttribute("aria-pressed"), "true");
+    fireEvent.click(getByRole("button", { name: "Vodafone" }));
+    flush();
+    await waitFor(() => assert.strictEqual(aviso()?.textContent, "Solo Vodafone y OrangeVer todas"));
+    fireEvent.click(getByRole("button", { name: "Vodafone" }));
+    flush();
+    await waitFor(() => assert.strictEqual(aviso()?.textContent, "Solo OrangeVer todas"));
   });
 
   it("con un filtro sin nada que sorprenda, el aviso es una sola línea", async () => {
