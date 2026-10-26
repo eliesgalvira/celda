@@ -1,6 +1,6 @@
 # Códigos del modo de información
 
-De dónde salen los códigos que Celda enseña para abrir el modo de información de cada móvil, y los tramos con que explica la potencia y la calidad de la señal. Todas las fuentes se consultaron el 26/09/2026. Los datos están en `packages/dominio/src/modoInformacion.ts` y cada código lleva allí sus fuentes y su grado de comprobación.
+De dónde salen los códigos que Celda enseña para abrir el modo de información de cada móvil, y los tramos con que explica la potencia y la calidad de la señal. Todas las fuentes se consultaron el 26/09/2026. Los códigos y su grado de comprobación están en `packages/dominio/src/modoInformacion.ts`; sus fuentes, en la tabla por marca.
 
 ## Qué quiere decir cada grado
 

@@ -227,7 +227,7 @@ Lo que sigue es la vista agrupada y, en las dos vistas, lo que se ve desde el zo
 - `medir/Medir.tsx` tiene las piezas del paso de medir: `CodigoDelModo` (ocupa lo mismo con código o sin él, así que elegir la marca no mueve nada), `Pasos` y `Paso`, `Puntos`, `Opcion`, `Nota` y `MedidaMostrada`, que enseña una medida con lo que quiere decir cada valor que no es evidente.
 - `medir/CodigoQr.tsx` dibuja el código QR en el navegador con `uqr`, sin pedir nada a ningún servidor. Cada fila es un solo trazo SVG. Usa `--qr-tinta` sobre `--qr-fondo`, que no cambian en el tema oscuro porque las cámaras leen mejor oscuro sobre claro. La figura se nombra por su pie visible.
 - La medida de ejemplo tiene su propio color, `--ejemplo`, que no usa ningún dato: `MedidaMostrada` la enmarca con él y le pone `Etiqueta tono="ejemplo"`.
-- Qué se enseña en cada dispositivo lo deciden funciones puras de `apps/web/src/medir`: `detectarDispositivo` e `instruccionesPara`, con sus pruebas. Los códigos y sus fuentes están en `packages/dominio/src/modoInformacion.ts` y en [docs/investigacion/modo-de-informacion.md](../investigacion/modo-de-informacion.md).
+- Qué se enseña en cada dispositivo lo deciden funciones puras de `apps/web/src/medir`: `detectarDispositivo` e `instruccionesPara`, con sus pruebas. Los códigos están en `packages/dominio/src/modoInformacion.ts` y sus fuentes en [docs/investigacion/modo-de-informacion.md](../investigacion/modo-de-informacion.md).
 
 ## Punto de referencia
 
