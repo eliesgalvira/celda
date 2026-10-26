@@ -9,7 +9,9 @@
  * aunque también sea el valor de `VITE_VERCEL_PROJECT_PRODUCTION_URL`.
  * `soloLasVariablesDeLaWeb` es el plugin de Vite que hace fallar el build en ese caso.
  */
-import { SITIO } from "@celda/ui/marca/compartir.ts";
+// Por ruta relativa: la API (`src/api`) llega a este fichero por ruta relativa, y TypeScript no deja
+// importar por el nombre del paquete un `.ts` de la misma compilación (TS2877).
+import { SITIO } from "../../../packages/ui/src/marca/alCompartir.ts";
 import { loadEnv, type Plugin } from "vite";
 
 import { VARIABLES_DE_LA_WEB } from "./variables.ts";

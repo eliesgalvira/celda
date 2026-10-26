@@ -17,8 +17,9 @@ const alfa = (pixeles: Uint8Array, tamano: number, x: number, y: number) =>
   pixeles[(y * tamano + x) * 4 + 3] ?? 0;
 
 describe("iconos de la marca", () => {
-  it("hay favicon, PNG y manifiesto, y nada más", () => {
+  it("hay favicon, PNG, manifiesto y la hoja de la página de la API, y nada más", () => {
     assert.deepStrictEqual([...ficheros.keys()].toSorted(), [
+      "iconos/api.css",
       "iconos/apple-touch-icon.png",
       "iconos/favicon-32.png",
       "iconos/favicon.svg",

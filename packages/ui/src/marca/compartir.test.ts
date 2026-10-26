@@ -4,9 +4,9 @@ import { leerOklch } from "../mapa/color.ts";
 import { CONTORNO_DE_ESPANA } from "../mapa/espana.ts";
 import tema from "../tema.css?raw";
 import { leerTokens } from "../tokens.ts";
+import { COMPARTIR } from "./alCompartir.ts";
 import {
   coloresAlCompartir,
-  COMPARTIR,
   type DatosAlCompartir,
   pixelesAlCompartir,
   pngAlCompartir,

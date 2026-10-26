@@ -6,7 +6,11 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!api/|capas/|assets/|iconos/|despliegue\\.json).*)",
+      "source": "/api/((?!(?:emplazamientos|index|no-encontrada)/?$).+)",
+      "destination": "/api/no-encontrada"
+    },
+    {
+      "source": "/((?!api(?:/|$)|capas/|assets/|iconos/|despliegue\\.json).*)",
       "destination": "/index.html"
     }
   ],

@@ -39,9 +39,14 @@ const DEL_DOMINIO = [
 /** Los metadatos de la página, que no son código. */
 const PAGINAS = ["apps/web/index.html"];
 
-/** Pruebas, sus dobles y sus datos: no llegan a la interfaz. */
+/**
+ * Pruebas, sus dobles y sus datos: no llegan a la interfaz. Tampoco cuenta la respuesta de ejemplo
+ * de la página de la API, que enseña datos exportados con su versión, como los devuelve la API.
+ */
 const esDePrueba = (ruta: string): boolean =>
-  /\.test\.tsx?$/u.test(ruta) || /(^|\/)pruebas(\/|[A-Z.])/u.test(ruta);
+  /\.test\.tsx?$/u.test(ruta) ||
+  /(^|\/)pruebas(\/|[A-Z.])/u.test(ruta) ||
+  ruta === "packages/ui/src/api/ejemplo.ts";
 
 /** El hueco que ocupa cada `${…}` de una plantilla al leerla. */
 const HUECO = "${…}";

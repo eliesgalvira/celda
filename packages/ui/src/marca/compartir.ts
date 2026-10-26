@@ -9,25 +9,10 @@ import type { LimitesDeComunidadesYProvincias } from "@celda/dominio/limites";
 import { leerOklch } from "../mapa/color.ts";
 import type { ContornoDeEspana } from "../mapa/rotulos.ts";
 import { leerTokens, type Tema } from "../tokens.ts";
-import { CAJA_MARCA, CARPETA_ICONOS, MARCA, type Punto, type Tono } from "./geometria.ts";
+import { COMPARTIR } from "./alCompartir.ts";
+import { CAJA_MARCA, MARCA, type Punto, type Tono } from "./geometria.ts";
 import { codificarPng } from "./png.ts";
 import { type Capa, rasterizar, type Rgb } from "./raster.ts";
-
-/** La dirección pública de Celda: las redes solo aceptan la imagen con la URL entera. */
-export const SITIO = "https://celda.elies.site";
-
-/** El tamaño que piden X y Facebook para una tarjeta grande: 1,91 a 1. */
-export const COMPARTIR = {
-  ancho: 1200,
-  alto: 630,
-  fichero: "compartir.png",
-  ruta: `${CARPETA_ICONOS}/compartir.png`,
-} as const;
-
-/** El título y la descripción de la tarjeta, y el texto alternativo de su imagen. */
-export const TITULO_AL_COMPARTIR = "Celda · Antenas de telefonía móvil de España";
-export const ALTERNATIVO_AL_COMPARTIR =
-  "Mapa de España con sus provincias y un punto por cada emplazamiento de antenas de telefonía móvil, con el logo de Celda en el centro.";
 
 /** Los colores de la imagen, de los tokens del mapa y de los iconos de un tema. */
 export interface ColoresAlCompartir {
