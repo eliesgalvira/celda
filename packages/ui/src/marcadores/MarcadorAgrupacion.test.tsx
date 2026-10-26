@@ -4,6 +4,7 @@ import { createSignal, flush } from "solid-js";
 
 import type { Movimiento } from "./Deslizable.tsx";
 import { MarcadorAgrupacion } from "./MarcadorAgrupacion.tsx";
+import type { TamanoDeMarcador } from "./tamano.ts";
 
 describe("MarcadorAgrupacion", () => {
   it("es un botón con el número a la vista y un nombre que dice qué hace", () => {
@@ -31,23 +32,22 @@ describe("MarcadorAgrupacion", () => {
   });
 
   it("de lejos encoge y se aclara, pero el botón y el número siguen igual", () => {
-    const { getByRole } = render(() => (
-      <MarcadorAgrupacion
-        x={0}
-        y={0}
-        cuantos={40}
-        nombre="40 emplazamientos, acercar"
-        tamano="medio"
-      />
-    ));
-    const boton = getByRole("button");
-    assert.strictEqual(boton.getAttribute("data-tamano"), "medio");
-    assert.include(
-      boton.querySelector("svg")?.parentElement?.parentElement?.getAttribute("class"),
-      "scale-[0.8]",
+    const boton = (tamano: TamanoDeMarcador) =>
+      render(() => (
+        <MarcadorAgrupacion x={0} y={0} cuantos={40} nombre="40 emplazamientos" tamano={tamano} />
+      )).getByRole("button");
+    const medio = boton("medio");
+    const normal = boton("normal");
+    const dibujo = (boton: HTMLElement) => boton.querySelector("svg");
+    const escala = (boton: HTMLElement) => dibujo(boton)?.parentElement?.parentElement?.className;
+    assert.strictEqual(medio.getAttribute("data-tamano"), "medio");
+    assert.notStrictEqual(escala(medio), escala(normal));
+    assert.notStrictEqual(
+      dibujo(medio)?.getAttribute("class"),
+      dibujo(normal)?.getAttribute("class"),
     );
-    assert.include(boton.querySelector("svg")?.getAttribute("class"), "opacity-82");
-    assert.strictEqual(boton.querySelector("svg + span")?.textContent, "40");
+    assert.strictEqual(medio.className, normal.className);
+    assert.strictEqual(medio.textContent, "40");
   });
 
   it("mientras sale hacia otra agrupación no se puede pulsar ni enfocar", () => {

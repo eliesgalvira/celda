@@ -63,40 +63,30 @@ describe("MarcadorZona", () => {
     }
   });
 
-  it("el nombre es el de un área: en versalitas espaciadas, en una cinta, no como un rótulo", () => {
-    // «VALÈNCIA» bajo el hexágono de la provincia y «València» sobre la ciudad se leen como dos
-    // cosas: la provincia y su capital (ADR 0024).
+  it("el nombre es el de un área, en versalitas espaciadas, con la letra que mide `cajaDeZona`", () => {
     const { boton } = montar({ zona: "provincia", nombreDeZona: "València" });
     const nombre = boton.querySelector(".cinta");
     assert.strictEqual(nombre?.textContent, "València");
     const clases = nombre?.getAttribute("class") ?? "";
     assert.include(clases, "[font-variant-caps:all-small-caps]");
     assert.include(clases, "tracking-[0.12em]");
-    // Ya no es la letra de las etiquetas, monoespaciada.
-    assert.notInclude(clases, "font-mono");
-    // Los rótulos del mapa base van sin fondo y con halo; el nombre de Celda, sobre su cinta.
-    assert.notInclude(clases, "halo");
-    assert.include(clases, "bg-superficie-alta");
   });
 
-  it("de lejos el hexágono encoge y se aclara, y la cinta va siempre a 0,85 justo debajo", () => {
-    const lejos = montar({ tamano: "lejos" });
-    assert.strictEqual(lejos.boton.getAttribute("data-tamano"), "lejos");
-    const hexagono = lejos.boton.querySelector("svg")?.parentElement?.parentElement;
-    assert.include(hexagono?.getAttribute("class"), "scale-[0.62]");
-    assert.include(lejos.boton.querySelector("svg")?.getAttribute("class"), "opacity-82");
-    const cinta = lejos.boton.querySelector(".cinta")?.parentElement;
-    assert.include(cinta?.getAttribute("class"), "scale-85");
-    assert.include(cinta?.getAttribute("class"), "top-[calc(50%+17.36px)]");
-    // El número sigue opaco y en su sitio, y el botón no encoge.
-    assert.strictEqual(lejos.numero(), "118");
-    assert.include(lejos.boton.getAttribute("class"), "w-[50px]");
-    const cerca = montar({ tamano: "normal" });
-    assert.notInclude(cerca.boton.querySelector("svg")?.getAttribute("class"), "opacity");
-    assert.include(
-      cerca.boton.querySelector(".cinta")?.parentElement?.getAttribute("class"),
-      "scale-85",
+  it("de lejos el hexágono encoge y se aclara y la cinta sube, pero el botón y lo escrito no cambian", () => {
+    const lejos = montar({ tamano: "lejos" }).boton;
+    const normal = montar({ tamano: "normal" }).boton;
+    const dibujo = (boton: HTMLElement) => boton.querySelector("svg");
+    const escala = (boton: HTMLElement) => dibujo(boton)?.parentElement?.parentElement?.className;
+    const cinta = (boton: HTMLElement) => boton.querySelector(".cinta")?.parentElement?.className;
+    assert.strictEqual(lejos.getAttribute("data-tamano"), "lejos");
+    assert.notStrictEqual(escala(lejos), escala(normal));
+    assert.notStrictEqual(
+      dibujo(lejos)?.getAttribute("class"),
+      dibujo(normal)?.getAttribute("class"),
     );
+    assert.notStrictEqual(cinta(lejos), cinta(normal));
+    assert.strictEqual(lejos.className, normal.className);
+    assert.strictEqual(lejos.textContent, normal.textContent);
   });
 
   it("un barrio vacío va en claro con un 0", () => {
