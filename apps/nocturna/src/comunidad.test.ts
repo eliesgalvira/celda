@@ -55,18 +55,12 @@ const buzonDePrueba = (
                 (olvidaElCursor || despuesDe === null || (a.moderadaEl ?? 0) > despuesDe),
             )
             .toSorted((a, b) => (a.moderadaEl ?? 0) - (b.moderadaEl ?? 0))
-            .flatMap((a): ReadonlyArray<AceptadaParaPublicar> =>
-              a.contenido.tipo === "propia"
-                ? []
-                : [
-                    {
-                      id: a.id,
-                      persona: `persona-de-${a.identidad}`,
-                      aceptadaEl: a.moderadaEl ?? 0,
-                      contenido: a.contenido,
-                    },
-                  ],
-            );
+            .map((a): AceptadaParaPublicar => ({
+              id: a.id,
+              persona: `persona-de-${a.identidad}`,
+              aceptadaEl: a.moderadaEl ?? 0,
+              contenido: a.contenido,
+            }));
           const pagina: PaginaParaPublicar = { aportaciones: aceptadas, ultima: null };
           return pagina;
         }),

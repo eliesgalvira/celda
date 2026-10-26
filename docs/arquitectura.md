@@ -146,7 +146,6 @@ interface Simulacion<Params, Resultado> {
 | Cambiar de emplazamiento y ver la ficha del anterior con el nombre nuevo | `<Loading on={idEmplazamiento}>`: el cambio de identidad es un límite duro. |
 | Capa del mapa y ficha con versiones distintas | Marca de agua por vista: se ve la versión de cada una y cuál es más reciente. |
 | Ubicación desconocida tratada como conocida | Estados explícitos: ninguna, denegada, GPS con precisión, punto elegido. |
-| Medida de ejemplo confundida con una propia | Tipo distinto en el dominio, no solo un color. |
 | Corrección de la comunidad presentada como dato oficial | Cada dato lleva su fuente, y los conflictos se muestran, no se esconden. |
 
 ## Plan por fases

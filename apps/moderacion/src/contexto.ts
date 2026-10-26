@@ -4,7 +4,6 @@ import {
   type AportacionEnCola,
   CONTEXTOS_POR_LLAMADA,
   type ContextoEnElBuzon,
-  emplazamientoDe,
   PAGINA_MAXIMA,
   type PaginaDeCola,
   puntoPropuesto,
@@ -27,7 +26,7 @@ export const conLoPublicado = Effect.fn("Moderacion.conLoPublicado")(function* (
   const publicado = yield* LoPublicado;
   const { aportacion } = enBuzon;
   const { contenido } = aportacion;
-  const emplazamiento = emplazamientoDe(contenido);
+  const emplazamiento = contenido.emplazamiento;
   const ficha = Option.getOrNull(
     emplazamiento === null ? Option.none() : yield* publicado.ficha(emplazamiento),
   );

@@ -145,7 +145,7 @@ const relacionadasCon = Effect.fn("Moderacion.relacionadasCon")(function* (fila:
     );
   };
   const relacionadas = mismas
-    .filter((otra) => otra.id !== fila.id && otra.tipo !== "propia" && cerca(otra))
+    .filter((otra) => otra.id !== fila.id && cerca(otra))
     .slice(0, RELACIONADAS_MAXIMAS);
   return yield* Effect.forEach(relacionadas, enCola);
 });
@@ -209,21 +209,16 @@ const publicables = FunctionImpl.make(
           return despuesDe === null ? aceptada : aceptada.gt("moderadaEl", despuesDe);
         })
         .take(limite);
-      const aportaciones = yield* Effect.forEach(
-        filas.flatMap((fila) => {
-          const { contenido } = fila;
-          if (contenido.tipo === "propia") return [];
-          const sinNota =
-            contenido.tipo === "correccion-propuesta" ? { ...contenido, nota: null } : contenido;
-          return [{ fila, contenido: sinNota }];
-        }),
-        ({ fila, contenido }) =>
-          Effect.map(personaDe(clave, fila.identidad), (persona): AceptadaParaPublicar => ({
-            id: fila.id,
-            persona,
-            aceptadaEl: fila.moderadaEl ?? fila.recibidaEl,
-            contenido,
-          })),
+      const aportaciones = yield* Effect.forEach(filas, (fila) =>
+        Effect.map(personaDe(clave, fila.identidad), (persona): AceptadaParaPublicar => ({
+          id: fila.id,
+          persona,
+          aceptadaEl: fila.moderadaEl ?? fila.recibidaEl,
+          contenido:
+            fila.contenido.tipo === "correccion-propuesta"
+              ? { ...fila.contenido, nota: null }
+              : fila.contenido,
+        })),
       );
       const ultima = filas.at(-1);
       return {

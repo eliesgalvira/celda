@@ -37,8 +37,8 @@ const montar = (navegador: DatosDelNavegador) => {
 };
 
 describe("DialogoMedir en un ordenador", () => {
-  it("dice que no se puede medir, por qué, y ofrece el móvil, la captura y el ejemplo", () => {
-    const { dialogo, getByRole, getByText, queryByRole } = montar(ORDENADOR);
+  it("dice que no se puede medir, por qué, y ofrece el móvil y el ejemplo", () => {
+    const { dialogo, getByRole, getByText } = montar(ORDENADOR);
 
     const aviso = getByText("Desde un ordenador no se puede medir").parentElement;
     assert.match(aviso?.textContent ?? "", /la radio y la SIM de un móvil/u);
@@ -46,19 +46,6 @@ describe("DialogoMedir en un ordenador", () => {
     // El QR se dibuja aquí mismo y se nombra por su pie visible.
     const qr = getByRole("figure", { name: "Abre este paso en el móvil" });
     assert.isAbove(qr.querySelectorAll("path").length, 20);
-
-    // Subir una captura se ve, pero dice que aún no funciona y no finge un botón.
-    const captura = getByRole("heading", { name: /Subir una captura que ya tengas/u });
-    const opcion = captura.closest("section");
-    assert.match(opcion?.textContent ?? "", /PRONTO/u);
-    assert.match(opcion?.textContent ?? "", /Aún no se puede, porque/u);
-    // Solo el término subrayado, que abre su explicación, es un botón.
-    const botones = within(opcion ?? dialogo).queryAllByRole("button");
-    assert.deepStrictEqual(
-      botones.map((boton) => boton.getAttribute("data-termino")),
-      ["modo-de-informacion"],
-    );
-    assert.isNull(queryByRole("button", { name: /Subir/u }));
 
     assert.strictEqual(
       within(dialogo).getByRole("radio", { name: "Ordenador" }).matches(":checked"),
@@ -72,7 +59,6 @@ describe("DialogoMedir en un ordenador", () => {
     flush();
 
     const medida = getByRole("region", { name: /Medida de ejemplo en/u });
-    assert.strictEqual(medida.getAttribute("data-tipo"), "ejemplo");
     assert.strictEqual(
       getByText("EJEMPLO").closest("[data-tono]")?.getAttribute("data-tono"),
       "ejemplo",
@@ -119,7 +105,6 @@ describe("DialogoMedir en Android", () => {
     assert.isFalse(contenido?.hidden);
     assert.match(contenido?.textContent ?? "", /No instala ni cambia nada/u);
     assert.match(contenido?.textContent ?? "", /No llama ni cuesta nada/u);
-    assert.match(contenido?.textContent ?? "", /De la captura que subas, Celda solo lee/u);
 
     assert.strictEqual(getByRole("combobox", { name: "Marca del móvil" }).tagName, "SELECT");
   });

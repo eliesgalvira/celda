@@ -4,7 +4,6 @@
 // fechan con él, como las del navegador.
 // @effect-diagnostics globalDate:off
 import type { CorreccionPropuesta, Corroboracion } from "@celda/dominio/aportacion";
-import type { MedidaPropia } from "@celda/dominio/medida";
 import { afterEach, beforeEach, vi } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Ref from "effect/Ref";
@@ -47,23 +46,6 @@ export const uuid = () => {
   contador += 1;
   return `00000000-0000-4000-8000-${contador.toString(16).padStart(12, "0")}`;
 };
-
-/** Una medida a unos 150 m al este de Campus Nord, en el sector de 120°. */
-export const medida = (cambios: Partial<MedidaPropia> = {}): MedidaPropia => ({
-  tipo: "propia",
-  id: uuid(),
-  esquema: 1,
-  creada: Date.now() - 60_000,
-  origen: "captura",
-  punto: { longitud: 2.1155, latitud: 41.3878 },
-  senal: { compania: "vodafone", red: "4g", mhz: 1800, rsrpDbm: -90, rsrqDb: -10, pci: 12 },
-  unidaA: {
-    emplazamiento: "movistar-0802532",
-    posicion: { longitud: 2.113628, latitud: 41.388344 },
-    azimut: 120,
-  },
-  ...cambios,
-});
 
 /** Una corrección propuesta de la posición de Campus Nord. */
 export const correccion = (cambios: Partial<CorreccionPropuesta> = {}): CorreccionPropuesta => ({

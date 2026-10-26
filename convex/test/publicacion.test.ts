@@ -13,7 +13,6 @@ import {
   correccion,
   corroboracion,
   identidadDesde,
-  medida,
   prepararBuzon,
   tablas,
 } from "./ayudas";
@@ -49,7 +48,7 @@ beforeEach(() => {
   vi.stubEnv(VARIABLE_CLAVE_DE_PUBLICACION, CLAVE);
 });
 
-/** Una corrección aceptada, una rechazada, una pendiente, una corroboración y una medida aceptadas. */
+/** Una corrección aceptada, una rechazada, una pendiente y una corroboración aceptada. */
 const buzonConDeTodo = Effect.gen(function* () {
   const convex = yield* TestConfect.TestConfect;
   const identidad = yield* identidadDesde(IP);
@@ -65,14 +64,12 @@ const buzonConDeTodo = Effect.gen(function* () {
   yield* convex
     .desde(IP)
     .mutation(buzon.enviarCorroboracion, { identidad, corroboracion: respaldo });
-  const propia = medida();
-  yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad, medida: propia });
-  for (const id of [aceptada.id, respaldo.id, propia.id]) {
+  for (const id of [aceptada.id, respaldo.id]) {
     avanzar(1000);
     yield* convex.mutation(moderacion.aceptar, { id, motivo: "Bien" });
   }
   yield* convex.mutation(moderacion.rechazar, { id: rechazada.id, motivo: "No" });
-  return { identidad, aceptada, respaldo, propia, rechazada, pendiente };
+  return { identidad, aceptada, respaldo, rechazada, pendiente };
 });
 
 describe("lo aceptado para la publicación nocturna, por HTTP", () => {
@@ -100,7 +97,7 @@ describe("lo aceptado para la publicación nocturna, por HTTP", () => {
       assert.strictEqual(respuesta.estado, 200);
       assert.strictEqual(respuesta.cache, "no-store");
       const pagina = yield* decodificarPagina(respuesta.texto);
-      // Ni la medida, ni la rechazada, ni la pendiente.
+      // Ni la rechazada ni la pendiente.
       assert.deepStrictEqual(
         pagina.aportaciones.map((a) => a.id),
         [aceptada.id, respaldo.id],

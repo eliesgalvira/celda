@@ -11,11 +11,8 @@ export const variantesEtiqueta = cva(
         verificado: "bg-verificado text-verificado-fg",
         corregido: "bg-corregido text-corregido-fg",
         nuevo: "bg-nuevo text-nuevo-fg",
-        /** Una medida de ejemplo: nunca se confunde con una propia (historia 49). */
+        /** La medida de ejemplo. */
         ejemplo: "bg-ejemplo text-ejemplo-fg",
-        /** Algo que se enseña pero todavía no funciona. */
-        pronto:
-          "bg-superficie-alta text-tinta-suave shadow-[inset_0_0_0_1.5px_var(--linea-fuerte)]",
         /** Una aportación que el buzón de Celda ya ha recibido. */
         compartida: "bg-primario text-primario-fg",
         /** Una aportación que solo está en este dispositivo. */
@@ -31,8 +28,8 @@ export type EtiquetaProps = VariantProps<typeof variantesEtiqueta> & {
 };
 
 /**
- * Etiqueta del tema Hexágono: estado de un emplazamiento, marca de ejemplo, algo que llega pronto
- * o si una aportación se ha compartido.
+ * Etiqueta del tema Hexágono: estado de un emplazamiento, marca de ejemplo o si una aportación se
+ * ha compartido.
  */
 export function Etiqueta(props: EtiquetaProps) {
   return (

@@ -2,7 +2,6 @@ import * as Schema from "effect/Schema";
 
 import { Coordenada } from "./area.ts";
 import { Compania } from "./compania.ts";
-import { ClaveEmplazamiento, MedidaPropia } from "./medida.ts";
 
 /**
  * Las aportaciones son lo que la persona crea en su dispositivo. Se guardan con el mismo formato
@@ -10,6 +9,12 @@ import { ClaveEmplazamiento, MedidaPropia } from "./medida.ts";
  * esquema y origen, más el contenido de cada tipo. Cambiar el contenido de un tipo es subir su
  * versión y leer también la anterior.
  */
+
+/**
+ * Clave de un emplazamiento, como la publica la capa («movistar-0802532»), o de una corrección
+ * publicada.
+ */
+const Clave = Schema.String.pipe(Schema.check(Schema.isMinLength(1), Schema.isMaxLength(120)));
 
 /** Cómo se marcó un punto elegido: en el mapa (clic, arrastre o pin central) o con una dirección. */
 export const OrigenPunto = Schema.Literals(["mapa", "busqueda"]);
@@ -76,7 +81,7 @@ export const CorreccionPropuesta = Schema.Struct({
   creada: Schema.Int,
   /** Desde dónde se propuso: la ficha de un emplazamiento o el mapa, para uno que falta. */
   origen: Schema.Literals(["ficha", "mapa"]),
-  emplazamiento: Schema.NullOr(ClaveEmplazamiento),
+  emplazamiento: Schema.NullOr(Clave),
   cambio: Cambio,
   nota: Schema.NullOr(Nota),
 }).pipe(
@@ -89,11 +94,6 @@ export const CorreccionPropuesta = Schema.Struct({
   ),
 );
 export type CorreccionPropuesta = typeof CorreccionPropuesta.Type;
-
-/** Lo más largo que puede ser la clave de una corrección publicada. */
-const ClaveCorreccion = Schema.String.pipe(
-  Schema.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
-);
 
 /** Versión del esquema de la corroboración. */
 export const ESQUEMA_CORROBORACION = 1;
@@ -108,41 +108,31 @@ export const Corroboracion = Schema.Struct({
   esquema: Schema.Literal(ESQUEMA_CORROBORACION),
   creada: Schema.Int,
   origen: Schema.Literal("ficha"),
-  emplazamiento: ClaveEmplazamiento,
+  emplazamiento: Clave,
   /** La clave de la corrección publicada que respalda (`CorreccionDeFicha.clave`). */
-  correccion: ClaveCorreccion,
+  correccion: Clave,
 });
 export type Corroboracion = typeof Corroboracion.Type;
 
 /** Toda aportación que se guarda en el dispositivo. */
-export const Aportacion = Schema.Union([
-  PuntoElegido,
-  MedidaPropia,
-  CorreccionPropuesta,
-  Corroboracion,
-]);
+export const Aportacion = Schema.Union([PuntoElegido, CorreccionPropuesta, Corroboracion]);
 export type Aportacion = typeof Aportacion.Type;
 
 export type TipoAportacion = Aportacion["tipo"];
 
 /**
- * Lo que se puede compartir: la medida propia, la corrección propuesta y la corroboración. El
- * punto elegido nunca sale del dispositivo (ADR 0007).
+ * Lo que se puede compartir: la corrección propuesta y la corroboración. El punto elegido nunca
+ * sale del dispositivo (ADR 0007).
  */
-export const AportacionCompartible = Schema.Union([
-  MedidaPropia,
-  CorreccionPropuesta,
-  Corroboracion,
-]);
+export const AportacionCompartible = Schema.Union([CorreccionPropuesta, Corroboracion]);
 export type AportacionCompartible = typeof AportacionCompartible.Type;
 
 export type TipoCompartible = AportacionCompartible["tipo"];
 
-export const TIPOS_COMPARTIBLES: ReadonlyArray<TipoCompartible> = [
-  "propia",
+export const TIPOS_COMPARTIBLES = [
   "correccion-propuesta",
   "corroboracion",
-];
+] as const satisfies ReadonlyArray<TipoCompartible>;
 
 /** Si la aportación se puede compartir. */
 export const esCompartible = (aportacion: Aportacion): aportacion is AportacionCompartible =>

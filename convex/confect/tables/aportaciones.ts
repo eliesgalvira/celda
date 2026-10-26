@@ -1,4 +1,4 @@
-import { AportacionCompartible } from "@celda/dominio/aportacion";
+import { AportacionCompartible, TIPOS_COMPARTIBLES } from "@celda/dominio/aportacion";
 import { EstadoDeModeracion } from "@celda/dominio/moderacion";
 import { GenericId, Table } from "@confect/core";
 import * as Schema from "effect/Schema";
@@ -12,15 +12,15 @@ export default Table.make(() =>
   Schema.Struct({
     /** El identificador que puso el dispositivo: la clave idempotente del envío. */
     id: Schema.String,
-    tipo: Schema.Literals(["propia", "correccion-propuesta", "corroboracion"]),
+    tipo: Schema.Literals(TIPOS_COMPARTIBLES),
     identidad: GenericId.GenericId("identidades"),
     /** HMAC de la IP con la sal del día. Lo borra la limpieza a las 24 horas. */
     huellaIp: Schema.NullOr(Schema.String),
     recibidaEl: Schema.Finite,
     contenido: AportacionCompartible,
     /**
-     * El emplazamiento al que se refiere (`emplazamientoDe`), o `null` si dice que falta uno. Va
-     * fuera del contenido para buscar las demás aportaciones del mismo emplazamiento.
+     * El emplazamiento al que se refiere, o `null` si dice que falta uno. Va fuera del contenido
+     * para buscar las demás aportaciones del mismo emplazamiento.
      */
     emplazamiento: Schema.NullOr(Schema.String),
     estado: EstadoDeModeracion,

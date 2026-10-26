@@ -1,4 +1,4 @@
-import type { MedidaPropia } from "@celda/dominio/medida";
+import type { CorreccionPropuesta } from "@celda/dominio/aportacion";
 import type { Ficha } from "@celda/dominio/ficha";
 import { assert, describe, it } from "@effect/vitest";
 import { fireEvent, render, waitFor, within } from "@solidjs/testing-library";
@@ -8,12 +8,10 @@ import { flush } from "solid-js";
 
 import { App } from "../App.tsx";
 import { type CapaDePrueba, capaDePrueba, FUENTE_DE_BARRIOS } from "../capa/pruebas.ts";
-import { ProveedorDeDatos } from "../datos.tsx";
 import { FICHA_CON_CORRECCIONES_ACEPTADAS } from "../ficha/fichasCorregidas.ts";
 import { fichasDePrueba } from "../ficha/pruebas.ts";
 import { navegar, ruta } from "../lib/rutas.ts";
 import { type OpcionesDeUbicacion, ubicacionDePrueba } from "../ubicacion/pruebas.ts";
-import { DialogoAportaciones } from "./DialogoAportaciones.tsx";
 import { buzonDePrueba } from "./pruebas.ts";
 import { LimiteDelBuzon } from "./sincronizacion.ts";
 
@@ -35,16 +33,16 @@ const CAPA: CapaDePrueba = {
   fuenteDeBarrios: FUENTE_DE_BARRIOS,
 };
 
-/** Una medida propia de prueba, la que dejaría el registro de medidas (#29). */
-const MEDIDA: MedidaPropia = {
-  tipo: "propia",
+/** Una corrección propuesta que se quedó en el dispositivo sin compartir. */
+const CORRECCION: CorreccionPropuesta = {
   id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  tipo: "correccion-propuesta",
   esquema: 1,
   creada: Date.UTC(2026, 9, 3, 10, 30),
-  origen: "captura",
-  punto: { longitud: 2.1155, latitud: 41.3878 },
-  senal: { compania: "vodafone", red: "4g", mhz: 1800, rsrpDbm: -90, rsrqDb: -10, pci: 12 },
-  unidaA: { emplazamiento: FICHA.clave, posicion: FICHA.posicion, azimut: 120 },
+  origen: "ficha",
+  emplazamiento: FICHA.clave,
+  cambio: { tipo: "ya-no-existe" },
+  nota: null,
 };
 
 const servicios = (opciones: OpcionesDeUbicacion, fichas = fichasDePrueba()) => {
@@ -163,9 +161,9 @@ describe("ficha: correcciones aceptadas de la comunidad", () => {
 });
 
 describe("Tus aportaciones", () => {
-  /** El diálogo de las aportaciones de un dispositivo con una medida propia guardada. */
+  /** El diálogo de las aportaciones de un dispositivo con una corrección guardada. */
   const abrirAportaciones = async (buzon = buzonDePrueba()) => {
-    const montados = servicios({ guardadas: [MEDIDA], buzon });
+    const montados = servicios({ guardadas: [CORRECCION], buzon });
     navegar(`${ruta.mapa}?aportaciones`, { reemplazar: true });
     const pantalla = render(() => <App servicios={montados.capa} />);
     flush();
@@ -173,27 +171,26 @@ describe("Tus aportaciones", () => {
     return { ...pantalla, ...montados, abierto };
   };
 
-  it("comparte una medida propia: solo sus números y la dedicación CC0 antes de enviar", async () => {
+  it("comparte una corrección guardada: lo que sale y la dedicación CC0 antes de enviar", async () => {
     const pantalla = await abrirAportaciones();
-    const medidas = await within(pantalla.abierto).findByRole("region", {
-      name: "Medidas propias",
+    const correcciones = await within(pantalla.abierto).findByRole("region", {
+      name: "Correcciones propuestas",
     });
-    assert.isNotNull(within(medidas).getByText("SOLO EN ESTE DISPOSITIVO"));
-    fireEvent.click(within(medidas).getByRole("button", { name: "Compartir" }));
+    assert.isNotNull(within(correcciones).getByText("SOLO EN ESTE DISPOSITIVO"));
+    fireEvent.click(within(correcciones).getByRole("button", { name: "Compartir" }));
     flush();
     const abierto = await dialogo(pantalla, "Compartir una aportación");
     const sale = within(abierto).getByRole("region", {
       name: "¿Qué se envía desde tu dispositivo?",
     });
-    for (const valor of ["−90 dBm", "−10 dB", "1800 MHz", "41.38780, 2.11550", MEDIDA.id]) {
+    for (const valor of ["El emplazamiento ya no existe", FICHA.clave, "sin nota", CORRECCION.id]) {
       assert.isNotNull(within(sale).getByText(valor));
     }
-    assert.isNotNull(within(sale).getByText(/La captura se queda en tu dispositivo/u));
     assert.isNotNull(within(abierto).getByText(/dominio público con la CC0 1.0 Universal/u));
     fireEvent.click(within(abierto).getByRole("button", { name: "Enviar al dominio público" }));
     flush();
     await within(abierto).findByText(/^Recibida el /u);
-    assert.deepStrictEqual(pantalla.dispositivo.buzon.recibidas(), [MEDIDA]);
+    assert.deepStrictEqual(pantalla.dispositivo.buzon.recibidas(), [CORRECCION]);
 
     fireEvent.click(within(abierto).getByRole("button", { name: "Hecho" }));
     flush();
@@ -201,7 +198,7 @@ describe("Tus aportaciones", () => {
     await within(lista).findByText(/COMPARTIDA EL/u);
   });
 
-  it("si el buzón rechaza por un límite lo dice, y la medida sigue en el dispositivo", async () => {
+  it("si el buzón rechaza por un límite lo dice, y la corrección sigue en el dispositivo", async () => {
     const buzon = buzonDePrueba();
     // El aviso cuenta lo que falta desde la hora del navegador, como en la web.
     // @effect-diagnostics-next-line globalDate:off
@@ -216,19 +213,8 @@ describe("Tus aportaciones", () => {
     assert.isNotNull(within(aviso).getByText("Muchas aportaciones desde tu red"));
     assert.match(aviso.textContent ?? "", /dentro de 5 min/u);
     assert.match(aviso.textContent ?? "", /Sigue guardada en este dispositivo/u);
-    assert.deepStrictEqual(pantalla.dispositivo.almacen.guardadas(), [MEDIDA]);
+    assert.deepStrictEqual(pantalla.dispositivo.almacen.guardadas(), [CORRECCION]);
     assert.strictEqual(pantalla.dispositivo.almacen.compartidas().size, 0);
     assert.isNotNull(within(abierto).getByRole("button", { name: "Intentar otra vez" }));
-  });
-
-  it("en un ordenador dice por qué no hay medidas propias", async () => {
-    const montados = servicios({});
-    const { findByText } = render(() => (
-      <ProveedorDeDatos servicios={montados.capa}>
-        <DialogoAportaciones dispositivo="ordenador" alCerrar={() => {}} alElegirPunto={() => {}} />
-      </ProveedorDeDatos>
-    ));
-    flush();
-    assert.isNotNull(await findByText("En un ordenador no hay medidas propias"));
   });
 });

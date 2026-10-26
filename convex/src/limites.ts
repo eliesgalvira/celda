@@ -1,4 +1,4 @@
-import { DAY, HOUR, RateLimiter, type RateLimitConfig } from "@convex-dev/rate-limiter";
+import { DAY, RateLimiter, type RateLimitConfig } from "@convex-dev/rate-limiter";
 import type { GenericMutationCtx, GenericDataModel } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Random from "effect/Random";
@@ -17,9 +17,6 @@ import { type AmbitoDeLimite, LimiteAlcanzado } from "../confect/buzon.spec";
  * hay conflictos en el documento de un cubo, y así cada límite corta en su número exacto.
  */
 export const LIMITES = {
-  medidasPorDispositivo: { kind: "token bucket", rate: 10, period: HOUR, capacity: 3 },
-  medidasPorIp: { kind: "token bucket", rate: 300, period: HOUR },
-  medidasEnTotal: { kind: "token bucket", rate: 5000, period: DAY },
   correccionesPorDispositivo: { kind: "token bucket", rate: 10, period: DAY, capacity: 3 },
   correccionesPorIp: { kind: "token bucket", rate: 50, period: DAY },
   correccionesEnTotal: { kind: "token bucket", rate: 300, period: DAY },
@@ -32,7 +29,6 @@ export type NombreDeLimite = keyof typeof LIMITES;
 
 /** Los límites cuya clave es la huella de una IP: la limpieza los borra con ella. */
 export const LIMITES_POR_IP: ReadonlyArray<NombreDeLimite> = [
-  "medidasPorIp",
   "correccionesPorIp",
   "corroboracionesPorIp",
   "identidadesPorIp",

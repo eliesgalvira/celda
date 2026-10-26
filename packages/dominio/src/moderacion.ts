@@ -3,8 +3,8 @@ import * as Schema from "effect/Schema";
 import {
   AportacionCompartible,
   type Cambio,
-  CorreccionPropuesta,
-  Corroboracion,
+  type CorreccionPropuesta,
+  type Corroboracion,
 } from "./aportacion.ts";
 import { Coordenada, distanciaMetros } from "./area.ts";
 import { Compania, NOMBRE_COMPANIA } from "./compania.ts";
@@ -133,22 +133,9 @@ export const DISTANCIA_DUDOSA_M = 1000;
 /** Hasta dónde se buscan emplazamientos publicados alrededor de uno que falta. */
 export const RADIO_CERCANOS_M = 300;
 
-/** El emplazamiento al que se refiere una aportación, o `null` si dice que falta uno. */
-export const emplazamientoDe = (contenido: AportacionCompartible): string | null => {
-  switch (contenido.tipo) {
-    case "propia":
-      return contenido.unidaA.emplazamiento;
-    case "correccion-propuesta":
-    case "corroboracion":
-      return contenido.emplazamiento;
-  }
-};
-
-/** El punto que propone una aportación, si propone uno: una posición, un sitio que falta o una medida. */
+/** El punto que propone una aportación, si propone uno: una posición o un sitio que falta. */
 export const puntoPropuesto = (contenido: AportacionCompartible): Coordenada | null => {
   switch (contenido.tipo) {
-    case "propia":
-      return contenido.punto;
     case "correccion-propuesta":
       return contenido.cambio.tipo === "posicion" || contenido.cambio.tipo === "falta"
         ? contenido.cambio.posicion
@@ -172,8 +159,8 @@ export type EmplazamientoCercano = typeof EmplazamientoCercano.Type;
  *
  * - `publicado`: la ficha del emplazamiento tal como está publicada en la versión `version`, con
  *   lo que dice el registro oficial y las correcciones ya aceptadas, o `null` si no está publicado;
- * - `distanciaM`: de la posición publicada al punto que propone la aportación (la posición nueva o
- *   la medida), o, si dice que falta un emplazamiento, al publicado más cercano;
+ * - `distanciaM`: de la posición publicada al punto que propone la aportación (la posición nueva),
+ *   o, si dice que falta un emplazamiento, al publicado más cercano;
  * - `cercanos`: los emplazamientos publicados a menos de `RADIO_CERCANOS_M` del punto de uno que
  *   falta, del más cercano al más lejano;
  * - el historial de quien la envía y las demás aportaciones del mismo emplazamiento, del buzón.
@@ -457,7 +444,7 @@ export const AceptadaParaPublicar = Schema.Struct({
   /** HMAC de la identidad con la clave del buzón: cuenta a cada persona una vez. */
   persona: Schema.String,
   aceptadaEl: Schema.Finite,
-  contenido: Schema.Union([CorreccionPropuesta, Corroboracion]),
+  contenido: AportacionCompartible,
 });
 export type AceptadaParaPublicar = typeof AceptadaParaPublicar.Type;
 

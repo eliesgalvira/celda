@@ -30,54 +30,11 @@ export const LecturaDeSenal = Schema.Struct({
 });
 export type LecturaDeSenal = typeof LecturaDeSenal.Type;
 
-/** Clave de un emplazamiento, como la publica la capa: «movistar-0802532». */
-export const ClaveEmplazamiento = Schema.String.pipe(
-  Schema.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
-);
-
-/**
- * A qué está unida una medida propia: el emplazamiento que le daba servicio, en la posición que
- * publicaba su ficha al registrarla, y el azimut del sector que le daba servicio, si se sabía.
- * La posición va con la medida porque el buzón no tiene los emplazamientos: con ella comprueba
- * que la medida es verosímil, y la moderación la compara con lo publicado.
- */
-export const UnidaA = Schema.Struct({
-  emplazamiento: ClaveEmplazamiento,
-  posicion: Coordenada,
-  /** Azimut del sector que daba servicio, en grados desde el norte, o `null` si no se sabía. */
-  azimut: Schema.NullOr(Schema.Finite.pipe(Schema.check(entre(0, 360)))),
-});
-export type UnidaA = typeof UnidaA.Type;
-
-/** Versión del esquema de la medida propia. */
-export const ESQUEMA_MEDIDA_PROPIA = 1;
-
-/**
- * Medida que la persona registra en su dispositivo a partir de una captura. Es una aportación,
- * así que lleva el mismo sobre que las demás (ADR 0007): identificador, versión del esquema,
- * fecha de creación y origen. Solo tiene números: la captura nunca sale del dispositivo, ni
- * siquiera en el formato (ADR 0020).
- */
-export const MedidaPropia = Schema.Struct({
-  tipo: Schema.tag("propia"),
-  /** UUID v4 creado en el dispositivo. Al compartirse es la clave idempotente. */
-  id: Schema.String.pipe(Schema.check(Schema.isUUID(4))),
-  esquema: Schema.Literal(ESQUEMA_MEDIDA_PROPIA),
-  /** Cuándo se registró, en milisegundos desde 1970. */
-  creada: Schema.Int,
-  origen: Schema.Literal("captura"),
-  punto: Coordenada,
-  senal: LecturaDeSenal,
-  unidaA: UnidaA,
-});
-export type MedidaPropia = typeof MedidaPropia.Type;
-
 /**
  * Medida que trae Celda para enseñar cómo funciona. No es de nadie ni es una aportación: no
  * tiene identificador, fecha ni origen, y no se guarda en el dispositivo.
  */
 export const MedidaDeEjemplo = Schema.Struct({
-  tipo: Schema.tag("ejemplo"),
   /** Dónde se supone tomada, dicho para las personas. */
   lugar: Schema.String,
   punto: Coordenada,
@@ -86,22 +43,10 @@ export const MedidaDeEjemplo = Schema.Struct({
 export type MedidaDeEjemplo = typeof MedidaDeEjemplo.Type;
 
 /**
- * Lectura de la señal en un punto. Siempre es propia o de ejemplo, nunca las dos. El
- * discriminante es `tipo` y no `_tag`, como en el resto del dominio, por Convex.
- */
-export const Medida = Schema.Union([MedidaPropia, MedidaDeEjemplo]);
-export type Medida = typeof Medida.Type;
-
-/** Las medidas de la persona. Una medida de ejemplo nunca cuenta como suya (historia 49). */
-export const medidasPropias = (medidas: ReadonlyArray<Medida>): ReadonlyArray<MedidaPropia> =>
-  medidas.filter((medida): medida is MedidaPropia => medida.tipo === "propia");
-
-/**
  * La medida de ejemplo de Celda. Los números son inventados, pero verosímiles para un móvil de
  * Movistar en 4G en el centro de Barcelona.
  */
 export const MEDIDA_DE_EJEMPLO: MedidaDeEjemplo = {
-  tipo: "ejemplo",
   lugar: "Plaça de Catalunya, Barcelona",
   punto: { longitud: 2.1701, latitud: 41.3871 },
   senal: { compania: "movistar", red: "4g", mhz: 1800, rsrpDbm: -95, rsrqDb: -11, pci: 212 },
