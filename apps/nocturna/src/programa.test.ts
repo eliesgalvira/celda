@@ -102,7 +102,7 @@ const publicadoEn = (almacen: ReadonlyMap<string, string>) => {
 const resumenDe = (entorno: Entorno) =>
   conBase(
     entorno.base,
-    Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+    Effect.flatMap(BaseNocturna, (base) => base.resumen),
   );
 
 /** El registro oficial del resumen, que es la única fuente con extractor. */
@@ -232,7 +232,6 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
         assert.strictEqual(fuente.ultima?.cambios.fichas.leidas, 40);
         assert.strictEqual(fuente.ultima?.publicacion?.tipo, "publicada");
         assert.strictEqual(fuente.vigentes, 40);
-        assert.strictEqual(fuente.sinLeer, 0);
         assert.isDefined(hecha.copia);
       }),
     ),
@@ -413,7 +412,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           const original = yield* resumenDe(entorno);
           const copiada = yield* conBase(
             ultima ?? "",
-            Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+            Effect.flatMap(BaseNocturna, (base) => base.resumen),
           );
           assert.deepStrictEqual(copiada, original);
 
@@ -597,20 +596,19 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           yield* TestClock.setTime(NOCHE);
           yield* unaNoche(entorno, registroOficial(sinFichas), { proceso: EN_RONDAS });
 
-          const { resumen, cola, turno } = yield* conBase(
-            entorno.base,
-            estado(EN_RONDAS, CALENDARIO),
-          );
+          const { resumen, turno } = yield* conBase(entorno.base, estado(EN_RONDAS, CALENDARIO));
           const fuente = resumen.fuentes.find((f) => f.fuente === "registro-oficial");
-          assert.strictEqual(fuente?.sinLeer, 40);
           assert.strictEqual(fuente?.ultima?.errores.length, 4);
           // Las tres que han fallado esperan a la ronda siguiente; las demás siguen en la cola.
-          assert.deepStrictEqual(cola, { nuevas: 37, porReleer: 0, enEspera: 3 });
-          assert.strictEqual(turno.porLeer, 37);
+          assert.deepStrictEqual(turno.cola, { nuevas: 37, porReleer: 0, enEspera: 3 });
           const texto = describirResumen(entorno.base, resumen, turno);
           assert.include(texto, "registro-oficial: encendida");
           assert.include(texto, "2026-09-26 02:15:00 UTC, completada, 40 registros en el listado");
-          assert.include(texto, "fichas pendientes: 40 sin leer");
+          assert.include(texto, "Observaciones vigentes: 40\n");
+          assert.include(
+            texto,
+            "Fichas por leer en la ronda: 37 sin leer, 0 por releer, 3 esperando tras fallar",
+          );
           assert.include(texto, "- cataluna: último barrido completado 2026-09-26 02:15:00 UTC");
           assert.include(
             texto,
@@ -625,7 +623,8 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
               "ronda, en la que barre su zona y lee todas las fichas",
           );
           assert.include(texto, `Última versión publicada: ${VERSION}`);
-          assert.include(texto, "comunidad: apagada");
+          // La comunidad no tiene interruptor: sale sin «encendida» ni «apagada».
+          assert.include(texto, "\ncomunidad\n  Ninguna ejecución todavía");
 
           // Durante una ejecución, la orden dice cuántas fichas le quedan a la ronda.
           yield* conBase(
@@ -706,7 +705,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
       // Nunca por debajo de 3 s entre peticiones.
       assert.strictEqual(Duration.toSeconds(cambiada.registroOficial.pausa), 3);
       assert.strictEqual(cambiada.registroOficial.userAgent, "Celda (pruebas)");
-      assert.isFalse(cambiada.interruptores["registro-oficial"].activo);
+      assert.isFalse(cambiada.interruptores["registro-oficial"]?.activo);
       assert.deepStrictEqual(
         cambiada.noche.proceso.zonas.map((zona) => zona.nombre),
         ["cataluna", "centro", "andalucia"],

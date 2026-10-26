@@ -42,7 +42,7 @@ import {
   type EjecucionProgramada,
   proximaEjecucion,
 } from "./calendario.ts";
-import { describirResumen, loQueQueda, type Turno } from "./estado.ts";
+import { describirResumen, describirZonaEnLaEjecucion, loQueQueda, type Turno } from "./estado.ts";
 
 /**
  * Los extractores de la ejecución, uno por fuente que ya tiene extractor. Cada ejecución construye
@@ -307,7 +307,8 @@ const ejecutarCon = <I, A, E, R>(capa: Layer.Layer<I>, ejecucion: Effect.Effect<
  * página, como una ejecución de la comunidad (ADR 0020). Sigue desde la última aceptada que tiene
  * la base, y una que ya tenía no se guarda dos veces, así que leer dos veces lo mismo no duplica
  * nada. Si el buzón no contesta, la ejecución queda fallida con lo que haya guardado, lo dice el
- * diario y la orden sigue: lo que falte llega en la ejecución siguiente.
+ * diario y la orden sigue: lo que falte llega en la ejecución siguiente. La comunidad no tiene
+ * interruptor (`Interruptores`): su ejecución nunca queda omitida.
  */
 export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function* (
   buzon: Layer.Layer<AceptadasDelBuzon>,
@@ -317,15 +318,6 @@ export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function*
   const inicio = yield* Clock.currentTimeMillis;
   const arranque = yield* base.iniciar("comunidad", inicio);
   const sinZonas: ReadonlyArray<ZonaEnLaEjecucion> = [];
-  if (arranque.tipo === "omitida") {
-    const omitida: EjecucionDeLaNoche = {
-      fuente: "comunidad",
-      ejecucion: arranque.ejecucion,
-      estado: "omitida",
-      zonas: sinZonas,
-    };
-    return omitida;
-  }
   const cuentas = { leidas: 0, nuevas: 0 };
   const recogida = Effect.gen(function* () {
     const cliente = yield* AceptadasDelBuzon;
@@ -378,12 +370,6 @@ export const recogerAceptadas = Effect.fn("Nocturna.recogerAceptadas")(function*
   };
   return hecha;
 });
-
-const describirZona = (z: ZonaEnLaEjecucion): string =>
-  `Zona ${z.zona}: ${z.estado}, ${z.cuadros} cuadros, ${z.peticiones} peticiones, ` +
-  `${Math.round(z.bytes / 1000)} kB, ${z.registros} registros, observaciones ` +
-  `+${z.observaciones.creados} ~${z.observaciones.cambiados} -${z.observaciones.retirados}` +
-  (z.error === undefined ? "" : ` (${z.error})`);
 
 /** Una línea del diario, y si va como aviso. */
 export interface LineaDelDiario {
@@ -472,7 +458,7 @@ export const noche = Effect.fn("Nocturna.noche")(function* (opciones: OpcionesNo
   for (const { fuente, estado, zonas } of ejecuciones) {
     yield* Effect.logInfo(`Ejecución de ${fuente}: ${estado}`);
     for (const zona of zonas) {
-      yield* Effect.logInfo(describirZona(zona));
+      yield* Effect.logInfo(`Zona ${describirZonaEnLaEjecucion(zona)}`);
     }
   }
   if (registro.porLeer !== undefined && registro.detenida === undefined) {
@@ -562,15 +548,14 @@ export const estado = Effect.fn("Nocturna.estado")(function* (
   const ahora = yield* Clock.currentTimeMillis;
   // Lo leído desde aquí es de la ronda de ahora.
   const desde = ahora - Duration.toMillis(opciones.reciente);
-  const resumen = yield* base.resumen(desde);
+  const resumen = yield* base.resumen;
   const pendientes = yield* barrido.colaDeFichas("registro-oficial", desde);
-  const cola = resumirCola(pendientes, ahora);
   const porZona = pendientesPorZona(pendientes, opciones.zonas, ahora);
   const proxima = proximaEjecucion(calendario, ahora);
   const estadoDeZonas = yield* barrido.estadoDeZonas("registro-oficial");
   const turno: Turno = {
     zonas: [...porZona].map(([zona, fichas]) => ({ zona, fichas })),
-    porLeer: cola.nuevas + cola.porReleer,
+    cola: resumirCola(pendientes, ahora),
     proxima: {
       cuando: describirProgramada(calendario, proxima),
       dia: proxima.dia,
@@ -583,5 +568,5 @@ export const estado = Effect.fn("Nocturna.estado")(function* (
     },
   };
   yield* Console.log(describirResumen(base.fichero, resumen, turno));
-  return { resumen, cola, turno };
+  return { resumen, turno };
 });

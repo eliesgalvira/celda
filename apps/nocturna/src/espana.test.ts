@@ -233,13 +233,12 @@ describe("toda España en la ingesta (#50 y ADR 0029)", () => {
           assert.strictEqual(suma, hecha.publicacion.emplazamientos);
 
           // Las fichas: todas sin leer, en una sola cola, y cada zona con las de sus cuadros.
-          const { cola, turno } = yield* estadoDe(entorno, c.noche.proceso);
-          assert.deepStrictEqual(cola, {
+          const { turno } = yield* estadoDe(entorno, c.noche.proceso);
+          assert.deepStrictEqual(turno.cola, {
             nuevas: espana.listado.registros.length,
             porReleer: 0,
             enEspera: 0,
           });
-          assert.strictEqual(turno.porLeer, espana.listado.registros.length);
           for (const zona of ZONAS) {
             assert.strictEqual(
               turno.zonas.find((z) => z.zona === zona)?.fichas.nuevas,

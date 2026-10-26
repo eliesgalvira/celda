@@ -85,7 +85,7 @@ Todo va en variables de entorno, con los valores de hoy por defecto (`apps/noctu
 | `CELDA_REGISTRO_ESPERA_SEGUNDOS` | 10 | Tiempo máximo de una respuesta |
 | `CELDA_REGISTRO_USER_AGENT` | `Celda (ingesta; contacto en celda.elies.site)` | Se envía en cada petición |
 | `CELDA_CONVEX_SITE_URL` | | Las acciones HTTP del buzón de Convex, `https://<nombre>.convex.site`, de las que se lee lo aceptado en la moderación |
-| `CELDA_PUBLICACION_CLAVE` | | La clave de publicación del buzón. Con las dos, la comunidad tiene el interruptor encendido; sin ellas, apagado. Nunca una clave de despliegue. Ver [Moderar](#moderar) |
+| `CELDA_PUBLICACION_CLAVE` | | La clave de publicación del buzón. Con las dos, la noche lee lo aceptado en la moderación; sin ellas, no lo lee. Nunca una clave de despliegue. Ver [Moderar](#moderar) |
 
 Las zonas son `cataluna`, `centro` (Madrid y Castilla-La Mancha), `andalucia` (con Ceuta y Melilla), `levante` (Comunitat Valenciana, Murcia e Illes Balears), `norte` (Galicia, Asturias, Cantabria y País Vasco), `ebro-y-duero` (Castilla y León, Aragón, Navarra y La Rioja) y `oeste-y-canarias` (Extremadura y Canarias), con sus cuadros en `ZONAS_DE_BARRIDO` (`packages/dominio/src/barrido.ts`). Un nombre que no está ahí para el programa al arrancar. De las que se turnan va primero la que quedó a medias, luego las que nunca se han completado, en el orden de la configuración, y luego las que llevan más tiempo sin completarse.
 

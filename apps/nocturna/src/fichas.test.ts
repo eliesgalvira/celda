@@ -10,13 +10,19 @@ import {
   leerLoteDeProvincia,
   leerResumen,
 } from "@celda/dominio/provincias";
+import { BaseDeBarrido } from "@celda/ingesta/barrido";
 import {
   ExtractorPorCajas,
   FuenteBloqueada,
   type Registro,
   RespuestaInesperada,
 } from "@celda/ingesta/extractor";
-import { OPCIONES_FICHAS, type OpcionesFichas, SIN_FICHA_SEGUIDAS } from "@celda/ingesta/fichas";
+import {
+  OPCIONES_FICHAS,
+  type OpcionesFichas,
+  resumirCola,
+  SIN_FICHA_SEGUIDAS,
+} from "@celda/ingesta/fichas";
 import { ObservacionGuardada } from "@celda/ingesta/guardado";
 import {
   capaGrabadaPorCajas,
@@ -167,7 +173,7 @@ const ultimaDe = (entorno: Entorno) =>
   conBase(
     entorno.base,
     Effect.map(
-      Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+      Effect.flatMap(BaseNocturna, (base) => base.resumen),
       (resumen) => resumen.fuentes.find((f) => f.fuente === "registro-oficial")?.ultima,
     ),
   );
@@ -473,7 +479,7 @@ describe("fichas en cada ronda (base SQLite y registro grabado)", () => {
             entorno.base,
             yield* conBase(
               entorno.base,
-              Effect.flatMap(BaseNocturna, (base) => base.resumen(SABADO)),
+              Effect.flatMap(BaseNocturna, (base) => base.resumen),
             ),
           );
           assert.include(
@@ -636,14 +642,11 @@ describe("fichas en cada ronda (base SQLite y registro grabado)", () => {
                 datos = json_remove(datos, '$.medidasDeExposicion')
               WHERE clave IN ${sql.in(viejas)}`;
           }).pipe(Effect.provide(SqliteClient.layer({ filename: entorno.base })));
-          const resumen = yield* conBase(
+          const cola = yield* conBase(
             entorno.base,
-            Effect.flatMap(BaseNocturna, (base) => base.resumen(SABADO)),
+            Effect.flatMap(BaseDeBarrido, (base) => base.colaDeFichas("registro-oficial", SABADO)),
           );
-          assert.strictEqual(
-            resumen.fuentes.find((f) => f.fuente === "registro-oficial")?.porReleer,
-            5,
-          );
+          assert.strictEqual(resumirCola(cola, SABADO).porReleer, 5);
 
           // El domingo se piden solo esas cinco, aunque se leyeron en la ronda. Una de ellas
           // publica ahora otras medidas que las de la muestra, y son las que se guardan.
