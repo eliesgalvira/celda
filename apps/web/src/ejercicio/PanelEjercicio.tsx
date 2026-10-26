@@ -11,7 +11,6 @@ import {
   type ProvinciasDelBorde,
   provinciasParaLasVecinas,
   resolverEjercicio,
-  type ResultadoDelEjercicio,
 } from "@celda/dominio/ejercicio";
 import { enumerar } from "@celda/dominio/enumerar";
 import type { IndiceDeMunicipios } from "@celda/dominio/municipio";
@@ -104,16 +103,6 @@ export interface PanelEjercicioProps {
   readonly alDibujar: (zona: ZonaEnMapa, encuadre: Rectangulo | undefined) => void;
   readonly alCerrar: () => void;
 }
-
-const CAMPOS_CUOTA: ReadonlyArray<GrupoDeLineas> = GRUPOS_DE_LINEAS;
-
-const SIN_RESULTADO: ResultadoDelEjercicio = {
-  habitantes: null,
-  areaKm2: 0,
-  densidad: undefined,
-  lineas: undefined,
-  companias: [],
-};
 
 const SIN_BORDE: ProvinciasDelBorde = { faltan: [], incompletas: [] };
 
@@ -439,9 +428,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
     },
   );
 
-  const fuenteParametros = createMemo(() =>
-    fuenteDeParametros(parametros(), PARAMETROS_POR_DEFECTO),
-  );
+  const fuenteParametros = createMemo(() => fuenteDeParametros(parametros()));
   /** La fecha de los emplazamientos de la zona: la de la capa de su provincia. */
   const fechaCapa = createMemo(() => {
     const actual = capaDeLaZona();
@@ -453,20 +440,16 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
     const zonaActual = resuelta();
     if (actual === undefined || zonaActual === undefined) return undefined;
     const hecho = leidas();
-    return tablaDelEjercicio(
-      actual,
-      {
-        zona: zonaActual.titulo,
-        origen: zonaActual.origen,
-        fechaCapa: fechaCapa(),
-        parametros: parametros(),
-        bandas:
-          hecho === undefined
-            ? { de: "capa", fecha: fechaCapa() }
-            : { de: "fichas", fecha: hecho.fecha },
-      },
-      PARAMETROS_POR_DEFECTO,
-    );
+    return tablaDelEjercicio(actual, {
+      zona: zonaActual.titulo,
+      origen: zonaActual.origen,
+      fechaCapa: fechaCapa(),
+      parametros: parametros(),
+      bandas:
+        hecho === undefined
+          ? { de: "capa", fecha: fechaCapa() }
+          : { de: "fichas", fecha: hecho.fecha },
+    });
   });
 
   const leer = () => {
@@ -807,7 +790,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                         setParametros((antes) => ({ ...antes, penetracion }))
                       }
                     />
-                    <For each={CAMPOS_CUOTA}>
+                    <For each={GRUPOS_DE_LINEAS}>
                       {(grupo) => (
                         <CampoNumero
                           etiqueta={`Cuota ${NOMBRE_GRUPO[grupo]}`}
@@ -837,14 +820,18 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       Datos de la CNMC
                     </Enlace>
                   </AccionesEjercicio>
-                  <CadenaDelCalculo
-                    pasos={cadenaDeUsuarios(
-                      resultado() ?? SIN_RESULTADO,
-                      actual().compania,
-                      parametros(),
-                      fuenteParametros().texto,
+                  <Show when={resultado()}>
+                    {(deLaZona) => (
+                      <CadenaDelCalculo
+                        pasos={cadenaDeUsuarios(
+                          deLaZona(),
+                          actual().compania,
+                          parametros(),
+                          fuenteParametros().texto,
+                        )}
+                      />
                     )}
-                  />
+                  </Show>
                 </SeccionFicha>
 
                 <SeccionFicha titulo="4 · Tecnologías y bandas">

@@ -50,25 +50,6 @@ export const seCortan = (a: Rectangulo, b: Rectangulo): boolean =>
 const contieneCaja = ([o, s, e, n]: Caja, [od, sd, ed, nd]: Caja): boolean =>
   od >= o && sd >= s && ed <= e && nd <= n;
 
-/**
- * A cuántos metros queda un punto de lo barrido: 0 si cae en alguna caja de una zona con algún
- * barrido completo. Sin ninguna, `undefined`: no se sabe hasta dónde llegan los datos.
- */
-export const distanciaALoBarrido = (
-  punto: Coordenada,
-  cobertura: ReadonlyArray<ZonaBarrida>,
-): number | undefined => {
-  let minima: number | undefined;
-  for (const zona of cobertura) {
-    if (zona.barrido === null) continue;
-    for (const caja of zona.cajas) {
-      const metros = distanciaAlRectangulo(punto, rectanguloDeCaja(caja));
-      minima = minima === undefined ? metros : Math.min(minima, metros);
-    }
-  }
-  return minima;
-};
-
 /** Lo que dice hasta dónde llegan los datos: las zonas barridas y la caja de cada provincia. */
 export interface AlcanceDeLosDatos {
   readonly cobertura: ReadonlyArray<ZonaBarrida>;

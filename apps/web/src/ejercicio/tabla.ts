@@ -8,6 +8,7 @@ import {
   GRUPO_DE_LINEAS,
   GRUPOS_DE_LINEAS,
   NOMBRE_GRUPO,
+  PARAMETROS_POR_DEFECTO,
   type ParametrosDelEjercicio,
   type ResultadoDeCompania,
   type ResultadoDelEjercicio,
@@ -132,16 +133,14 @@ const TEXTO_CERTEZA: Readonly<Record<Certeza, Valor>> = {
 const todasConBandas = (c: ResultadoDeCompania): boolean =>
   c.estaciones > 0 && c.conBandas === c.estaciones;
 
-const sonLosDeFabrica = (p: ParametrosDelEjercicio, porDefecto: ParametrosDelEjercicio) =>
-  p.penetracion === porDefecto.penetracion &&
-  GRUPOS_DE_LINEAS.every((grupo) => p.cuotas[grupo] === porDefecto.cuotas[grupo]);
-
 /** La fuente de los parámetros: la CNMC si no se han cambiado, o que los ha puesto quien estudia. */
 export const fuenteDeParametros = (
   parametros: ParametrosDelEjercicio,
-  porDefecto: ParametrosDelEjercicio,
 ): { readonly texto: string; readonly fecha: string } =>
-  sonLosDeFabrica(parametros, porDefecto)
+  parametros.penetracion === PARAMETROS_POR_DEFECTO.penetracion &&
+  GRUPOS_DE_LINEAS.every(
+    (grupo) => parametros.cuotas[grupo] === PARAMETROS_POR_DEFECTO.cuotas[grupo],
+  )
     ? {
         texto: `${FUENTE_DE_PARAMETROS.atribucion}, toda España, ${FUENTE_DE_PARAMETROS.periodo}`,
         fecha: FUENTE_DE_PARAMETROS.publicada,
@@ -152,11 +151,10 @@ export const fuenteDeParametros = (
 export const tablaDelEjercicio = (
   resultado: ResultadoDelEjercicio,
   contexto: ContextoDeTabla,
-  porDefecto: ParametrosDelEjercicio,
 ): Tabla => {
   const companias = resultado.companias;
   const porCompania = (valor: (c: ResultadoDeCompania) => Valor) => companias.map(valor);
-  const parametros = fuenteDeParametros(contexto.parametros, porDefecto);
+  const parametros = fuenteDeParametros(contexto.parametros);
   const { origen } = contexto;
   const padron = citaDelPadron(origen);
   const fechaPadron = origen.poblacion.publicada;
