@@ -1,12 +1,11 @@
-import type { Fuente } from "@celda/dominio/observacion";
 import { limiteDeCambiosDesdeConfig, RECIENTE, zonasDesdeConfig } from "@celda/ingesta/barrido";
 import type { OpcionesCliente } from "@celda/ingesta/cliente";
-import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
+import { INTERRUPTOR_POR_DEFECTO, type Interruptores } from "@celda/ingesta/ejecucion";
 import { opcionesClienteDeFichas, opcionesFichasDesdeConfig } from "@celda/ingesta/fichas";
 import * as RegistroOficial from "@celda/ingesta/registro-oficial/extractor";
 import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
-import * as Option from "effect/Option";
+import type * as Option from "effect/Option";
 
 import { type ConexionDePublicacion, conexionDePublicacionDesdeConfig } from "./buzon.ts";
 import { calendarioDesdeConfig } from "./calendario.ts";
@@ -22,7 +21,7 @@ export interface Configuracion {
   readonly registroOficial: OpcionesCliente;
   /** Las del cliente de las fichas del registro oficial: su pausa es el ritmo de las fichas. */
   readonly fichasDelRegistro: OpcionesCliente;
-  readonly interruptores: Readonly<Record<Fuente, Interruptor>>;
+  readonly interruptores: Interruptores;
   /** De dónde se lee lo aceptado en la moderación, si está configurado. */
   readonly buzon: Option.Option<ConexionDePublicacion>;
 }
@@ -60,9 +59,8 @@ export const COPIAS_CONSERVADAS = 14;
  *   `CELDA_REGISTRO_ESPERA_SEGUNDOS` (`RegistroOficial.opcionesClienteDesdeConfig`).
  *
  * - `CELDA_CONVEX_SITE_URL` y `CELDA_PUBLICACION_CLAVE`: las acciones HTTP del buzón de Convex y
- *   la clave de publicación, con las que la noche lee lo aceptado en la moderación (ADR 0020). Con
- *   las dos, la comunidad tiene su interruptor encendido; sin ellas, apagado. Nunca una clave de
- *   despliegue.
+ *   la clave de publicación, con las que la noche lee lo aceptado en la moderación (ADR 0020). Sin
+ *   ellas no lo lee. Nunca una clave de despliegue.
  *
  * El registro oficial es la única fuente con extractor (ADR 0019), y la comunidad llega por el
  * buzón. Dónde se publica lo dice `almacenDesdeConfig` (`@celda/publicacion`).
@@ -107,13 +105,9 @@ export const configuracion: Config.Config<Configuracion> = Config.all({
     registroOficial: c.registroOficial,
     fichasDelRegistro: opcionesClienteDeFichas(c.registroOficial, c.fichas),
     interruptores: {
-      ...INTERRUPTOR_POR_DEFECTO,
       "registro-oficial": c.registroActivo
         ? INTERRUPTOR_POR_DEFECTO["registro-oficial"]
         : { activo: false, motivo: c.registroMotivo },
-      comunidad: Option.isSome(c.buzon)
-        ? { activo: true, motivo: "" }
-        : INTERRUPTOR_POR_DEFECTO.comunidad,
     },
     buzon: c.buzon,
   })),

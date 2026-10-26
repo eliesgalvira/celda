@@ -4,12 +4,7 @@ import * as Result from "effect/Result";
 import type { LimitesDeBarrios } from "./barrio.ts";
 import { type EmplazamientoDeCapa, versionDeCapa } from "./capa.ts";
 import { cajaDeCuadro, zonaDeBarrido } from "./barrido.ts";
-import {
-  cuadrosDeProvincias,
-  distanciaALoBarrido,
-  distanciaALosDatos,
-  type ZonaBarrida,
-} from "./cobertura.ts";
+import { cuadrosDeProvincias, distanciaALosDatos, type ZonaBarrida } from "./cobertura.ts";
 import { EstacionDeFicha, Ficha } from "./ficha.ts";
 import { contarConFiltro } from "./filtro.ts";
 import {
@@ -789,21 +784,6 @@ describe("hasta dónde llegan los datos", () => {
     assert.isUndefined(CUADROS.get("43"));
   });
 
-  it("una zona que aún no ha acabado ningún barrido no cuenta", () => {
-    const sinAcabar = { ...CATALUNA, barrido: null };
-    assert.isUndefined(distanciaALoBarrido({ longitud: 2.15, latitud: 41.4 }, [sinAcabar]));
-  });
-
-  it("un punto en una caja barrida está a 0 m; fuera, a la distancia de la más cercana", () => {
-    assert.strictEqual(
-      distanciaALoBarrido({ longitud: 2.15, latitud: 41.4 }, [CAJA_DE_BARCELONA]),
-      0,
-    );
-    const girona = distanciaALoBarrido({ longitud: 2.82, latitud: 41.98 }, [CAJA_DE_BARCELONA]);
-    assert.isAbove(girona ?? 0, 60_000);
-    assert.isUndefined(distanciaALoBarrido({ longitud: 2.82, latitud: 41.98 }, []));
-  });
-
   it("con la cobertura real, lo barrido se recorta a las cajas de los emplazamientos", () => {
     const barcelona = {
       caja: {
@@ -823,10 +803,12 @@ describe("hasta dónde llegan los datos", () => {
     assert.strictEqual(distanciaALosDatos({ longitud: 2.96, latitud: 42.27 }, alcance), 0);
     // Perpiñán está en un cuadro barrido de Cataluña, pero a 28 km del último emplazamiento.
     const perpinan = { longitud: 2.9, latitud: 42.7 };
-    assert.strictEqual(distanciaALoBarrido(perpinan, [CATALUNA]), 0);
     assert.approximately(distanciaALosDatos(perpinan, alcance) ?? 0, 27_800, 500);
-    // Sin ninguna zona barrida no se sabe.
+    // Sin ninguna zona barrida, o sin ninguna que haya acabado un barrido, no se sabe.
     assert.isUndefined(distanciaALosDatos(perpinan, { ...alcance, cobertura: [] }));
+    assert.isUndefined(
+      distanciaALosDatos(perpinan, { ...alcance, cobertura: [{ ...CATALUNA, barrido: null }] }),
+    );
     assert.isUndefined(
       distanciaALosDatos(perpinan, { cobertura: [CATALUNA], provincias: [{ caja: undefined }] }),
     );

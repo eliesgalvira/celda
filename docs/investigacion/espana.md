@@ -16,7 +16,7 @@ Peticiones hechas a las fuentes, todas con el `User-Agent` «Celda (investigaci�
 - IGN, CNIG e INE: unas 25 peticiones a sus servicios de descarga (ATOM, WFS y la API de INEbase).
 - Protomaps y OpenFreeMap: `pmtiles extract --dry-run`, que solo lee los directorios del archivo.
 
-Los guiones y el registro de las peticiones al ministerio están en [`muestras/espana/`](muestras/espana/).
+Los listados y el registro de las peticiones al ministerio están en [`muestras/espana/`](muestras/espana/). Los guiones que se citan aquí (`muestreo-registro.mjs`, `muestra-fusion.mjs`, `compactar-muestra.mjs`, `fusion-fuera.mjs`, `fusion-madrid.mjs` y el banco, `espana.js` e `indice-worker.js`) se borraron el 26/10/2026 y siguen en el commit `6b9df51`, en la misma carpeta: `git show 6b9df51:docs/investigacion/muestras/espana/fusion-madrid.mjs`.
 
 ## Resumen
 
@@ -469,7 +469,7 @@ En el formato 4 real, generado con `generarCapa` sobre esas 42.855 posiciones, l
 
 ### Cómo se midió
 
-El banco es la página de la exploración 03 con dos cosas nuevas (`muestras/espana/espana.js` e `indice-worker.js`):
+El banco es la página de la exploración 03 con dos cosas nuevas (`espana.js` e `indice-worker.js`, en el commit `6b9df51`):
 
 - **Índice en un Worker.** supercluster 9.1 guarda cada nivel en un KDBush sobre un `ArrayBuffer`. El Worker construye el índice y devuelve esos búferes transferidos, y el hilo principal rehidrata un `Supercluster` con `KDBush.from` sin volver a agrupar. La API sigue siendo síncrona.
 - **Capa por provincias.** Un resumen nacional de 52 provincias (6 KB, 2,2 KB con gzip) y un fichero por provincia. Por debajo del zoom 8 solo se ve el resumen, un hexágono por provincia. Desde el 8 se piden las provincias cuya caja corta la vista, cada una con su índice. Las provincias del banco son las celdas de Voronoi de las capitales, una partición aproximada que basta para medir pesos y tiempos.

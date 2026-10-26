@@ -93,11 +93,6 @@ export function ResultadoDelEnvio(props: { readonly children?: JSX.Element }) {
   return <div class="min-h-[7.5rem]">{props.children}</div>;
 }
 
-/** Una fila de botones al final de un paso: el principal primero. */
-export function AccionesDelPaso(props: { readonly children: JSX.Element }) {
-  return <div class="flex flex-wrap items-center gap-2">{props.children}</div>;
-}
-
 export interface FilaAportacionProps {
   readonly titulo: string;
   /** Una línea con lo esencial: fecha, emplazamiento o valores. */

@@ -35,8 +35,8 @@ import {
   FuenteDeMunicipios,
   type IndiceDeMunicipios,
   type Lugar,
+  lugarDelPunto,
   type MunicipioConHabitantes,
-  municipioDelPunto,
   puntoDeMunicipio,
 } from "./municipio.ts";
 import { compararTexto } from "./banda.ts";
@@ -107,7 +107,7 @@ const distancia2 = (a: Coordenada, b: Coordenada): number => {
 };
 
 /**
- * Pone a cada emplazamiento su municipio (`municipioDelPunto`) y lo reparte por provincias. Uno sin
+ * Pone a cada emplazamiento su municipio (`lugarDelPunto`) y lo reparte por provincias. Uno sin
  * provincia, en un territorio sin provincia o en el mar lejos de la costa, va a la capa de la
  * provincia de etiqueta más cercana, pero su ficha sigue diciendo que no tiene ni municipio ni
  * provincia. Devuelve las provincias por código y, en cada una, sus emplazamientos por clave. Es
@@ -120,15 +120,9 @@ export const situarEmplazamientos = (
   const provincias = [...indice.provincias.values()];
   const porProvincia = new Map<string, Array<EmplazamientoSituado>>();
   for (const emplazamiento of emplazamientos) {
-    const { municipio, provincia } = municipioDelPunto(emplazamiento.posicion, indice);
-    const lugar: Lugar = {
-      municipio:
-        municipio === undefined ? null : { codigo: municipio.codigo, nombre: municipio.nombre },
-      provincia:
-        provincia === undefined ? null : { codigo: provincia.codigo, nombre: provincia.nombre },
-    };
+    const lugar = lugarDelPunto(emplazamiento.posicion, indice);
     const deCapa =
-      provincia ??
+      lugar.provincia ??
       provincias.reduce<(typeof provincias)[number] | undefined>(
         (cercana, p) =>
           cercana === undefined ||
@@ -143,7 +137,7 @@ export const situarEmplazamientos = (
     lista.push({
       emplazamiento,
       provincia: deCapa.codigo,
-      municipio: municipio?.codigo ?? null,
+      municipio: lugar.municipio?.codigo ?? null,
       lugar,
     });
     porProvincia.set(deCapa.codigo, lista);

@@ -133,7 +133,7 @@ const comunidadDe = (entorno: Entorno) =>
   conBase(
     entorno.base,
     Effect.map(
-      Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+      Effect.flatMap(BaseNocturna, (base) => base.resumen),
       (resumen) => resumen.fuentes.find((f) => f.fuente === "comunidad"),
     ),
   );

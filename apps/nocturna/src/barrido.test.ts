@@ -183,7 +183,7 @@ const ultimaEjecucion = (entorno: Entorno) =>
   conBase(
     entorno.base,
     Effect.flatMap(BaseNocturna, (base) =>
-      Effect.map(base.resumen(NOCHE), (resumen) => {
+      Effect.map(base.resumen, (resumen) => {
         const fuente = resumen.fuentes.find((f) => f.fuente === "registro-oficial");
         assert.isDefined(fuente?.ultima);
         return fuente.ultima;
@@ -219,7 +219,7 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
           const texto = yield* conBase(
             entorno.base,
             Effect.flatMap(BaseNocturna, (base) =>
-              Effect.map(base.resumen(NOCHE), (r) => describirResumen(entorno.base, r)),
+              Effect.map(base.resumen, (r) => describirResumen(entorno.base, r)),
             ),
           );
           assert.include(
@@ -504,7 +504,7 @@ describe("barrido por zonas (base SQLite, registro oficial grabado)", () => {
             );
             const aMedias = yield* conBase(
               entorno.base,
-              Effect.flatMap(BaseNocturna, (base) => base.resumen(NOCHE)),
+              Effect.flatMap(BaseNocturna, (base) => base.resumen),
             );
             const registro = aMedias.fuentes.find((f) => f.fuente === "registro-oficial");
             assert.deepStrictEqual(registro?.zonas, [

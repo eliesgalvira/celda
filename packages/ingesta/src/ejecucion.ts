@@ -8,18 +8,15 @@ export interface Interruptor {
 }
 
 /**
- * Interruptor de cada fuente mientras nadie lo cambie. Las correcciones de la comunidad llegan del
- * buzón de Convex, con lo aceptado en la moderación (ADR 0020): la ingesta nocturna la enciende
- * cuando tiene la conexión con el buzón.
+ * Los interruptores de las fuentes con extractor. La comunidad no tiene: llega del buzón de Convex
+ * (ADR 0020), y sin la conexión con él la ingesta nocturna no la recoge.
  */
-export const INTERRUPTOR_POR_DEFECTO: Readonly<Record<Fuente, Interruptor>> = {
+export type Interruptores = Readonly<Partial<Record<Fuente, Interruptor>>>;
+
+/** Los interruptores mientras nadie los cambie. */
+export const INTERRUPTOR_POR_DEFECTO = {
   "registro-oficial": { activo: true, motivo: "" },
-  comunidad: {
-    activo: false,
-    motivo:
-      "apagado por defecto: sin la conexión con el buzón (CELDA_CONVEX_SITE_URL y CELDA_PUBLICACION_CLAVE)",
-  },
-};
+} satisfies Interruptores;
 
 /** Lo que apunta una ejecución omitida por su interruptor. */
 export const erroresDeOmitida = (interruptor: Interruptor): ReadonlyArray<string> => [

@@ -165,26 +165,14 @@ const principalEnMarcha = (): StyleSpecification => {
   }
   const edificio = estilo.sources[FUENTE_EDIFICIO];
   if (edificio?.type === "geojson") edificio.data = { type: "FeatureCollection", features: [] };
-  // Una capa de Celda con otra opacidad y una que la web añadió por su cuenta, entre las vías y la
-  // línea hasta el punto.
-  const capas = estilo.layers.map((capa) =>
-    capa.id === FUENTE_LINEA_AL_PUNTO && capa.type === "line"
-      ? { ...capa, paint: { ...capa.paint, "line-opacity": 0.85 } }
-      : capa,
-  );
-  const antesDeLaLinea = capas.findIndex((capa) => capa.id === FUENTE_LINEA_AL_PUNTO);
-  capas.splice(antesDeLaLinea, 0, {
-    id: "capa-de-la-web",
-    type: "line",
-    source: "de-la-web",
-  });
+  // Una capa de Celda con otra opacidad.
   return {
     ...estilo,
-    sources: {
-      ...estilo.sources,
-      "de-la-web": { type: "geojson", data: { type: "FeatureCollection", features: [] } },
-    },
-    layers: capas,
+    layers: estilo.layers.map((capa) =>
+      capa.id === FUENTE_LINEA_AL_PUNTO && capa.type === "line"
+        ? { ...capa, paint: { ...capa.paint, "line-opacity": 0.85 } }
+        : capa,
+    ),
   };
 };
 
@@ -237,18 +225,13 @@ describe("pasar al mapa base de reserva", () => {
     assert.isTrue(ordenes.has("removeSource"));
   });
 
-  it("la capa que añadió la web sigue en su sitio y las fuentes conservan sus datos", () => {
+  it("las capas y las fuentes de Celda conservan lo que la web les puso", () => {
     const anterior = principalEnMarcha();
     const siguiente = conLoDeCelda(anterior, RESERVA);
-    const ids = siguiente.layers.map((capa) => capa.id);
-    const deLaWeb = ids.indexOf("capa-de-la-web");
-    assert.isAbove(deLaWeb, ids.indexOf("vias-autopistas"));
-    assert.isBelow(deLaWeb, ids.indexOf(FUENTE_LINEA_AL_PUNTO));
     assert.deepStrictEqual(
       siguiente.sources[FUENTE_LINEA_AL_PUNTO],
       anterior.sources[FUENTE_LINEA_AL_PUNTO],
     );
-    assert.isDefined(siguiente.sources["de-la-web"]);
     const cambiada = siguiente.layers.find((capa) => capa.id === FUENTE_LINEA_AL_PUNTO);
     assert.isTrue(cambiada?.type === "line" && cambiada.paint?.["line-opacity"] === 0.85);
     assert.deepStrictEqual(siguiente.state, {

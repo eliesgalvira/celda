@@ -138,6 +138,11 @@ export function Enlace(props: EnlaceProps) {
   );
 }
 
+/** Una fila de botones y enlaces, el principal primero. Si no caben, pasan a la línea siguiente. */
+export function Acciones(props: { readonly children: JSX.Element }) {
+  return <div class="flex flex-wrap items-center gap-2">{props.children}</div>;
+}
+
 /**
  * La ✕ de todos los cierres: la ficha, los diálogos, la explicación de un término y los avisos. Va
  * sin fondo y en la tinta de lo que la rodea, así que sirve igual sobre el panel, sobre la

@@ -50,7 +50,7 @@ const EN_TORDERA: ContextoDeTabla = {
   },
 };
 
-const tabla = () => tablaDelEjercicio(resolverEjercicio(ENTRADA), CONTEXTO, PARAMETROS_POR_DEFECTO);
+const tabla = () => tablaDelEjercicio(resolverEjercicio(ENTRADA), CONTEXTO);
 
 const fila = (magnitud: string) => {
   const encontrada = tabla()
@@ -75,11 +75,9 @@ describe("tabla del ejercicio", () => {
   });
 
   it("en un municipio cita al IGN y al INE como piden, con el código del municipio", () => {
-    const filas = tablaDelEjercicio(
-      resolverEjercicio(ENTRADA),
-      EN_TORDERA,
-      PARAMETROS_POR_DEFECTO,
-    ).secciones.flatMap((s) => s.filas);
+    const filas = tablaDelEjercicio(resolverEjercicio(ENTRADA), EN_TORDERA).secciones.flatMap(
+      (s) => s.filas,
+    );
     const deMagnitud = (magnitud: string) => filas.find((f) => f.magnitud === magnitud);
     assert.strictEqual(
       deMagnitud("Zona")?.fuente,
@@ -101,7 +99,6 @@ describe("tabla del ejercicio", () => {
     const filas = tablaDelEjercicio(
       resolverEjercicio({ ...ENTRADA, habitantes: null }),
       EN_TORDERA,
-      PARAMETROS_POR_DEFECTO,
     ).secciones.flatMap((s) => s.filas);
     const deMagnitud = (magnitud: string) => filas.find((f) => f.magnitud === magnitud);
     assert.strictEqual(deMagnitud("Habitantes")?.valores[0]?.texto, "—");
@@ -113,11 +110,10 @@ describe("tabla del ejercicio", () => {
 
   it("con parámetros cambiados a mano no cita a la CNMC", () => {
     const propios = { ...PARAMETROS_POR_DEFECTO, penetracion: 110 };
-    const cambiada = tablaDelEjercicio(
-      resolverEjercicio({ ...ENTRADA, parametros: propios }),
-      { ...CONTEXTO, parametros: propios },
-      PARAMETROS_POR_DEFECTO,
-    );
+    const cambiada = tablaDelEjercicio(resolverEjercicio({ ...ENTRADA, parametros: propios }), {
+      ...CONTEXTO,
+      parametros: propios,
+    });
     const penetracion = cambiada.secciones[0]?.filas.find((f) => f.magnitud === "Penetración");
     assert.strictEqual(penetracion?.fuente, "Valor puesto a mano en el ejercicio");
   });

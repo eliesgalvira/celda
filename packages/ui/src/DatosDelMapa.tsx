@@ -11,8 +11,6 @@ export const variantesDatosDelMapa = cva(
         fecha: "text-tinta",
         /** La capa aún no ha llegado: se dice, para que el mapa no parezca vacío. */
         espera: "text-tinta-suave",
-        /** La capa no ha cargado. */
-        fallo: "text-aviso-tinta",
         /** Lo que se ve queda fuera de lo que Celda tiene: se dice, sin alarmar. */
         limite: "text-tinta",
       },

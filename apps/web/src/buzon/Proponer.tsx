@@ -7,8 +7,7 @@ import {
 } from "@celda/dominio/aportacion";
 import type { Coordenada } from "@celda/dominio/area";
 import { type Compania, NOMBRE_COMPANIA } from "@celda/dominio/compania";
-import { Boton } from "@celda/ui/Boton.tsx";
-import { AccionesDelPaso } from "@celda/ui/buzon/Compartir.tsx";
+import { Acciones, Boton } from "@celda/ui/Boton.tsx";
 import { AreaDeTexto, Casillas, Segmentado, Selector } from "@celda/ui/Eleccion.tsx";
 import { Nota } from "@celda/ui/medir/Medir.tsx";
 import { Termino } from "@celda/ui/termino/Termino.tsx";
@@ -204,14 +203,14 @@ export function Proponer(props: ProponerProps) {
             alCambiar={setNota}
             ayuda="Cuenta qué has visto, sin datos personales."
           />
-          <AccionesDelPaso>
+          <Acciones>
             <Boton variante="destacado" disabled={cambio() === undefined} onClick={revisar}>
               Revisar y enviar
             </Boton>
             <Boton variante="secundario" onClick={() => props.alSalir()}>
               {props.textoSalir}
             </Boton>
-          </AccionesDelPaso>
+          </Acciones>
         </>
       }
     >

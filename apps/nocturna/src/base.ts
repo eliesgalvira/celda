@@ -26,6 +26,7 @@ import {
   erroresDeOmitida,
   EstadoEjecucion,
   type Interruptor,
+  type Interruptores,
   SIN_CAMBIOS,
 } from "@celda/ingesta/ejecucion";
 import type { FichaEnCola } from "@celda/ingesta/fichas";
@@ -74,7 +75,7 @@ import { corregirOrdenDeFilas } from "./ordenDeFilas.ts";
 export interface OpcionesBase {
   /** El fichero SQLite. Su carpeta se crea si no existe. */
   readonly fichero: string;
-  readonly interruptores: Readonly<Record<Fuente, Interruptor>>;
+  readonly interruptores: Interruptores;
   /**
    * El archivo de páginas, que la versión 11 del esquema lee para corregir el historial
    * (`corregirOrdenDeFilas`). Sin él, la corrección compara con lo que guarda la base.
@@ -535,17 +536,11 @@ export interface IntentoDePublicacion {
 /** Lo que el mantenedor quiere saber de una fuente. */
 export interface ResumenDeFuente {
   readonly fuente: Fuente;
-  readonly interruptor: Interruptor;
+  /** Sin interruptor, como la comunidad, la fuente no se apaga. */
+  readonly interruptor: Interruptor | undefined;
   readonly ultima: EjecucionGuardada | undefined;
   /** Observaciones que no se han retirado. */
   readonly vigentes: number;
-  /** Fichas que no se han leído nunca, o que cambiaron en el listado. */
-  readonly sinLeer: number;
-  /**
-   * Fichas leídas antes de la fecha de rotación, o con una versión de la lectura anterior, que se
-   * vuelven a leer.
-   */
-  readonly porReleer: number;
   /** Fichas que esperan tras un fallo para volver a pedirse. */
   readonly enEspera: number;
   /** Las primeras que se volverán a pedir, como mucho `PRIMERAS_EN_ESPERA`. */
@@ -595,7 +590,7 @@ export class BaseNocturna extends Context.Service<
      * El estado de cada fuente, de los emplazamientos y de lo publicado. Las fichas en espera son
      * las que esperan a esta hora.
      */
-    readonly resumen: (leidasAntesDe: number) => Effect.Effect<Resumen>;
+    readonly resumen: Effect.Effect<Resumen>;
     /** Una copia coherente de la base en `destino`, que no puede existir (`VACUUM INTO`). */
     readonly copiar: (destino: string) => Effect.Effect<void>;
     /**
@@ -812,7 +807,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
             Effect.gen(function* () {
               yield* sql`UPDATE ejecuciones SET estado = 'interrumpida', fin = ${fecha}
                   WHERE fuente = ${fuente} AND estado = 'en curso'`;
-              const omitida = !interruptor.activo;
+              const omitida = interruptor !== undefined && !interruptor.activo;
               const [fila] = yield* sql<{
                 readonly id: number;
               }>`INSERT INTO ejecuciones ${sql.insert({
@@ -1446,7 +1441,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
           );
         }, Effect.orDie),
 
-        resumen: Effect.fn("BaseNocturna.resumen")(function* (leidasAntesDe) {
+        resumen: Effect.gen(function* () {
           const ahora = yield* Clock.currentTimeMillis;
           const fuentes = yield* Effect.forEach(Fuente.literals, (fuente) =>
             Effect.gen(function* () {
@@ -1460,12 +1455,6 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                 ultima,
                 vigentes: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
                     WHERE fuente = ${fuente} AND retirada_en IS NULL`),
-                sinLeer: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
-                    WHERE fuente = ${fuente} AND retirada_en IS NULL AND ficha_leida_en IS NULL`),
-                porReleer: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
-                    WHERE fuente = ${fuente} AND retirada_en IS NULL
-                      AND (ficha_leida_en < ${leidasAntesDe}
-                        OR (ficha_leida_en IS NOT NULL AND ficha_leida_con < ${VERSION_DE_LECTURA}))`),
                 enEspera: yield* cuenta(sql`SELECT count(*) AS n FROM observaciones
                     WHERE fuente = ${fuente} AND retirada_en IS NULL
                       AND ficha_espera_hasta > ${ahora}`),
@@ -1498,7 +1487,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
             ultimoIntento: intento,
           };
           return resumen;
-        }, Effect.orDie),
+        }).pipe(Effect.orDie, Effect.withSpan("BaseNocturna.resumen")),
 
         copiar: Effect.fn("BaseNocturna.copiar")(function* (destino) {
           yield* sql`VACUUM INTO ${destino}`;

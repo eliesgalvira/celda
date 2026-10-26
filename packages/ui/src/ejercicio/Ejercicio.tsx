@@ -276,11 +276,6 @@ export function BuscadorDeZonas(props: BuscadorDeZonasProps) {
   );
 }
 
-/** Una fila de botones o de avisos al final de una sección. */
-export function AccionesEjercicio(props: { readonly children: JSX.Element }) {
-  return <div class="flex flex-wrap items-center gap-2">{props.children}</div>;
-}
-
 /** Los campos de los parámetros, en dos columnas desde que caben. */
 export function RejillaDeCampos(props: { readonly children: JSX.Element }) {
   return <div class="grid grid-cols-2 gap-x-4 gap-y-3">{props.children}</div>;

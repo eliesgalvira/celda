@@ -1,8 +1,7 @@
 // Las pruebas son su propio punto de entrada y montan sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
 import { FICHERO_VIGENTE } from "@celda/dominio/capa";
-import type { Fuente } from "@celda/dominio/observacion";
-import { INTERRUPTOR_POR_DEFECTO, type Interruptor } from "@celda/ingesta/ejecucion";
+import { INTERRUPTOR_POR_DEFECTO, type Interruptores } from "@celda/ingesta/ejecucion";
 import { zonaDeBarrido } from "@celda/dominio/barrido";
 import { BaseDeBarrido, OPCIONES_BARRIDO, type OpcionesBarrido } from "@celda/ingesta/barrido";
 import type { ExtractorPorCajas } from "@celda/ingesta/extractor";
@@ -31,12 +30,6 @@ import type { AceptadasDelBuzon } from "../buzon.ts";
 import { CALENDARIO } from "../calendario.ts";
 import { COPIAS_CONSERVADAS, REINTENTO_DE_PUBLICACION } from "../configuracion.ts";
 import { Extractores, noche, type OpcionesNoche, publicadorEn, sinAlmacen } from "../programa.ts";
-
-/** Los interruptores por defecto con la comunidad encendida, como con el buzón configurado. */
-export const CON_COMUNIDAD: Readonly<Record<Fuente, Interruptor>> = {
-  ...INTERRUPTOR_POR_DEFECTO,
-  comunidad: { activo: true, motivo: "" },
-};
 
 /** Lotes pequeños, para que la muestra del Campus Nord ocupe varios. */
 export const POR_LOTE = 8;
@@ -136,11 +129,8 @@ export interface Variante {
   readonly archivo?: string;
   /** Los paquetes del archivo de páginas en R2. Sin ellos, se quedan en la carpeta de copias. */
   readonly archivoEnR2?: Layer.Layer<AlmacenDelArchivo>;
-  readonly interruptores?: Readonly<Record<Fuente, Interruptor>>;
-  /**
-   * El buzón de Convex del que se lee lo aceptado. Con él, la comunidad tiene el interruptor
-   * encendido, salvo si `interruptores` dice otra cosa.
-   */
+  readonly interruptores?: Interruptores;
+  /** El buzón de Convex del que se lee lo aceptado. */
   readonly buzon?: Layer.Layer<AceptadasDelBuzon>;
   readonly proceso?: OpcionesBarrido;
   /** Cambia la base del barrido de la noche, para que falle donde quiera la prueba. */
@@ -180,9 +170,7 @@ export const unaNoche = (
       Layer.provideMerge(
         baseNocturna({
           fichero: entorno.base,
-          interruptores:
-            variante.interruptores ??
-            (variante.buzon === undefined ? INTERRUPTOR_POR_DEFECTO : CON_COMUNIDAD),
+          interruptores: variante.interruptores ?? INTERRUPTOR_POR_DEFECTO,
           archivo: variante.archivo ?? entorno.archivo,
         }),
       ),
