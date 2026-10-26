@@ -17,7 +17,7 @@ import { BANDAS_NOMINALES } from "@celda/dominio/tecnologia";
 
 /**
  * La tabla del ejercicio de emplazamientos, con la fuente y la fecha de cada fila: la misma para
- * la pantalla, el CSV y el XLSX. Todo son funciones puras.
+ * la pantalla y el CSV. Todo son funciones puras.
  */
 
 /** Un valor de la tabla: el texto que se ve y, si es un número, el número para exportarlo. */
@@ -319,58 +319,41 @@ const cabecera = (tabla: Tabla): ReadonlyArray<string> => [
   "Fecha",
 ];
 
-/** Una celda exportada: un número, que la hoja de cálculo trata como tal, o un texto. */
-export interface Celda {
-  readonly texto: string;
-  readonly numero?: number;
-}
-
-const texto = (valor: string): Celda => ({ texto: valor });
-
-/**
- * La tabla como filas de celdas, con una fila de cabecera. Un valor de toda la zona va en la
- * primera columna de las compañías. Los números se redondean a dos decimales.
- */
-export const filasExportadas = (tabla: Tabla): ReadonlyArray<ReadonlyArray<Celda>> => [
-  cabecera(tabla).map(texto),
-  ...tabla.secciones.flatMap((seccion) =>
-    seccion.filas.map((fila): ReadonlyArray<Celda> => {
-      const valores = tabla.companias.map((_, i): Celda => {
-        const valor = fila.valores[i];
-        if (valor === undefined || valor.texto === NINGUNO.texto) return texto("");
-        return valor.numero === undefined
-          ? texto(valor.texto)
-          : { texto: valor.texto, numero: Math.round(valor.numero * 100) / 100 };
-      });
-      return [
-        texto(seccion.titulo),
-        texto(fila.magnitud),
-        texto(fila.unidad ?? ""),
-        ...valores,
-        texto(fila.fuente),
-        texto(fila.fecha),
-      ];
-    }),
-  ),
-];
-
 /** Marca de orden de bytes: dice a la hoja de cálculo que el fichero está en UTF-8. */
-const BOM = "﻿";
+const BOM = "\uFEFF";
 
-const celdaCsv = (celda: Celda): string => {
-  const escrita = celda.numero === undefined ? celda.texto : String(celda.numero).replace(".", ",");
-  return /[;"\r\n]/u.test(escrita) ? `"${escrita.replaceAll('"', '""')}"` : escrita;
+/** Un valor en el CSV: vacío si no hay ninguno; un número, con dos decimales y coma decimal. */
+const valorCsv = (valor: Valor | undefined): string => {
+  if (valor === undefined || valor.texto === NINGUNO.texto) return "";
+  return valor.numero === undefined
+    ? valor.texto
+    : String(Math.round(valor.numero * 100) / 100).replace(".", ",");
 };
+
+const celdaCsv = (texto: string): string =>
+  /[;"\r\n]/u.test(texto) ? `"${texto.replaceAll('"', '""')}"` : texto;
 
 /**
  * La tabla en CSV como lo abre una hoja de cálculo en castellano: punto y coma entre columnas,
  * coma decimal, saltos de línea de Windows y la marca de UTF-8 al principio para que las tildes
- * se lean bien.
+ * se lean bien. Un valor de toda la zona va en la primera columna de las compañías.
  */
-export const csvDeTabla = (tabla: Tabla): string =>
-  `${BOM}${filasExportadas(tabla)
-    .map((fila) => fila.map(celdaCsv).join(";"))
-    .join("\r\n")}\r\n`;
+export const csvDeTabla = (tabla: Tabla): string => {
+  const filas = [
+    cabecera(tabla),
+    ...tabla.secciones.flatMap((seccion) =>
+      seccion.filas.map((fila) => [
+        seccion.titulo,
+        fila.magnitud,
+        fila.unidad ?? "",
+        ...tabla.companias.map((_, i) => valorCsv(fila.valores[i])),
+        fila.fuente,
+        fila.fecha,
+      ]),
+    ),
+  ];
+  return `${BOM}${filas.map((fila) => fila.map(celdaCsv).join(";")).join("\r\n")}\r\n`;
+};
 
 /** El nombre del fichero, sin extensión: «estaciones-base-pedralbes». */
 export const nombreDeFichero = (zona: string): string =>
