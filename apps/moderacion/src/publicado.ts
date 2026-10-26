@@ -99,11 +99,6 @@ export const loPublicadoDesde = (leer: LeerPublicado) =>
           const texto = yield* leer(FICHERO_VIGENTE);
           if (Option.isNone(texto)) return Option.none();
           const vigente = yield* resultado(decodificarVigente(texto.value), FICHERO_VIGENTE);
-          if (vigente.resumen === undefined) {
-            return yield* noDisponible(
-              `${vigente.version} no tiene resumen nacional: es del formato 4 o anterior`,
-            );
-          }
           const contenido = yield* obligatorio(vigente.resumen);
           return Option.some(
             yield* resultado(leerResumen(contenido, vigente.version), vigente.resumen),
@@ -122,8 +117,7 @@ export const loPublicadoDesde = (leer: LeerPublicado) =>
        */
       const situar = (leido: ResumenLeido, clave: string) =>
         Effect.gen(function* () {
-          const partes = leido.claves ?? [];
-          const parte = partes[parteDeClave(clave, partes.length)];
+          const parte = leido.claves[parteDeClave(clave, leido.claves.length)];
           if (parte === undefined) return Option.none<ClaveSituada>();
           const indice = yield* resultado(leerParteDelIndice(yield* obligatorio(parte)), parte);
           return Option.fromNullishOr(situarEnLaParte(indice, clave));

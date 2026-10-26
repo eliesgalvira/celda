@@ -240,7 +240,7 @@ const publicado = (entorno: Entorno, clave: string) =>
     const almacen = yield* contenidoDe(entorno.almacen);
     const vigente = Result.getOrThrow(decodificarVigente(almacen.get(FICHERO_VIGENTE) ?? ""));
     const resumen = Result.getOrThrow(
-      leerResumen(almacen.get(vigente.resumen ?? "") ?? "", vigente.version),
+      leerResumen(almacen.get(vigente.resumen) ?? "", vigente.version),
     );
     for (const provincia of resumen.provincias) {
       if (provincia.fichero === undefined) continue;

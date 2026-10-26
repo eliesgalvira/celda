@@ -41,6 +41,9 @@ const en = (clave: string, longitud: number, latitud: number): EmplazamientoLeid
   estado: "verificado",
   companias: ["movistar"],
   barrio: null,
+  lote: 0,
+  provincia: "08",
+  municipio: null,
 });
 
 /** Generador pseudoaleatorio con semilla (mulberry32): las pruebas dan siempre lo mismo. */

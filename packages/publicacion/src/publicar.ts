@@ -553,9 +553,9 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
 /**
  * Con `vigente.json` ya en la versión de los datos, rehace su resumen con la cobertura de ahora,
  * sin leer la instantánea. Si sale el mismo, no escribe nada; si no, escribe el nuevo resumen y
- * `vigente.json`. `undefined` si la vigente no tiene un resumen legible del formato 8, o si es
- * de antes de las combinaciones de compañías (ADR 0026): entonces hay que publicarla entera. Las
- * capas y los lotes salen iguales y no se vuelven a escribir; cambian el resumen y `vigente.json`.
+ * `vigente.json`. `undefined` si la vigente no tiene un resumen legible: entonces hay que
+ * publicarla entera. Las capas y los lotes salen iguales y no se vuelven a escribir; cambian el
+ * resumen y `vigente.json`.
  */
 const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
   vigente: Vigente,
@@ -563,12 +563,10 @@ const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
   zonas: ZonasDePublicacion,
 ) {
   const almacen = yield* AlmacenDeFicheros;
-  if (vigente.resumen === undefined) return undefined;
   const contenido = yield* almacen.leer(vigente.resumen);
   if (Option.isNone(contenido)) return undefined;
   const leido = leerResumen(contenido.value, vigente.version);
   if (Result.isFailure(leido)) return undefined;
-  if (leido.success.provincias.some((p) => p.combinaciones === undefined)) return undefined;
   const resumen = yield* resumenNombrado(
     {
       version: vigente.version,

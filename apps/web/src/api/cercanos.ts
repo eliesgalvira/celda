@@ -9,7 +9,7 @@ import {
   distanciaMetros,
   type Coordenada,
 } from "../../../../packages/dominio/src/area.ts";
-import { LICENCIAS, type Licencias } from "../../../../packages/dominio/src/licencias.ts";
+import type { Licencias } from "../../../../packages/dominio/src/licencias.ts";
 import type {
   CapaDeProvincia,
   ProvinciaDelResumen,
@@ -61,7 +61,7 @@ export const cercanos = (
   resumen: ResumenLeido,
   capas: ReadonlyArray<CapaDeProvincia>,
   origen: string,
-  licencias: Licencias = LICENCIAS,
+  licencias: Licencias,
 ): RespuestaDeCercanos => {
   const punto: Coordenada = { longitud: consulta.longitud, latitud: consulta.latitud };
   const nombreDeProvincia = new Map(resumen.provincias.map((p) => [p.codigo, p.nombre]));
@@ -81,8 +81,8 @@ export const cercanos = (
       ) {
         continue;
       }
-      const lote = capa.lotes[emplazamiento.lote ?? -1] ?? "";
-      const codigoMunicipio = emplazamiento.municipio ?? null;
+      const lote = capa.lotes[emplazamiento.lote] ?? "";
+      const codigoMunicipio = emplazamiento.municipio;
       dentro.push({
         clave: emplazamiento.clave,
         posicion: emplazamiento.posicion,

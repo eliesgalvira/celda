@@ -1,5 +1,6 @@
 import { cajaDe, type Rectangulo } from "@celda/dominio/area";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
+import { combinacionesDe } from "@celda/dominio/filtro";
 import type {
   CapaDeProvincia,
   MunicipioDeCapa,
@@ -78,6 +79,7 @@ const fila = (
     cubierta: suyos.length > 0,
     barrido: suyos.length > 0 ? NOCHE : null,
     fichero: suyos.length > 0 ? `provincias/${codigo}/prueba.json` : undefined,
+    combinaciones: combinacionesDe(suyos),
   };
 };
 
@@ -91,6 +93,7 @@ export const RESUMEN: ResumenLeido = {
     fila("17", "Girona", { longitud: 2.7, latitud: 41.95 }),
     fila("25", "Lleida", { longitud: 1, latitud: 42 }),
   ],
+  claves: [],
   puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
 };
 
@@ -288,6 +291,7 @@ export const espanaDePrueba = (conResumen?: ResumenLeido) => {
       cubierta: suyos.length > 0,
       barrido: suyos.length > 0 ? NOCHE : null,
       fichero: suyos.length > 0 ? `provincias/${codigo}/prueba.json` : undefined,
+      combinaciones: combinacionesDe(suyos),
     };
   };
   const resumen: ResumenLeido = conResumen ?? {

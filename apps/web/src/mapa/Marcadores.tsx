@@ -44,7 +44,6 @@ import {
   NIVEL_DE_PROVINCIAS,
 } from "../capa/nacional.ts";
 import type { FichaPedida } from "../ficha/servicio.ts";
-import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import {
   CON,
   type EstadoDelTraspaso,
@@ -458,12 +457,7 @@ export function Marcadores(props: MarcadoresProps) {
       const seVeAhora = seVe();
       const pedidas = [...(ahora?.elementos.values() ?? [])].flatMap((elemento) =>
         elemento.tipo === "emplazamiento" && seVeAhora(proyectarAhora(elemento.posicion))
-          ? [
-              {
-                clave: elemento.emplazamiento.clave,
-                provincia: elemento.emplazamiento.provincia ?? PROVINCIA_DE_LOS_ENLACES_VIEJOS,
-              },
-            ]
+          ? [elemento.emplazamiento]
           : [],
       );
       return pedidas.length > 0
@@ -637,17 +631,6 @@ export function Marcadores(props: MarcadoresProps) {
     });
   };
 
-  /** La provincia en cuya capa va un emplazamiento que se ve. */
-  const provinciaDe = (clave: string): string => {
-    for (const estado of props.provincias.values()) {
-      if (estado.tipo !== "lista") continue;
-      if (estado.provincia.capa.emplazamientos.some((e) => e.clave === clave)) {
-        return estado.provincia.codigo;
-      }
-    }
-    return PROVINCIA_DE_LOS_ENLACES_VIEJOS;
-  };
-
   return (
     <>
       <Show when={moviendose()}>
@@ -681,7 +664,7 @@ export function Marcadores(props: MarcadoresProps) {
         ocultos={ocultos()}
         tamano={tamano()}
         seleccionada={props.seleccionada}
-        alSeleccionar={(clave) => props.alSeleccionar(clave, provinciaDe(clave))}
+        alSeleccionar={(clave, provincia) => props.alSeleccionar(clave, provincia)}
         alAbrir={abrir}
         traspaso={traspasoDeCapa()}
       />

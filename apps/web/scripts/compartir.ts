@@ -35,7 +35,6 @@ const tema = opciones.join(" ") === "--tema claro" ? "claro" : "oscuro";
 const leer = (fichero: string): string => NodeFS.readFileSync(`${origen}/${fichero}`, "utf8");
 
 const vigente = Result.getOrThrow(decodificarVigente(leer(FICHERO_VIGENTE)));
-if (vigente.resumen === undefined) throw new Error(`${vigente.version} no tiene resumen nacional`);
 const resumen = Result.getOrThrow(leerResumen(leer(vigente.resumen), vigente.version));
 const puntos = Result.getOrThrow(leerPuntos(leer(resumen.puntos)));
 

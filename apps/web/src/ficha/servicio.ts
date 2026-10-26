@@ -81,7 +81,7 @@ const loteDe = (provincia: ProvinciaCargada, clave: string): Option.Option<strin
     const { capa } = provincia;
     lotes = new Map(
       capa.emplazamientos.flatMap((e) => {
-        const fichero = capa.lotes[e.lote ?? -1];
+        const fichero = capa.lotes[e.lote];
         return fichero === undefined ? [] : [[e.clave, fichero] as const];
       }),
     );

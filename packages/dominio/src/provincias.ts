@@ -396,10 +396,7 @@ export const generarCapaDeProvincia = (capa: {
 export interface MunicipioDeCapa {
   readonly codigo: string;
   readonly nombre: string;
-  /**
-   * Dónde va su hexágono: junto a su capital, entre sus emplazamientos (`puntoDeMunicipio`). Las
-   * capas de antes de las capitales traen la etiqueta de su recinto.
-   */
+  /** Dónde va su hexágono: junto a su capital, entre sus emplazamientos (`puntoDeMunicipio`). */
   readonly etiqueta: Coordenada;
   /** `null` si el padrón aún no lo tiene. */
   readonly habitantes: number | null;
@@ -671,8 +668,8 @@ export const FuentesDeZonas = Schema.Struct({
   barrios: FuenteDeBarrios,
   municipios: FuenteDeMunicipios,
   padron: FuenteDePoblacion,
-  /** Las capitales con que va cada municipio a su punto. Los resúmenes de antes no la llevan. */
-  capitales: Schema.optionalKey(FuenteDeCapitales),
+  /** Las capitales con que va cada municipio a su punto. */
+  capitales: FuenteDeCapitales,
 });
 export type FuentesDeZonas = typeof FuentesDeZonas.Type;
 
@@ -701,19 +698,15 @@ const ColumnasDelResumen = Schema.Struct({
      * Cuántos emplazamientos tiene con cada combinación de compañías, en pares de la máscara de la
      * columna `companias` de la capa y su número: `[1, 523, 3, 120]` son 523 solo de Movistar y
      * 120 de Movistar y Vodafone. Con ellas el mapa cuenta de lejos con cualquier filtro de
-     * compañías sin descargar ninguna capa (ADR 0026). Los resúmenes de antes no las llevan.
+     * compañías sin descargar ninguna capa (ADR 0026).
      */
-    combinaciones: Schema.optionalKey(Schema.Array(Schema.Array(Schema.Int))),
+    combinaciones: Schema.Array(Schema.Array(Schema.Int)),
   }),
-  /**
-   * Las partes del índice de claves, en el orden de `parteDeClave`. Los resúmenes publicados antes
-   * del índice no lo llevan.
-   */
-  claves: Schema.optionalKey(Schema.Array(Schema.String)),
-  /** Los puntos de toda España de la versión (`ficheroDePuntos`). Desde el formato 8. */
+  /** Las partes del índice de claves, en el orden de `parteDeClave`. */
+  claves: Schema.Array(Schema.String),
+  /** Los puntos de toda España de la versión (`ficheroDePuntos`). */
   puntos: Schema.String,
 });
-type ColumnasDelResumen = typeof ColumnasDelResumen.Type;
 
 const ResumenEnJson = Schema.fromJsonString(ColumnasDelResumen);
 const codificarResumen = Schema.encodeSync(ResumenEnJson);
@@ -730,11 +723,8 @@ export interface DatosDeProvincia {
   readonly companias: ReadonlyArray<Compania>;
   /** Su capa, o `undefined` si no tiene emplazamientos. */
   readonly fichero: string | undefined;
-  /**
-   * Cuántos emplazamientos tiene con cada combinación de compañías (ADR 0026), o `undefined` en
-   * un resumen de antes de que se publicaran.
-   */
-  readonly combinaciones?: Combinaciones | undefined;
+  /** Cuántos emplazamientos tiene con cada combinación de compañías (ADR 0026). */
+  readonly combinaciones: Combinaciones;
 }
 
 /** Una fila del resumen nacional. */
@@ -774,25 +764,17 @@ export const combinacionesDeSituados = (
 const enPares = (combinaciones: Combinaciones): ReadonlyArray<number> =>
   [...combinaciones].sort(([a], [b]) => a - b).flat();
 
-/**
- * Las combinaciones de una fila del resumen, o `undefined` si están mal formadas o no cuadran con
- * su número: entonces el mapa cuenta como con un resumen de antes, sin ellas.
- */
+/** Las combinaciones de una fila del resumen, o `undefined` si no suman su número. */
 const dePares = (
   pares: ReadonlyArray<number>,
   emplazamientos: number,
 ): Combinaciones | undefined => {
-  if (pares.length % 2 !== 0) return undefined;
   const combinaciones = new Map<number, number>();
-  let suma = 0;
-  for (let i = 0; i < pares.length; i += 2) {
-    const mascara = pares[i] ?? -1;
-    const cuantos = pares[i + 1] ?? -1;
-    if (mascara < 0 || cuantos < 0 || combinaciones.has(mascara)) return undefined;
-    combinaciones.set(mascara, cuantos);
-    suma += cuantos;
+  for (let i = 0; i + 1 < pares.length; i += 2) {
+    combinaciones.set(pares[i] ?? 0, pares[i + 1] ?? 0);
   }
-  return suma === emplazamientos ? combinaciones : undefined;
+  const suma = [...combinaciones.values()].reduce((a, b) => a + b, 0);
+  return pares.length % 2 === 0 && suma === emplazamientos ? combinaciones : undefined;
 };
 
 /** Las compañías con algún emplazamiento entre unos cuantos, en el orden de la capa. */
@@ -815,7 +797,7 @@ export const generarResumen = (resumen: {
   readonly provincias: ReadonlyArray<DatosDeProvincia>;
   readonly cuadros: ReadonlyMap<string, ReadonlySet<Cuadro>>;
   /** Las partes del índice de claves (`generarIndiceDeClaves`), ya nombradas. */
-  readonly claves?: ReadonlyArray<string> | undefined;
+  readonly claves: ReadonlyArray<string>;
   /** Los puntos de toda España (`generarPuntos`), ya nombrados. */
   readonly puntos: string;
 }): string => {
@@ -823,7 +805,7 @@ export const generarResumen = (resumen: {
   const estados = provincias.map((p) =>
     coberturaDeProvincia(resumen.cuadros.get(p.codigo) ?? new Set(), p.caja, resumen.cobertura),
   );
-  const sinIndice: ColumnasDelResumen = {
+  return codificarResumen({
     version: resumen.version,
     formato: FORMATO_PROVINCIAS,
     fuentes: resumen.fuentes,
@@ -839,23 +821,11 @@ export const generarResumen = (resumen: {
       cubierta: estados.map((e) => e.cubierta),
       barrido: estados.map((e) => e.barrido),
       fichero: provincias.map((p) => p.fichero ?? null),
+      combinaciones: provincias.map((p) => enPares(p.combinaciones)),
     },
+    claves: resumen.claves,
     puntos: resumen.puntos,
-  };
-  // Un resumen de antes de las combinaciones, rehecho con otra cobertura, sigue sin ellas.
-  const combinaciones = provincias.map((p) => p.combinaciones);
-  const conCombinaciones: ColumnasDelResumen = combinaciones.every((c) => c !== undefined)
-    ? {
-        ...sinIndice,
-        provincias: { ...sinIndice.provincias, combinaciones: combinaciones.map(enPares) },
-      }
-    : sinIndice;
-  // Un resumen de antes del índice, rehecho con otra cobertura, sigue sin él.
-  return codificarResumen(
-    resumen.claves === undefined
-      ? conCombinaciones
-      : { ...conCombinaciones, claves: resumen.claves },
-  );
+  });
 };
 
 /** El resumen nacional, leído. */
@@ -867,8 +837,8 @@ export interface ResumenLeido {
   readonly cobertura: ReadonlyArray<ZonaBarrida>;
   /** Por código INE. */
   readonly provincias: ReadonlyArray<ProvinciaDelResumen>;
-  /** Las partes del índice de claves, o nada en un resumen de antes del índice. */
-  readonly claves?: ReadonlyArray<string> | undefined;
+  /** Las partes del índice de claves. */
+  readonly claves: ReadonlyArray<string>;
   /** Los puntos de toda España (`ficheroDePuntos`). */
   readonly puntos: string;
 }
@@ -907,20 +877,19 @@ export const leerResumen = (
         p.cubierta,
         p.barrido,
         p.fichero,
+        p.combinaciones,
       ];
       if (columnas.some((columna) => columna.length !== n)) {
         return descuadrada("el resumen está descuadrado");
       }
-      // Unas combinaciones que no cuadran no tumban el resumen: se cuenta como sin ellas.
-      const pares = p.combinaciones?.length === n ? p.combinaciones : undefined;
-      const combinaciones = p.codigo.map((_, i) =>
-        pares === undefined ? undefined : dePares(pares[i] ?? [], p.emplazamientos[i] ?? 0),
-      );
-      const conTodas = combinaciones.every((c) => c !== undefined);
-      const provincias = p.codigo.map((codigo, i): ProvinciaDelResumen => {
+      const provincias: Array<ProvinciaDelResumen> = [];
+      for (const [i, codigo] of p.codigo.entries()) {
+        const combinaciones = dePares(p.combinaciones[i] ?? [], p.emplazamientos[i] ?? 0);
+        if (combinaciones === undefined) {
+          return descuadrada(`las combinaciones de ${codigo} no suman sus emplazamientos`);
+        }
         const caja = p.caja[i];
-        const suyas = conTodas ? combinaciones[i] : undefined;
-        const fila: ProvinciaDelResumen = {
+        provincias.push({
           codigo,
           nombre: p.nombre[i] ?? "",
           etiqueta: { longitud: p.lon[i] ?? 0, latitud: p.lat[i] ?? 0 },
@@ -930,9 +899,9 @@ export const leerResumen = (
           cubierta: p.cubierta[i] ?? false,
           barrido: p.barrido[i] ?? null,
           fichero: p.fichero[i] ?? undefined,
-        };
-        return suyas === undefined ? fila : { ...fila, combinaciones: suyas };
-      });
+          combinaciones,
+        });
+      }
       return Result.succeed({
         version: c.version,
         fecha: fecha.value,

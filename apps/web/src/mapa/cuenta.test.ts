@@ -63,6 +63,7 @@ const RESUMEN: ResumenLeido = {
     provincia("22", "Huesca", [emplazamiento("h", "22125", ["orange"])], false),
     provincia("42", "Soria", [], false),
   ],
+  claves: [],
   puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
 };
 const PUNTOS = puntosDePrueba([{ codigo: "08", emplazamientos: EN_BARCELONA }]).puntos;

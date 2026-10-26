@@ -177,11 +177,6 @@ export const planearCapas = Effect.fn("Vercel.planearCapas")(function* (origen: 
     });
   }
   const { version, resumen: ficheroResumen } = vigente.success;
-  if (ficheroResumen === undefined) {
-    return yield* new CapasIncompletas({
-      motivo: `${version} no tiene resumen nacional: es del formato 4 o anterior`,
-    });
-  }
 
   const resumen = yield* leerEntero(origen, ficheroResumen);
   const leido = leerResumen(resumen, version);

@@ -1,7 +1,6 @@
 import { contiene } from "@celda/dominio/area";
 import {
   claveDeFiltro,
-  combinacionesDe,
   type FiltroDeCompanias,
   separarPorPapel,
   SIN_FILTRO,
@@ -397,25 +396,16 @@ describe("niveles de municipios grandes", () => {
 });
 
 describe("filtro de compañías (ADR 0026)", () => {
-  const { resumen: sinCombinaciones, provincias } = espanaDePrueba();
-  /** El resumen de prueba con las combinaciones de cada provincia, como lo publica la noche. */
-  const resumen: ResumenLeido = {
-    ...sinCombinaciones,
-    provincias: sinCombinaciones.provincias.map((p) => {
-      const estado = provincias.get(p.codigo);
-      const suyos = estado?.tipo === "lista" ? estado.provincia.capa.emplazamientos : [];
-      return { ...p, combinaciones: combinacionesDe(suyos) };
-    }),
-  };
+  const { resumen, provincias } = espanaDePrueba();
   const cargadas = [...provincias.values()].flatMap((e) =>
     e.tipo === "lista" ? [e.provincia] : [],
   );
   const todos = cargadas.flatMap((p) => p.capa.emplazamientos);
-  const agrupadorCon = (filtro: FiltroDeCompanias, conResumen: ResumenLeido = resumen) =>
-    crearAgrupadorNacional(conResumen, provincias, {
+  const agrupadorCon = (filtro: FiltroDeCompanias) =>
+    crearAgrupadorNacional(resumen, provincias, {
       filtro,
       agrupaciones: new Map(
-        cargadas.map((p) => [p.codigo, agrupacionEnHilo(p, conResumen, filtro)] as const),
+        cargadas.map((p) => [p.codigo, agrupacionEnHilo(p, resumen, filtro)] as const),
       ),
     });
 
@@ -480,21 +470,20 @@ describe("filtro de compañías (ADR 0026)", () => {
   });
 
   it("de lejos, cada provincia cuenta lo del filtro por sus combinaciones", () => {
-    const hexagonos = (filtro: FiltroDeCompanias, conResumen = resumen) =>
-      provinciasDe(agrupadorCon(filtro, conResumen).escena(6, MUNDO)).map((p) => [
+    const hexagonos = (filtro: FiltroDeCompanias) =>
+      provinciasDe(agrupadorCon(filtro).escena(6, MUNDO)).map((p) => [
         p.provincia.codigo,
         p.cuantos,
         p.deLaRed,
-        p.sinFiltrar,
       ]);
     const deLaProvincia = (codigo: string, filtro: FiltroDeCompanias) => {
       const suyos = todos.filter((e) => e.provincia === codigo);
       const { propios, redUsada } = separarPorPapel(suyos, filtro);
-      return [codigo, propios.length, redUsada.length, false];
+      return [codigo, propios.length, redUsada.length];
     };
     assert.deepStrictEqual(hexagonos(["digi"]), [
       deLaProvincia("08", ["digi"]),
-      ["25", 0, 0, false],
+      ["25", 0, 0],
       deLaProvincia("50", ["digi"]),
     ]);
     // Zaragoza no tiene Digi: su hexágono dice 0, y los de Movistar salen aparte.
@@ -507,12 +496,6 @@ describe("filtro de compañías (ADR 0026)", () => {
         ["50", 217],
       ],
     );
-    // Con un resumen de antes de las combinaciones no se puede contar: cuenta todas y lo dice.
-    assert.deepStrictEqual(hexagonos(["digi"], sinCombinaciones), [
-      ["08", 70, 0, true],
-      ["25", 0, 0, true],
-      ["50", 217, 0, true],
-    ]);
   });
 
   it("las zonas cuentan solo lo del filtro, y un municipio sin bastantes deja de ser zona", () => {

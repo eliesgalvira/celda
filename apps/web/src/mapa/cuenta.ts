@@ -26,8 +26,7 @@ export interface FuentesDeLaCuenta {
 
 /**
  * La cuenta de un sitio, o `undefined` si no se sabe: un municipio sin los puntos ni la capa de su
- * provincia, una provincia de la que Celda aún no tiene nada o un resumen de antes de las
- * combinaciones de compañías con un filtro puesto.
+ * provincia o una provincia de la que Celda aún no tiene nada.
  *
  * - España, por el resumen: la suma de sus provincias, parcial si alguna no está cubierta.
  * - Una provincia, por el resumen.
@@ -40,10 +39,11 @@ export const cuentaDelSitio = (
 ): CuentaDelSitio | undefined => {
   const { resumen, filtro } = fuentes;
   if (sitio.tipo === "espana") {
-    const cuentas = resumen.provincias.map((p) => cuentaDeProvincia(p, filtro));
-    if (cuentas.some((c) => c.sinFiltrar)) return undefined;
     return {
-      cuantos: cuentas.reduce((suma, c) => suma + c.cuantos, 0),
+      cuantos: resumen.provincias.reduce(
+        (suma, p) => suma + cuentaDeProvincia(p, filtro).cuantos,
+        0,
+      ),
       parcial: resumen.provincias.some((p) => !p.cubierta),
     };
   }
@@ -54,8 +54,7 @@ export const cuentaDelSitio = (
   }
   const parcial = !provincia.cubierta;
   if (sitio.tipo === "provincia") {
-    const cuenta = cuentaDeProvincia(provincia, filtro);
-    return cuenta.sinFiltrar ? undefined : { cuantos: cuenta.cuantos, parcial };
+    return { cuantos: cuentaDeProvincia(provincia, filtro).cuantos, parcial };
   }
   if (fuentes.puntos !== undefined) {
     const tramos = tramosDeMunicipio(fuentes.puntos, sitio.codigo);

@@ -76,10 +76,7 @@ const sinQuitado = (grabada: FuenteGrabada): FuenteGrabada => ({
 const publicadoEn = (almacen: ReadonlyMap<string, string>) => {
   const vigente = decodificarVigente(almacen.get(FICHERO_VIGENTE) ?? "");
   if (Result.isFailure(vigente)) return assert.fail("vigente.json no se entiende");
-  const resumen = leerResumen(
-    almacen.get(vigente.success.resumen ?? "") ?? "",
-    vigente.success.version,
-  );
+  const resumen = leerResumen(almacen.get(vigente.success.resumen) ?? "", vigente.success.version);
   if (Result.isFailure(resumen)) return assert.fail(resumen.failure.message);
   const emplazamientos: Array<{
     readonly emplazamiento: EmplazamientoLeido;
@@ -91,7 +88,7 @@ const publicadoEn = (almacen: ReadonlyMap<string, string>) => {
     if (Result.isFailure(capa)) return assert.fail(capa.failure.message);
     for (const emplazamiento of capa.success.emplazamientos) {
       const fichas = leerLoteDeProvincia(
-        almacen.get(capa.success.lotes[emplazamiento.lote ?? -1] ?? "") ?? "",
+        almacen.get(capa.success.lotes[emplazamiento.lote] ?? "") ?? "",
         provincia.codigo,
       );
       if (Result.isFailure(fichas)) return assert.fail(fichas.failure.message);
@@ -259,7 +256,7 @@ describe("ingesta nocturna (base SQLite, almacén en carpeta, registro oficial g
           const publicado = publicadoEn(almacen);
           assert.deepStrictEqual(yield* entorno.escritos, [
             ...antes,
-            publicado.vigente.resumen ?? "",
+            publicado.vigente.resumen,
             FICHERO_VIGENTE,
           ]);
           assert.strictEqual(publicado.vigente.version, VERSION);

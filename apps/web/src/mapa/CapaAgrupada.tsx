@@ -67,7 +67,7 @@ export interface CapaAgrupadaProps {
   /** Clave del emplazamiento con la ficha abierta: su marcador se resalta. */
   readonly seleccionada: string | null;
   /** Se ha pulsado el marcador de un emplazamiento: se abre su ficha. */
-  readonly alSeleccionar: (clave: string) => void;
+  readonly alSeleccionar: (clave: string, provincia: string) => void;
   /** Se ha pulsado una agrupación o una zona: hay que acercar el mapa a ella. */
   readonly alAbrir: (elemento: ElementoAbrible) => void;
   /**
@@ -169,7 +169,7 @@ export function CapaAgrupada(props: CapaAgrupadaProps) {
             tamano={props.tamano ?? "normal"}
             filtro={props.filtro ?? SIN_FILTRO}
             seleccionada={props.seleccionada}
-            alSeleccionar={(clave) => props.alSeleccionar(clave)}
+            alSeleccionar={(clave, provincia) => props.alSeleccionar(clave, provincia)}
             alAbrir={(elemento) => props.alAbrir(elemento)}
           />
         )}
@@ -187,7 +187,7 @@ function MarcadorPintado(props: {
   readonly tamano: TamanoDeMarcador;
   readonly filtro: FiltroDeCompanias;
   readonly seleccionada: string | null;
-  readonly alSeleccionar: (clave: string) => void;
+  readonly alSeleccionar: (clave: string, provincia: string) => void;
   readonly alAbrir: (elemento: ElementoAbrible) => void;
 }) {
   const punto = createMemo(() => {
@@ -232,7 +232,9 @@ function MarcadorPintado(props: {
             )}
             seleccionado={props.seleccionada === suelto().emplazamiento.clave}
             movimiento={props.pintado.movimiento}
-            onClick={() => props.alSeleccionar(suelto().emplazamiento.clave)}
+            onClick={() =>
+              props.alSeleccionar(suelto().emplazamiento.clave, suelto().emplazamiento.provincia)
+            }
           />
         )}
       </Match>

@@ -36,6 +36,9 @@ const EMPLAZAMIENTOS: ReadonlyArray<EmplazamientoLeido> = [
     estado: "verificado",
     companias: ["movistar"],
     barrio: "10",
+    lote: 0,
+    provincia: "08",
+    municipio: null,
   },
   {
     clave: "b",
@@ -43,6 +46,9 @@ const EMPLAZAMIENTOS: ReadonlyArray<EmplazamientoLeido> = [
     estado: "corregido",
     companias: ["vodafone", "orange"],
     barrio: "10",
+    lote: 0,
+    provincia: "08",
+    municipio: null,
   },
   {
     clave: "c",
@@ -50,6 +56,9 @@ const EMPLAZAMIENTOS: ReadonlyArray<EmplazamientoLeido> = [
     estado: "verificado",
     companias: ["digi"],
     barrio: "68",
+    lote: 0,
+    provincia: "08",
+    municipio: null,
   },
 ];
 

@@ -179,7 +179,7 @@ const fichasPublicadas = (entorno: Entorno) =>
     const vigente = decodificarVigente(almacen.get(FICHERO_VIGENTE) ?? "");
     if (Result.isFailure(vigente)) return assert.fail("vigente.json no se entiende");
     const resumen = leerResumen(
-      almacen.get(vigente.success.resumen ?? "") ?? "",
+      almacen.get(vigente.success.resumen) ?? "",
       vigente.success.version,
     );
     if (Result.isFailure(resumen)) return assert.fail(resumen.failure.message);

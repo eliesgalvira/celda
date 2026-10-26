@@ -525,22 +525,29 @@ describe("resumen nacional", () => {
       emplazamientos: suyos.length,
       companias: companiasDeSituados(suyos),
       fichero: suyos.length === 0 ? undefined : ficheroDeCapaDeProvincia(p.codigo, p.codigo),
+      combinaciones: combinacionesDeSituados(suyos),
     };
   });
-
-  it("empieza por la versión y trae cada provincia con su número, su caja y su capa", () => {
-    const contenido = generarResumen({
+  const CLAVES = ["claves/0.json", "claves/1.json"];
+  const resumen = (cambios: Partial<Parameters<typeof generarResumen>[0]> = {}) =>
+    generarResumen({
       version: VERSION,
       fuentes: FUENTES,
       cobertura: [CAJA_DE_BARCELONA],
       provincias,
       cuadros: CUADROS,
+      claves: CLAVES,
       puntos: PUNTOS,
+      ...cambios,
     });
+
+  it("empieza por la versión y trae cada provincia con su número, su caja y su capa", () => {
+    const contenido = resumen();
     assert.isTrue(contenido.startsWith(`{"version":"${VERSION}","formato":${FORMATO_PROVINCIAS},`));
     const leido = leerResumen(contenido, VERSION);
     if (Result.isFailure(leido)) return assert.fail(leido.failure.message);
     assert.strictEqual(leido.success.fecha, NOCHE);
+    assert.deepStrictEqual(leido.success.claves, CLAVES);
     assert.deepStrictEqual(
       leido.success.provincias.map((p) => [
         p.codigo,
@@ -564,15 +571,7 @@ describe("resumen nacional", () => {
   });
 
   it("una provincia está cubierta si se han barrido todos sus cuadros con datos", () => {
-    const contenido = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [CAJA_DE_BARCELONA],
-      provincias,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
-    const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
+    const leido = Result.getOrUndefined(leerResumen(resumen(), VERSION));
     assert.deepStrictEqual(
       leido?.provincias.map((p) => [p.codigo, p.cubierta, p.barrido]),
       [
@@ -584,17 +583,7 @@ describe("resumen nacional", () => {
     );
 
     const conCataluna = Result.getOrUndefined(
-      leerResumen(
-        generarResumen({
-          version: VERSION,
-          fuentes: FUENTES,
-          cobertura: [CAJA_DE_BARCELONA, CATALUNA],
-          provincias,
-          cuadros: CUADROS,
-          puntos: PUNTOS,
-        }),
-        VERSION,
-      ),
+      leerResumen(resumen({ cobertura: [CAJA_DE_BARCELONA, CATALUNA] }), VERSION),
     );
     assert.deepStrictEqual(
       conCataluna?.provincias.map((p) => [p.codigo, p.cubierta, p.barrido]),
@@ -611,15 +600,7 @@ describe("resumen nacional", () => {
     const conBilingue = provincias.map((p) =>
       p.codigo === "43" ? { ...p, codigo: "46", nombre: "València/Valencia" } : p,
     );
-    const contenido = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [CAJA_DE_BARCELONA],
-      provincias: conBilingue,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
-    const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
+    const leido = Result.getOrUndefined(leerResumen(resumen({ provincias: conBilingue }), VERSION));
     if (leido === undefined) return assert.fail("no se lee");
     assert.deepStrictEqual(
       leido.provincias.map((p) => p.nombre),
@@ -636,85 +617,27 @@ describe("resumen nacional", () => {
   });
 
   it("se puede rehacer desde el leído con otra cobertura sin volver a los datos", () => {
-    const antes = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [CAJA_DE_BARCELONA],
-      provincias,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
-    const leido = Result.getOrUndefined(leerResumen(antes, VERSION));
+    const leido = Result.getOrUndefined(leerResumen(resumen(), VERSION));
     if (leido === undefined) return assert.fail("no se lee");
-    const rehecho = generarResumen({
-      version: VERSION,
-      fuentes: leido.fuentes,
-      cobertura: [CATALUNA],
-      provincias: leido.provincias,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
     assert.strictEqual(
-      rehecho,
-      generarResumen({
-        version: VERSION,
-        fuentes: FUENTES,
+      resumen({
+        fuentes: leido.fuentes,
         cobertura: [CATALUNA],
-        provincias,
-        cuadros: CUADROS,
-        puntos: PUNTOS,
+        provincias: leido.provincias,
+        claves: leido.claves,
       }),
+      resumen({ cobertura: [CATALUNA] }),
     );
   });
 
-  it("lleva las partes del índice de claves, y se rehace con ellas", () => {
-    const claves = ["claves/0.json", "claves/1.json"];
-    const contenido = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [CAJA_DE_BARCELONA],
-      provincias,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-      claves,
-    });
-    const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
-    assert.deepStrictEqual(leido?.claves, claves);
-    // Uno de antes del índice se sigue leyendo, sin él.
-    const sinIndice = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [CAJA_DE_BARCELONA],
-      provincias,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
-    assert.notInclude(sinIndice, '"claves"');
-    assert.isUndefined(Result.getOrUndefined(leerResumen(sinIndice, VERSION))?.claves);
-  });
-
-  // Las combinaciones de compañías no suben el formato (ADR 0026): la web de antes las ignora, la
-  // de ahora lee los resúmenes de antes sin ellas, y unas que no cuadran no tumban el resumen.
-  const conCombinaciones = provincias.map((p) => ({
-    ...p,
-    combinaciones: combinacionesDeSituados(situados.get(p.codigo) ?? []),
-  }));
-
   it("lleva por provincia cuántos hay con cada combinación de compañías", () => {
-    const contenido = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [CAJA_DE_BARCELONA],
-      provincias: conCombinaciones,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
+    const contenido = resumen();
     // Barcelona: Movistar y Orange (5), Vodafone (2) y Orange (4), uno de cada.
     assert.include(contenido, '"combinaciones":[[2,1,4,1,5,1],[1,1,8,1],[2,1]]');
     const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
     if (leido === undefined) return assert.fail("no se lee");
     assert.deepStrictEqual(
-      leido.provincias.map((p) => [p.codigo, [...(p.combinaciones ?? [])]]),
+      leido.provincias.map((p) => [p.codigo, [...p.combinaciones]]),
       [
         [
           "08",
@@ -741,87 +664,18 @@ describe("resumen nacional", () => {
         redUsada: 0,
       },
     );
-    // Rehecho desde el leído con otra cobertura, las conserva.
-    const rehecho = generarResumen({
-      version: VERSION,
-      fuentes: leido.fuentes,
-      cobertura: [CATALUNA],
-      provincias: leido.provincias,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
-    assert.strictEqual(
-      rehecho,
-      generarResumen({
-        version: VERSION,
-        fuentes: FUENTES,
-        cobertura: [CATALUNA],
-        provincias: conCombinaciones,
-        cuadros: CUADROS,
-        puntos: PUNTOS,
-      }),
-    );
   });
 
-  it("un resumen sin combinaciones no las lleva, y si alguna provincia no las tiene no las lleva ninguna", () => {
-    const sinEllas = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [CAJA_DE_BARCELONA],
-      provincias,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
-    assert.notInclude(sinEllas, '"combinaciones"');
-    const leido = Result.getOrUndefined(leerResumen(sinEllas, VERSION));
-    assert.deepStrictEqual(
-      leido?.provincias.map((p) => p.combinaciones),
-      [undefined, undefined, undefined],
+  it("unas combinaciones que no suman el número de su provincia no se dan por buenas", () => {
+    const contenido = resumen().replace(
+      '"combinaciones":[[2,1,4,1,5,1]',
+      '"combinaciones":[[2,1,4,1,5,9]',
     );
-    // Si alguna provincia no las tiene, no las lleva ninguna.
-    const aMedias = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [],
-      provincias: [...conCombinaciones.slice(0, 2), ...provincias.slice(2)],
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
-    assert.notInclude(aMedias, '"combinaciones"');
-  });
-
-  it("unas combinaciones que no cuadran con su número se leen como si no estuvieran", () => {
-    const contenido = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [],
-      provincias: conCombinaciones,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    }).replace('"combinaciones":[[2,1,4,1,5,1]', '"combinaciones":[[2,1,4,1,5,9]');
-    const leido = leerResumen(contenido, VERSION);
-    if (Result.isFailure(leido)) return assert.fail(leido.failure.message);
-    assert.deepStrictEqual(
-      leido.success.provincias.map((p) => [p.emplazamientos, p.combinaciones]),
-      [
-        [3, undefined],
-        [2, undefined],
-        [1, undefined],
-      ],
-    );
+    assert.isTrue(Result.isFailure(leerResumen(contenido, VERSION)));
   });
 
   it("uno de otra versión no se da por bueno", () => {
-    const contenido = generarResumen({
-      version: VERSION,
-      fuentes: FUENTES,
-      cobertura: [],
-      provincias,
-      cuadros: CUADROS,
-      puntos: PUNTOS,
-    });
-    const leido = leerResumen(contenido, versionDeCapa(NOCHE + 1000));
-    assert.isTrue(Result.isFailure(leido));
+    assert.isTrue(Result.isFailure(leerResumen(resumen(), versionDeCapa(NOCHE + 1000))));
   });
 
   it("los nombres de la versión llevan su sello", () => {

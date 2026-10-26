@@ -1,6 +1,6 @@
 # Capa por provincias con resumen nacional, indexada en un Worker
 
-Estado: aceptada el 29/09/2026 con el #43, que la implementa de punta a punta. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 3). Cambia el formato de la capa y la parte del ADR 0004 que reservaba PMTiles para más de 20.000 emplazamientos. Lo que se decidió al implementarla va en «Cómo quedó». Cambiada en parte por el [ADR 0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md) (03/10/2026): el resumen nacional se dibuja hasta z9 en lugar de z8, el hexágono de cada provincia va en su centro visual y el mapa ya no enseña ausencias. El 20/10/2026, con la retirada del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md), salen las celdas y la vista de interferencia, y con ellas lo de «Provincias vecinas»: el mapa ya no pide provincias que no se ven.
+Estado: aceptada el 29/09/2026 con el #43, que la implementa de punta a punta. Sale de la investigación de la ampliación a toda España (`docs/investigacion/espana.md`, apartado 3). Cambia el formato de la capa y la parte del ADR 0004 que reservaba PMTiles para más de 20.000 emplazamientos. Lo que se decidió al implementarla va en «Cómo quedó». Cambiada en parte por el [ADR 0024](0024-datos-discretos-y-rotulos-sobre-los-datos.md) (03/10/2026): el resumen nacional se dibuja hasta z9 en lugar de z8, el hexágono de cada provincia va en su centro visual y el mapa ya no enseña ausencias. El 20/10/2026, con la retirada del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md), salen las celdas y la vista de interferencia, y con ellas lo de «Provincias vecinas»: el mapa ya no pide provincias que no se ven. El 26/10/2026 el índice de claves, las combinaciones de compañías y las capitales pasan a ser obligatorios en el resumen, y el resumen en `vigente.json`: la web solo lee el formato 8, que siempre los lleva.
 
 ## Contexto
 
@@ -69,7 +69,7 @@ Medidas del 29/09/2026. La tabla completa y cómo repetirlas están en `docs/pat
 
 ## Cómo quedó (#45)
 
-**Un enlace sin provincia.** El resumen lista las partes de un índice de claves: 16 ficheros `claves/<huella>.json`, y en cada uno las claves que le tocan por FNV-1a (`parteDeClave`), agrupadas por provincia. La web que abre `?emplazamiento=<clave>` sin `provincia` lee la parte de esa clave, pone la provincia en la dirección con `replaceState` y pide solo esa provincia. Si ninguna la tiene, la ficha dice que el emplazamiento no existe. Con un resumen de antes del índice, el enlace se da por de Barcelona, como antes.
+**Un enlace sin provincia.** El resumen lista las partes de un índice de claves: 16 ficheros `claves/<huella>.json`, y en cada uno las claves que le tocan por FNV-1a (`parteDeClave`), agrupadas por provincia. La web que abre `?emplazamiento=<clave>` sin `provincia` lee la parte de esa clave, pone la provincia en la dirección con `replaceState` y pide solo esa provincia. Si ninguna la tiene, la ficha dice que el emplazamiento no existe.
 
 Descarté meter la provincia en la clave: la clave es la identidad del emplazamiento en las fichas, las correcciones y los enlaces ya compartidos, y el código de un emplazamiento del registro no siempre empieza por su provincia: 1.739 de las 5.049 claves de Cataluña no lo hacen. La otra opción era un índice entero en el resumen. Medido con gzip el 29/09/2026:
 

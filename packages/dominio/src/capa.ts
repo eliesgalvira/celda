@@ -69,15 +69,12 @@ export const emplazamientoDeCapa = (
 export interface EmplazamientoLeido extends EmplazamientoDeCapa {
   /** Código del barrio, o `null` si el emplazamiento queda fuera de Barcelona. */
   readonly barrio: string | null;
-  /**
-   * El lote de fichas de su versión en el que está su ficha. Desde el formato 4. En el 5 es la
-   * posición del fichero en la lista de lotes de su provincia.
-   */
-  readonly lote?: number;
-  /** Código INE de la provincia en cuya capa va. Desde el formato 5. */
-  readonly provincia?: string;
-  /** Código INE del municipio, o `null` en un territorio compartido. Desde el formato 5. */
-  readonly municipio?: string | null;
+  /** La posición del fichero de su ficha en la lista de lotes de su provincia. */
+  readonly lote: number;
+  /** Código INE de la provincia en cuya capa va. */
+  readonly provincia: string;
+  /** Código INE del municipio, o `null` en un territorio compartido. */
+  readonly municipio: string | null;
 }
 
 /** La capa publicada que dice el backend: su versión, dónde está y cuántos emplazamientos lleva. */
@@ -92,8 +89,7 @@ export type CapaPublicada = typeof CapaPublicada.Type;
 
 /**
  * La publicación vigente: el único fichero del almacén que cambia. Dice qué versión tiene que
- * cargar la web y, desde el formato 5, su resumen nacional (ADR 0016), que dice dónde está la
- * capa de cada provincia. Se escribe el último, cuando ya están todos los demás.
+ * cargar la web y su resumen nacional (ADR 0016), que dice dónde está la capa de cada provincia. Se escribe el último, cuando ya están todos los demás.
  */
 export const Vigente = Schema.Struct({
   version: Schema.String,
@@ -102,16 +98,13 @@ export const Vigente = Schema.Struct({
   emplazamientos: Schema.Int,
   /** Cuántos lotes de fichas tiene la versión. */
   lotes: Schema.Int,
-  /**
-   * Desde el formato 5, el resumen nacional de la versión (`ficheroDeResumen`). Sin él, la
-   * versión es de una capa entera del formato 4 o anterior.
-   */
-  resumen: Schema.optionalKey(Schema.String),
+  /** El resumen nacional de la versión (`ficheroDeResumen`). */
+  resumen: Schema.String,
   /**
    * Qué parte de lo publicado es CC0 y de quién es el resto, con los créditos que piden los
-   * terceros (ADR 0021). Las publicaciones de antes del buzón (#56) no lo llevan.
+   * terceros (ADR 0021).
    */
-  licencias: Schema.optionalKey(Licencias),
+  licencias: Licencias,
 });
 export type Vigente = typeof Vigente.Type;
 

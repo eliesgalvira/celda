@@ -201,7 +201,7 @@ const leerVigente = (entorno: Entorno) =>
     const vigente = decodificarVigente((yield* leer(entorno, FICHERO_VIGENTE)) ?? "");
     if (Result.isFailure(vigente)) return assert.fail("vigente.json no se entiende");
     const resumen = leerResumen(
-      (yield* leer(entorno, vigente.success.resumen ?? "")) ?? "",
+      (yield* leer(entorno, vigente.success.resumen)) ?? "",
       vigente.success.version,
     );
     if (Result.isFailure(resumen)) return assert.fail(resumen.failure.message);
@@ -227,9 +227,9 @@ const leerVigente = (entorno: Entorno) =>
 /** Las fichas del lote de un emplazamiento leído. */
 const fichasDelLote = (entorno: Entorno, leida: Leida, e: EmplazamientoLeido) =>
   Effect.gen(function* () {
-    const capa = leida.capas.get(e.provincia ?? "");
-    const fichero = capa?.lotes[e.lote ?? -1] ?? "";
-    const fichas = leerLoteDeProvincia((yield* leer(entorno, fichero)) ?? "", e.provincia ?? "");
+    const capa = leida.capas.get(e.provincia);
+    const fichero = capa?.lotes[e.lote] ?? "";
+    const fichas = leerLoteDeProvincia((yield* leer(entorno, fichero)) ?? "", e.provincia);
     if (Result.isFailure(fichas)) return assert.fail(`${e.clave}: ${fichas.failure.message}`);
     return fichas.success;
   });
@@ -260,7 +260,7 @@ const comprobarPuntos = (entorno: Entorno, leida: Leida) =>
 
 const comprobarIndice = (entorno: Entorno, leida: Leida) =>
   Effect.gen(function* () {
-    const partes = leida.resumen.claves ?? [];
+    const partes = leida.resumen.claves;
     for (const e of leida.emplazamientos) {
       const parte = partes[parteDeClave(e.clave, partes.length)] ?? "";
       const indice = leerParteDelIndice((yield* leer(entorno, parte)) ?? "");
@@ -342,7 +342,7 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
           // fichero.
           const escritos = yield* entorno.escritos;
           const leida = yield* leerVigente(entorno);
-          const partes = leida.resumen.claves ?? [];
+          const partes = leida.resumen.claves;
           assert.lengthOf(partes, PARTES_DEL_INDICE);
           assert.strictEqual(escritos.length, publicada.lotes + 2 + new Set(partes).size + 1 + 3);
           assert.strictEqual(escritos.at(-4), leida.resumen.puntos);
@@ -510,7 +510,14 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         yield* fs.makeDirectory(entorno.almacen, { recursive: true });
-        const posterior = `{"version":"${versionDeCapa(NOCHE + DIA)}","fecha":${NOCHE + DIA},"emplazamientos":1,"lotes":1}`;
+        const posterior = codificarVigente({
+          version: versionDeCapa(NOCHE + DIA),
+          fecha: NOCHE + DIA,
+          emplazamientos: 1,
+          lotes: 1,
+          resumen: "resumen@posterior.json",
+          licencias: LICENCIAS,
+        });
         yield* fs.writeFileString(path.join(entorno.almacen, FICHERO_VIGENTE), posterior);
 
         const fallo = yield* Effect.flip(publicar(entorno));
@@ -521,32 +528,8 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
     ),
   );
 
-  it.effect("una vigente del formato 4 con la misma versión se vuelve a publicar en el 5", () =>
-    conEntorno((entorno) =>
-      Effect.gen(function* () {
-        yield* TestClock.setTime(NOCHE);
-        yield* ingerir(entorno, yield* muestraCampusNord);
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        yield* fs.makeDirectory(entorno.almacen, { recursive: true });
-        const version = versionDeCapa(NOCHE);
-        yield* fs.writeFileString(
-          path.join(entorno.almacen, FICHERO_VIGENTE),
-          `{"version":"${version}","fecha":${NOCHE},"emplazamientos":19,"lotes":3}`,
-        );
-        yield* fs.writeFileString(path.join(entorno.almacen, `${version}.json`), "{}");
-
-        const publicada = yield* publicar(entorno);
-        assert.strictEqual(publicada.tipo, "publicada");
-        const leida = yield* leerVigente(entorno);
-        assert.strictEqual(leida.vigente.version, version);
-        assert.isAbove(leida.emplazamientos.length, 0);
-      }),
-    ),
-  );
-
   it.effect(
-    "una vigente sin combinaciones de compañías se vuelve a publicar con ellas, sin tocar las capas",
+    "una vigente con un resumen que no se lee se vuelve a publicar entera, sin tocar las capas",
     () =>
       conEntorno((entorno) =>
         Effect.gen(function* () {
@@ -556,25 +539,24 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
           const leida = yield* leerVigente(entorno);
           for (const p of leida.resumen.provincias) {
             const suyos = leida.capas.get(p.codigo)?.emplazamientos.length ?? 0;
-            const suma = [...(p.combinaciones ?? [])].reduce((n, [, cuantos]) => n + cuantos, 0);
+            const suma = [...p.combinaciones].reduce((n, [, cuantos]) => n + cuantos, 0);
             assert.strictEqual(suma, suyos, p.codigo);
           }
 
-          // Lo que dejó una publicación de antes de las combinaciones (ADR 0026): el mismo
-          // resumen sin su columna, con otro nombre, y la vigente apuntando a él.
+          // El mismo resumen sin las combinaciones, con otro nombre, y la vigente apuntando a él.
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
-          const conEllas = (yield* leer(entorno, leida.vigente.resumen ?? "")) ?? "";
+          const conEllas = (yield* leer(entorno, leida.vigente.resumen)) ?? "";
           const sinEllas = conEllas.replace(/,"combinaciones":\[(?:\[[0-9,]*\],?)*\]/u, "");
           assert.notStrictEqual(sinEllas, conEllas);
-          const viejo = leida.vigente.resumen?.replace(
+          const viejo = leida.vigente.resumen.replace(
             /\.[0-9a-f]+\.json$/u,
             ".0000000000000000.json",
           );
-          yield* fs.writeFileString(path.join(entorno.almacen, viejo ?? ""), sinEllas);
+          yield* fs.writeFileString(path.join(entorno.almacen, viejo), sinEllas);
           yield* fs.writeFileString(
             path.join(entorno.almacen, FICHERO_VIGENTE),
-            codificarVigente({ ...leida.vigente, resumen: viejo ?? "" }),
+            codificarVigente({ ...leida.vigente, resumen: viejo }),
           );
           const antes = (yield* entorno.escritos).length;
 
@@ -587,7 +569,6 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
           );
           const despues = yield* leerVigente(entorno);
           assert.strictEqual(despues.vigente.resumen, leida.vigente.resumen);
-          assert.isTrue(despues.resumen.provincias.every((p) => p.combinaciones !== undefined));
         }),
       ),
   );
