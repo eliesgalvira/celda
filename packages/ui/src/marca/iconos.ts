@@ -24,7 +24,8 @@ import {
   type Tono,
   trayecto,
 } from "./geometria.ts";
-import { ALTERNATIVO_AL_COMPARTIR, COMPARTIR, SITIO, TITULO_AL_COMPARTIR } from "./compartir.ts";
+import { estiloDeLaPagina, HOJA_DE_LA_PAGINA } from "../api/pagina.ts";
+import { ALTERNATIVO_AL_COMPARTIR, COMPARTIR, SITIO, TITULO_AL_COMPARTIR } from "./alCompartir.ts";
 import { codificarPng } from "./png.ts";
 import { type Capa, rasterizar, type Rgb } from "./raster.ts";
 
@@ -193,6 +194,8 @@ export const ficherosDeIconos = (css: string): ReadonlyMap<string, string | Uint
   ficheros.set(`${carpeta}/${ICONOS.png192}`, png("tapiz", 192));
   ficheros.set(`${carpeta}/${ICONOS.png512}`, png("tapiz", 512));
   ficheros.set(`${carpeta}/${ICONOS.manifiesto}`, manifiesto(colores));
+  // La hoja de la página de la API (`../api/pagina.ts`): la función de Vercel no puede leer el tema.
+  ficheros.set(`${carpeta}/${HOJA_DE_LA_PAGINA}`, estiloDeLaPagina(css));
   return ficheros;
 };
 
@@ -202,7 +205,9 @@ const tipoDe = (ruta: string): string =>
     ? "image/svg+xml"
     : ruta.endsWith(".png")
       ? "image/png"
-      : "application/manifest+json";
+      : ruta.endsWith(".css")
+        ? "text/css"
+        : "application/manifest+json";
 
 /**
  * Las etiquetas Open Graph, que leen WhatsApp, Telegram, LinkedIn y las demás, y la de X, que con

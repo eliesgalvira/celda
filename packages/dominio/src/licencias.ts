@@ -33,6 +33,10 @@ export const Licencias = Schema.Struct({
 });
 export type Licencias = typeof Licencias.Type;
 
+/** El crédito que pide el registro oficial a quien reutiliza sus datos, con la fecha de consulta. */
+export const CREDITO_DEL_REGISTRO_OFICIAL =
+  "Origen de los datos: Ministerio para la Transformación Digital y de la Función Pública (Infoantenas)";
+
 /** La tabla del ADR 0021, tal como la lleva lo publicado. */
 export const LICENCIAS: Licencias = {
   propios: {
@@ -46,8 +50,7 @@ export const LICENCIAS: Licencias = {
       datos: "Registro oficial de estaciones (Infoantenas)",
       condiciones:
         "Ley 37/2007 y condiciones generales de reutilización del Ministerio: citar la fuente, no desnaturalizar los datos, dar la fecha y no sugerir que el Ministerio apoya este uso.",
-      credito:
-        "Origen de los datos: Ministerio para la Transformación Digital y de la Función Pública (Infoantenas)",
+      credito: CREDITO_DEL_REGISTRO_OFICIAL,
       enlace: "https://geoportal.minetur.gob.es/VCTEL/vcne.do",
     },
     {

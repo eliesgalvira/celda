@@ -12,6 +12,7 @@ import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
 import { atender } from "./emplazamientos.ts";
+import { DOCUMENTACION } from "./http.ts";
 import { Publicacion, publicacionDelOrigen } from "./publicacion.ts";
 import { type ProvinciaDePrueba, publicacionDePrueba } from "./pruebas.ts";
 import { CercanosEnJson, ErrorEnJson } from "./respuesta.ts";
@@ -23,6 +24,9 @@ const V2 = versionDeCapa(NOCHE + 30 * 86_400_000);
 
 /** El punto de las consultas: en el límite entre Madrid, al norte, y Toledo, al sur. */
 const PUNTO = "lat=40.1&lon=-3.7";
+/** La cabecera `Accept` con que Chrome abre una página. */
+const NAVEGADOR =
+  "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
 
 const MADRID: ProvinciaDePrueba = {
   codigo: "28",
@@ -76,11 +80,13 @@ const conOrigen = (inicial: ReadonlyMap<string, string>) =>
       Effect.service(Publicacion),
       publicacionDelOrigen.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, cliente))),
     );
-    const consultar = (busqueda: string) =>
+    const consultar = (busqueda: string, accept?: string) =>
       Effect.gen(function* () {
         yield* Ref.set(peticiones, []);
+        const consulta = busqueda === "" ? "" : `?${busqueda}`;
+        const cabeceras = new Headers(accept === undefined ? {} : { accept });
         const respuesta = yield* Effect.provideService(
-          atender(new Request(`${WEB}/api/emplazamientos?${busqueda}`)),
+          atender(new Request(`${WEB}/api/emplazamientos${consulta}`, { headers: cabeceras })),
           Publicacion,
           publicacion,
         );
@@ -118,6 +124,99 @@ describe("GET /api/emplazamientos", () => {
       }),
   );
 
+  it.effect("solo con lat y lon busca a 1 km, como el enlace que se comparte", () =>
+    Effect.gen(function* () {
+      const { consultar } = yield* conOrigen(HOY);
+      const { respuesta, texto } = yield* consultar(PUNTO);
+      assert.strictEqual(respuesta.status, 200);
+      const { consulta, emplazamientos } = comoRespuesta(texto);
+      assert.strictEqual(consulta.radioMetros, 1000);
+      assert.strictEqual(consulta.limite, 20);
+      assert.isAbove(emplazamientos.length, 0);
+    }),
+  );
+
+  it.effect("cada error de la consulta enlaza la documentación", () =>
+    Effect.gen(function* () {
+      const { consultar } = yield* conOrigen(HOY);
+      for (const busqueda of ["", "lat=40.1", "lat=40.1&lon=-3.7&radius=5km", "lat=91&lon=0"]) {
+        const { respuesta, texto } = yield* consultar(busqueda);
+        assert.strictEqual(respuesta.status, 400);
+        assert.isTrue(
+          comoError(texto).mensaje.endsWith(`La documentación está en ${DOCUMENTACION}`),
+        );
+      }
+    }),
+  );
+
+  it.effect("un navegador que abre la ruta sin parámetros recibe la página que la explica", () =>
+    Effect.gen(function* () {
+      const { consultar } = yield* conOrigen(HOY);
+      const { respuesta, texto, peticiones } = yield* consultar("", NAVEGADOR);
+      assert.strictEqual(respuesta.status, 200);
+      assert.strictEqual(respuesta.headers.get("Content-Type"), "text/html; charset=utf-8");
+      assert.strictEqual(respuesta.headers.get("Vary"), "Accept");
+      assert.strictEqual(respuesta.headers.get("Cache-Control"), "private, max-age=300");
+      assert.include(texto, "<h1>La API de Celda</h1>");
+      assert.include(texto, DOCUMENTACION);
+      assert.deepStrictEqual(peticiones, []);
+    }),
+  );
+
+  it.effect("curl sin parámetros recibe el error en JSON, con la documentación", () =>
+    Effect.gen(function* () {
+      const { consultar } = yield* conOrigen(HOY);
+      const { respuesta, texto } = yield* consultar("", "*/*");
+      assert.strictEqual(respuesta.status, 400);
+      assert.strictEqual(respuesta.headers.get("Vary"), "Accept");
+      assert.isTrue(comoError(texto).mensaje.startsWith("Faltan lat y lon"));
+      assert.include(comoError(texto).mensaje, DOCUMENTACION);
+    }),
+  );
+
+  it.effect("con parámetros contesta en JSON aunque pida como un navegador", () =>
+    Effect.gen(function* () {
+      const { consultar } = yield* conOrigen(HOY);
+      const { respuesta, texto } = yield* consultar(PUNTO, NAVEGADOR);
+      assert.strictEqual(respuesta.status, 200);
+      assert.strictEqual(respuesta.headers.get("Content-Type"), "application/json; charset=utf-8");
+      assert.strictEqual(respuesta.headers.get("Vary"), "Accept");
+      assert.isAbove(comoRespuesta(texto).emplazamientos.length, 0);
+      const malo = yield* consultar("lat=91&lon=0", NAVEGADOR);
+      assert.strictEqual(malo.respuesta.status, 400);
+      assert.strictEqual(comoError(malo.texto).error, "consulta-no-valida");
+    }),
+  );
+
+  it.effect("un radio sin unidad son metros, como en el comando del vídeo", () =>
+    Effect.gen(function* () {
+      const { consultar } = yield* conOrigen(HOY);
+      const { respuesta, texto } = yield* consultar(`${PUNTO}&radio=10000`);
+      assert.strictEqual(respuesta.status, 200);
+      assert.strictEqual(comoRespuesta(texto).consulta.radioMetros, 10_000);
+      assert.deepStrictEqual(claves(texto).slice(0, 4), ["t1", "m1", "t2", "m2"]);
+      assert.isUndefined(comoRespuesta(texto).aviso);
+    }),
+  );
+
+  it.effect("un radio sin unidad que parece de kilómetros y no encuentra nada lo avisa", () =>
+    Effect.gen(function* () {
+      const { consultar } = yield* conOrigen(HOY);
+      const corto = yield* consultar(`${PUNTO}&radio=15`);
+      assert.strictEqual(corto.respuesta.status, 200);
+      assert.strictEqual(comoRespuesta(corto.texto).total, 0);
+      assert.strictEqual(
+        comoRespuesta(corto.texto).aviso,
+        "El radio va en metros: radio=15 busca a 15 m. Para kilómetros, escribe la unidad, como radio=15km.",
+      );
+      const conUnidad = yield* consultar(`${PUNTO}&radio=15m`);
+      assert.isUndefined(comoRespuesta(conUnidad.texto).aviso);
+      const encuentra = yield* consultar(`${PUNTO}&radio=99`);
+      assert.isAbove(comoRespuesta(encuentra.texto).total, 0);
+      assert.isUndefined(comoRespuesta(encuentra.texto).aviso);
+    }),
+  );
+
   it.effect("con un límite devuelve los más cercanos y dice que hay más", () =>
     Effect.gen(function* () {
       const { consultar } = yield* conOrigen(HOY);
@@ -139,9 +238,10 @@ describe("GET /api/emplazamientos", () => {
           "movistar",
           "orange",
         ]);
-        const lejos = yield* consultar(`${PUNTO}&radio=2000&compania=Orange,digi`);
+        const lejos = yield* consultar(`${PUNTO}&radio=2km&compania=Orange,digi`);
         assert.deepStrictEqual(claves(lejos.texto), ["t1", "t2", "t3"]);
         assert.deepStrictEqual(comoRespuesta(lejos.texto).consulta.companias, ["orange", "digi"]);
+        assert.strictEqual(comoRespuesta(lejos.texto).consulta.radioMetros, 2000);
       }),
   );
 
@@ -239,11 +339,13 @@ describe("GET /api/emplazamientos", () => {
   it.effect("una consulta que no vale contesta 400 sin pedir nada al origen", () =>
     Effect.gen(function* () {
       const { consultar } = yield* conOrigen(HOY);
-      const { respuesta, texto, peticiones } = yield* consultar("lat=40.1&lon=-3.7&radio=20000");
+      const { respuesta, texto, peticiones } = yield* consultar("lat=40.1&lon=-3.7&radio=60km");
       assert.strictEqual(respuesta.status, 400);
       assert.deepStrictEqual(comoError(texto), {
         error: "consulta-no-valida",
-        mensaje: "radio tiene que ser un número entero de metros, de 1 a 10000.",
+        mensaje:
+          "radio tiene que ser una distancia en metros (1500) o con su unidad (1500m o 1.5km), de 1 m a 50km. " +
+          `La documentación está en ${DOCUMENTACION}`,
       });
       assert.deepStrictEqual(peticiones, []);
       assert.strictEqual(respuesta.headers.get("Access-Control-Allow-Origin"), "*");

@@ -1,6 +1,6 @@
 # API pública: una función de Vercel que lee la publicación vigente de su propio origen
 
-Estado: aceptada el 25/10/2026, con la decisión del usuario del mismo día. Añade una función pública a lo que fijó el ADR 0008, que solo dejaba al público leer ficheros estáticos. La documentación para quien la use está en [docs/api.md](../api.md).
+Estado: aceptada el 25/10/2026, con la decisión del usuario del mismo día. Revisada el 26/10/2026 tras ver a agentes de IA usarla: el radio admite unidad, avisa cuando parece de kilómetros y llega a 50 km, `/api` tiene un índice y la documentación separa el acimut de las medidas de la orientación de las antenas (ver «Revisión del 26/10/2026»). Añade una función pública a lo que fijó el ADR 0008, que solo dejaba al público leer ficheros estáticos. La documentación para quien la use está en [docs/api.md](../api.md).
 
 ## Contexto
 
@@ -35,6 +35,34 @@ El plan Hobby de Vercel incluye al mes un millón de invocaciones de funciones, 
 - **Medido el 25/10/2026 contra la publicación `sitios@2026-10-21T22:30:02Z`**, desde fuera de Vercel:
   - La capa de provincia más grande, Madrid, pesa 217 KB y se lee con su esquema en 18 ms; el resumen, 14 KB, en 4 ms.
   - Una instancia nueva hace tres peticiones para una consulta en Madrid (`vigente.json`, el resumen y la capa de Madrid) y tardó 0,5 s. La misma consulta después, ninguna petición y 1 ms. Un círculo de 10 km en Soria pidió tres capas, Soria, La Rioja y Navarra, porque sus cajas lo tocan. Un punto entre Madrid y Toledo devuelve emplazamientos de las dos.
+
+## Revisión del 26/10/2026
+
+Para el vídeo de la API se pidió a agentes de IA de verdad que la usaran, con la documentación delante. Fallaron en cinco sitios:
+
+- **El radio en kilómetros.** Varios mandaron `radio=15` pensando en 15 km. La API lo leía como 15 m y contestaba con 0 emplazamientos, sin ningún aviso. Rechazar el número sin unidad lo habría evitado, pero habría roto las consultas ya escritas, como la del vídeo de la API (`radio=10000`). Así que un número sin unidad siguen siendo metros, `radio` admite además la unidad (`1500m`, `1.5km`, también `15 km` con espacio), y un radio sin unidad de menos de 100 que no encuentra nada trae un `aviso` que explica que el radio va en metros y propone `radio=15km`, con un 200. La respuesta repite el radio pasado a metros, en `consulta.radioMetros`. Sin `radio`, se sigue buscando a 1 km: el enlace que se comparte, `/api/emplazamientos?lat=40.4169&lon=-3.7035`, contesta igual que antes.
+- **10 km se quedaban cortos fuera de las ciudades.** Un agente hizo ocho consultas más para buscar más lejos. El radio llega ahora a 50 km, con los mismos 50 resultados como mucho, los más cercanos.
+- **El acimut de las medidas de exposición.** Un agente leyó `acimutGrados` como la dirección en que apuntan las antenas. Es la del punto de medida visto desde la estación base. `docs/api.md` tiene ahora un apartado que lo explica con un ejemplo y dice que ninguna fuente pública da la orientación de las antenas.
+- **Nombres de parámetros adivinados**, como `companias` o `municipio`. El mensaje de error ya les decía qué se acepta, y a la segunda acertaban. La consulta sigue siendo estricta, sin alias: un nombre parecido a uno que existe, como `companias` o `radius`, recibe en el error el que buscaba, y `municipio` o `provincia` reciben que no hay ese filtro.
+- **`/api` sin más contestaba con la página del mapa** y un 200, porque la reescritura a `index.html` solo dejaba fuera `/api/`. Ahora `/api` devuelve un índice en JSON con las rutas, un ejemplo de cada una y el enlace a la documentación (`apps/web/api/index.ts`), y una ruta de `/api/` que no existe contesta 404 en JSON (`apps/web/api/no-encontrada.ts`, al que la manda `vercel.json`).
+
+Además, la dirección se comparte en X, y quien la abre desde el navegador no debe encontrarse un error:
+
+- **Sin parámetros, un navegador recibe una página.** `/api` y `/api/emplazamientos` miran la cabecera `Accept`: si pide `text/html` con más calidad que `application/json`, contestan con una página que explica cómo usar la API con un agente de IA, con un ejemplo de pregunta y de consulta, los parámetros, el límite y lo que hay que citar. El HTML está en `packages/ui/src/api/pagina.ts`, con los valores de `tema.css` copiados y una prueba que los compara. `curl` (`*/*`) y los agentes que piden JSON siguen recibiendo JSON: el índice en `/api`, y en `/api/emplazamientos` un 400 que dice que faltan `lat` y `lon`.
+- **Con parámetros, siempre JSON.** Algunos agentes piden con la cabecera `Accept` de un navegador, y tienen que recibir los datos o el error en JSON.
+- **`Vary: Accept` en todas las respuestas de la API.** Las de esas dos rutas sin parámetros, la página y el índice, llevan `Cache-Control: private, max-age=300`: solo las guarda el navegador, para que ninguna caché compartida dé la página a un agente o el JSON a un navegador aunque no respete `Vary`.
+- **El mensaje de cada 400 acaba con el enlace a `docs/api.md`.**
+
+En el código, la caché por instancia de `publicacion.ts` pasa a `Cache` de Effect, que comparte la lectura entre consultas simultáneas y no guarda las que fallan; antes era un `Map` con un semáforo por clave escrito a mano. `atender` es un `Effect.fn` que convierte los errores de la consulta y de la publicación en respuestas con `catchTags`, y las respuestas JSON salen de un solo sitio (`http.ts`).
+
+Medido el 26/10/2026 contra `sitios@2026-10-21T22:30:02Z`, desde fuera de Vercel y con la función en local:
+
+| Consulta | Peticiones de una instancia nueva | Tiempo | Repetida |
+|---|---|---|---|
+| El enlace del post, sin radio (1 km en Madrid) | 3: `vigente.json`, el resumen y Madrid | 255 ms | 0 peticiones, 2 ms |
+| 50 km alrededor de la Puerta del Sol | 7: `vigente.json`, el resumen y cinco provincias (Cuenca, Guadalajara, Madrid, Segovia y Toledo) | 217 ms, 3.886 dentro del radio, 26 KB de respuesta con 50 | 0 peticiones, 3 ms |
+| 50 km alrededor de la plaza de Cataluña | 4 provincias (Barcelona, Girona, Lleida y Tarragona) | 121 ms con el resumen ya leído | — |
+| Medinaceli, Orange, 15 km | 2 provincias (Guadalajara y Soria) | 107 ms con el resumen ya leído | — |
 
 ## Consecuencias
 

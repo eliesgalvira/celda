@@ -1,5 +1,5 @@
 /**
- * Lo que contesta `GET /api/emplazamientos` (ADR 0032), como esquemas: la función escribe el
+ * Lo que contesta la API (ADR 0032), como esquemas: la función escribe el
  * cuerpo con ellos y las pruebas lo leen con ellos. `docs/api.md` lo explica campo a campo.
  *
  * Importa el dominio por ruta relativa, como el resto de `src/api` (ver `consulta.ts`).
@@ -42,7 +42,8 @@ export const RespuestaDeCercanos = Schema.Struct({
   consulta: Schema.Struct({
     lat: Schema.Finite,
     lon: Schema.Finite,
-    radio: Schema.Int,
+    /** El radio de la consulta, pasado a metros. */
+    radioMetros: Schema.Int,
     companias: Schema.Array(Compania),
     limite: Schema.Int,
   }),
@@ -51,15 +52,28 @@ export const RespuestaDeCercanos = Schema.Struct({
   /** Si hay más dentro del radio que los devueltos: se devuelven los más cercanos. */
   hayMas: Schema.Boolean,
   emplazamientos: Schema.Array(EmplazamientoCercano),
+  /** Solo si hace falta: por ejemplo, un radio sin unidad que parece de kilómetros y no encuentra nada. */
+  aviso: Schema.optionalKey(Schema.String),
   licencias: Licencias,
 });
 export type RespuestaDeCercanos = typeof RespuestaDeCercanos.Type;
 
 export const RespuestaDeError = Schema.Struct({
-  error: Schema.Literals(["consulta-no-valida", "datos-no-disponibles"]),
+  error: Schema.Literals(["consulta-no-valida", "datos-no-disponibles", "no-encontrado"]),
   mensaje: Schema.String,
 });
 export type RespuestaDeError = typeof RespuestaDeError.Type;
 
+/** Lo que contesta `GET /api`: qué hay y dónde está la documentación. */
+export const IndiceDeLaApi = Schema.Struct({
+  descripcion: Schema.String,
+  documentacion: Schema.String,
+  rutas: Schema.Array(
+    Schema.Struct({ ruta: Schema.String, descripcion: Schema.String, ejemplo: Schema.String }),
+  ),
+});
+export type IndiceDeLaApi = typeof IndiceDeLaApi.Type;
+
 export const CercanosEnJson = Schema.fromJsonString(RespuestaDeCercanos);
+export const IndiceEnJson = Schema.fromJsonString(IndiceDeLaApi);
 export const ErrorEnJson = Schema.fromJsonString(RespuestaDeError);
