@@ -33,11 +33,14 @@ const variantesHexagonoAviso = cva("hexagono size-3 shrink-0", {
   defaultVariants: { tono: "espera" },
 });
 
-/** Dónde va el aviso: flotando sobre el mapa o dentro de un panel, a todo su ancho. */
+/**
+ * Dónde va el aviso: flotando sobre el mapa o dentro de un panel, a todo su ancho. Flotante vuelve
+ * a recibir los toques, porque las capas que lo ponen sobre el mapa los dejan pasar al mapa.
+ */
 export const variantesEncajeAviso = cva("", {
   variants: {
     encaje: {
-      flotante: "w-[min(26rem,calc(100vw-2rem))] drop-shadow-panel",
+      flotante: "pointer-events-auto w-[min(26rem,calc(100vw-2rem))] drop-shadow-panel",
       panel: "w-full",
     },
   },
