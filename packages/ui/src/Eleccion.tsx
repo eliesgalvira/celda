@@ -155,7 +155,6 @@ export interface InterruptorProps {
   readonly descripcion?: JSX.Element;
   readonly encendido: boolean;
   readonly alCambiar: (encendido: boolean) => void;
-  readonly disabled?: boolean;
 }
 
 /**
@@ -177,8 +176,7 @@ export function Interruptor(props: InterruptorProps) {
         "group/interruptor grid min-h-11 cursor-pointer grid-cols-[1fr_auto] items-start gap-x-3 gap-y-1 " +
         "bg-superficie-alta px-4 py-3 text-base font-semibold " +
         "shadow-[inset_0_0_0_1.5px_var(--linea)] hover:bg-fondo " +
-        "has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-foco " +
-        "has-disabled:cursor-default has-disabled:opacity-60"
+        "has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-foco"
       }
     >
       <span id={idEtiqueta}>{props.etiqueta}</span>
@@ -188,7 +186,6 @@ export function Interruptor(props: InterruptorProps) {
         checked={props.encendido}
         aria-checked={props.encendido ? "true" : "false"}
         aria-labelledby={idEtiqueta}
-        disabled={props.disabled}
         aria-describedby={props.descripcion === undefined ? undefined : id}
         onChange={(evento) => props.alCambiar(evento.currentTarget.checked)}
         class="sr-only"

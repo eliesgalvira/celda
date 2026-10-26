@@ -42,8 +42,6 @@
   --tinta: oklch(29.9% 0.005 121.8);
   --tinta-suave: oklch(46% 0.011 106.8);
   --tinta-invertida: oklch(94.1% 0.009 84.6);
-  /* Texto secundario sobre la superficie invertida, como el término técnico de una explicación */
-  --tinta-invertida-suave: oklch(80% 0.012 87.5);
   /* La explicación de un término: invertida en el claro; en el oscuro, una superficie oscura más
      clara que el panel, para no deslumbrar */
   --superficie-explicacion: oklch(29.9% 0.005 121.8);
@@ -224,7 +222,6 @@
     --tinta: oklch(93% 0.008 87.5);
     --tinta-suave: oklch(76% 0.01 100);
     --tinta-invertida: oklch(25% 0.006 100);
-    --tinta-invertida-suave: oklch(40% 0.011 100);
     --superficie-explicacion: oklch(37% 0.009 100);
     --tinta-explicacion: oklch(93% 0.008 87.5);
     --tinta-explicacion-suave: oklch(80% 0.01 100);
@@ -353,7 +350,6 @@
   --color-tinta: var(--tinta);
   --color-tinta-suave: var(--tinta-suave);
   --color-tinta-invertida: var(--tinta-invertida);
-  --color-tinta-invertida-suave: var(--tinta-invertida-suave);
   --color-superficie-explicacion: var(--superficie-explicacion);
   --color-tinta-explicacion: var(--tinta-explicacion);
   --color-tinta-explicacion-suave: var(--tinta-explicacion-suave);

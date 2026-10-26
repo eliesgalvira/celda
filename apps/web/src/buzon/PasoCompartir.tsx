@@ -1,13 +1,8 @@
 import type { AportacionCompartible } from "@celda/dominio/aportacion";
 import { DEDICACION_CC0 } from "@celda/dominio/licencias";
 import { Aviso } from "@celda/ui/Aviso.tsx";
-import { Boton } from "@celda/ui/Boton.tsx";
-import {
-  AccionesDelPaso,
-  DedicacionCc0,
-  QueSale,
-  ResultadoDelEnvio,
-} from "@celda/ui/buzon/Compartir.tsx";
+import { Acciones, Boton } from "@celda/ui/Boton.tsx";
+import { DedicacionCc0, QueSale, ResultadoDelEnvio } from "@celda/ui/buzon/Compartir.tsx";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -87,7 +82,7 @@ export function PasoCompartir(props: PasoCompartirProps) {
           podrá usarla sin pedirte permiso ni citarte. No se puede retirar.
         </p>
       </DedicacionCc0>
-      <AccionesDelPaso>
+      <Acciones>
         <Show
           when={estado().tipo !== "enviada"}
           fallback={
@@ -108,7 +103,7 @@ export function PasoCompartir(props: PasoCompartirProps) {
             {props.textoSalir}
           </Boton>
         </Show>
-      </AccionesDelPaso>
+      </Acciones>
       <ResultadoDelEnvio>
         <Switch>
           <Match when={estado().tipo === "enviando"}>

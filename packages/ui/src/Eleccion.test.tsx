@@ -4,7 +4,7 @@ import { createSignal, flush } from "solid-js";
 
 import { Corredera, Interruptor } from "./Eleccion.tsx";
 
-const montarInterruptor = (inicial: boolean, disabled = false) => {
+const montarInterruptor = (inicial: boolean) => {
   const [encendido, setEncendido] = createSignal(inicial);
   const cambios: Array<boolean> = [];
   const pantalla = render(() => (
@@ -12,7 +12,6 @@ const montarInterruptor = (inicial: boolean, disabled = false) => {
       etiqueta="Modo estudiante"
       descripcion="Añade un ejercicio."
       encendido={encendido()}
-      disabled={disabled}
       alCambiar={(valor) => {
         cambios.push(valor);
         setEncendido(valor);
@@ -65,15 +64,6 @@ describe("Interruptor", () => {
     const mando = pista?.firstElementChild;
     assert.include(pista?.getAttribute("class") ?? "", "motion-reduce:transition-none");
     assert.include(mando?.getAttribute("class") ?? "", "motion-reduce:transition-none");
-  });
-
-  it("desactivado no cambia", () => {
-    const { getByRole, cambios } = montarInterruptor(false, true);
-    const interruptor = getByRole("switch", { name: "Modo estudiante" });
-    assert.isTrue(interruptor.hasAttribute("disabled"));
-    fireEvent.click(interruptor);
-    flush();
-    assert.deepStrictEqual(cambios, []);
   });
 });
 

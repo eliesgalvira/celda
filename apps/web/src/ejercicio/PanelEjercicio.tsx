@@ -24,10 +24,9 @@ import {
   zonaDeCodigo,
 } from "@celda/dominio/zonaDelEjercicio";
 import { Aviso } from "@celda/ui/Aviso.tsx";
-import { Boton, Enlace } from "@celda/ui/Boton.tsx";
+import { Acciones, Boton, Enlace } from "@celda/ui/Boton.tsx";
 import { CampoNumero, Segmentado, Selector } from "@celda/ui/Eleccion.tsx";
 import {
-  AccionesEjercicio,
   BuscadorDeZonas,
   CadenaDelCalculo,
   EsqueletoEjercicio,
@@ -588,7 +587,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
             <Show
               when={eligiendo()}
               fallback={
-                <AccionesEjercicio>
+                <Acciones>
                   <Boton
                     variante="secundario"
                     disabled={indice().tipo !== "lista"}
@@ -596,7 +595,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                   >
                     Elegir en el mapa
                   </Boton>
-                </AccionesEjercicio>
+                </Acciones>
               }
             >
               <Nota titulo="Toca el mapa dentro de la zona">
@@ -604,11 +603,11 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                 <Show when={fueraDelMapa()}>
                   <p>Ahí no hay ningún municipio. Toca dentro de uno.</p>
                 </Show>
-                <AccionesEjercicio>
+                <Acciones>
                   <Boton variante="secundario" onClick={dejarDeElegir}>
                     Cancelar
                   </Boton>
-                </AccionesEjercicio>
+                </Acciones>
               </Nota>
             </Show>
             <Show when={conBarrios(zona())}>
@@ -684,7 +683,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       </p>
                     </Nota>
                   </Show>
-                  <AccionesEjercicio>
+                  <Acciones>
                     <Enlace
                       variante="enlace"
                       href={actual().origen.poblacion.enlace}
@@ -695,7 +694,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                         ? "Padrón en Open Data BCN"
                         : "Padrón en el INE"}
                     </Enlace>
-                  </AccionesEjercicio>
+                  </Acciones>
                 </>
               )}
             </Show>
@@ -750,14 +749,14 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                         {enumerar(vecinasFallidas().map(nombreDeProvincia))}. El radio puede salir
                         mayor que el real.
                       </p>
-                      <AccionesEjercicio>
+                      <Acciones>
                         <Boton
                           variante="secundario"
                           onClick={() => props.alReintentarProvincias(vecinasFallidas())}
                         >
                           Reintentar
                         </Boton>
-                      </AccionesEjercicio>
+                      </Acciones>
                     </Nota>
                   </Show>
                   <Show when={borde().incompletas.length > 0}>
@@ -803,7 +802,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       )}
                     </For>
                   </RejillaDeCampos>
-                  <AccionesEjercicio>
+                  <Acciones>
                     <Boton
                       variante="secundario"
                       disabled={fuenteParametros().fecha !== ""}
@@ -819,7 +818,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     >
                       Datos de la CNMC
                     </Enlace>
-                  </AccionesEjercicio>
+                  </Acciones>
                   <Show when={resultado()}>
                     {(deLaZona) => (
                       <CadenaDelCalculo
@@ -845,7 +844,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                     misma versión publicada.
                   */}
                   <Show when={leidas() === undefined}>
-                    <AccionesEjercicio>
+                    <Acciones>
                       <Boton
                         variante="secundario"
                         cargando={bandas().tipo === "leyendo"}
@@ -853,7 +852,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                       >
                         {`Leer las fichas de ${entero(enZona().length)} emplazamientos`}
                       </Boton>
-                    </AccionesEjercicio>
+                    </Acciones>
                     <TextoEjercicio>
                       El mapa trae bandas de {entero(conBandasEnCapa())} de los{" "}
                       {entero(enZona().length)} emplazamientos de la zona. De los demás, la tabla
@@ -893,7 +892,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                           La tabla se podrá descargar cuando lleguen las provincias de al lado.
                         </TextoEjercicio>
                       </Show>
-                      <AccionesEjercicio>
+                      <Acciones>
                         <Boton
                           disabled={vecinasPendientes().length > 0}
                           onClick={() =>
@@ -905,7 +904,7 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                         >
                           Descargar CSV
                         </Boton>
-                      </AccionesEjercicio>
+                      </Acciones>
                     </SeccionFicha>
                   )}
                 </Show>
