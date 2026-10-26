@@ -81,8 +81,6 @@ const esDelPrincipal = (capa: LayerSpecification): boolean =>
  * - Las fuentes de Celda se quedan como están, con lo que la web les ha puesto (la línea hasta el
  *   punto, el edificio resaltado…). Con las vacías del estilo, el mapa las vaciaría.
  * - Sus capas también, con los cambios que la web les haya hecho.
- * - Las capas y fuentes que la web añadió al principal y la reserva no trae se quedan, en el mismo
- *   sitio respecto a las demás.
  * - El estado del estilo es el de antes: con otro, el mapa volvería a los valores por defecto y
  *   apagaría la foto aérea.
  */
@@ -90,19 +88,9 @@ export const conLoDeCelda = (
   anterior: StyleSpecification,
   reserva: StyleSpecification,
 ): StyleSpecification => {
-  const deCelda = anterior.layers.filter((capa) => !esDelPrincipal(capa));
-  const porId = new Map(deCelda.map((capa) => [capa.id, capa]));
-  const capas = reserva.layers.map((capa) => porId.get(capa.id) ?? capa);
-  const puestas = new Set(capas.map((capa) => capa.id));
-  deCelda.forEach((capa, indice) => {
-    if (puestas.has(capa.id)) return;
-    // Va delante de la siguiente de Celda que ya está; si no hay ninguna, al final.
-    const siguiente = deCelda.slice(indice + 1).find((otra) => puestas.has(otra.id));
-    const donde =
-      siguiente === undefined ? -1 : capas.findIndex((otra) => otra.id === siguiente.id);
-    capas.splice(donde === -1 ? capas.length : donde, 0, capa);
-    puestas.add(capa.id);
-  });
+  const deCelda = new Map(
+    anterior.layers.filter((capa) => !esDelPrincipal(capa)).map((capa) => [capa.id, capa]),
+  );
   const fuentes = Object.fromEntries(
     Object.entries(anterior.sources).filter(([id]) => id !== FUENTE_MAPA_BASE),
   );
@@ -110,6 +98,6 @@ export const conLoDeCelda = (
     ...reserva,
     state: anterior.state ?? estadoDelEstilo(),
     sources: { ...reserva.sources, ...fuentes },
-    layers: capas,
+    layers: reserva.layers.map((capa) => deCelda.get(capa.id) ?? capa),
   };
 };
