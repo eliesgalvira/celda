@@ -728,7 +728,9 @@ export interface DatosDeProvincia {
 }
 
 /** Una fila del resumen nacional. */
-export interface ProvinciaDelResumen extends DatosDeProvincia {
+export interface ProvinciaDelResumen extends Omit<DatosDeProvincia, "combinaciones"> {
+  /** Sus combinaciones, o `undefined` si no suman su número: el resumen se lee sin ellas. */
+  readonly combinaciones: Combinaciones | undefined;
   /** Si alguna zona de barrido la cubre entera: su número es el de toda la provincia. */
   readonly cubierta: boolean;
   /** Inicio del último barrido completo de lo que se sabe de ella, o `null`. */
@@ -882,14 +884,9 @@ export const leerResumen = (
       if (columnas.some((columna) => columna.length !== n)) {
         return descuadrada("el resumen está descuadrado");
       }
-      const provincias: Array<ProvinciaDelResumen> = [];
-      for (const [i, codigo] of p.codigo.entries()) {
-        const combinaciones = dePares(p.combinaciones[i] ?? [], p.emplazamientos[i] ?? 0);
-        if (combinaciones === undefined) {
-          return descuadrada(`las combinaciones de ${codigo} no suman sus emplazamientos`);
-        }
+      const provincias = p.codigo.map((codigo, i): ProvinciaDelResumen => {
         const caja = p.caja[i];
-        provincias.push({
+        return {
           codigo,
           nombre: p.nombre[i] ?? "",
           etiqueta: { longitud: p.lon[i] ?? 0, latitud: p.lat[i] ?? 0 },
@@ -899,9 +896,9 @@ export const leerResumen = (
           cubierta: p.cubierta[i] ?? false,
           barrido: p.barrido[i] ?? null,
           fichero: p.fichero[i] ?? undefined,
-          combinaciones,
-        });
-      }
+          combinaciones: dePares(p.combinaciones[i] ?? [], p.emplazamientos[i] ?? 0),
+        };
+      });
       return Result.succeed({
         version: c.version,
         fecha: fecha.value,

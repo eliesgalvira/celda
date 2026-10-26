@@ -247,13 +247,15 @@ export interface OpcionesNacional {
 
 /**
  * Lo que dice el hexágono de una provincia del resumen con un filtro: los emplazamientos de las
- * compañías del filtro y, aparte, los de la red que usan.
+ * compañías del filtro y, aparte, los de la red que usan. Sin sus combinaciones, todos.
  */
 export const cuentaDeProvincia = (
   provincia: ProvinciaDelResumen,
   filtro: FiltroDeCompanias,
 ): Pick<ElementoProvincia, "cuantos" | "deLaRed"> => {
-  if (!hayFiltro(filtro)) return { cuantos: provincia.emplazamientos, deLaRed: 0 };
+  if (!hayFiltro(filtro) || provincia.combinaciones === undefined) {
+    return { cuantos: provincia.emplazamientos, deLaRed: 0 };
+  }
   const { propios, redUsada } = contarConFiltro(provincia.combinaciones, filtro);
   return { cuantos: propios, deLaRed: redUsada };
 };

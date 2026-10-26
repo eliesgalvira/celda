@@ -623,7 +623,10 @@ describe("resumen nacional", () => {
       resumen({
         fuentes: leido.fuentes,
         cobertura: [CATALUNA],
-        provincias: leido.provincias,
+        provincias: leido.provincias.map((p) => ({
+          ...p,
+          combinaciones: p.combinaciones ?? new Map(),
+        })),
         claves: leido.claves,
       }),
       resumen({ cobertura: [CATALUNA] }),
@@ -637,7 +640,7 @@ describe("resumen nacional", () => {
     const leido = Result.getOrUndefined(leerResumen(contenido, VERSION));
     if (leido === undefined) return assert.fail("no se lee");
     assert.deepStrictEqual(
-      leido.provincias.map((p) => [p.codigo, [...p.combinaciones]]),
+      leido.provincias.map((p) => [p.codigo, [...(p.combinaciones ?? [])]]),
       [
         [
           "08",
@@ -666,12 +669,17 @@ describe("resumen nacional", () => {
     );
   });
 
-  it("unas combinaciones que no suman el número de su provincia no se dan por buenas", () => {
+  it("unas combinaciones que no suman el número de su provincia se leen como si no estuvieran", () => {
     const contenido = resumen().replace(
       '"combinaciones":[[2,1,4,1,5,1]',
       '"combinaciones":[[2,1,4,1,5,9]',
     );
-    assert.isTrue(Result.isFailure(leerResumen(contenido, VERSION)));
+    const leido = leerResumen(contenido, VERSION);
+    if (Result.isFailure(leido)) return assert.fail(leido.failure.message);
+    assert.deepStrictEqual(
+      leido.success.provincias.map((p) => p.combinaciones?.size),
+      [undefined, 2, 1],
+    );
   });
 
   it("uno de otra versión no se da por bueno", () => {

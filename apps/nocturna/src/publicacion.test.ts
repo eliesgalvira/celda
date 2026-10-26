@@ -539,7 +539,7 @@ describe("publicación de la capa y las fichas (base SQLite, almacén en carpeta
           const leida = yield* leerVigente(entorno);
           for (const p of leida.resumen.provincias) {
             const suyos = leida.capas.get(p.codigo)?.emplazamientos.length ?? 0;
-            const suma = [...p.combinaciones].reduce((n, [, cuantos]) => n + cuantos, 0);
+            const suma = [...(p.combinaciones ?? [])].reduce((n, [, cuantos]) => n + cuantos, 0);
             assert.strictEqual(suma, suyos, p.codigo);
           }
 

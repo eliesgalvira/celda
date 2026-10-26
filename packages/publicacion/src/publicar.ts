@@ -16,6 +16,7 @@ import {
   combinacionesDeSituados,
   companiasDeSituados,
   type DatosDeProvincia,
+  type ProvinciaDelResumen,
   decodificarManifiesto,
   ficheroDeCapaDeProvincia,
   ficheroDeIndiceDeClaves,
@@ -553,8 +554,8 @@ export const publicar = Effect.fn("Publicacion.publicar")(function* (
 /**
  * Con `vigente.json` ya en la versión de los datos, rehace su resumen con la cobertura de ahora,
  * sin leer la instantánea. Si sale el mismo, no escribe nada; si no, escribe el nuevo resumen y
- * `vigente.json`. `undefined` si la vigente no tiene un resumen legible: entonces hay que
- * publicarla entera. Las capas y los lotes salen iguales y no se vuelven a escribir; cambian el
+ * `vigente.json`. `undefined` si la vigente no tiene un resumen legible, o alguna provincia sin
+ * combinaciones que cuadren: entonces hay que publicarla entera. Las capas y los lotes salen iguales y no se vuelven a escribir; cambian el
  * resumen y `vigente.json`.
  */
 const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
@@ -567,12 +568,20 @@ const rehacerCobertura = Effect.fn("Publicacion.rehacerCobertura")(function* (
   if (Option.isNone(contenido)) return undefined;
   const leido = leerResumen(contenido.value, vigente.version);
   if (Result.isFailure(leido)) return undefined;
+  const { provincias } = leido.success;
+  if (
+    !provincias.every(
+      (p): p is ProvinciaDelResumen & DatosDeProvincia => p.combinaciones !== undefined,
+    )
+  ) {
+    return undefined;
+  }
   const resumen = yield* resumenNombrado(
     {
       version: vigente.version,
       fuentes: leido.success.fuentes,
       cobertura,
-      provincias: leido.success.provincias,
+      provincias,
       claves: leido.success.claves,
       puntos: leido.success.puntos,
     },
