@@ -1,6 +1,6 @@
 # Filtro de compañías, con la red que usa cada una aparte
 
-Estado: aceptada el 04/10/2026, con las decisiones del usuario del 04/10/2026 (#69). Añade al resumen nacional del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) una columna opcional, sin cambiar de formato, y cambia la definición de celda del glosario: con un filtro puesto, se calcula entre los emplazamientos que salen con él, también los de la red que usan DIGI o Yoigo (segunda decisión del usuario del 04/10/2026). El 20/10/2026 salen las celdas con la retirada del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md), y con ellas lo que dice «Las celdas»: el filtro y la red usada se quedan como están para los emplazamientos, las agrupaciones y las zonas. El 26/10/2026 las combinaciones pasan a ser obligatorias: la web solo lee el formato 8, que siempre las lleva, así que ya no hay resúmenes sin ellas ni aviso de «Los números de lejos incluyen todas las compañías», y unas que no suman el número de la provincia hacen ilegible el resumen.
+Estado: aceptada el 04/10/2026, con las decisiones del usuario del 04/10/2026 (#69). Añade al resumen nacional del [ADR 0016](0016-capa-por-provincias-con-resumen-nacional.md) una columna opcional, sin cambiar de formato, y cambia la definición de celda del glosario: con un filtro puesto, se calcula entre los emplazamientos que salen con él, también los de la red que usan DIGI o Yoigo (segunda decisión del usuario del 04/10/2026). El 20/10/2026 salen las celdas con la retirada del [ADR 0005](0005-simulaciones-puras-interfaz-fija.md), y con ellas lo que dice «Las celdas»: el filtro y la red usada se quedan como están para los emplazamientos, las agrupaciones y las zonas. El 26/10/2026 las combinaciones pasan a ser obligatorias: la web solo lee el formato 8, que siempre las lleva, así que ya no hay resúmenes sin ellas ni aviso de «Los números de lejos incluyen todas las compañías», y unas que no suman el número de la provincia hacen ilegible el resumen. Ese mismo día el panel suma «¿No sale la tuya?», con las compañías sin red propia y la red que usa cada una (maqueta aprobada por el usuario).
 
 ## Contexto
 
@@ -26,6 +26,7 @@ Hay otra dificultad en los números. De lejos el mapa dibuja solo el resumen nac
 - **Dónde.** Una pastilla «Compañías», con un embudo, encima de «Foto aérea». Abre encima un panel con los chips y no se cierra al tocarlos; Escape o un toque fuera lo cierran. Los chips son controles: rectángulos claros con borde de tinta, el logo pequeño y el nombre escrito. Los marcadores, que son los datos, son redondos o hexagonales.
 - **El aviso.** Bajo la fecha de los datos: «Solo Movistar» con «Ver todas». Si sale una red aparte, una línea más: «La red de Movistar que usa Digi sale más clara.»
 - **Se guarda en los ajustes del dispositivo** (`Ajustes.companias`, clave opcional). Los ajustes de antes se leen igual, sin subir de esquema. Lo guardado vale al abrir.
+- **¿No sale la tuya?** Quien es de Simyo, O2 o Lowi no encuentra su compañía entre los chips, porque no tiene emplazamientos. Al final del panel, tras una raya, «¿No sale la tuya?» cambia el panel, algo más ancho, por una nota («Estas compañías no tienen antenas propias y usan las de otra. Toca la tuya para ver esa red.») y un grupo por red, en el orden de los chips: «Red de Orange» con su logo y debajo sus compañías. «‹ Compañías» o Escape vuelven a los chips. Tocar una compañía pone el filtro de su red, como si se hubiera elegido ese chip, y cierra el panel, porque es una elección sola y lo que se quiere ver es el mapa. El aviso suma la línea «Simyo usa la red de Orange.» hasta que el filtro cambia de otra forma. Esa compañía no se guarda: al volver a abrir Celda queda el filtro de su red, y el chip pulsado ya dice cuál es.
 
 ### Qué sale con un filtro
 
@@ -90,6 +91,24 @@ Comprobado el 04/10/2026:
 
 Si cambia un acuerdo, se cambia `RED_QUE_USA` y estas fuentes.
 
+### Las compañías sin red propia, con sus fuentes
+
+Comprobado el 26/10/2026 (`SIN_RED_PROPIA`). Entra lo que dice la propia compañía, o la prensa citando a la compañía, como con Yoigo. Lo que solo dicen los comparadores, o se contradice, no entra.
+
+- **Red de Movistar: O2**, marca de Telefónica. Su web dice «Cobertura de Telefónica» ([o2online.es](https://www.o2online.es/)).
+- **Red de Vodafone: Lowi**, marca de Vodafone: «usamos la red Vodafone» ([lowi.es/cobertura](https://www.lowi.es/cobertura/)). **Finetwork**, de Vodafone desde 2026: la CNMC la cuenta dentro de Vodafone en su [informe mensual de febrero de 2026](https://www.cnmc.es/sites/default/files/editor_contenidos/Notas%20de%20prensa/2026/20260413_NP_Mensual%20telecos%20febrero%202026.pdf), y sus tarifas «incluyen cobertura 5G de Vodafone» ([Xataka Móvil, 29/07/2026](https://www.xatakamovil.com/vodafone/nueva-finetwork-vodafone-esta-aqui-movimiento-que-nunca-antes-hemos-visto-telecos-espanolas)).
+- **Red de Orange: Simyo**, marca de Orange: «En esta página puedes ver el mapa de cobertura de Orange en España» ([simyo.es/cobertura](https://www.simyo.es/cobertura)). **Jazztel**, marca de Orange, «se nutre de la red de Orange» ([Roams, julio de 2026](https://roams.es/companias-telefonicas/jazztel/cobertura)). **MásMóvil, Pepephone, Lebara, Llamaya, Euskaltel y R**, marcas de MasOrange: «todos los clientes de las marcas del grupo MásMóvil utilizan ya la infraestructura 4G de Orange» ([Xataka Móvil, 23/02/2026](https://www.xatakamovil.com/masorange/usuarios-masmovil-han-perdido-cobertura-movistar-eso-implica-menor-dependencia-red-terceros), citando a MasOrange). Llamaya absorbió Lycamobile el 02/02/2026. **Avatel**: «A partir del 1 de enero de 2026, los cerca de 700.000 clientes de telefonía móvil de Avatel dejarán de utilizar la red de Movistar para pasar a recibir servicio bajo la cobertura de MasOrange» ([Mobile World Live, finales de 2025](https://www.mobileworldlive.com/spanish/avatel-migrara-de-telefonica-a-masorange-sus-700-000-clientes-de-movil/)).
+
+**Las salvedades:**
+
+- Wewi sigue usando la marca Finetwork en finetwork.com, y ninguna fuente dice qué red usa. Celda enseña la de Vodafone, la de la Finetwork que compró Vodafone.
+- Algún comparador dice que Lebara y Llamaya aún caen en Movistar de respaldo. MasOrange dice que lo está retirando («estamos dejando de utilizar la red 4G de Movistar», en la misma nota de Xataka Móvil). Celda enseña Orange.
+- Jazztel solo tiene una fuente de comparador, pero es una marca de Orange.
+
+**Lo que no entra:** las compañías cerradas o renombradas (Tuenti, Amena, Virgin telco, que ahora es SIMple, Lycamobile, Eroski Móvil, Carrefour Móvil, Sweno y Silbö); las que no se han podido confirmar o tienen fuentes que se contradicen (Telecable, Guuk, Hits Mobile, SIMple, Aire Networks e ion mobile, y PTV Telecom, cuyo paso a Vodafone no está confirmado); y las que solo citan los comparadores (Adamo, Parlem, RACCtel+ y Fi Network). Una compañía que use varias redes tampoco entra hasta que se decida cómo se enseña. DIGI no tiene segunda marca.
+
+Si una compañía cambia de red, se cambia `SIN_RED_PROPIA` y estas fuentes.
+
 ## Cómo quedó (#69)
 
 - **Dominio.** `filtro.ts`: el filtro, su papel por emplazamiento, las redes usadas, lo que resalta cada logo y el recuento por combinaciones. `provincias.ts`: la columna y su lectura. `ajustes.ts`: la clave `companias`.
@@ -97,6 +116,7 @@ Si cambia un acuerdo, se cambia `RED_QUE_USA` y estas fuentes.
 - **Celdas con la red usada** (segunda decisión). `deLasCeldas` en `filtro.ts`, `celdasDelFiltro` en `filtro/enMapa.ts`, la propiedad `redUsada` de cada celda en `celdas/celdas.ts` y las opacidades de `packages/ui/src/mapa/celdas.ts`.
 - **Web.** `capa/nacional.ts`: `partesDelFiltro`, `agrupacionConFiltro` y el agrupador nacional con el filtro, la red usada en su propia parte de cada escena (claves `a:08r:…`) y el recuento de lejos (`cuentaDeProvincia`). `capa/indexador.ts`: la solicitud `filtro` del Worker, con las columnas transferidas. `capa/servicio.ts`: `agrupacion(codigo, filtro)`, con su turno y su caché. `filtro/enMapa.ts`: el filtro aplicado tras la espera, las agrupaciones de cada provincia y los emplazamientos de las celdas. `filtro/Filtro.tsx` y `filtro/textos.ts`: la pastilla, los chips y el aviso.
 - **Librería.** `filtro/FiltroDeCompanias.tsx` (pastilla, chips, panel y aviso), el tono `red-usada` de `MarcadorEmplazamiento` y `MarcadorAgrupacion`, las porciones apagadas de `LogoCompanias` y `RedUsadaFicha`.
+- **Compañías sin red propia** (26/10/2026). `SIN_RED_PROPIA` en `filtro.ts`; la segunda vista de `MenuDeCompanias`, que se queda con lo que hacía `PanelDeCompanias`; `sinRedPropia` de `crearFiltro`, que vive hasta el siguiente `elegir`, y la línea del aviso en `filtro/textos.ts`.
 - **Medido** el 04/10/2026 en Chromium sin interfaz con SwiftShader, la build local y la publicación de toda España del 30/09/2026 rehecha con combinaciones (35.667 emplazamientos), en el móvil (390 × 844) y en el escritorio (1400 × 900), con Barcelona a z12 y todo cargado:
   - **Del toque al mapa redibujado**, contando los 150 ms de espera: el primer marcador cambia a los 157-174 ms y el último a los 159-215 ms. Con la CPU a ×4, a los 184-318 ms el primero y, con un filtro nuevo que agrupa el Worker, a los 360 ms en el móvil y 552 en el escritorio el último. La tabla está en [rendimiento.md](../patterns/rendimiento.md#filtro-de-compañías-69).
   - **Red:** 0 peticiones al tocar los chips.
@@ -129,3 +149,5 @@ Si cambia un acuerdo, se cambia `RED_QUE_USA` y estas fuentes.
 - **Celdas solo con los suyos**, lo que hubo primero. Con DIGI quedaban unas pocas celdas enormes que cubrían zonas donde el móvil se conecta a Movistar. El usuario lo cambió el 04/10/2026.
 - **Celdas de la red usada iguales que las propias.** No se distinguiría qué celdas son de la compañía y cuáles de la red que usa, cuando sus emplazamientos ya van más claros.
 - **Tocar un chip desde todas apaga solo esa** (cinco chips encendidos por defecto). Para ver solo una había que apagar cuatro.
+- **Las compañías sin red propia como chips**, junto a las cinco. Serían diecisiete chips, y tocar Simyo encendería Orange sin que la columna lo dejara ver.
+- **Guardar la compañía sin red propia en los ajustes**, para que el aviso diga «Simyo usa la red de Orange.» también al volver a abrir. Sería una clave más con su lectura y su regla para borrarla al cambiar el filtro, para repetir algo que la persona eligió y ya sabe.
