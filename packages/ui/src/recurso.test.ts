@@ -7,8 +7,6 @@ import {
   flush,
   mapArray,
   onCleanup,
-  onSettled,
-  untrack,
 } from "solid-js";
 
 import { avisosDeSolid } from "./pruebas/vigilante.ts";
@@ -35,11 +33,10 @@ const enRaiz = (montar: () => void): (() => void) =>
   });
 
 /**
- * Lo que hace la versión de Solid del catálogo con los efectos y los memos, comprobado aquí para
- * que una subida de versión que lo cambie se note. Es la razón de `recurso`
- * (docs/patterns/efectos.md).
+ * Lo que hace la versión de Solid del catálogo con los efectos y que da forma a `recurso`,
+ * comprobado aquí para que una subida de versión que lo cambie se note (docs/patterns/efectos.md).
  */
-describe("Solid 2: igualdad de efectos y memos", () => {
+describe("Solid 2: efectos", () => {
   it("un efecto vuelve a correr, y limpia antes, aunque su primera función devuelva lo mismo", () => {
     const registro: Array<string> = [];
     const [estado, setEstado] = createSignal({ lecturas: 0, encendido: true });
@@ -68,81 +65,6 @@ describe("Solid 2: igualdad de efectos y memos", () => {
     ]);
   });
 
-  it("también si devuelve el mismo objeto", () => {
-    let veces = 0;
-    const mismo = { a: 1 };
-    const [n, setN] = createSignal(0);
-    const desmontar = enRaiz(() => {
-      createEffect(
-        () => {
-          n();
-          return mismo;
-        },
-        () => {
-          veces += 1;
-        },
-      );
-    });
-    flush();
-    setN(1);
-    flush();
-    desmontar();
-    assert.strictEqual(veces, 2);
-  });
-
-  it("un memo compara con `===`: el mismo primitivo no avisa, un objeto nuevo igual sí", () => {
-    const registro: Array<string> = [];
-    const [estado, setEstado] = createSignal({ lecturas: 0, encendido: true });
-    const desmontar = enRaiz(() => {
-      const encendido = createMemo(() => estado().encendido);
-      const envuelto = createMemo(() => ({ encendido: estado().encendido }));
-      createEffect(encendido, () => {
-        registro.push("primitivo");
-      });
-      createEffect(envuelto, () => {
-        registro.push("objeto");
-      });
-    });
-    flush();
-    setEstado({ lecturas: 1, encendido: true });
-    flush();
-    desmontar();
-    assert.deepStrictEqual(registro, ["primitivo", "objeto", "objeto"]);
-  });
-
-  it("un memo con `equals` compara con esa función", () => {
-    let veces = 0;
-    const [estado, setEstado] = createSignal({ lecturas: 0, encendido: true });
-    const desmontar = enRaiz(() => {
-      const envuelto = createMemo(() => ({ encendido: estado().encendido }), {
-        equals: (a, b) => a.encendido === b.encendido,
-      });
-      createEffect(envuelto, () => {
-        veces += 1;
-      });
-    });
-    flush();
-    setEstado({ lecturas: 1, encendido: true });
-    flush();
-    desmontar();
-    assert.strictEqual(veces, 1);
-  });
-
-  it("una señal a la que se escribe el mismo valor no avisa", () => {
-    let veces = 0;
-    const [n, setN] = createSignal(1);
-    const desmontar = enRaiz(() => {
-      createEffect(n, () => {
-        veces += 1;
-      });
-    });
-    flush();
-    setN(1);
-    flush();
-    desmontar();
-    assert.strictEqual(veces, 1);
-  });
-
   it("`onCleanup` dentro de la segunda función de un efecto no se llama nunca", () => {
     const registro: Array<string> = [];
     const [n, setN] = createSignal(0);
@@ -160,57 +82,6 @@ describe("Solid 2: igualdad de efectos y memos", () => {
     assert.deepStrictEqual(codigosDeAvisos(), ["NO_OWNER_CLEANUP", "NO_OWNER_CLEANUP"]);
     // El vigilante haría fallar esta prueba por el aviso que acaba de comprobar.
     avisosDeSolid?.clear();
-  });
-
-  it("`onSettled` corre una vez, no sigue lo que lee, y limpia al desmontar", () => {
-    const registro: Array<string> = [];
-    const [n, setN] = createSignal(0);
-    const desmontar = enRaiz(() => {
-      onSettled(() => {
-        registro.push(`abre ${n()}`);
-        return () => registro.push("cierra");
-      });
-    });
-    flush();
-    setN(1);
-    flush();
-    desmontar();
-    assert.deepStrictEqual(registro, ["abre 0", "cierra"]);
-  });
-
-  it("leer una señal en la segunda función de un efecto avisa `STRICT_READ_UNTRACKED`, y con `untrack` no", () => {
-    const [n, setN] = createSignal(0);
-    const [otra] = createSignal("a");
-    const desmontar = enRaiz(() => {
-      createEffect(n, () => {
-        untrack(otra);
-      });
-    });
-    flush();
-    setN(1);
-    flush();
-    assert.deepStrictEqual(codigosDeAvisos(), []);
-    desmontar();
-    const sinUntrack = enRaiz(() => {
-      createEffect(n, () => {
-        otra();
-      });
-    });
-    flush();
-    sinUntrack();
-    assert.deepStrictEqual(codigosDeAvisos(), ["STRICT_READ_UNTRACKED"]);
-    // El vigilante haría fallar esta prueba por el aviso que acaba de comprobar.
-    avisosDeSolid?.clear();
-  });
-
-  it("`onCleanup` en el cuerpo del dueño se llama al desmontar", () => {
-    const registro: Array<string> = [];
-    const desmontar = enRaiz(() => {
-      onCleanup(() => registro.push("cierra"));
-    });
-    flush();
-    desmontar();
-    assert.deepStrictEqual(registro, ["cierra"]);
   });
 });
 

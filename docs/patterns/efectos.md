@@ -8,7 +8,7 @@ En septiembre de 2026 el GPS se abrió 3135 veces en 7 s en Chromium (commits d3
 
 ## Qué hace Solid 2
 
-Comprobado con la versión de `solid-js` del catálogo en `packages/ui/src/recurso.test.ts`, bloque «Solid 2: igualdad de efectos y memos». Si una subida de versión lo cambia, esas pruebas fallan.
+Con la versión de `solid-js` del catálogo. Lo que da forma a `recurso` lo comprueba `packages/ui/src/recurso.test.ts`: los efectos y el `onCleanup` en el bloque «Solid 2: efectos», los memos y las listas en las pruebas de `recurso`. Si una subida de versión lo cambia, esas pruebas fallan.
 
 - La segunda función de `createEffect` corre otra vez, y antes llama a la limpieza que devolvió, cada vez que cambia algo que lee la primera. No compara lo que devuelve la primera: ni un primitivo igual (`true` y `true`) ni el mismo objeto. En el código de Solid, el nodo de un efecto nace con `_equals: false`.
 - `createMemo` compara con `===` por defecto. Un primitivo igual no avisa a quien lo lee; un objeto nuevo con los mismos campos, sí. Con `{ equals }` compara con esa función.

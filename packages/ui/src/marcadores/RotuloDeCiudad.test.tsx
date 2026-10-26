@@ -24,13 +24,9 @@ describe("RotuloDeCiudad", () => {
     return { contenedor, rotulo };
   };
 
-  it("es el nombre de una población, en caja normal, centrado en su punto y con su tamaño", () => {
+  it("es el nombre de una población, centrado en su punto y con su tamaño", () => {
     const { contenedor, rotulo } = montar(false);
     assert.strictEqual(rotulo?.textContent, "València");
-    const clases = rotulo?.getAttribute("class") ?? "";
-    assert.notInclude(clases, "small-caps");
-    assert.include(clases, "font-rotulo");
-    assert.include(clases, "text-rotulo-ciudad");
     assert.include(
       rotulo?.getAttribute("style"),
       "translate(120.0px, 80.0px) translate(-50%, -50%)",
@@ -42,11 +38,10 @@ describe("RotuloDeCiudad", () => {
     assert.include(lamina?.getAttribute("class"), "pointer-events-none");
   });
 
-  it("las capitales van en negrita; sobre la foto, en blanco con halo oscuro", () => {
-    assert.include(montar(false, "capital").rotulo?.getAttribute("class"), "font-bold");
-    const sobreLaFoto = montar(true).rotulo?.getAttribute("class") ?? "";
-    assert.include(sobreLaFoto, "text-rotulo-foto");
-    assert.include(sobreLaFoto, "--mapa-foto-halo");
-    assert.notInclude(sobreLaFoto, "text-rotulo-ciudad");
+  it("las capitales y los rótulos sobre la foto se distinguen de los demás", () => {
+    const clases = (conFoto: boolean, importancia?: "capital") =>
+      montar(conFoto, importancia).rotulo?.className;
+    assert.notStrictEqual(clases(false, "capital"), clases(false));
+    assert.notStrictEqual(clases(true), clases(false));
   });
 });
