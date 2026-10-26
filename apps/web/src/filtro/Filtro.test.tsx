@@ -53,10 +53,7 @@ const FICHA: Ficha = {
   version: NOCHE,
 };
 
-const montar = (
-  companias?: ReadonlyArray<"movistar" | "digi">,
-  opciones: { readonly datosDeAntes?: boolean } = {},
-) => {
+const montar = (companias?: ReadonlyArray<"movistar" | "digi">) => {
   const fichas = fichasDePrueba();
   const ubicacion = ubicacionDePrueba({
     ajustes:
@@ -66,11 +63,7 @@ const montar = (
   });
   const pantalla = render(() => (
     <App
-      servicios={Layer.mergeAll(
-        capaDePrueba([Effect.succeed(CAPA)], { sinCombinaciones: opciones.datosDeAntes === true }),
-        fichas.capa,
-        ubicacion.capa,
-      )}
+      servicios={Layer.mergeAll(capaDePrueba([Effect.succeed(CAPA)]), fichas.capa, ubicacion.capa)}
     />
   ));
   flush();
@@ -157,16 +150,6 @@ describe("filtro de compañías (ADR 0026)", () => {
     fireEvent.click(await findByRole("button", { name: "Compañías" }));
     flush();
     assert.strictEqual(getByRole("button", { name: "Digi" }).getAttribute("aria-pressed"), "true");
-  });
-
-  it("con datos publicados antes de poder contar por compañía, el aviso dice que de lejos aún cuentan todas", async () => {
-    navegar(ruta.mapa, { reemplazar: true });
-    montar(["movistar"], { datosDeAntes: true });
-    await waitFor(() => assert.isNotNull(aviso()));
-    assert.match(
-      aviso()?.textContent ?? "",
-      /Los números de lejos incluyen todas las compañías\./u,
-    );
   });
 
   it("la ficha de un emplazamiento de la red que usa una compañía del filtro lo explica", async () => {

@@ -101,11 +101,6 @@ export interface ElementoProvincia {
   readonly cuantos: number;
   /** Con un filtro, los de la red que usan sus compañías, aparte. Sin filtro, 0. */
   readonly deLaRed: number;
-  /**
-   * Con un filtro y un resumen publicado antes de las combinaciones de compañías, no se puede
-   * contar lo del filtro: `cuantos` es el de todas.
-   */
-  readonly sinFiltrar: boolean;
 }
 
 /** Lo que el mapa dibuja en un sitio. La clave identifica el mismo elemento entre escenas. */
@@ -294,7 +289,7 @@ export const crearAgrupador = (
   const deMunicipio = new Map<string, Array<number>>();
   if (hayMunicipios) {
     for (const [i, emplazamiento] of emplazamientos.entries()) {
-      const codigo = emplazamiento.municipio ?? null;
+      const codigo = emplazamiento.municipio;
       if (codigo === null) continue;
       const suyos = deMunicipio.get(codigo) ?? [];
       suyos.push(i);

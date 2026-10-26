@@ -34,12 +34,6 @@ const EMPLAZAMIENTO = "emplazamiento";
 /** El parámetro de la URL con la provincia en cuya capa va el emplazamiento seleccionado. */
 const PROVINCIA = "provincia";
 
-/**
- * La provincia de un emplazamiento que no la dice: los enlaces de antes de la capa por provincias
- * (ADR 0016), cuando Celda solo tenía Barcelona, si el resumen aún no tiene índice de claves.
- */
-export const PROVINCIA_DE_LOS_ENLACES_VIEJOS = "08";
-
 /** Los destinos con nombre: la única forma de escribir una URL de la app. */
 export const ruta = {
   mapa: "/",

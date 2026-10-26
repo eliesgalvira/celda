@@ -219,7 +219,7 @@ export type R2DelDespliegue =
 const versionDe = (contenido: string): { version: string; resumen: string } => {
   const vigente = decodificarVigente(contenido);
   return Result.isSuccess(vigente)
-    ? { version: vigente.success.version, resumen: vigente.success.resumen ?? "" }
+    ? { version: vigente.success.version, resumen: vigente.success.resumen }
     : { version: "una versión que no se entiende", resumen: "" };
 };
 

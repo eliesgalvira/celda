@@ -26,7 +26,6 @@ import * as Semaphore from "effect/Semaphore";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
-import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import type { VariableDeLaWeb } from "../variables.ts";
 import { IndexadorDeProvincias, type IndiceFallido } from "./indexador.ts";
 import type { PuntosDelMapa } from "./puntos.ts";
@@ -84,8 +83,7 @@ export class CapaEmplazamientos extends Context.Service<
     /**
      * La provincia en cuya capa va un emplazamiento, por su clave, sin descargar ninguna capa:
      * lee la parte del índice de claves que le toca. Si la clave es de un emplazamiento que se
-     * juntó con otro, da la clave de ese otro (ADR 0027). `None` si ninguna provincia lo tiene. Un
-     * resumen de antes del índice no sabe buscar, y da la de los enlaces viejos (Barcelona).
+     * juntó con otro, da la clave de ese otro (ADR 0027). `None` si ninguna provincia lo tiene.
      */
     readonly situarClave: (clave: string) => Effect.Effect<Option.Option<ClaveSituada>, FalloCapa>;
     /**
@@ -175,12 +173,6 @@ export const descargarFichero = (http: HttpClient.HttpClient, origen: string, fi
  */
 export const descargarResumen = (http: HttpClient.HttpClient, origen: string, vigente: Vigente) =>
   Effect.gen(function* () {
-    if (vigente.resumen === undefined) {
-      // Un `vigente.json` del formato 4 o anterior: esta web ya no sabe leerlo.
-      return yield* new CapaIlegible({
-        motivo: `${vigente.version} no tiene resumen nacional: es del formato 4 o anterior`,
-      });
-    }
     const url = `${origen}/${vigente.resumen}`;
     const contenido = yield* descargarFichero(http, origen, vigente.resumen);
     if (Option.isNone(contenido)) {
@@ -314,9 +306,6 @@ export const capaDelOrigen = Layer.effect(
 
     const situarClave = Effect.fn("CapaEmplazamientos.situarClave")(function* (clave: string) {
       const { claves } = yield* resumen;
-      if (claves === undefined) {
-        return Option.some<ClaveSituada>({ clave, provincia: PROVINCIA_DE_LOS_ENLACES_VIEJOS });
-      }
       const fichero = claves[parteDeClave(clave, claves.length)];
       if (fichero === undefined) return Option.none<ClaveSituada>();
       return Option.fromNullishOr(situarEnLaParte(yield* parte(fichero), clave));

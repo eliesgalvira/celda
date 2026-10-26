@@ -6,6 +6,7 @@ import {
 } from "@celda/dominio/capa";
 import type { ZonaBarrida } from "@celda/dominio/cobertura";
 import type { Ficha } from "@celda/dominio/ficha";
+import { LICENCIAS } from "@celda/dominio/licencias";
 import { repartirEnLotes } from "@celda/dominio/lotes";
 import type { FuenteDeMunicipios } from "@celda/dominio/municipio";
 import {
@@ -72,13 +73,20 @@ export const agrupacionEnHilo = (
 export const FICHERO_DE_PUNTOS_DE_PRUEBA = ficheroDePuntos("prueba");
 
 /**
+ * Un emplazamiento de las pruebas de pantalla: sin lote, va en el primero; sin provincia, en la
+ * de la capa, y sin municipio, en ninguno.
+ */
+export type EmplazamientoDePrueba = Omit<EmplazamientoLeido, "lote" | "provincia" | "municipio"> &
+  Partial<Pick<EmplazamientoLeido, "lote" | "provincia" | "municipio">>;
+
+/**
  * Los puntos de toda España de unas provincias de prueba, como los publica la publicación y los
  * deja el Worker de capas.
  */
 export const puntosDePrueba = (
   provincias: ReadonlyArray<{
     readonly codigo: string;
-    readonly emplazamientos: ReadonlyArray<EmplazamientoLeido>;
+    readonly emplazamientos: ReadonlyArray<EmplazamientoDePrueba>;
   }>,
 ): PuntosDelMapa => {
   const leidos = leerPuntosDelMapa(
@@ -129,6 +137,13 @@ export const FUENTES_DE_PRUEBA: FuentesDeZonas = {
     referencia: "2025-01-01",
     publicada: "2025-12-11",
   },
+  capitales: {
+    atribucion: "Instituto Geográfico Nacional",
+    producto: "Nomenclátor Geográfico Básico de España",
+    licencia: "CC BY 4.0",
+    enlace: "https://www.ign.es/wfs-inspire/ngbe?service=WFS&request=GetCapabilities",
+    fecha: "2026-05-28",
+  },
 };
 
 /** La caja de Barcelona como zona barrida la noche de `barrido`. */
@@ -140,13 +155,13 @@ export const cajaDeBarcelona = (barrido: number | null): ZonaBarrida => ({
 });
 
 /**
- * Lo que las pruebas de pantalla dan como capa: los emplazamientos de una provincia de una
- * versión, con sus barrios. Es la forma de la capa entera de antes del formato 5.
+ * Lo que las pruebas de pantalla dan como capa: los emplazamientos de Barcelona de una versión,
+ * con sus barrios.
  */
 export interface CapaDePrueba {
   readonly version: string;
   readonly fecha: number;
-  readonly emplazamientos: ReadonlyArray<EmplazamientoLeido>;
+  readonly emplazamientos: ReadonlyArray<EmplazamientoDePrueba>;
   readonly barrios: ReadonlyArray<Barrio>;
   readonly fuenteDeBarrios: FuenteDeBarrios;
   /** Los ficheros de sus lotes; si faltan, uno por cada número de la columna `lote`. */
@@ -163,7 +178,7 @@ const BARCELONA: Pick<ProvinciaDelResumen, "codigo" | "nombre" | "etiqueta"> = {
 /** La provincia de Barcelona cargada con la capa de prueba: todos sus emplazamientos van en ella. */
 export const provinciaDePrueba = (capa: CapaDePrueba): ProvinciaCargada => {
   const codigo = BARCELONA.codigo;
-  const emplazamientos = capa.emplazamientos.map((e) => ({
+  const emplazamientos = capa.emplazamientos.map((e): EmplazamientoLeido => ({
     ...e,
     provincia: codigo,
     municipio: e.municipio ?? null,
@@ -193,31 +208,28 @@ export const provinciaDePrueba = (capa: CapaDePrueba): ProvinciaCargada => {
 
 /**
  * El resumen con la capa de prueba: Barcelona, cubierta, con todos sus emplazamientos y sus
- * combinaciones de compañías. Con `sinCombinaciones`, como uno publicado antes de ellas.
+ * combinaciones de compañías.
  */
-export const resumenDePrueba = (capa: CapaDePrueba, sinCombinaciones = false): ResumenLeido => {
-  const barcelona: ProvinciaDelResumen = {
-    ...BARCELONA,
-    caja: cajaDe(capa.emplazamientos.map((e) => e.posicion)),
-    emplazamientos: capa.emplazamientos.length,
-    companias: [...new Set(capa.emplazamientos.flatMap((e) => e.companias))],
-    cubierta: true,
-    barrido: capa.fecha,
-    fichero: ficheroDeCapaDeProvincia(BARCELONA.codigo, "prueba"),
-  };
-  return {
-    version: capa.version,
-    fecha: capa.fecha,
-    fuentes: FUENTES_DE_PRUEBA,
-    cobertura: [cajaDeBarcelona(capa.fecha)],
-    provincias: [
-      sinCombinaciones
-        ? barcelona
-        : { ...barcelona, combinaciones: combinacionesDe(capa.emplazamientos) },
-    ],
-    puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
-  };
-};
+export const resumenDePrueba = (capa: CapaDePrueba): ResumenLeido => ({
+  version: capa.version,
+  fecha: capa.fecha,
+  fuentes: FUENTES_DE_PRUEBA,
+  cobertura: [cajaDeBarcelona(capa.fecha)],
+  provincias: [
+    {
+      ...BARCELONA,
+      caja: cajaDe(capa.emplazamientos.map((e) => e.posicion)),
+      emplazamientos: capa.emplazamientos.length,
+      companias: [...new Set(capa.emplazamientos.flatMap((e) => e.companias))],
+      cubierta: true,
+      barrido: capa.fecha,
+      fichero: ficheroDeCapaDeProvincia(BARCELONA.codigo, "prueba"),
+      combinaciones: combinacionesDe(capa.emplazamientos),
+    },
+  ],
+  claves: [],
+  puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
+});
 
 /**
  * Servicio de capa de prueba: la carga número `n` del resumen devuelve el de `cargas[n]`, y a
@@ -227,10 +239,7 @@ export const resumenDePrueba = (capa: CapaDePrueba, sinCombinaciones = false): R
  */
 export const capaDePrueba = (
   cargas: ReadonlyArray<Effect.Effect<CapaDePrueba, FalloCapa>>,
-  opciones: {
-    readonly sinCombinaciones?: boolean;
-    readonly anteriores?: ReadonlyMap<string, string>;
-  } = {},
+  opciones: { readonly anteriores?: ReadonlyMap<string, string> } = {},
 ): Layer.Layer<CapaEmplazamientos> =>
   Layer.sync(CapaEmplazamientos, () => {
     let hechas = 0;
@@ -246,7 +255,7 @@ export const capaDePrueba = (
               llegada = Option.some(capa);
             }),
           ),
-          (capa) => resumenDePrueba(capa, opciones.sinCombinaciones === true),
+          resumenDePrueba,
         );
       }),
       provincia: () =>
@@ -266,12 +275,7 @@ export const capaDePrueba = (
               onSome: Effect.succeed,
               onNone: () => carga(cargas.length - 1),
             }),
-            (capa) =>
-              agrupacionEnHilo(
-                provinciaDePrueba(capa),
-                resumenDePrueba(capa, opciones.sinCombinaciones === true),
-                filtro,
-              ),
+            (capa) => agrupacionEnHilo(provinciaDePrueba(capa), resumenDePrueba(capa), filtro),
           ),
         ),
       puntos: Effect.suspend(() =>
@@ -329,15 +333,14 @@ export interface PublicacionDePrueba {
 /**
  * Publica unas fichas en Barcelona como lo haría la publicación, en lotes de `porLote`, sin
  * municipios ni barrios, para probar el servicio de capa y el de fichas con el formato de verdad.
- * El índice de claves va en `partesDelIndice` partes; con `null`, el resumen es de antes del
- * índice.
+ * El índice de claves va en `partesDelIndice` partes.
  */
 export const publicacionDePrueba = (
   version: string,
   fecha: number,
   fichas: ReadonlyArray<Ficha>,
   porLote = 2,
-  partesDelIndice: number | null = 4,
+  partesDelIndice = 4,
   anteriores: ReadonlyArray<readonly [anterior: string, actual: string]> = [],
 ): PublicacionDePrueba => {
   const situados: ReadonlyArray<EmplazamientoSituado> = fichas
@@ -381,18 +384,15 @@ export const publicacionDePrueba = (
   });
   const ficheroCapa = ficheroDeCapaDeProvincia("08", huellaDePrueba(contenidoCapa));
   ficheros.set(ficheroCapa, contenidoCapa);
-  const claves =
-    partesDelIndice === null
-      ? undefined
-      : generarIndiceDeClaves(
-          new Map([["08", situados]]),
-          partesDelIndice,
-          new Map(anteriores),
-        ).map((contenido) => {
-          const fichero = ficheroDeIndiceDeClaves(huellaDePrueba(contenido));
-          ficheros.set(fichero, contenido);
-          return fichero;
-        });
+  const claves = generarIndiceDeClaves(
+    new Map([["08", situados]]),
+    partesDelIndice,
+    new Map(anteriores),
+  ).map((contenido) => {
+    const fichero = ficheroDeIndiceDeClaves(huellaDePrueba(contenido));
+    ficheros.set(fichero, contenido);
+    return fichero;
+  });
   const contenidoPuntos = generarPuntos(new Map([["08", situados]]));
   const ficheroPuntos = ficheroDePuntos(huellaDePrueba(contenidoPuntos));
   ficheros.set(ficheroPuntos, contenidoPuntos);
@@ -424,6 +424,7 @@ export const publicacionDePrueba = (
       emplazamientos: situados.length,
       lotes: lotes.length,
       resumen: ficheroResumen,
+      licencias: LICENCIAS,
     }),
   );
   const resumen = leerResumen(contenidoResumen, version);

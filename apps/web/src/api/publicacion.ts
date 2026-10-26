@@ -139,12 +139,6 @@ export const publicacionDelOrigen = Layer.effect(
 
     const version = Effect.fn("Publicacion.version")(function* (origen: string) {
       const vigente = yield* Cache.get(vigentes, `${origen}/${FICHERO_VIGENTE}`);
-      if (vigente.resumen === undefined) {
-        return yield* new DatosNoDisponibles({
-          url: `${origen}/${FICHERO_VIGENTE}`,
-          motivo: `${vigente.version} no tiene resumen nacional`,
-        });
-      }
       const resumen = yield* Cache.get(resumenes, {
         url: `${origen}/${vigente.resumen}`,
         espera: vigente.version,

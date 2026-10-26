@@ -15,6 +15,7 @@ import {
   versionDeCabecera,
   versionDeCapa,
 } from "./capa.ts";
+import { LICENCIAS } from "./licencias.ts";
 
 const NOCHE = Date.UTC(2026, 8, 26, 2, 15, 3, 456);
 
@@ -31,20 +32,16 @@ describe("capa de emplazamientos", () => {
     assert.strictEqual(carpetaDeFichas(versionDeCapa(NOCHE)), "fichas@2026-09-26T02:15:03Z");
   });
 
-  it("vigente.json dice la versión y su resumen, y se lee de vuelta; sin resumen es del 4", () => {
+  it("vigente.json dice la versión, su resumen y sus licencias, y se lee de vuelta", () => {
     const vigente = {
       version: versionDeCapa(NOCHE),
       fecha: NOCHE,
       emplazamientos: 3,
       lotes: 1,
       resumen: "resumen@2026-09-26T02:15:03Z.0123456789abcdef.json",
+      licencias: LICENCIAS,
     };
     assert.deepStrictEqual(decodificarVigente(codificarVigente(vigente)), Result.succeed(vigente));
-    const { resumen: _resumen, ...delFormato4 } = vigente;
-    assert.deepStrictEqual(
-      decodificarVigente(codificarVigente(delFormato4)),
-      Result.succeed(delFormato4),
-    );
     assert.isTrue(Result.isFailure(decodificarVigente('{"version":3}')));
     assert.isTrue(Result.isFailure(decodificarVigente("<!doctype html>")));
   });

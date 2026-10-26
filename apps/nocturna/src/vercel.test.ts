@@ -131,7 +131,7 @@ const loQuePideUnaPestana = (almacen: ReadonlyMap<string, string>, resumen: stri
   const leido = leerResumen(contenido, version);
   if (Result.isFailure(leido)) return assert.fail(`${resumen} no se entiende`);
   return [
-    ...(leido.success.claves ?? []),
+    ...leido.success.claves,
     ...leido.success.provincias.flatMap((provincia) => {
       if (provincia.fichero === undefined) return [];
       const capa = leerCapaDeProvincia(almacen.get(provincia.fichero) ?? "", provincia.codigo);

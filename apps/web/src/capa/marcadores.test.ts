@@ -106,16 +106,12 @@ describe("nombres accesibles con un filtro de compañías (ADR 0026)", () => {
     );
   });
 
-  it("el de una provincia cuenta lo del filtro, aparte la red usada, y dice si aún cuenta todas", () => {
+  it("el de una provincia cuenta lo del filtro y, aparte, la red usada", () => {
     const [barcelona] = provinciasDeRESUMEN();
     if (barcelona === undefined) return assert.fail("sin Barcelona");
     assert.strictEqual(
       nombreDeProvincia({ ...barcelona, cuantos: 3, deLaRed: 20 }, ["digi"]),
       "Barcelona, 3 emplazamientos de Digi y 20 de Movistar, la red que usa Digi, acercar",
-    );
-    assert.strictEqual(
-      nombreDeProvincia({ ...barcelona, sinFiltrar: true }, ["digi"]),
-      `Barcelona, ${barcelona.cuantos} emplazamientos de todas las compañías, acercar`,
     );
   });
 });

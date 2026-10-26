@@ -193,12 +193,7 @@ export const agrupadorDeProvincia = (
   const opciones: OpcionesAgrupador = {
     indices,
     prefijo: prefijoDeProvincia(capa.provincia),
-    municipios: cubierta
-      ? resumirMunicipios(
-          capa.municipios,
-          capa.emplazamientos.map((e) => ({ ...e, municipio: e.municipio ?? null })),
-        )
-      : [],
+    municipios: cubierta ? resumirMunicipios(capa.municipios, capa.emplazamientos) : [],
   };
   return crearAgrupador(capa.emplazamientos, capa.barrios, opciones);
 };
@@ -252,21 +247,17 @@ export interface OpcionesNacional {
 
 /**
  * Lo que dice el hexágono de una provincia del resumen con un filtro: los emplazamientos de las
- * compañías del filtro y, aparte, los de la red que usan. Con un resumen de antes de las
- * combinaciones no se puede contar: dice los de todas y lo marca `sinFiltrar`.
+ * compañías del filtro y, aparte, los de la red que usan. Sin sus combinaciones, todos.
  */
 export const cuentaDeProvincia = (
   provincia: ProvinciaDelResumen,
   filtro: FiltroDeCompanias,
-): Pick<ElementoProvincia, "cuantos" | "deLaRed" | "sinFiltrar"> => {
-  if (!hayFiltro(filtro)) {
-    return { cuantos: provincia.emplazamientos, deLaRed: 0, sinFiltrar: false };
-  }
-  if (provincia.combinaciones === undefined) {
-    return { cuantos: provincia.emplazamientos, deLaRed: 0, sinFiltrar: true };
+): Pick<ElementoProvincia, "cuantos" | "deLaRed"> => {
+  if (!hayFiltro(filtro) || provincia.combinaciones === undefined) {
+    return { cuantos: provincia.emplazamientos, deLaRed: 0 };
   }
   const { propios, redUsada } = contarConFiltro(provincia.combinaciones, filtro);
-  return { cuantos: propios, deLaRed: redUsada, sinFiltrar: false };
+  return { cuantos: propios, deLaRed: redUsada };
 };
 
 /**

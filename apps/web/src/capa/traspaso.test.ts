@@ -12,6 +12,9 @@ const emplazamiento = (clave: string, longitud: number, latitud: number): Emplaz
   estado: "verificado",
   companias: ["movistar"],
   barrio: null,
+  lote: 0,
+  provincia: "08",
+  municipio: null,
 });
 
 // Dos casi juntos, que van en una agrupación a zoom 15, y uno suelto.

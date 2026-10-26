@@ -49,7 +49,6 @@ import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from
 
 import type { EstadoProvincia } from "../capa/nacional.ts";
 import { usarDatos } from "../datos.tsx";
-import { PROVINCIA_DE_LOS_ENLACES_VIEJOS } from "../lib/rutas.ts";
 import { type BandasLeidas, bandasDeEmplazamiento, leerBandas } from "./bandas.ts";
 import {
   conBarrios,
@@ -473,13 +472,9 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
   const leer = () => {
     lectura += 1;
     const esta = lectura;
-    const pedidas = enZona().map((e) => ({
-      clave: e.clave,
-      provincia: e.provincia ?? PROVINCIA_DE_LOS_ENLACES_VIEJOS,
-    }));
     setBandas({ tipo: "leyendo" });
     void datos
-      .runPromiseExit(Effect.zip(leerBandas(pedidas), Clock.currentTimeMillis))
+      .runPromiseExit(Effect.zip(leerBandas(enZona()), Clock.currentTimeMillis))
       .then((salida) => {
         if (esta !== lectura) return;
         setBandas(

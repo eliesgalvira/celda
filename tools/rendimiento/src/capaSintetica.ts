@@ -14,6 +14,7 @@ import {
 } from "../../../packages/dominio/src/capa.ts";
 import type { Compania } from "../../../packages/dominio/src/compania.ts";
 import type { Ficha } from "../../../packages/dominio/src/ficha.ts";
+import { LICENCIAS } from "../../../packages/dominio/src/licencias.ts";
 import { repartirEnLotes } from "../../../packages/dominio/src/lotes.ts";
 import {
   cajaDeSituados,
@@ -21,9 +22,11 @@ import {
   companiasDeSituados,
   type EmplazamientoSituado,
   ficheroDeCapaDeProvincia,
+  ficheroDeIndiceDeClaves,
   ficheroDeLoteDeProvincia,
   ficheroDeResumen,
   generarCapaDeProvincia,
+  generarIndiceDeClaves,
   generarLoteDeProvincia,
   generarResumen,
 } from "../../../packages/dominio/src/provincias.ts";
@@ -82,6 +85,14 @@ const FUENTE_INE = {
   enlace: "https://www.ine.es/jaxiT3/Tabla.htm?t=29005",
   referencia: "2025-01-01",
   publicada: "2025-12-11",
+};
+
+const FUENTE_NGBE = {
+  atribucion: "Instituto Geográfico Nacional",
+  producto: "Nomenclátor Geográfico Básico de España",
+  licencia: "CC BY 4.0",
+  enlace: "https://www.ign.es/wfs-inspire/ngbe?service=WFS&request=GetCapabilities",
+  fecha: "2026-05-28",
 };
 
 export interface CapaSintetica {
@@ -184,9 +195,20 @@ export const escribirCapaSintetica = async (base: string): Promise<CapaSintetica
   const puntos = generarPuntos(new Map([["08", situados]]));
   const ficheroPuntos = ficheroDePuntos(huella(puntos));
   await guardar(ficheroPuntos, puntos);
+  const claves = [];
+  for (const contenido of generarIndiceDeClaves(new Map([["08", situados]]))) {
+    const fichero = ficheroDeIndiceDeClaves(huella(contenido));
+    await guardar(fichero, contenido);
+    claves.push(fichero);
+  }
   const resumen = generarResumen({
     version,
-    fuentes: { barrios: LIMITES.fuente, municipios: FUENTE_IGN, padron: FUENTE_INE },
+    fuentes: {
+      barrios: LIMITES.fuente,
+      municipios: FUENTE_IGN,
+      padron: FUENTE_INE,
+      capitales: FUENTE_NGBE,
+    },
     cobertura: [
       {
         nombre: "prueba",
@@ -215,6 +237,7 @@ export const escribirCapaSintetica = async (base: string): Promise<CapaSintetica
       },
     ],
     cuadros: new Map(),
+    claves,
     puntos: ficheroPuntos,
   });
   const ficheroResumen = ficheroDeResumen(version, huella(resumen));
@@ -227,6 +250,7 @@ export const escribirCapaSintetica = async (base: string): Promise<CapaSintetica
       emplazamientos: emplazamientos.length,
       lotes: lotes.length,
       resumen: ficheroResumen,
+      licencias: LICENCIAS,
     }),
   );
   return {

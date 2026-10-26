@@ -7,6 +7,7 @@ import { cajaDe } from "@celda/dominio/area";
 import { codificarVigente, type EmplazamientoDeCapa } from "@celda/dominio/capa";
 import type { Compania } from "@celda/dominio/compania";
 import type { Ficha } from "@celda/dominio/ficha";
+import { LICENCIAS } from "@celda/dominio/licencias";
 import type { MunicipioConHabitantes } from "@celda/dominio/municipio";
 import {
   combinacionesDeSituados,
@@ -132,6 +133,7 @@ export const publicacionDePrueba = (
       cobertura: [],
       provincias: filas,
       cuadros: new Map(),
+      claves: [],
       puntos,
     }),
   );
@@ -143,6 +145,7 @@ export const publicacionDePrueba = (
       emplazamientos: filas.reduce((suma, p) => suma + p.emplazamientos, 0),
       lotes: provincias.length,
       resumen,
+      licencias: LICENCIAS,
     }),
   );
   return ficheros;

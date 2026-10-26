@@ -16,6 +16,9 @@ const emplazamiento = (
   estado: "verificado",
   companias,
   barrio: null,
+  lote: 0,
+  provincia: "08",
+  municipio: null,
 });
 
 const UNO = emplazamiento("uno", 2.1, ["movistar"]);
@@ -54,7 +57,6 @@ describe("hacia dónde vuela cada punto al cambiar de vista", () => {
       carga: "resumen",
       cuantos: 3,
       deLaRed: 0,
-      sinFiltrar: false,
     };
     const escena: Escena = { nivel: 6, elementos: new Map([[hexagono.clave, hexagono]]) };
     const { desde, hasta } = posicionesDelVuelo(

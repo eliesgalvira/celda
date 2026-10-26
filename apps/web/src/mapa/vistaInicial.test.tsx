@@ -37,6 +37,7 @@ const provincia = (
   cubierta: datos.cubierta ?? false,
   barrido: null,
   fichero: datos.caja === undefined ? undefined : `provincias/${codigo}/prueba.json`,
+  combinaciones: new Map(),
 });
 
 const resumenCon = (provincias: ReadonlyArray<ProvinciaDelResumen>): ResumenLeido => ({
@@ -45,6 +46,7 @@ const resumenCon = (provincias: ReadonlyArray<ProvinciaDelResumen>): ResumenLeid
   fuentes: FUENTES_DE_PRUEBA,
   cobertura: [],
   provincias,
+  claves: [],
   puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
 });
 

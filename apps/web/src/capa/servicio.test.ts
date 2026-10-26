@@ -1,6 +1,6 @@
 // Cada prueba es su propio punto de entrada y monta sus capas, nuevas en cada una.
 // @effect-diagnostics strictEffectProvide:off
-import { codificarVigente, versionDeCapa } from "@celda/dominio/capa";
+import { versionDeCapa } from "@celda/dominio/capa";
 import type { Compania } from "@celda/dominio/compania";
 import { SIN_FILTRO } from "@celda/dominio/filtro";
 import { parteDeClave } from "@celda/dominio/provincias";
@@ -163,46 +163,25 @@ describe("carga del resumen nacional", () => {
     }),
   );
 
-  it.effect(
-    "sin capa publicada, sin origen o con un vigente.json del formato 4, falla con el motivo",
-    () =>
-      Effect.gen(function* () {
-        const sinPublicar = yield* conCapa(new Map(), (capa) => Effect.exit(capa.resumen));
-        assert.strictEqual(errorDe(sinPublicar.resultado), "SinCapaPublicada");
-        assert.deepStrictEqual(sinPublicar.peticiones, ["vigente.json"]);
+  it.effect("sin capa publicada o sin origen, falla con el motivo", () =>
+    Effect.gen(function* () {
+      const sinPublicar = yield* conCapa(new Map(), (capa) => Effect.exit(capa.resumen));
+      assert.strictEqual(errorDe(sinPublicar.resultado), "SinCapaPublicada");
+      assert.deepStrictEqual(sinPublicar.peticiones, ["vigente.json"]);
 
-        const caido = yield* conCapa(
-          new Map([[`${ORIGEN}/vigente.json`, { estado: 503, cuerpo: "" }]]),
-          (capa) => Effect.exit(capa.resumen),
-        );
-        assert.strictEqual(errorDe(caido.resultado), "OrigenNoResponde");
+      const caido = yield* conCapa(
+        new Map([[`${ORIGEN}/vigente.json`, { estado: 503, cuerpo: "" }]]),
+        (capa) => Effect.exit(capa.resumen),
+      );
+      assert.strictEqual(errorDe(caido.resultado), "OrigenNoResponde");
 
-        // Un servidor que contesta a todo con la página de la web.
-        const html = yield* conCapa(
-          new Map([[`${ORIGEN}/vigente.json`, { estado: 200, cuerpo: "<!doctype html>" }]]),
-          (capa) => Effect.exit(capa.resumen),
-        );
-        assert.strictEqual(errorDe(html.resultado), "OrigenNoResponde");
-
-        const formato4 = yield* conCapa(
-          new Map([
-            [
-              `${ORIGEN}/vigente.json`,
-              {
-                estado: 200,
-                cuerpo: codificarVigente({
-                  version: HOY.version,
-                  fecha: NOCHE,
-                  emplazamientos: 3,
-                  lotes: 2,
-                }),
-              },
-            ],
-          ]),
-          (capa) => Effect.exit(capa.resumen),
-        );
-        assert.strictEqual(errorDe(formato4.resultado), "CapaIlegible");
-      }),
+      // Un servidor que contesta a todo con la página de la web.
+      const html = yield* conCapa(
+        new Map([[`${ORIGEN}/vigente.json`, { estado: 200, cuerpo: "<!doctype html>" }]]),
+        (capa) => Effect.exit(capa.resumen),
+      );
+      assert.strictEqual(errorDe(html.resultado), "OrigenNoResponde");
+    }),
   );
 });
 
@@ -561,17 +540,6 @@ describe("dónde está una clave", () => {
         capa.situarClave("vodafone-juntado"),
       );
       assert.deepStrictEqual(resultado, Option.some({ clave: "movistar-a", provincia: "08" }));
-    }),
-  );
-
-  it.effect("con un resumen de antes del índice, un enlace sin provincia es de Barcelona", () =>
-    Effect.gen(function* () {
-      const antes = publicacionDePrueba(versionDeCapa(NOCHE), NOCHE, FICHAS, 2, null);
-      const { resultado, peticiones } = yield* conCapa(origenCon(antes), (capa) =>
-        capa.situarClave("vodafone-nadie"),
-      );
-      assert.deepStrictEqual(resultado, Option.some({ clave: "vodafone-nadie", provincia: "08" }));
-      assert.lengthOf(peticiones, 2);
     }),
   );
 

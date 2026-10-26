@@ -171,10 +171,8 @@ export const nombreDeProvincia = (
 ): string => {
   const { nombre } = elemento.provincia;
   const cobertura = coberturaDe(elemento);
-  const deLosSuyos = elemento.sinFiltrar
-    ? " de todas las compañías"
-    : `${deQuien(filtro)}${elemento.deLaRed > 0 ? ` y ${elemento.deLaRed}${deLaRed(filtro)}` : ""}`;
-  const emplazamientos = `${textoDeEmplazamientos(elemento.cuantos)}${deLosSuyos}`;
+  const deLaSuya = elemento.deLaRed > 0 ? ` y ${elemento.deLaRed}${deLaRed(filtro)}` : "";
+  const emplazamientos = `${textoDeEmplazamientos(elemento.cuantos)}${deQuien(filtro)}${deLaSuya}`;
   const cuantos =
     cobertura === "ninguna"
       ? "Celda aún no tiene sus emplazamientos"

@@ -80,11 +80,11 @@ const provincia = (codigo: string, nombre: string, posicion: Coordenada): Elemen
     cubierta: true,
     barrido: null,
     fichero: undefined,
+    combinaciones: new Map(),
   },
   carga: "resumen",
   cuantos: 100,
   deLaRed: 0,
-  sinFiltrar: false,
 });
 
 const rotulo = (texto: string, posicion: Coordenada, habitantes: number): RotuloEnElMapa => ({
@@ -126,6 +126,9 @@ describe("tamaño de los hexágonos por zoom", () => {
         estado: "verificado",
         companias: ["movistar"],
         barrio: null,
+        lote: 0,
+        provincia: "08",
+        municipio: null,
       },
     };
     assert.deepStrictEqual(cajaDeMarcador(logo, "compacta", "lejos"), {
@@ -441,6 +444,9 @@ describe("la red que usa una compañía del filtro (ADR 0026)", () => {
         estado: "verificado",
         companias: ["movistar"],
         barrio: null,
+        lote: 0,
+        provincia: "08",
+        municipio: null,
       },
       redUsada: true,
     };

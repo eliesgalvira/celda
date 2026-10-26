@@ -59,15 +59,13 @@ export function ControlDeCompanias(props: {
  */
 export function AvisoDelFiltro(props: {
   readonly filtro: FiltroDeCompanias;
-  /** De lejos, con unos datos de antes, los números aún son de todas las compañías. */
-  readonly deLejosSinFiltrar: boolean;
   readonly alQuitar: () => void;
 }) {
   return (
     <Show when={hayFiltro(props.filtro)}>
       <AvisoDeFiltro
         texto={textoDelAviso(props.filtro)}
-        detalle={detalleDelAviso(props.filtro, props.deLejosSinFiltrar)}
+        detalle={detalleDelAviso(props.filtro)}
         alQuitar={() => props.alQuitar()}
       />
     </Show>

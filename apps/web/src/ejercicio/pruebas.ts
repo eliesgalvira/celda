@@ -1,6 +1,7 @@
 import { cajaDe, type Coordenada } from "@celda/dominio/area";
 import type { EmplazamientoLeido } from "@celda/dominio/capa";
 import type { Compania } from "@celda/dominio/compania";
+import { combinacionesDe } from "@celda/dominio/filtro";
 import {
   ficheroDeCapaDeProvincia,
   ficheroDeLoteDeProvincia,
@@ -114,7 +115,9 @@ export const resumenDeProvincias = (
     barrido: FECHA,
     fichero:
       p.emplazamientos.length === 0 ? undefined : ficheroDeCapaDeProvincia(p.codigo, "prueba"),
+    combinaciones: combinacionesDe(p.emplazamientos),
   })),
+  claves: [],
   puntos: FICHERO_DE_PUNTOS_DE_PRUEBA,
 });
 

@@ -256,7 +256,6 @@ describe("GET /api/emplazamientos", () => {
       assert.strictEqual(t1?.enlace, `${WEB}/?emplazamiento=t1&provincia=45`);
       assert.strictEqual(comoRespuesta(texto).version, V1);
       assert.strictEqual(comoRespuesta(texto).fecha, "2026-10-03T22:30:00.000Z");
-      // Una publicación sin licencias en `vigente.json` lleva las del código.
       assert.deepStrictEqual(comoRespuesta(texto).licencias, LICENCIAS);
       assert.strictEqual(respuesta.headers.get("Access-Control-Allow-Origin"), "*");
       assert.strictEqual(

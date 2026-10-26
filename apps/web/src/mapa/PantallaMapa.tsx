@@ -576,8 +576,8 @@ export function PantallaMapa() {
   });
   /**
    * Los créditos del mapa base y, con el resumen, el de los límites de municipios y el de las
-   * capitales, si el resumen las cita. El de los límites de barrio, solo con una provincia con
-   * barrios cargada: la de Barcelona.
+   * capitales. El de los límites de barrio, solo con una provincia con barrios cargada: la de
+   * Barcelona.
    */
   const conBarrios = createMemo(() => cargadas().some((p) => p.capa.barrios.length > 0));
   /**
@@ -599,7 +599,7 @@ export function PantallaMapa() {
       : [
           ...delCallejero,
           creditoDeMunicipios(fuentes.municipios),
-          ...(fuentes.capitales === undefined ? [] : [creditoDeCapitales(fuentes.capitales)]),
+          creditoDeCapitales(fuentes.capitales),
           ...(conBarrios() ? [creditoDeBarrios(fuentes.barrios)] : []),
           ...deLosLogos,
         ];
@@ -971,16 +971,6 @@ export function PantallaMapa() {
   });
 
   /**
-   * Con un filtro, de lejos, y un resumen publicado antes de las combinaciones de compañías: los
-   * hexágonos de las provincias aún cuentan todas, y el aviso del filtro lo dice.
-   */
-  const deLejosSinFiltrar = createMemo(
-    () =>
-      hayFiltro(filtro.aplicado()) &&
-      Math.floor(vistaDelMapa()?.zoom ?? 0) < NIVEL_DE_PROVINCIAS &&
-      (resumen()?.provincias.some((p) => p.combinaciones === undefined) ?? false),
-  );
-  /**
    * Si el emplazamiento seleccionado sale por la red que usa una compañía del filtro, cuál: la
    * ficha lo explica (ADR 0026).
    */
@@ -1051,11 +1041,7 @@ export function PantallaMapa() {
               estado().tipo === "cargando" ? <CargaDelMapa texto="Cargando el mapa…" /> : undefined
             }
             filtro={
-              <AvisoDelFiltro
-                filtro={filtro.aplicado()}
-                deLejosSinFiltrar={deLejosSinFiltrar()}
-                alQuitar={() => filtro.elegir([])}
-              />
+              <AvisoDelFiltro filtro={filtro.aplicado()} alQuitar={() => filtro.elegir([])} />
             }
             ubicacion={
               <>
