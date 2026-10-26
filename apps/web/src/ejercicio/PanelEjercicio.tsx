@@ -67,12 +67,10 @@ import {
   csvDeTabla,
   decimal,
   entero,
-  filasExportadas,
   fuenteDeParametros,
   nombreDeFichero,
   tablaDelEjercicio,
 } from "./tabla.ts";
-import { xlsxDeFilas } from "./xlsx.ts";
 import {
   cargarContornos,
   cargarIndiceDeZonas,
@@ -123,9 +121,9 @@ const SIN_BORDE: ProvinciasDelBorde = { faltan: [], incompletas: [] };
 /** Antes de leer las fichas no se sabe de ninguna estación base sin ficha en el registro. */
 const SIN_MARCAS: ReadonlyMap<string, ReadonlyArray<Compania>> = new Map();
 
-/** Descarga unos bytes o un texto como fichero, sin pasar por ningún servidor. */
-const descargar = (contenido: BlobPart, tipo: string, nombre: string) => {
-  const url = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+/** Descarga un CSV como fichero, sin pasar por ningún servidor. */
+const descargarCsv = (csv: string, nombre: string) => {
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const enlace = document.createElement("a");
   enlace.href = url;
   enlace.download = nombre;
@@ -917,27 +915,13 @@ export function PanelEjercicio(props: PanelEjercicioProps) {
                         <Boton
                           disabled={vecinasPendientes().length > 0}
                           onClick={() =>
-                            descargar(
+                            descargarCsv(
                               csvDeTabla(hecha()),
-                              "text/csv;charset=utf-8",
                               `${nombreDeFichero(resuelta()?.titulo ?? "")}.csv`,
                             )
                           }
                         >
                           Descargar CSV
-                        </Boton>
-                        <Boton
-                          variante="secundario"
-                          disabled={vecinasPendientes().length > 0}
-                          onClick={() =>
-                            descargar(
-                              xlsxDeFilas(resuelta()?.nombre ?? "Tabla", filasExportadas(hecha())),
-                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                              `${nombreDeFichero(resuelta()?.titulo ?? "")}.xlsx`,
-                            )
-                          }
-                        >
-                          Descargar XLSX
                         </Boton>
                       </AccionesEjercicio>
                     </SeccionFicha>

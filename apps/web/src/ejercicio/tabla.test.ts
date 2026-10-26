@@ -6,14 +6,7 @@ import {
 import { assert, describe, it } from "@effect/vitest";
 
 import { FUENTE_DE_BARRIOS, FUENTES_DE_PRUEBA } from "../capa/pruebas.ts";
-import {
-  type ContextoDeTabla,
-  csvDeTabla,
-  filasExportadas,
-  nombreDeFichero,
-  tablaDelEjercicio,
-} from "./tabla.ts";
-import { crc32, letraDeColumna, xlsxDeFilas } from "./xlsx.ts";
+import { type ContextoDeTabla, csvDeTabla, nombreDeFichero, tablaDelEjercicio } from "./tabla.ts";
 
 const ENTRADA: EntradaDelEjercicio = {
   habitantes: 12_479,
@@ -178,57 +171,6 @@ describe("tabla del ejercicio", () => {
     assert.strictEqual(
       nombreDeFichero("Sant Martí de Provençals"),
       "estaciones-base-sant-marti-de-provencals",
-    );
-  });
-});
-
-/** Las entradas de un ZIP sin comprimir, leyendo sus cabeceras locales en orden. */
-const leerZip = (zip: Uint8Array): ReadonlyMap<string, string> => {
-  const vista = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
-  const decodificar = new TextDecoder();
-  const entradas = new Map<string, string>();
-  let i = 0;
-  while (vista.getUint32(i, true) === 0x04_03_4b_50) {
-    const tamano = vista.getUint32(i + 18, true);
-    const largoNombre = vista.getUint16(i + 26, true);
-    const nombre = decodificar.decode(zip.subarray(i + 30, i + 30 + largoNombre));
-    const datos = zip.subarray(i + 30 + largoNombre, i + 30 + largoNombre + tamano);
-    assert.strictEqual(vista.getUint32(i + 14, true), crc32(datos), `CRC de ${nombre}`);
-    entradas.set(nombre, decodificar.decode(datos));
-    i += 30 + largoNombre + tamano;
-  }
-  return entradas;
-};
-
-describe("XLSX", () => {
-  it("calcula el CRC-32 del ZIP", () => {
-    assert.strictEqual(crc32(new TextEncoder().encode("123456789")), 0xcb_f4_39_26);
-  });
-
-  it("nombra las columnas como una hoja de cálculo", () => {
-    assert.deepStrictEqual([0, 25, 26, 27, 701].map(letraDeColumna), ["A", "Z", "AA", "AB", "ZZ"]);
-  });
-
-  it("guarda la tabla en una hoja, con los números como números y los textos escapados", () => {
-    const zip = xlsxDeFilas("Pedralbes", filasExportadas(tabla()));
-    const entradas = leerZip(zip);
-    assert.deepStrictEqual(
-      [...entradas.keys()],
-      [
-        "[Content_Types].xml",
-        "_rels/.rels",
-        "xl/workbook.xml",
-        "xl/_rels/workbook.xml.rels",
-        "xl/worksheets/sheet1.xml",
-      ],
-    );
-    assert.include(entradas.get("xl/workbook.xml"), '<sheet name="Pedralbes"');
-    const hoja = entradas.get("xl/worksheets/sheet1.xml") ?? "";
-    assert.include(hoja, '<c r="D4"><v>12479</v></c>');
-    assert.include(hoja, '<t xml:space="preserve">Radio de cobertura</t>');
-    assert.include(
-      leerZip(xlsxDeFilas("x", [[{ texto: "a < b & c" }]])).get("xl/worksheets/sheet1.xml"),
-      "a &lt; b &amp; c",
     );
   });
 });
