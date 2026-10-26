@@ -3,13 +3,16 @@ import { enumerar } from "@celda/dominio/enumerar";
 import {
   type FiltroDeCompanias,
   hayFiltro,
+  mismoFiltro,
   nombresDelFiltro,
   redesUsadas,
+  type SinRedPropia,
 } from "@celda/dominio/filtro";
 
 /**
  * Los textos del filtro de compañías (ADR 0026). Lo que ya dicen los chips pulsados no se repite;
- * solo se escribe lo que sorprendería: lo que sale más claro.
+ * solo se escribe lo que sorprendería: lo que sale más claro y por qué se ve otra compañía que la
+ * sin red propia que se ha tocado.
  */
 
 /** El chip que quita el filtro. */
@@ -26,10 +29,10 @@ export const textoDelAviso = (filtro: FiltroDeCompanias): string =>
   `Solo ${nombresDelFiltro(filtro)}`;
 
 /**
- * La línea de debajo del aviso, solo con compañías del filtro que usan otra red: «La red de
+ * Lo que sale aparte con las compañías del filtro que usan otra red, en una línea: «La red de
  * Movistar que usa Digi sale más clara.» Sin ninguna, `undefined`.
  */
-export const detalleDelAviso = (filtro: FiltroDeCompanias): string | undefined => {
+const textoDeLaRedUsada = (filtro: FiltroDeCompanias): string | undefined => {
   const redes = redesUsadas(filtro);
   if (redes.length === 0) return undefined;
   const de = enumerar(redes.map((r) => NOMBRE_COMPANIA[r.red]));
@@ -38,3 +41,21 @@ export const detalleDelAviso = (filtro: FiltroDeCompanias): string | undefined =
     ? `La red de ${de} que usa ${quienes} sale más clara.`
     : `Las redes de ${de} que usan ${quienes} salen más claras.`;
 };
+
+/** «Simyo usa la red de Orange.», mientras el filtro sea solo el de esa red. */
+const textoSinRedPropia = (
+  filtro: FiltroDeCompanias,
+  sinRedPropia: SinRedPropia | undefined,
+): string | undefined =>
+  sinRedPropia !== undefined && mismoFiltro(filtro, [sinRedPropia.red])
+    ? `${sinRedPropia.compania} usa la red de ${NOMBRE_COMPANIA[sinRedPropia.red]}.`
+    : undefined;
+
+/**
+ * La línea de debajo del aviso, solo si algo sorprendería: la red que usa la compañía sin red
+ * propia que se ha tocado o lo que sale más claro.
+ */
+export const detalleDelAviso = (
+  filtro: FiltroDeCompanias,
+  sinRedPropia?: SinRedPropia,
+): string | undefined => textoSinRedPropia(filtro, sinRedPropia) ?? textoDeLaRedUsada(filtro);

@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import { mascaraDeCompanias } from "./capa.ts";
-import type { Compania } from "./compania.ts";
+import { type Compania, NOMBRE_COMPANIA } from "./compania.ts";
 import {
   claveDeFiltro,
   combinacionesDe,
@@ -16,6 +16,7 @@ import {
   resaltadasDe,
   separarPorPapel,
   SIN_FILTRO,
+  SIN_RED_PROPIA,
   textoDeRedUsada,
 } from "./filtro.ts";
 
@@ -163,5 +164,12 @@ describe("filtro de compañías", () => {
         claveDeFiltro(filtro),
       );
     }
+  });
+
+  it("cada compañía sin red propia sale una vez, y el filtro de su red no saca nada aparte", () => {
+    const nombres = SIN_RED_PROPIA.flatMap((grupo) => grupo.companias);
+    assert.strictEqual(new Set(nombres).size, nombres.length);
+    for (const nombre of Object.values(NOMBRE_COMPANIA)) assert.notInclude(nombres, nombre);
+    for (const { red } of SIN_RED_PROPIA) assert.deepStrictEqual(redesUsadas([red]), [], red);
   });
 });

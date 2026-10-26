@@ -28,6 +28,41 @@ export const RED_QUE_USA: ReadonlyMap<Compania, Compania> = new Map([
   ["yoigo", "orange"],
 ]);
 
+/** Las compañías sin red propia que usan la red de una compañía. */
+export interface GrupoSinRedPropia {
+  readonly red: Compania;
+  readonly companias: ReadonlyArray<string>;
+}
+
+/**
+ * Las compañías sin red propia, por la red que usan, comprobado el 26/10/2026 (ADR 0026). No
+ * tienen emplazamientos: elegir una pone el filtro de su red. Las que usan más de una red no están.
+ */
+export const SIN_RED_PROPIA: ReadonlyArray<GrupoSinRedPropia> = [
+  { red: "movistar", companias: ["O2"] },
+  { red: "vodafone", companias: ["Lowi", "Finetwork"] },
+  {
+    red: "orange",
+    companias: [
+      "Simyo",
+      "Jazztel",
+      "MásMóvil",
+      "Pepephone",
+      "Lebara",
+      "Llamaya",
+      "Euskaltel",
+      "R",
+      "Avatel",
+    ],
+  },
+];
+
+/** Una compañía sin red propia que se ha elegido, y la de la red que usa. */
+export interface SinRedPropia {
+  readonly compania: string;
+  readonly red: Compania;
+}
+
 /** Las compañías de una lista que se pueden elegir, en su orden y sin repetir. */
 export const normalizarFiltro = (companias: ReadonlyArray<Compania>): FiltroDeCompanias => {
   const elegidas = Compania.literals.filter((c) => companias.includes(c));

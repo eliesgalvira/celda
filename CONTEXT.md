@@ -36,6 +36,10 @@ _Evitar_: operador, filtro de operadoras, capa de compañía
 La red de otra compañía a la que se conectan los clientes de una del filtro donde esta no tiene la suya: la de Movistar para DIGI y la de Orange para Yoigo. Con DIGI en el filtro y Movistar no, los emplazamientos de Movistar salen aparte, más claros, sin contar en las zonas ni en las agrupaciones.
 _Evitar_: itinerancia, roaming (en la interfaz), red prestada, cobertura
 
+**Compañía sin red propia**:
+Empresa de telefonía móvil sin emplazamientos que da servicio con la red de una compañía, como Simyo con la de Orange. No sale en el mapa ni en los chips: se elige en «¿No sale la tuya?», y eso pone el filtro de su red (ADR 0026). Las que usan más de una red no están.
+_Evitar_: operador móvil virtual, OMV, marca blanca
+
 **Agrupación**:
 Hexágono con un número que recoge los emplazamientos cercanos cuando se aleja el mapa: en la vista agrupada y, en las dos vistas, desde el zoom de los logos, donde varios quedan muy juntos.
 _Evitar_: cluster, grupo, hexágono
@@ -409,5 +413,5 @@ _Evitar_: clientes, carga
 - «Estado» a secas es el del emplazamiento. El de la ubicación se nombra siempre completo.
 - La ingesta llama «ficha» también a la página de cada estación en el registro oficial (`detalleEstacion.do`), de la que salen las bandas, y «cola de fichas» a las que quedan por leer en la ronda. En la interfaz, ficha es solo la del panel, con una excepción: «el registro no tiene ficha para este emplazamiento», que se dice de una estación base sin ficha en el registro.
 - El servicio de NixOS y el paquete se llaman `celda-nocturna`, y la orden que lanza una ejecución de ingesta, `noche`, de cuando la ingesta corría cada noche. Desde el ADR 0029 corre el primer fin de semana de cada mes, y conservan el nombre.
-- Falta decidir si una marca que usa la red de otra empresa aparece como compañía. DIGI y Yoigo sí lo son, y la red que usan sale aparte con el filtro (ADR 0026).
+- La interfaz llama «compañías» a las compañías sin red propia («Estas compañías no tienen antenas propias…»), aunque no emiten desde ningún emplazamiento. DIGI y Yoigo sí son compañías, porque tienen emplazamientos, aunque usen también la red de otra (ADR 0026).
 - El INE escribe con barra los nombres oficiales con dos formas («Valencia/València», «Donostia/San Sebastián»), y OpenStreetMap a veces también. Los datos los guardan así; lo que se ve es el nombre de lugar, en una sola forma.
