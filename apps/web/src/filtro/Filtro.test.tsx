@@ -196,10 +196,15 @@ describe("filtro de compañías (ADR 0026)", () => {
     // Al volver a abrir, el chip de su red está pulsado, y cambiar el filtro con él quita la línea.
     fireEvent.click(pastilla);
     flush();
-    assert.strictEqual(getByRole("button", { name: "Orange" }).getAttribute("aria-pressed"), "true");
+    assert.strictEqual(
+      getByRole("button", { name: "Orange" }).getAttribute("aria-pressed"),
+      "true",
+    );
     fireEvent.click(getByRole("button", { name: "Vodafone" }));
     flush();
-    await waitFor(() => assert.strictEqual(aviso()?.textContent, "Solo Vodafone y OrangeVer todas"));
+    await waitFor(() =>
+      assert.strictEqual(aviso()?.textContent, "Solo Vodafone y OrangeVer todas"),
+    );
     fireEvent.click(getByRole("button", { name: "Vodafone" }));
     flush();
     await waitFor(() => assert.strictEqual(aviso()?.textContent, "Solo OrangeVer todas"));

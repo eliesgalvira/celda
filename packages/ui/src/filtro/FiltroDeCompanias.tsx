@@ -105,34 +105,39 @@ function Raya() {
   return <span aria-hidden="true" class="mx-1 my-1 border-t border-linea" />;
 }
 
-/** «Red de Orange», con su logo, y debajo las compañías que la usan, en filas que se parten. */
+/**
+ * «Red de Orange», con su logo, y debajo las compañías que la usan, en filas que se parten. La raya
+ * de entre grupos va en el envoltorio: en el `fieldset`, la leyenda la cortaría.
+ */
 function CompaniasDeLaRed(props: {
   readonly grupo: GrupoSinRedPropia;
   readonly alElegir: (compania: string) => void;
 }) {
-  const titulo = createUniqueId();
   return (
-    <div role="group" aria-labelledby={titulo} class="flex flex-col pt-1.5">
-      <span
-        id={titulo}
-        class="flex items-center gap-1.5 px-0.5 font-texto text-xs font-semibold text-tinta"
-      >
-        <span aria-hidden="true" class="grid size-4 place-items-center">
-          <LogoCompanias companias={[props.grupo.red]} tamano={16} />
-        </span>
-        Red de {NOMBRE_COMPANIA[props.grupo.red]}
-      </span>
-      <div class="flex flex-wrap gap-x-1">
-        <For each={props.grupo.companias}>
-          {(compania) => (
-            <button type="button" class={variantesDiana()} onClick={() => props.alElegir(compania)}>
-              <span class="border-[1.5px] border-control-borde bg-control px-2 py-1 font-texto text-xs font-semibold text-control-tinta group-hover:bg-control-hover group-active:bg-primario group-active:text-primario-fg">
-                {compania}
-              </span>
-            </button>
-          )}
-        </For>
-      </div>
+    <div class="pt-1.5">
+      <fieldset class="flex flex-col">
+        <legend class="flex items-center gap-1.5 px-0.5 font-texto text-xs font-semibold text-tinta">
+          <span aria-hidden="true" class="grid size-4 place-items-center">
+            <LogoCompanias companias={[props.grupo.red]} tamano={16} />
+          </span>
+          Red de {NOMBRE_COMPANIA[props.grupo.red]}
+        </legend>
+        <div class="flex flex-wrap gap-x-1">
+          <For each={props.grupo.companias}>
+            {(compania) => (
+              <button
+                type="button"
+                class={variantesDiana()}
+                onClick={() => props.alElegir(compania)}
+              >
+                <span class="border-[1.5px] border-control-borde bg-control px-2 py-1 font-texto text-xs font-semibold text-control-tinta group-hover:bg-control-hover group-active:bg-primario group-active:text-primario-fg">
+                  {compania}
+                </span>
+              </button>
+            )}
+          </For>
+        </div>
+      </fieldset>
     </div>
   );
 }
@@ -253,18 +258,19 @@ export function MenuDeCompanias(props: MenuDeCompaniasProps) {
                   class={variantesDiana({ class: "w-full" })}
                   onClick={() => verSinRed(true)}
                 >
-                  <span class="flex w-full items-center justify-between px-1 font-texto text-sm font-semibold text-primario-texto group-hover:text-tinta">
-                    <span class="underline underline-offset-4">¿No sale la tuya?</span>
+                  <span class="flex w-full items-center justify-between px-1 font-texto text-sm font-semibold text-primario-texto underline underline-offset-4 group-hover:text-tinta">
+                    ¿No sale la tuya?
                     <span aria-hidden="true">›</span>
                   </span>
                 </button>
               </>
             }
           >
-            <div role="group" aria-labelledby={nota} class="flex flex-col">
+            <>
               <button
                 type="button"
                 aria-label="Volver a las compañías"
+                aria-describedby={nota}
                 ref={(boton) => {
                   volver = boton;
                 }}
@@ -293,7 +299,7 @@ export function MenuDeCompanias(props: MenuDeCompaniasProps) {
                   )}
                 </For>
               </div>
-            </div>
+            </>
           </Show>
         </div>
       </Show>
