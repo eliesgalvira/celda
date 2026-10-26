@@ -2,6 +2,8 @@ import type { JSX } from "@solidjs/web";
 import { cva, type VariantProps } from "class-variance-authority";
 import { For, Show } from "solid-js";
 
+import { Etiqueta } from "../Etiqueta.tsx";
+
 /**
  * Piezas del paso de medir la señal: el código del modo de información, los pasos, las opciones
  * en un ordenador y la medida de ejemplo con sus valores explicados.
@@ -108,8 +110,6 @@ export function Puntos(props: { readonly children: JSX.Element }) {
 export interface OpcionProps {
   readonly titulo: string;
   readonly children: JSX.Element;
-  /** Una marca junto al título, como «PRONTO». */
-  readonly etiqueta?: JSX.Element;
   /** Lo que va al lado del texto en escritorio y debajo en el móvil, como un código QR. */
   readonly lado?: JSX.Element;
   /** Botones o enlaces de la opción. */
@@ -121,10 +121,7 @@ export function Opcion(props: OpcionProps) {
   return (
     <section class="flex flex-col gap-3 bg-superficie-alta px-4 py-3 shadow-[inset_0_0_0_1.5px_var(--linea)] sm:flex-row sm:items-start">
       <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-        <h3 class="flex flex-wrap items-center gap-2 text-base font-semibold">
-          {props.titulo}
-          {props.etiqueta}
-        </h3>
+        <h3 class="text-base font-semibold">{props.titulo}</h3>
         <div class="flex flex-col gap-1.5">{props.children}</div>
         <Show when={props.acciones}>
           <div class="mt-1 flex flex-wrap gap-2">{props.acciones}</div>
@@ -165,32 +162,24 @@ function Rayas(props: { readonly rayas: number }) {
 }
 
 export interface MedidaMostradaProps {
-  /** La marca que dice de quién es la medida, como la etiqueta «EJEMPLO». */
-  readonly etiqueta: JSX.Element;
   readonly titulo: string;
-  /** El tono del marco: una medida de ejemplo nunca lleva el de una propia. */
-  readonly tipo: "propia" | "ejemplo";
   readonly valores: ReadonlyArray<ValorDeSenal>;
   /** Frases tras los valores, como que es inventada. */
   readonly children?: JSX.Element;
 }
 
 /**
- * Una medida con sus valores explicados uno a uno. La de ejemplo lleva el marco y la etiqueta
- * del color de ejemplo, que ningún dato usa (historia 49).
+ * La medida de ejemplo con sus valores explicados uno a uno, con el marco y la etiqueta del color
+ * de ejemplo, que ningún dato usa.
  */
 export function MedidaMostrada(props: MedidaMostradaProps) {
   return (
     <section
-      data-tipo={props.tipo}
       aria-label={props.titulo}
-      class={
-        "flex flex-col gap-3 bg-superficie-alta px-4 py-3 shadow-[inset_0_0_0_2px_var(--primario)] " +
-        "data-[tipo=ejemplo]:shadow-[inset_0_0_0_2px_var(--ejemplo)]"
-      }
+      class="flex flex-col gap-3 bg-superficie-alta px-4 py-3 shadow-[inset_0_0_0_2px_var(--ejemplo)]"
     >
       <div class="flex flex-wrap items-center gap-2">
-        {props.etiqueta}
+        <Etiqueta tono="ejemplo">EJEMPLO</Etiqueta>
         <h3 class="text-base font-semibold">{props.titulo}</h3>
       </div>
       <dl class="flex flex-col">

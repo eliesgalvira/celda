@@ -45,14 +45,6 @@ export const textoAportacion = (contenido: AportacionCompartible): string => {
       return `Corrección propuesta: ${textoCambio(contenido.cambio)}`;
     case "corroboracion":
       return `Corroboración de la corrección ${contenido.correccion}`;
-    case "propia": {
-      const { senal, unidaA } = contenido;
-      return (
-        `Medida propia: ${NOMBRE_COMPANIA[senal.compania]} ${senal.red} ${senal.mhz} MHz, ` +
-        `${senal.rsrpDbm} dBm, en ${punto(contenido.punto)}, unida al sector de ` +
-        (unidaA.azimut === null ? "azimut desconocido" : `${unidaA.azimut}°`)
-      );
-    }
   }
 };
 

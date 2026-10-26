@@ -8,7 +8,6 @@ import { Boton } from "@celda/ui/Boton.tsx";
 import { Desplegable } from "@celda/ui/Desplegable.tsx";
 import { Dialogo } from "@celda/ui/Dialogo.tsx";
 import { Segmentado, Selector } from "@celda/ui/Eleccion.tsx";
-import { Etiqueta } from "@celda/ui/Etiqueta.tsx";
 import { CodigoQr } from "@celda/ui/medir/CodigoQr.tsx";
 import { Termino } from "@celda/ui/termino/Termino.tsx";
 import {
@@ -50,7 +49,7 @@ export interface DialogoMedirProps {
 }
 
 /**
- * El paso de medir la señal (historias 44 a 46 y 49). Explica qué hacer según el dispositivo:
+ * El paso de medir la señal (historias 44 a 46). Explica qué hacer según el dispositivo:
  * en un ordenador, por qué no se puede y qué alternativas hay; en un móvil, el código de su
  * marca y qué le pasa al marcarlo. Desde cualquiera se puede ver la medida de ejemplo.
  */
@@ -103,15 +102,6 @@ export function DialogoMedir(props: DialogoMedirProps) {
             >
               <p>Escanea el código con la cámara del móvil.</p>
             </Opcion>
-            <Opcion
-              titulo="Subir una captura que ya tengas"
-              etiqueta={<Etiqueta tono="pronto">PRONTO</Etiqueta>}
-            >
-              <p>
-                Aún no se puede, porque falta decidir cómo leerá Celda la captura del{" "}
-                <Termino termino="modo-de-informacion">modo de información</Termino>.
-              </p>
-            </Opcion>
             <Opcion titulo="Ver una medida de ejemplo" acciones={verEjemplo}>
               <p>Es una medida inventada con cada número explicado.</p>
             </Opcion>
@@ -154,12 +144,6 @@ export function DialogoMedir(props: DialogoMedirProps) {
               <Paso numero={2} titulo="Haz una captura de pantalla">
                 <p>Hazla cuando se vean los números de la señal.</p>
               </Paso>
-              <Paso numero={3} titulo="Súbela a Celda">
-                <p>
-                  <Etiqueta tono="pronto">PRONTO</Etiqueta> Aún no se puede, porque falta decidir
-                  cómo leerá Celda la captura. Guárdala para más adelante.
-                </p>
-              </Paso>
             </Pasos>
             <Desplegable titulo="¿Qué hace el código en el móvil?" abierto variante="recuadro">
               <Puntos>
@@ -168,7 +152,6 @@ export function DialogoMedir(props: DialogoMedirProps) {
                 <Show when={instrucciones().tipo === "android"}>
                   <li>Si salen botones de pruebas, no los toques. Sal con el botón de volver.</li>
                 </Show>
-                <li>De la captura que subas, Celda solo lee los números de la señal.</li>
               </Puntos>
             </Desplegable>
             <div>
@@ -223,13 +206,11 @@ function ComoSeAbre(props: { readonly codigo: CodigoModoInformacion; readonly de
   );
 }
 
-/** La medida de ejemplo con sus valores explicados. Nunca se presenta como propia (historia 49). */
+/** La medida de ejemplo con sus valores explicados. */
 function VistaEjemplo(props: { readonly volver: () => void }) {
   return (
     <>
       <MedidaMostrada
-        tipo="ejemplo"
-        etiqueta={<Etiqueta tono="ejemplo">EJEMPLO</Etiqueta>}
         titulo={`Medida de ejemplo en ${MEDIDA_DE_EJEMPLO.lugar}`}
         valores={valoresDeLaLectura(MEDIDA_DE_EJEMPLO.senal)}
       >

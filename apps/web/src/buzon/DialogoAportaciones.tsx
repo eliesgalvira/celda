@@ -15,14 +15,12 @@ import { Dialogo } from "@celda/ui/Dialogo.tsx";
 import { Etiqueta } from "@celda/ui/Etiqueta.tsx";
 import { Nota } from "@celda/ui/medir/Medir.tsx";
 import { recurso } from "@celda/ui/recurso.ts";
-import { Termino } from "@celda/ui/termino/Termino.tsx";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 
 import { usarDatos } from "../datos.tsx";
 import { fechaCorta } from "../ficha/textos.ts";
-import type { TipoDeDispositivo } from "../medir/dispositivo.ts";
 import { AlmacenLocal } from "../ubicacion/almacen.ts";
 import { PasoCompartir } from "./PasoCompartir.tsx";
 import { Proponer } from "./Proponer.tsx";
@@ -40,9 +38,16 @@ type Vista =
   | { readonly tipo: "proponer" };
 
 const TITULO_GRUPO: Readonly<Record<TipoCompartible, string>> = {
-  propia: "Medidas propias",
   "correccion-propuesta": "Correcciones propuestas",
   corroboracion: "Corroboraciones",
+};
+
+/** Lo que se dice de un tipo sin ninguna aportación en el dispositivo, y cómo crear una. */
+const SIN_APORTACIONES: Readonly<Record<TipoCompartible, string>> = {
+  "correccion-propuesta":
+    "Todavía no has propuesto ninguna. Se hace desde la ficha de un emplazamiento.",
+  corroboracion:
+    "Todavía no has respaldado ninguna. Se hace desde la ficha donde sale la corrección.",
 };
 
 const leerDelDispositivo = Effect.gen(function* () {
@@ -55,8 +60,6 @@ const leerDelDispositivo = Effect.gen(function* () {
 });
 
 export interface DialogoAportacionesProps {
-  /** El dispositivo, para decir en un ordenador por qué no tiene medidas propias. */
-  readonly dispositivo: TipoDeDispositivo;
   readonly alCerrar: () => void;
   /** Cierra el diálogo para marcar en el mapa el punto de un emplazamiento que falta. */
   readonly alElegirPunto: () => void;
@@ -143,7 +146,7 @@ export function DialogoAportaciones(props: DialogoAportacionesProps) {
                       each={delTipo(tipo)}
                       fallback={
                         <GrupoVacio>
-                          <SinAportaciones tipo={tipo} dispositivo={props.dispositivo} />
+                          <p>{SIN_APORTACIONES[tipo]}</p>
                         </GrupoVacio>
                       }
                     >
@@ -194,37 +197,5 @@ export function DialogoAportaciones(props: DialogoAportacionesProps) {
         </Match>
       </Switch>
     </Dialogo>
-  );
-}
-
-/** Lo que se dice de un tipo sin ninguna aportación en el dispositivo, y cómo crear una. */
-function SinAportaciones(props: {
-  readonly tipo: TipoCompartible;
-  readonly dispositivo: TipoDeDispositivo;
-}) {
-  return (
-    <Switch>
-      <Match when={props.tipo === "propia" && props.dispositivo === "ordenador"}>
-        <Nota tono="aviso" titulo="En un ordenador no hay medidas propias">
-          <p>
-            Se guardan en el móvil que toma la captura del{" "}
-            <Termino termino="modo-de-informacion">modo de información</Termino>. Compártelas desde
-            allí.
-          </p>
-        </Nota>
-      </Match>
-      <Match when={props.tipo === "propia"}>
-        <p>
-          <Etiqueta tono="pronto">PRONTO</Etiqueta> Aún no se pueden registrar medidas a partir de
-          una captura.
-        </p>
-      </Match>
-      <Match when={props.tipo === "correccion-propuesta"}>
-        <p>Todavía no has propuesto ninguna. Se hace desde la ficha de un emplazamiento.</p>
-      </Match>
-      <Match when={props.tipo === "corroboracion"}>
-        <p>Todavía no has respaldado ninguna. Se hace desde la ficha donde sale la corrección.</p>
-      </Match>
-    </Switch>
   );
 }

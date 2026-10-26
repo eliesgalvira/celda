@@ -1,6 +1,5 @@
 import { AportacionCompartible, type TipoCompartible } from "@celda/dominio/aportacion";
 import { motivoNoAceptable } from "@celda/dominio/buzon";
-import { emplazamientoDe } from "@celda/dominio/moderacion";
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
@@ -20,14 +19,10 @@ import buzon, {
   ErrorDeIdentidad,
   type FormaCorreccion,
   type FormaCorroboracion,
-  type FormaMedida,
 } from "./buzon.spec";
 
 /** Lo que llega en un envío: una aportación con la forma que acepta Convex, sin comprobar. */
-type FormaDeAportacion =
-  | typeof FormaMedida.Type
-  | typeof FormaCorreccion.Type
-  | typeof FormaCorroboracion.Type;
+type FormaDeAportacion = typeof FormaCorreccion.Type | typeof FormaCorroboracion.Type;
 
 /** Comprueba lo que llega con los esquemas del dominio: los rangos, los UUID y los largos. */
 const leerAportacion = Schema.decodeUnknownEffect(AportacionCompartible);
@@ -45,7 +40,6 @@ const noValida = (motivo: string) =>
 const LIMITES_DE: Readonly<
   Record<TipoCompartible, readonly [NombreDeLimite, NombreDeLimite, NombreDeLimite | undefined]>
 > = {
-  propia: ["medidasPorDispositivo", "medidasPorIp", "medidasEnTotal"],
   "correccion-propuesta": [
     "correccionesPorDispositivo",
     "correccionesPorIp",
@@ -108,7 +102,7 @@ const recibir = Effect.fn("Buzon.recibir")(function* (token: string, forma: Form
     huellaIp,
     recibidaEl: ahora,
     contenido: aportacion,
-    emplazamiento: emplazamientoDe(aportacion),
+    emplazamiento: aportacion.emplazamiento,
     estado: "pendiente",
     moderadaEl: null,
     motivo: null,
@@ -133,10 +127,6 @@ const pedirIdentidad = FunctionImpl.make(databaseSchema, buzon, "pedirIdentidad"
   }).pipe(soloDeclarados(ErrorDeIdentidad)),
 );
 
-const enviarMedida = FunctionImpl.make(databaseSchema, buzon, "enviarMedida", (args) =>
-  recibir(args.identidad, args.medida).pipe(soloDeclarados(ErrorDeEnvio)),
-);
-
 const enviarCorreccion = FunctionImpl.make(databaseSchema, buzon, "enviarCorreccion", (args) =>
   recibir(args.identidad, args.correccion).pipe(soloDeclarados(ErrorDeEnvio)),
 );
@@ -150,7 +140,6 @@ const enviarCorroboracion = FunctionImpl.make(
 
 export default GroupImpl.make(databaseSchema, buzon).pipe(
   Layer.provide(pedirIdentidad),
-  Layer.provide(enviarMedida),
   Layer.provide(enviarCorreccion),
   Layer.provide(enviarCorroboracion),
   GroupImpl.finalize,

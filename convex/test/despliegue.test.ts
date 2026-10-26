@@ -53,7 +53,6 @@ describe("despliegue de Convex", () => {
       [
         { nombre: "buzon:enviarCorreccion", tipo: "mutation" },
         { nombre: "buzon:enviarCorroboracion", tipo: "mutation" },
-        { nombre: "buzon:enviarMedida", tipo: "mutation" },
         { nombre: "buzon:pedirIdentidad", tipo: "mutation" },
       ],
     );
@@ -63,6 +62,6 @@ describe("despliegue de Convex", () => {
     const devuelven = funciones
       .filter(({ funcion }) => funcion.functionVisibility === "public")
       .map(({ funcion }) => Object.keys(funcion.functionProvenance.returns.fields).join(","));
-    assert.deepStrictEqual(devuelven.toSorted(), ["identidad", "nueva", "nueva", "nueva"]);
+    assert.deepStrictEqual(devuelven.toSorted(), ["identidad", "nueva", "nueva"]);
   });
 });

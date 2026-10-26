@@ -3,8 +3,8 @@ import * as Schema from "effect/Schema";
 
 /**
  * El buzón de las aportaciones compartidas (ADR 0020): las únicas funciones públicas de Celda.
- * Una pide la identidad del dispositivo y las otras tres envían una medida propia, una corrección
- * propuesta o una corroboración. Ninguna devuelve aportaciones: lo que una persona ha enviado lo
+ * Una pide la identidad del dispositivo y las otras dos envían una corrección propuesta o una
+ * corroboración. Ninguna devuelve aportaciones: lo que una persona ha enviado lo
  * sabe su dispositivo (ADR 0007), y lo aceptado lo publica la ingesta nocturna.
  */
 
@@ -68,7 +68,7 @@ export type ErrorDeIdentidad = typeof ErrorDeIdentidad.Type;
 /*
  * Las formas que acepta Convex en los argumentos: la estructura de cada aportación, con sus tipos
  * pero sin sus comprobaciones. Convex rechaza un campo de más o de otro tipo antes de llamar a la
- * función; los rangos de 3GPP, los UUID y los largos los comprueba la función con los esquemas del
+ * función; los UUID, las compañías y los largos los comprueba la función con los esquemas del
  * dominio, para dar `AportacionNoValida` en lugar de un error sin tipo. Ninguna forma tiene un
  * campo de bytes ni de fichero: no hay por dónde mandar una imagen.
  */
@@ -81,25 +81,6 @@ const FormaEncabezado = {
   creada: Schema.Number,
   origen: Schema.String,
 };
-
-export const FormaMedida = Schema.Struct({
-  ...FormaEncabezado,
-  tipo: Schema.Literal("propia"),
-  punto: FormaCoordenada,
-  senal: Schema.Struct({
-    compania: Schema.String,
-    red: Schema.String,
-    mhz: Schema.NullOr(Schema.Number),
-    rsrpDbm: Schema.Number,
-    rsrqDb: Schema.NullOr(Schema.Number),
-    pci: Schema.NullOr(Schema.Number),
-  }),
-  unidaA: Schema.Struct({
-    emplazamiento: Schema.String,
-    posicion: FormaCoordenada,
-    azimut: Schema.NullOr(Schema.Number),
-  }),
-});
 
 export const FormaCorreccion = Schema.Struct({
   ...FormaEncabezado,
@@ -142,14 +123,6 @@ export default GroupSpec.make()
       name: "pedirIdentidad",
       returns: () => Schema.Struct({ identidad: Schema.String }),
       error: () => ErrorDeIdentidad,
-    }),
-  )
-  .addFunction(
-    FunctionSpec.publicMutation({
-      name: "enviarMedida",
-      args: () => ({ identidad: Schema.String, medida: FormaMedida }),
-      returns: () => Recibida,
-      error: () => ErrorDeEnvio,
     }),
   )
   .addFunction(

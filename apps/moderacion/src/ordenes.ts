@@ -1,4 +1,4 @@
-import type { TipoCompartible } from "@celda/dominio/aportacion";
+import { TIPOS_COMPARTIBLES, type TipoCompartible } from "@celda/dominio/aportacion";
 import {
   AportacionConContexto,
   AportacionEnCola,
@@ -122,13 +122,7 @@ const json = Flag.Boolean("json").pipe(
   Flag.withDefault(false),
 );
 
-const TIPOS = [
-  "correccion-propuesta",
-  "corroboracion",
-  "propia",
-] as const satisfies ReadonlyArray<TipoCompartible>;
-
-const tipo = Flag.Literals("tipo", TIPOS).pipe(
+const tipo = Flag.Literals("tipo", TIPOS_COMPARTIBLES).pipe(
   Flag.withDescription("Solo las de este tipo. Sin él, todas."),
   Flag.optional,
 );

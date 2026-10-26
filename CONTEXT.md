@@ -279,12 +279,8 @@ _Evitar_: compás, giroscopio, sensor
 ### Medidas y aportaciones
 
 **Medida**:
-Lectura de la señal de la red en un punto y un momento. Es siempre una medida propia o una medida de ejemplo, nunca las dos.
+Lectura de la señal de la red en un punto y un momento. Celda solo tiene la medida de ejemplo: las medidas propias, que se iban a sacar de una captura, se retiraron el 26/10/2026 sin haber llegado a crearse (ADR 0007).
 _Evitar_: medición, muestra, lectura
-
-**Medida propia**:
-Medida que la persona registra en su dispositivo a partir de una captura.
-_Evitar_: mi medida, medida real
 
 **Medida de ejemplo**:
 Medida que trae Celda para enseñar cómo funciona. No cuenta como de nadie y no es una aportación: no se guarda ni tiene identificador.
@@ -303,11 +299,11 @@ Pantalla oculta del móvil, que se abre marcando un código, con los datos de la
 _Evitar_: modo servicio, field test, modo ingeniero
 
 **Captura**:
-Imagen de la pantalla del modo de información de la que sale una medida propia. Se lee en el dispositivo y nunca sale de él.
+Imagen de la pantalla del modo de información que la persona guarda en su móvil, por ejemplo para reclamar. Celda nunca la recibe.
 _Evitar_: screenshot, foto
 
 **Aportación**:
-Dato que la persona crea en su dispositivo: una medida propia, un punto elegido, una corrección propuesta o una corroboración.
+Dato que la persona crea en su dispositivo: un punto elegido, una corrección propuesta o una corroboración.
 _Evitar_: contribución, envío, subida
 
 **Corrección propuesta**:
@@ -395,9 +391,7 @@ _Evitar_: clientes, carga
 - La **fusión** convierte observaciones en **emplazamientos**, con su **confianza**, sus **conflictos** y su **estado**.
 - Una **zona de barrido** tiene uno o varios **cuadros**, y cada cuadro es de una sola zona. Un **barrido** recorre los cuadros de una zona y solo cuenta ausencias a las **observaciones** que caen en ellos.
 - Una **capa** sale de una instantánea de emplazamientos y tiene una **versión de capa**. La **publicación** escribe con ella la **ficha** de cada uno de sus emplazamientos. La ficha lleva además la fecha en que cambió su emplazamiento, y la **marca de agua** de cada vista deja ver si es más reciente que el mapa.
-- Una **medida propia** queda unida al emplazamiento que le daba servicio donde se tomó.
-- Las **aportaciones** viven en el dispositivo hasta que la persona comparte una. Una **corrección propuesta** compartida pasa a ser **corrección** solo si la **moderación** la acepta. La **captura** y el **punto elegido** nunca se comparten.
-- Una **medida propia** compartida solo se publica dentro de un agregado, nunca suelta.
+- Las **aportaciones** viven en el dispositivo hasta que la persona comparte una. Una **corrección propuesta** compartida pasa a ser **corrección** solo si la **moderación** la acepta. El **punto elegido** nunca se comparte.
 - Una **aportación compartida** llega al **buzón** con la **identidad del dispositivo** y la **huella de la IP**. Una **corroboración** pasa por la **moderación** como una **corrección propuesta**, y cada identidad cuenta una vez por **corrección**.
 - Una **corrección** se enseña junto a la **observación** del **registro oficial** que contradice, con cuántas personas la sostienen.
 - Una **zona** es un **barrio**, un **municipio** o una **provincia**, y cada **ausencia** es de una zona.

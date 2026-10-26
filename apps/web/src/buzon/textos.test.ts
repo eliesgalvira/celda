@@ -1,4 +1,3 @@
-import type { MedidaPropia } from "@celda/dominio/medida";
 import { assert, describe, it } from "@effect/vitest";
 
 import { AlmacenNoDisponible } from "../ubicacion/almacen.ts";
@@ -9,43 +8,9 @@ import {
   EnvioVetado,
   LimiteDelBuzon,
 } from "./sincronizacion.ts";
-import { cuantoFalta, haciaDonde, queSale, textoCambio, textosDelFallo } from "./textos.ts";
+import { cuantoFalta, haciaDonde, textoCambio, textosDelFallo } from "./textos.ts";
 
 const AHORA = Date.UTC(2026, 9, 3, 12);
-
-const MEDIDA: MedidaPropia = {
-  tipo: "propia",
-  id: "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-  esquema: 1,
-  creada: AHORA,
-  origen: "captura",
-  punto: { longitud: 2.1155, latitud: 41.3878 },
-  senal: { compania: "vodafone", red: "4g", mhz: null, rsrpDbm: -90, rsrqDb: null, pci: null },
-  unidaA: {
-    emplazamiento: "movistar-0802532",
-    posicion: { longitud: 2.113628, latitud: 41.388344 },
-    azimut: null,
-  },
-};
-
-describe("queSale", () => {
-  it("de una medida, cada número que se envía y nada que no esté en ella", () => {
-    const datos = queSale(MEDIDA);
-    assert.deepStrictEqual(
-      datos.map((d) => d.nombre),
-      [
-        "Compañía",
-        "Tipo de red",
-        "Potencia de la señal",
-        "Dónde la tomaste",
-        "Código del emplazamiento que daba servicio",
-        "Posición del emplazamiento",
-        "Creada",
-        "Código al azar de esta aportación",
-      ],
-    );
-  });
-});
 
 describe("textosDelFallo", () => {
   it("cada límite dice de quién es y cuándo reintentar, y que se queda en el dispositivo", () => {
@@ -72,7 +37,10 @@ describe("textosDelFallo", () => {
     );
     assert.match(textosDelFallo(new EnvioVetado({ que: "ip" }), AHORA).texto, /esta red/u);
     assert.match(
-      textosDelFallo(new EnvioNoValido({ motivo: "la medida está fuera de España" }), AHORA).texto,
+      textosDelFallo(
+        new EnvioNoValido({ motivo: "el punto propuesto está fuera de España" }),
+        AHORA,
+      ).texto,
       /fuera de España/u,
     );
     const sinAlmacen = textosDelFallo(

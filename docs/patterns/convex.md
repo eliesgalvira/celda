@@ -420,7 +420,7 @@ Lo que decide el ADR 0020 y cómo quedó, en su apartado «Cómo quedó en el #5
 
 | Qué | Dónde |
 |---|---|
-| Las cuatro mutaciones públicas y sus errores tipados | `confect/buzon.spec.ts` y `buzon.impl.ts` |
+| Las tres mutaciones públicas y sus errores tipados | `confect/buzon.spec.ts` y `buzon.impl.ts` |
 | Lo que necesita la moderación (#57) | `confect/moderacion.spec.ts` y `moderacion.impl.ts`, todas internas |
 | Los esquemas de la moderación, el veredicto propuesto y cómo lo aceptado llega a la ficha | `packages/dominio/src/moderacion.ts` |
 | La herramienta de moderación y su cliente de Convex | `apps/moderacion/src/` |
@@ -478,7 +478,7 @@ De cada aportación, la lista da:
 
 - lo que propone, con la nota si la tiene;
 - la ficha publicada de su emplazamiento en la versión vigente: lo que dice el registro oficial de cada compañía, con su fecha y su enlace, y las correcciones ya publicadas;
-- la distancia de la posición publicada al punto propuesto (la posición nueva o la medida); de un emplazamiento que falta, los publicados a menos de 300 m y la distancia al más cercano;
+- la distancia de la posición publicada al punto propuesto (la posición nueva); de un emplazamiento que falta, los publicados a menos de 300 m y la distancia al más cercano;
 - la identidad y la huella de la IP que la enviaron, con cuántas aportaciones suyas se han aceptado, rechazado o esperan, y si están vetadas;
 - las demás correcciones propuestas y corroboraciones del mismo emplazamiento, en cualquier estado (de uno que falta, las que dicen que falta uno a menos de 60 m).
 
@@ -511,7 +511,7 @@ GET https://<nombre>.convex.site/aportaciones/aceptadas?despues-de=<ms>
 Authorization: Bearer <CELDA_PUBLICACION_CLAVE>
 ```
 
-Contesta una `PaginaParaPublicar` (`packages/dominio/src/moderacion.ts`, de `moderacion:publicables`): solo las correcciones propuestas y corroboraciones aceptadas, sin la nota, sin la huella de la IP y sin la identidad. En su lugar va `persona`, el HMAC de la identidad con `CELDA_BUZON_CLAVE`, que cuenta a cada persona una vez y del que no se puede volver a la identidad. Las medidas no salen. Sin la clave, con otra o sin la variable en el despliegue, contesta un 401 vacío, siempre igual; las dos claves se comparan por su SHA-256, sin que el tiempo diga cuánto se parecen. Quien tenga esa clave solo puede leer lo que se va a publicar con licencia CC0.
+Contesta una `PaginaParaPublicar` (`packages/dominio/src/moderacion.ts`, de `moderacion:publicables`): solo las correcciones propuestas y corroboraciones aceptadas, sin la nota, sin la huella de la IP y sin la identidad. En su lugar va `persona`, el HMAC de la identidad con `CELDA_BUZON_CLAVE`, que cuenta a cada persona una vez y del que no se puede volver a la identidad. Sin la clave, con otra o sin la variable en el despliegue, contesta un 401 vacío, siempre igual; las dos claves se comparan por su SHA-256, sin que el tiempo diga cuánto se parecen. Quien tenga esa clave solo puede leer lo que se va a publicar con licencia CC0.
 
 En cada ejecución, antes del registro oficial, la ingesta lee esa acción desde la última aceptada que tiene su base y guarda lo nuevo en `aportaciones_aceptadas`, página a página, como una ejecución de la fuente `comunidad` (`recogerAceptadas` en `apps/nocturna/src/programa.ts`, con el cliente de `apps/nocturna/src/buzon.ts`). El buzón da a cada aceptada una hora propia, posterior a la de la anterior, así que seguir desde la última no se salta ninguna; y una que ya estaba no se guarda dos veces. La publicación pone en la ficha de cada emplazamiento sus correcciones (`correccionesDeFicha`): las propuestas que dicen lo mismo son una, con la clave de la primera, y cuentan cada persona una vez, con las corroboraciones que la citan. El emplazamiento pasa de verificado a corregido, el registro sigue igual al lado y la ficha toma la fecha de la ejecución que trajo la corrección. Un emplazamiento que falta no se publica: aún no hay dónde enseñarlo, porque no tiene ficha.
 
@@ -525,11 +525,11 @@ Las pruebas usan el Convex en memoria de convex-test con el esquema, los módulo
 
 El limitador lee la hora con `Date.now()`, que el `TestClock` de Effect no mueve. `convex/test/ayudas.ts` falsea solo `Date` con `vi.useFakeTimers({ toFake: ["Date"] })` y la mueve con `vi.setSystemTime`, así convex-test sigue con sus temporizadores de verdad. La clave de prueba se pone con `vi.stubEnv`. Llenar un cubo de cientos de fichas con envíos tarda en convex-test, así que las pruebas de los límites grandes envían uno, gastan las demás de golpe con el limitador y comprueban que el siguiente envío pasa y el de después no.
 
-- `despliegue.test.ts`: las tablas, que las únicas funciones públicas son las cuatro mutaciones y que solo devuelven un token o si era nueva.
+- `despliegue.test.ts`: las tablas, que las únicas funciones públicas son las tres mutaciones y que solo devuelven un token o si era nueva.
 - `buzon.test.ts`: la identidad, cada límite de la tabla del ADR 0020, la idempotencia, la validación y los vetos.
 - `huellas.test.ts`: que la IP no está en claro en ninguna tabla, la sal de cada día y la limpieza a las 24 horas.
 - `moderacion.test.ts`: que nada llega a lo que lee la ingesta sin aceptarlo, y las funciones de la moderación: el contexto, el motivo obligatorio también saltándose el cliente, que un veredicto no se cambia, que dos aceptadas en el mismo milisegundo no se saltan y los vetos.
-- `publicacion.test.ts`: la acción HTTP de la ingesta: un 401 vacío sin clave, con otra, sin `Bearer` o sin la variable; con la clave, solo lo aceptado para publicar, sin la medida, la rechazada ni la pendiente, y sin ninguna identidad, huella ni nota en la respuesta; el cursor y un `despues-de` que no es un número.
+- `publicacion.test.ts`: la acción HTTP de la ingesta: un 401 vacío sin clave, con otra, sin `Bearer` o sin la variable; con la clave, solo lo aceptado para publicar, sin la rechazada ni la pendiente, y sin ninguna identidad, huella ni nota en la respuesta; el cursor y un `despues-de` que no es un número.
 - `herramienta.test.ts`: la herramienta de moderación entera, con su cliente HTTP, contra el Convex en memoria. Un `HttpClient` de prueba hace de la API HTTP de Convex: lleva cada petición a la función interna que nombra, solo con la clave de prueba. Lanza las órdenes como desde la terminal (`@celda/moderacion/pruebas/orden`): la lista con su contexto, el veredicto propuesto sin cambiar nada, aceptar y rechazar sin motivo, aceptar, rechazar, vetar, exportar y una clave que no vale.
 
 `pnpm run test:repetido` (desde `convex/`) pasa las pruebas de Convex cinco veces con semillas seguidas a partir de una al azar, y la CI lo hace en cada push.
@@ -541,3 +541,7 @@ Un despliegue de Convex en la nube con la ingesta de antes del #51 guarda sus ta
 1. Si se quieren guardar los datos, `pnpm exec convex export --path ~/celda-convex.zip`. `unzip` rechaza ese zip como posible bomba; se abre con `UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip`.
 2. Borra esas tablas desde el panel de Convex. El esquema nuevo no las describe y nadie las lee.
 3. Borra las variables de entorno del despliegue que eran de la ingesta y la publicación (`pnpm exec convex env list`): `CELDA_R2_*`, que es una clave de escritura del cubo de R2, `CELDA_ALMACEN_*`, `CELDA_INGESTA_*` y `CELDA_REGISTRO_*`.
+
+### Un despliegue con medidas propias
+
+Desde el 26/10/2026 la tabla `aportaciones` no admite medidas propias (ADR 0007). Si el despliegue guarda alguna, `pnpm exec convex deploy` falla al validar el esquema y no cambia nada. Antes de desplegar, filtra en el panel de Convex las de `tipo` igual a `propia`. Si hay alguna, bórrala y despliega cuando la última recibida tenga más de 25 horas: hasta entonces su cubo `medidasPorIp`, que va con la huella de la IP, lo vacía la limpieza del código de antes, y la del nuevo ya no lo conoce.

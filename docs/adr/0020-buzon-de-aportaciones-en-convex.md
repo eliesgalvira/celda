@@ -1,6 +1,6 @@
 # Buzón de aportaciones en Convex, con límites, sin captcha y sin imágenes
 
-Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Cambia el ADR 0003 (Convex deja de guardar los emplazamientos y pasa a ser solo el buzón), el 0007 (las aportaciones se pueden compartir) y el apartado «Escrituras del público» del 0008. Lo llevan a cabo el #56 (el buzón) y el #57 (la herramienta de moderación). Completada el 03/10/2026 con el #56 y el #57: ver [Cómo quedó en el #56](#cómo-quedó-en-el-56) y [Cómo quedó en el #57](#cómo-quedó-en-el-57).
+Estado: aceptada el 02/10/2026, con las decisiones del usuario del mismo día. Cambia el ADR 0003 (Convex deja de guardar los emplazamientos y pasa a ser solo el buzón), el 0007 (las aportaciones se pueden compartir) y el apartado «Escrituras del público» del 0008. Lo llevan a cabo el #56 (el buzón) y el #57 (la herramienta de moderación). Completada el 03/10/2026 con el #56 y el #57: ver [Cómo quedó en el #56](#cómo-quedó-en-el-56) y [Cómo quedó en el #57](#cómo-quedó-en-el-57). Corregida el 26/10/2026 con el ADR 0007: el buzón ya no recibe medidas propias. Quedan tres mutaciones públicas (`pedirIdentidad`, `enviarCorreccion` y `enviarCorroboracion`), y la fila de las medidas de la tabla de límites y la comprobación de su sector ya no se aplican.
 
 ## Contexto
 

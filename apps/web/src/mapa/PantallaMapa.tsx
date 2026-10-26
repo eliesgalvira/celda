@@ -107,7 +107,6 @@ import {
 } from "../lib/rutas.ts";
 import { DialogoMedir } from "../medir/DialogoMedir.tsx";
 import { DialogoSiAlgoVaMal } from "../problemas/DialogoSiAlgoVaMal.tsx";
-import { detectarDispositivo } from "../medir/dispositivo.ts";
 import { leerModelo, leerNavegador } from "../medir/navegador.ts";
 import { crearUbicacion, UbicacionContexto } from "../ubicacion/controlador.ts";
 import { posicionDe } from "../ubicacion/estado.ts";
@@ -1287,7 +1286,6 @@ export function PantallaMapa() {
           </Show>
           <Show when={dialogoAbierto(ubicacion(), "aportaciones")}>
             <DialogoAportaciones
-              dispositivo={detectarDispositivo({ ...leerNavegador(), modelo: modelo() }).tipo}
               alCerrar={() =>
                 navegar(conDialogo(ubicacion(), "aportaciones", false), { reemplazar: true })
               }

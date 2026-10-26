@@ -37,7 +37,7 @@ export interface PasoCompartirProps {
 }
 
 /**
- * El paso de compartir una aportación (ADR 0020 y 0021): qué números salen del dispositivo, qué
+ * El paso de compartir una aportación (ADR 0020 y 0021): qué datos salen del dispositivo, qué
  * no sale y la dedicación CC0, todo antes del botón de enviar. Enviar la guarda antes en el
  * dispositivo, así que si el buzón no la recibe se queda ahí. El cliente de Convex se descarga al
  * pulsar «Enviar» la primera vez, no al abrir este paso.
@@ -72,23 +72,14 @@ export function PasoCompartir(props: PasoCompartirProps) {
       });
   };
 
-  const esMedida = () => props.aportacion.tipo === "propia";
-
   return (
     <>
       <QueSale titulo="¿Qué se envía desde tu dispositivo?" datos={queSale(props.aportacion)}>
-        <Show when={esMedida()}>
-          <p>Solo se envían estos números. La captura se queda en tu dispositivo.</p>
-        </Show>
         <p>
           Va con un identificador anónimo de este dispositivo, sin nombre ni cuenta. Celda no guarda
           tu IP, solo una huella cifrada que se borra a las 24 horas.
         </p>
-        <p>
-          {esMedida()
-            ? "Solo se publican resúmenes de muchas medidas."
-            : "La revisa la moderación antes de que salga en el mapa."}
-        </p>
+        <p>La revisa la moderación antes de que salga en el mapa.</p>
       </QueSale>
       <DedicacionCc0 enlace={DEDICACION_CC0.enlace}>
         <p>

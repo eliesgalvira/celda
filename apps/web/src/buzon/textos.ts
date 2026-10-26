@@ -2,11 +2,9 @@ import type { AportacionCompartible, Cambio, CorreccionPropuesta } from "@celda/
 import { type Coordenada, distanciaMetros, rumboGrados } from "@celda/dominio/area";
 import { NOMBRE_COMPANIA } from "@celda/dominio/compania";
 import { enumerar } from "@celda/dominio/enumerar";
-import type { MedidaPropia } from "@celda/dominio/medida";
 import type { DatoQueSale } from "@celda/ui/buzon/Compartir.tsx";
 
 import { fechaCorta } from "../ficha/textos.ts";
-import { valoresDeLaLectura } from "../medir/textos.ts";
 import { nombreRumbo, textoDistancia } from "../ubicacion/textos.ts";
 import type { FalloAlCompartir } from "./sincronizacion.ts";
 
@@ -46,8 +44,6 @@ export const textoCambio = (cambio: Cambio, desde?: Coordenada): string => {
 /** El título de una aportación en la lista del dispositivo. */
 export const tituloDeAportacion = (aportacion: AportacionCompartible): string => {
   switch (aportacion.tipo) {
-    case "propia":
-      return `Medida de ${NOMBRE_COMPANIA[aportacion.senal.compania]}, ${aportacion.senal.red.toUpperCase()}`;
     case "correccion-propuesta":
       return textoCambio(aportacion.cambio);
     case "corroboracion":
@@ -56,22 +52,11 @@ export const tituloDeAportacion = (aportacion: AportacionCompartible): string =>
 };
 
 /**
- * La línea de detalle de una aportación en la lista del dispositivo: cuándo se creó y, de una
- * medida, su potencia. La clave del emplazamiento no sale: es interna y no dice nada a quien lee.
+ * La línea de detalle de una aportación en la lista del dispositivo: cuándo se creó. La clave del
+ * emplazamiento no sale: es interna y no dice nada a quien lee.
  */
-export const detalleDeAportacion = (aportacion: AportacionCompartible): string => {
-  const cuando = `Del ${fechaYHora(aportacion.creada)}`;
-  return aportacion.tipo === "propia"
-    ? `${cuando} · ${String(aportacion.senal.rsrpDbm).replace("-", "−")} dBm`
-    : cuando;
-};
-
-const datosDeMedida = (medida: MedidaPropia): ReadonlyArray<DatoQueSale> => [
-  ...valoresDeLaLectura(medida.senal).map(({ nombre, valor }) => ({ nombre, valor })),
-  { nombre: "Dónde la tomaste", valor: textoCoordenada(medida.punto) },
-  { nombre: "Código del emplazamiento que daba servicio", valor: medida.unidaA.emplazamiento },
-  { nombre: "Posición del emplazamiento", valor: textoCoordenada(medida.unidaA.posicion) },
-];
+export const detalleDeAportacion = (aportacion: AportacionCompartible): string =>
+  `Del ${fechaYHora(aportacion.creada)}`;
 
 const datosDeCambio = (correccion: CorreccionPropuesta): ReadonlyArray<DatoQueSale> => {
   const { cambio } = correccion;
@@ -110,8 +95,6 @@ export const queSale = (aportacion: AportacionCompartible): ReadonlyArray<DatoQu
     { nombre: "Código al azar de esta aportación", valor: aportacion.id },
   ];
   switch (aportacion.tipo) {
-    case "propia":
-      return [...datosDeMedida(aportacion), ...sobre];
     case "correccion-propuesta":
       return [
         ...(aportacion.emplazamiento === null

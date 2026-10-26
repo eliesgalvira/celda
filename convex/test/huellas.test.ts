@@ -11,7 +11,7 @@ import refs from "../confect/_generated/refs";
 import { MutationCtx } from "../confect/_generated/services";
 import { VIDA_DE_UNA_HUELLA_MS } from "../src/huella";
 import { limitador } from "../src/limites";
-import { avanzar, correccion, identidadDesde, medida, prepararBuzon, tablas } from "./ayudas";
+import { avanzar, correccion, identidadDesde, prepararBuzon, tablas } from "./ayudas";
 import * as TestConfect from "./TestConfect";
 
 const IP = "203.0.113.7";
@@ -21,8 +21,8 @@ const buzon = refs.public.buzon;
 
 prepararBuzon();
 
-/** Cuántas fichas le quedan a la huella en el límite de medidas por IP. */
-const fichasDeMedidasPorIp = (huella: string) =>
+/** Cuántas fichas le quedan a la huella en el límite de correcciones por IP. */
+const fichasDeCorreccionesPorIp = (huella: string) =>
   Effect.gen(function* () {
     const convex = yield* TestConfect.TestConfect;
     const fichas = yield* Ref.make(0);
@@ -30,7 +30,7 @@ const fichasDeMedidasPorIp = (huella: string) =>
       Effect.gen(function* () {
         const ctx = yield* MutationCtx;
         const { value } = yield* Effect.promise(() =>
-          limitador.getValue(ctx, "medidasPorIp", { key: huella }),
+          limitador.getValue(ctx, "correccionesPorIp", { key: huella }),
         );
         yield* Ref.set(fichas, value);
       }),
@@ -44,7 +44,9 @@ describe("huellas de IP", () => {
       const convex = yield* TestConfect.TestConfect;
       for (const ip of [IP, IP_V6]) {
         const identidad = yield* identidadDesde(ip);
-        yield* convex.desde(ip).mutation(buzon.enviarMedida, { identidad, medida: medida() });
+        yield* convex
+          .desde(ip)
+          .mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() });
       }
       const guardado = JSON.stringify(yield* tablas);
       assert.notInclude(guardado, IP);
@@ -64,16 +66,22 @@ describe("huellas de IP", () => {
     Effect.gen(function* () {
       const convex = yield* TestConfect.TestConfect;
       const identidad = yield* identidadDesde(IP);
-      yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad, medida: medida() });
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() });
       avanzar(3 * HOUR);
-      yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad, medida: medida() });
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() });
       const hoy = yield* tablas;
       assert.lengthOf(hoy.huellasDeIp, 1);
       assert.lengthOf(hoy.salesDeIp, 1);
 
       // Del 3 a las 13:00 al 4 a las 01:00 UTC: otro día, otra sal.
       avanzar(12 * HOUR);
-      yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad, medida: medida() });
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() });
       const manana = yield* tablas;
       assert.lengthOf(manana.huellasDeIp, 2);
       assert.deepStrictEqual(
@@ -90,10 +98,11 @@ describe("huellas de IP", () => {
       Effect.gen(function* () {
         const convex = yield* TestConfect.TestConfect;
         const identidad = yield* identidadDesde(IP);
-        yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad, medida: medida() });
-        yield* convex
-          .desde(IP)
-          .mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() });
+        for (let i = 0; i < 2; i++) {
+          yield* convex
+            .desde(IP)
+            .mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() });
+        }
         const [vista] = (yield* tablas).huellasDeIp;
         const huella = vista?.huella ?? "";
         yield* convex.mutation(refs.internal.moderacion.vetar, {
@@ -101,7 +110,7 @@ describe("huellas de IP", () => {
           valor: huella,
           motivo: "spam",
         });
-        assert.isBelow(yield* fichasDeMedidasPorIp(huella), 300);
+        assert.isBelow(yield* fichasDeCorreccionesPorIp(huella), 50);
 
         // Un minuto antes de las 24 horas no se borra nada, salvo la sal de ayer.
         avanzar(VIDA_DE_UNA_HUELLA_MS - 60_000);
@@ -120,7 +129,7 @@ describe("huellas de IP", () => {
         assert.isTrue(limpias.aportaciones.every((a) => a.huellaIp === null));
         assert.isTrue(limpias.identidades.every((i) => i.huellaIp === null));
         assert.notInclude(JSON.stringify(limpias), huella);
-        assert.strictEqual(yield* fichasDeMedidasPorIp(huella), 300);
+        assert.strictEqual(yield* fichasDeCorreccionesPorIp(huella), 50);
       }).pipe(Effect.provide(TestConfect.layer)),
   );
 

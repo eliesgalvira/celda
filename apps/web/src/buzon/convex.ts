@@ -59,8 +59,6 @@ export const buzonDeConvex = (direccion: string): BuzonRemoto => {
 
   const enviarSegunTipo = (identidad: string, aportacion: AportacionCompartible) => {
     switch (aportacion.tipo) {
-      case "propia":
-        return llamar(buzon.enviarMedida, { identidad, medida: aportacion });
       case "correccion-propuesta":
         return llamar(buzon.enviarCorreccion, { identidad, correccion: aportacion });
       case "corroboracion":

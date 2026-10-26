@@ -10,11 +10,7 @@ import {
   procedenciasDe,
 } from "@celda/dominio/claveEstable";
 import { fusionar } from "@celda/dominio/fusion";
-import {
-  AceptadaParaPublicar,
-  correccionesDeFicha,
-  emplazamientoDe,
-} from "@celda/dominio/moderacion";
+import { AceptadaParaPublicar, correccionesDeFicha } from "@celda/dominio/moderacion";
 import { Fuente, type Observacion } from "@celda/dominio/observacion";
 import {
   type BarridoAbierto,
@@ -1525,7 +1521,7 @@ export const baseNocturna = (opciones: OpcionesBase) =>
                   ${sql.insert({
                     id: aceptada.id,
                     tipo: aceptada.contenido.tipo,
-                    emplazamiento: emplazamientoDe(aceptada.contenido),
+                    emplazamiento: aceptada.contenido.emplazamiento,
                     persona: aceptada.persona,
                     aceptada_en: aceptada.aceptadaEl,
                     importada_en: fecha,

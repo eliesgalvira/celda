@@ -226,8 +226,7 @@ Lo que sigue es la vista agrupada y, en las dos vistas, lo que se ve desde el zo
 - `Eleccion.tsx` tiene `Segmentado`, unos botones de radio de verdad con aspecto de botones pegados, y `Selector`, un `<select>` nativo. Los dos llevan la etiqueta visible encima.
 - `medir/Medir.tsx` tiene las piezas del paso de medir: `CodigoDelModo` (ocupa lo mismo con código o sin él, así que elegir la marca no mueve nada), `Pasos` y `Paso`, `Puntos`, `Opcion`, `Nota` y `MedidaMostrada`, que enseña una medida con lo que quiere decir cada valor que no es evidente.
 - `medir/CodigoQr.tsx` dibuja el código QR en el navegador con `uqr`, sin pedir nada a ningún servidor. Cada fila es un solo trazo SVG. Usa `--qr-tinta` sobre `--qr-fondo`, que no cambian en el tema oscuro porque las cámaras leen mejor oscuro sobre claro. La figura se nombra por su pie visible.
-- La medida de ejemplo tiene su propio color, `--ejemplo`, que no usa ningún dato: `Etiqueta tono="ejemplo"` y el marco de `MedidaMostrada tipo="ejemplo"`. En el dominio es además otro tipo (`MedidaDeEjemplo`), así que no se distingue solo por el color.
-- `Etiqueta tono="pronto"` marca algo que se enseña pero aún no funciona, como subir una captura. Va siempre con una frase que dice por qué.
+- La medida de ejemplo tiene su propio color, `--ejemplo`, que no usa ningún dato: `MedidaMostrada` la enmarca con él y le pone `Etiqueta tono="ejemplo"`.
 - Qué se enseña en cada dispositivo lo deciden funciones puras de `apps/web/src/medir`: `detectarDispositivo` e `instruccionesPara`, con sus pruebas. Los códigos y sus fuentes están en `packages/dominio/src/modoInformacion.ts` y en [docs/investigacion/modo-de-informacion.md](../investigacion/modo-de-informacion.md).
 
 ## Punto de referencia
@@ -295,7 +294,7 @@ Las piezas están en `buzon/Compartir.tsx`; cuándo se usan, en `apps/web/src/bu
 - Se comparte siempre en un `Dialogo`: «Tus aportaciones» (`?aportaciones`, desde «Funciones»), «Proponer una corrección» y «Yo también lo veo» (desde la ficha). Proponer un emplazamiento que falta se hace desde «Tus aportaciones».
 - El paso de enviar (`PasoCompartir`) enseña, por este orden, `QueSale` (cada dato que sale del dispositivo con su valor tal como se envía, y debajo lo que no sale y lo que guarda el buzón), `DedicacionCc0` y los botones. La dedicación va en el mismo paso y antes de «Enviar al dominio público», como pide el ADR 0021. Los datos de `QueSale` que son códigos (el del emplazamiento, el de la aportación) salen tal cual, porque es lo que se envía, pero con un nombre que dice qué son: «Código del emplazamiento», «Código al azar de esta aportación».
 - `ResultadoDelEnvio` reserva 7,5 rem bajo los botones: el aviso de «Enviando…», el de «Recibida» (`Aviso tono="hecho"`) o el de fallo aparecen sin mover nada. Un fallo dice qué ha pasado, cuándo reintentar si es un límite, y que la aportación sigue en el dispositivo.
-- `FilaAportacion` y `GrupoDeAportaciones` hacen la lista de «Tus aportaciones», con `Etiqueta tono="compartida"` o `tono="local"`. En un ordenador, el grupo de medidas propias dice con `Nota tono="aviso"` que no hay ninguna porque se guardan en el móvil que las toma.
+- `FilaAportacion` y `GrupoDeAportaciones` hacen la lista de «Tus aportaciones», con `Etiqueta tono="compartida"` o `tono="local"`.
 - El formulario de proponer usa `Segmentado`, `Selector`, `Casillas` (casillas nativas en filas de 44 px) y `AreaDeTexto`, con los caracteres que quedan a la vista. El punto propuesto es el punto de referencia; sin él, una nota lo dice con un botón que cierra el diálogo y empieza a elegir el punto en el mapa.
 
 ## Ajustes y modo estudiante

@@ -12,7 +12,6 @@ import {
   corroboracion,
   correccion,
   identidadDesde,
-  medida,
   prepararBuzon,
   tablas,
 } from "./ayudas";
@@ -38,7 +37,6 @@ describe("moderación", () => {
         identidad,
         corroboracion: corroboracion(),
       });
-      yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad, medida: medida() });
 
       // Lo que lee la publicación nocturna: nada, por mucho que pase el tiempo.
       avanzar(7 * 24 * 60 * 60 * 1000);
@@ -49,7 +47,7 @@ describe("moderación", () => {
         despuesDe: null,
         limite: 100,
       });
-      assert.lengthOf(pendientes.aportaciones, 3);
+      assert.lengthOf(pendientes.aportaciones, 2);
       assert.isTrue(pendientes.aportaciones.every((a) => a.estado === "pendiente"));
 
       const aceptada = yield* convex.mutation(moderacion.aceptar, {
@@ -102,7 +100,9 @@ describe("moderación", () => {
     Effect.gen(function* () {
       const convex = yield* TestConfect.TestConfect;
       const identidad = yield* identidadDesde(IP);
-      yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad, medida: medida() });
+      yield* convex
+        .desde(IP)
+        .mutation(buzon.enviarCorreccion, { identidad, correccion: correccion() });
       const [id = ""] = identidad.split(".");
       const primero = yield* convex.mutation(moderacion.vetar, {
         tipo: "identidad",
@@ -167,12 +167,11 @@ describe("moderación", () => {
         motivo: "Se ve en la foto aérea",
       });
       yield* convex.mutation(moderacion.rechazar, { id: rechazada.id, motivo: "Repetida" });
-      // De otra identidad: una corroboración del mismo sitio, una medida (no cuenta) y otro sitio.
+      // De otra identidad: una corroboración del mismo sitio y una corrección de otro sitio.
       const respaldo = corroboracion();
       yield* convex
         .desde(IP)
         .mutation(buzon.enviarCorroboracion, { identidad: otra, corroboracion: respaldo });
-      yield* convex.desde(IP).mutation(buzon.enviarMedida, { identidad: otra, medida: medida() });
       yield* convex.desde(IP).mutation(buzon.enviarCorreccion, {
         identidad: otra,
         correccion: correccion({ emplazamiento: "orange-1" }),
@@ -182,7 +181,7 @@ describe("moderación", () => {
       assert.isDefined(contexto);
       assert.strictEqual(contexto.aportacion.id, pendiente.id);
       assert.deepStrictEqual(contexto.historial, { aceptadas: 1, rechazadas: 1, pendientes: 0 });
-      // De la más reciente a la más antigua, sin ella misma ni la medida.
+      // De la más reciente a la más antigua, sin ella misma.
       assert.deepStrictEqual(
         contexto.relacionadas.map((a) => [a.id, a.estado]),
         [
