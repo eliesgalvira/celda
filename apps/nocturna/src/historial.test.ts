@@ -283,7 +283,6 @@ describe("historial de cada registro (ADR 0027)", () => {
           assert.strictEqual((yield* hechosDe(entorno.base)).length, antes);
         }),
       ),
-    30_000,
   );
 
   it.effect(

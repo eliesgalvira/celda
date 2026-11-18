@@ -50,6 +50,7 @@ interface RuleHarness {
 
 interface RuleHarnessOptions {
   readonly filename?: string;
+  readonly ruleOptions?: { readonly allow: Readonly<Record<string, number>> };
 }
 
 const collectStreamAsString = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.Effect<string, E> =>
@@ -96,7 +97,11 @@ export const createOxlintRuleHarness = (
     const oxlintBin = path.join(pluginDir, "node_modules", ".bin", "oxlint");
     const pluginPath = path.join(
       pluginDir,
-      pluginName === "anti-slop" ? "anti-slop/index.ts" : "index.ts",
+      pluginName === "anti-slop"
+        ? "anti-slop/index.ts"
+        : pluginName === "landmines-testing"
+          ? "landmines/index.ts"
+          : "index.ts",
     );
     const sourceDir = sourcePath.slice(0, sourcePath.lastIndexOf("/"));
 
@@ -104,7 +109,9 @@ export const createOxlintRuleHarness = (
       configPath,
       yield* encodeOxlintConfig({
         jsPlugins: [{ name: pluginName, specifier: pluginPath }],
-        rules: { [ruleName]: "error" },
+        rules: {
+          [ruleName]: options.ruleOptions === undefined ? "error" : ["error", options.ruleOptions],
+        },
       }),
     );
     yield* fs.makeDirectory(sourceDir, { recursive: true });

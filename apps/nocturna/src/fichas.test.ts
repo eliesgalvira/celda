@@ -285,7 +285,6 @@ describe("fichas en cada ronda (base SQLite y registro grabado)", () => {
           );
         }),
       ),
-    30_000,
   );
 
   it.effect(
@@ -527,7 +526,6 @@ describe("fichas en cada ronda (base SQLite y registro grabado)", () => {
           );
         }),
       ),
-    30_000,
   );
 
   it.effect(
@@ -582,7 +580,6 @@ describe("fichas en cada ronda (base SQLite y registro grabado)", () => {
           assert.isUndefined(estacion.sinFichaEnRegistro);
         }),
       ),
-    30_000,
   );
 
   it.effect(
@@ -617,7 +614,6 @@ describe("fichas en cada ronda (base SQLite y registro grabado)", () => {
           assert.include(ejecucion?.errores.at(-1) ?? "", "puede que haya cambiado la URL");
         }),
       ),
-    30_000,
   );
 
   it.effect(
@@ -686,7 +682,6 @@ describe("fichas en cada ronda (base SQLite y registro grabado)", () => {
           assert.deepStrictEqual(yield* Ref.get(pedidas), []);
         }),
       ),
-    30_000,
   );
 
   it.effect(

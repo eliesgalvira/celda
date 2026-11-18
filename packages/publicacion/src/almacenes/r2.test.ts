@@ -2,6 +2,7 @@
 // @effect-diagnostics strictEffectProvide:off
 import { assert, describe, it } from "@effect/vitest";
 import * as Clock from "effect/Clock";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
@@ -480,12 +481,14 @@ describe("almacén de ficheros en R2", () => {
       Effect.gen(function* () {
         // Lo que ve el servidor, que vive fuera de Effect.
         const visto = { recibidas: 0, cerradas: 0, corta: false };
+        const cerradas = yield* Deferred.make<void>();
         const servidor = yield* Effect.acquireRelease(
           Effect.callback<NodeHttp.Server>((resume) => {
             const abierto = NodeHttp.createServer((peticion) => {
               visto.recibidas++;
               peticion.on("close", () => {
                 visto.cerradas++;
+                if (visto.cerradas === 2) Deferred.doneUnsafe(cerradas, Effect.void);
               });
               // Lee el cuerpo y no contesta nunca, o corta la conexión.
               peticion.resume();
@@ -518,7 +521,7 @@ describe("almacén de ficheros en R2", () => {
         );
         assert.strictEqual(visto.recibidas, 2);
         // El cliente ha cerrado las dos conexiones al pasarse del plazo.
-        yield* Effect.sleep("100 millis");
+        yield* Deferred.await(cerradas);
         assert.strictEqual(visto.cerradas, 2);
 
         visto.corta = true;

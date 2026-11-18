@@ -34,9 +34,10 @@ Cómo está montada la cadena de herramientas y qué hubo que ajustar para que f
 
 ## Lint
 
-`vite.config.ts` de la raíz configura oxlint: categorías de corrección, sospechosos y rendimiento como errores, `jsx-a11y`, y tres plugins locales de `tools/oxlint-plugin-celda`:
+`vite.config.ts` de la raíz configura oxlint: categorías de corrección, sospechosos y rendimiento como errores, `jsx-a11y`, y cuatro plugins locales de `tools/oxlint-plugin-celda`:
 
 - `celda`: la regla de estilos (ver [ui.md](ui.md)), `abrir-con-recurso` (ver [efectos.md](efectos.md)) y cuatro reglas genéricas copiadas de otro proyecto, tres de Effect y una de Node.
 - `anti-slop` y `anti-slop-effect`: copia de `dmmulroy/anti-slop` (MIT), con su licencia en la carpeta.
+- `landmines-testing`: copia de tres reglas de `interfere-inc/landmines` (MIT), contra esperas fijas, reintentos y plazos de pruebas aumentados, y sondeos de espías o peticiones con `expect.poll` y `vi.waitFor`. Las excepciones heredadas de `vite.config.ts` exigen un recuento exacto por fichero y fallan también cuando baja, para obligar a reducirlo. Las adaptaciones para Effect y `vp`, y las reglas descartadas, están en [el README de la copia](../../tools/oxlint-plugin-celda/landmines/README.md). Corren en `pnpm run lint`, también en CI.
 
 El modo con tipos de oxlint está apagado: los diagnósticos de Effect los da `typecheck`.
