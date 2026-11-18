@@ -17,6 +17,7 @@ export default defineConfig({
     ignorePatterns: [
       ...IGNORADOS,
       "tools/oxlint-plugin-celda/anti-slop/**",
+      "tools/oxlint-plugin-celda/landmines/**",
       "flake.lock",
       "**/*.md",
       "*.html",
@@ -59,6 +60,7 @@ export default defineConfig({
     ignorePatterns: [
       ...IGNORADOS,
       "tools/oxlint-plugin-celda/anti-slop/**",
+      "tools/oxlint-plugin-celda/landmines/**",
       "convex/convex/**",
       "convex/confect/_generated/**",
       // Respuestas grabadas y guiones de un solo uso de las investigaciones: no son código de Celda.
@@ -69,6 +71,7 @@ export default defineConfig({
       "./tools/oxlint-plugin-celda/index.ts",
       "./tools/oxlint-plugin-celda/anti-slop/index.ts",
       "./tools/oxlint-plugin-celda/anti-slop/effect/index.ts",
+      "./tools/oxlint-plugin-celda/landmines/index.ts",
     ],
     categories: {
       correctness: "error",
@@ -113,6 +116,34 @@ export default defineConfig({
       "anti-slop/no-widen-then-assert": "error",
       "anti-slop/require-safety-comment-for-type-assertion": "error",
       "anti-slop-effect/no-service-constructor-imports": "error",
+      "landmines-testing/no-fixed-sleep": [
+        "error",
+        {
+          allow: {
+            "apps/nocturna/src/fichas.test.ts": 1,
+            "apps/nocturna/src/programa.test.ts": 2,
+            "packages/publicacion/src/almacenes/r2.test.ts": 2,
+          },
+        },
+      ],
+      "landmines-testing/no-flake-masking": [
+        "error",
+        {
+          allow: {
+            "apps/nocturna/src/despliegue.test.ts": 7,
+            "apps/nocturna/src/espana.test.ts": 3,
+            "apps/nocturna/src/ordenDeFilas.test.ts": 2,
+            "apps/nocturna/src/publicacion.test.ts": 1,
+            "apps/nocturna/src/vercel.test.ts": 2,
+            "apps/nocturna/vite.config.ts": 1,
+            "apps/web/src/variablesDelBuild.test.ts": 1,
+            "packages/ingesta/src/fichas.test.ts": 1,
+            "packages/publicacion/src/almacenes/r2.test.ts": 1,
+            "tools/capas/vite.config.ts": 1,
+          },
+        },
+      ],
+      "landmines-testing/no-unsignaled-poll": "error",
       "celda/abrir-con-recurso": "error",
       "celda/namespace-node-imports": "error",
       "celda/no-effect-error-swallow": "error",

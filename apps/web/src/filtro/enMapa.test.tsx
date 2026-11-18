@@ -1,7 +1,7 @@
 import type { Compania } from "@celda/dominio/compania";
 import { claveDeFiltro, type FiltroDeCompanias, SIN_FILTRO } from "@celda/dominio/filtro";
 import { vigilante } from "@celda/ui/recurso.ts";
-import { assert, describe, it } from "@effect/vitest";
+import { afterEach, assert, describe, it, vi } from "@effect/vitest";
 import { render, waitFor } from "@solidjs/testing-library";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -51,11 +51,7 @@ const esperar = async (condicion: () => void = () => undefined) => {
   });
 };
 
-const dormir = (ms: number) =>
-  new Promise<void>((listo) => {
-    // @effect-diagnostics-next-line globalTimers:off
-    setTimeout(listo, ms);
-  });
+afterEach(() => vi.useRealTimers());
 
 interface Mandos {
   readonly filtro: FiltroDelMapa;
@@ -142,6 +138,7 @@ describe("filtro de compañías en el mapa (ADR 0026)", () => {
 
   it("varios toques seguidos aplican solo el último, una vez, y no piden los de paso", async () => {
     const m = await montar();
+    vi.useFakeTimers();
     m.filtro.elegir(["movistar"]);
     m.filtro.elegir(["movistar", "digi"]);
     m.filtro.elegir(["digi"]);
@@ -149,12 +146,14 @@ describe("filtro de compañías en el mapa (ADR 0026)", () => {
     // Los chips cambian en el acto; el mapa, tras la espera.
     assert.deepStrictEqual(m.filtro.elegido(), ["digi"]);
     assert.deepStrictEqual(m.aplicados, ["todas"]);
+    await vi.advanceTimersByTimeAsync(ESPERA_DEL_FILTRO_MS);
+    flush();
     await esperar(() => assert.deepStrictEqual(m.aplicados, ["todas", "digi"]));
     await esperar(() => assert.deepStrictEqual(m.pedidas, ["08 digi"]));
     await esperar(() => assert.strictEqual(m.filtro.agrupaciones().get("08")?.filtro, "digi"));
 
     // Quieto: ninguna otra agrupación.
-    await dormir(4 * ESPERA_DEL_FILTRO_MS);
+    await vi.advanceTimersByTimeAsync(4 * ESPERA_DEL_FILTRO_MS);
     flush();
     assert.deepStrictEqual(m.aplicados, ["todas", "digi"]);
     assert.deepStrictEqual(m.pedidas, ["08 digi"]);
@@ -168,10 +167,12 @@ describe("filtro de compañías en el mapa (ADR 0026)", () => {
     await esperar(() => assert.strictEqual(m.filtro.agrupaciones().get("08")?.filtro, "orange"));
     m.filtro.elegir(SIN_FILTRO);
     await esperar(() => assert.deepStrictEqual(m.aplicados.at(-1), "todas"));
+    vi.useFakeTimers();
     m.filtro.elegir(["orange"]);
-    await esperar(() => assert.deepStrictEqual(m.aplicados.at(-1), "orange"));
-    await dormir(2 * ESPERA_DEL_FILTRO_MS);
     flush();
+    await vi.advanceTimersByTimeAsync(2 * ESPERA_DEL_FILTRO_MS);
+    flush();
+    assert.strictEqual(m.aplicados.at(-1), "orange");
     assert.deepStrictEqual(m.pedidas, ["08 orange"]);
     m.desmontar();
   });
